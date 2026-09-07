@@ -14,6 +14,22 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The file browser's messages come from the catalogue, not from the code
+
+Two dozen places in the SFTP view resolved a message from the translation catalogue and kept
+an English sentence beside it as a fallback. The English half was never displayed, which is
+what made it harmful rather than harmless: it was user-facing text living in code, drifting
+from the catalogue by construction, because nothing updated it when a message was reworded.
+Two had already drifted far enough to fall back to the catalogue's key name.
+
+One of them was worse than dead. A failed automatic upload passed the literal `upload error`
+as part of the message, so a French user was told, in French, that their upload failed for
+an "upload error". That argument is gone and both catalogues carry the shorter sentence: the
+callback is told that the upload failed, not why, and a message should not invent a reason.
+
+One fallback is kept on purpose, in the column headers, where the key is derived from the
+column's own identity and falling back to the key would put `SftpColName` above a column.
+
 ### A server-side copy can no longer be turned into a link to somewhere else
 
 Copying a file on the remote server without downloading it works by copying to a sibling

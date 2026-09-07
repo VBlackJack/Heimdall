@@ -1806,7 +1806,7 @@
   "SftpStatusEditing": "Editing: {0} - save in your editor to auto-upload",
   "SftpStatusAutoUploaded": "Auto-uploaded: {0}",
   "SftpStatusUploadedViaSudo": "Saved via sudo: {0}",
-  "SftpStatusAutoUploadFailed": "Auto-upload failed for {0}: {1}",
+  "SftpStatusAutoUploadFailed": "Auto-upload failed for {0}.",
   "SftpHostKeyRotatedDuringUpload": "Host key for {1}:{2} changed since you opened {0}. Save aborted. Presented fingerprint: {3}. Re-open the file to re-establish trust.",
   "SftpHostKeyMismatchMidSession": "Security warning: host key for {0}:{1} changed during the session. Possible MITM. Presented fingerprint: {2}. Trusted fingerprint: {3}. Disconnect and reconnect to re-establish trust.",
   "SftpStatusEditFileTooLarge": "Cannot edit {0}: files larger than 16 MiB must be downloaded instead.",
