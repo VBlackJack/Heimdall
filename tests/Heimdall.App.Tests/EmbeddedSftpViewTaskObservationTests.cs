@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
 using Heimdall.Sftp;
 
@@ -39,6 +40,57 @@ public sealed class EmbeddedSftpViewTaskObservationTests
         Assert.Equal(
             expected,
             EmbeddedSftpView.GetFtpSecurityNoticeLocalizationKey(isTlsEnabled));
+    }
+
+    /// <summary>
+    /// A transport with nothing disclosed about it raises no notice at all.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// SFTP-001. The FTPS disclosure exists because the data channel's certificate cannot be
+    /// authenticated from inside Heimdall, so the badge is the remedy rather than a decoration
+    /// of one. That makes a FALSE badge its own defect: telling an SFTP user their data channel
+    /// is a cleartext FTP one is worse than telling them nothing.
+    /// </para>
+    /// <para>
+    /// Behavioural rather than source-reading, and not by preference. The wiring and the exact
+    /// argument are guarded by anchors on statements that stay present; a mutant that replaces
+    /// the null with a key leaves every one of those statements in place, so no anchor can see
+    /// it. It survived the first campaign for exactly that reason.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void TransportSecurityNoticeKey_ForATransportThatDisclosesNothing_IsNull()
+    {
+        using SftpBrowser browser = new();
+
+        Assert.Null(EmbeddedSftpView.TransportSecurityNoticeKey(browser));
+    }
+
+    /// <summary>
+    /// An SFTP session's pane is left silent, and an FTP session's is not.
+    /// </summary>
+    /// <remarks>
+    /// The pair matters more than either half: an implementation that raises nothing at all
+    /// passes the first assertion, and one that raises for everything passes the second.
+    /// </remarks>
+    [Fact]
+    public void ApplyTransportSecurityNotice_RaisesForFtpAndStaysSilentForSftp()
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel quiet = new(dispatcher);
+        using SftpBrowser sftp = new();
+
+        EmbeddedSftpView.ApplyTransportSecurityNotice(quiet, sftp);
+
+        Assert.False(quiet.IsSecurityNoticeVisible);
+
+        EmbeddedSftpViewModel warned = new(dispatcher);
+        using FtpBrowser ftp = new();
+
+        EmbeddedSftpView.ApplyTransportSecurityNotice(warned, ftp);
+
+        Assert.True(warned.IsSecurityNoticeVisible);
     }
 
     [Fact]

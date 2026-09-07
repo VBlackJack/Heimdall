@@ -65,4 +65,103 @@ public sealed class EmbeddedSftpViewExternalEditorSourceTests
         "Heimdall.App",
         "Views",
         "EmbeddedSftpView.xaml.cs"));
+
+    private const string ApplyNoticeStatement =
+        "ApplyTransportSecurityNotice(_viewModel, _browser);";
+
+    private const string NoticeKeyMember =
+        "internal static string? TransportSecurityNoticeKey(";
+
+    private const string NoticeKeyStatement =
+        "return GetFtpSecurityNoticeLocalizationKey(ftpBrowser.IsTlsEnabled);";
+
+    private const string ApplyNoticeMember =
+        "internal static void ApplyTransportSecurityNotice(";
+
+    private const string RaiseStatement = "viewModel.ShowSecurityNoticeKey(key);";
+
+    /// <summary>
+    /// Every session runs the transport-notice step, at the body level of InitializeSession.
+    /// </summary>
+    /// <remarks>
+    /// SFTP-001. The FTPS data-channel limitation cannot be fixed inside Heimdall, so the
+    /// disclosure IS the remedy and its wiring is load bearing. It used to sit inside an
+    /// else-if arm two braces deep: the statement predicate could not reach it, and deleting
+    /// it removed the badge from every FTPS session while the suite stayed green.
+    /// </remarks>
+    [Fact]
+    public void InitializeSession_RunsTheTransportSecurityNoticeStep()
+    {
+        string logic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(SftpViewSource()),
+            InitializeSessionMember);
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(logic, ApplyNoticeStatement),
+            "the transport-security notice is applied for every session, not inside a branch");
+    }
+
+    /// <summary>
+    /// The notice a session gets is derived from that session's own TLS setting.
+    /// </summary>
+    /// <remarks>
+    /// An exact-argument anchor rather than a behavioural test, because the two keys differ
+    /// only by the boolean: a mutant that negates it produces a perfectly valid key and a
+    /// perfectly wrong badge, telling a plaintext FTP user their data channel is encrypted.
+    /// </remarks>
+    [Fact]
+    public void TheTransportNotice_IsDerivedFromTheSessionsOwnTlsSetting()
+    {
+        string logic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(SftpViewSource()),
+            NoticeKeyMember);
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(logic, NoticeKeyStatement),
+            "the key follows the session's own IsTlsEnabled, not a constant");
+    }
+
+    /// <summary>
+    /// The decision is not merely computed, it is handed to the view model.
+    /// </summary>
+    [Fact]
+    public void TheTransportNotice_IsHandedToTheViewModel()
+    {
+        string logic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(SftpViewSource()),
+            ApplyNoticeMember);
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(logic, RaiseStatement),
+            "computing the key and never raising it would leave every FTPS pane silent");
+    }
+
+    /// <summary>
+    /// The wiring guard dies when the call it guards is commented out.
+    /// </summary>
+    /// <remarks>
+    /// The positive control. A presence assertion of this shape dies on deletion but not on
+    /// folding, and this repository has recorded the commented-out call as its wiring mutant.
+    /// Written so the control fails together with the oracle it protects rather than
+    /// surviving it.
+    /// </remarks>
+    [Fact]
+    public void TheWiringGuard_FailsOnACommentedOutCall()
+    {
+        string original = SftpViewSource();
+        string mutated = original.Replace(
+            "        " + ApplyNoticeStatement,
+            "        // " + ApplyNoticeStatement,
+            StringComparison.Ordinal);
+
+        Assert.NotEqual(original, mutated);
+
+        string logic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(mutated),
+            InitializeSessionMember);
+
+        Assert.False(
+            ViewSource.IsStatementOfTheMethodBody(logic, ApplyNoticeStatement),
+            "the guard would not notice its own call being commented out");
+    }
 }
