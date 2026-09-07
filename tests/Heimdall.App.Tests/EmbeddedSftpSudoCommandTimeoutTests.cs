@@ -48,20 +48,47 @@ public sealed class EmbeddedSftpSudoCommandTimeoutTests
 
     private const string BoundStatement = "command.CommandTimeout = SudoCommandTimeout;";
 
+    /// <summary>Below this a bound aborts legitimate privileged work instead of catching a wedge.</summary>
+    private static readonly TimeSpan ShortestUsefulBound = TimeSpan.FromMinutes(1);
+
+    /// <summary>Above this a bound is finite in name and leaves the pane wedged for the session.</summary>
+    private static readonly TimeSpan LongestUsefulBound = TimeSpan.FromMinutes(30);
+
     private static string ViewModelLogic() =>
         SourceStatements.Logic("src", "Heimdall.App", "ViewModels", "EmbeddedSftpViewModel.cs");
 
     /// <summary>
-    /// The bound the two paths share is a real deadline, not the infinite default it replaced.
+    /// The bound the two paths share sits between the two failure modes it trades off, not just
+    /// on the near side of one of them.
     /// </summary>
+    /// <remarks>
+    /// Both assertions are declarations rather than arithmetic: nothing in SSH.NET or in the SSH
+    /// protocol derives how long a privileged mkdir or recursive delete is allowed to take. They
+    /// are written as a pair because an oracle that watches one side only reports green while the
+    /// constant is set to a value that abandons the change. A day is finite and above the floor,
+    /// and it leaves a wedged pane exactly as wedged as an infinite bound did.
+    /// </remarks>
     [Fact]
-    public void ThePrivilegedCommandBoundIsFinite()
+    public void ThePrivilegedCommandBoundSitsBetweenBothFailureModes()
     {
-        Assert.NotEqual(Timeout.InfiniteTimeSpan, EmbeddedSftpViewModel.SudoCommandTimeout);
+        TimeSpan bound = EmbeddedSftpViewModel.SudoCommandTimeout;
+
+        Assert.NotEqual(Timeout.InfiniteTimeSpan, bound);
+
+        // Floor: a recursive delete over a large tree is legitimate work, and a bound below this
+        // aborts it rather than catching a wedge.
         Assert.True(
-            EmbeddedSftpViewModel.SudoCommandTimeout > TimeSpan.Zero,
-            $"A privileged command bound of {EmbeddedSftpViewModel.SudoCommandTimeout} would refuse "
-                + "every command instead of bounding it.");
+            bound >= ShortestUsefulBound,
+            $"A privileged command bound of {bound} is below {ShortestUsefulBound}, so it refuses "
+                + "slow but legitimate privileged work instead of bounding an unproductive channel.");
+
+        // Ceiling: the whole point is that a pane wedged on a server that stopped answering
+        // recovers inside the session the user is having.
+        Assert.True(
+            bound <= LongestUsefulBound,
+            $"A privileged command bound of {bound} is above {LongestUsefulBound}. It is finite, but "
+                + "a pane wedged for that long is wedged as far as the user is concerned, which is "
+                + "the failure this bound exists to end.");
     }
 
     /// <summary>
