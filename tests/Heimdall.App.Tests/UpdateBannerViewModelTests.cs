@@ -162,11 +162,12 @@ public sealed class UpdateBannerViewModelTests
     }
 
     /// <summary>
-    /// A transient failure is retried on the next launch.
+    /// Every cause but a spent quota is retried on the next launch.
     /// </summary>
     /// <remarks>
-    /// One GET per launch costs nothing and the answer may have changed by then. Every cause
-    /// here is one the user or the world can fix without Heimdall doing anything.
+    /// Not because the rest are transient: SourceNotFound covers a 451, which the classifier
+    /// itself calls permanent. Because one GET per launch reaches nobody and costs nothing,
+    /// while a spent quota is counted per address and retrying it keeps the bucket pinned.
     /// </remarks>
     [Theory]
     [InlineData(UpdateCheckFailure.NetworkUnreachable)]
@@ -177,7 +178,7 @@ public sealed class UpdateBannerViewModelTests
     [InlineData(UpdateCheckFailure.AccessDenied)]
     [InlineData(UpdateCheckFailure.SourceUnavailable)]
     [InlineData(UpdateCheckFailure.TimedOut)]
-    public async Task CheckOnStartup_TransientFailure_DoesNotPersistLastCheck(UpdateCheckFailure cause)
+    public async Task CheckOnStartup_AnyCauseButASpentQuota_DoesNotPersistLastCheck(UpdateCheckFailure cause)
     {
         var settings = BaseSettings();
         var update = new StubUpdateService { Result = UpdateCheckResult.Failed(cause) };

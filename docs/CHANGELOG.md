@@ -31,9 +31,12 @@ One case changed behaviour rather than wording. When the update server is refusi
 because too many have come from your network, Heimdall stops asking on every launch. That
 quota is counted per network address, so an office behind one address shares it, and
 checking again at every startup is what keeps it empty. Heimdall now waits for its ordinary
-daily check instead. The cost is that this usually waits longer than the server asked for:
-honouring the exact time it quoted needs somewhere to remember that time, and waiting too
-long is the safer half of that trade.
+check interval instead, which is a day unless you have changed it.
+
+Two things that buys less than it sounds like. It usually waits longer than the server asked
+for, because honouring the exact time needs somewhere to remember that time. And it only
+recognises the refusals that say so: a server can refuse for this reason without saying which
+reason, and Heimdall still asks again at the next launch in that case.
 
 The startup banner is unchanged: a check that fails at launch still says nothing at all,
 rather than opening with bad news.
