@@ -57,6 +57,7 @@ public sealed class UpdateInstallOutcomeTextTests
     [InlineData(UpdateInstallOutcome.Cancelled, "SettingsUpdateStatusCancelled")]
     [InlineData(UpdateInstallOutcome.VerificationFailed, "SettingsUpdateStatusVerificationFailed")]
     [InlineData(UpdateInstallOutcome.DownloadFailed, "SettingsUpdateStatusDownloadFailed")]
+    [InlineData(UpdateInstallOutcome.ReleaseSuperseded, "SettingsUpdateStatusReleaseSuperseded")]
     public void StatusKey_NonSuccessOutcome_MapsToExpectedKey(UpdateInstallOutcome outcome, string expectedKey)
     {
         UpdateInstallOutcomeText.StatusKey(outcome).Should().Be(expectedKey);

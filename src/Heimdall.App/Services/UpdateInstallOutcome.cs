@@ -33,6 +33,16 @@ public enum UpdateInstallOutcome
     /// <summary>No published checksum or a SHA-256 mismatch was detected.</summary>
     VerificationFailed,
 
+    /// <summary>
+    /// The release was republished between the check and the install, so the checksum this
+    /// install was authorised against is no longer the one the source publishes.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="VerificationFailed"/> on purpose. Both refuse, but only one
+    /// of them means somebody should look at the download: this one means check again.
+    /// </remarks>
+    ReleaseSuperseded,
+
     /// <summary>Any other download failure.</summary>
     DownloadFailed,
 }

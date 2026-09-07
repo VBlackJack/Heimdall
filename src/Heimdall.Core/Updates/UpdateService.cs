@@ -139,14 +139,20 @@ public sealed class UpdateService : IUpdateService
             return new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, releaseRef);
         }
 
-        var sha256 = await ResolveSha256Async(release, installerName, cancellationToken).ConfigureAwait(false);
+        var checksumAsset = FindChecksumAsset(release);
+        var sha256 = await ResolveSha256Async(checksumAsset, installerName, cancellationToken).ConfigureAwait(false);
         if (!IsSha256Hex(sha256))
         {
             FileLogger.Warn($"Update check: release {release.TagName} has no valid SHA-256 for '{installerName}'.");
             return new UpdateCheckResult(UpdateCheckStatus.UpdateNotInstallable, null, releaseRef);
         }
 
-        var info = new UpdateInfo(releaseVersion, release.TagName, release.HtmlUrl, release.Body, selectedAsset, sha256);
+        var info = new UpdateInfo(releaseVersion, release.TagName, release.HtmlUrl, release.Body, selectedAsset, sha256)
+        {
+            // Kept so the install can ask the source what it publishes NOW. The answer is
+            // never adopted, only compared; see UpdateSupersededException.
+            ChecksumUrl = checksumAsset?.DownloadUrl,
+        };
         return new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, info);
     }
 
@@ -156,6 +162,8 @@ public sealed class UpdateService : IUpdateService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(update);
+
+        await RefuseIfRepublishedAsync(update, cancellationToken).ConfigureAwait(false);
 
         // Preserve the installer's real extension so the relauncher can execute it; Windows
         // cannot run a ".tmp" file and would otherwise prompt the user to pick an app.
@@ -215,6 +223,15 @@ public sealed class UpdateService : IUpdateService
                     StringComparison.OrdinalIgnoreCase))
             {
                 integrityLease.Dispose();
+
+                // Ask once more before calling this an integrity failure. If what the source
+                // publishes now is exactly what arrived, the release was republished during
+                // the download, which is not the same event and must not carry the same
+                // words. Throws when it is; falls through to the honest failure when it
+                // cannot tell.
+                await RefuseIfTheDownloadedBytesAreTheRepublishedOnesAsync(
+                    update, actualSha256, cancellationToken).ConfigureAwait(false);
+
                 throw new InvalidOperationException("The downloaded update failed SHA-256 verification.");
             }
 
@@ -268,10 +285,146 @@ public sealed class UpdateService : IUpdateService
         return null;
     }
 
-    private async Task<string?> ResolveSha256Async(GitHubRelease release, string installerName, CancellationToken cancellationToken)
+    /// <summary>
+    /// Refuses an install when the source already publishes a different checksum than the
+    /// one the check froze, unless it cannot be asked.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The checksum is frozen at check time, and a maintainer who re-uploads an asset over
+    /// an existing release publishes new bytes and a new checksum beside them. The install
+    /// then downloaded the new bytes, compared them against the old checksum, and reported
+    /// a verification failure - the same words it uses for a tampered or truncated
+    /// download. The two are not the same event and do not deserve the same answer.
+    /// </para>
+    /// <para>
+    /// Asking the source again is a diagnosis, never a repair. The newly published checksum
+    /// is compared and then discarded; adopting it would make the application install
+    /// whatever the source serves at install time, which is the exact property freezing the
+    /// checksum exists to deny.
+    /// </para>
+    /// <para>
+    /// This is the cheap half of the answer and it is not the whole of it. A republication
+    /// is not atomic: Build.ps1 clobbers the installer and the checksum document in a single
+    /// upload, and the two do not land at the same instant, so this read can still see the
+    /// old document while the new bytes are already being served. What that window produces
+    /// is caught after the download instead, by
+    /// <see cref="RefuseIfTheDownloadedBytesAreTheRepublishedOnesAsync"/>.
+    /// </para>
+    /// <para>
+    /// Silence is not evidence of republication. A checksum that cannot be re-read - the
+    /// document gone, the network down, an unparseable line - lets the install continue,
+    /// because the frozen checksum still decides what may be installed and refusing here
+    /// would turn an unrelated network blip into a failed update.
+    /// </para>
+    /// </remarks>
+    private async Task RefuseIfRepublishedAsync(UpdateInfo update, CancellationToken cancellationToken)
     {
-        var checksumAsset = release.Assets
-            .FirstOrDefault(a => string.Equals(a.Name, ChecksumFileName, StringComparison.OrdinalIgnoreCase));
+        if (update.Sha256 is null)
+        {
+            return;
+        }
+
+        var publishedNow = await ReadPublishedSha256Async(update, cancellationToken).ConfigureAwait(false);
+        if (publishedNow is null
+            || string.Equals(publishedNow, update.Sha256.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        FileLogger.Warn(
+            $"Update install: release {update.TagName} was republished since it was checked.");
+        throw new UpdateSupersededException(update.TagName, update.Sha256.Trim(), publishedNow);
+    }
+
+    /// <summary>
+    /// Names a failed hash comparison as a republication when the bytes that arrived are
+    /// exactly what the source publishes now.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The other half, and the stronger evidence of the two: the pre-download check infers
+    /// republication from a changed document, while this one observes that the bytes on disk
+    /// ARE the bytes the source currently vouches for. It closes the window that the
+    /// pre-download read cannot see, which is the seconds during which the installer has
+    /// been clobbered and its checksum document has not yet.
+    /// </para>
+    /// <para>
+    /// It costs nothing on a successful install: the only caller is the mismatch branch,
+    /// which was about to fail anyway. The install is still refused. All that changes is
+    /// which of two very different events the user is told about, since only one of them
+    /// means the download is worth looking at.
+    /// </para>
+    /// </remarks>
+    private async Task RefuseIfTheDownloadedBytesAreTheRepublishedOnesAsync(
+        UpdateInfo update,
+        string actualSha256,
+        CancellationToken cancellationToken)
+    {
+        var publishedNow = await ReadPublishedSha256Async(update, cancellationToken).ConfigureAwait(false);
+        if (publishedNow is null
+            || !string.Equals(publishedNow, actualSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        FileLogger.Warn(
+            $"Update install: release {update.TagName} was republished while it was downloading.");
+        throw new UpdateSupersededException(update.TagName, update.Sha256?.Trim(), publishedNow);
+    }
+
+    /// <summary>
+    /// Reads the checksum the source publishes right now for this update's asset, or null
+    /// when it cannot be established.
+    /// </summary>
+    /// <remarks>
+    /// Null means "not known", never "unchanged": every caller treats it as a reason to stop
+    /// diagnosing, not as a comparison that succeeded. The URL is the checksum document's,
+    /// carried from the check - reading the installer's own URL here would fetch a hundred
+    /// megabytes as text, trip the client's size bound, return null, and silently disable
+    /// the whole diagnosis.
+    /// </remarks>
+    private async Task<string?> ReadPublishedSha256Async(UpdateInfo update, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(update.ChecksumUrl))
+        {
+            // Not reachable from a check, which only reports UpdateAvailable once a checksum
+            // asset has been found and parsed. Kept for an UpdateInfo assembled elsewhere.
+            return null;
+        }
+
+        string? publishedNow;
+        try
+        {
+            var text = await _client
+                .GetAssetTextAsync(update.ChecksumUrl, cancellationToken)
+                .ConfigureAwait(false);
+            publishedNow = string.IsNullOrEmpty(text)
+                ? null
+                : ParseChecksumLine(text, update.Asset.Name);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FileLogger.WarnDetailed("Update install: could not re-read the published checksum", ex);
+            return null;
+        }
+
+        if (!IsSha256Hex(publishedNow))
+        {
+            FileLogger.Warn(
+                $"Update install: the published checksum for '{update.Asset.Name}' could not be "
+                + "re-read; continuing against the checksum the check froze.");
+            return null;
+        }
+
+        return publishedNow;
+    }
+
+    private static UpdateAsset? FindChecksumAsset(GitHubRelease release) => release.Assets
+        .FirstOrDefault(a => string.Equals(a.Name, ChecksumFileName, StringComparison.OrdinalIgnoreCase));
+
+    private async Task<string?> ResolveSha256Async(UpdateAsset? checksumAsset, string installerName, CancellationToken cancellationToken)
+    {
         if (checksumAsset is null)
         {
             return null;
