@@ -14,6 +14,33 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### An update check that fails now says what stopped it
+
+"Update check failed. See the log for details." was the answer to five different questions.
+Being offline said it. So did a rate limit, a release page that is not there, an answer
+Heimdall could not read, and a connection that could not be secured. The advice for those is
+not the same advice - connect to the internet, wait a while, check your proxy or your clock,
+or do nothing at all because the problem is at the other end and somebody else has to fix
+it - and the one thing the message did offer was a log most people never find.
+
+The settings page now names the cause. When the update server says how long to wait, that
+goes in the sentence too; when it does not say, Heimdall does not guess, because a waiting
+time that turns out to be wrong is worse than none at all.
+
+One case changed behaviour rather than wording. When the update server is refusing requests
+because too many have come from your network, Heimdall stops asking on every launch. That
+quota is counted per network address, so an office behind one address shares it, and
+checking again at every startup is what keeps it empty. Heimdall now waits for its ordinary
+check interval instead, which is a day unless you have changed it.
+
+Two things that buys less than it sounds like. It usually waits longer than the server asked
+for, because honouring the exact time needs somewhere to remember that time. And it only
+recognises the refusals that say so: a server can refuse for this reason without saying which
+reason, and Heimdall still asks again at the next launch in that case.
+
+The startup banner is unchanged: a check that fails at launch still says nothing at all,
+rather than opening with bad news.
+
 ### A republished release is no longer reported as a corrupted download
 
 The checksum of an update is settled when Heimdall checks for one, and the download is

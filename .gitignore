@@ -63,3 +63,7 @@ TestResults/
 
 # Local-only artefacts (AI briefs, audits, session reports); never committed
 local/
+
+# Temporary project files the WPF build writes beside the real ones. Untracked and
+# not previously ignored, so a `git add -A` would have committed one.
+*_wpftmp.csproj

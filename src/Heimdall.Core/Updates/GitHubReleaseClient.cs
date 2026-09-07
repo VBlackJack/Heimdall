@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+using System.Globalization;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Authentication;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Heimdall.Core.Logging;
@@ -41,6 +45,12 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
         "githubusercontent.com",
     ];
     private const string GitHubAcceptHeader = "application/vnd.github+json";
+
+    /// <summary>Header GitHub uses to say how much of the caller's quota is left.</summary>
+    private const string RateLimitRemainingHeader = "X-RateLimit-Remaining";
+
+    /// <summary>Header GitHub uses to say when the caller's quota comes back, as a Unix time.</summary>
+    private const string RateLimitResetHeader = "X-RateLimit-Reset";
     private const string UserAgentProduct = "Heimdall";
 
     /// <summary>
@@ -76,7 +86,7 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
         _appVersion = appVersion;
     }
 
-    public async Task<GitHubRelease?> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken)
+    public async Task<GitHubReleaseResult> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentException.ThrowIfNullOrWhiteSpace(repo);
@@ -91,8 +101,12 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
 
             if (!response.IsSuccessStatusCode)
             {
-                FileLogger.Warn($"GitHub release check failed: HTTP {(int)response.StatusCode} for {owner}/{repo}.");
-                return null;
+                var failure = ClassifyStatus(response.StatusCode, response.Headers);
+                var retryAfter = ReadRetryAfter(response.Headers);
+                FileLogger.Warn(
+                    $"GitHub release check failed: HTTP {(int)response.StatusCode} for {owner}/{repo}, "
+                    + $"read as {failure}.");
+                return GitHubReleaseResult.Failed(failure, retryAfter);
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -101,7 +115,7 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
             if (dto?.TagName is null)
             {
                 FileLogger.Warn($"GitHub release response for {owner}/{repo} contained no tag_name.");
-                return null;
+                return GitHubReleaseResult.Failed(UpdateCheckFailure.MalformedResponse);
             }
 
             var assets = (dto.Assets ?? [])
@@ -109,19 +123,193 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
                 .Select(a => new UpdateAsset(a.Name!, a.DownloadUrl!, a.Size))
                 .ToList();
 
-            return new GitHubRelease(dto.TagName, dto.HtmlUrl ?? string.Empty, dto.Body ?? string.Empty, assets);
+            return GitHubReleaseResult.Succeeded(
+                new GitHubRelease(dto.TagName, dto.HtmlUrl ?? string.Empty, dto.Body ?? string.Empty, assets));
         }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        catch (JsonException ex)
         {
-            FileLogger.Warn($"GitHub release check error for {owner}/{repo}: {ex.Message}");
-            return null;
+            FileLogger.Warn($"GitHub release check could not read the answer for {owner}/{repo}: {ex.Message}");
+            return GitHubReleaseResult.Failed(UpdateCheckFailure.MalformedResponse);
+        }
+        catch (HttpRequestException ex)
+        {
+            var failure = ClassifyTransportFailure(ex);
+            FileLogger.Warn($"GitHub release check error for {owner}/{repo}: {ex.Message}, read as {failure}.");
+            return GitHubReleaseResult.Failed(failure);
+        }
+        catch (HttpIOException ex)
+        {
+            // The body is read after the headers, so a connection dropped mid-answer throws
+            // this - and it derives from IOException, NOT from HttpRequestException, so it
+            // used to escape every catch here and reach the caller's blanket handler as an
+            // unexplained fault. That is the ordinary flaky-connection case.
+            var failure = ex.HttpRequestError == HttpRequestError.InvalidResponse
+                ? UpdateCheckFailure.MalformedResponse
+                : UpdateCheckFailure.NetworkUnreachable;
+            FileLogger.Warn($"GitHub release check was cut off for {owner}/{repo}: {ex.Message}, read as {failure}.");
+            return GitHubReleaseResult.Failed(failure);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             // HttpClient timeout (not caller cancellation) surfaces as a canceled task.
             FileLogger.Warn($"GitHub release check timed out for {owner}/{repo}.");
+            return GitHubReleaseResult.Failed(UpdateCheckFailure.TimedOut);
+        }
+    }
+
+    /// <summary>
+    /// Reads a non-success status as the thing the user would have to do about it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The rate-limit reading is the one that needs care. GitHub answers a spent quota with
+    /// <c>403</c> far more often than with <c>429</c>, and a <c>403</c> is otherwise an
+    /// ordinary refusal, so the status alone cannot separate "wait an hour" from "this will
+    /// never work". Two headers separate them, and BOTH are needed. The primary quota sets
+    /// <c>X-RateLimit-Remaining: 0</c>. The secondary limit - the one an office behind a
+    /// single address trips first - typically does not: it sets <c>Retry-After</c> and leaves
+    /// a remaining count above zero. Reading only the first sends exactly that case to
+    /// "the update server refused the request", which is the sentence this whole change
+    /// exists to stop showing. A <c>429</c> is rate limiting whatever the headers say.
+    /// </para>
+    /// <para>
+    /// Everything above 500 is the source's own fault and may work later. Anything else
+    /// unexpected is reported the same way rather than invented into a category: a status
+    /// this client has no reading for is exactly "the source did not answer usefully".
+    /// </para>
+    /// </remarks>
+    internal static UpdateCheckFailure ClassifyStatus(HttpStatusCode status, HttpResponseHeaders headers)
+    {
+        if (status == HttpStatusCode.TooManyRequests)
+        {
+            return UpdateCheckFailure.RateLimited;
+        }
+
+        if (status == HttpStatusCode.Forbidden)
+        {
+            return HasSpentRateLimit(headers) || headers.RetryAfter is not null
+                ? UpdateCheckFailure.RateLimited
+                : UpdateCheckFailure.AccessDenied;
+        }
+
+        if (status == HttpStatusCode.Unauthorized)
+        {
+            return UpdateCheckFailure.AccessDenied;
+        }
+
+        if (status is HttpStatusCode.NotFound or HttpStatusCode.UnavailableForLegalReasons)
+        {
+            // 451 is permanent in practice - a repository taken down does not come back on
+            // its own - so it belongs with "there is nothing here", not with "try later".
+            return UpdateCheckFailure.SourceNotFound;
+        }
+
+        return UpdateCheckFailure.SourceUnavailable;
+    }
+
+    /// <summary>Whether the response says this caller's quota is spent.</summary>
+    private static bool HasSpentRateLimit(HttpResponseHeaders headers)
+    {
+        if (!headers.TryGetValues(RateLimitRemainingHeader, out var values))
+        {
+            return false;
+        }
+
+        foreach (var value in values)
+        {
+            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var remaining))
+            {
+                return remaining <= 0;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// How long the source asked the caller to wait, when it said so.
+    /// </summary>
+    /// <remarks>
+    /// Two spellings, and both are read. <c>Retry-After</c> carries a delay or a date;
+    /// GitHub's own throttling instead sets <c>X-RateLimit-Reset</c> to a Unix time. A hint
+    /// is never invented when neither is present, and a negative one - a reset already past,
+    /// or a clock out of step - is dropped rather than shown as "wait 0 seconds".
+    /// </remarks>
+    internal static TimeSpan? ReadRetryAfter(HttpResponseHeaders headers)
+    {
+        var retryAfter = headers.RetryAfter;
+        if (retryAfter?.Delta is { } delta)
+        {
+            return delta > TimeSpan.Zero ? delta : null;
+        }
+
+        if (retryAfter?.Date is { } date)
+        {
+            var untilDate = date - DateTimeOffset.UtcNow;
+            return untilDate > TimeSpan.Zero ? untilDate : null;
+        }
+
+        if (!headers.TryGetValues(RateLimitResetHeader, out var values))
+        {
             return null;
         }
+
+        foreach (var value in values)
+        {
+            if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var epochSeconds))
+            {
+                continue;
+            }
+
+            var untilReset = DateTimeOffset.FromUnixTimeSeconds(epochSeconds) - DateTimeOffset.UtcNow;
+            return untilReset > TimeSpan.Zero ? untilReset : null;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Reads a transport failure as the thing the user would have to do about it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Five unrelated conditions arrive here as the same <see cref="HttpRequestException"/>:
+    /// no route, a proxy that refuses the tunnel, a handshake that fails, a response that is
+    /// not HTTP, and one that ends early. Returning "you are offline" for all of them would
+    /// reproduce, one layer down, the collapse this whole change exists to undo.
+    /// </para>
+    /// <para>
+    /// <see cref="HttpRequestException.HttpRequestError"/> is the contractual signal and is
+    /// read first. The walk for a nested <see cref="AuthenticationException"/> stays behind
+    /// it as a fallback, for an exception that carries no code - one built by hand, or by a
+    /// stack that does not set it. It is a guess, which is why it no longer decides alone.
+    /// </para>
+    /// </remarks>
+    internal static UpdateCheckFailure ClassifyTransportFailure(HttpRequestException exception)
+    {
+        switch (exception.HttpRequestError)
+        {
+            case HttpRequestError.SecureConnectionError:
+                return UpdateCheckFailure.SecureChannelFailed;
+
+            case HttpRequestError.ProxyTunnelError:
+                return UpdateCheckFailure.ProxyRefused;
+
+            case HttpRequestError.InvalidResponse:
+            case HttpRequestError.ResponseEnded:
+            case HttpRequestError.ConfigurationLimitExceeded:
+                return UpdateCheckFailure.MalformedResponse;
+        }
+
+        for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
+        {
+            if (cause is AuthenticationException)
+            {
+                return UpdateCheckFailure.SecureChannelFailed;
+            }
+        }
+
+        return UpdateCheckFailure.NetworkUnreachable;
     }
 
     public async Task<string?> GetAssetTextAsync(string url, CancellationToken cancellationToken)

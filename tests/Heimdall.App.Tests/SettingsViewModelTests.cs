@@ -2961,6 +2961,94 @@ public sealed class SettingsViewModelTests : IDisposable
             profileImportService);
     }
 
+    /// <summary>
+    /// A failed check says which of the nine causes stopped it.
+    /// </summary>
+    /// <remarks>
+    /// A-17, on the only surface that shows any of it. The theory below covers the STATUS
+    /// mapping and reaches the failed branch with no cause attached, which is the generic
+    /// sentence - so it stayed green through the whole change and proved nothing about it.
+    /// Gut the view model's helper and every cause prints "Update check failed. See the log
+    /// for details." again, which is the finding, restored.
+    /// </remarks>
+    [Theory]
+    [InlineData(UpdateCheckFailure.NetworkUnreachable, "SettingsUpdateStatusFailedNetworkUnreachable")]
+    [InlineData(UpdateCheckFailure.SecureChannelFailed, "SettingsUpdateStatusFailedSecureChannel")]
+    [InlineData(UpdateCheckFailure.ProxyRefused, "SettingsUpdateStatusFailedProxyRefused")]
+    [InlineData(UpdateCheckFailure.SourceNotFound, "SettingsUpdateStatusFailedSourceNotFound")]
+    [InlineData(UpdateCheckFailure.MalformedResponse, "SettingsUpdateStatusFailedMalformedResponse")]
+    [InlineData(UpdateCheckFailure.AccessDenied, "SettingsUpdateStatusFailedAccessDenied")]
+    [InlineData(UpdateCheckFailure.SourceUnavailable, "SettingsUpdateStatusFailedSourceUnavailable")]
+    [InlineData(UpdateCheckFailure.TimedOut, "SettingsUpdateStatusFailedTimedOut")]
+    public async Task CheckNowAsync_FailedCheck_SaysWhichCauseStoppedIt(
+        UpdateCheckFailure cause, string expectedKey)
+    {
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService { Result = UpdateCheckResult.Failed(cause) };
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer, updateService: updateService);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer.Format(expectedKey), viewModel.UpdateStatusText);
+        Assert.NotEqual(localizer.Format("SettingsUpdateStatusFailed"), viewModel.UpdateStatusText);
+    }
+
+    /// <summary>
+    /// A rate limit that came with a reset time says how long to wait, in the sentence.
+    /// </summary>
+    /// <remarks>
+    /// The retry hint was reachable only from its own unit test: deleting the view model's
+    /// branch made the key unreachable and the rounding helper dead, with nothing going red.
+    /// Both the plural and the singular are rendered here, because the singular exists only
+    /// because the plural produced "in about 1 minutes".
+    /// </remarks>
+    [Theory]
+    [InlineData(20, 1)]
+    [InlineData(1500, 25)]
+    public async Task CheckNowAsync_RateLimitedWithAResetTime_QuotesTheWait(int seconds, int expectedMinutes)
+    {
+        var wait = TimeSpan.FromSeconds(seconds);
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService
+        {
+            Result = UpdateCheckResult.Failed(UpdateCheckFailure.RateLimited, wait),
+        };
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer, updateService: updateService);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+
+        string hintKey = UpdateCheckFailureText.RetryHintKey(UpdateCheckFailure.RateLimited, wait)!;
+        Assert.Equal(
+            localizer.Format(hintKey, expectedMinutes.ToString(CultureInfo.InvariantCulture)),
+            viewModel.UpdateStatusText);
+
+        // Never "1 minutes": the floor of one makes the plural template wrong by construction.
+        Assert.DoesNotContain("1 minutes", viewModel.UpdateStatusText, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A rate limit with no reset time says nothing about waiting.
+    /// </summary>
+    /// <remarks>
+    /// A duration is never invented. A number that turns out wrong teaches the user to
+    /// ignore every number the application shows afterwards.
+    /// </remarks>
+    [Fact]
+    public async Task CheckNowAsync_RateLimitedWithNoResetTime_QuotesNoWait()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var updateService = new FakeUpdateService
+        {
+            Result = UpdateCheckResult.Failed(UpdateCheckFailure.RateLimited),
+        };
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer, updateService: updateService);
+
+        await viewModel.CheckNowCommand.ExecuteAsync(null);
+
+        Assert.Equal(
+            localizer.Format("SettingsUpdateStatusFailedRateLimited"), viewModel.UpdateStatusText);
+    }
+
     [Theory]
     [InlineData(UpdateCheckStatus.UpToDate, "SettingsUpdateStatusUpToDate")]
     [InlineData(UpdateCheckStatus.CheckFailed, "SettingsUpdateStatusFailed")]
