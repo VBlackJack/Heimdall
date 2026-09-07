@@ -140,6 +140,46 @@ public static class SshConnectionFactory
         }
     }
 
+    /// <summary>
+    /// Bound on ONE SFTP request/response exchange, not on a transfer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// SSH.NET leaves <c>SftpClient.OperationTimeout</c> at -1, and -1 reaches
+    /// <c>WaitHandle.WaitAny(..., -1)</c>. A server that stays TCP-alive but never answers an
+    /// SFTP request is then bounded by nothing at all, and <c>SftpBrowser</c> holds its client
+    /// lock across the call, so one such request wedges the whole pane for good. Keepalives do
+    /// not rescue it: <c>BaseClient</c> sends them with <c>TrySendMessage</c> and swallows the
+    /// failure, so nothing ever signals the error handle the wait is watching.
+    /// </para>
+    /// <para>
+    /// Measured rather than argued, on 2026-09-07 against the local OpenSSH bench, by stopping
+    /// the server's sftp-server subprocess so the channel stayed open with no reply possible.
+    /// A directory listing that took 17 ms healthy was STILL WAITING after 45 seconds with the
+    /// default; with a five second bound the same listing raised
+    /// <c>SshOperationTimeoutException</c> after five seconds. The wedge is not a derivation.
+    /// </para>
+    /// <para>
+    /// The audit parked this on "setting it blind risks interrupting a legitimate transfer".
+    /// That reason is wrong, and it is worth saying why rather than just dropping it: SSH.NET
+    /// re-arms this timeout for every SSH_FXP_* request, so no transfer can be killed for being
+    /// LONG. What it can be killed for is being SLOW, which is a different and much smaller
+    /// claim. A read stream issues up to 100 requests at once
+    /// (<c>SftpFileStream</c>'s nested <c>SftpFileReader</c>, ramping to its 100 ceiling), each
+    /// of min(BufferSize 32768, LocalPacketSize 65536) - 13 = 32755 bytes, and every request's
+    /// clock starts when it is ISSUED, so the deepest of them waits for the whole 3,275,500-byte
+    /// window to arrive. Fifteen minutes therefore aborts a read sustaining less than about
+    /// 3.6 KB/s. That window applies to any read stream, not only to
+    /// <c>SftpClient.DownloadFile</c>.
+    /// </para>
+    /// <para>
+    /// Named for the exchange rather than the operation on purpose:
+    /// <c>EmbeddedSftpView.SftpOperationTimeout</c> already exists and is the health timer's
+    /// period, which is a different thing entirely.
+    /// </para>
+    /// </remarks>
+    internal static readonly TimeSpan SftpExchangeTimeout = TimeSpan.FromMinutes(15);
+
     internal static SftpClient CreateSftpClient(
         SshConnectionParams connectionParams,
         SshAgentRegistry agentRegistry)
@@ -150,7 +190,12 @@ public static class SshConnectionFactory
         var ownedConnectionInfo = CreateOwned(connectionParams, agentRegistry);
         try
         {
-            return new OwnedSftpClient(ownedConnectionInfo);
+            var client = new OwnedSftpClient(ownedConnectionInfo);
+
+            // The single door every SFTP client in the product passes through, which is why
+            // the bound goes here rather than beside KeepAliveInterval in SftpBrowser.
+            client.OperationTimeout = SftpExchangeTimeout;
+            return client;
         }
         catch
         {
