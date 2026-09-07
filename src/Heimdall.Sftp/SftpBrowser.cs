@@ -496,11 +496,12 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
 
         try
         {
-            await Task.Run(() =>
-            {
-                ct.ThrowIfCancellationRequested();
-                client.Connect();
-            }, ct).ConfigureAwait(false);
+            // Not Task.Run around the blocking Connect: SSH.NET assigns the session only
+            // once the handshake has run, so a token cancelled meanwhile changed nothing
+            // and the attempt ran on to the connect timeout. This helper is the SSH side's,
+            // it observes the token through the handshake, and its cancellation oracle
+            // lives with it in Heimdall.Ssh.Tests.
+            await SshConnectionFactory.ConnectWithCancellationAsync(client, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -1756,9 +1757,12 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             ? normalizedPath
             : normalizedPath[(lastSlash + 1)..];
 
-        // SSH.NET 2025.1.0's Get/GetAttributes canonicalize via REALPATH first.
-        // A parent listing gives lstat-style entries, so symlinks, including
-        // broken ones, are unlinked as entries instead of following their target.
+        // Get/GetAttributes canonicalize via REALPATH first, so they answer about the
+        // TARGET of a symlink and never about the link. A parent listing gives
+        // lstat-style entries, so a symlink, including a broken one, is unlinked as the
+        // entry it is instead of following where it points. Verified against SSH.NET
+        // 2026.0.0, the version this repository pins; the note used to cite 2025.1.0,
+        // which the tree has not carried for some time.
         foreach (ISftpFile entry in client.ListDirectory(parentPath))
         {
             if (string.Equals(entry.Name, entryName, StringComparison.Ordinal))

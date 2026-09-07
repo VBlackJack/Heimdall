@@ -14,6 +14,24 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Cancelling an SFTP connection now reaches the handshake
+
+Connecting to an SFTP server ran the blocking SSH.NET connect on a pool thread with the
+cancellation token checked once, before the call. SSH.NET assigns a client's session only
+once the whole handshake has run, so cancelling changed nothing: the attempt ran on to the
+connect timeout while the user waited, whatever they pressed. The four connects of the SFTP
+layer - the browser, the exec channel and both privileged editor paths - now go through the
+same cancellable connect the SSH side has used for months, which hands the token to the
+handshake itself.
+
+This is the whole of the change, and the rest of the finding it comes from was refused
+after measurement. Making every SFTP operation natively asynchronous would mean releasing
+the client lock with a request still on the wire, so the next caller reuses a session the
+server is still answering; and two operations Heimdall performs, writing file attributes
+and the POSIX rename that makes an overwrite atomic, have no asynchronous form at all in
+the pinned library. Substituting the ordinary rename there would have compiled, taken a
+token, and quietly given up atomicity on the path that exists to keep it.
+
 ### The updater refuses a checksum list that does not fit, and stops reusing a stale route
 
 Four residues of the 2026-09-06 updater audit, parked then as having no real case and

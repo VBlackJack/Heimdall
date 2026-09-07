@@ -61,11 +61,10 @@ internal sealed class SshNetSftpExecCommandRunner : ISftpExecCommandRunner
 
             try
             {
-                await Task.Run(() =>
-                {
-                    ct.ThrowIfCancellationRequested();
-                    ssh.Connect();
-                }, ct).ConfigureAwait(false);
+                // The registration above stays: it tears the client down on cancel. What
+                // changes is that the handshake itself now observes the token instead of
+                // running on to the connect timeout while nothing could interrupt it.
+                await SshConnectionFactory.ConnectWithCancellationAsync(ssh, ct).ConfigureAwait(false);
 
                 ct.ThrowIfCancellationRequested();
                 using SshCommand sshCommand = ssh.CreateCommand(command);

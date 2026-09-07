@@ -17,6 +17,10 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Heimdall.Ssh.Tests" />
     <InternalsVisibleTo Include="Heimdall.App.Tests" />
+    <!-- The SFTP browser and its editors connect through ConnectWithCancellationAsync,
+         which observes the token through the handshake. Narrower than making the member
+         public: the assembly that owns the helper decides who may call it. -->
+    <InternalsVisibleTo Include="Heimdall.Sftp" />
   </ItemGroup>
 
 </Project>

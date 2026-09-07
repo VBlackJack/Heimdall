@@ -183,11 +183,9 @@ public sealed class RemoteFileEditor : IDisposable
                 sshParams,
                 pinnedVerifier);
 
-            await Task.Run(() =>
-            {
-                ct.ThrowIfCancellationRequested();
-                sshClient.Connect();
-            }, ct).ConfigureAwait(false);
+            // The handshake observes the token here; the blocking Connect could not be
+            // interrupted at all, whatever the wrapper checked before calling it.
+            await SshConnectionFactory.ConnectWithCancellationAsync(sshClient, ct).ConfigureAwait(false);
 
             try
             {
@@ -657,11 +655,8 @@ public sealed class RemoteFileEditor : IDisposable
             session.SshParams,
             session.Verifier);
 
-        await Task.Run(() =>
-        {
-            ct.ThrowIfCancellationRequested();
-            sshClient.Connect();
-        }, ct).ConfigureAwait(false);
+        // Same as the download path: the token reaches the handshake itself.
+        await SshConnectionFactory.ConnectWithCancellationAsync(sshClient, ct).ConfigureAwait(false);
 
         try
         {
