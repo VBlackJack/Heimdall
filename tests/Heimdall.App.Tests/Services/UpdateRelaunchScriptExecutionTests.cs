@@ -280,6 +280,18 @@ public sealed class UpdateRelaunchScriptExecutionTests
         Assert.False(File.Exists(sandbox.InstallerPath), "the installer should be removed");
         Assert.False(File.Exists(sandbox.ScriptPath), "the script should delete itself");
 
+        // The success path now leaves an account of itself. Before this, it wrote nothing:
+        // a relaunch that ran and a relaunch that never happened produced identical
+        // transcripts, and BL-0067 spent a fortnight unable to tell them apart.
+        string transcript = sandbox.ReadTranscript();
+        Assert.Contains("relaunch starting after stage", transcript, StringComparison.Ordinal);
+        Assert.Contains("relaunch started process id", transcript, StringComparison.Ordinal);
+        Assert.DoesNotContain("relaunch skipped", transcript, StringComparison.Ordinal);
+        Assert.Contains(
+            "relaunch skipped",
+            "heimdall-update: relaunch skipped, stage ApplicationStillRunning",
+            StringComparison.Ordinal);
+
         // The exit code is pinned by the staging test beside this one, which is the
         // place where a non-zero code has a named cause.
         _ = run;
@@ -390,6 +402,17 @@ public sealed class UpdateRelaunchScriptExecutionTests
         Assert.False(
             sandbox.SequenceContainsRole(RelaunchRole),
             "an application that never exited must not be relaunched");
+
+        // And it SAYS so. A relaunch that does not happen used to leave the same silence as
+        // one that happened and produced nothing, which is the whole reason BL-0067 could
+        // not be read. The control keeps the absence assertion below from being vacuous.
+        string transcript = sandbox.ReadTranscript();
+        Assert.Contains("relaunch skipped, stage", transcript, StringComparison.Ordinal);
+        Assert.DoesNotContain("relaunch started process id", transcript, StringComparison.Ordinal);
+        Assert.Contains(
+            "relaunch started process id",
+            "heimdall-update: relaunch started process id 4242",
+            StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -963,6 +986,17 @@ public sealed class UpdateRelaunchScriptExecutionTests
             using StreamReader reader = new(stream);
             return reader.ReadToEnd();
         }
+
+        /// <summary>
+        /// The transcript the emitted script wrote, read through the shared handle.
+        /// </summary>
+        /// <remarks>
+        /// Through <see cref="ReadSharedText"/> for the reason recorded there: a Windows
+        /// handle outlives the process that closed it for a moment, and a plain read taken
+        /// right after the host exits meets the writer. Returns empty when the script never
+        /// got as far as starting a transcript, which is a state, not an error.
+        /// </remarks>
+        internal string ReadTranscript() => File.Exists(LogPath) ? ReadSharedText(LogPath) : string.Empty;
 
         internal UpdateRelaunchSpec CreateSpec(bool requiresElevation = false, bool withLog = true)
         {

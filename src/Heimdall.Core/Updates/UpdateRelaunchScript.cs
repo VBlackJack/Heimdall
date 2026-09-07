@@ -310,15 +310,44 @@ public static class UpdateRelaunchScript
         sb.AppendLine("        $installerStream.Dispose()");
         sb.AppendLine("    }");
 
+        // The relaunch says what it decided, into the transcript, while the transcript is
+        // still open. Nothing here wrote anything on the success path: "the application did
+        // not come back" and "the relaunch was never attempted" left exactly the same
+        // silence, and no failure record is written when nothing throws. Twice on CI - and
+        // the second time on master - a test watched for the relaunch and could not tell
+        // which of the two had happened.
+        //
         // The one case in which the application must NOT be started: it never exited,
         // so it is still there. A second instance would only hand over to it.
+        sb.AppendLine("    $relaunchProcess = $null");
+        sb.AppendLine("    $relaunchProcessId = 0");
         sb.AppendLine($"    if ($updateStage -ne '{UpdateOutcomeStage.ApplicationStillRunning}') {{");
+        sb.AppendLine(
+            "        Write-Output ('heimdall-update: relaunch starting after stage ' + $updateStage)");
         sb.AppendLine("        try {");
         sb.AppendLine(
-            $"            Start-Process -FilePath '{EscapeSingleQuoted(spec.TargetExecutablePath)}'");
+            $"            $relaunchProcess = Start-Process -FilePath '{EscapeSingleQuoted(spec.TargetExecutablePath)}' -PassThru");
         sb.AppendLine("        } catch {");
         sb.AppendLine("            Write-Warning $_");
         sb.AppendLine("        }");
+
+        // Guarded exactly like the installer's ExitCode read above, and for the same
+        // measured reason: reading a property of a process object can throw depending on
+        // how the process was started, and failing to describe the relaunch must never
+        // become a second failure. The line sits outside that guard so an id of 0 is
+        // reported rather than omitted.
+        sb.AppendLine("        if ($null -ne $relaunchProcess) {");
+        sb.AppendLine("            try {");
+        sb.AppendLine("                $relaunchProcessId = [int]$relaunchProcess.Id");
+        sb.AppendLine("            } catch {");
+        sb.AppendLine("                $relaunchProcessId = 0");
+        sb.AppendLine("            }");
+        sb.AppendLine("        }");
+        sb.AppendLine(
+            "        Write-Output ('heimdall-update: relaunch started process id ' + $relaunchProcessId)");
+        sb.AppendLine("    } else {");
+        sb.AppendLine(
+            "        Write-Output ('heimdall-update: relaunch skipped, stage ' + $updateStage)");
         sb.AppendLine("    }");
 
         if (hasLog)

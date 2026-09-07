@@ -14,6 +14,22 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The update relauncher writes down what it decided
+
+When an update finishes, a detached PowerShell script installs it and starts Heimdall again.
+On the path where everything works, that script wrote nothing at all: no failure record is
+written when nothing throws, so "the application came back" and "the application was never
+started" left byte-identical transcripts. A test that watched for the relaunch spent a
+fortnight unable to say which of the two had happened, twice on the project's own CI.
+
+The script now records its decision while the transcript is still open: which stage it read,
+whether it skipped the relaunch because the application was still running, and the process id
+the launch returned - zero included, which is itself the answer when a launch produces
+nothing. A failure to describe the relaunch can never become a second failure: reading the
+id is guarded exactly like the installer's exit code beside it.
+
+Diagnostic only. Nothing about when Heimdall relaunches, or whether it does, changes.
+
 ### The file browser's messages come from the catalogue, not from the code
 
 Two dozen places in the SFTP view resolved a message from the translation catalogue and kept
