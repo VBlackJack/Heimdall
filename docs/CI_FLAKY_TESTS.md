@@ -77,6 +77,36 @@ Bound a lane positionally instead, between its own `##[group]Run dotnet test
 ... --filter "Category=RequiresDesktop"` header and the next step's
 `##[group]Run` header.
 
+### The run prints them itself, since 2026-09-07
+
+The step `Report informational lane failures` runs after both lanes with
+`if: always()`. It reads the TRX files under `TestResults/CIUnstable` and
+`TestResults/RequiresDesktop`, prints every failed test under the greppable
+marker `[INFO-FAIL]` with its duration and the head of its message, and raises
+one `::warning::` per failure so the run summary carries it. It always exits 0:
+it observes, it does not gate.
+
+Why it exists. Across the 99 green runs between 2026-08-26 and 2026-09-06,
+1 179 440 test results were reparsed from the artifacts: **seven tests had failed
+inside runs GitHub called successful**. One was the occurrence backlog item
+BL-0067 had been waiting a fortnight for, on master, inside the release run for
+v2026.090505, captured and never replayed. A backlog item whose reopening trigger
+is "the lane turns red" cannot fire once its tests sit in a lane that never does.
+
+Two traps the script encodes, both met while taking that measurement:
+
+- Never grep a TRX for `outcome="Failed"`. The `ResultSummary` element carries
+  the same attribute, so a text search reports a failure in a file whose tests
+  all passed. Only `UnitTestResult` elements count, selected through the TRX
+  namespace.
+- A zero is not evidence by itself. A wrong path, a missing namespace and an
+  empty lane all produce the same silent zero as a clean run, so the step always
+  prints how many TRX files it read and how many results they held. Zero
+  failures over zero results is reported as unknown, not as clean.
+
+The raw-log method below stays the fallback: it is what to use on a run older
+than this step, or when the artifact has expired.
+
 ### A worked example, and what it does and does not prove
 
 Two runs were read this way while delivering PR #140:

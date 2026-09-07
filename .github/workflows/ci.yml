@@ -35,6 +35,17 @@ jobs:
           ./scripts/Test-CommittedLineEndingsGuard.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The informational-lane reporter is the only thing that will ever say a
+      # test failed in a lane that cannot turn this run red, so a version of it
+      # that silently reports nothing would restore the blind spot it removes.
+      # Its suite runs here, blocking, over throwaway TRX fixtures: no .NET, no
+      # build, a second at most.
+      - name: Check the informational-lane reporter sees what it must
+        shell: pwsh
+        run: |
+          ./scripts/Test-InformationalTestFailures.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Placed with the other cheap fail-fast gates, before the SDK is even set
       # up: the typography guard is pure PowerShell over docs/release-notes, so it
       # needs no .NET and no build. Running it here reports a bad character in
@@ -141,6 +152,22 @@ jobs:
           --verbosity normal
           --logger trx
           --results-directory TestResults/RequiresDesktop
+
+      # Both lanes above are `continue-on-error`, so a test that fails in them
+      # leaves this run at `conclusion: success` and no step marked red. The only
+      # trace is the TRX inside the test-results artifact, which somebody has to
+      # download and parse on purpose. Measured on 2026-09-07 across the 99 green
+      # runs since 2026-08-26: seven failed tests inside runs GitHub called
+      # successful, one of them the occurrence BL-0067 had been waiting a
+      # fortnight for, on master, in a release run. This step changes nothing
+      # about what blocks; it makes those lanes audible in the run summary.
+      - name: Report informational lane failures
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./scripts/InformationalTestFailures.ps1 -ResultsRoot TestResults
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Check for vulnerable dependencies
         shell: pwsh

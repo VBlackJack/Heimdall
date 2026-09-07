@@ -85,6 +85,40 @@ chaîne par sa position, entre son propre en-tête `##[group]Run dotnet test
 ... --filter "Category=RequiresDesktop"` et l'en-tête `##[group]Run` de l'étape
 suivante.
 
+### L'exécution les imprime elle-même, depuis le 2026-09-07
+
+L'étape `Report informational lane failures` s'exécute après les deux chaînes,
+avec `if: always()`. Elle lit les fichiers TRX sous `TestResults/CIUnstable` et
+`TestResults/RequiresDesktop`, imprime chaque test en échec sous le marqueur
+`[INFO-FAIL]`, avec sa durée et le début de son message, et lève un
+`::warning::` par échec pour que le résumé de l'exécution le porte. Elle sort
+toujours en 0 : elle observe, elle ne bloque pas.
+
+Pourquoi elle existe. Sur les 99 exécutions vertes entre le 2026-08-26 et le
+2026-09-06, 1 179 440 résultats de tests ont été relus depuis les artefacts :
+**sept tests avaient échoué dans des exécutions que GitHub déclarait réussies**.
+L'un d'eux était l'occurrence que l'item de backlog BL-0067 attendait depuis
+quinze jours, sur master, dans l'exécution de release de v2026.090505, capturée
+et jamais rejouée. Un item dont le déclencheur de réouverture est "la chaîne
+rougit" ne peut plus se déclencher dès que ses tests vivent dans une chaîne qui
+ne rougit jamais.
+
+Deux pièges que le script encode, rencontrés tous les deux pendant cette mesure :
+
+- Ne jamais chercher `outcome="Failed"` dans un TRX par recherche de texte.
+  L'élément `ResultSummary` porte le même attribut, donc une recherche textuelle
+  signale un échec dans un fichier dont tous les tests sont passés. Seuls les
+  éléments `UnitTestResult` comptent, sélectionnés via l'espace de noms du TRX.
+- Un zéro ne prouve rien à lui seul. Un mauvais chemin, un espace de noms oublié
+  et une chaîne vide produisent le même zéro silencieux qu'une exécution propre :
+  l'étape imprime donc toujours combien de fichiers TRX elle a lus et combien de
+  résultats ils portaient. Zéro échec sur zéro résultat est rapporté comme
+  inconnu, pas comme propre.
+
+La méthode par log brut ci-dessous reste le recours : c'est elle qu'il faut
+employer sur une exécution antérieure à cette étape, ou quand l'artefact a
+expiré.
+
 ### Un exemple traité, et ce qu'il prouve ou non
 
 Deux exécutions ont été lues de cette manière pendant la livraison de la
