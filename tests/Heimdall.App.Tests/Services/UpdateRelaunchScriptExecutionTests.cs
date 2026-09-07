@@ -68,6 +68,17 @@ public sealed class UpdateRelaunchScriptExecutionTests
     private static readonly TimeSpan MarkerDeadline = TimeSpan.FromSeconds(20);
 
     /// <summary>
+    /// How long a missed marker is watched afterwards, to say what missed it.
+    /// </summary>
+    /// <remarks>
+    /// This is not a longer deadline and must never be read as one. The test has already
+    /// failed when this starts; the wait only buys a sentence that separates a late child
+    /// from an absent one in the next CI record. Kept short so a red run stays cheap: the
+    /// whole class holds twelve process-spawning cases.
+    /// </remarks>
+    private static readonly TimeSpan MarkerGrace = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// Wait applied to the script's own <c>Wait-Process</c>. Deliberately not the
     /// production default of two minutes: a recycled process id must bound the test
     /// rather than stall it.
@@ -1112,8 +1123,59 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 await Task.Delay(25);
             }
 
+            // The bound has expired and this test will fail whatever happens next. The
+            // grace below exists to make the NEXT occurrence decidable, which is a
+            // different job from making this one pass. Twice on CI - 2026-09-06 07:37
+            // under Windows PowerShell 5.1, 2026-09-07 08:31 under PowerShell 7 - this
+            // wait expired while the host exited 0 with an empty stderr and the installer
+            // role already recorded. Neither record could say whether the relaunch child
+            // had been started late or never started at all, and those two have different
+            // causes and different remedies. Nothing else in the payload separates them.
+            string afterTheBound = await ObserveAfterTheBoundAsync(marker);
+
             throw new TimeoutException(
-                $"'{role}' never recorded within {MarkerDeadline.TotalSeconds} s.{Environment.NewLine}{Diagnose()}");
+                $"'{role}' never recorded within {MarkerDeadline.TotalSeconds} s.{Environment.NewLine}"
+                    + $"{afterTheBound}{Environment.NewLine}{Diagnose()}");
+        }
+
+        /// <summary>
+        /// Watches one marker past its expired deadline, only to report what happened.
+        /// </summary>
+        /// <remarks>
+        /// A marker that lands during the grace is a child that ran late on a loaded
+        /// runner. Silence through the grace is a child that never wrote at all. This
+        /// never rescues the test: the deadline is the contract, and it has already been
+        /// missed by the time this runs.
+        /// </remarks>
+        private async Task<string> ObserveAfterTheBoundAsync(string marker)
+        {
+            DateTime start = DateTime.UtcNow;
+            DateTime graceDeadline = start + MarkerGrace;
+
+            while (DateTime.UtcNow < graceDeadline)
+            {
+                try
+                {
+                    if (File.Exists(SequencePath)
+                        && ReadSharedText(SequencePath).Contains(marker, StringComparison.Ordinal))
+                    {
+                        double lateBy = (DateTime.UtcNow - start).TotalMilliseconds;
+                        return "after the bound: the marker LANDED "
+                            + lateBy.ToString("F0", CultureInfo.InvariantCulture)
+                            + " ms past the deadline, so the child ran and was late, not absent.";
+                    }
+                }
+                catch (IOException)
+                {
+                    // Still being written; fall through and retry.
+                }
+
+                await Task.Delay(100);
+            }
+
+            return "after the bound: still absent "
+                + MarkerGrace.TotalSeconds.ToString("F0", CultureInfo.InvariantCulture)
+                + " s later, so this is not a slow child.";
         }
 
         /// <summary>
