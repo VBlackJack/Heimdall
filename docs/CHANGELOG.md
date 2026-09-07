@@ -14,6 +14,19 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The FTPS data-channel warning can no longer disappear unnoticed
+
+When you connect over FTPS, Heimdall shows a standing notice that the data channel's identity is
+not verified. That notice is not a decoration: the limitation behind it comes from the FTP library
+and cannot be fixed inside Heimdall, so the warning is the whole of what Heimdall can offer, and it
+is the thing a careful user relies on.
+
+It was raised from a spot in the code where deleting it would have removed the warning from every
+FTPS session without a single test noticing. Nothing about the warning changes for you; what
+changes is that it is now pinned by tests that fail if it stops appearing, if it appears on a
+connection that does not need it, or if it appears with the wrong text.
+
+
 ### Corrected: what Heimdall does with a server's interactive questions
 
 The security notes and the troubleshooting guide both said that Heimdall answers only a password

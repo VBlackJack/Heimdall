@@ -416,11 +416,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         {
             sftpBrowser.SecurityEventOccurred += OnBrowserSecurityEvent;
         }
-        else if (_browser is FtpBrowser ftpBrowser)
-        {
-            _viewModel.ShowSecurityNoticeKey(
-                GetFtpSecurityNoticeLocalizationKey(ftpBrowser.IsTlsEnabled));
-        }
+
+        ApplyTransportSecurityNotice(_viewModel, _browser);
 
         UpdateStatus(_localizer["SftpStatusConnected"]);
         StartHealthTimer();
@@ -2134,6 +2131,61 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         => isTlsEnabled
             ? "WarnFtpsDataChannelIdentityBadge"
             : "WarnFtpCleartextBadge";
+
+    /// <summary>
+    /// The persistent transport-security notice this browser's transport requires, or null when
+    /// the transport carries no disclosed limitation.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// SFTP-001. The FTPS data channel is encrypted but its certificate is not authenticated,
+    /// and that cannot be changed from here: the library accepts any certificate on a data
+    /// connection from inside itself, and the only TLS callback this application installs is
+    /// never consulted for one. The audit record carries the measurement and the reasoning.
+    /// </para>
+    /// <para>
+    /// Since the limitation cannot be fixed, the disclosure IS the remedy, which makes its
+    /// wiring load bearing rather than cosmetic. It used to live inside an else-if arm two
+    /// braces deep, where the statement predicate could not reach it and deleting it turned
+    /// nothing red. Written as body-level statements on purpose: a ternary return would put
+    /// the argument back out of reach of the exact-argument anchor that guards it.
+    /// </para>
+    /// </remarks>
+    internal static string? TransportSecurityNoticeKey(IRemoteBrowser browser)
+    {
+        ArgumentNullException.ThrowIfNull(browser);
+
+        if (browser is not FtpBrowser ftpBrowser)
+        {
+            return null;
+        }
+
+        return GetFtpSecurityNoticeLocalizationKey(ftpBrowser.IsTlsEnabled);
+    }
+
+    /// <summary>
+    /// Raises the transport-security notice for a session, when its transport has one.
+    /// </summary>
+    /// <remarks>
+    /// Called for every session rather than for FTP sessions only, so that the decision about
+    /// which transports disclose something lives in one named place instead of in the shape of
+    /// a branch at the call site. SFTP and SCP answer null and nothing is raised.
+    /// </remarks>
+    internal static void ApplyTransportSecurityNotice(
+        EmbeddedSftpViewModel viewModel,
+        IRemoteBrowser browser)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(browser);
+
+        string? key = TransportSecurityNoticeKey(browser);
+        if (key is null)
+        {
+            return;
+        }
+
+        viewModel.ShowSecurityNoticeKey(key);
+    }
 
     internal static Task DisposeBrowserAsync(IRemoteBrowser browser)
     {
