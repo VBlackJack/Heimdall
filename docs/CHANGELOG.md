@@ -14,21 +14,29 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
-### A server-side copy no longer stages under a name the server can guess
+### A server-side copy can no longer be turned into a link to somewhere else
 
 Copying a file on the remote server without downloading it works by copying to a sibling
-name and then hard-linking that to the destination, so the destination never exists
-half-written. That sibling name was built from the remote shell's process id, which gives a
-few thousand candidates in a directory the attacker may write to: a hostile local user on
-the server could plant a symlink at every one of them in advance and wait for the copy to
-open through it, with no race to win. The name is now drawn by Heimdall, per copy, from the
-same generator the upload path already used.
+name and hard-linking that to the destination, so the destination never exists
+half-written. Three things about that were wrong for a user sharing a directory with
+someone hostile on the server.
 
-This narrows the finding rather than closing it, and the code says so where the next reader
-will find it. An attacker who can write to that directory can still unlink the staging file
-and put a symlink in its place while the copy runs. Closing that needs the staging file to
-be created exclusively before the copy writes, which would move mode preservation onto the
-remote `cp` in a way that can only be measured against a live server.
+The sibling name was built from the remote shell's process id, a few thousand candidates:
+a hostile local user could plant a symlink at every one of them in advance and wait for the
+copy to open through it, with no race to win. The name is now drawn by Heimdall, per copy.
+
+The staging file was created by the copy itself, so whatever sat at that name was written
+through. It is now reserved first, and the copy refuses if the name is already taken.
+
+And a staging file swapped for a symlink while the copy ran was published as that symlink,
+because `ln` links a symlink rather than what it points at, and the whole chain still
+reported success. The destination is now checked afterwards; one that came out as a link is
+removed and the copy is refused.
+
+The reason the last two were deferred at first is worth recording: they looked like they
+would move mode preservation onto the remote `cp`, unmeasurable without a live server.
+Measured on three shells and three `cp` implementations, they do not - a staging file
+pre-created at 644 comes out 600 after copying a 600 source on all three.
 
 ### Cancelling an SFTP connection now reaches the handshake
 

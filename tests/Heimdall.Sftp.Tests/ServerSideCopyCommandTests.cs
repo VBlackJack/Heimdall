@@ -31,9 +31,13 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
 
+        string temp = StagingToken(command);
         Assert.Equal(
-            $"cp -p -- '/srv/a.txt' {StagingToken(command)} && ln -- {StagingToken(command)} '/srv/b.txt'; "
-            + $"status=$?; rm -f -- {StagingToken(command)}; exit $status",
+            $"set -C; : > {temp} || exit $?; set +C; "
+            + $"cp -p -- '/srv/a.txt' {temp} && ln -- {temp} '/srv/b.txt'; "
+            + "status=$?; if [ $status -eq 0 ] && [ -L '/srv/b.txt' ]; then "
+            + "rm -f -- '/srv/b.txt'; status=99; fi; "
+            + $"rm -f -- {temp}; exit $status",
             command);
     }
 
@@ -84,8 +88,11 @@ public sealed class ServerSideCopyCommandTests
         // matters more than before since the token embeds the destination's own quote.
         string escapedTemp = StagingToken(command);
         Assert.Equal(
-            $"cp -p -- '/srv/my dir/it'\\''s a file.txt' {escapedTemp} "
-            + $"&& ln -- {escapedTemp} '/dst/o'\\''brien'; status=$?; "
+            $"set -C; : > {escapedTemp} || exit $?; set +C; "
+            + $"cp -p -- '/srv/my dir/it'\\''s a file.txt' {escapedTemp} "
+            + $"&& ln -- {escapedTemp} '/dst/o'\\''brien'; "
+            + "status=$?; if [ $status -eq 0 ] && [ -L '/dst/o'\\''brien' ]; then "
+            + "rm -f -- '/dst/o'\\''brien'; status=99; fi; "
             + $"rm -f -- {escapedTemp}; exit $status",
             command);
     }
@@ -145,11 +152,16 @@ public sealed class ServerSideCopyCommandTests
         string escapedSource = "'/srv/my dir/it'\\''s.txt'";
         string escapedDestination = "'/dst/o'\\''brien.txt'";
         string escapedTemp = StagingToken(command);
-        string copyCommand = command[..command.IndexOf(" && ", StringComparison.Ordinal)];
+        int copyStart = command.IndexOf("cp ", StringComparison.Ordinal);
+        string copyCommand = command[copyStart..command.IndexOf(" && ", copyStart, StringComparison.Ordinal)];
         int linkStart = command.IndexOf("ln ", StringComparison.Ordinal);
         int linkEnd = command.IndexOf(';', linkStart);
         string linkCommand = command[linkStart..linkEnd];
-        int cleanupStart = command.IndexOf("rm ", StringComparison.Ordinal);
+
+        // The LAST rm is the staging cleanup. The chain now holds an earlier one, which
+        // removes a destination that came out as a symlink, and reading that one instead
+        // would assert the guard on the wrong command.
+        int cleanupStart = command.LastIndexOf("rm ", StringComparison.Ordinal);
         int cleanupEnd = command.IndexOf(';', cleanupStart);
         string cleanupCommand = command[cleanupStart..cleanupEnd];
 
@@ -208,9 +220,56 @@ public sealed class ServerSideCopyCommandTests
         // cp writing one path, ln linking a path that does not exist, and rm deleting
         // nothing.
         Assert.Matches(
-            @"^cp -p -- '/srv/a\.txt' '(/srv/b\.txt\.[0-9a-f]{32}\.part)' && ln -- '\1' '/srv/b\.txt'; "
-                + @"status=\$\?; rm -f -- '\1'; exit \$status$",
+            @"^set -C; : > '(/srv/b\.txt\.[0-9a-f]{32}\.part)' \|\| exit \$\?; set \+C; "
+                + @"cp -p -- '/srv/a\.txt' '\1' && ln -- '\1' '/srv/b\.txt'; "
+                + @"status=\$\?; if \[ \$status -eq 0 \] && \[ -L '/srv/b\.txt' \]; then "
+                + @"rm -f -- '/srv/b\.txt'; status=99; fi; "
+                + @"rm -f -- '\1'; exit \$status$",
             command);
+    }
+
+    /// <remarks>
+    /// Measured on 2026-09-07 against BusyBox 1.36.1 and GNU coreutils 9.1 and 8.25: a
+    /// staging file pre-created at 644 came out 600 after `cp -p` of a 600 source, so the
+    /// reservation costs nothing in mode preservation; `set -C` refuses a name already
+    /// taken by a symlink and writes nothing through it; and the whole chain exits
+    /// non-zero, leaving the plant in place, because deleting a name it did not create is
+    /// not this command's business.
+    /// </remarks>
+    [Fact]
+    public void Build_File_ReservesTheStagingNameBeforeItCopiesIntoIt()
+    {
+        string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
+
+        int reservation = command.IndexOf("set -C; : > ", StringComparison.Ordinal);
+        int copy = command.IndexOf("cp -p -- ", StringComparison.Ordinal);
+
+        Assert.Equal(0, reservation);
+        Assert.True(copy > reservation, command);
+        // Without the guard the reservation is a comment: cp would create the file anyway.
+        Assert.Contains("|| exit $?", command, StringComparison.Ordinal);
+    }
+
+    /// <remarks>
+    /// `ln` given a symlink publishes the symlink itself and exits 0 - measured on both
+    /// implementations. A staging file swapped between the copy and the link would
+    /// otherwise leave the destination pointing wherever the attacker chose, reported to
+    /// the user as a copy that worked.
+    /// </remarks>
+    [Fact]
+    public void Build_File_RefusesADestinationThatCameOutASymlink()
+    {
+        string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
+
+        Assert.Contains("[ -L '/srv/b.txt' ]", command, StringComparison.Ordinal);
+        Assert.Contains(
+            $"rm -f -- '/srv/b.txt'; status={ServerSideCopyCommand.PublishedASymlinkStatus};",
+            command,
+            StringComparison.Ordinal);
+
+        // The check must not fire on the ordinary path, where the link succeeded and the
+        // destination is a hard link to a regular file.
+        Assert.Contains("if [ $status -eq 0 ] &&", command, StringComparison.Ordinal);
     }
 
     /// <summary>
