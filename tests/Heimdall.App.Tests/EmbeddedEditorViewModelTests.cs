@@ -24,6 +24,22 @@ namespace Heimdall.App.Tests;
 
 public sealed class EmbeddedEditorViewModelTests
 {
+    /// <remarks>
+    /// The save gate is deliberately never disposed. A save can still hold it after the view
+    /// that owns this model is torn down, and releasing a disposed semaphore throws inside
+    /// that save's finally, which is where the user's only copy of the typed text is. Two UI
+    /// tests already prove that ordering happens; what they cannot catch is the step that
+    /// would arm the failure, because disposal would arrive through this type gaining
+    /// IDisposable and being swept up by a teardown loop over disposable children. The
+    /// absence of the interface is therefore the fact worth pinning, and it holds for the
+    /// local pane too, which neither of those tests reaches.
+    /// </remarks>
+    [Fact]
+    public void EmbeddedEditorViewModel_DoesNotAdvertiseDisposal()
+    {
+        Assert.False(typeof(IDisposable).IsAssignableFrom(typeof(EmbeddedEditorViewModel)));
+    }
+
     [Fact]
     public async Task SaveAsync_RemoteFile_WithoutPersistenceHandler_RemainsModified()
     {
