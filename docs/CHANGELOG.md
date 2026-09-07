@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-09-07: five parked findings closed by measurement, nothing waits forever, and the security notes corrected (v2026.090701)
 
 ### Cancelling an update now takes effect during verification too
 

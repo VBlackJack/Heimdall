@@ -151,7 +151,7 @@ Heimdall shows the reason in plain language wherever it can. The common ones:
 
 | What you see | What it usually means |
 |---|---|
-| The password is refused | Wrong password, or the account is locked on the remote machine. |
+| The password is refused | Wrong password, or the account is locked on the remote machine. If the server's only question is a verification code, Heimdall answers it with your password and the refusal arrives here. |
 | The connection times out | The machine is off, or a firewall is in the way. Check the address. |
 | The host key changed | See the warning above. Do not accept it without asking. |
 | The server asks a question this client cannot answer | The server wants a verification code or another second factor. Heimdall only answers password prompts; use another client for that server. |

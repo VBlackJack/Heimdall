@@ -878,9 +878,11 @@ remplacer la destination.
 - Assainissement de la génération de fichiers RDP :
   `tests/Heimdall.Rdp.Tests/RdpFileGeneratorTests.cs`.
 - La CI impose : une compilation sans aucun avertissement sous
-  `TreatWarningsAsErrors`, `dotnet format --verify-no-changes`, la suite de
-  tests complète, la parité des locales JSON (les jeux de clés EN et FR doivent
-  être identiques, actuellement 5 489 clés chacun) et une analyse informative
+  `TreatWarningsAsErrors`, `dotnet format --verify-no-changes`, la lane de tests
+  bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
+  qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
+  l'exécution), la parité des locales JSON (les jeux de clés EN et FR doivent
+  être identiques, actuellement 6 272 clés chacun) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

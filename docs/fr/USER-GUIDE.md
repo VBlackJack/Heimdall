@@ -161,7 +161,7 @@ Heimdall affiche la raison en clair partout où il le peut. Les cas courants :
 
 | Ce que vous voyez | Ce que cela veut dire en général |
 |---|---|
-| Le mot de passe est refusé | Mauvais mot de passe, ou compte verrouillé sur la machine distante. |
+| Le mot de passe est refusé | Mauvais mot de passe, ou compte verrouillé sur la machine distante. Si la seule question du serveur est un code de vérification, Heimdall y répond avec votre mot de passe et le refus arrive ici. |
 | La connexion expire | La machine est éteinte, ou un pare-feu bloque. Vérifiez l'adresse. |
 | La clé d'hôte a changé | Voir l'avertissement plus haut. N'acceptez pas sans demander. |
 | Le serveur pose une question à laquelle ce client ne peut pas répondre | Le serveur veut un code de vérification ou un autre second facteur. Heimdall ne répond qu'aux demandes de mot de passe ; utilisez un autre client pour ce serveur. |
