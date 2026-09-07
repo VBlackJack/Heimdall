@@ -949,6 +949,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         for (int i = 0; i < gridView.Columns.Count && i < names.Length; i++)
         {
+            // The one fallback left in this file, and it is not the pattern the others were.
+            // `names` is the column identity, used two lines below to match SortColumn, so
+            // the key is derived from it rather than the other way round; falling back to the
+            // key name here would put "SftpColName" in a column header. It stays a literal
+            // English word only in the state where no localizer exists at all.
             string baseName = _localizer?[$"SftpCol{names[i]}"] ?? names[i];
             gridView.Columns[i].Header = string.Equals(names[i], _viewModel.SortColumn, StringComparison.Ordinal)
                 ? baseName + arrow
@@ -1069,7 +1074,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     {
         if (_viewModel.Bookmarks.Count == 0)
         {
-            UpdateStatus(_localizer?["SftpBookmarkEmpty"] ?? "No bookmarks");
+            UpdateStatus(L("SftpBookmarkEmpty"));
             return;
         }
 
@@ -1116,7 +1121,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             OpenFileDialog dialog = new()
             {
                 Multiselect = true,
-                Title = _localizer?["SftpBtnUpload"] ?? "Upload"
+                Title = L("SftpBtnUpload")
             };
 
             if (dialog.ShowDialog() != true || dialog.FileNames.Length == 0)
@@ -1157,7 +1162,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         if (_viewModel.IsTransferInProgress)
         {
-            UpdateStatus(_localizer?["SftpTransferInProgress"] ?? "A file transfer is already in progress.");
+            UpdateStatus(L("SftpTransferInProgress"));
             return;
         }
 
@@ -1166,7 +1171,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         {
             System.Windows.Forms.FolderBrowserDialog dialog = new()
             {
-                Description = _localizer?["SftpBtnDownload"] ?? "Download"
+                Description = L("SftpBtnDownload")
             };
 
             if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
@@ -1326,8 +1331,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     {
         if (!file.IsRegularFile)
         {
-            UpdateStatus(_localizer?.Format("SftpStatusEditUnsupportedEntry", file.Name)
-                ?? $"Cannot edit {file.Name}: this entry is not a regular file.");
+            UpdateStatus(LF("SftpStatusEditUnsupportedEntry", file.Name));
             return;
         }
 
@@ -1340,14 +1344,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         // handed to one as an argument is a command line.
         if (_externalEditorRejectionKey is { } rejectionKey)
         {
-            ShowError(_localizer?[rejectionKey] ?? rejectionKey);
+            ShowError(L(rejectionKey));
             return;
         }
 
         try
         {
-            UpdateStatus(_localizer?.Format("SftpStatusEditing", file.Name)
-                ?? $"Editing: {file.Name}");
+            UpdateStatus(LF("SftpStatusEditing", file.Name));
 
             try
             {
@@ -1362,8 +1365,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         }
         catch (ExternalEditorLaunchException ex)
         {
-            ShowError(_localizer?.Format("SftpErrorExternalEditorLaunchFailed", ex.EditorPath)
-                ?? $"The external editor could not be started: {ex.EditorPath}");
+            ShowError(LF("SftpErrorExternalEditorLaunchFailed", ex.EditorPath));
         }
         catch (Exception ex)
         {
@@ -1376,8 +1378,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         if (FileListView.SelectedItem is SftpFileInfo file)
         {
             Clipboard.SetText(file.FullPath);
-            UpdateStatus(_localizer?.Format("SftpStatusPathCopied", file.FullPath)
-                ?? $"Copied: {file.FullPath}");
+            UpdateStatus(LF("SftpStatusPathCopied", file.FullPath));
         }
     }
 
@@ -1385,8 +1386,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     {
         if (!file.IsRegularFile)
         {
-            UpdateStatus(_localizer?.Format("SftpStatusEditUnsupportedEntry", file.Name)
-                ?? $"Cannot edit {file.Name}: this entry is not a regular file.");
+            UpdateStatus(LF("SftpStatusEditUnsupportedEntry", file.Name));
             return;
         }
 
@@ -1406,8 +1406,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         try
         {
-            UpdateStatus(_localizer?.Format("SftpStatusEditing", file.Name)
-                ?? $"Editing: {file.Name}");
+            UpdateStatus(LF("SftpStatusEditing", file.Name));
 
             // Download file content for embedded editing
             tempPath = EditorTempPaths.CreateWorkingDirectory();
@@ -1484,7 +1483,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 string content = document.Text;
                 string remotePath = file.FullPath;
                 string? encodingNotice = document.DecodedWithFallback
-                    ? _localizer?["EditorEncodingFallbackNotice"] ?? "EditorEncodingFallbackNotice"
+                    ? L("EditorEncodingFallbackNotice")
                     : null;
 
                 // Open in embedded AvalonEdit editor
@@ -1568,8 +1567,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                                 return false;
                             }
 
-                            UpdateStatus(_localizer?.Format("SftpStatusAutoUploaded", file.Name)
-                                ?? $"Uploaded: {file.Name}");
+                            UpdateStatus(LF("SftpStatusAutoUploaded", file.Name));
                             return true;
                         }
                         catch (OperationCanceledException)
@@ -1599,8 +1597,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                                     return false;
                                 }
 
-                                UpdateStatus(_localizer?.Format("SftpStatusUploadedViaSudo", file.Name)
-                                    ?? $"Saved via sudo: {file.Name}");
+                                UpdateStatus(LF("SftpStatusUploadedViaSudo", file.Name));
                                 return true;
                             }
                             catch (OperationCanceledException)
@@ -1669,7 +1666,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         {
             ShowError(ex is SudoEditFileTooLargeException
                 ? _viewModel.DescribeTransferError(ex)
-                : _localizer?.Format("SftpStatusEditOpenFailed", ex.Message) ?? ex.Message);
+                : LF("SftpStatusEditOpenFailed", ex.Message));
             if (tempPath is not null)
             {
                 CleanupEditTempDir(tempPath);
@@ -1828,7 +1825,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         if (!_disposed && ReferenceEquals(_browser, browser))
         {
-            UpdateStatus(_localizer?["SftpStatusDisconnected"] ?? "Disconnected");
+            UpdateStatus(L("SftpStatusDisconnected"));
         }
     }
 
@@ -1840,7 +1837,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         }
 
         Core.Logging.FileLogger.Info("EmbeddedSFTP reconnect requested by user");
-        UpdateStatus(_localizer?["SftpStatusReconnecting"] ?? "Reconnecting...");
+        UpdateStatus(L("SftpStatusReconnecting"));
         ReconnectRequested?.Invoke();
     }
 
@@ -1865,9 +1862,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             }
 
             string status = string.IsNullOrWhiteSpace(errorMessage)
-                ? (_localizer?["SftpStatusDisconnected"] ?? "Disconnected")
-                : (_localizer?.Format("SftpErrorSessionDied", errorMessage)
-                    ?? $"Session lost: {errorMessage}");
+                ? (L("SftpStatusDisconnected"))
+                : (LF("SftpErrorSessionDied", errorMessage));
 
             if (_pendingBrowserSecurityStatus is { } securityStatus)
             {
@@ -1912,7 +1908,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             {
                 if (!_disposed)
                 {
-                    UpdateStatus(_localizer?["SftpStatusHealthCheckFailed"] ?? "Connection lost");
+                    UpdateStatus(L("SftpStatusHealthCheckFailed"));
                 }
             });
 
@@ -1937,8 +1933,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
             if (success)
             {
-                UpdateStatus(_localizer?.Format("SftpStatusAutoUploaded", fileName)
-                    ?? $"Auto-uploaded: {fileName}");
+                UpdateStatus(LF("SftpStatusAutoUploaded", fileName));
             }
             else
             {
@@ -1947,8 +1942,10 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                     return;
                 }
 
-                ShowError(_localizer?.Format("SftpStatusAutoUploadFailed", fileName, "upload error")
-                    ?? $"Auto-upload failed: {fileName}");
+                // One argument, not two. The second used to be the literal "upload error",
+                // which reached a French user untranslated for the one reason no reason is
+                // available here: this callback is told that the upload failed, not why.
+                ShowError(LF("SftpStatusAutoUploadFailed", fileName));
             }
         });
     }
@@ -1962,13 +1959,12 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 return;
             }
 
-            ShowError(_localizer?.Format(
-                    "SftpHostKeyRotatedDuringUpload",
-                    evt.RemotePath,
-                    evt.Host,
-                    evt.Port,
-                    evt.PresentedFingerprint)
-                ?? $"Host key for {evt.Host}:{evt.Port} changed while saving {evt.RemotePath}. Save aborted.");
+            ShowError(LF(
+                "SftpHostKeyRotatedDuringUpload",
+                evt.RemotePath,
+                evt.Host,
+                evt.Port,
+                evt.PresentedFingerprint));
             _editor?.CloseEdit(evt.RemotePath);
         });
     }
@@ -2042,18 +2038,38 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
     private string FormatHostKeyMismatchMidSession(SshSessionSecurityEvent evt)
     {
-        return _localizer?.Format(
-                "SftpHostKeyMismatchMidSession",
-                evt.Host,
-                evt.Port,
-                evt.PresentedFingerprint ?? "?",
-                evt.StoredFingerprint ?? "?")
-            ?? $"Security warning: host key for {evt.Host}:{evt.Port} changed during the session. Presented fingerprint: {evt.PresentedFingerprint ?? "?"}. Trusted fingerprint: {evt.StoredFingerprint ?? "?"}.";
+        // The two fingerprints keep their own fallbacks: those are data, not prose, and a
+        // security warning that says "changed to nothing" would be worse than one that says
+        // "changed to ?".
+        return LF(
+            "SftpHostKeyMismatchMidSession",
+            evt.Host,
+            evt.Port,
+            evt.PresentedFingerprint ?? "?",
+            evt.StoredFingerprint ?? "?");
     }
 
     // ------------------------------------------------------------------
     // UI helpers
     // ------------------------------------------------------------------
+
+    /// <summary>Resolves a locale key, degrading to the key itself when no localizer is set.</summary>
+    /// <remarks>
+    /// The same helper the SSH view already uses. It replaces a dozen
+    /// <c>L("Key")</c> arms whose English half was never shown -
+    /// production always has a localizer - but which were, literally, user-facing text
+    /// written in the code, and which drifted from the catalogue by construction: nothing
+    /// updated them when a message was reworded.
+    /// </remarks>
+    private string L(string key) => L(key);
+
+    /// <summary>As <see cref="L"/>, with the localizer applying the arguments.</summary>
+    /// <remarks>
+    /// Through the localizer's own <c>Format</c>, never <c>string.Format</c>: that one
+    /// swallows a malformed template and returns it, where <c>string.Format</c> throws in
+    /// front of the user, on the line meant to tell them what went wrong.
+    /// </remarks>
+    private string LF(string key, params object[] args) => _localizer?.Format(key, args) ?? key;
 
     private void UpdateStatus(string text)
     {
@@ -2067,8 +2083,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
     private void ShowInlineEditFileTooLarge(string fileName)
     {
-        ShowError(_localizer?.Format("SftpStatusEditFileTooLarge", fileName)
-            ?? "SftpStatusEditFileTooLarge");
+        ShowError(LF("SftpStatusEditFileTooLarge", fileName));
     }
 
     private List<SftpFileInfo> GetSelectedFiles()
