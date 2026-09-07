@@ -14,6 +14,24 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A stalled SFTP server no longer freezes the file browser for good
+
+If an SFTP server stopped answering while the connection stayed open - a hung server process, a
+silent middlebox - the file browser waited for it with no time limit at all, and because it holds
+its connection while it waits, the whole pane stopped responding until you closed it. Nothing
+ended that wait, not even the keepalives, which are sent in a way that ignores its own failure.
+
+Heimdall now gives each SFTP request a quarter of an hour. This is not a limit on how long a
+transfer may take: the clock is per request, so a download of any size finishes as long as the
+link keeps moving. What it limits is how slow the link may be, and the floor works out at about
+3.5 KB/s for a download; below that a transfer now stops instead of continuing.
+
+Two things it does not do, stated because the obvious reading is wrong. It does not make a hung
+operation end quickly, only end at all: a wedged pane still takes up to fifteen minutes to free
+itself. And the failure looks like any other transfer failure, so you will not be told that
+waiting was the cause.
+
+
 ### A republished release is no longer reported as a corrupted download
 
 The checksum of an update is settled when Heimdall checks for one, and the download is
