@@ -727,4 +727,75 @@ public sealed class SshConnectionFactoryTests
         public byte[] PublicKeyBlob => publicKeyBlob;
         public byte[] Sign(byte[] data, SshAgentSignFlags flags) => [1, 2, 3];
     }
+
+    /// <summary>
+    /// An SFTP exchange is bounded, where SSH.NET leaves it waiting forever.
+    /// </summary>
+    /// <remarks>
+    /// A-19a step 2. SSH.NET's default is -1, which becomes <c>WaitAny(..., -1)</c>: a server
+    /// that stays TCP-alive but stops answering wedges the pane with nothing to end it. The
+    /// client is constructed and never connected, so this needs no network.
+    /// </remarks>
+    [Fact]
+    public void CreateSftpClient_BoundsOneSftpExchange_InsteadOfWaitingForever()
+    {
+        var connectionParams = new SshConnectionParams
+        {
+            Host = "example.com",
+            Port = 22,
+            Username = "user",
+            Password = "p",
+        };
+
+        using var client = SshConnectionFactory.CreateSftpClient(
+            connectionParams, new SshAgentRegistry(Array.Empty<ISshAgent>()));
+
+        Assert.NotEqual(Timeout.InfiniteTimeSpan, client.OperationTimeout);
+        Assert.Equal(SshConnectionFactory.SftpExchangeTimeout, client.OperationTimeout);
+    }
+
+    /// <summary>
+    /// The bound is wide enough for a slow link and narrow enough to free a wedged pane.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Pinned from BOTH sides, and the upper side is the one that matters. An oracle that only
+    /// checked the slow-link floor passes for a value of twenty-four hours, which is bounded in
+    /// name only and leaves the wedge case - the entire reason this change exists - exactly as
+    /// it was.
+    /// </para>
+    /// <para>
+    /// The floor is arithmetic, restated here from SSH.NET rather than referenced from the
+    /// product, so that this is an independent reading of the library and not a tautology. The
+    /// ceiling is not arithmetic: it is a declaration that a wedged pane must free itself
+    /// within the half hour, and an editor who wants longer is changing a product decision,
+    /// which is what the message says.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void SftpExchangeTimeout_CoversASlowLinkAndStillFreesAWedgedPane()
+    {
+        // Renci.SshNet.Sftp.SftpFileStream's nested SftpFileReader, read-ahead ceiling.
+        const long ReadAheadRequests = 100;
+
+        // min(SftpClient.BufferSize 32768, Session.LocalChannelDataPacketSize 65536) - 13.
+        const long ReadChunkBytes = 32755;
+
+        const double SlowestSupportedBytesPerSecond = 4 * 1024;
+        var wedgeCeiling = TimeSpan.FromMinutes(30);
+
+        double impliedFloor =
+            ReadAheadRequests * ReadChunkBytes / SshConnectionFactory.SftpExchangeTimeout.TotalSeconds;
+
+        Assert.True(
+            impliedFloor < SlowestSupportedBytesPerSecond,
+            $"a read slower than {impliedFloor:F0} B/s would abort, which is above the "
+            + $"{SlowestSupportedBytesPerSecond:F0} B/s this bound claims to support");
+
+        Assert.True(
+            SshConnectionFactory.SftpExchangeTimeout <= wedgeCeiling,
+            $"a wedged pane would take {SshConnectionFactory.SftpExchangeTimeout.TotalMinutes:F0} "
+            + $"minutes to free itself, past the {wedgeCeiling.TotalMinutes:F0} minute ceiling "
+            + "this bound exists to enforce");
+    }
 }
