@@ -957,8 +957,13 @@ public sealed class UpdateServiceTests : IDisposable
 
         public int AssetStreamOpenCount { get; private set; }
 
-        public Task<GitHubRelease?> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken)
-            => Task.FromResult<GitHubRelease?>(null);
+        /// <remarks>
+        /// This double only ever exercises the download path, so the lookup is never called.
+        /// It still has to name a cause: the seam refuses to carry "no release and no reason",
+        /// which is what stops a double from quietly answering "nothing happened".
+        /// </remarks>
+        public Task<GitHubReleaseResult> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken)
+            => Task.FromResult(GitHubReleaseResult.Failed(UpdateCheckFailure.SourceUnavailable));
 
         public Task<string?> GetAssetTextAsync(string url, CancellationToken cancellationToken)
         {
