@@ -214,7 +214,12 @@ public sealed class UpdateService : IUpdateService
             string actualSha256;
             try
             {
-                actualSha256 = Sha256Verifier.ComputeHex(integrityLease);
+                // Abandonable: this reads the whole installer back, and on a cold cache or a
+                // slow volume that is not instant. Cancelling here used to do nothing until
+                // the read finished.
+                actualSha256 = await Sha256Verifier
+                    .ComputeHexAsync(integrityLease, cancellationToken)
+                    .ConfigureAwait(false);
                 integrityLease.Position = 0;
             }
             catch

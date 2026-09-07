@@ -14,6 +14,17 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Cancelling an update now takes effect during verification too
+
+After an update finishes downloading, Heimdall reads the whole file back to check it against the
+published checksum. Cancelling during that step used to do nothing until the check had finished.
+On a fast disk that is under a second, but the file is a few hundred megabytes and the read is only
+as quick as the drive under it.
+
+The check can now be abandoned like the download it follows. Nothing else changes: the same
+checksum is computed the same way, and an update that is not cancelled behaves exactly as before.
+
+
 ### A privileged file operation no longer hangs forever on a server that stops answering
 
 In the SFTP pane's sudo mode, every privileged operation - creating a folder, changing

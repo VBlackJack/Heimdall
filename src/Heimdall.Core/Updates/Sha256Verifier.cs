@@ -41,6 +41,33 @@ public static class Sha256Verifier
     }
 
     /// <summary>
+    /// The lowercase hexadecimal SHA-256 of a stream, abandonable while it reads.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A-21, and the half of it that survived measurement. The synchronous overload was never a
+    /// responsiveness problem: the largest installer this project ships is 284,834,865 bytes and
+    /// hashes in 397 to 674 milliseconds, and no caller runs it on the UI thread. What it could
+    /// not do is stop. <c>DownloadVerifiedAsync</c> accepts a cancellation token and used to
+    /// ignore it for the whole verification pass, so a user who cancelled there waited for the
+    /// file to be read anyway - and the read, unlike the hashing, is only as fast as the volume
+    /// under it.
+    /// </para>
+    /// <para>
+    /// The synchronous overload stays and is not deprecated. Hashing a short in-memory string,
+    /// which is what <c>UpdateInstaller</c> does to the relauncher script, has nothing to
+    /// abandon and would pay a state machine for nothing.
+    /// </para>
+    /// </remarks>
+    public static async Task<string> ComputeHexAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    /// <summary>
     /// Verifies that the file at <paramref name="filePath"/> matches the expected
     /// hexadecimal SHA-256 digest, comparing case-insensitively.
     /// </summary>
