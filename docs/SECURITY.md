@@ -792,9 +792,11 @@ caller refuses: there is no fallback to a primitive that could replace the desti
 - RDP file generation sanitization:
   `tests/Heimdall.Rdp.Tests/RdpFileGeneratorTests.cs`.
 - CI enforces: build with zero warnings under `TreatWarningsAsErrors`,
-  `dotnet format --verify-no-changes`, full test suite, JSON locale parity
-  (EN and FR key sets must be identical, currently 5,489 keys each), and an
-  informational `dotnet list package --vulnerable` scan.
+  `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
+  the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
+  lanes that report their failures without turning the run red), JSON locale
+  parity (EN and FR key sets must be identical, currently 6,272 keys each), and
+  an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on
   vulnerability results, since advisories occasionally include false

@@ -125,7 +125,7 @@ nom ou son adresse.
 | [Architecture](docs/fr/ARCHITECTURE.md) | Comment tout cela est agencé |
 | [Journal des versions](docs/CHANGELOG.md) | Ce qui a changé, et quand |
 
-Chaque document public existe en anglais et en français.
+Chaque document ci-dessus existe en anglais et en français, sauf le journal des versions et les notes de version, qui n'existent qu'en anglais.
 
 ---
 
