@@ -434,6 +434,17 @@ le voisin `.bak`. Heimdall ne reprend pas depuis cet état : un voisin
 `<nom>.<guid>.bak` laissé par une validation interrompue est le fichier
 précédent, à renommer à la main.
 
+Heimdall le nomme désormais. Le listage d'un répertoire signale chaque voisin
+`.bak` qu'il reconnaît comme le sien, une fois par connexion, en disant laquelle
+des deux situations il représente : une copie dont l'original est absent du
+listage, qui détient donc le seul contenu du fichier en cours de remplacement,
+ou une copie dont l'original est présent, qui détient la version remplacée et
+aurait dû être supprimée ensuite. Ce signalement n'est qu'un signalement.
+Heimdall ne remet pas le fichier en place, parce que ce renommage entrerait en
+course avec un autre client en train de valider un remplacement au même instant,
+ce que la présence d'une copie orpheline suggère précisément, et c'est
+l'utilisateur qui peut distinguer les deux cas.
+
 Le remplacement FTP ne préserve par ailleurs aucune métadonnée du fichier
 remplacé. Ce qui atterrit à la destination est un fichier fraîchement remonté,
 portant le propriétaire, le mode et les horodatages que le serveur attribue à

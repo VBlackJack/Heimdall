@@ -27,6 +27,12 @@ public sealed record RemoteOperationWarning
     private const string FtpExistingTargetReplacedWarningKey =
         "WarnFtpReplacementNonAtomicMetadataNotPreserved";
 
+    private const string FtpBackupResidueOriginalMissingWarningKey =
+        "WarnFtpBackupResidueOriginalMissing";
+
+    private const string FtpBackupResidueOriginalPresentWarningKey =
+        "WarnFtpBackupResidueOriginalPresent";
+
     private RemoteOperationWarning(string warningKey, string remotePath)
     {
         WarningKey = warningKey;
@@ -68,5 +74,53 @@ public sealed record RemoteOperationWarning
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
 
         return new RemoteOperationWarning(FtpExistingTargetReplacedWarningKey, remotePath);
+    }
+
+    /// <summary>
+    /// Creates the warning for a set-aside copy whose original is missing from the listing.
+    /// </summary>
+    /// <remarks>
+    /// The interrupted replacement: the destination was moved aside, the upload never
+    /// arrived, and this file holds the only copy of what used to be there. Naming it is the
+    /// whole point - before this, the user saw a file with a hex name and no explanation.
+    /// </remarks>
+    public static RemoteOperationWarning CreateFtpBackupResidueOriginalMissing(string remotePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+        return new RemoteOperationWarning(FtpBackupResidueOriginalMissingWarningKey, remotePath);
+    }
+
+    /// <summary>
+    /// Creates the warning for a set-aside copy whose original is present in the listing.
+    /// </summary>
+    /// <remarks>
+    /// A different thing to say, kept apart on purpose. The replacement completed and only
+    /// its cleanup failed, so nothing is lost: the file the user wants is there, and this one
+    /// holds the version it replaced.
+    /// </remarks>
+    public static RemoteOperationWarning CreateFtpBackupResidueOriginalPresent(string remotePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+        return new RemoteOperationWarning(FtpBackupResidueOriginalPresentWarningKey, remotePath);
+    }
+
+    /// <summary>
+    /// Chooses which of the two residue warnings a finding deserves.
+    /// </summary>
+    /// <remarks>
+    /// The choice lives here rather than at the call site so that it can be tested without a
+    /// server. A caller that made the choice itself would be a second copy of the decision,
+    /// and collapsing the two branches there would leave every classifier test green while
+    /// the user was told the wrong thing about their file.
+    /// </remarks>
+    public static RemoteOperationWarning ForBackupResidue(FtpBackupResidueFinding finding)
+    {
+        ArgumentNullException.ThrowIfNull(finding);
+
+        return finding.OriginalIsPresent
+            ? CreateFtpBackupResidueOriginalPresent(finding.RemotePath)
+            : CreateFtpBackupResidueOriginalMissing(finding.RemotePath);
     }
 }

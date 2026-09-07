@@ -38,6 +38,26 @@ would move mode preservation onto the remote `cp`, unmeasurable without a live s
 Measured on three shells and three `cp` implementations, they do not - a staging file
 pre-created at 644 comes out 600 after copying a 600 source on all three.
 
+### An interrupted FTP replacement no longer leaves an unexplained file behind
+
+FTP cannot replace a file in one step. Heimdall moves the existing file aside, moves the
+upload into place, and deletes the copy it set aside. Interrupt that in the middle - a
+dropped connection, a killed application, a server that refuses the second move - and the
+destination is gone and a file named after a GUID is sitting in its place, which nothing in
+the product ever mentioned.
+
+Listing a directory now names each of those, once per connection, and says which of two
+situations it is: the original is missing from the listing, so this copy holds its only
+contents; or the original is there, so nothing is lost and this copy holds the version that
+was replaced. A file the user made themselves, `notes.txt.bak`, is not claimed as one of
+Heimdall's.
+
+It is a report and nothing else. Heimdall does not move the file back, because that rename
+would race another client committing a replacement at the same instant - which is exactly
+what an orphaned copy suggests may be happening - and the user is the one who can tell the
+two apart. Neither message tells them to rename or delete anything, and a test holds that
+line in both languages.
+
 ### Cancelling an SFTP connection now reaches the handshake
 
 Connecting to an SFTP server ran the blocking SSH.NET connect on a pool thread with the

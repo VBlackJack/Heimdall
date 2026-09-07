@@ -388,6 +388,16 @@ under the `.bak` sibling. Heimdall does not resume from that state: a
 `<name>.<guid>.bak` sibling left by an interrupted commit is the previous
 file, to be renamed back by hand.
 
+Heimdall does now name it. Listing a directory reports each `.bak` sibling it
+recognises as its own, once per connection, saying which of two things it is: a
+copy whose original is missing from the listing, which holds the only contents
+of the file that was being replaced, or a copy whose original is present, which
+holds the version that was replaced and should have been deleted afterwards.
+The report is only a report. Heimdall does not move the file back, because that
+rename would race another client committing a replacement at the same instant -
+which is the very situation an orphaned copy suggests - and the user is the one
+who can tell the two apart.
+
 FTP replacement also preserves none of the replaced file's metadata. What lands
 at the destination is a freshly uploaded file, carrying whatever owner, mode and
 timestamps the server assigns a new upload, so the previous file's ownership,
