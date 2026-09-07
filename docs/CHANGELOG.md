@@ -12,6 +12,27 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### CI says out loud when a test fails in a lane that cannot turn a run red
+
+Two test steps run with `continue-on-error: true`, the `CIUnstable` lane and the
+`RequiresDesktop` lane. A test failing there leaves the workflow at
+`conclusion: success` with no step marked red, and the only surviving trace is a
+TRX inside the `test-results` artifact that somebody has to download and parse on
+purpose. Nobody did. Reparsing the 99 green runs between 2026-08-26 and
+2026-09-06 turned up 1 179 440 test results and seven failed tests inside runs
+GitHub called successful, one of them on master inside a release run.
+
+A new step, `Report informational lane failures`, now reads those TRX after both
+lanes and prints every failure under the marker `[INFO-FAIL]`, with its duration,
+the head of its message and a workflow warning. Nothing changes about what
+blocks: the step always exits 0. It also states how many TRX files it read and
+how many results they held, so zero failures over zero results reads as unknown
+rather than as clean, and it counts only `UnitTestResult` elements, because the
+`ResultSummary` element of a TRX carries an `outcome="Failed"` attribute of its
+own that a text search would report as a failing test.
+
 ## 2026-09-06: the updater and the application exit audited, then the SFTP, FTP and FTPS layer (v2026.090604)
 
 ### The update relauncher brings the application back even when its script never starts
