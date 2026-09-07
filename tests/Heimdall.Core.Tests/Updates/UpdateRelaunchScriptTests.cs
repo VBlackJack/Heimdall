@@ -363,6 +363,66 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Contains("Stop-Transcript", script);
     }
 
+    /// <remarks>
+    /// The relaunch used to write nothing at all on the success path, and no failure record
+    /// is written when nothing throws: "the application did not come back" and "the relaunch
+    /// was never attempted" left the same silence. Twice on CI, once on master, a test
+    /// watched for the relaunch marker and could not tell the two apart.
+    /// <para>
+    /// Asserted by ORDER rather than by presence, because presence is satisfied by a line
+    /// emitted after Stop-Transcript, where nothing would ever read it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Build_RecordsItsRelaunchDecisionWhileTheTranscriptIsStillOpen()
+    {
+        const string logPath = @"C:\Temp\heimdall_update.log";
+        string script = UpdateRelaunchScript.Build(SampleSpec(logPath: logPath));
+
+        int finallyIndex = script.LastIndexOf("} finally {", StringComparison.Ordinal);
+        int decisionIndex = script.IndexOf("relaunch starting after stage", StringComparison.Ordinal);
+        int launchIndex = script.IndexOf(
+            $"Start-Process -FilePath '{RelaunchTarget}'",
+            StringComparison.Ordinal);
+        int idIndex = script.IndexOf("relaunch started process id", StringComparison.Ordinal);
+        int elseIndex = script.IndexOf(
+            Environment.NewLine + "    } else {",
+            idIndex,
+            StringComparison.Ordinal);
+        int skipIndex = script.IndexOf("relaunch skipped, stage", StringComparison.Ordinal);
+        int stopIndex = script.IndexOf("Stop-Transcript", StringComparison.Ordinal);
+
+        Assert.True(finallyIndex < decisionIndex, "the decision is recorded inside the finally");
+        Assert.True(decisionIndex < launchIndex, "the decision is recorded before the launch");
+        Assert.True(launchIndex < idIndex, "the process id is recorded after the launch");
+
+        // The skip line is the ELSE of the decision, not a second unconditional line: a
+        // transcript that says both "starting" and "skipped" describes nothing.
+        Assert.True(idIndex < elseIndex && elseIndex < skipIndex, "the skip line is the else branch");
+        Assert.True(skipIndex < stopIndex, "everything is written while the transcript is open");
+    }
+
+    /// <remarks>
+    /// The id must be MEASURED from the process the launch returned, and reported even when
+    /// there is none. Printing a constant, or hoisting the line inside the null guard so a
+    /// failed launch says nothing, both leave the finding exactly where it was.
+    /// </remarks>
+    [Fact]
+    public void Build_MeasuresTheRelaunchProcessIdAndReportsItEvenWhenThereIsNone()
+    {
+        string script = UpdateRelaunchScript.Build(SampleSpec(logPath: @"C:\Temp\heimdall_update.log"));
+
+        Assert.Contains("-PassThru", script[
+            script.IndexOf($"Start-Process -FilePath '{RelaunchTarget}'", StringComparison.Ordinal)..script.IndexOf("relaunch started process id", StringComparison.Ordinal)]);
+        Assert.Contains("$relaunchProcessId = [int]$relaunchProcess.Id", script);
+
+        // Eight spaces: the branch's own depth. The guard's inner statements sit at twelve,
+        // so hoisting the line into the guard fails here.
+        Assert.Contains(
+            Environment.NewLine + "        Write-Output ('heimdall-update: relaunch started process id ",
+            script);
+    }
+
     [Fact]
     public void Build_WithoutLogPath_EmitsNoTranscript()
     {
