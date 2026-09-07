@@ -14,6 +14,34 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A privileged file operation no longer hangs forever on a server that stops answering
+
+In the SFTP pane's sudo mode, every privileged operation - creating a folder, changing
+permissions, renaming, deleting, listing a directory you cannot read as yourself - runs as a
+single command over its own SSH channel. Those commands had no deadline of their own. The SSH
+library leaves a command's timeout infinite unless it is told otherwise, so a server that
+accepted the channel and then never answered left the operation running with nothing able to
+end it. Measured against a live server whose shell was frozen mid-command, the operation was
+still running when the measurement gave up; the same command with a deadline gave up in
+seconds.
+
+Nothing outside the command closed that gap. Several of these operations, the sudo folder
+creation and the permission change among them, were started without any cancellation at all,
+so there was no token to trip even when the pane was closing. And the key-only path ran the
+command on a background thread in a way that a cancellation cannot interrupt once it has
+started: cancelling would have stopped it from starting, never stopped it from running.
+
+Each privileged command now carries a ten-minute deadline of its own, the same bound the file
+browser already uses for a server-side copy. Long enough for a recursive delete over a large
+tree, short enough that a channel producing nothing stops holding the operation open. Reaching
+it reports a failure, which is what an unproductive channel is. The key-only path was also
+rewritten so the command it runs is one it can bound and one the cancellation reaches for as
+long as it runs.
+
+What this does not cover: a privileged upload or download. Those are bulk transfers whose
+duration is set by the size of the file, and a fixed deadline would abort a legitimate large
+one. They keep the cancellation they already had, and no deadline was added to them.
+
 ### The FTPS data-channel warning can no longer disappear unnoticed
 
 When you connect over FTPS, Heimdall shows a standing notice that the data channel's identity is
@@ -25,7 +53,6 @@ It was raised from a spot in the code where deleting it would have removed the w
 FTPS session without a single test noticing. Nothing about the warning changes for you; what
 changes is that it is now pinned by tests that fail if it stops appearing, if it appears on a
 connection that does not need it, or if it appears with the wrong text.
-
 
 ### Corrected: what Heimdall does with a server's interactive questions
 

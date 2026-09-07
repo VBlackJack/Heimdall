@@ -75,6 +75,23 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private const int MaximumCapturedSudoStandardErrorBytes = 65_536;
     private static readonly TimeSpan ErrorHighlightDuration = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// Generous but finite bound on one privileged control command: the mkdir, chmod, mv, rm and ls
+    /// bodies, and the rename probes.
+    /// </summary>
+    /// <remarks>
+    /// <para>SSH.NET leaves <c>SshCommand.CommandTimeout</c> at
+    /// <see cref="System.Threading.Timeout.InfiniteTimeSpan"/>, so a server that accepts the exec
+    /// channel and then never answers wedges the operation with nothing left to end it. The
+    /// caller's token does not cover that gap on its own: several sudo call sites pass no token at
+    /// all, and a token cannot interrupt a delegate that has already started running.</para>
+    /// <para>Ten minutes, matching the server-side copy bound in the SFTP browser: long enough for
+    /// a recursive delete over a large tree, short enough that an unproductive channel gives up by
+    /// itself rather than holding the operation open forever. Reaching it surfaces the failure to
+    /// the user as a failure, which is what an unproductive exec channel is.</para>
+    /// </remarks>
+    internal static readonly TimeSpan SudoCommandTimeout = TimeSpan.FromMinutes(10);
+
     private readonly Stack<string> _navigationHistory = new();
     private readonly IUiDispatcher _uiDispatcher;
     private readonly IRemoteClipboardService _remoteClipboard;
@@ -2059,7 +2076,22 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         if (!authenticateViaStdin)
         {
-            return await Task.Run(() => ssh.RunCommand(commandText), ct).ConfigureAwait(false);
+            // Not RunCommand: it builds the command internally, so there is no object to bound
+            // before it blocks, and the token handed to a Task.Run cannot interrupt a delegate
+            // that has already started. Created here, the command carries its own bound and the
+            // await honours the token for as long as the command runs.
+            Renci.SshNet.SshCommand command = ssh.CreateCommand(commandText);
+            command.CommandTimeout = SudoCommandTimeout;
+            try
+            {
+                await command.ExecuteAsync(ct).ConfigureAwait(false);
+                return command;
+            }
+            catch
+            {
+                command.Dispose();
+                throw;
+            }
         }
 
         return await ExecuteSudoBodyWithPasswordAsync(
@@ -2081,6 +2113,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         try
         {
             command = ssh.CreateCommand(commandText);
+            command.CommandTimeout = SudoCommandTimeout;
             executeTask = command.ExecuteAsync(ct);
             await WriteSudoPasswordAsync(command, password, ct).ConfigureAwait(false);
 
