@@ -224,7 +224,24 @@ public partial class UpdateBannerViewModel : ObservableObject
 
         if (result.Status == UpdateCheckStatus.CheckFailed)
         {
-            // Do not stamp UpdateLastCheckUtc on failure so an offline launch retries next time.
+            // An offline launch retries next time, which is right for every transient cause:
+            // one GET per launch costs nothing and the answer may have changed.
+            //
+            // A spent quota is the exception, and retrying makes it worse. The unauthenticated
+            // GitHub quota is counted per ADDRESS, so an office behind one address shares a
+            // single bucket; checking again on every launch while the quota reads zero keeps
+            // that bucket pinned and is how the secondary limit gets tripped. Stamping the
+            // check backs off to the ordinary daily throttle instead.
+            //
+            // The cost is stated rather than hidden: the daily throttle is usually longer than
+            // the reset the source quoted, so this waits longer than it strictly must. Honouring
+            // the quoted reset needs a stored resume-at time, which is a settings field and a
+            // migration; waiting too long is the safe side of that trade.
+            if (result.Failure == UpdateCheckFailure.RateLimited)
+            {
+                await PersistLastCheckAsync();
+            }
+
             return;
         }
 

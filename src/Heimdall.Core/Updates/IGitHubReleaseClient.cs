@@ -23,9 +23,15 @@ namespace Heimdall.Core.Updates;
 public interface IGitHubReleaseClient
 {
     /// <summary>
-    /// Fetches the latest release of a repository, or null on any failure.
+    /// Fetches the latest release of a repository, or the reason it could not.
     /// </summary>
-    Task<GitHubRelease?> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken);
+    /// <remarks>
+    /// Returns a result rather than a nullable release so that "there is no release" always
+    /// arrives with a cause attached. Five conditions used to reach the caller as the same
+    /// null - offline, rate limited, no such repository, unreadable JSON, and a TLS failure -
+    /// and the user was told the same sentence for all of them.
+    /// </remarks>
+    Task<GitHubReleaseResult> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken);
 
     /// <summary>
     /// Downloads a small text asset (such as SHA256SUMS.txt), or null on failure.

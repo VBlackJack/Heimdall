@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+using System.Globalization;
+using System.IO;
 using System.Net;
+using System.Net.Http;
+using System.Security.Authentication;
 using System.Text;
 using Heimdall.Core.Updates;
 
@@ -45,8 +49,10 @@ public sealed class GitHubReleaseClientTests
     {
         var client = CreateClient((_, _) => JsonResponse(HttpStatusCode.OK, LatestReleaseJson));
 
-        var release = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+        var result = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
 
+        Assert.Equal(UpdateCheckFailure.None, result.Failure);
+        var release = result.Release;
         Assert.NotNull(release);
         Assert.Equal("v2026.061502", release!.TagName);
         Assert.Equal("https://github.com/VBlackJack/Heimdall/releases/tag/v2026.061502", release.HtmlUrl);
@@ -76,35 +82,91 @@ public sealed class GitHubReleaseClientTests
         Assert.Contains("application/vnd.github+json", captured.Headers.Accept.ToString());
     }
 
+    /// <summary>
+    /// The five conditions that used to arrive as one null now arrive named.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A-17, asserted through the real client rather than through
+    /// <c>ClassifyStatus</c> alone. A perfect classifier that nothing reached would leave
+    /// every one of these green, which is the vacuity this covers: each row here drives an
+    /// actual response or an actual throw all the way to a returned cause.
+    /// </para>
+    /// <para>
+    /// The advice differs for every row. Connect to the internet; look at your proxy or your
+    /// clock; wait; nothing you can do, it is the maintainer's problem; nothing anybody can
+    /// do yet. One sentence for all five sent every user to read a log they cannot find.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task GetLatestReleaseAsync_NotFound_ReturnsNull()
+    public async Task GetLatestReleaseAsync_EachStoppingCondition_ArrivesWithItsOwnCause()
     {
-        var client = CreateClient((_, _) => new HttpResponseMessage(HttpStatusCode.NotFound));
+        await AssertCauseAsync(
+            (_, _) => new HttpResponseMessage(HttpStatusCode.NotFound),
+            UpdateCheckFailure.SourceNotFound);
 
-        var release = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+        await AssertCauseAsync(
+            (_, _) => throw new HttpRequestException("network down"),
+            UpdateCheckFailure.NetworkUnreachable);
 
-        Assert.Null(release);
-    }
+        await AssertCauseAsync(
+            (_, _) => throw new HttpRequestException(
+                "handshake", new AuthenticationException("bad certificate")),
+            UpdateCheckFailure.SecureChannelFailed);
 
-    [Fact]
-    public async Task GetLatestReleaseAsync_HttpRequestException_ReturnsNull()
-    {
-        var client = CreateClient((_, _) => throw new HttpRequestException("network down"));
-
-        var release = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
-
-        Assert.Null(release);
-    }
-
-    [Fact]
-    public async Task GetLatestReleaseAsync_Timeout_ReturnsNull()
-    {
         // HttpClient timeout surfaces as TaskCanceledException while the caller token is not signaled.
-        var client = CreateClient((_, _) => throw new TaskCanceledException("timed out"));
+        await AssertCauseAsync(
+            (_, _) => throw new TaskCanceledException("timed out"),
+            UpdateCheckFailure.TimedOut);
 
-        var release = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+        await AssertCauseAsync(
+            (_, _) => JsonResponse(HttpStatusCode.OK, "{ this is not json"),
+            UpdateCheckFailure.MalformedResponse);
 
-        Assert.Null(release);
+        // A 200 that parses but names no release is unreadable in the sense that matters.
+        await AssertCauseAsync(
+            (_, _) => JsonResponse(HttpStatusCode.OK, "{ }"),
+            UpdateCheckFailure.MalformedResponse);
+    }
+
+    /// <summary>
+    /// A throttled answer carries both the cause and the wait the source volunteered.
+    /// </summary>
+    /// <remarks>
+    /// The 403-with-no-quota-left shape is GitHub's usual way of throttling, and the reason
+    /// the classifier reads a header rather than the status alone. The reset time is what
+    /// turns "try again later" into something the user can act on.
+    /// </remarks>
+    [Fact]
+    public async Task GetLatestReleaseAsync_ThrottledWithAResetTime_ReportsBoth()
+    {
+        var client = CreateClient((_, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Forbidden);
+            response.Headers.TryAddWithoutValidation("X-RateLimit-Remaining", "0");
+            response.Headers.TryAddWithoutValidation(
+                "X-RateLimit-Reset",
+                DateTimeOffset.UtcNow.AddMinutes(20).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
+            return response;
+        });
+
+        var result = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+
+        Assert.Equal(UpdateCheckFailure.RateLimited, result.Failure);
+        Assert.NotNull(result.RetryAfter);
+        Assert.InRange(result.RetryAfter!.Value, TimeSpan.FromMinutes(18), TimeSpan.FromMinutes(20));
+    }
+
+    private async Task AssertCauseAsync(
+        Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> handler,
+        UpdateCheckFailure expected)
+    {
+        var client = CreateClient(handler);
+
+        var result = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+
+        Assert.Null(result.Release);
+        Assert.Equal(expected, result.Failure);
     }
 
     [Fact]
@@ -366,5 +428,205 @@ public sealed class GitHubReleaseClientTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromResult(responder(request, cancellationToken));
+    }
+
+    /// <summary>
+    /// Each non-success status is read as the thing the user would have to do about it.
+    /// </summary>
+    /// <remarks>
+    /// A-17. The two rows that matter are the pair of 403s. GitHub answers a spent quota
+    /// with 403 far more often than with 429, and a 403 is otherwise an ordinary refusal, so
+    /// the status alone cannot tell "wait an hour" from "this will never work" - only
+    /// X-RateLimit-Remaining can. Collapse the two and half the users get advice that will
+    /// never help them.
+    /// </remarks>
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, null, UpdateCheckFailure.SourceNotFound)]
+    [InlineData(HttpStatusCode.Forbidden, "0", UpdateCheckFailure.RateLimited)]
+    [InlineData(HttpStatusCode.Forbidden, "57", UpdateCheckFailure.AccessDenied)]
+    [InlineData((HttpStatusCode)451, null, UpdateCheckFailure.SourceNotFound)]
+    [InlineData(HttpStatusCode.Forbidden, null, UpdateCheckFailure.AccessDenied)]
+    [InlineData(HttpStatusCode.Forbidden, "not a number", UpdateCheckFailure.AccessDenied)]
+    [InlineData(HttpStatusCode.TooManyRequests, "57", UpdateCheckFailure.RateLimited)]
+    [InlineData(HttpStatusCode.Unauthorized, null, UpdateCheckFailure.AccessDenied)]
+    [InlineData(HttpStatusCode.InternalServerError, null, UpdateCheckFailure.SourceUnavailable)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, null, UpdateCheckFailure.SourceUnavailable)]
+    [InlineData(HttpStatusCode.BadGateway, null, UpdateCheckFailure.SourceUnavailable)]
+    [InlineData((HttpStatusCode)418, null, UpdateCheckFailure.SourceUnavailable)]
+    public void ClassifyStatus_ReadsTheStatusAsACause(
+        HttpStatusCode status, string? rateLimitRemaining, UpdateCheckFailure expected)
+    {
+        using HttpResponseMessage response = new(status);
+        if (rateLimitRemaining is not null)
+        {
+            response.Headers.TryAddWithoutValidation("X-RateLimit-Remaining", rateLimitRemaining);
+        }
+
+        Assert.Equal(expected, GitHubReleaseClient.ClassifyStatus(status, response.Headers));
+    }
+
+    /// <summary>
+    /// GitHub's secondary rate limit is read as rate limiting, not as a plain refusal.
+    /// </summary>
+    /// <remarks>
+    /// The row the first version of this change missed, and the one that matters most in
+    /// practice. GitHub's documented behaviour for a secondary limit is a 403 or 429 with
+    /// <c>Retry-After</c> set, and with <c>X-RateLimit-Remaining</c> typically ABOVE zero -
+    /// the primary quota is not what was spent. Reading only the remaining count sends
+    /// exactly that case to "the update server refused the request. See the log for
+    /// details", which is the sentence A-17 exists to stop showing.
+    /// </remarks>
+    [Fact]
+    public void ClassifyStatus_SecondaryRateLimit_IsReadAsRateLimiting()
+    {
+        using HttpResponseMessage secondary = new(HttpStatusCode.Forbidden);
+        secondary.Headers.TryAddWithoutValidation("X-RateLimit-Remaining", "57");
+        secondary.Headers.TryAddWithoutValidation("Retry-After", "60");
+
+        Assert.Equal(
+            UpdateCheckFailure.RateLimited,
+            GitHubReleaseClient.ClassifyStatus(HttpStatusCode.Forbidden, secondary.Headers));
+
+        // And the wait it asked for survives, which is the whole value of naming it.
+        Assert.Equal(TimeSpan.FromSeconds(60), GitHubReleaseClient.ReadRetryAfter(secondary.Headers));
+    }
+
+    /// <summary>
+    /// A transport failure is read from the error code the stack sets, not from a guess.
+    /// </summary>
+    /// <remarks>
+    /// Five unrelated conditions arrive as the same exception type. Returning "you are
+    /// offline" for all of them would rebuild, one layer down, the collapse this change
+    /// undoes: a proxy demanding credentials and a response that is not HTTP are neither of
+    /// them a missing network, and neither is fixed by looking at one.
+    /// </remarks>
+    [Theory]
+    [InlineData(HttpRequestError.SecureConnectionError, UpdateCheckFailure.SecureChannelFailed)]
+    [InlineData(HttpRequestError.ProxyTunnelError, UpdateCheckFailure.ProxyRefused)]
+    [InlineData(HttpRequestError.InvalidResponse, UpdateCheckFailure.MalformedResponse)]
+    [InlineData(HttpRequestError.ResponseEnded, UpdateCheckFailure.MalformedResponse)]
+    [InlineData(HttpRequestError.ConfigurationLimitExceeded, UpdateCheckFailure.MalformedResponse)]
+    [InlineData(HttpRequestError.NameResolutionError, UpdateCheckFailure.NetworkUnreachable)]
+    [InlineData(HttpRequestError.ConnectionError, UpdateCheckFailure.NetworkUnreachable)]
+    public void ClassifyTransportFailure_ReadsTheErrorCode(
+        HttpRequestError error, UpdateCheckFailure expected)
+    {
+        Assert.Equal(
+            expected,
+            GitHubReleaseClient.ClassifyTransportFailure(new HttpRequestException(error, "transport")));
+    }
+
+    /// <summary>
+    /// An answer cut off after its headers is reported, not left to escape.
+    /// </summary>
+    /// <remarks>
+    /// The body is read after the headers, so a dropped connection throws
+    /// <see cref="HttpIOException"/> - which derives from <see cref="IOException"/> and NOT
+    /// from <see cref="HttpRequestException"/>, so it used to slip past every catch here and
+    /// reach the caller's blanket handler as an unexplained fault. That is the ordinary
+    /// flaky-connection case, and it was not in the enumeration this finding claimed to make.
+    /// </remarks>
+    [Fact]
+    public async Task GetLatestReleaseAsync_AnswerCutOffAfterTheHeaders_IsReportedNotEscaped()
+    {
+        await AssertCauseAsync(
+            (_, _) => throw new HttpIOException(HttpRequestError.ResponseEnded, "cut off"),
+            UpdateCheckFailure.NetworkUnreachable);
+
+        await AssertCauseAsync(
+            (_, _) => throw new HttpIOException(HttpRequestError.InvalidResponse, "not http"),
+            UpdateCheckFailure.MalformedResponse);
+    }
+
+    /// <summary>
+    /// A waiting time is read when the source volunteered one, and never invented.
+    /// </summary>
+    /// <remarks>
+    /// Two spellings, because GitHub uses the second: <c>Retry-After</c> carries a delay or a
+    /// date, while its own throttling sets <c>X-RateLimit-Reset</c> to a Unix time. A reset
+    /// already in the past is dropped rather than shown as "wait 0 minutes", which is what a
+    /// clock a few seconds out would otherwise produce on every throttled check.
+    /// </remarks>
+    [Fact]
+    public void ReadRetryAfter_ReadsBothSpellingsAndInventsNothing()
+    {
+        using HttpResponseMessage none = new(HttpStatusCode.Forbidden);
+        Assert.Null(GitHubReleaseClient.ReadRetryAfter(none.Headers));
+
+        using HttpResponseMessage delta = new(HttpStatusCode.TooManyRequests);
+        delta.Headers.TryAddWithoutValidation("Retry-After", "120");
+        Assert.Equal(TimeSpan.FromSeconds(120), GitHubReleaseClient.ReadRetryAfter(delta.Headers));
+
+        using HttpResponseMessage reset = new(HttpStatusCode.Forbidden);
+        reset.Headers.TryAddWithoutValidation(
+            "X-RateLimit-Reset",
+            DateTimeOffset.UtcNow.AddMinutes(30).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
+        var fromReset = GitHubReleaseClient.ReadRetryAfter(reset.Headers);
+        Assert.NotNull(fromReset);
+        Assert.InRange(fromReset!.Value, TimeSpan.FromMinutes(28), TimeSpan.FromMinutes(30));
+
+        using HttpResponseMessage past = new(HttpStatusCode.Forbidden);
+        past.Headers.TryAddWithoutValidation(
+            "X-RateLimit-Reset",
+            DateTimeOffset.UtcNow.AddMinutes(-5).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
+        Assert.Null(GitHubReleaseClient.ReadRetryAfter(past.Headers));
+
+        using HttpResponseMessage garbage = new(HttpStatusCode.Forbidden);
+        garbage.Headers.TryAddWithoutValidation("X-RateLimit-Reset", "soon");
+        Assert.Null(GitHubReleaseClient.ReadRetryAfter(garbage.Headers));
+    }
+
+    /// <summary>
+    /// A connection that could not be secured is not reported as an absent network.
+    /// </summary>
+    /// <remarks>
+    /// A TLS failure arrives as an <see cref="HttpRequestException"/> exactly like an
+    /// unreachable host, with the real cause nested inside. Telling somebody behind an
+    /// intercepting proxy, or with a clock a year out, that they are offline sends them to
+    /// look at the one thing that is working.
+    /// </remarks>
+    [Fact]
+    public void ClassifyTransportFailure_SeparatesATlsFailureFromAnAbsentNetwork()
+    {
+        Assert.Equal(
+            UpdateCheckFailure.NetworkUnreachable,
+            GitHubReleaseClient.ClassifyTransportFailure(new HttpRequestException("no route to host")));
+
+        Assert.Equal(
+            UpdateCheckFailure.SecureChannelFailed,
+            GitHubReleaseClient.ClassifyTransportFailure(
+                new HttpRequestException("failed", new AuthenticationException("bad certificate"))));
+
+        // Nested one level deeper than HttpClient usually puts it, because it is not
+        // contractual: the walk has to reach the cause wherever the stack put it.
+        Assert.Equal(
+            UpdateCheckFailure.SecureChannelFailed,
+            GitHubReleaseClient.ClassifyTransportFailure(
+                new HttpRequestException(
+                    "failed",
+                    new IOException("stream", new AuthenticationException("bad certificate")))));
+    }
+
+    /// <summary>
+    /// A lookup cannot say "no release" without saying why, and cannot say both.
+    /// </summary>
+    /// <remarks>
+    /// The invariant is the point of the type. A test double left returning a bare null
+    /// would leave every caller's failure handling unexercised while every existing test
+    /// stayed green - which is exactly the shape of the defect A-17 records.
+    /// </remarks>
+    [Fact]
+    public void GitHubReleaseResult_CannotBeSilentAndCannotBeBoth()
+    {
+        Assert.Throws<ArgumentException>(
+            () => new GitHubReleaseResult(null, UpdateCheckFailure.None));
+
+        Assert.Throws<ArgumentException>(
+            () => new GitHubReleaseResult(
+                new GitHubRelease("v1", "url", "body", []), UpdateCheckFailure.RateLimited));
+
+        var failed = GitHubReleaseResult.Failed(UpdateCheckFailure.TimedOut);
+        Assert.Null(failed.Release);
+        Assert.Equal(UpdateCheckFailure.TimedOut, failed.Failure);
     }
 }

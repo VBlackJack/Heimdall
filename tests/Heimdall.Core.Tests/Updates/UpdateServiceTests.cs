@@ -579,10 +579,22 @@ public sealed class UpdateServiceTests : IDisposable
 
         public Func<Stream>? StreamFactory { get; set; }
 
-        public Task<GitHubRelease?> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken)
+        /// <summary>Why the lookup fails, when <see cref="Release"/> is null.</summary>
+        /// <remarks>
+        /// Defaulted to a real cause rather than to None. The seam refuses to carry "nothing,
+        /// and no reason", so a double that has not been told what to fail with would throw
+        /// instead of quietly leaving every caller's failure handling unexercised.
+        /// </remarks>
+        public UpdateCheckFailure Failure { get; set; } = UpdateCheckFailure.SourceUnavailable;
+
+        public TimeSpan? RetryAfter { get; set; }
+
+        public Task<GitHubReleaseResult> GetLatestReleaseAsync(string owner, string repo, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(Release);
+            return Task.FromResult(Release is null
+                ? GitHubReleaseResult.Failed(Failure, RetryAfter)
+                : GitHubReleaseResult.Succeeded(Release));
         }
 
         public Task<string?> GetAssetTextAsync(string url, CancellationToken cancellationToken)
@@ -640,5 +652,87 @@ public sealed class UpdateServiceTests : IDisposable
         public List<double> Reports { get; } = [];
 
         public void Report(double value) => Reports.Add(value);
+    }
+
+    /// <summary>
+    /// The cause of a failed lookup reaches the caller, and so does any waiting time.
+    /// </summary>
+    /// <remarks>
+    /// A-17. Five conditions used to arrive as one null and be reported with one sentence
+    /// telling the user to read a log they cannot find. The status stays CheckFailed - what a
+    /// caller DOES about it has not changed - and the cause rides alongside. Every member is
+    /// covered rather than a sample, because a switch that forgets one is the defect.
+    /// </remarks>
+    [Theory]
+    [InlineData(UpdateCheckFailure.NetworkUnreachable)]
+    [InlineData(UpdateCheckFailure.SecureChannelFailed)]
+    [InlineData(UpdateCheckFailure.RateLimited)]
+    [InlineData(UpdateCheckFailure.SourceNotFound)]
+    [InlineData(UpdateCheckFailure.MalformedResponse)]
+    [InlineData(UpdateCheckFailure.AccessDenied)]
+    [InlineData(UpdateCheckFailure.SourceUnavailable)]
+    [InlineData(UpdateCheckFailure.TimedOut)]
+    public async Task CheckForUpdatesAsync_LookupFailed_CarriesTheCauseNotJustTheFailure(
+        UpdateCheckFailure failure)
+    {
+        var client = new StubReleaseClient { Release = null, Failure = failure };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var result = await service.CheckForUpdatesAsync(
+            HeimdallVersion.Parse(CurrentTag), "owner", "repo", CancellationToken.None);
+
+        Assert.Equal(UpdateCheckStatus.CheckFailed, result.Status);
+        Assert.Equal(failure, result.Failure);
+    }
+
+    /// <summary>
+    /// A waiting time the source volunteered reaches the caller too.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the cause because it is separately droppable: the hint is optional on
+    /// every path, and a caller that has the cause but silently loses the hint would show a
+    /// vaguer message than it could, with nothing going red.
+    /// </remarks>
+    [Fact]
+    public async Task CheckForUpdatesAsync_RateLimitedWithAResetTime_CarriesTheWaitingTime()
+    {
+        var client = new StubReleaseClient
+        {
+            Release = null,
+            Failure = UpdateCheckFailure.RateLimited,
+            RetryAfter = TimeSpan.FromMinutes(42),
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var result = await service.CheckForUpdatesAsync(
+            HeimdallVersion.Parse(CurrentTag), "owner", "repo", CancellationToken.None);
+
+        Assert.Equal(UpdateCheckFailure.RateLimited, result.Failure);
+        Assert.Equal(TimeSpan.FromMinutes(42), result.RetryAfter);
+    }
+
+    /// <summary>
+    /// A check that succeeded reports no cause at all.
+    /// </summary>
+    /// <remarks>
+    /// The control that keeps the field honest. A Failure left at a stale value on the
+    /// success path would be invisible here without it, and would surface later as a cause
+    /// attached to an answer that worked.
+    /// </remarks>
+    [Fact]
+    public async Task CheckForUpdatesAsync_Succeeded_ReportsNoCause()
+    {
+        var client = new StubReleaseClient
+        {
+            Release = new GitHubRelease(CurrentTag, "https://example.test", "notes", []),
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var result = await service.CheckForUpdatesAsync(
+            HeimdallVersion.Parse(CurrentTag), "owner", "repo", CancellationToken.None);
+
+        Assert.Equal(UpdateCheckStatus.UpToDate, result.Status);
+        Assert.Equal(UpdateCheckFailure.None, result.Failure);
+        Assert.Null(result.RetryAfter);
     }
 }
