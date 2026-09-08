@@ -178,10 +178,18 @@ spent at most once per connection attempt, so when a password round is followed 
 second round asking for a verification code, that second round is refused rather
 than answered with the password again, and the refusal is reported as an unanswered
 question. Heimdall then retries the connection through the embedded Plink, which
-runs with a real console in the terminal pane, so the server's remaining questions
-are asked where somebody can see them. That retry happens when Pageant is available
-or when no SSH agent is running; with the Windows OpenSSH agent running and Pageant
-absent, no retry is attempted and the refusal stands.
+runs with a real console in the terminal pane. That retry happens when Pageant is
+available or when no SSH agent is running; with the Windows OpenSSH agent running
+and Pageant absent, no retry is attempted and the refusal stands.
+
+What the retry reaches depends on what the server asks next, and this was measured
+rather than assumed. Against a server whose remaining question is a password, the
+bundled Plink asks it in the terminal pane and waits for an answer. Against a server
+that offers a verification code over keyboard-interactive, the bundled Plink refuses
+with "No supported authentication methods available" and the connection ends there.
+So a second factor delivered that way is still not reachable: the retry replaces a
+silent misuse of the password with an honest refusal, which is an improvement, but
+it is not a way in.
 
 Two costs of that retry, stated rather than left implicit. The second round is now a
 refusal where it used to be an answer. And the number of authentication attempts a

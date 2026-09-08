@@ -23,7 +23,14 @@ way to ask you for another.
 
 The password is now spent at most once per connection attempt. The second question is refused
 instead, and Heimdall retries the connection through the bundled Plink, which runs with a real
-console in the terminal pane, so the server's remaining questions are asked where you can see them.
+console in the terminal pane.
+
+How far that gets you depends on what the server asks next, and this was measured rather than
+assumed. If the remaining question is a password, Plink asks it in the pane and waits for your
+answer. If the server offers a verification code over keyboard-interactive, the bundled Plink
+refuses with "No supported authentication methods available" and the connection ends there. So a
+code-based second factor is still not a way in: what changes is that your password is no longer
+spent on the question, and the refusal is honest.
 
 Two things this costs, and one thing it does not do.
 
