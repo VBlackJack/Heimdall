@@ -4622,6 +4622,37 @@ public partial class EmbeddedRdpView
         }
     }
 
+    private void OnOverlayCopyAnonymousClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        bool copied = RdpClipboardCopy.TryCopy(
+            report => Clipboard.SetDataObject(report, copy: true),
+            BuildAnonymousReconnectReport(),
+            ex => Core.Logging.FileLogger.Warn($"RDP diagnostic copy failed ({ex.GetType().Name})."));
+        ShowTransientToast(L(copied ? LocaleKeys.CopyErrorToast : LocaleKeys.CopyErrorFailedToast));
+    }
+
+    internal string BuildAnonymousReconnectReport()
+    {
+        Core.SessionDiagnostics.SessionDiagnostic? diagnostic =
+            _ownerPane?.FailureDetails ?? _sessionTab?.PrimaryPane?.FailureDetails;
+        StringBuilder builder = new();
+        builder.AppendLine(L("RdpCopyAnonymousHeader"));
+        AppendReportLine(builder, L("RdpCopyErrorTimeLabel"),
+            DateTime.UtcNow.ToString("u", CultureInfo.InvariantCulture));
+        AppendReportLine(builder, L("RdpCopyErrorAppLabel"), BuildCopyErrorAppValue());
+        if (diagnostic?.Code is int)
+        {
+            builder.AppendLine(FormatOverlayCode(diagnostic, _lastExtendedDisconnectReason));
+        }
+        builder.AppendLine(L("RdpCopyAnonymousHint"));
+        return builder.ToString().TrimEnd();
+    }
+
     private string BuildReconnectErrorReport(IReadOnlyCollection<string> messageLines)
     {
         if (_localizer is null)

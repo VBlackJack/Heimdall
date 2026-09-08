@@ -67,6 +67,8 @@ C'est gratuit, open source, et cela tourne sur Windows 10 et 11.
   et votre `~/.ssh/known_hosts` s'importe et s'exporte pour que OpenSSH et Heimdall soient
   d'accord sur qui est qui.
 - **Rien à installer à côté.** Les deux téléchargements sont autonomes.
+- **Comprendre un échec de connexion.** Testez chaque passerelle SSH, modifiez le profil d'une
+  session SSH ou SFTP déconnectée depuis son onglet et copiez un diagnostic RDP anonymisé.
 
 Le catalogue complet se trouve dans la [référence des fonctionnalités](docs/fr/FEATURES.md).
 

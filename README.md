@@ -62,6 +62,8 @@ It is free, open source, and runs on Windows 10 and 11.
   to compare; a key that changes is refused by default, and your `~/.ssh/known_hosts` can be
   imported and exported so OpenSSH and Heimdall agree on who is who.
 - **Nothing to install alongside it.** Both downloads are self-contained.
+- **Understand a failed connection.** Test each SSH gateway hop before connecting, edit a
+  disconnected SSH or SFTP profile from its tab, and copy an anonymized RDP diagnostic for support.
 
 The full catalogue is in the [feature reference](docs/FEATURES.md).
 

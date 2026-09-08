@@ -72,6 +72,15 @@
                         Margin="8,0,0,0"
                         Visibility="{Binding IsDisconnected, Converter={StaticResource BoolToVisibilityConverter}}"
                         AutomationProperties.Name="{loc:Translate A11yReconnectSession}"/>
+                <Button x:Name="EditProfileButton"
+                        DockPanel.Dock="Right"
+                        Content="{loc:Translate BtnEditProfileOverlay}"
+                        Click="OnEditProfileClick"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Padding="8,2"
+                        Margin="8,0,0,0"
+                        Visibility="{Binding IsDisconnected, Converter={StaticResource BoolToVisibilityConverter}}"
+                        AutomationProperties.Name="{loc:Translate A11yEditProfileOverlay}"/>
                 <Button x:Name="SplitButton"
                         DockPanel.Dock="Right"
                         Content="&#xE8A9;"

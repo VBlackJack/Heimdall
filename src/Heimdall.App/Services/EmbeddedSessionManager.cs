@@ -1002,6 +1002,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
 
     private void WireReconnectRequested(EmbeddedSshView view, SessionTabViewModel tab)
     {
+        view.EditProfileRequested += () => EditServerRequestedCallback?.Invoke(
+            view.OwningPane?.ProfileLookupServerId ?? tab.ProfileLookupServerId);
         view.ReconnectContextRequested += context =>
             ForwardReconnectRequest(tab, context, ReconnectRequestedCallback);
         view.CloseRequested += () => CloseRequestedCallback?.Invoke(tab);
@@ -1139,6 +1141,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
 
     private void WireReconnectRequested(EmbeddedSftpView view, SessionTabViewModel tab)
     {
+        view.EditProfileRequested += () => EditServerRequestedCallback?.Invoke(
+            view.OwningPane?.ProfileLookupServerId ?? tab.ProfileLookupServerId);
         view.ReconnectRequested += () =>
         {
             if (tab.IsSplit && view.OwningPane is { } ownerPane)

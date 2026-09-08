@@ -50,6 +50,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Fail-closed host-key enforcement for SSH.NET and Plink fallback paths, including `HostKeyUnavailable` when a pinned gateway key cannot be resolved without falling back to PuTTY/Plink's cache
 - Gateway-aware tunnel reuse includes endpoints, accounts, stored credentials and agent preference. Connection-affecting edits open a fresh tunnel; display-name changes preserve sharing.
 - Multi-gateway tunnel chaining with circular dependency detection
+- **Test gateway route** from the gateway add/edit dialog: preview every ancestor, test SSH authentication at each hop, optionally confirm a destination TCP port, and copy an anonymized report with durations and next actions. Tests use existing trusted host keys, can be cancelled, and do not save the form or disturb existing tunnels
 - Dynamic tunnel port allocation with bounded retry on bind-race (`AddressAlreadyInUse`)
 - Tunnel ref-counting (shared tunnels survive individual session close)
 - Terminal resize via SSH window-change request (public `ShellStream.ChangeWindowSize` API, no reflection)

@@ -346,6 +346,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// </summary>
     public event Action? ReconnectRequested;
 
+    public event Action? EditProfileRequested;
+
     internal event Action<ReconnectRequestContext>? ReconnectContextRequested;
 
     /// <summary>
@@ -899,6 +901,17 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         HideReconnectOverlay();
         Core.Logging.FileLogger.Info("EmbeddedSSH Close requested via overlay");
         CloseRequested?.Invoke();
+    }
+
+    private void OnOverlayEditProfileClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        StopAutoReconnectTimer();
+        EditProfileRequested?.Invoke();
     }
 
     private void OnAutoReconnectCancelClick(object sender, RoutedEventArgs e)

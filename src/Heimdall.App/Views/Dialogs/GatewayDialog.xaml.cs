@@ -15,8 +15,13 @@
  */
 
 using System.Windows;
+using Heimdall.App.Services;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Configuration;
+using Heimdall.Core.Logging;
+using Heimdall.Core.Ssh;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 
 namespace Heimdall.App.Views.Dialogs;
@@ -33,6 +38,8 @@ public partial class GatewayDialog : Window
     {
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
+        Loaded += InitializeDiagnostics;
+        Closed += (_, _) => (DataContext as GatewayDialogViewModel)?.CloseDiagnostics();
 
         Loaded += (_, _) =>
         {
@@ -82,12 +89,44 @@ public partial class GatewayDialog : Window
         };
     }
 
+    private async void InitializeDiagnostics(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not GatewayDialogViewModel vm || vm.DiagnosticsReady) return;
+        try
+        {
+            IServiceProvider? services = (Application.Current as App)?.Services;
+            if (services is null) return;
+            IConfigManager config = services.GetRequiredService<IConfigManager>();
+            AppSettings settings = await config.LoadSettingsAsync();
+            GatewayDiagnosticService.Configure(vm, settings, services.GetRequiredService<IHostKeyTrustService>());
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Gateway diagnostic initialization failed: {ex.GetType().Name}");
+            vm.DiagnosticStatus = vm.Localizer?["GatewayDiagnosticUnavailable"] ?? "GatewayDiagnosticUnavailable";
+        }
+    }
+
+    private void OnTestRouteClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not GatewayDialogViewModel vm || !vm.TestGatewayRouteCommand.CanExecute(null)) return;
+        vm.Password = PasswordBox.Password;
+        vm.KeyPassphrase = vm.HasKeyPath ? KeyPassphraseBox.Password : "";
+        vm.TestGatewayRouteCommand.Execute(null);
+    }
+
+    private void OnCopyDiagnosticClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is GatewayDialogViewModel vm) vm.CopyDiagnosticReport(new WpfClipboardService());
+    }
+
     private void OnCredentialPasswordChanged(object sender, RoutedEventArgs e)
     {
         if (!_suppressCredentialDirtyTracking
             && DataContext is GatewayDialogViewModel vm)
         {
             vm.IsDirty = true;
+            vm.InvalidateDiagnosticResult();
         }
     }
 

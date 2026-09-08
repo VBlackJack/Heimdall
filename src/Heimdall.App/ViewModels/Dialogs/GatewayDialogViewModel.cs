@@ -146,6 +146,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
             or nameof(SelectedParentGatewayId))
         {
             IsDirty = true;
+            InvalidateDiagnosticResult();
         }
     }
 
@@ -304,6 +305,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
 
         var vm = new GatewayDialogViewModel { _isInitializing = true };
         vm.IsEditMode = true;
+        vm._diagnosticGatewayId = dto.Id;
         vm.Name = dto.Name;
         vm.Host = dto.Host;
         vm.Port = dto.Port;
