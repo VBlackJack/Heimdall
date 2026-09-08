@@ -383,11 +383,18 @@ privilégiée. Ce compromis accepte quelques invites de nouvelle tentative
 manuelle en échange de l'absence d'actions sudo sur des échecs qui ne relèvent
 pas des permissions.
 
-Les remontées privilégiées séparent les commandes d'écriture et de nettoyage.
-L'écriture par `sudo tee` est exécutée séparément, et la suppression du fichier
-de transit `/tmp/.heimdall_*` s'effectue depuis un chemin `finally` avec une
-commande de nettoyage non annulable. Les échecs de nettoyage sont journalisés
-en avertissement tout en préservant l'erreur d'écriture d'origine.
+Les téléversements privilégiés écrivent dans un répertoire privé voisin de la cible.
+Un remplacement accepté utilise un renommage atomique ; une création seule publie
+par lien physique exclusif. Le nettoyage ne retire que les fichiers temporaires.
+Les décisions de conflit des transferts ordinaires atteignent aussi le commit final :
+une cible libre ou un renommage automatique n'autorise pas de remplacement. FTP ne
+garantit pas la création distante exclusive ; ces téléversements sont donc refusés.
+
+Un remplacement SFTP applique le GID POSIX de la cible avant le mode et les dates,
+puis relit tous ces attributs. Un échec de changement de GID ou une relecture
+différente refuse la publication. Le listing privilégié utilise GNU find et des
+champs séparés par NUL ; les sauts de ligne ne peuvent pas créer de fausses entrées.
+Les noms enfants non supportés sont exclus avant leur utilisation.
 
 `RemoteFileEditor` suit les tâches de remontée du surveillant de fichiers par
 session d'édition, propage l'annulation via `CloseEdit` et `Dispose`, et
@@ -396,6 +403,10 @@ arrière-plan non gérées n'atteignent pas le pipeline
 `UnobservedTaskException` à l'échelle du processus. Les sessions d'édition sudo
 mettent en cache le `PinnedFingerprintVerifier` construit à l'ouverture au lieu
 de résoudre à nouveau la confiance de clé d'hôte à chaque enregistrement.
+
+Les ouvertures d'éditeur externe sont sérialisées et liées à la durée de vie de leur
+propriétaire. Sa fermeture annule les téléchargements en cours ; l'enregistrement,
+la création du surveillant et le lancement de l'éditeur ne reprennent pas après sa destruction.
 
 ### Garanties de validation des remontées distantes
 

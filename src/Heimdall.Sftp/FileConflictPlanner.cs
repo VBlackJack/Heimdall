@@ -124,7 +124,11 @@ public sealed record FileConflictResolvedItem(
     string SourceIdentity,
     string OriginalTargetPath,
     string EffectiveTargetPath,
-    FileConflictEffectiveAction Action);
+    FileConflictEffectiveAction Action)
+{
+    /// <summary>True only when the operator explicitly chose to replace this destination.</summary>
+    public bool Overwrite { get; init; }
+}
 
 /// <summary>
 /// Pure batch conflict analyzer and resolver. All destination access is supplied by the caller, and
@@ -289,7 +293,7 @@ public static class FileConflictPlanner
                     resolved.Add(ToResolved(item, item.TargetPath, FileConflictEffectiveAction.Skip));
                     break;
                 case FileConflictResolutionChoice.Replace:
-                    resolved.Add(ToResolved(item, item.TargetPath, FileConflictEffectiveAction.Proceed));
+                    resolved.Add(ToResolved(item, item.TargetPath, FileConflictEffectiveAction.Proceed) with { Overwrite = true });
                     break;
                 case FileConflictResolutionChoice.AutoRename:
                     string renamedTarget = BuildAvailableTarget(

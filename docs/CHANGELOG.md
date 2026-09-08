@@ -14,6 +14,16 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### SFTP publication and editing safety
+
+- Transfers preserve the explicit replacement choice through publication. New destinations and
+  automatically renamed targets refuse late collisions; privileged transfers use the same policy.
+  FTP uploads that require exclusive creation are refused because FTP cannot guarantee it.
+- SFTP replacements preserve and verify the group owner before restoring permission and special bits.
+- Privileged directory browsing uses NUL-delimited GNU find records, preserving literal arrow names
+  and excluding unsafe names without creating entries from embedded newlines.
+- Closing an external-edit owner cancels pending opens and prevents later watcher or editor creation.
+
 ### SSH gateway routing and lifecycle
 
 - New connections stop reusing a tunnel after a gateway endpoint, account, stored credential

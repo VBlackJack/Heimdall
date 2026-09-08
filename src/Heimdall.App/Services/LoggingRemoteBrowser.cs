@@ -166,16 +166,24 @@ public sealed class LoggingRemoteBrowser
 
     /// <inheritdoc />
     public Task DownloadFileAsync(string remotePath, string localPath, CancellationToken ct = default)
+        => DownloadFileAsync(remotePath, localPath, overwrite: true, ct);
+
+    /// <inheritdoc />
+    public Task DownloadFileAsync(string remotePath, string localPath, bool overwrite, CancellationToken ct = default)
         => RunLoggedAsync(
-            () => _inner.DownloadFileAsync(remotePath, localPath, ct),
+            () => _inner.DownloadFileAsync(remotePath, localPath, overwrite, ct),
             ms => SessionOperationRecord.Download.Success(_protocol, _host, remotePath, localPath, FileLength(localPath), ms),
             ms => SessionOperationRecord.Download.Cancelled(_protocol, _host, remotePath, localPath, ms),
             (ms, category) => SessionOperationRecord.Download.Error(_protocol, _host, remotePath, localPath, ms, category));
 
     /// <inheritdoc />
     public Task UploadFileAsync(string localPath, string remotePath, CancellationToken ct = default)
+        => UploadFileAsync(localPath, remotePath, overwrite: true, ct);
+
+    /// <inheritdoc />
+    public Task UploadFileAsync(string localPath, string remotePath, bool overwrite, CancellationToken ct = default)
         => RunLoggedAsync(
-            () => _inner.UploadFileAsync(localPath, remotePath, ct),
+            () => _inner.UploadFileAsync(localPath, remotePath, overwrite, ct),
             ms => SessionOperationRecord.Upload.Success(_protocol, _host, remotePath, localPath, FileLength(localPath), ms),
             ms => SessionOperationRecord.Upload.Cancelled(_protocol, _host, remotePath, localPath, ms),
             (ms, category) => SessionOperationRecord.Upload.Error(_protocol, _host, remotePath, localPath, ms, category));

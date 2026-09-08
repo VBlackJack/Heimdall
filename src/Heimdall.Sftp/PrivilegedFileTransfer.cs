@@ -25,6 +25,8 @@ namespace Heimdall.Sftp;
 /// </summary>
 public static class PrivilegedFileCommands
 {
+    /// <summary>A creation-only privileged upload encountered an occupied destination.</summary>
+    public const int DestinationExistsExitStatus = 78;
     /// <summary>Exit status used when a privileged edit exceeds its configured size limit.</summary>
     public const int FileTooLargeExitStatus = 75;
 
@@ -74,6 +76,7 @@ public static class PrivilegedFileCommands
         + "trap cleanup EXIT HUP INT TERM; "
         + "preserve_metadata=0; "
         + "if [ -e \"$target\" ] || [ -L \"$target\" ]; then "
+        + "if [ \"$replace\" -eq 0 ]; then printf '%s\\n' 'Refusing existing destination.' >&2; exit 78; fi; "
         + "if ln -P -- \"$target\" original 2>/dev/null; then :; else ln -- \"$target\" original; fi; "
         + "if [ -L original ] || [ ! -f original ]; then "
         + "printf '%s\\n' 'Refusing non-regular or symbolic-link target.' >&2; exit 73; fi; "
@@ -106,7 +109,10 @@ public static class PrivilegedFileCommands
         + "rm -f -- original; "
         + "if [ -L \"$target\" ]; then "
         + "printf '%s\\n' 'Refusing symbolic-link target.' >&2; exit 73; fi; "
-        + "mv -fT -- payload \"$target\"; "
+        + "if [ \"$replace\" -eq 1 ]; then mv -fT -- payload \"$target\"; "
+        + "else if ln -T -- payload \"$target\"; then :; "
+        + "else if [ -e \"$target\" ] || [ -L \"$target\" ]; then exit 78; else exit 1; fi; fi; "
+        + "rm -f -- payload; fi; "
         + "cd /; rmdir -- \"$work\" 2>/dev/null || :; "
         + "trap - EXIT HUP INT TERM; sync -f \"$dir\"";
 
@@ -131,11 +137,11 @@ public static class PrivilegedFileCommands
     /// <summary>
     /// Builds a root-side streamed write that commits with a same-directory atomic rename.
     /// </summary>
-    public static string BuildAtomicWriteBody(string targetRemotePath)
+    public static string BuildAtomicWriteBody(string targetRemotePath, bool overwrite = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetRemotePath);
 
-        return BuildShellBody(AtomicWriteScript, targetRemotePath);
+        return BuildShellBody($"replace={(overwrite ? 1 : 0)}; " + AtomicWriteScript, targetRemotePath);
     }
 
     /// <summary>
