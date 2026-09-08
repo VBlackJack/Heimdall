@@ -32,9 +32,8 @@ public sealed record TunnelSetupOutcome(
     /// Whether an already-open tunnel was handed back rather than a new one opened.
     /// </summary>
     /// <remarks>
-    /// Carried out of the tunnel layer because a reused tunnel's route is not the one this
-    /// connection resolved. <see cref="TunnelResult.ReusedExistingTunnel"/> says why the two can
-    /// disagree: the reuse key hashes gateway identifiers, which an edit leaves alone.
+    /// A display-name edit can change the current route label while preserving reuse.
+    /// The reused tunnel retains the route description captured when it was opened.
     /// </remarks>
     public bool ReusedExistingTunnel { get; init; }
 

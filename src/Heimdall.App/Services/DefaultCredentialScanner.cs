@@ -75,7 +75,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
     {
         if (_gateway is not null)
         {
-            EnsureTunnel(ct);
+            await EnsureTunnelAsync(ct).ConfigureAwait(false);
             var safeHost = InputValidator.EscapeShellArg(host);
             var commandText =
                 $"timeout 2 bash -c \"echo >/dev/tcp/{safeHost}/{port}\" 2>/dev/null && echo OPEN || echo CLOSED";
@@ -98,7 +98,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
         {
             if (_gateway is not null)
             {
-                EnsureTunnel(ct);
+                await EnsureTunnelAsync(ct).ConfigureAwait(false);
             }
 
             var accepted = service switch
@@ -164,10 +164,18 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
         _commandLock = null;
     }
 
-    private void EnsureTunnel(CancellationToken ct)
+    private async Task EnsureTunnelAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        _tunnelClient ??= ToolGatewayConnector.Connect(_gateway!);
+        await _commandLock!.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            _tunnelClient ??= await ToolGatewayConnector.ConnectAsync(_gateway!, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _commandLock.Release();
+        }
     }
 
     private async Task<string> ExecuteTunnelCommandAsync(

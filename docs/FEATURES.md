@@ -48,7 +48,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - SSH keepalive heartbeat (prevents TMOUT disconnects); the shell-level reset fires only into an idle SSH shell, never into a half-typed line, a local or WinRM terminal, or a macro recording
 - User-confirmed TOFU host key verification with persistent fingerprint pinning; trust decisions resolved *before* `Connect()` via a dedicated pre-authentication probe - SSH.NET's `HostKeyReceived` callback never performs async work or UI dispatch
 - Fail-closed host-key enforcement for SSH.NET and Plink fallback paths, including `HostKeyUnavailable` when a pinned gateway key cannot be resolved without falling back to PuTTY/Plink's cache
-- Gateway-aware tunnel reuse identity (stable gateway IDs + normalized chain hash) prevents accidental sharing across overlapping private networks
+- Gateway-aware tunnel reuse includes endpoints, accounts, stored credentials and agent preference. Connection-affecting edits open a fresh tunnel; display-name changes preserve sharing.
 - Multi-gateway tunnel chaining with circular dependency detection
 - Dynamic tunnel port allocation with bounded retry on bind-race (`AddressAlreadyInUse`)
 - Tunnel ref-counting (shared tunnels survive individual session close)

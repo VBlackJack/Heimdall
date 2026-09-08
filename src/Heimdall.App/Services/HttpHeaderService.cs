@@ -161,9 +161,9 @@ public sealed class HttpHeaderService : IHttpHeaderService
         Uri uri,
         CancellationToken ct)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
-            using var client = ToolGatewayConnector.Connect(gateway);
+            using var client = await ToolGatewayConnector.ConnectAsync(gateway, ct).ConfigureAwait(false);
             var curlCommand = $"curl -sI --max-time 10 {InputValidator.EscapeShellArg(uri.ToString())} 2>/dev/null";
             using var cmd = client.CreateCommand(curlCommand);
             cmd.CommandTimeout = ConnectionTimeout;

@@ -62,17 +62,16 @@ public sealed class PingService : IPingService
         _gateway = gateway;
     }
 
-    public Task StartSessionAsync(CancellationToken ct)
+    public async Task StartSessionAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         EndSession();
 
         if (_gateway is not null)
         {
-            _sshClient = ToolGatewayConnector.Connect(_gateway);
+            _sshClient = await ToolGatewayConnector.ConnectAsync(_gateway, ct).ConfigureAwait(false);
         }
 
-        return Task.CompletedTask;
     }
 
     public async Task<PingProbeResult> PingAsync(string host, int seq, int timeoutMs, CancellationToken ct)

@@ -258,6 +258,7 @@ public sealed partial class TunnelManager : IDisposable
 
             var session = context.CreateSession(info);
 
+            openToken.ThrowIfCancellationRequested();
             return RegisterTunnelSession(session, boundLocalPort, info);
         }
         catch (Exception ex)
@@ -294,7 +295,8 @@ public sealed partial class TunnelManager : IDisposable
         string? label = null,
         string? gatewayChainKey = null,
         string localBindHost = LoopbackBinding.DefaultHost,
-        string? gatewayRoute = null)
+        string? gatewayRoute = null,
+        int keepAliveIntervalSeconds = AppSettings.DefaultSshKeepAliveIntervalSeconds)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(gatewayChain);
@@ -315,6 +317,7 @@ public sealed partial class TunnelManager : IDisposable
         {
             return await OpenTunnelAsync(gatewayChain[0], remoteHost, remotePort, localPort, hostKeyStore, verifier,
                     cancellationToken,
+                    keepAliveIntervalSeconds: keepAliveIntervalSeconds,
                     socksProxyPort: socksProxyPort, remoteBindPort: remoteBindPort, remoteLocalPort: remoteLocalPort,
                     label: label,
                     gatewayChainKey: gatewayChainKey,
@@ -360,6 +363,7 @@ public sealed partial class TunnelManager : IDisposable
             // Connect to the first (root) gateway directly
             var rootClient = _createSshClient(gatewayChain[0]);
             context.IntermediateClients.Add(rootClient);
+            rootClient.KeepAliveInterval = TimeSpan.FromSeconds(keepAliveIntervalSeconds);
 
             await _connectSshClient(
                     rootClient,
@@ -419,6 +423,7 @@ public sealed partial class TunnelManager : IDisposable
                     context.FinalClient = hopClient;
                 }
 
+                hopClient.KeepAliveInterval = TimeSpan.FromSeconds(keepAliveIntervalSeconds);
                 await _connectSshClient(
                         hopClient,
                         nextGateway.Host,
@@ -455,6 +460,7 @@ public sealed partial class TunnelManager : IDisposable
                 gatewayChainKey,
                 localBindHost);
 
+            openToken.ThrowIfCancellationRequested();
             return RegisterTunnelSession(context.CreateSession(tunnelInfo), boundLocalPort, tunnelInfo);
         }
         catch (Exception ex)

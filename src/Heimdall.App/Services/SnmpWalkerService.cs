@@ -159,10 +159,10 @@ public sealed class SnmpWalkerService : ISnmpWalkerService
             throw new InvalidOperationException("Tunnel walk requested without a configured gateway.");
         }
 
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var entries = new List<SnmpEntry>();
-            using var client = ToolGatewayConnector.Connect(_gateway);
+            using var client = await ToolGatewayConnector.ConnectAsync(_gateway, ct).ConfigureAwait(false);
             try
             {
                 var commandText =

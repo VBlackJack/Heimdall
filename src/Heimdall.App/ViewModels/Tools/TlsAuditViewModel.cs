@@ -333,7 +333,7 @@ public sealed partial class TlsAuditViewModel : ObservableObject, IDisposable
             _sshClient = null;
         }
 
-        private bool TestProtocolViaTunnel(string host, int port, SslProtocols protocol, CancellationToken ct)
+        private async Task<bool> TestProtocolViaTunnel(string host, int port, SslProtocols protocol, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
 
@@ -355,7 +355,7 @@ public sealed partial class TlsAuditViewModel : ObservableObject, IDisposable
             try
             {
                 var escapedHost = InputValidator.EscapeShellArg(host);
-                using var command = EnsureTunnelClient().CreateCommand(
+                using var command = (await EnsureTunnelClientAsync(ct).ConfigureAwait(false)).CreateCommand(
                     $"echo | openssl s_client -connect {escapedHost}:{port} {flag} 2>&1 | head -5");
                 command.CommandTimeout = TlsAuditEngine.ConnectionTimeout;
                 command.Execute();
@@ -376,7 +376,7 @@ public sealed partial class TlsAuditViewModel : ObservableObject, IDisposable
             }
         }
 
-        private bool TestCipherSuiteViaTunnel(string host, int port, TlsCipherSuite suite, CancellationToken ct)
+        private async Task<bool> TestCipherSuiteViaTunnel(string host, int port, TlsCipherSuite suite, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
 
@@ -386,7 +386,7 @@ public sealed partial class TlsAuditViewModel : ObservableObject, IDisposable
             try
             {
                 var escapedHost = InputValidator.EscapeShellArg(host);
-                using var command = EnsureTunnelClient().CreateCommand(
+                using var command = (await EnsureTunnelClientAsync(ct).ConfigureAwait(false)).CreateCommand(
                     $"echo | openssl s_client -connect {escapedHost}:{port} -tls1_2 -cipher {opensslName} 2>&1 | head -5");
                 command.CommandTimeout = TlsAuditEngine.ConnectionTimeout;
                 command.Execute();
@@ -406,12 +406,12 @@ public sealed partial class TlsAuditViewModel : ObservableObject, IDisposable
             }
         }
 
-        private X509Certificate2? RetrieveCertificateViaTunnel(string host, int port, CancellationToken ct)
+        private async Task<X509Certificate2?> RetrieveCertificateViaTunnel(string host, int port, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
 
             var escapedHost = InputValidator.EscapeShellArg(host);
-            using var command = EnsureTunnelClient().CreateCommand(
+            using var command = (await EnsureTunnelClientAsync(ct).ConfigureAwait(false)).CreateCommand(
                 $"echo | openssl s_client -connect {escapedHost}:{port} -servername {escapedHost} 2>/dev/null");
             command.CommandTimeout = TlsAuditEngine.ConnectionTimeout;
             command.Execute();
@@ -436,7 +436,7 @@ public sealed partial class TlsAuditViewModel : ObservableObject, IDisposable
             return X509CertificateLoader.LoadCertificate(certBytes);
         }
 
-        private SshClient EnsureTunnelClient()
+        private async Task<SshClient> EnsureTunnelClientAsync(CancellationToken ct)
         {
             if (_sshClient is { IsConnected: true })
                 return _sshClient;
@@ -445,7 +445,7 @@ public sealed partial class TlsAuditViewModel : ObservableObject, IDisposable
                 throw new InvalidOperationException("No gateway is configured.");
 
             _sshClient?.Dispose();
-            _sshClient = ToolGatewayConnector.Connect(_gateway);
+            _sshClient = await ToolGatewayConnector.ConnectAsync(_gateway, ct).ConfigureAwait(false);
             return _sshClient;
         }
     }

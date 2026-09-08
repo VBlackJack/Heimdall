@@ -76,12 +76,9 @@ public sealed record TunnelInfo(
     /// </summary>
     /// <remarks>
     /// <para><b>Why it lives on the tunnel and not on the connection that asks.</b>
-    /// <see cref="GatewayChainKey"/> above is a hash over the chain's gateway IDENTIFIERS, and
-    /// editing a gateway leaves its identifier alone - which is deliberate, since a tunnel
-    /// already dialled to a host is still a working tunnel to that host. The consequence is that
-    /// a later connection reusing this tunnel can resolve a chain naming an entirely different
-    /// machine, and it may belong to a different profile altogether. The route that is true is
-    /// the one recorded here by whoever opened it.</para>
+    /// <see cref="GatewayChainKey"/> includes the endpoint and authentication configuration.
+    /// A display-name edit preserves that identity, so the route label can still differ from
+    /// the current settings. The opening description remains on the shared transport.</para>
     /// <para><b>Set at construction, which stamping it afterwards could not achieve.</b> The
     /// first attempt assigned it to the returned instance once the tunnel was up. That left two
     /// holes and both were reachable. The assignment happened after the configured establishment
