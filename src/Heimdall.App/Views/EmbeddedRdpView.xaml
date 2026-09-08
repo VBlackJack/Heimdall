@@ -594,6 +594,16 @@
                                 Padding="16,6"
                                 FontSize="{StaticResource FontSizeBodyLarge}"
                                 Margin="8,0,0,0"/>
+                        <Button x:Name="OverlayCopyAnonymousButton"
+                                TabIndex="4"
+                                Click="OnOverlayCopyAnonymousClick"
+                                Content="{loc:Translate RdpCopyAnonymous}"
+                                ToolTip="{loc:Translate RdpCopyAnonymousHint}"
+                                AutomationProperties.Name="{loc:Translate RdpCopyAnonymous}"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="16,6"
+                                FontSize="{StaticResource FontSizeBodyLarge}"
+                                Margin="8,0,0,0"/>
                         <Button x:Name="OverlayEditProfileButton"
                                 TabIndex="2"
                                 Click="OnOverlayEditProfileClick"

@@ -1,4 +1,7 @@
 {
+  "RdpCopyAnonymous": "Copy anonymized report",
+  "RdpCopyAnonymousHeader": "RDP diagnostic report (anonymized)",
+  "RdpCopyAnonymousHint": "Includes time, application version and available RDP codes. Excludes server addresses, account names and error message text.",
   "GatewayDiagnosticTitle": "Test and understand this route",
   "GatewayDiagnosticHint": "Tests the current form without saving it. Uses trusted host keys only. Each step has the host-key probe timeout configured in Settings. Existing sessions stay open.",
   "GatewayDiagnosticRoute": "Complete gateway route",

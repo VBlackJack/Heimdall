@@ -14,6 +14,13 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Recovery actions in SSH, SFTP and RDP
+
+- Disconnected SSH and SFTP sessions can open their saved profile directly. Split views target
+  the clicked pane's inventory profile and keep the recovery controls available while editing.
+- RDP adds an anonymized support report containing UTC time, application version and available
+  numeric RDP codes. The detailed report remains available separately.
+
 ### SSH gateway route diagnostics
 
 - Gateway add/edit dialogs show the complete route and can test the current form without saving.

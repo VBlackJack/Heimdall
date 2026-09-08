@@ -219,6 +219,14 @@
                                         Padding="16,6"
                                         FontSize="{StaticResource FontSizeBodyLarge}"
                                         Margin="0,0,8,0"/>
+                                <Button x:Name="OverlayEditProfileButton"
+                                        Content="{loc:Translate BtnEditProfileOverlay}"
+                                        Click="OnOverlayEditProfileClick"
+                                        AutomationProperties.Name="{loc:Translate A11yEditProfileOverlay}"
+                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                        Padding="16,6"
+                                        FontSize="{StaticResource FontSizeBodyLarge}"
+                                        Margin="0,0,8,0"/>
                                 <Button x:Name="OverlayCloseButton"
                                         Content="{loc:Translate BtnCloseOverlay}"
                                         Click="OnOverlayCloseClick"

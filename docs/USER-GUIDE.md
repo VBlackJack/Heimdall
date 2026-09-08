@@ -163,6 +163,14 @@ is doing. You can cancel that from the toolbar.
 
 If the reason on screen is not enough, the log will have more.
 
+For a disconnected SSH or SFTP session, choose **Edit profile** to correct its saved settings,
+then reconnect. The session stays open while you edit. In a split view, this edits the profile
+of the pane where you clicked, rather than the first pane.
+
+For RDP, **Copy anonymized report** copies the UTC time, Heimdall version and available RDP
+codes without server addresses, accounts or error message text. The existing **Copy error**
+action keeps the detailed report, including the server identity. Review that report before sharing.
+
 For an SSH gateway, open its add/edit dialog and use **Test route**. The preview shows the
 complete parent chain and includes the values currently in the form. Testing does not save them.
 Optionally enter a destination host and TCP port to check access from the last gateway.

@@ -176,6 +176,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     /// </summary>
     public event Action? ReconnectRequested;
 
+    public event Action? EditProfileRequested;
+
     /// <summary>
     /// Raised when the user asks the shared pane lifecycle to close this session tab.
     /// </summary>
@@ -1847,6 +1849,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         Core.Logging.FileLogger.Info("EmbeddedSFTP close requested by user");
         CloseRequested?.Invoke();
+    }
+
+    private void OnEditProfileClick(object sender, RoutedEventArgs e)
+    {
+        if (!_disposed)
+        {
+            EditProfileRequested?.Invoke();
+        }
     }
 
     private void OnBrowserDisconnected(string? errorMessage)

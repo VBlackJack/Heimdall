@@ -173,6 +173,14 @@ montrant ce qu'elle fait. Vous pouvez annuler depuis la barre d'outils.
 
 Si la raison affichée ne suffit pas, le journal en dira davantage.
 
+Dans une session SSH ou SFTP déconnectée, choisissez **Modifier le profil** pour corriger les
+paramètres enregistrés, puis reconnectez-vous. La session reste ouverte pendant la modification.
+Dans une vue partagée, le bouton ouvre le profil du volet concerné.
+
+Pour RDP, **Copier le rapport anonymisé** fournit la date UTC, la version de Heimdall et les codes
+RDP disponibles, sans adresses, comptes ni texte des erreurs. **Copier l'erreur** conserve le
+rapport détaillé avec l'identité du serveur. Relisez ce dernier avant de le partager.
+
 Pour une passerelle SSH, ouvrez son formulaire de création/modification et utilisez
 **Tester le parcours**. L'aperçu montre tous les parents et les valeurs actuelles du formulaire.
 Le test ne les enregistre pas. Vous pouvez ajouter un hôte cible et un port TCP pour vérifier

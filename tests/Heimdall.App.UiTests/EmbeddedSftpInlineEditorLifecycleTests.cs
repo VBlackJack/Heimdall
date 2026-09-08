@@ -38,6 +38,34 @@ public sealed class EmbeddedSftpInlineEditorLifecycleTests
     private const long MaxInlineEditFileBytes = 16L * 1024 * 1024;
 
     [Fact]
+    public async Task DisconnectedProfileEdit_PreservesThePaneAndTargetsItsInventoryProfile()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(() =>
+        {
+            BlockingUploadRemoteBrowser browser = new();
+            (EmbeddedSftpView owner, SessionPaneModel pane) = CreateInitializedOwner(browser);
+            pane.ServerId = "split-runtime";
+            pane.OriginalServerId = "saved-sftp";
+            EmbeddedSessionManager manager = (EmbeddedSessionManager)
+                System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EmbeddedSessionManager));
+            string? edited = null;
+            manager.EditServerRequestedCallback = id => edited = id;
+            typeof(EmbeddedSessionManager).GetMethod("WireReconnectRequested",
+                BindingFlags.Instance | BindingFlags.NonPublic, null,
+                [typeof(EmbeddedSftpView), typeof(SessionTabViewModel)], null)!
+                .Invoke(manager, [owner, new SessionTabViewModel { ServerId = "different-primary" }]);
+            Button button = Assert.IsType<Button>(owner.FindName("EditProfileButton"));
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("saved-sftp", edited);
+            Assert.Same(owner, pane.HostControl);
+            edited = null;
+            owner.Dispose();
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Null(edited);
+        });
+    }
+
+    [Fact]
     public async Task InlineEditor_KnownOversizeFile_RefusesBeforeDownload()
     {
         await WpfTestHost.Dispatcher.InvokeAsync(async () =>
