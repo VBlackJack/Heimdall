@@ -349,10 +349,18 @@ generic `SshException("Failure")` messages do not trigger privileged
 operations. This trades occasional manual retry prompts for avoiding sudo
 actions on non-permission failures.
 
-Privileged uploads split the write and cleanup commands. The `sudo tee`
-write is executed separately, and removal of the `/tmp/.heimdall_*` staging
-file runs from a `finally` path with an uncancelled cleanup command. Cleanup
-failures are logged as warnings while preserving the original write error.
+Privileged uploads stream into a private directory beside the destination.
+Accepted replacements use atomic rename; creation-only transfers publish by an
+exclusive hard link. Cleanup removes only the staging files. Ordinary upload and
+download conflict decisions also reach the final commit: an unoccupied target or
+automatic rename never authorizes replacement. FTP cannot guarantee exclusive
+remote creation, so such uploads are refused rather than silently weakened.
+
+SFTP replacement copies the destination's POSIX GID before restoring mode and
+timestamps, then verifies all of them. A failed GID change or mismatching
+read-back refuses publication. Privileged listings use GNU find with NUL-separated
+fields; embedded newlines cannot create fictitious rows. Unsupported child names
+are excluded before any operation can consume them.
 
 `RemoteFileEditor` tracks file-watcher upload tasks per edit session,
 propagates cancellation through `CloseEdit` and `Dispose`, and observes
@@ -360,6 +368,10 @@ faults synchronously so unhandled background upload exceptions do not reach
 the process-wide `UnobservedTaskException` pipeline. Sudo edit sessions
 cache the `PinnedFingerprintVerifier` built at open time instead of resolving
 host-key trust again on every save.
+
+External-editor opens are serialized and linked to their owner's lifetime. Closing
+the owner cancels pending downloads; registration, watcher creation and editor launch
+cannot resume after disposal.
 
 ### Remote upload commit guarantees
 

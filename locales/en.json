@@ -1873,6 +1873,8 @@
   "ValidationInlineSshUserRequired": "SSH username is required",
   "ValidationInlineSshUserFormat": "Invalid SSH username format",
 
+  "SftpErrorDestinationChanged": "The destination is now occupied and was not replaced. Refresh the folder and retry with a new name or an explicit replacement choice.",
+  "SftpErrorExclusiveUploadUnconfirmed": "The upload could not be confirmed without replacing a file. Refresh the destination before retrying. Safe creation requires SFTP with a working SSH command channel; FTP cannot guarantee it.",
   "SftpErrorUnknown": "An unexpected error occurred.",
   "SftpSuccessMkdir": "Folder created successfully.",
   "SftpSuccessDelete": "Item deleted successfully.",

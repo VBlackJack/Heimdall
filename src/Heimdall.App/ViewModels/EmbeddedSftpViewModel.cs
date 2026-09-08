@@ -920,6 +920,16 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(ex);
 
+        if (ex is LocalDestinationExistsException or RemoteDestinationExistsException)
+        {
+            return L10n("SftpErrorDestinationChanged");
+        }
+
+        if (ex is RemoteNoClobberPublishUnavailableException)
+        {
+            return L10n("SftpErrorExclusiveUploadUnconfirmed");
+        }
+
         if (ex is SudoAuthenticationException sudoException)
         {
             return GetSudoAuthenticationErrorMessage(sudoException.Kind);
@@ -1387,13 +1397,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             try
             {
-                await _browser.UploadFileAsync(op.LocalPath, resolved.EffectiveTargetPath, ct);
+                await _browser.UploadFileAsync(op.LocalPath, resolved.EffectiveTargetPath, resolved.Overwrite, ct);
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP upload permission denied, falling back to sudo for {fileName}");
-                await UploadViaSudoAsync(op.LocalPath, resolved.EffectiveTargetPath, ct);
+                await UploadViaSudoAsync(op.LocalPath, resolved.EffectiveTargetPath, ct, resolved.Overwrite);
             }
 
             _uploadBatchProgress = (uploadedFiles, totalFiles);
@@ -1893,13 +1903,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
                 try
                 {
-                    await browser.DownloadFileAsync(file.FullPath, resolved.EffectiveTargetPath, ct);
+                    await browser.DownloadFileAsync(file.FullPath, resolved.EffectiveTargetPath, resolved.Overwrite, ct);
                 }
                 catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
                 {
                     Core.Logging.FileLogger.Info(
                         $"EmbeddedSFTP download permission denied, falling back to sudo for {file.Name}");
-                    await DownloadViaSudoAsync(file.FullPath, resolved.EffectiveTargetPath, ct);
+                    await DownloadViaSudoAsync(file.FullPath, resolved.EffectiveTargetPath, ct, resolved.Overwrite);
                 }
 
                 downloadedFiles++;
@@ -2147,15 +2157,15 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// Downloads a file via <c>sudo base64</c> over a direct SSH exec channel,
     /// bypassing SFTP permission restrictions.
     /// </summary>
-    internal Task DownloadViaSudoAsync(string remotePath, string localPath, CancellationToken ct)
+    internal Task DownloadViaSudoAsync(string remotePath, string localPath, CancellationToken ct, bool overwrite = true)
         => _sudoEmitter.RunDownloadAsync(
             remotePath,
             localPath,
-            () => DownloadViaSudoCoreAsync(remotePath, localPath, ct),
+            () => DownloadViaSudoCoreAsync(remotePath, localPath, ct, overwrite),
             () => new FileInfo(localPath).Length,
             privileged: true);
 
-    private async Task DownloadViaSudoCoreAsync(string remotePath, string localPath, CancellationToken ct)
+    private async Task DownloadViaSudoCoreAsync(string remotePath, string localPath, CancellationToken ct, bool overwrite)
     {
         string privilegedBody = BuildSudoBase64DownloadBody(remotePath);
         string? password = _sshParams?.Password;
@@ -2179,7 +2189,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     () => command.ExitStatus ?? -1,
                     commandCancellation,
                     localPath,
-                    ct);
+                    ct,
+                    overwrite);
 
                 if (authenticateViaStdin)
                 {
@@ -2244,7 +2255,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         Func<int> exitStatusProvider,
         CancellationTokenSource commandCancellation,
         string localPath,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool overwrite = true)
     {
         ArgumentNullException.ThrowIfNull(standardOutput);
         ArgumentNullException.ThrowIfNull(standardError);
@@ -2277,7 +2289,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
 
             EnsureSudoSucceeded(exitStatusProvider(), standardErrorText, "base64");
-            AtomicLocalFile.Commit(tempPath, localPath);
+            ct.ThrowIfCancellationRequested();
+            AtomicLocalFile.Commit(tempPath, localPath, overwrite);
         }
         catch
         {
@@ -2413,7 +2426,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// Streams a file over SSH to a root-owned same-directory temp file, then
     /// atomically replaces the privileged target without following symlinks.
     /// </summary>
-    internal async Task UploadViaSudoAsync(string localPath, string remotePath, CancellationToken ct)
+    internal async Task UploadViaSudoAsync(string localPath, string remotePath, CancellationToken ct, bool overwrite = true)
     {
         if (_browser is null)
         {
@@ -2436,7 +2449,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                         FileShare.Read,
                         bufferSize: 81920,
                         FileOptions.Asynchronous | FileOptions.SequentialScan);
-                    string writeBody = SudoUploadCommands.Build(remotePath);
+                    string writeBody = SudoUploadCommands.Build(remotePath, overwrite);
                     PrivilegedCommandResult result = await PrivilegedFileTransfer.ExecuteAtomicWriteAsync(
                             ssh,
                             writeBody,
@@ -2445,6 +2458,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                             ct)
                         .ConfigureAwait(false);
 
+                    if (!overwrite && result.ExitStatus == PrivilegedFileCommands.DestinationExistsExitStatus)
+                    {
+                        throw new RemoteDestinationExistsException(remotePath);
+                    }
                     EnsureSudoSucceeded(
                         result.ExitStatus,
                         result.Error,
@@ -3402,8 +3419,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string path,
         CancellationToken ct)
     {
-        string escaped = PathEscaper.EscapeForShell(path);
-        string privilegedBody = $"ls -la --time-style=long-iso {escaped}";
+        string privilegedBody = SudoDirectoryListing.Build(path);
         using Renci.SshNet.SshClient ssh = await CreateSudoSshClientAsync(ct).ConfigureAwait(false);
 
         try
@@ -3411,100 +3427,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             using Renci.SshNet.SshCommand cmd = await ExecuteSudoBodyAsync(ssh, privilegedBody, ct)
                 .ConfigureAwait(false);
 
-            EnsureSudoSucceeded(cmd, "ls");
+            EnsureSudoSucceeded(cmd, "find");
 
-            return ParseLsOutput(cmd.Result ?? string.Empty, path);
+            return SudoDirectoryListing.Parse(cmd.Result ?? string.Empty, path);
         }
         finally
         {
             SafeDisconnect(ssh);
         }
-    }
-
-    /// <remarks>
-    /// Expects GNU coreutils <c>ls -la --time-style=long-iso</c> output with
-    /// eight whitespace-separated fields; BusyBox or non-GNU <c>ls</c> layouts may differ.
-    /// </remarks>
-    internal static IReadOnlyList<SftpFileInfo> ParseLsOutput(string output, string parentPath)
-    {
-        var results = new List<SftpFileInfo>();
-        var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-
-        foreach (var line in lines)
-        {
-            if (line.StartsWith("total ", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var parts = line.Split((char[]?)null, 8, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 8)
-            {
-                Heimdall.Core.Logging.FileLogger.Debug(
-                    $"EmbeddedSftpViewModel: skipped malformed sudo ls line: {line}");
-                continue;
-            }
-
-            string permissions = parts[0];
-            if (permissions.Length < 2 || !"dl-cbps".Contains(permissions[0]))
-            {
-                Heimdall.Core.Logging.FileLogger.Debug(
-                    $"EmbeddedSftpViewModel: skipped sudo ls line with unsupported permissions: {line}");
-                continue;
-            }
-
-            string owner = parts[2];
-            string group = parts[3];
-            _ = long.TryParse(
-                parts[4],
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out long size);
-
-            DateTime lastModified = DateTime.MinValue;
-            _ = DateTime.TryParse(
-                $"{parts[5]} {parts[6]}",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out lastModified);
-
-            string name = parts[7];
-            if (name is "." or "..")
-            {
-                continue;
-            }
-
-            int arrowIndex = name.IndexOf(" -> ", StringComparison.Ordinal);
-            if (arrowIndex >= 0)
-            {
-                name = name[..arrowIndex];
-            }
-
-            RemoteEntryKind kind = permissions[0] switch
-            {
-                'd' => RemoteEntryKind.Directory,
-                'l' => RemoteEntryKind.SymbolicLink,
-                'p' => RemoteEntryKind.Fifo,
-                's' => RemoteEntryKind.Socket,
-                'c' or 'b' => RemoteEntryKind.Device,
-                '-' => RemoteEntryKind.File,
-
-                // Unreachable: this same loop already skipped any line whose type character is not one
-                // of "dl-cbps", so the switch above covers every character that reaches here. The arm
-                // states that impossibility rather than quietly answering "file", as it used to.
-                _ => throw new InvalidOperationException(
-                    $"unfiltered ls type character reached the mapper: {permissions[0]}"),
-            };
-            string fullPath = parentPath.EndsWith("/", StringComparison.Ordinal)
-                ? $"{parentPath}{name}"
-                : $"{parentPath}/{name}";
-
-            results.Add(new SftpFileInfo(
-                name, fullPath, kind, size, lastModified,
-                permissions, owner, group));
-        }
-
-        return results;
     }
 
     partial void OnFilterTextChanged(string value)
@@ -3708,9 +3638,9 @@ internal static class SudoUploadCommands
     /// </summary>
     /// <param name="targetRemotePath">Privileged target path to replace atomically.</param>
     /// <returns>The privileged shell body.</returns>
-    internal static string Build(string targetRemotePath)
+    internal static string Build(string targetRemotePath, bool overwrite = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetRemotePath);
-        return PrivilegedFileCommands.BuildAtomicWriteBody(targetRemotePath);
+        return PrivilegedFileCommands.BuildAtomicWriteBody(targetRemotePath, overwrite);
     }
 }

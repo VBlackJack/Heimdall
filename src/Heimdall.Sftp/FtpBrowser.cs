@@ -327,10 +327,14 @@ public sealed class FtpBrowser : IRemoteBrowser
     }
 
     /// <inheritdoc/>
-    public async Task DownloadFileAsync(
+    public Task DownloadFileAsync(
         string remotePath,
         string localPath,
         CancellationToken ct = default)
+        => DownloadFileAsync(remotePath, localPath, overwrite: true, ct);
+
+    /// <inheritdoc/>
+    public async Task DownloadFileAsync(string remotePath, string localPath, bool overwrite, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
@@ -356,7 +360,8 @@ public sealed class FtpBrowser : IRemoteBrowser
                     ct).ConfigureAwait(false);
 
                 ThrowIfFailed(status, remotePath, "download");
-                AtomicLocalFile.Commit(tempPath, localPath);
+                ct.ThrowIfCancellationRequested();
+                AtomicLocalFile.Commit(tempPath, localPath, overwrite);
             }
             catch
             {

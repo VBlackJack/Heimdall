@@ -1873,6 +1873,8 @@
   "ValidationInlineSshUserRequired": "Le nom d'utilisateur SSH est obligatoire",
   "ValidationInlineSshUserFormat": "Format de nom d'utilisateur SSH invalide",
 
+  "SftpErrorDestinationChanged": "La destination est maintenant occupée et n'a pas été remplacée. Actualisez le dossier et réessayez avec un autre nom ou un choix explicite de remplacement.",
+  "SftpErrorExclusiveUploadUnconfirmed": "Le téléversement sans remplacement n'a pas pu être confirmé. Actualisez la destination avant de réessayer. Une création sûre exige SFTP avec un canal de commandes SSH fonctionnel ; FTP ne peut pas la garantir.",
   "SftpErrorUnknown": "Une erreur inattendue s'est produite.",
   "SftpSuccessMkdir": "Dossier cr\u00e9\u00e9 avec succ\u00e8s.",
   "SftpSuccessDelete": "\u00c9l\u00e9ment supprim\u00e9 avec succ\u00e8s.",

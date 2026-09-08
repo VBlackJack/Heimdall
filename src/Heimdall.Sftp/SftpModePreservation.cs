@@ -123,7 +123,7 @@ public static class SftpModePreservation
         Action Commit);
 
     /// <summary>
-    /// The mode and timestamps a published file must end up carrying.
+    /// The mode, timestamps and group a published replacement must end up carrying.
     /// </summary>
     /// <remarks>
     /// UTC on both ends, deliberately. SSH.NET exposes a local-time and a UTC property for each
@@ -133,7 +133,8 @@ public static class SftpModePreservation
     internal readonly record struct SftpPublicationAttributes(
         uint Mode,
         DateTime? LastAccessTimeUtc,
-        DateTime? LastWriteTimeUtc);
+        DateTime? LastWriteTimeUtc,
+        int? GroupId = null);
 
     /// <summary>
     /// Uploads through a temporary file that is private for the whole time it holds content.
@@ -236,6 +237,7 @@ public static class SftpModePreservation
         // anything. The commit is refused rather than published on an unverified claim.
         SftpPublicationAttributes applied = operations.ReadTempAttributesAfterApply();
         if (GetMode(applied.Mode) != desired.Mode
+            || (desired.GroupId is not null && applied.GroupId != desired.GroupId)
             || applied.LastWriteTimeUtc != desired.LastWriteTimeUtc
             || applied.LastAccessTimeUtc != desired.LastAccessTimeUtc)
         {
@@ -243,9 +245,10 @@ public static class SftpModePreservation
                 "Refusing to publish the upload: the staged file reports mode "
                 + $"0{Convert.ToString(GetMode(applied.Mode), 8)} with write time "
                 + $"{applied.LastWriteTimeUtc:O} and access time {applied.LastAccessTimeUtc:O}, "
+                + $"group {applied.GroupId}, "
                 + $"but the destination carried mode 0{Convert.ToString(desired.Mode, 8)} with "
                 + $"write time {desired.LastWriteTimeUtc:O} and access time "
-                + $"{desired.LastAccessTimeUtc:O}, so the replacement would not preserve them.");
+                + $"{desired.LastAccessTimeUtc:O}, group {desired.GroupId}, so the replacement would not preserve them.");
         }
 
         operations.Commit();

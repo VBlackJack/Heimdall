@@ -68,8 +68,20 @@ public interface IRemoteBrowser : IDisposable
     /// <summary>Downloads a remote file to a local path.</summary>
     Task DownloadFileAsync(string remotePath, string localPath, CancellationToken ct = default);
 
+    /// <summary>Downloads with explicit permission to replace a local destination.</summary>
+    Task DownloadFileAsync(string remotePath, string localPath, bool overwrite, CancellationToken ct = default)
+        => overwrite ? DownloadFileAsync(remotePath, localPath, ct)
+            : throw new NotSupportedException("The browser does not support exclusive local publication.");
+
     /// <summary>Uploads a local file to a remote path.</summary>
     Task UploadFileAsync(string localPath, string remotePath, CancellationToken ct = default);
+
+    /// <summary>Uploads with explicit permission to replace a remote destination.</summary>
+    Task UploadFileAsync(string localPath, string remotePath, bool overwrite, CancellationToken ct = default)
+        => overwrite ? UploadFileAsync(localPath, remotePath, ct)
+            : (this as IRemoteNoClobberCapability)?.NoClobberPublisher is { } publisher
+                ? publisher.PublishFileIfAbsentAsync(localPath, remotePath, ct)
+                : throw new RemoteNoClobberPublishUnavailableException(remotePath, "exclusive publication is unavailable");
 
     /// <summary>Creates a directory on the remote host.</summary>
     Task CreateDirectoryAsync(string path, CancellationToken ct = default);
