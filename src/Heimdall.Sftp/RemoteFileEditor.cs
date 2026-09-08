@@ -50,6 +50,9 @@ public sealed class RemoteFileEditor : IDisposable
     private readonly ConcurrentDictionary<string, EditSession> _activeSessions = new();
     private long _sessionTransitions;
     private bool _disposed;
+    private readonly object _sessionGate = new();
+    private readonly CancellationTokenSource _lifetimeCts = new();
+    private readonly SemaphoreSlim _openingGate = new(1, 1);
 
     /// <summary>
     /// Raised after an auto-upload attempt. Parameters: remote path, success flag.
@@ -102,7 +105,10 @@ public sealed class RemoteFileEditor : IDisposable
     /// <exception cref="InvalidOperationException">
     /// The file is already open for editing in another session.
     /// </exception>
-    public async Task EditFileAsync(string remotePath, CancellationToken ct = default)
+    public Task EditFileAsync(string remotePath, CancellationToken ct = default)
+        => RunOpeningAsync(token => EditFileCoreAsync(remotePath, token), ct);
+
+    private async Task EditFileCoreAsync(string remotePath, CancellationToken ct)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
@@ -130,16 +136,7 @@ public sealed class RemoteFileEditor : IDisposable
             LastUploadTime = DateTime.UtcNow
         };
 
-        if (!_activeSessions.TryAdd(remotePath, session))
-        {
-            session.Dispose();
-            CleanupTempFile(localPath);
-            return;
-        }
-
-        Interlocked.Increment(ref _sessionTransitions);
-        StartWatcher(session);
-        AttachEditor(session);
+        RegisterAndLaunch(session, ct);
     }
 
     /// <summary>
@@ -150,10 +147,13 @@ public sealed class RemoteFileEditor : IDisposable
     /// <param name="remotePath">Full remote path to the privileged file.</param>
     /// <param name="sshParams">SSH connection parameters for the sudo SSH session.</param>
     /// <param name="ct">Cancellation token.</param>
-    public async Task EditFileSudoAsync(
+    public Task EditFileSudoAsync(
         string remotePath,
         SshConnectionParams sshParams,
         CancellationToken ct = default)
+        => RunOpeningAsync(token => EditFileSudoCoreAsync(remotePath, sshParams, token), ct);
+
+    private async Task EditFileSudoCoreAsync(string remotePath, SshConnectionParams sshParams, CancellationToken ct)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
@@ -237,16 +237,56 @@ public sealed class RemoteFileEditor : IDisposable
             LastUploadTime = DateTime.UtcNow
         };
 
-        if (!_activeSessions.TryAdd(remotePath, session))
+        RegisterAndLaunch(session, ct);
+    }
+
+    private async Task RunOpeningAsync(Func<CancellationToken, Task> open, CancellationToken ct)
+    {
+        CancellationTokenSource linked;
+        lock (_sessionGate)
         {
-            session.Dispose();
-            CleanupTempFile(localPath);
-            return;
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetimeCts.Token);
         }
 
-        Interlocked.Increment(ref _sessionTransitions);
-        StartWatcher(session);
-        AttachEditor(session);
+        using (linked)
+        {
+            await _openingGate.WaitAsync(linked.Token).ConfigureAwait(false);
+            try { await open(linked.Token).ConfigureAwait(false); }
+            finally { _openingGate.Release(); }
+        }
+    }
+
+    private void RegisterAndLaunch(EditSession session, CancellationToken ct)
+    {
+        lock (_sessionGate)
+        {
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (!_activeSessions.TryAdd(session.RemotePath, session))
+                {
+                    throw new InvalidOperationException("The remote file is already being edited.");
+                }
+
+                Interlocked.Increment(ref _sessionTransitions);
+                StartWatcher(session);
+                AttachEditor(session);
+            }
+            catch
+            {
+                if (_activeSessions.TryRemove(new KeyValuePair<string, EditSession>(session.RemotePath, session)))
+                {
+                    Interlocked.Increment(ref _sessionTransitions);
+                }
+
+                // AttachEditor already drains an unsuccessful launch. Dispose is idempotent below.
+                DrainSession(session);
+                CleanupTempFile(session.LocalPath);
+                throw;
+            }
+        }
     }
 
     /// <summary>
@@ -258,7 +298,12 @@ public sealed class RemoteFileEditor : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
 
-        if (_activeSessions.TryRemove(remotePath, out var session))
+        EditSession? session;
+        lock (_sessionGate)
+        {
+            _activeSessions.TryRemove(remotePath, out session);
+        }
+        if (session is not null)
         {
             ReleaseSession(session);
         }
@@ -297,22 +342,21 @@ public sealed class RemoteFileEditor : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (_disposed)
+        EditSession[] sessions;
+        lock (_sessionGate)
         {
-            return;
+            if (_disposed) return;
+            _disposed = true;
+            sessions = _activeSessions.Values.ToArray();
+            _activeSessions.Clear();
         }
-
-        _disposed = true;
-
-        foreach (var kvp in _activeSessions.ToArray())
+        // Cancellation callbacks run outside the registration lock.
+        _lifetimeCts.Cancel();
+        _lifetimeCts.Dispose();
+        foreach (EditSession session in sessions)
         {
-            if (_activeSessions.TryRemove(kvp.Key, out var session))
-            {
-                ReleaseSession(session);
-            }
+            ReleaseSession(session);
         }
-
-        _activeSessions.Clear();
     }
 
     // ------------------------------------------------------------------
@@ -841,6 +885,7 @@ public sealed class SudoEditFileTooLargeException : InvalidOperationException
 /// </summary>
 internal sealed class EditSession : IDisposable
 {
+    private int _disposeState;
     private readonly object _currentUploadLock = new();
     private Task? _currentUpload;
 
@@ -938,6 +983,7 @@ internal sealed class EditSession : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0) return;
         Watcher?.Dispose();
         DebounceTimer?.Dispose();
         UploadSemaphore.Dispose();

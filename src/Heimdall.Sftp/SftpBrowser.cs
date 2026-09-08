@@ -636,10 +636,14 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
     /// <param name="remotePath">Full remote file path.</param>
     /// <param name="localPath">Local destination path.</param>
     /// <param name="ct">Cancellation token.</param>
-    public async Task DownloadFileAsync(
+    public Task DownloadFileAsync(
         string remotePath,
         string localPath,
         CancellationToken ct = default)
+        => DownloadFileAsync(remotePath, localPath, overwrite: true, ct);
+
+    /// <inheritdoc/>
+    public async Task DownloadFileAsync(string remotePath, string localPath, bool overwrite, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
@@ -692,7 +696,8 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                     }, ct).ConfigureAwait(false);
                 }
 
-                AtomicLocalFile.Commit(tempPath, localPath);
+                ct.ThrowIfCancellationRequested();
+                AtomicLocalFile.Commit(tempPath, localPath, overwrite);
             }
             catch
             {
@@ -846,7 +851,8 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                                 return new SftpModePreservation.SftpPublicationAttributes(
                                     GetPermissionMode(targetAttributes),
                                     targetAttributes.LastAccessTimeUtc,
-                                    targetAttributes.LastWriteTimeUtc);
+                                    targetAttributes.LastWriteTimeUtc,
+                                    targetAttributes.GroupId);
                             },
                             // Mode still routed through the existing helper, so a mode that cannot
                             // be set refuses the commit rather than publishing wrong permissions.
@@ -855,6 +861,14 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                             ApplyPublicationAttributes: desired =>
                             {
                                 SftpFileAttributes attributes = client.GetAttributes(tempRemotePath);
+                                // Changing group can clear special mode bits. Apply ownership first,
+                                // then fetch fresh attributes before restoring mode and timestamps.
+                                if (desired.GroupId is { } groupId && attributes.GroupId != groupId)
+                                {
+                                    attributes.GroupId = groupId;
+                                    client.SetAttributes(tempRemotePath, attributes);
+                                    attributes = client.GetAttributes(tempRemotePath);
+                                }
                                 ApplyPublicationAttributesBeforeCommit(
                                     remotePath,
                                     desired,
@@ -877,7 +891,8 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                                 return new SftpModePreservation.SftpPublicationAttributes(
                                     GetPermissionMode(applied),
                                     applied.LastAccessTimeUtc,
-                                    applied.LastWriteTimeUtc);
+                                    applied.LastWriteTimeUtc,
+                                    applied.GroupId);
                             },
                             Commit: () =>
                             {

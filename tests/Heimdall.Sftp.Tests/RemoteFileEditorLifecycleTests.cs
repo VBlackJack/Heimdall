@@ -133,6 +133,62 @@ public sealed class RemoteFileEditorLifecycleTests
     private static RemoteFileEditor CreateEditor(IRemoteBrowser browser, string editorPath = "notepad.exe")
         => new(browser, new HostKeyStore(), RejectingHostKeyVerifier.Instance, editorPath);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Opening_CancelledOrDisposedDuringDownload_NeverRegistersOrLaunches(bool dispose)
+    {
+        PausedBrowser browser = new();
+        using RemoteFileEditor editor = CreateEditor(browser, Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".exe"));
+        using CancellationTokenSource cancellation = new();
+        Task opening = editor.EditFileAsync("/srv/config", cancellation.Token);
+        await browser.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        if (dispose) editor.Dispose();
+        else cancellation.Cancel();
+        Assert.True(browser.Token.IsCancellationRequested);
+        browser.Release.SetResult();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => opening);
+        Assert.Empty(editor.GetActiveEdits());
+        Assert.Equal(0, editor.EditSessionTransitions);
+        Assert.False(File.Exists(browser.LocalPath));
+    }
+
+    [Fact]
+    public async Task Opening_SecondRequestIsSerializedAndCancelledByDispose()
+    {
+        PausedBrowser browser = new();
+        using RemoteFileEditor editor = CreateEditor(browser);
+        Task first = editor.EditFileAsync("/srv/config");
+        await browser.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Task second = editor.EditFileAsync("/srv/config");
+        Assert.Equal(1, browser.Calls);
+        editor.Dispose();
+        browser.Release.SetResult();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => second);
+        Assert.Equal(1, browser.Calls);
+        Assert.Empty(editor.GetActiveEdits());
+    }
+
+    private sealed class PausedBrowser : NullBrowser
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public string? LocalPath { get; private set; }
+        public CancellationToken Token { get; private set; }
+        public int Calls { get; private set; }
+        public override async Task DownloadFileAsync(string remotePath, string localPath, CancellationToken ct = default)
+        {
+            Calls++;
+            Token = ct;
+            LocalPath = localPath;
+            await File.WriteAllTextAsync(localPath, "synthetic");
+            Entered.TrySetResult();
+            // Deliberately ignore cancellation to prove the boundary after the await.
+            await Release.Task;
+        }
+    }
+
     private static string CreateStagedFile()
     {
         string directory = Path.Combine(Path.GetTempPath(), "Heimdall", "edit", Guid.NewGuid().ToString("N"));

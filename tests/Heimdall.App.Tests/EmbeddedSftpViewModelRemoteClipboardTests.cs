@@ -274,7 +274,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         Assert.Empty(targetBrowser.CreateDirectoryCalls);
 
         // The exact final status, not merely the absence of a completed paste.
-        AssertLocalized(localizer, "SftpStatusTransferFailed", targetPane.StatusText);
+        AssertLocalized(localizer, "SftpErrorDestinationChanged", targetPane.StatusText);
         Assert.True(targetPane.IsErrorStatus);
     }
 
@@ -313,7 +313,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         // The exact final status, not the absence of two forbidden ones: excluding Ready and
         // PasteComplete would accept any other error status, including one describing a different
         // failure entirely.
-        AssertLocalized(localizer, "SftpStatusTransferFailed", targetPane.StatusText);
+        AssertLocalized(localizer, "SftpErrorDestinationChanged", targetPane.StatusText);
         Assert.True(targetPane.IsErrorStatus);
 
         // The refresh still happened: the entry the other party wrote is now visible.
@@ -580,7 +580,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
 
         // The exact final status. Excluding one forbidden value would also accept Ready, which is
         // what a refresh writes when it runs after the status instead of before it.
-        AssertLocalized(localizer, "SftpStatusTransferFailed", targetPane.StatusText);
+        AssertLocalized(localizer, "SftpErrorDestinationChanged", targetPane.StatusText);
         Assert.True(targetPane.IsErrorStatus);
     }
 
@@ -648,9 +648,9 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
         Assert.NotNull(clipboard.Current);
         Assert.Contains(clipboard.Current!.Entries, entry => entry.FullPath == "/src/a.txt");
 
-        // The exact final status: an unconfirmed publication is reported as a failed transfer, and the
+        // An unconfirmed publication keeps a specific warning visible, and the
         // refresh that precedes it must not have replaced that with Ready.
-        AssertLocalized(localizer, "SftpStatusTransferFailed", targetPane.StatusText);
+        AssertLocalized(localizer, "SftpErrorExclusiveUploadUnconfirmed", targetPane.StatusText);
         Assert.True(targetPane.IsErrorStatus);
     }
 

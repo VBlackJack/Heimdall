@@ -44,7 +44,7 @@ public static class AtomicLocalFile
     }
 
     /// <summary>
-    /// Atomically replaces the final file with the completed temporary file.
+    /// Publishes the completed temporary file, replacing only when explicitly allowed.
     /// </summary>
     /// <remarks>
     /// Retried on a sharing violation. On Windows an antivirus scanner, the search indexer
@@ -54,7 +54,7 @@ public static class AtomicLocalFile
     /// violation, so both are retried; a real permission failure still propagates after the
     /// last attempt.
     /// </remarks>
-    public static void Commit(string tempPath, string finalPath)
+    public static void Commit(string tempPath, string finalPath, bool overwrite = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tempPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(finalPath);
@@ -63,8 +63,12 @@ public static class AtomicLocalFile
         {
             try
             {
-                File.Move(tempPath, finalPath, overwrite: true);
+                File.Move(tempPath, finalPath, overwrite);
                 return;
+            }
+            catch (IOException ex) when (!overwrite && (File.Exists(finalPath) || Directory.Exists(finalPath)))
+            {
+                throw new LocalDestinationExistsException(finalPath, ex);
             }
             catch (Exception ex) when (IsTransientMoveFailure(ex) && attempt < CommitRetryDelays.Length)
             {

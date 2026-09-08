@@ -39,6 +39,7 @@ public sealed class EmbeddedSftpDownloadConflictTests
             target.Path);
 
         Assert.Equal(0, presenter.CallCount);
+        Assert.All(browser.OverwriteChoices, Assert.False);
         Assert.Collection(
             browser.DownloadCalls,
             call => Assert.Equal(System.IO.Path.Combine(target.Path, "alpha.txt"), call.LocalPath),
@@ -111,6 +112,7 @@ public sealed class EmbeddedSftpDownloadConflictTests
                 Assert.Equal("/remote/beta.txt", call.RemotePath);
                 Assert.Equal(betaTarget, call.LocalPath);
             });
+        Assert.True(Assert.Single(browser.OverwriteChoices));
     }
 
     [Fact]
@@ -132,6 +134,7 @@ public sealed class EmbeddedSftpDownloadConflictTests
         await viewModel.DownloadFilesAsync([CreateFile("alpha.txt")], target.Path);
 
         Assert.Equal(1, presenter.CallCount);
+        Assert.False(Assert.Single(browser.OverwriteChoices));
         Assert.Collection(
             browser.DownloadCalls,
             call => Assert.Equal(
@@ -202,6 +205,13 @@ public sealed class EmbeddedSftpDownloadConflictTests
         public bool IsConnected => true;
 
         public List<(string RemotePath, string LocalPath)> DownloadCalls { get; } = [];
+        public List<bool> OverwriteChoices { get; } = [];
+
+        public Task DownloadFileAsync(string remotePath, string localPath, bool overwrite, CancellationToken ct = default)
+        {
+            OverwriteChoices.Add(overwrite);
+            return DownloadFileAsync(remotePath, localPath, ct);
+        }
 
         public Task<IReadOnlyList<SftpFileInfo>> ListDirectoryAsync(
             string? path = null,

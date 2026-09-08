@@ -2273,6 +2273,9 @@ public sealed class EmbeddedSftpViewModelTests
             return Task.CompletedTask;
         }
 
+        public Task UploadFileAsync(string localPath, string remotePath, bool overwrite, CancellationToken ct = default)
+            => UploadFileAsync(localPath, remotePath, ct);
+
         public Task UploadFileAsync(
             string localPath,
             string remotePath,

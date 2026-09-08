@@ -341,6 +341,7 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Collection(
             browser.UploadCalls,
             call => Assert.Equal((localFile, "/srv/alpha.txt"), call));
+        Assert.False(Assert.Single(browser.OverwriteChoices));
     }
 
     [Fact]
@@ -883,6 +884,14 @@ public sealed class EmbeddedSftpUploadConflictTests
             string localPath,
             CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        internal List<bool> OverwriteChoices { get; } = [];
+
+        public Task UploadFileAsync(string localPath, string remotePath, bool overwrite, CancellationToken ct = default)
+        {
+            OverwriteChoices.Add(overwrite);
+            return UploadFileAsync(localPath, remotePath, ct);
+        }
 
         public Task UploadFileAsync(
             string localPath,
