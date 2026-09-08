@@ -173,6 +173,21 @@ it: a server whose only question is a verification code receives the stored
 password as the answer to that question. The attempt fails and the server records a
 failed second-factor attempt. Second-factor entry is not supported.
 
+A server that authenticates in stages is treated differently. The stored password is
+spent at most once per connection attempt, so when a password round is followed by a
+second round asking for a verification code, that second round is refused rather
+than answered with the password again, and the refusal is reported as an unanswered
+question. Heimdall then retries the connection through the embedded Plink, which
+runs with a real console in the terminal pane, so the server's remaining questions
+are asked where somebody can see them. That retry happens when Pageant is available
+or when no SSH agent is running; with the Windows OpenSSH agent running and Pageant
+absent, no retry is attempted and the refusal stands.
+
+Two costs of that retry, stated rather than left implicit. The second round is now a
+refusal where it used to be an answer. And the number of authentication attempts a
+server counts for one connection goes up, because the embedded client's attempt and
+Plink's are counted separately; on an account with a lockout threshold that matters.
+
 The key generator writes both files as UTF-8 without a byte order mark with LF
 line endings, and creates the private key through the same restrictive-ACL
 writer as the Plink password file, so Win32-OpenSSH does not refuse it as

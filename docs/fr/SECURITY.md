@@ -190,6 +190,23 @@ mot de passe stocké en réponse à cette question. La tentative échoue et le s
 enregistre un second facteur en échec. La saisie d'un second facteur n'est pas prise
 en charge.
 
+Un serveur qui authentifie par étapes est traité autrement. Le mot de passe stocké
+n'est dépensé qu'une fois par tentative de connexion : lorsqu'un tour de mot de passe
+est suivi d'un second tour demandant un code de vérification, ce second tour est
+refusé plutôt que répondu de nouveau avec le mot de passe, et le refus est signalé
+comme une question sans réponse. Heimdall retente alors la connexion via le Plink
+embarqué, qui tourne avec une vraie console dans le volet terminal, de sorte que les
+questions restantes du serveur sont posées là où quelqu'un peut les voir. Cette
+reprise a lieu quand Pageant est disponible ou qu'aucun agent SSH ne tourne ; avec
+l'agent OpenSSH de Windows et sans Pageant, aucune reprise n'est tentée et le refus
+subsiste.
+
+Deux coûts de cette reprise, énoncés plutôt que laissés implicites. Le second tour
+est désormais un refus là où il était une réponse. Et le nombre de tentatives
+d'authentification que le serveur compte pour une seule connexion augmente, car la
+tentative du client embarqué et celle de Plink sont comptées séparément ; sur un
+compte doté d'un seuil de verrouillage, cela compte.
+
 Le générateur de clés écrit les deux fichiers en UTF-8 sans marque d'ordre des
 octets avec des fins de ligne LF, et crée la clé privée par le même écrivain à
 ACL restrictive que le fichier de mot de passe Plink, afin que Win32-OpenSSH ne

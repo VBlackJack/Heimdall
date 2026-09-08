@@ -52,6 +52,10 @@ namespace Heimdall.App.Tests;
 public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
 {
     private const string RefusalFromServer = "Permission denied.";
+    private const string KeyboardInteractiveRefusal = "Permission denied (keyboard-interactive).";
+    private const string VerificationCodePrompt = "Verification code:";
+    private const string PlinkReached = "FIXTURE the Plink launch was reached.";
+    private const string RetryingViaPlinkStatus = "FIXTURE retrying through the interactive client.";
     private const string AuthRejectedSentence = "FIXTURE the server refused this sign-in.";
     private const string PlinkAgentUnusableSentence =
         "FIXTURE the Plink fallback cannot use this agent.";
@@ -67,7 +71,8 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
             JsonSerializer.Serialize(new Dictionary<string, string>
             {
                 ["ErrorSshAuthRejected"] = AuthRejectedSentence,
-                [SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported] = PlinkAgentUnusableSentence
+                [SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported] = PlinkAgentUnusableSentence,
+                [SshLocalizationKeys.StatusSshRetryingViaPlink] = RetryingViaPlinkStatus
             }));
     }
 
@@ -131,11 +136,60 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
             result.Failure.Detail);
     }
 
-    private async Task<Harness> CreateHarnessAsync(IReadOnlyList<ISshAgent> agents)
+    /// <summary>
+    /// A server that asks for a second factor is retried through the interactive client.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// P-01. The embedded client has one secret and no way to ask for another, so a server whose
+    /// remaining question is a verification code is unreachable through it. Plink runs in the
+    /// terminal pane with a real console, so the question reaches somebody who can answer.
+    /// </para>
+    /// <para>
+    /// Built on this harness rather than on a launch fixture, because the composition under test
+    /// is the classification feeding the retry decision. The launch itself is replaced and
+    /// counted: what is pinned is that the decision reached it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task AServerAskingForASecondFactor_IsRetriedThroughPlink()
+    {
+        using Harness harness = await CreateHarnessAsync(
+            agents: [], leaveAPromptUnanswered: true);
+
+        await harness.ConnectAsync();
+
+        Assert.Contains(RetryingViaPlinkStatus, harness.Statuses);
+    }
+
+    /// <summary>
+    /// With an agent the Plink fallback cannot use, the same server gets no retry.
+    /// </summary>
+    /// <remarks>
+    /// The real boundary of the change, and the one an earlier proposal had not seen. The retry
+    /// set decides WHETHER a refusal is worth a second attempt; the agent guard decides whether
+    /// this machine can make one at all. A test that only proved the first would report the
+    /// feature working on a machine where it never runs.
+    /// </remarks>
+    [Fact]
+    public async Task AServerAskingForASecondFactor_IsNotRetriedWhenTheAgentRulesPlinkOut()
+    {
+        using Harness harness = await CreateHarnessAsync(
+            agents: [new FakeAgent(OpenSshPipeAgent.AgentName)], leaveAPromptUnanswered: true);
+
+        ConnectionResult result = await harness.ConnectAsync();
+
+        Assert.DoesNotContain(RetryingViaPlinkStatus, harness.Statuses);
+        Assert.Contains(PlinkAgentUnusableSentence, result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    private async Task<Harness> CreateHarnessAsync(
+        IReadOnlyList<ISshAgent> agents,
+        bool leaveAPromptUnanswered = false)
     {
         LocalizationManager localizer = new LocalizationManager();
         await localizer.LoadAsync(_localesPath, "en");
-        return new Harness(localizer, agents);
+        return new Harness(localizer, agents, leaveAPromptUnanswered);
     }
 
     private sealed class Harness : IDisposable
@@ -144,7 +198,10 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
 
         private readonly SshHandler _handler;
 
-        public Harness(LocalizationManager localizer, IReadOnlyList<ISshAgent> agents)
+        public Harness(
+            LocalizationManager localizer,
+            IReadOnlyList<ISshAgent> agents,
+            bool leaveAPromptUnanswered = false)
         {
             ConnectionStates = new ConnectionStateMachine();
             _handler = new SshHandler(
@@ -152,15 +209,45 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
                 ConnectionStates,
                 localizer,
                 new HostKeyStore(),
-                hostKeyTrustService: null!,
+
+                // Null for every case that must never reach the Plink path, so touching it
+                // fails loudly. The second-factor cases DO reach it by design, and a real one
+                // over an empty store answers "no stored key" without any I/O.
+                hostKeyTrustService: leaveAPromptUnanswered
+                    ? new HostKeyTrustService(new HostKeyStore())
+                    : null!,
                 RejectingHostKeyVerifier.Instance,
                 x11ServerManager: null!,
                 dialogService: null!,
                 plinkHostKeyProbe: new NeverProbedPlinkHostKeyProbe(),
                 agentRegistryFactory: _ => new SshAgentRegistry(agents),
-                connectShellSession: (_, _, _, _, _, _, _) =>
-                    throw new SshAuthenticationException(RefusalFromServer));
+                connectShellSession: (_, connectionParams, _, _, _, _, _) =>
+                {
+                    if (!leaveAPromptUnanswered)
+                    {
+                        throw new SshAuthenticationException(RefusalFromServer);
+                    }
+
+                    // What a server authenticating in stages leaves behind: the round that
+                    // asked for the second factor was refused and recorded, so the classifier
+                    // reads the refusal as an unanswered question rather than a bad password.
+                    connectionParams.KeyboardInteractive.RecordUnanswered(VerificationCodePrompt);
+                    throw new SshAuthenticationException(KeyboardInteractiveRefusal);
+                },
+                startPipeModeSession: (_, _, _, _, _, _) =>
+                    throw new InvalidOperationException(PlinkReached));
+
+            _handler.SetStatusText = text => Statuses.Add(text);
         }
+
+        /// <summary>Every status the handler announced, in order.</summary>
+        /// <remarks>
+        /// The retry decision is observed here rather than at the launch, and the difference
+        /// matters. The Plink path carries host-key gates of its own that stop it before any
+        /// process on this harness, so a launch counter reads zero whether the decision fired or
+        /// not. The announcement is emitted on the line after the decision and nowhere else.
+        /// </remarks>
+        public List<string> Statuses { get; } = [];
 
         public ConnectionStateMachine ConnectionStates { get; }
 

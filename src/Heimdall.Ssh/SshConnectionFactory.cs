@@ -752,13 +752,30 @@ public static class SshConnectionFactory
     }
 
     /// <summary>
-    /// Answers a keyboard-interactive round. Only a prompt that asks for a password gets
-    /// the stored password; anything else (a verification code, a challenge) is left
-    /// empty and recorded, so the refusal that follows names the question instead of
-    /// blaming a password that may have been right. A round with a single prompt is
-    /// taken to be the password prompt whatever its wording, since servers phrase it
-    /// freely and the password is the only answer this client has.
+    /// Answers a keyboard-interactive round, spending the stored password at most once.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A prompt that asks for a password gets the stored password; anything else, a verification
+    /// code or a challenge, is left empty and recorded, so the refusal that follows names the
+    /// question instead of blaming a password that may have been right. A round with a single
+    /// prompt is taken to be the password prompt whatever its wording, since servers phrase it
+    /// freely and the password is the only answer this client has.
+    /// </para>
+    /// <para>
+    /// That last rule is why the password can be spent at most once per attempt. A server that
+    /// authenticates in stages asks the password and then the verification code as two separate
+    /// single-prompt rounds, and the second is indistinguishable from the first by wording. The
+    /// password used to be sent to both. Now the second round is refused and recorded, which is
+    /// what lets the failure be classified as an unanswered question and routed to the client
+    /// that can actually ask the user.
+    /// </para>
+    /// <para>
+    /// A round carrying two password-looking prompts would see only the first answered. No
+    /// server is known to do that, and answering the second would be spending the password on a
+    /// question this client did not understand, which is the thing being stopped.
+    /// </para>
+    /// </remarks>
     internal static void AnswerKeyboardInteractivePrompts(
         IReadOnlyList<AuthenticationPrompt> prompts,
         string password,
@@ -770,7 +787,8 @@ public static class SshConnectionFactory
         bool single = prompts.Count == 1;
         foreach (AuthenticationPrompt prompt in prompts)
         {
-            if (single || LooksLikePasswordPrompt(prompt.Request))
+            bool asksForThePassword = single || LooksLikePasswordPrompt(prompt.Request);
+            if (asksForThePassword && observation.TryTakePasswordAnswer())
             {
                 prompt.Response = password;
             }

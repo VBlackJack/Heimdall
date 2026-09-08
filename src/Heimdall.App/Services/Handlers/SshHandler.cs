@@ -340,12 +340,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             var failure = FailureClassifier.Classify(ex, sshParams);
             SshFailureInfo localizedFailure = LocalizeFailure(failure, targetHost);
 
-            if (failure.Code is SshFailureCode.AuthRejected
-                    or SshFailureCode.KeyRejected
-                    or SshFailureCode.PassphraseRejected
-                    or SshFailureCode.PasswordRejected
-                    or SshFailureCode.NoSupportedAuth
-                    or SshFailureCode.KeyboardInteractiveNoPassword)
+            if (SshPlinkRetryPolicy.AllowsPlinkRetry(failure.Code))
             {
                 var fallbackAgentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
                 if (!fallbackAgentRegistry.HasPlinkCompatibleAgent() && fallbackAgentRegistry.HasAnyNonPlinkAgent())

@@ -12,6 +12,33 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### A server that asks for a second factor after the password is now reachable
+
+When a server asks for your password and then, separately, for a verification code, Heimdall used
+to answer the second question with your password as well. That fails, and the server records it as
+a failed second-factor attempt. There was no way through: the built-in client has one secret and no
+way to ask you for another.
+
+The password is now spent at most once per connection attempt. The second question is refused
+instead, and Heimdall retries the connection through the bundled Plink, which runs with a real
+console in the terminal pane, so the server's remaining questions are asked where you can see them.
+
+Two things this costs, and one thing it does not do.
+
+It costs an extra authentication attempt: the built-in client's and Plink's are counted separately
+by the server, which matters on an account with a lockout threshold. And the second question is now
+a refusal rather than an answer, so a server that would have accepted the password twice - if any
+does - stops working.
+
+The retry only happens when Pageant is available or when no SSH agent is running. With the Windows
+OpenSSH agent running and Pageant absent, no retry is attempted and the refusal stands, as before.
+
+Unchanged: a server whose *only* question is a verification code still receives your password as
+the answer to it. That round is the first one, and nothing distinguishes it from a password prompt.
+
+
 ## 2026-09-07: five parked findings closed by measurement, nothing waits forever, and the security notes corrected (v2026.090701)
 
 ### Cancelling an update now takes effect during verification too
