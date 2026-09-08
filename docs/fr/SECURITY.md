@@ -7,11 +7,17 @@ les décisions délibérées de défense en profondeur de Heimdall.
 
 ## Signaler une vulnérabilité
 
-Signalez toute vulnérabilité suspectée en privé au mainteneur. Ce dépôt ne
-publie pas pour l'instant d'adresse de messagerie dédiée à la sécurité ;
-utilisez le canal privé par lequel vous avez obtenu les sources, ou consultez
-`LICENSE` pour le contexte de maintenance et de licence. N'ouvrez pas de ticket
-public pour un problème de sécurité.
+Signalez toute vulnérabilité suspectée par le signalement privé de GitHub :
+[ouvrir un rapport privé](https://github.com/VBlackJack/Heimdall/security/advisories/new).
+Le rapport reste visible de vous et du mainteneur seulement. N'ouvrez pas de
+ticket public pour un problème de sécurité.
+
+Ce projet ne publie aucune adresse de contact, et la messagerie n'est pas un
+moyen pris en charge pour joindre le mainteneur. Les adresses qui apparaissent
+dans les métadonnées de commit sont un artefact de la façon dont Git enregistre
+la paternité, pas une invitation : elles ne sont pas relevées. La politique
+complète, avec les canaux pour les bogues et les questions, est dans
+[SECURITY.fr.md](../../SECURITY.fr.md).
 
 ## Périmètre du modèle de menace
 
