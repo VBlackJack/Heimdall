@@ -14,6 +14,14 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### SSH gateway route diagnostics
+
+- Gateway add/edit dialogs show the complete route and can test the current form without saving.
+- Each gateway reports SSH authentication, duration and an actionable failure. An optional destination
+  step confirms remote TCP access, including services that send a banner first or remain silent.
+- Tests are cancellable, use existing trusted host keys, and release their private route on completion
+  or closure. Copied reports exclude hostnames, accounts, key paths and raw exception text.
+
 ### SSH gateway routing and lifecycle
 
 - New connections stop reusing a tunnel after a gateway endpoint, account, stored credential

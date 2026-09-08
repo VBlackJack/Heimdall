@@ -50,6 +50,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Application fail-closed de la clé d'hôte pour SSH.NET comme pour le repli Plink, avec `HostKeyUnavailable` lorsqu'une clé de passerelle épinglée ne peut pas être résolue sans retomber sur le cache de PuTTY/Plink
 - La réutilisation des tunnels tient compte des adresses, comptes, identifiants enregistrés et préférences d'agent. Une modification de connexion ouvre un nouveau tunnel ; un simple renommage conserve le partage.
 - Chaînage de tunnels multi-passerelles avec détection des dépendances circulaires
+- **Tester le parcours** depuis le formulaire de création/modification d'une passerelle : afficher tous les parents, tester l'authentification SSH à chaque saut, vérifier éventuellement un port TCP cible et copier un rapport anonymisé avec les durées et les actions à entreprendre. Le test utilise les clés d'hôtes de confiance existantes, peut être annulé et ne sauvegarde pas le formulaire ni ne perturbe les tunnels ouverts
 - Allocation dynamique du port de tunnel avec nouvelles tentatives bornées en cas de course sur le bind (`AddressAlreadyInUse`)
 - Comptage de références des tunnels (les tunnels partagés survivent à la fermeture d'une session isolée)
 - Redimensionnement du terminal via la requête SSH window-change (API publique `ShellStream.ChangeWindowSize`, sans réflexion)

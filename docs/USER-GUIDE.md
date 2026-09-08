@@ -163,6 +163,17 @@ is doing. You can cancel that from the toolbar.
 
 If the reason on screen is not enough, the log will have more.
 
+For an SSH gateway, open its add/edit dialog and use **Test route**. The preview shows the
+complete parent chain and includes the values currently in the form. Testing does not save them.
+Optionally enter a destination host and TCP port to check access from the last gateway.
+Each step shows its duration and an action to take if it fails; later steps stop at the first failure.
+Use **Stop test** or close the dialog to cancel. Changing the form clears the previous report.
+
+The diagnostic uses existing SSH trusted host keys and never accepts a new or changed key for you.
+Its per-step deadline uses the host-key probe timeout in Settings. **Copy diagnostic report**
+omits hostnames, accounts, key paths and raw errors. A successful destination step proves TCP
+access only, not that an RDP, database or other application login will work.
+
 ---
 
 ## Sending a log when you need help

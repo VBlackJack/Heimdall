@@ -3,12 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:Heimdall.App.Converters"
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
+        xmlns:loc="clr-namespace:Heimdall.App.Localization"
         d:DataContext="{d:DesignInstance Type=vm:GatewayDialogViewModel}"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="{Binding DialogTitle}"
-        Width="500" SizeToContent="Height" MaxHeight="700"
+        Width="640" SizeToContent="Height" MaxHeight="800"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource BackgroundBrush}"
         ResizeMode="CanResizeWithGrip"
@@ -36,6 +37,7 @@
 
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="0,0,8,0">
+                <StackPanel IsEnabled="{Binding CanEditGateway}">
                 <TextBlock x:Name="LblName" Style="{StaticResource DialogLabelStyle}" Margin="0,0,0,4"/>
                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblName}"
@@ -140,6 +142,49 @@
                            Style="{StaticResource DialogHintTextStyle}"
                            Margin="0,4,0,0"
                            TextWrapping="Wrap"/>
+                </StackPanel>
+                <Border x:Name="DiagnosticPanel" Style="{StaticResource DialogSectionCardStyle}" Margin="0,16,0,0">
+                    <StackPanel Margin="{StaticResource SpacingSm}">
+                        <TextBlock Text="{loc:Translate GatewayDiagnosticTitle}" Style="{StaticResource DialogSectionTitleStyle}"/>
+                        <TextBlock Text="{loc:Translate GatewayDiagnosticHint}" TextWrapping="Wrap"
+                                   Style="{StaticResource DialogHintTextStyle}"/>
+                        <TextBlock Text="{Binding FullDiagnosticRoute}" TextWrapping="Wrap" Margin="0,8,0,8"
+                                   AutomationProperties.Name="{loc:Translate GatewayDiagnosticRoute}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <StackPanel IsEnabled="{Binding CanEditGateway}">
+                            <TextBlock Text="{loc:Translate GatewayDiagnosticTargetHost}" Style="{StaticResource DialogLabelStyle}"/>
+                            <TextBox Text="{Binding DiagnosticTargetHost, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DialogFormTextBoxStyle}"
+                                     AutomationProperties.Name="{loc:Translate GatewayDiagnosticTargetHost}"/>
+                            <TextBlock Text="{loc:Translate GatewayDiagnosticTargetPort}" Style="{StaticResource DialogLabelStyle}"/>
+                            <TextBox Text="{Binding DiagnosticTargetPort, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"
+                                     Style="{StaticResource DialogFormTextBoxStyle}"
+                                     AutomationProperties.Name="{loc:Translate GatewayDiagnosticTargetPort}"/>
+                        </StackPanel>
+                        <WrapPanel Margin="0,8,0,8">
+                            <Button Content="{loc:Translate GatewayDiagnosticTest}" Click="OnTestRouteClick"
+                                    IsEnabled="{Binding CanStartDiagnostic}"
+                                    x:Name="TestRouteButton"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    AutomationProperties.Name="{loc:Translate GatewayDiagnosticTest}"/>
+                            <Button Content="{loc:Translate GatewayDiagnosticStop}" Command="{Binding CancelGatewayDiagnosticCommand}"
+                                    IsEnabled="{Binding IsDiagnosticRunning}" Margin="8,0,0,0"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    AutomationProperties.Name="{loc:Translate GatewayDiagnosticStop}"/>
+                            <Button Content="{loc:Translate GatewayDiagnosticCopy}" Click="OnCopyDiagnosticClick"
+                                    IsEnabled="{Binding HasDiagnosticReport}"
+                                    Margin="8,0,0,0" Style="{DynamicResource SecondaryButtonStyle}"
+                                    AutomationProperties.Name="{loc:Translate GatewayDiagnosticCopy}"/>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding DiagnosticStatus}" TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBox Text="{Binding DiagnosticReport, Mode=OneWay}" IsReadOnly="True"
+                                 TextWrapping="Wrap" MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                                 Style="{StaticResource DialogFormTextBoxStyle}" Margin="0,8,0,0"
+                                 AutomationProperties.Name="{loc:Translate GatewayDiagnosticCopy}"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
 
@@ -164,6 +209,7 @@
                     Margin="0,0,8,0"
                     Style="{DynamicResource SecondaryButtonStyle}"/>
             <Button x:Name="SaveBtn"
+                    IsEnabled="{Binding CanEditGateway}"
                     IsDefault="True"
                     AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}"
                     MinWidth="80"

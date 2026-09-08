@@ -173,6 +173,20 @@ montrant ce qu'elle fait. Vous pouvez annuler depuis la barre d'outils.
 
 Si la raison affichée ne suffit pas, le journal en dira davantage.
 
+Pour une passerelle SSH, ouvrez son formulaire de création/modification et utilisez
+**Tester le parcours**. L'aperçu montre tous les parents et les valeurs actuelles du formulaire.
+Le test ne les enregistre pas. Vous pouvez ajouter un hôte cible et un port TCP pour vérifier
+l'accès depuis la dernière passerelle. Chaque étape indique sa durée et l'action à entreprendre
+en cas d'échec ; les étapes suivantes s'arrêtent au premier échec.
+Utilisez **Arrêter le test** ou fermez le formulaire pour annuler. Modifier le formulaire efface
+le rapport précédent.
+
+Le diagnostic utilise les clés SSH de confiance existantes et n'accepte aucune clé nouvelle ou
+modifiée à votre place. Son délai par étape correspond au délai de sonde de clé d'hôte des paramètres.
+**Copier le diagnostic** exclut les noms d'hôtes, comptes, chemins de clés et erreurs brutes.
+Une étape cible réussie prouve uniquement l'accès TCP, pas le fonctionnement d'une authentification
+RDP, de base de données ou d'une autre application.
+
 ---
 
 ## Envoyer un journal quand vous avez besoin d'aide
