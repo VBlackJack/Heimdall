@@ -336,10 +336,7 @@ public partial class App : System.Windows.Application
 
             var rdpCertificateStore = _serviceProvider.GetRequiredService<RdpCertificateTrustStore>();
             LoadTrustedRdpCertificates(rdpCertificateStore, settings);
-            rdpCertificateStore.TrustChanged += (key, entries) =>
-            {
-                _ = PersistTrustedRdpCertificatesAsync(configManager, key, entries);
-            };
+            _serviceProvider.GetRequiredService<RdpCertificatePersistence>();
 
             _serviceProvider.GetRequiredService<KnownHostsStartupSync>().StartIfEnabled(settings);
 
@@ -602,6 +599,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IHostKeyVerifier, DialogHostKeyVerifier>();
         services.AddSingleton<FtpsCertificateStore>();
         services.AddSingleton<RdpCertificateTrustStore>();
+        services.AddSingleton<RdpCertificatePersistence>();
         services.AddSingleton<IRdpCertificateProbe>(_ => new RdpCertificateProbe());
         services.AddSingleton<RdpTrustPromptSurfaceRegistry>();
         services.AddSingleton<RdpTrustQuestionCoalescer>();
@@ -989,22 +987,7 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            await configManager.MergeSettingAsync(settings =>
-            {
-                Dictionary<string, List<RdpCertificateEntry>> owners = key.Scope switch
-                {
-                    RdpTrustScope.TypedDestination => settings.TrustedRdpCertificatesForTypedDestinations,
-                    _ => settings.TrustedRdpCertificates,
-                };
-
-                if (entries.Count == 0)
-                {
-                    owners.Remove(key.Identity);
-                    return;
-                }
-
-                owners[key.Identity] = [.. entries];
-            });
+            await RdpCertificatePersistence.PersistAsync(configManager, key, entries);
         }
         catch (Exception ex)
         {

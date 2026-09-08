@@ -95,6 +95,13 @@ internal sealed class RdpConnectAttemptArbiter
     /// </remarks>
     public void UserRequestedConnect() => _runner.RunAttempt(_gate.OpenAttempt());
 
+    /// <summary>Opens the attempt before its asynchronous certificate check starts.</summary>
+    public int PrepareAttempt() => _gate.OpenAttempt();
+
+    /// <summary>Revalidates an attempt after dispatch or a nested layout message pump.</summary>
+    public bool CanContinue(int attempt, bool viewDisposed)
+        => !viewDisposed && _gate.AdmitRetry(attempt) == RdpConnectRetryAdmission.Admit;
+
     /// <summary>
     /// Decides what becomes of a retry that has waited out its render pass, and runs it when it
     /// is still allowed to connect.

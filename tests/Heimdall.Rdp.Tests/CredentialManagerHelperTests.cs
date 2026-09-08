@@ -21,6 +21,80 @@ namespace Heimdall.Rdp.Tests;
 public sealed class CredentialManagerHelperTests
 {
     [Fact]
+    public async Task ConcurrentLaunchCannotWriteBetweenAnotherLaunchProbeAndWrite()
+    {
+        using ManualResetEventSlim entered = new();
+        using ManualResetEventSlim release = new();
+        TaskCompletionSource secondStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        DateTime now = DateTime.UtcNow;
+        string? currentMarker = null;
+        int writes = 0;
+        int reads = 0;
+        CredentialManagerHelper.CredentialProbeResult Probe(string target, string prefix)
+        {
+            string? snapshot = currentMarker;
+            if (Interlocked.Increment(ref reads) == 1)
+            {
+                entered.Set();
+                Assert.True(release.Wait(TimeSpan.FromSeconds(10)));
+            }
+            return new(true, snapshot is not null, true, null, snapshot);
+        }
+        bool Write(string target, string user, string password, uint type, uint persistence, string? marker, out string? error)
+        {
+            currentMarker = marker;
+            Interlocked.Increment(ref writes);
+            error = null;
+            return true;
+        }
+        bool Launch()
+        {
+            string marker = CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(Environment.ProcessId, now);
+            return CredentialManagerHelper.WriteDomainCredential("TERMSRV/audit.invalid", "user", "synthetic", marker,
+                Probe, Write, Environment.ProcessId, now, out bool written, out _) && written;
+        }
+        Task<bool> first = Task.Run(Launch);
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        Task<bool> second = Task.Run(() => { secondStarted.SetResult(); return Launch(); });
+        try
+        {
+            await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.NotSame(second, await Task.WhenAny(second, Task.Delay(TimeSpan.FromMilliseconds(200))));
+        }
+        finally
+        {
+            release.Set();
+        }
+        Assert.True(await first.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.False(await second.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(1, writes);
+    }
+
+    [Theory]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, false)]
+    public void SweepDoesNotDeleteAReplacedMissingOrUnverifiableEntry(bool success, bool exists, bool matches)
+    {
+        string marker = MarkerAgedBy(TimeSpan.FromHours(1));
+        int deleted = CredentialManagerHelper.SweepStaleOwnedCredentials(SweepNow,
+            (string _, out IReadOnlyList<CredentialManagerHelper.StoredCredentialSummary> entries, out int error) =>
+            {
+                entries = [new("TERMSRV/audit.invalid", CredentialManagerHelper.CredTypeDomainPassword, marker)];
+                error = 0;
+                return true;
+            },
+            (_, _) => throw new InvalidOperationException("Must preserve the current entry"),
+            null,
+            (target, expectedMarker) =>
+            {
+                Assert.Equal(marker, expectedMarker);
+                return new(success, exists, matches, null);
+            });
+        Assert.Equal(0, deleted);
+    }
+
+    [Fact]
     public void CreateDomainCredentialOwnershipMarker_ReturnsFreshLaunchMarkers()
     {
         string first = CredentialManagerHelper.CreateDomainCredentialOwnershipMarker();
@@ -324,7 +398,8 @@ public sealed class CredentialManagerHelperTests
                 deleted.Add((target, type));
                 return new CredentialManagerHelper.CredentialDeleteResult(true, 0);
             },
-            warn: null);
+            warn: null,
+            probeCredential: (_, _) => new(true, true, true, null));
 
         Assert.Equal(1, count);
         Assert.Equal([("TERMSRV/stale", CredentialManagerHelper.CredTypeDomainPassword)], deleted);
@@ -349,7 +424,8 @@ public sealed class CredentialManagerHelperTests
                 deleteCalled = true;
                 return new CredentialManagerHelper.CredentialDeleteResult(true, 0);
             },
-            warnings.Add);
+            warnings.Add,
+            probeCredential: (_, _) => throw new InvalidOperationException("probe must not be reached"));
 
         Assert.Equal(0, count);
         Assert.False(deleteCalled);
@@ -370,7 +446,8 @@ public sealed class CredentialManagerHelperTests
                 return false;
             },
             (_, _) => throw new InvalidOperationException("delete must not be reached"),
-            warnings.Add);
+            warnings.Add,
+            probeCredential: (_, _) => throw new InvalidOperationException("probe must not be reached"));
 
         Assert.Equal(0, count);
         string warning = Assert.Single(warnings);
@@ -399,7 +476,8 @@ public sealed class CredentialManagerHelperTests
             (target, _) => target.EndsWith("first", StringComparison.Ordinal)
                 ? new CredentialManagerHelper.CredentialDeleteResult(false, 5)
                 : new CredentialManagerHelper.CredentialDeleteResult(true, 0),
-            warnings.Add);
+            warnings.Add,
+            probeCredential: (_, _) => new(true, true, true, null));
 
         Assert.Equal(1, count);
         string warning = Assert.Single(warnings);

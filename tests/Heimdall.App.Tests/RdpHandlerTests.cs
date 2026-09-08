@@ -27,6 +27,32 @@ namespace Heimdall.App.Tests;
 
 public sealed class RdpHandlerTests
 {
+    [Fact]
+    public async Task ProtectedFileFailureStopsLaunchAndReleasesOwnedCredential()
+    {
+        TrackingRdpExternalClientLauncher launcher = new();
+        TrackingRdpCredentialManager credentials = new() { CredentialWritten = true };
+        bool artifactDeleted = false;
+        RdpHandler handler = new(
+            new PassThroughTunnelService(), new ConnectionStateMachine(), new LocalizationManager(), launcher,
+            credentialManager: credentials,
+            decryptPassword: _ => "synthetic-password",
+            deleteRdpFile: _ => artifactDeleted = true,
+            sweepStaleRdpArtifacts: () => { },
+            writeProtectedRdpFile: (_, _) => throw new UnauthorizedAccessException("Protection unavailable"));
+        ServerProfileDto server = CreateServer("External");
+        server.RdpUsername = "synthetic-user";
+        server.RdpPasswordEncrypted = "synthetic-encrypted-value";
+
+        ConnectionResult result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(0, launcher.LaunchCalls);
+        Assert.Equal(1, credentials.WriteCalls);
+        Assert.Equal(1, credentials.DeleteCalls);
+        Assert.True(artifactDeleted);
+    }
+
     /// <summary>Budget for observing a detached autofill task reach - or not reach - its fake.</summary>
     private static readonly TimeSpan AutofillObservationBudget = TimeSpan.FromSeconds(5);
 

@@ -238,6 +238,15 @@ endpoint.
 
 ### RDP server certificate trust
 
+Certificate revocation is acknowledged only after its settings write succeeds. A failed write
+leaves the approval and its settings row visible, with an error and the option to retry. Trust
+writes are serialized by the application so a delayed snapshot cannot restore a removed entry.
+
+External RDP launch fails if the temporary `.rdp` file cannot be created with its restricted ACL.
+Credential Manager ownership checks and writes/deletes share a process-wide gate, and stale
+cleanup rechecks ownership after enumeration. This coordinates Heimdall's own operations;
+Windows does not provide conditional credential deletion against changes by unrelated processes.
+
 Windows keeps exactly **one** RDP server thumbprint per host name. Behind a
 single name there is often more than one machine - a pool of domain
 controllers, each with its own self-signed RDP certificate. Every connection

@@ -260,6 +260,17 @@ d'accès.
 
 ### Confiance envers le certificat de serveur RDP
 
+La révocation d'un certificat est confirmée uniquement après la réussite de son enregistrement.
+Si celui-ci échoue, le certificat reste approuvé et visible dans les réglages, avec un message
+d'erreur permettant de réessayer. Les écritures de confiance sont sérialisées par l'application
+pour empêcher une sauvegarde retardée de rétablir une entrée supprimée.
+
+Le lancement RDP externe s'arrête si le fichier temporaire `.rdp` ne peut pas être créé avec son
+ACL restrictive. Les contrôles de propriété et les écritures/suppressions dans le Gestionnaire
+d'identifiants partagent un verrou dans le processus. Le nettoyage des entrées périmées relit
+leur marqueur avant suppression. Ce verrou coordonne les opérations de Heimdall ; Windows ne
+fournit pas de suppression conditionnelle face aux modifications d'autres processus.
+
 Windows ne conserve qu'**une seule** empreinte de serveur RDP par nom d'hôte.
 Derrière un même nom il y a pourtant souvent plusieurs machines - un pool de
 contrôleurs de domaine, chacun avec son certificat RDP auto-signé. Chaque
