@@ -195,11 +195,18 @@ n'est dépensé qu'une fois par tentative de connexion : lorsqu'un tour de mot d
 est suivi d'un second tour demandant un code de vérification, ce second tour est
 refusé plutôt que répondu de nouveau avec le mot de passe, et le refus est signalé
 comme une question sans réponse. Heimdall retente alors la connexion via le Plink
-embarqué, qui tourne avec une vraie console dans le volet terminal, de sorte que les
-questions restantes du serveur sont posées là où quelqu'un peut les voir. Cette
-reprise a lieu quand Pageant est disponible ou qu'aucun agent SSH ne tourne ; avec
-l'agent OpenSSH de Windows et sans Pageant, aucune reprise n'est tentée et le refus
-subsiste.
+embarqué, qui tourne avec une vraie console dans le volet terminal. Cette reprise a
+lieu quand Pageant est disponible ou qu'aucun agent SSH ne tourne ; avec l'agent
+OpenSSH de Windows et sans Pageant, aucune reprise n'est tentée et le refus subsiste.
+
+Ce que la reprise permet d'atteindre dépend de ce que le serveur demande ensuite, et
+cela a été mesuré plutôt que supposé. Face à un serveur dont la question restante est
+un mot de passe, le Plink embarqué la pose dans le volet terminal et attend une
+réponse. Face à un serveur qui propose un code de vérification en clavier-interactif,
+le Plink embarqué refuse avec "No supported authentication methods available" et la
+connexion s'arrête là. Un second facteur fourni de cette manière reste donc
+inatteignable : la reprise remplace un usage silencieux et fautif du mot de passe par
+un refus honnête, ce qui est un progrès, mais ce n'est pas une porte d'entrée.
 
 Deux coûts de cette reprise, énoncés plutôt que laissés implicites. Le second tour
 est désormais un refus là où il était une réponse. Et le nombre de tentatives
