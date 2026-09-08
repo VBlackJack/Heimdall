@@ -14,6 +14,8 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+## 2026-09-08: gateway diagnostics, session recovery and safer transfers (v2026.090801)
+
 ### Recovery actions in SSH, SFTP and RDP
 
 - Disconnected SSH and SFTP sessions can open their saved profile directly. Split views target
