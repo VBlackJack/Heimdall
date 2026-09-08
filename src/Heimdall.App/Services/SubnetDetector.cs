@@ -89,8 +89,7 @@ internal static class SubnetDetector
         SshGatewayDto gateway,
         CancellationToken ct = default)
     {
-        using var sshClient = await Task.Run(
-            () => ToolGatewayConnector.Connect(gateway), ct).ConfigureAwait(false);
+        using var sshClient = await ToolGatewayConnector.ConnectAsync(gateway, ct).ConfigureAwait(false);
 
         var output = ExecuteSshCommand(sshClient, "ip -4 addr show 2>/dev/null");
         var subnets = ParseLinuxInterfaces(output);

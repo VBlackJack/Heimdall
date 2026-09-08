@@ -213,10 +213,20 @@ Heimdall-trusted fingerprint, the operation returns
 own cache.
 
 Reusable tunnel identity includes the remote target, forwarding mode, and a
-collision-safe gateway chain key (`GatewayChainKey`) derived from stable
-gateway IDs and a versioned SHA-256 hash over length-prefixed chain parts.
-Two tenants that both expose `10.0.0.5:3389` through different bastions do
-not share a local tunnel.
+versioned SHA-256 gateway chain key over length-prefixed IDs, endpoints,
+accounts, key paths, encrypted credentials, legacy credential mapping and agent
+preference. Connection-affecting configuration edits prevent new acquisitions of
+the old tunnel. A display-name-only edit preserves sharing. Existing consumers
+keep their authenticated transport until they close it; editing a gateway does
+not revoke those sessions. Two tenants exposing `10.0.0.5:3389` through different
+bastions do not share a local tunnel.
+
+Network tools resolve the full parent chain from current settings. Every hop
+requires an existing trusted fingerprint and pins the authenticating connection.
+The final client owns the parent route, including intermediate listeners and key
+resources, and releases it on disposal or a failed handshake. Connection work
+runs off the UI dispatcher and observes cancellation through the SSH handshake.
+Chained tunnels apply the configured SSH keepalive interval at each hop.
 
 Mid-session host-key failures are surfaced as typed security events, not
 generic disconnect strings. `SshSessionFailureDispatcher` maps

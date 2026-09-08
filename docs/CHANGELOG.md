@@ -14,6 +14,16 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### SSH gateway routing and lifecycle
+
+- New connections stop reusing a tunnel after a gateway endpoint, account, stored credential
+  or SSH agent preference changes. Display-name edits preserve sharing; existing sessions remain open.
+- Network tools follow the full parent-gateway chain, with a trusted host-key pin at every hop.
+  Gateway handshakes are asynchronous and cancellable, including the Ping tool.
+- Closing a tool connection or failing its handshake releases its parent route and authentication
+  resources. Cancelled tunnel reuse and zero-delay establishment release any acquired reference.
+- The configured SSH keepalive interval is applied to every hop of a chained tunnel.
+
 ### RDP trust, cancellation and launch safety
 
 - Forgetting a trusted RDP certificate now waits for settings to be saved. A failed save keeps

@@ -453,11 +453,10 @@ public sealed partial class CertInspectorViewModel : ObservableObject, IDisposab
                 }
             }
 
-            EnsureTunnel(ct);
-
             await _commandLock!.WaitAsync(ct).ConfigureAwait(false);
             try
             {
+                await EnsureTunnelAsync(ct).ConfigureAwait(false);
                 return await Task.Run(() => RetrieveCertificateViaTunnel(_tunnelClient!, host, port, ct), ct);
             }
             catch (OperationCanceledException)
@@ -495,10 +494,10 @@ public sealed partial class CertInspectorViewModel : ObservableObject, IDisposab
             _commandLock = null;
         }
 
-        private void EnsureTunnel(CancellationToken ct)
+        private async Task EnsureTunnelAsync(CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            _tunnelClient ??= ToolGatewayConnector.Connect(_gateway!);
+            _tunnelClient ??= await ToolGatewayConnector.ConnectAsync(_gateway!, ct).ConfigureAwait(false);
         }
 
         private static CertProbeResult RetrieveCertificateViaTunnel(

@@ -231,11 +231,21 @@ résoudre une empreinte de confiance pour Heimdall, l'opération retourne
 propre à PuTTY/Plink.
 
 L'identité d'un tunnel réutilisable inclut la cible distante, le mode de
-transfert et une clé de chaîne de passerelles résistante aux collisions
-(`GatewayChainKey`), dérivée d'identifiants de passerelle stables et d'un
-hachage SHA-256 versionné sur des segments de chaîne préfixés par leur
-longueur. Deux locataires qui exposent tous deux `10.0.0.5:3389` à travers des
-bastions différents ne partagent pas de tunnel local.
+transfert et un hachage SHA-256 versionné des identifiants, adresses, comptes,
+chemins de clés, secrets chiffrés, mode de compatibilité et préférence d'agent.
+Les segments sont préfixés par leur longueur. Une modification de connexion
+empêche les nouvelles sessions de reprendre l'ancien tunnel ; un simple
+renommage conserve le partage. Les sessions déjà ouvertes gardent leur transport
+authentifié jusqu'à leur fermeture : modifier une passerelle ne les révoque pas.
+Deux locataires exposant `10.0.0.5:3389` via des bastions différents ne partagent
+pas de tunnel local.
+
+Les outils réseau résolvent toute la chaîne parente depuis les paramètres
+courants. Chaque saut exige une empreinte déjà approuvée et vérifie cette
+empreinte sur la connexion authentifiée. Le client final possède la route
+parente et libère ses listeners, sessions et ressources de clés à la fermeture
+ou en cas d'échec. Le handshake SSH s'exécute hors du thread UI et respecte
+l'annulation. Le keepalive configuré est appliqué à chaque saut.
 
 Les échecs de clé d'hôte en cours de session sont remontés sous forme
 d'événements de sécurité typés, et non de chaînes de déconnexion génériques.

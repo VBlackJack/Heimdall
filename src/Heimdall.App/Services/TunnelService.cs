@@ -127,6 +127,7 @@ public sealed class TunnelService : ITunnelService
             CancellationToken ct,
             bool preferDistinctLoopback = false)
     {
+        ct.ThrowIfCancellationRequested();
         if (server.UseDirectConnection || string.IsNullOrEmpty(server.SshGatewayId))
         {
             return new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, null, null);
@@ -203,7 +204,7 @@ public sealed class TunnelService : ITunnelService
                 chainDtos,
                 ConnectionHelpers.DecryptPassword,
                 settings.SshAgentPreference);
-            gatewayChainKey = BuildGatewayChainKey(chainDtos);
+            gatewayChainKey = BuildGatewayChainKey(chainDtos, settings.SshAgentPreference);
         }
         catch (GatewayChainException chainEx)
         {
@@ -233,20 +234,19 @@ public sealed class TunnelService : ITunnelService
 
         if (existing is not null)
         {
+            if (ct.IsCancellationRequested)
+            {
+                _tunnelManager.ReleaseReference(existing.LocalPort);
+                ct.ThrowIfCancellationRequested();
+            }
             Core.Logging.FileLogger.Info(
                 $"Reusing existing tunnel on port {existing.LocalPort} for {serverId}");
             _connectionSm.SetTunnelInfo(serverId, existing.LocalPort, 0);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.EstablishingTunnel);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
 
-            // The route this tunnel was OPENED through, not the one just resolved. The reuse key
-            // hashes gateway identifiers and an edit leaves those alone, so the tunnel handed
-            // back here can have been dialled from an older settings instance, through a gateway
-            // host that has since been changed - or by another profile entirely.
-            //
-            // Null when nothing recorded that opening, which is a tunnel this process did not
-            // open. The question then shows no route line, as it did for every reuse before the
-            // opening was recorded at all.
+            // Endpoint and authentication edits invalidate reuse. A display-name-only edit
+            // still shares this transport, whose recorded route describes its opening.
             return new TunnelResult(true, existing, null, null)
             {
                 ReusedExistingTunnel = true,
@@ -316,7 +316,7 @@ public sealed class TunnelService : ITunnelService
 
         if (chain.Count == 1)
         {
-            int keepAlive = _currentSettings?.SshKeepAliveIntervalSeconds ?? AppSettings.DefaultSshKeepAliveIntervalSeconds;
+            int keepAlive = settings.SshKeepAliveIntervalSeconds;
             result = await _tunnelManager.OpenTunnelAsync(
                     chain[0],
                     remoteHost,
@@ -349,7 +349,8 @@ public sealed class TunnelService : ITunnelService
                     remoteLocalPort: remoteLocalPort,
                     gatewayChainKey: gatewayChainKey,
                     localBindHost: localBindHost,
-                    gatewayRoute: resolvedRoute)
+                    gatewayRoute: resolvedRoute,
+                    keepAliveIntervalSeconds: settings.SshKeepAliveIntervalSeconds)
                 .ConfigureAwait(false);
         }
 
@@ -840,6 +841,7 @@ public sealed class TunnelService : ITunnelService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(timeProvider);
+        cancellationToken.ThrowIfCancellationRequested();
 
         return delayMs <= 0
             ? Task.CompletedTask
@@ -879,7 +881,8 @@ public sealed class TunnelService : ITunnelService
         return settings.DefaultSshTunnelPort;
     }
 
-    internal static string BuildGatewayChainKey(IReadOnlyList<SshGatewayDto> chainDtos)
+    internal static string BuildGatewayChainKey(IReadOnlyList<SshGatewayDto> chainDtos,
+        SshAgentPreference agentPreference = SshAgentPreference.AutoOpenSshFirst)
     {
         ArgumentNullException.ThrowIfNull(chainDtos);
         if (chainDtos.Count == 0)
@@ -888,13 +891,22 @@ public sealed class TunnelService : ITunnelService
         }
 
         using MemoryStream payload = new MemoryStream();
+        WriteLengthPrefixedString(payload, agentPreference.ToString());
         foreach (SshGatewayDto gateway in chainDtos)
         {
             WriteLengthPrefixedString(payload, gateway.Id ?? string.Empty);
+            WriteLengthPrefixedString(payload, gateway.Host);
+            WriteLengthPrefixedString(payload, gateway.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            WriteLengthPrefixedString(payload, gateway.User);
+            WriteLengthPrefixedString(payload, gateway.KeyPath ?? string.Empty);
+            WriteLengthPrefixedString(payload, gateway.SshPasswordEncrypted ?? string.Empty);
+            // Null and empty have different legacy credential mapping semantics.
+            WriteLengthPrefixedString(payload, gateway.SshKeyPassphraseEncrypted is null ? "legacy" : "explicit");
+            WriteLengthPrefixedString(payload, gateway.SshKeyPassphraseEncrypted ?? string.Empty);
         }
 
         byte[] hash = SHA256.HashData(payload.ToArray());
-        return $"v1:sha256:{Convert.ToBase64String(hash)}";
+        return $"v2:sha256:{Convert.ToBase64String(hash)}";
     }
 
     private static void WriteLengthPrefixedString(Stream destination, string value)

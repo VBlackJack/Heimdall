@@ -122,7 +122,7 @@ public sealed class SmbEnumerationService : ISmbEnumerationService
 
         try
         {
-            client = ToolGatewayConnector.Connect(gateway);
+            client = await ToolGatewayConnector.ConnectAsync(gateway, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

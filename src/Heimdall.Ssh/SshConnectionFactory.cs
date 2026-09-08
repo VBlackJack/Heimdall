@@ -88,6 +88,27 @@ public static class SshConnectionFactory
     }
 
     /// <summary>
+    /// Creates a client that releases its parent route after its own transport and keys.
+    /// Ownership of the route transfers only when this method returns successfully.
+    /// </summary>
+    public static SshClient CreateSshClient(SshConnectionParams connectionParams, IDisposable parentRoute)
+    {
+        ArgumentNullException.ThrowIfNull(connectionParams);
+        ArgumentNullException.ThrowIfNull(parentRoute);
+        OwnedConnectionInfo owned = CreateOwned(
+            connectionParams, SshAgentRegistry.CreateDefault(connectionParams.SshAgentPreference));
+        try
+        {
+            return new OwnedSshClient(owned, parentRoute);
+        }
+        catch
+        {
+            owned.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Creates an <see cref="SftpClient"/> that owns any private-key material
     /// loaded while building its authentication methods.
     /// </summary>
@@ -911,11 +932,13 @@ public static class SshConnectionFactory
     private sealed class OwnedSshClient : SshClient
     {
         private OwnedConnectionInfo? _ownedConnectionInfo;
+        private IDisposable? _parentRoute;
 
-        public OwnedSshClient(OwnedConnectionInfo ownedConnectionInfo)
+        public OwnedSshClient(OwnedConnectionInfo ownedConnectionInfo, IDisposable? parentRoute = null)
             : base((ownedConnectionInfo ?? throw new ArgumentNullException(nameof(ownedConnectionInfo))).ConnectionInfo)
         {
             _ownedConnectionInfo = ownedConnectionInfo;
+            _parentRoute = parentRoute;
         }
 
         protected override void Dispose(bool disposing)
@@ -929,6 +952,7 @@ public static class SshConnectionFactory
                 if (disposing)
                 {
                     Interlocked.Exchange(ref _ownedConnectionInfo, null)?.Dispose();
+                    Interlocked.Exchange(ref _parentRoute, null)?.Dispose();
                 }
             }
         }

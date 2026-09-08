@@ -33,11 +33,8 @@ public sealed record TunnelResult(
     /// Whether this attempt handed back a tunnel that was already open rather than opening one.
     /// </summary>
     /// <remarks>
-    /// <para><b>The reuse decision is taken on gateway IDENTIFIERS, so a reused tunnel need not
-    /// have been opened from the settings this attempt read.</b> The reuse key is a hash over the
-    /// chain's gateway identifiers, and editing a gateway's host leaves its identifier alone: a
-    /// tunnel opened through Paris is therefore still reused by a later connection whose settings
-    /// now say Berlin, on the same local port, to the same target.</para>
+    /// <para>Endpoint and authentication edits invalidate reuse. Display-name-only edits do not,
+    /// so the recorded route label can differ from the current gateway display name.</para>
     /// <para>Reported because a caller may then not claim that what it resolved describes the
     /// wire. What the wire actually is lives on <see cref="TunnelInfo.GatewayRoute"/>, set when
     /// that tunnel's record was built and carried by every copy of it - deliberately NOT

@@ -324,9 +324,9 @@ public sealed class DnsLookupService : IDnsLookupService
         string? dnsServer,
         CancellationToken ct)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
-            using var client = ToolGatewayConnector.Connect(gateway);
+            using var client = await ToolGatewayConnector.ConnectAsync(gateway, ct).ConfigureAwait(false);
             try
             {
                 var safeHostname = InputValidator.EscapeShellArg(hostname);

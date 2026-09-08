@@ -126,7 +126,7 @@ public sealed class TracerouteService : ITracerouteService
         Renci.SshNet.SshClient? client = null;
         try
         {
-            client = ToolGatewayConnector.Connect(_gateway!);
+            client = await ToolGatewayConnector.ConnectAsync(_gateway!, ct).ConfigureAwait(false);
             var escapedHost = InputValidator.EscapeShellArg(inputs.Host);
             var command =
                 $"traceroute -n -m {inputs.MaxHops} {escapedHost} 2>/dev/null || " +

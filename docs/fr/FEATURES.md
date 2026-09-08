@@ -48,7 +48,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Heartbeat keepalive SSH (évite les déconnexions dues à TMOUT) ; la remise à zéro côté shell ne part que vers un shell SSH inactif, jamais dans une ligne à moitié tapée, un terminal local ou WinRM, ni un enregistrement de macro
 - Vérification TOFU de la clé d'hôte confirmée par l'utilisateur avec épinglage persistant de l'empreinte ; les décisions de confiance sont tranchées *avant* `Connect()` via une sonde de pré-authentification dédiée - le callback `HostKeyReceived` de SSH.NET n'effectue jamais de travail asynchrone ni de dispatch UI
 - Application fail-closed de la clé d'hôte pour SSH.NET comme pour le repli Plink, avec `HostKeyUnavailable` lorsqu'une clé de passerelle épinglée ne peut pas être résolue sans retomber sur le cache de PuTTY/Plink
-- L'identité de réutilisation des tunnels tient compte de la passerelle (identifiants de passerelle stables + hachage de chaîne normalisé), ce qui évite tout partage accidentel entre réseaux privés qui se recouvrent
+- La réutilisation des tunnels tient compte des adresses, comptes, identifiants enregistrés et préférences d'agent. Une modification de connexion ouvre un nouveau tunnel ; un simple renommage conserve le partage.
 - Chaînage de tunnels multi-passerelles avec détection des dépendances circulaires
 - Allocation dynamique du port de tunnel avec nouvelles tentatives bornées en cas de course sur le bind (`AddressAlreadyInUse`)
 - Comptage de références des tunnels (les tunnels partagés survivent à la fermeture d'une session isolée)

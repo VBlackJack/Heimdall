@@ -80,26 +80,11 @@ public sealed class TunnelReuseIdentityTests
         Assert.Equal(localBindHost, result.Host);
         Assert.Equal(localPort, result.Port);
 
-        // The chain resolved just above is not what this tunnel was opened through, and the
-        // caller has to be told so. The reuse key hashes gateway identifiers, which an edit
-        // leaves alone, so the certificate question would otherwise name the gateway host as it
-        // reads TODAY for a certificate that answered at the end of a tunnel opened through the
-        // host it had BEFORE.
+        // The caller receives both the reused transport address and the reuse flag.
         Assert.True(result.ReusedExistingTunnel);
     }
 
-    // What the reuse flag above is FOR, measured on the value the question actually shows.
-    //
-    // Reuse is decided on a hash over the chain's gateway identifiers, and editing a gateway
-    // leaves its identifier alone - so the tunnel handed back here was dialled through a chain
-    // this connection cannot reconstruct, and may have been dialled by another profile entirely.
-    // Resolving the route from the settings in hand would name Berlin for a certificate that
-    // answered at the end of the Paris tunnel.
-    //
-    // Withholding it instead - which is what shipped - is honest and not sufficient: the line
-    // exists so that two identically named profiles reaching two different sites can be told
-    // apart, and both of them reusing a tunnel is precisely when both lines vanished. So the
-    // opener records the route on the tunnel, and reuse reads it back.
+    // A display-name-only edit preserves reuse and the original route description.
     [Fact]
     public async Task SetupTunnelIfNeededAsync_ReusedTunnel_ReportsTheRouteThatTunnelWasOpenedThrough()
     {
@@ -152,7 +137,7 @@ public sealed class TunnelReuseIdentityTests
                 {
                     Id = gatewayId,
                     Name = "Berlin datacentre",
-                    Host = "berlin.example.test",
+                    Host = "gateway.example.test",
                     User = "ssh-user"
                 }
             ]
@@ -222,7 +207,7 @@ public sealed class TunnelReuseIdentityTests
                 {
                     Id = gatewayId,
                     Name = "Berlin datacentre",
-                    Host = "berlin.example.test",
+                    Host = "gateway.example.test",
                     User = "ssh-user"
                 }
             ]
@@ -592,7 +577,7 @@ public sealed class TunnelReuseIdentityTests
         var first = TunnelService.BuildGatewayChainKey(chain);
         var second = TunnelService.BuildGatewayChainKey(chain);
 
-        Assert.StartsWith("v1:sha256:", first, StringComparison.Ordinal);
+        Assert.StartsWith("v2:sha256:", first, StringComparison.Ordinal);
         Assert.Equal(first, second);
     }
 

@@ -525,7 +525,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                     verifier: _hostKeyVerifier,
                     cancellationToken: ct,
                     label: label,
-                    gatewayRoute: gatewayRoute)
+                    gatewayRoute: gatewayRoute,
+                    keepAliveIntervalSeconds: settings.SshKeepAliveIntervalSeconds)
                 .ConfigureAwait(false);
         }
 

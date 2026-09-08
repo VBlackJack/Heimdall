@@ -74,7 +74,7 @@ public sealed class BannerGrabService : IBannerGrabService
         SemaphoreSlim? commandLock = null;
         if (_gateway is not null)
         {
-            tunnelClient = ToolGatewayConnector.Connect(_gateway);
+            tunnelClient = await ToolGatewayConnector.ConnectAsync(_gateway, ct).ConfigureAwait(false);
             commandLock = new SemaphoreSlim(1, 1);
         }
 

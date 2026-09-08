@@ -203,8 +203,7 @@ public sealed class CartographyScanner : ICartographyScanner
             IsIndeterminate = true,
         });
 
-        using var sshClient = await Task.Run(
-            () => ToolGatewayConnector.Connect(gateway), ct).ConfigureAwait(false);
+        using var sshClient = await ToolGatewayConnector.ConnectAsync(gateway, ct).ConfigureAwait(false);
 
         var ipList = CartographyEngine.ParseCidr(profile.Subnet);
         var hosts = new List<HostScanResult>();

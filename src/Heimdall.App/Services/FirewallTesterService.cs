@@ -80,7 +80,7 @@ public sealed class FirewallTesterService : IFirewallTesterService
         SshClient? tunnelClient = null;
         if (_gateway is not null)
         {
-            tunnelClient = ToolGatewayConnector.Connect(_gateway);
+            tunnelClient = await ToolGatewayConnector.ConnectAsync(_gateway, ct).ConfigureAwait(false);
         }
 
         var concurrency = tunnelClient is not null
