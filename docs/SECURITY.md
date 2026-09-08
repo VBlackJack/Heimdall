@@ -7,10 +7,16 @@ defense-in-depth decisions in Heimdall.
 
 ## Reporting a vulnerability
 
-Report suspected vulnerabilities privately to the maintainer. This repository
-does not currently publish a dedicated security email address; use the private
-channel through which you obtained the source, or see `LICENSE` for maintainer
-and licensing context. Do not file public issues for security problems.
+Report a suspected vulnerability through GitHub private vulnerability
+reporting: [open a private report](https://github.com/VBlackJack/Heimdall/security/advisories/new).
+The report stays visible to you and the maintainer only. Do not file a public
+issue for a security problem.
+
+This project publishes no contact address, and mail is not a supported way to
+reach the maintainer. Addresses that appear in commit metadata are an artifact
+of how Git records authorship, not an invitation: they are not monitored. The
+full policy, including where to raise bugs and questions, is in
+[SECURITY.md](../SECURITY.md).
 
 ## Threat model scope
 
