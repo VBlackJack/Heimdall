@@ -14,6 +14,16 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### RDP trust, cancellation and launch safety
+
+- Forgetting a trusted RDP certificate now waits for settings to be saved. A failed save keeps
+  the certificate visible and reports an error so the action can be retried.
+- RDP credential ownership checks and mutations are serialized within Heimdall. Cleanup rechecks
+  the current ownership marker before deleting an entry found by the stale-credential sweep.
+- Cancelling an embedded connection also stops its queued start and its continuation after layout
+  messages have been processed.
+- External RDP launch stops if its temporary connection file cannot be created with a private ACL.
+
 ### A server that asks for a second factor after the password is now reachable
 
 When a server asks for your password and then, separately, for a verification code, Heimdall used

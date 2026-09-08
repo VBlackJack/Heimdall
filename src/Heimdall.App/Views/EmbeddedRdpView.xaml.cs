@@ -1682,21 +1682,19 @@ public partial class EmbeddedRdpView
         }
     }
 
-    /// <summary>Starts a fresh connect attempt, on behalf of the user.</summary>
+    /// <summary>Resumes the verified attempt after its dispatcher wait.</summary>
     /// <remarks>
-    /// Opening the attempt is what clears any prior abandonment, so this connect can promote
-    /// normally and is not refused by the late-connect guard. Nothing else may clear it: a retry
-    /// of an attempt the user cancelled in the meantime is not a new decision by the user, and
-    /// used to be treated as one.
+    /// Preparation already opened this attempt. Dispatch must preserve its identity and any
+    /// cancellation delivered while the callback was waiting, just like a surface retry.
     /// </remarks>
-    private void BeginConnect()
+    private void BeginConnect(int attempt)
     {
         if (_disposed || _rdpHost is null || _server is null || _settings is null)
         {
             return;
         }
 
-        _connectAttempts.UserRequestedConnect();
+        ContinueConnectAttempt(attempt);
     }
 
     /// <summary>Hands a retry that has waited out a render pass back to the arbiter.</summary>
@@ -1758,10 +1756,10 @@ public partial class EmbeddedRdpView
             // view down: the host is handed back and the field is cleared. Re-read the field
             // here rather than the copy the guard above took, or the next line dereferences a
             // control that now belongs to the pool and reports a failure on a pane that is gone.
-            if (_disposed || _rdpHost is null)
+            if (!_connectAttempts.CanContinue(attempt, _disposed) || _rdpHost is null)
             {
                 Core.Logging.FileLogger.Info(
-                    "EmbeddedRDP BeginConnect abandoned: the view was torn down while its layout was flushed.");
+                    "EmbeddedRDP BeginConnect abandoned: the attempt ended while its layout was flushed.");
                 return;
             }
 
@@ -1811,6 +1809,11 @@ public partial class EmbeddedRdpView
                     throw new InvalidOperationException(
                         _rdpHost.LastError ?? "Failed to attach the Remote Desktop event sink.");
                 }
+            }
+
+            if (!_connectAttempts.CanContinue(attempt, _disposed) || _rdpHost is null)
+            {
+                return;
             }
 
             Core.Logging.FileLogger.Info("EmbeddedRDP calling Connect()...");
@@ -3302,6 +3305,7 @@ public partial class EmbeddedRdpView
     /// </remarks>
     private async Task StartVerifiedConnectAsync()
     {
+        int attempt = _connectAttempts.PrepareAttempt();
         // The certificate probe and any trust question happen here, before Connect(). This is the
         // Preparing phase: it lights the stepper's first segment, shows the Cancel button and
         // arms the connect watchdog, none of which used to happen because the phase had no
@@ -3348,7 +3352,7 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(BeginConnect));
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() => BeginConnect(attempt)));
     }
 
     /// <summary>Runs the certificate check for this profile, when one is owed.</summary>

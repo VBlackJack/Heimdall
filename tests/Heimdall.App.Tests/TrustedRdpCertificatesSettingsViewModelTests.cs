@@ -40,6 +40,25 @@ namespace Heimdall.App.Tests;
 /// </remarks>
 public sealed class TrustedRdpCertificatesSettingsViewModelTests
 {
+    [Fact]
+    public async Task ForgetWaitsForPersistenceAndReportsFailureWithoutDroppingTheRow()
+    {
+        TaskCompletionSource save = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        VmFixture fixture = await VmFixture.CreateAsync((_, _) => save.Task);
+        fixture.Store.Trust(RdpTrustKey.ForProfile("srv-1"), "SHA256:AA");
+        await fixture.ViewModel.RefreshAsync();
+        fixture.Dialog.ConfirmResult = true;
+        Task forget = fixture.ViewModel.ForgetCommand.ExecuteAsync(fixture.ViewModel.Rows[0]);
+        Assert.False(forget.IsCompleted);
+        Assert.Single(fixture.ViewModel.Rows);
+        Assert.False(fixture.ViewModel.HasStatusMessage);
+        save.SetException(new IOException("Save unavailable"));
+        await forget;
+        Assert.Single(fixture.ViewModel.Rows);
+        Assert.Single(fixture.Store.GetApproved(RdpTrustKey.ForProfile("srv-1")));
+        Assert.Contains("Save unavailable", fixture.ViewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
     private static readonly DateTimeOffset Stamp =
         new(2026, 8, 23, 10, 0, 0, TimeSpan.Zero);
 
@@ -798,7 +817,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         /// </remarks>
         public Task? ProfileLoadGate { get; set; }
 
-        public static async Task<VmFixture> CreateAsync()
+        public static async Task<VmFixture> CreateAsync(Func<RdpTrustKey, string, Task>? revoke = null)
         {
             var store = new RdpCertificateTrustStore();
             var localizer = new LocalizationManager();
@@ -823,7 +842,8 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
                 },
                 localizer,
                 dialog,
-                new FakeUiDispatcher());
+                new FakeUiDispatcher(),
+                revoke);
 
             fixture = new VmFixture(store, viewModel, dialog);
             return fixture;

@@ -44,13 +44,8 @@ namespace Heimdall.App.ViewModels.Settings;
 /// up, so it is shown under its raw identifier and flagged rather than dropped or blanked.
 /// </para>
 /// <para>
-/// <b>Persisting the removal is not this class's job, and must still be proven.</b>
-/// <see cref="RdpCertificateTrustStore.Remove"/> raises
-/// <see cref="RdpCertificateTrustStore.TrustChanged"/> with the set as it now stands, and the
-/// application's startup wiring writes that set back through
-/// <c>App.PersistTrustedRdpCertificatesAsync</c> - the same path a new approval takes. A screen
-/// that forgot only until the next launch would look identical from here, which is why the
-/// suite asserts the reload from disk rather than a call on a double.
+/// The application persistence service acknowledges removal before this screen reports
+/// success. A failed write keeps the row visible and reports an error so it can be retried.
 /// </para>
 /// </remarks>
 public sealed partial class TrustedRdpCertificatesSettingsViewModel : ObservableObject, IDisposable
@@ -66,6 +61,7 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
     private readonly LocalizationManager _localizer;
     private readonly IDialogService _dialogService;
     private readonly IUiDispatcher _dispatcher;
+    private readonly Func<RdpTrustKey, string, Task> _revoke;
     private readonly List<TrustedRdpCertificateRowViewModel> _allRows = [];
     private Dictionary<string, string> _profileNames = new(StringComparer.Ordinal);
 
@@ -97,19 +93,22 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
     /// <param name="localizer">Resolves every string this screen shows.</param>
     /// <param name="dialogService">Asks the user before anything is forgotten.</param>
     /// <param name="dispatcher">Marshals store notifications onto the UI thread.</param>
+    /// <param name="persistence">Acknowledges durable certificate revocations.</param>
     public TrustedRdpCertificatesSettingsViewModel(
         RdpCertificateTrustStore store,
         IConfigManager configManager,
         LocalizationManager localizer,
         IDialogService dialogService,
-        IUiDispatcher dispatcher)
+        IUiDispatcher dispatcher,
+        RdpCertificatePersistence persistence)
         : this(
             store,
             async () => (IReadOnlyList<ServerProfileDto>)await configManager.LoadServersAsync()
                 .ConfigureAwait(false),
             localizer,
             dialogService,
-            dispatcher)
+            dispatcher,
+            persistence.RevokeAsync)
     {
     }
 
@@ -124,13 +123,19 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
         Func<Task<IReadOnlyList<ServerProfileDto>>> loadProfiles,
         LocalizationManager localizer,
         IDialogService dialogService,
-        IUiDispatcher dispatcher)
+        IUiDispatcher dispatcher,
+        Func<RdpTrustKey, string, Task>? revoke = null)
     {
         _store = store;
         _loadProfiles = loadProfiles;
         _localizer = localizer;
         _dialogService = dialogService;
         _dispatcher = dispatcher;
+        _revoke = revoke ?? ((key, thumbprint) =>
+        {
+            _store.Remove(key, thumbprint);
+            return Task.CompletedTask;
+        });
 
         _store.TrustChanged += OnTrustChanged;
         _localizer.LocaleChanged += OnLocaleChanged;
@@ -276,13 +281,17 @@ public sealed partial class TrustedRdpCertificatesSettingsViewModel : Observable
             return;
         }
 
-        // Remove raises TrustChanged, which the startup wiring turns into the settings write and
-        // which this screen turns into the row disappearing. Nothing else has to be done here.
-        if (_store.Remove(row.Key, row.Thumbprint))
+        try
         {
+            await _revoke(row.Key, row.Thumbprint);
             StatusMessage = _localizer.Format(
                 "ToastTrustedRdpCertificateForgotten",
                 row.ProfileDisplay);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"RDP certificate revocation was not saved: {ex.Message}");
+            StatusMessage = _localizer.Format("ToastTrustedRdpCertificateSaveFailed", ex.Message);
         }
     }
 

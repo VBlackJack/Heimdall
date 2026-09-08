@@ -49,9 +49,32 @@ namespace Heimdall.App.Tests.Views.EmbeddedRdp;
 /// </remarks>
 public sealed class RdpLateConnectPolicyTests
 {
+    [Fact]
+    public void NativeConnectRevalidatesAttemptAfterLayoutAndAfterHostConfiguration()
+    {
+        string logic = ViewSource.HandlerBody(
+            ViewSource.HandlerLogic("private void RunConnectAttempt(int attempt)"), "try");
+        const string gate = "if (!_connectAttempts.CanContinue(attempt, _disposed) || _rdpHost is null)";
+        const string password = "var password = TryDecryptPassword(_server);";
+        const string nativeConnect = "_rdpHost.Connect();";
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, gate));
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, password));
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, nativeConnect));
+        int layout = logic.LastIndexOf("FlushLayoutPipeline(", StringComparison.Ordinal);
+        int firstCheck = logic.IndexOf(gate, layout, StringComparison.Ordinal);
+        int credentials = logic.IndexOf(password, StringComparison.Ordinal);
+        int finalCheck = logic.LastIndexOf(gate, StringComparison.Ordinal);
+        int connect = logic.IndexOf(nativeConnect, StringComparison.Ordinal);
+        Assert.True(layout >= 0 && firstCheck > layout && credentials > firstCheck);
+        Assert.True(finalCheck > credentials && connect > finalCheck);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody("{" + logic[credentials..], gate));
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic[firstCheck..], "return;"));
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic[finalCheck..], "return;"));
+    }
+
     private const string CancelMember =
         "private void OnCancelConnectClick(object sender, RoutedEventArgs e)";
-    private const string BeginMember = "private void BeginConnect()";
+    private const string BeginMember = "private void BeginConnect(int attempt)";
     private const string ContinueMember = "private void ContinueConnectAttempt(int attempt)";
     private const string ConnectedMember = "private void OnRdpConnected()";
     private const string RetryMember = "private async Task RetryBeginConnectAsync(int attempt)";
@@ -64,7 +87,7 @@ public sealed class RdpLateConnectPolicyTests
     // whole condition: what has to be written there is the refusal being acted on, not a call
     // whose answer is dropped.
     private const string CancelCall = "_connectAttempts.UserCancelled();";
-    private const string BeginCall = "_connectAttempts.UserRequestedConnect();";
+    private const string BeginCall = "ContinueConnectAttempt(attempt);";
     private const string ContinueCall =
         "if (_connectAttempts.RetryArrived(attempt, _disposed) == RdpConnectRetryAdmission.Refuse)";
     private const string ConnectedCall =

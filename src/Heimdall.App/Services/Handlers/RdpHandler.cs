@@ -39,6 +39,7 @@ internal sealed class RdpHandler : IProtocolHandler
     private readonly Action<string> _deleteRdpFile;
     private readonly Func<TimeSpan, Task> _artifactCleanupDelay;
     private readonly Action _sweepStaleRdpArtifacts;
+    private readonly Action<string, string> _writeProtectedRdpFile;
 
     /// <summary>
     /// The deferred cleanups that have not run yet, keyed by artifact path. Consulted by
@@ -82,7 +83,8 @@ internal sealed class RdpHandler : IProtocolHandler
         RdpCredentialAutofillOperation? credentialAutofill = null,
         Action<string>? deleteRdpFile = null,
         Func<TimeSpan, Task>? artifactCleanupDelay = null,
-        Action? sweepStaleRdpArtifacts = null)
+        Action? sweepStaleRdpArtifacts = null,
+        Action<string, string>? writeProtectedRdpFile = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -97,6 +99,7 @@ internal sealed class RdpHandler : IProtocolHandler
         _deleteRdpFile = deleteRdpFile ?? File.Delete;
         _artifactCleanupDelay = artifactCleanupDelay ?? (delay => Task.Delay(delay));
         _sweepStaleRdpArtifacts = sweepStaleRdpArtifacts ?? SweepStaleArtifactsBeforeLaunch;
+        _writeProtectedRdpFile = writeProtectedRdpFile ?? Core.Security.SecureFileWriter.WriteAndProtect;
     }
 
     /// <summary>
@@ -361,36 +364,17 @@ internal sealed class RdpHandler : IProtocolHandler
             {
                 try
                 {
-                    Core.Security.SecureFileWriter.WriteAndProtect(rdpFile, rdpContent);
+                    _writeProtectedRdpFile(rdpFile, rdpContent);
                 }
                 catch (Exception swEx)
                 {
                     Core.Logging.FileLogger.Error(
-                        $"Atomic ACL write failed for .rdp file, falling back to unprotected write: {swEx.Message}");
-                    try
-                    {
-                        await File.WriteAllTextAsync(rdpFile, rdpContent, ct).ConfigureAwait(false);
-                    }
-                    catch (Exception writeEx)
-                    {
-                        Core.Logging.FileLogger.Error("Failed to write .rdp file", writeEx);
-                        return new ConnectionResult(
-                            false,
-                            _localizer["RdpErrorRdpFileWrite"],
-                            null,
-                            RdpSessionDiagnosticFactory.FromRdpFileWriteException(writeEx));
-                    }
-
-                    try
-                    {
-                        Heimdall.Core.Security.AclEnforcer.SetFileAcl(rdpFile);
-                    }
-                    catch (Exception aclEx)
-                    {
-                        Core.Logging.FileLogger.Error(
-                            $"Failed to set ACL on .rdp file - file has inherited permissions: {aclEx.Message}");
-                        warning ??= _localizer["WarnRdpFileAclFailed"];
-                    }
+                        $"Atomic ACL write failed for .rdp file; launch stopped: {swEx.Message}");
+                    return new ConnectionResult(
+                        false,
+                        _localizer["RdpErrorRdpFileWrite"],
+                        null,
+                        RdpSessionDiagnosticFactory.FromRdpFileWriteException(swEx));
                 }
             }
             else

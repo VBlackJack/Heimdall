@@ -44,6 +44,36 @@ namespace Heimdall.App.Tests.Views.EmbeddedRdp;
 /// </remarks>
 public sealed class RdpConnectAttemptArbiterTests
 {
+    [Fact]
+    public void CancelAfterCertificateAdmissionStopsQueuedConnectAndPreservesAbandonment()
+    {
+        RecordingRunner runner = new();
+        RdpConnectAttemptArbiter arbiter = new(runner);
+        int attempt = arbiter.PrepareAttempt();
+        Assert.Equal(RdpVerifiedConnectAdmission.Proceed, arbiter.CertificateCheckSettled(false));
+        arbiter.UserCancelled();
+        Assert.Equal(RdpConnectRetryAdmission.Refuse, arbiter.RetryArrived(attempt, false));
+        Assert.Empty(runner.RunAttempts);
+        Assert.True(arbiter.AbandonedByUser);
+        Assert.Equal(RdpLateConnectDecision.Refuse, arbiter.ConnectArrived());
+    }
+
+    [Fact]
+    public void LayoutContinuationRejectsCancellationWatchdogAndSupersededAttempts()
+    {
+        RdpConnectAttemptArbiter arbiter = new(new RecordingRunner());
+        int first = arbiter.PrepareAttempt();
+        Assert.True(arbiter.CanContinue(first, false));
+        arbiter.UserCancelled();
+        Assert.False(arbiter.CanContinue(first, false));
+        int second = arbiter.PrepareAttempt();
+        Assert.False(arbiter.CanContinue(first, false));
+        Assert.True(arbiter.CanContinue(second, false));
+        arbiter.WatchdogAborted();
+        Assert.False(arbiter.CanContinue(second, false));
+        Assert.False(arbiter.CanContinue(arbiter.PrepareAttempt(), true));
+    }
+
     /// <summary>The defect itself, from Cancel to the connect that arrives after it.</summary>
     /// <remarks>
     /// One test for both halves on purpose: refusing the retry while letting the late connect

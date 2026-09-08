@@ -26,6 +26,9 @@ namespace Heimdall.Rdp;
 /// </summary>
 public static class CredentialManagerHelper
 {
+    // Covers ownership probes and mutations, including background cleanup and startup sweep.
+    // Windows does not offer compare-and-delete; unrelated processes remain outside this gate.
+    private static readonly Lock CredentialGate = new();
     #region Constants
 
     internal const uint CredTypeGeneric = 1;
@@ -157,55 +160,73 @@ public static class CredentialManagerHelper
                     deleted,
                     deleted ? 0 : Marshal.GetLastWin32Error());
             },
-            warn);
+            warn,
+            (target, marker) => ProbeCredential(target, CredTypeDomainPassword, marker, exactMarker: true));
     }
 
     internal static int SweepStaleOwnedCredentials(
         DateTime utcNow,
         CredentialEnumerateOperation enumerateCredentials,
         Func<string, uint, CredentialDeleteResult> deleteCredential,
-        Action<string>? warn)
+        Action<string>? warn,
+        Func<string, string, CredentialProbeResult> probeCredential)
     {
-        ArgumentNullException.ThrowIfNull(enumerateCredentials);
-        ArgumentNullException.ThrowIfNull(deleteCredential);
-
-        if (!enumerateCredentials(
-                RdpCredentialTargetFilter,
-                out IReadOnlyList<StoredCredentialSummary> credentials,
-                out int errorCode))
+        lock (CredentialGate)
         {
-            if (errorCode != ErrorNotFound)
+            ArgumentNullException.ThrowIfNull(enumerateCredentials);
+            ArgumentNullException.ThrowIfNull(deleteCredential);
+            ArgumentNullException.ThrowIfNull(probeCredential);
+
+            if (!enumerateCredentials(
+                    RdpCredentialTargetFilter,
+                    out IReadOnlyList<StoredCredentialSummary> credentials,
+                    out int errorCode))
             {
-                warn?.Invoke($"Stale RDP credential sweep: enumeration failed with WIN32_ERROR_{errorCode}");
+                if (errorCode != ErrorNotFound)
+                {
+                    warn?.Invoke($"Stale RDP credential sweep: enumeration failed with WIN32_ERROR_{errorCode}");
+                }
+
+                return 0;
             }
 
-            return 0;
+            int deleted = 0;
+            foreach (StoredCredentialSummary credential in credentials)
+            {
+                if (credential.Type != CredTypeDomainPassword
+                    || !IsStaleOwnedMarker(credential.Comment, utcNow))
+                {
+                    continue;
+                }
+
+                CredentialProbeResult current = probeCredential(credential.TargetName, credential.Comment!);
+                if (!current.Success)
+                {
+                    warn?.Invoke($"Stale RDP credential sweep: ownership could not be verified for '{credential.TargetName}'");
+                    continue;
+                }
+
+                if (!current.Exists || !current.MarkerMatches)
+                {
+                    continue;
+                }
+
+                CredentialDeleteResult result = deleteCredential(credential.TargetName, credential.Type);
+                if (result.Success)
+                {
+                    deleted++;
+                }
+                else if (result.ErrorCode != ErrorNotFound)
+                {
+                    // The target is a host name, which is not a secret; the comment and the blob
+                    // are never logged.
+                    warn?.Invoke(
+                        $"Stale RDP credential sweep: could not delete '{credential.TargetName}': WIN32_ERROR_{result.ErrorCode}");
+                }
+            }
+
+            return deleted;
         }
-
-        int deleted = 0;
-        foreach (StoredCredentialSummary credential in credentials)
-        {
-            if (credential.Type != CredTypeDomainPassword
-                || !IsStaleOwnedMarker(credential.Comment, utcNow))
-            {
-                continue;
-            }
-
-            CredentialDeleteResult result = deleteCredential(credential.TargetName, credential.Type);
-            if (result.Success)
-            {
-                deleted++;
-            }
-            else if (result.ErrorCode != ErrorNotFound)
-            {
-                // The target is a host name, which is not a secret; the comment and the blob
-                // are never logged.
-                warn?.Invoke(
-                    $"Stale RDP credential sweep: could not delete '{credential.TargetName}': WIN32_ERROR_{result.ErrorCode}");
-            }
-        }
-
-        return deleted;
     }
 
     /// <summary>
@@ -460,55 +481,58 @@ public static class CredentialManagerHelper
         out bool credentialWritten,
         out string? error)
     {
-        credentialWritten = false;
-        error = null;
-
-        if (string.IsNullOrWhiteSpace(targetName))
+        lock (CredentialGate)
         {
-            error = "Credential target cannot be empty.";
-            return false;
+            credentialWritten = false;
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(targetName))
+            {
+                error = "Credential target cannot be empty.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(ownershipMarker) ||
+                !ownershipMarker.StartsWith(DomainCredentialOwnershipPrefix, StringComparison.Ordinal))
+            {
+                error = "Credential ownership marker is invalid.";
+                return false;
+            }
+
+            ArgumentNullException.ThrowIfNull(probeCredential);
+            ArgumentNullException.ThrowIfNull(writeCredential);
+
+            CredentialProbeResult probe = probeCredential(targetName, DomainCredentialOwnershipPrefix);
+            if (!probe.Success)
+            {
+                error = probe.Error;
+                return false;
+            }
+
+            if (probe.Exists && !probe.MarkerMatches)
+            {
+                return true;
+            }
+
+            if (probe.Exists && IsLiveLaunchMarker(probe.Comment, currentProcessId, utcNow))
+            {
+                // The entry belongs to a launch of this process that may not have read it yet.
+                // Overwriting it would hand that session this profile's account instead of its
+                // own, so treat it exactly like a foreign entry and leave it in place.
+                return true;
+            }
+
+            bool written = writeCredential(
+                targetName,
+                username,
+                password,
+                CredTypeDomainPassword,
+                CredPersistSession,
+                ownershipMarker,
+                out error);
+            credentialWritten = written;
+            return written;
         }
-
-        if (string.IsNullOrWhiteSpace(ownershipMarker) ||
-            !ownershipMarker.StartsWith(DomainCredentialOwnershipPrefix, StringComparison.Ordinal))
-        {
-            error = "Credential ownership marker is invalid.";
-            return false;
-        }
-
-        ArgumentNullException.ThrowIfNull(probeCredential);
-        ArgumentNullException.ThrowIfNull(writeCredential);
-
-        CredentialProbeResult probe = probeCredential(targetName, DomainCredentialOwnershipPrefix);
-        if (!probe.Success)
-        {
-            error = probe.Error;
-            return false;
-        }
-
-        if (probe.Exists && !probe.MarkerMatches)
-        {
-            return true;
-        }
-
-        if (probe.Exists && IsLiveLaunchMarker(probe.Comment, currentProcessId, utcNow))
-        {
-            // The entry belongs to a launch of this process that may not have read it yet.
-            // Overwriting it would hand that session this profile's account instead of its
-            // own, so treat it exactly like a foreign entry and leave it in place.
-            return true;
-        }
-
-        bool written = writeCredential(
-            targetName,
-            username,
-            password,
-            CredTypeDomainPassword,
-            CredPersistSession,
-            ownershipMarker,
-            out error);
-        credentialWritten = written;
-        return written;
     }
 
     internal static bool DeleteCredential(
@@ -519,45 +543,48 @@ public static class CredentialManagerHelper
         out bool credentialDeleted,
         out string? error)
     {
-        credentialDeleted = false;
-        error = null;
-
-        if (string.IsNullOrWhiteSpace(targetName))
+        lock (CredentialGate)
         {
-            error = "Credential target cannot be empty.";
-            return false;
-        }
+            credentialDeleted = false;
+            error = null;
 
-        if (string.IsNullOrWhiteSpace(ownershipMarker))
-        {
-            error = "Credential ownership marker cannot be empty.";
-            return false;
-        }
+            if (string.IsNullOrWhiteSpace(targetName))
+            {
+                error = "Credential target cannot be empty.";
+                return false;
+            }
 
-        ArgumentNullException.ThrowIfNull(probeCredential);
-        ArgumentNullException.ThrowIfNull(deleteCredential);
+            if (string.IsNullOrWhiteSpace(ownershipMarker))
+            {
+                error = "Credential ownership marker cannot be empty.";
+                return false;
+            }
 
-        CredentialProbeResult probe = probeCredential(targetName, ownershipMarker);
-        if (!probe.Success)
-        {
-            error = probe.Error;
-            return false;
-        }
+            ArgumentNullException.ThrowIfNull(probeCredential);
+            ArgumentNullException.ThrowIfNull(deleteCredential);
 
-        if (!probe.Exists || !probe.MarkerMatches)
-        {
+            CredentialProbeResult probe = probeCredential(targetName, ownershipMarker);
+            if (!probe.Success)
+            {
+                error = probe.Error;
+                return false;
+            }
+
+            if (!probe.Exists || !probe.MarkerMatches)
+            {
+                return true;
+            }
+
+            CredentialDeleteResult result = deleteCredential(targetName, CredTypeDomainPassword);
+            if (!result.Success && result.ErrorCode != ErrorNotFound)
+            {
+                error = $"WIN32_ERROR_{result.ErrorCode}";
+                return false;
+            }
+
+            credentialDeleted = result.Success;
             return true;
         }
-
-        CredentialDeleteResult result = deleteCredential(targetName, CredTypeDomainPassword);
-        if (!result.Success && result.ErrorCode != ErrorNotFound)
-        {
-            error = $"WIN32_ERROR_{result.ErrorCode}";
-            return false;
-        }
-
-        credentialDeleted = result.Success;
-        return true;
     }
 
     internal delegate bool CredentialWriteOperation(

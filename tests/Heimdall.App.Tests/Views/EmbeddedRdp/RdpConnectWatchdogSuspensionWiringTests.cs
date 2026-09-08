@@ -80,7 +80,7 @@ public sealed class RdpConnectWatchdogSuspensionWiringTests
     private const string ResumeStatement =
         "_connectWatchdogArbiter.CertificateCheckCompleted(_connectionPhase, _disposed);";
     private const string BeginConnectDispatch =
-        "_ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(BeginConnect));";
+        "_ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() => BeginConnect(attempt)));";
 
     // The question itself, carried whole. The ordering below used to end on the bare name
     // "RdpCertificateGate.CheckConnectionAsync", and a bare name is text at an offset: fold the
