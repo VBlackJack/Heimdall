@@ -33,6 +33,9 @@ public sealed class KeyboardInteractiveObservation
 {
     private string? _unansweredPrompt;
 
+    /// <summary>0 while the stored password has not been given yet, 1 once it has.</summary>
+    private int _passwordAnswered;
+
     /// <summary>The first prompt left unanswered, trimmed, or null when every prompt was answered.</summary>
     public string? UnansweredPrompt => Volatile.Read(ref _unansweredPrompt);
 
@@ -43,6 +46,31 @@ public sealed class KeyboardInteractiveObservation
         Interlocked.CompareExchange(ref _unansweredPrompt, text, null);
     }
 
+    /// <summary>
+    /// Claims the one chance this attempt has to answer with the stored password.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// True the first time and false afterwards, for the whole connection attempt. A server that
+    /// authenticates in stages asks twice: the password, then a verification code, each as its
+    /// own single-prompt round. The second round is indistinguishable from the first by wording
+    /// alone, so without this the stored password was sent as the answer to the code prompt -
+    /// which fails, and which the server records as a failed second factor.
+    /// </para>
+    /// <para>
+    /// Refusing the second round is what lets the refusal be classified as an unanswered
+    /// question rather than a rejected password, and that classification is what routes the host
+    /// to the interactive client that CAN answer it. The two halves only work together: refusing
+    /// without the routing would take a working route away from these hosts.
+    /// </para>
+    /// </remarks>
+    public bool TryTakePasswordAnswer() =>
+        Interlocked.CompareExchange(ref _passwordAnswered, 1, 0) == 0;
+
     /// <summary>Clears the record before a new attempt.</summary>
-    public void Reset() => Volatile.Write(ref _unansweredPrompt, null);
+    public void Reset()
+    {
+        Volatile.Write(ref _unansweredPrompt, null);
+        Volatile.Write(ref _passwordAnswered, 0);
+    }
 }

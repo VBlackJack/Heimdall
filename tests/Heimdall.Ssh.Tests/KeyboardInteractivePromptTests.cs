@@ -116,4 +116,55 @@ public sealed class KeyboardInteractivePromptTests
             Username = "user",
             Password = "s3cret"
         };
+
+    /// <summary>
+    /// The stored password is spent once per attempt, not once per round.
+    /// </summary>
+    /// <remarks>
+    /// P-01 change 2. A server that authenticates in stages asks the password and then the
+    /// verification code as two separate single-prompt rounds, and the second is
+    /// indistinguishable from the first by wording. The password used to be sent to both, which
+    /// fails and which the server records as a failed second factor.
+    /// </remarks>
+    [Fact]
+    public void ASecondSinglePromptRound_IsRefusedAndRecorded()
+    {
+        KeyboardInteractiveObservation observation = new();
+        observation.Reset();
+
+        AuthenticationPrompt first = new(0, false, "Password: ");
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([first], "s3cret", observation);
+
+        AuthenticationPrompt second = new(0, false, "Verification code: ");
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([second], "s3cret", observation);
+
+        Assert.Equal("s3cret", first.Response);
+        Assert.Equal(string.Empty, second.Response);
+        Assert.Equal("Verification code:", observation.UnansweredPrompt);
+    }
+
+    /// <summary>
+    /// A new attempt may spend the password again.
+    /// </summary>
+    /// <remarks>
+    /// The control. A flag that latched for the life of the object would make the SECOND
+    /// connection attempt of a session refuse a perfectly ordinary password round, and every
+    /// assertion above would still pass.
+    /// </remarks>
+    [Fact]
+    public void Reset_LetsTheNextAttemptSpendThePasswordAgain()
+    {
+        KeyboardInteractiveObservation observation = new();
+
+        AuthenticationPrompt first = new(0, false, "Password: ");
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([first], "s3cret", observation);
+
+        observation.Reset();
+
+        AuthenticationPrompt afterReset = new(0, false, "Password: ");
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([afterReset], "s3cret", observation);
+
+        Assert.Equal("s3cret", afterReset.Response);
+        Assert.Null(observation.UnansweredPrompt);
+    }
 }
