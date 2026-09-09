@@ -57,7 +57,8 @@ It is free, open source, and runs on Windows 10 and 11.
   and password generators, and dozens more, built in.
 - **Sessions organised the way you work.** Folders with colours, drag and drop to move a folder
   or to arrange sessions by hand, filters by protocol, favourite, connected state or gateway, and
-  a tree that opens where you left it.
+  a tree that opens where you left it. Remove active filters individually, act on several
+  sessions from the selection toolbar, and undo the latest move, inline rename or reorder.
 - **Trust you can audit.** SSH host keys are pinned the first time you connect and shown for you
   to compare; a key that changes is refused by default, and your `~/.ssh/known_hosts` can be
   imported and exported so OpenSSH and Heimdall agree on who is who.

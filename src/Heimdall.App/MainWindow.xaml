@@ -398,6 +398,8 @@
                                             <TextBox x:Name="Mw_FilterBox" Text="{Binding ServerList.SearchText, UpdateSourceTrigger=PropertyChanged}"
                                                      Style="{DynamicResource SearchTextBoxStyle}"
                                                      Tag="{loc:Translate SearchPlaceholder}" Padding="10,6,28,6"
+                                                     ToolTip="{loc:Translate SearchTooltip}"
+                                                     AutomationProperties.HelpText="{loc:Translate SearchTooltip}"
                                                      AutomationProperties.Name="{loc:Translate A11ySearchAndFilter}"/>
                                             <Button x:Name="Mw_FilterClearBtn"
                                                     Content="&#xE711;"
@@ -559,6 +561,25 @@
                                         </Button>
                                     </Grid>
 
+                                    <ItemsControl ItemsSource="{Binding ServerList.ActiveFilterChips}" Margin="0,4,0,0">
+                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Command="{Binding RemoveCommand}" Style="{DynamicResource GhostButtonStyle}"
+                                                        Margin="0,0,4,4" Padding="6,2" ToolTip="{Binding RemoveAccessibilityName}"
+                                                        AutomationProperties.Name="{Binding RemoveAccessibilityName}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Label}" MaxWidth="160" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="&#x00D7;" Margin="6,0,0,0"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <Button Content="{loc:Translate TreeUxResetFilters}" Command="{Binding ServerList.ResetTreeFiltersCommand}"
+                                            HorizontalAlignment="Left" Style="{DynamicResource GhostButtonStyle}"
+                                            AutomationProperties.Name="{loc:Translate TreeUxResetFilters}"
+                                            Visibility="{Binding ServerList.HasTreeFilters, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     <!-- Count is hidden while a debounced pass is pending so it
                                          never describes the previous applied filter. -->
                                     <TextBlock x:Name="Mw_FilterResultCount"
@@ -583,6 +604,37 @@
                                            AutomationProperties.Name="{Binding ServerList.SelectionCountText}"
                                            AutomationProperties.LiveSetting="Polite"
                                            behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                                    <WrapPanel Visibility="{Binding ServerList.HasMultiSelection, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <Button Content="{loc:Translate TreeUxConnect}" Command="{Binding ServerList.ConnectSelectedCommand}"
+                                                Style="{DynamicResource GhostButtonStyle}" AutomationProperties.Name="{loc:Translate TreeUxConnect}"/>
+                                        <Button Content="{loc:Translate TreeUxMove}" Click="OnTreeBulkMoveClick"
+                                                Style="{DynamicResource GhostButtonStyle}" AutomationProperties.Name="{loc:Translate TreeUxMove}"/>
+                                        <Button Content="{loc:Translate TreeUxMore}" Click="OnTreeBulkMoreClick"
+                                                Style="{DynamicResource GhostButtonStyle}" AutomationProperties.Name="{loc:Translate TreeUxMore}"/>
+                                    </WrapPanel>
+                                    <StackPanel Margin="0,8,0,4" Visibility="{Binding ServerList.HasNoTreeResults, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Translate TreeUxNoResults}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   AutomationProperties.LiveSetting="Polite"/>
+                                        <WrapPanel>
+                                            <Button Content="{loc:Translate TreeUxClearSearch}" Command="{Binding ServerList.ClearTreeSearchCommand}"
+                                                    Style="{DynamicResource GhostButtonStyle}" AutomationProperties.Name="{loc:Translate TreeUxClearSearch}"/>
+                                            <Button Content="{loc:Translate TreeUxResetFilters}" Command="{Binding ServerList.ResetTreeFiltersCommand}"
+                                                    Style="{DynamicResource GhostButtonStyle}" AutomationProperties.Name="{loc:Translate TreeUxResetFilters}"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                    <WrapPanel Visibility="{Binding ServerList.CanUndoTreeOrganization, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="{loc:Translate TreeUxChanged}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <Button Content="{loc:Translate TreeUxUndo}" Command="{Binding ServerList.UndoTreeOrganizationCommand}"
+                                                Style="{DynamicResource GhostButtonStyle}" AutomationProperties.Name="{loc:Translate TreeUxUndo}"/>
+                                    </WrapPanel>
+                                    <Popup x:Name="TreeDropHint" PlacementTarget="{Binding ElementName=SessionTreeView}" Placement="Bottom"
+                                           AllowsTransparency="True" IsHitTestVisible="False" StaysOpen="True">
+                                        <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                                                BorderThickness="1" Padding="8" MaxWidth="380">
+                                            <TextBlock x:Name="TreeDropFeedback" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       AutomationProperties.LiveSetting="Polite"/>
+                                        </Border>
+                                    </Popup>
                                 </StackPanel>
 
                                 <Border x:Name="SessionTreeNoGroupDropZone"
@@ -764,6 +816,7 @@
                                             </Ellipse>
                                             <!-- Server name -->
                                             <Grid Grid.Column="2">
+                                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                                 <TextBlock Text="{Binding DisplayName}"
                                                            FontSize="{StaticResource FontSizeBody}"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"
@@ -779,6 +832,12 @@
                                                          behaviors:InlineRenameFocusBehavior.CommitOnLostKeyboardFocus="True"
                                                          behaviors:InlineRenameFocusBehavior.CommitRequested="OnInlineRenameEditorCommitRequested"
                                                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                <TextBlock Grid.Row="1" FontSize="{StaticResource FontSizeSmallCaption}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"
+                                                           Visibility="{Binding DataContext.ServerList.ShowSearchContext, RelativeSource={RelativeSource AncestorType={x:Type TreeView}}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                    <TextBlock.Text><MultiBinding StringFormat="{}{0}  {1}"><Binding Path="Group"/><Binding Path="RemoteServer"/></MultiBinding></TextBlock.Text>
+                                                    <TextBlock.ToolTip><MultiBinding StringFormat="{}{0}  {1}"><Binding Path="Group"/><Binding Path="RemoteServer"/></MultiBinding></TextBlock.ToolTip>
+                                                </TextBlock>
                                             </Grid>
                                             <StackPanel Grid.Column="3"
                                                         Orientation="Horizontal"
@@ -1685,7 +1744,7 @@
                                     VerticalAlignment="Center" HorizontalAlignment="Center"
                                     IsHitTestVisible="True">
                             <!-- Show empty state overlay when no servers exist -->
-                            <StackPanel Visibility="{Binding ServerList.IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Visibility="{Binding ServerList.HasNoInventory, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="&#xE774;"
                                            FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeHero}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
@@ -1730,7 +1789,7 @@
                             </StackPanel>
 
                             <!-- Show hint when servers exist but none selected -->
-                            <Border Visibility="{Binding ServerList.IsEmpty, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"
+                            <Border Visibility="{Binding ServerList.HasNoInventory, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"
                                     Style="{DynamicResource EmptyStateStyle}">
                                 <StackPanel HorizontalAlignment="Center"
                                             VerticalAlignment="Center">

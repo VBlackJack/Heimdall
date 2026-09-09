@@ -1553,7 +1553,11 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var moved = false;
 
-        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
+        await WithOrganizationUndoAsync(async () =>
+        {
+            await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
+            return moved;
+        }, serverIds: ids.ToArray());
 
         if (moved)
         {

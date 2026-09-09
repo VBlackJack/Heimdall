@@ -250,7 +250,17 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
             ? new HashSet<ServerItemViewModel>()
             : normalized.ToHashSet();
 
-        foreach (var previouslySelected in SelectedItems.ToList())
+        List<ServerItemViewModel> previousSelection = SelectedItems.ToList();
+
+        // Publish membership before row notifications: automation peers query the host
+        // synchronously when IsSelected changes.
+        SelectedItems.Clear();
+        foreach (ServerItemViewModel item in normalized)
+        {
+            SelectedItems.Add(item);
+        }
+
+        foreach (ServerItemViewModel previouslySelected in previousSelection)
         {
             if (!selectedSet.Contains(previouslySelected))
             {
@@ -258,11 +268,9 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
             }
         }
 
-        SelectedItems.Clear();
-        foreach (var item in normalized)
+        foreach (ServerItemViewModel item in normalized)
         {
             item.IsSelected = true;
-            SelectedItems.Add(item);
         }
 
         var primary = normalized.Count == 0

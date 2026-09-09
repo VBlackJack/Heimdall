@@ -156,6 +156,28 @@ public sealed partial class ServerListSelectionTests
     }
 
     [Theory]
+    [InlineData("A-folder", "B-folder")]
+    [InlineData("Parent/Child", "Parent")]
+    public async Task Reorder_FromDifferentFolders_PreservesVisualOrder(string firstFolder, string secondFolder)
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        await fixture.LoadServersAsync(fixture.ExpandGroups(firstFolder, secondFolder, "Target"),
+            CreateServer("a", "Zulu", firstFolder, sortOrder: 20),
+            CreateServer("b", "Alpha", secondFolder, sortOrder: 10),
+            CreateServer("target", "Target", "Target"));
+        Assert.Equal(new[] { "a", "b", "target" },
+            SelectionHelpers.EnumerateVisibleLeaves(fixture.ViewModel.GroupedServers).Select(server => server.Id));
+
+        await fixture.ViewModel.ReorderServersAsync(
+            [fixture.ServerById("b"), fixture.ServerById("a")], fixture.ServerById("target"), placeAfter: true);
+
+        Assert.Equal(new[] { "target", "a", "b" }, fixture.FolderByPath("Target").Servers.Select(server => server.Id));
+        List<ServerProfileDto> saved = await fixture.ConfigManager.LoadServersAsync();
+        Assert.Equal(new[] { "target", "a", "b" }, saved.OrderBy(server => server.SortOrder).Select(server => server.Id));
+        Assert.All(saved, server => Assert.Equal("Target", server.Group));
+    }
+
+    [Theory]
     [InlineData(0, 24, DropInsertion.Before)]
     [InlineData(11, 24, DropInsertion.Before)]
     [InlineData(12, 24, DropInsertion.After)]

@@ -522,6 +522,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     internal void RefreshLocalizedState()
     {
+        RefreshTreeFilterChips();
         foreach (ServerItemViewModel server in _allServers)
         {
             server.RefreshLocalizedState();

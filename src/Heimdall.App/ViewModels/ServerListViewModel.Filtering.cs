@@ -133,6 +133,8 @@ public partial class ServerListViewModel
 
     partial void OnSearchTextChanged(string value)
     {
+        if (_resettingTreeFilters) return;
+        RefreshTreeFilterChips();
         if (string.IsNullOrWhiteSpace(value))
         {
             CancelSearchFilterDebounce();
@@ -142,6 +144,7 @@ public partial class ServerListViewModel
 
         IsFilterPending = true;
         OnPropertyChanged(nameof(HasAppliedFilterResult));
+        OnPropertyChanged(nameof(HasNoTreeResults));
         ScheduleSearchFilter();
     }
 
@@ -201,6 +204,8 @@ public partial class ServerListViewModel
 
     private void ApplyDiscreteFilter()
     {
+        if (_resettingTreeFilters) return;
+        RefreshTreeFilterChips();
         OnPropertyChanged(nameof(HasActiveFacetFilter));
         CancelSearchFilterDebounce();
         ApplyFilter();
@@ -330,6 +335,8 @@ public partial class ServerListViewModel
         OnPropertyChanged(nameof(FilterResultCountText));
         OnPropertyChanged(nameof(HasAppliedFilterResult));
         OnPropertyChanged(nameof(ShowNoGroupDropZone));
+        OnPropertyChanged(nameof(HasNoTreeResults));
+        OnPropertyChanged(nameof(HasNoInventory));
         return true;
     }
 

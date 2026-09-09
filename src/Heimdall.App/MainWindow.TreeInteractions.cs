@@ -672,8 +672,8 @@ public partial class MainWindow
             }
         }
 
-        if (e.Key is Key.Up or Key.Down
-            && modifiers == ModifierKeys.Alt
+        int nudgeDelta = ResolveTreeNudgeDelta(e, modifiers);
+        if (nudgeDelta != 0
             && DataContext is MainViewModel nudgeViewModel
             && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
         {
@@ -687,7 +687,7 @@ public partial class MainWindow
 
             // Consumed before the write: Alt+Up left unhandled reaches the tree's own navigation.
             e.Handled = true;
-            if (await nudgeViewModel.ServerList.NudgeServerAsync(nudged, e.Key == Key.Up ? -1 : 1))
+            if (await nudgeViewModel.ServerList.NudgeServerAsync(nudged, nudgeDelta))
             {
                 RefocusSessionRow(nudged);
             }
@@ -768,7 +768,8 @@ public partial class MainWindow
             e.Key,
             modifiers,
             FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext,
-            vm.ServerList.SelectionCount);
+            vm.ServerList.SelectionCount,
+            IsInlineRenameEditorSource(e.OriginalSource as DependencyObject));
 
         if (!deleteHandled
             || (deleteSelection && !vm.ServerList.DeleteSelectedCommand.CanExecute(null)))
@@ -789,12 +790,25 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// Resolves an Alt-arrow nudge, including WPF system-key events.
+    /// </summary>
+    internal static int ResolveTreeNudgeDelta(KeyEventArgs e, ModifierKeys modifiers)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        return modifiers == ModifierKeys.Alt
+            ? key switch { Key.Up => -1, Key.Down => 1, _ => 0 }
+            : 0;
+    }
+
+    /// <summary>
     /// Resolves what a Delete press does, without reading global keyboard state.
     /// </summary>
     /// <param name="key">The key raised by the sessions tree.</param>
     /// <param name="modifiers">The exact modifier combination for the gesture.</param>
     /// <param name="focusedNode">The data context of the container owning keyboard focus.</param>
     /// <param name="selectionCount">How many sessions the view model reports as selected.</param>
+    /// <param name="isInlineRenameEditorSource">Whether text editing owns the key.</param>
     /// <returns>
     /// Whether the tree consumes the press, and whether it deletes the current selection.
     /// </returns>
@@ -802,9 +816,10 @@ public partial class MainWindow
         Key key,
         ModifierKeys modifiers,
         object? focusedNode,
-        int selectionCount)
+        int selectionCount,
+        bool isInlineRenameEditorSource = false)
     {
-        if (key != Key.Delete || modifiers != ModifierKeys.None)
+        if (key != Key.Delete || modifiers != ModifierKeys.None || isInlineRenameEditorSource)
         {
             return default;
         }
@@ -1037,8 +1052,9 @@ public partial class MainWindow
         try
         {
             ServerRenameResult result =
-                await new ServerRenameService(vm.ConfigManager)
-                    .RenameAsync(server.Id, server.EditName);
+                await vm.ServerList.WithOrganizationUndoAsync(
+                    () => new ServerRenameService(vm.ConfigManager).RenameAsync(server.Id, server.EditName),
+                    serverIds: new[] { server.Id });
 
             switch (result.Status)
             {
@@ -1101,9 +1117,12 @@ public partial class MainWindow
         string oldPath = folder.FullPath;
         try
         {
+            await vm.ServerList.FlushExpandStateForCloseAsync();
             FolderRenameResult result =
-                await new FolderRenameService(vm.ConfigManager)
-                    .RenameAsync(oldPath, folder.EditName);
+                await vm.ServerList.WithOrganizationUndoAsync(
+                    () => new FolderRenameService(vm.ConfigManager).RenameAsync(oldPath, folder.EditName),
+                    result => result.Status == FolderRenameStatus.Renamed
+                        ? new FolderRenamePlan(result.NewPath!, oldPath) : null);
 
             switch (result.Status)
             {
@@ -1366,32 +1385,40 @@ public partial class MainWindow
             return;
         }
 
-        switch (sourceItem)
+        try
         {
-            case ServerItemViewModel sourceServer:
-                ExecuteTreeDrag(
-                    _treeState,
-                    sourceContainer,
-                    new TreeServerDragPayload(
-                        sourceServer,
-                        vm.ServerList.ResolveDragSelection(sourceServer)),
-                    static (container, data) =>
-                        DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
-                break;
+            switch (sourceItem)
+            {
+                case ServerItemViewModel sourceServer:
+                    ExecuteTreeDrag(
+                        _treeState,
+                        sourceContainer,
+                        new TreeServerDragPayload(
+                            sourceServer,
+                            vm.ServerList.ResolveDragSelection(sourceServer)),
+                        static (container, data) =>
+                            DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
+                    break;
 
-            case FolderViewModel sourceFolder:
-                ExecuteTreeDrag(
-                    _treeState,
-                    sourceContainer,
-                    TreeFolderDragPayload.DataFormat,
-                    new TreeFolderDragPayload(sourceFolder),
-                    static (container, data) =>
-                        DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
-                break;
+                case FolderViewModel sourceFolder:
+                    ExecuteTreeDrag(
+                        _treeState,
+                        sourceContainer,
+                        TreeFolderDragPayload.DataFormat,
+                        new TreeFolderDragPayload(sourceFolder),
+                        static (container, data) =>
+                            DragDrop.DoDragDrop(container, data, System.Windows.DragDropEffects.Move));
+                    break;
 
-            default:
-                _treeState.ResetDrag();
-                break;
+                default:
+                    _treeState.ResetDrag();
+                    break;
+            }
+        }
+        finally
+        {
+            StopTreeDragNavigation();
+            ClearDropHighlight();
         }
     }
 
@@ -1623,6 +1650,7 @@ public partial class MainWindow
 
         bool allowed;
         TreeViewItem? targetContainer;
+        TreeFolderDragPayload? folderPayload = null;
         if (TryGetTreeDragPayload(e.Data, out TreeServerDragPayload? payload))
         {
             // Over a session row the drop is positioned: before or after that row, in its
@@ -1631,34 +1659,54 @@ public partial class MainWindow
             {
                 if (!TreeInteractionState.CanReorderOnto(payload.Servers, anchor))
                 {
+                    SetTreeDropFeedback("");
+                    UpdateTreeDragNavigation(e, null);
                     return;
                 }
 
                 e.Effects = System.Windows.DragDropEffects.Move;
                 DropTargetVisualState.SetInsertion(row, insertion);
                 _treeState.LastDropHighlight = row;
+                SetTreeDropFeedback(string.Format(
+                    vm.Localize(insertion == DropInsertion.Before ? "TreeUxDropBefore" : "TreeUxDropAfter"),
+                    payload.Servers.Count, anchor.DisplayName,
+                    string.IsNullOrWhiteSpace(anchor.Group) ? vm.Localize("TreeNodeNoGroup") : anchor.Group));
+                UpdateTreeDragNavigation(e, null);
                 return;
             }
 
             allowed = TryResolveTreeGroupDropTarget(sender, e, vm, out targetContainer, out string? targetGroup, out _)
                 && vm.ServerList.IsBulkMoveTargetEnabled(payload.Servers, targetGroup);
         }
-        else if (TryGetTreeFolderDragPayload(e.Data, out TreeFolderDragPayload? folderPayload))
+        else if (TryGetTreeFolderDragPayload(e.Data, out folderPayload))
         {
             allowed = TryResolveTreeGroupDropTarget(sender, e, vm, out targetContainer, out string? targetParent, out _)
                 && TreeInteractionState.IsFolderMoveTarget(folderPayload.Folder.FullPath, targetParent);
         }
         else
         {
+            StopTreeDragNavigation();
             return;
         }
 
         if (!allowed)
         {
+            // A folder may be the current parent and still need opening to reach a child.
+            // Navigation does not grant permission to drop on an invalid destination.
+            SetTreeDropFeedback("");
+            UpdateTreeDragNavigation(e, targetContainer?.DataContext as FolderViewModel);
             return;
         }
 
         e.Effects = System.Windows.DragDropEffects.Move;
+
+        FolderViewModel? hoverFolder = targetContainer?.DataContext as FolderViewModel;
+        string destination = string.IsNullOrWhiteSpace(hoverFolder?.FullPath)
+            ? vm.Localize("TreeNodeNoGroup") : hoverFolder.FullPath;
+        SetTreeDropFeedback(payload is not null
+            ? string.Format(vm.Localize("TreeUxDropFolder"), payload.Servers.Count, destination)
+            : string.Format(vm.Localize("TreeUxDropMoveFolder"), folderPayload!.Folder.Name, destination));
+        UpdateTreeDragNavigation(e, hoverFolder);
 
         if (targetContainer is not null)
         {
@@ -1669,11 +1717,13 @@ public partial class MainWindow
 
     private void OnTreeViewDragLeave(object sender, System.Windows.DragEventArgs e)
     {
+        StopTreeDragNavigation();
         ClearDropHighlight();
     }
 
     private async void OnTreeViewDrop(object sender, System.Windows.DragEventArgs e)
     {
+        StopTreeDragNavigation();
         ClearDropHighlight();
 
         if (DataContext is not MainViewModel vm)
@@ -1789,8 +1839,11 @@ public partial class MainWindow
             // A debounced expand-state save still holding the old paths would land after the
             // reload and put them back; the deletion flushes for the same reason.
             await vm.ServerList.FlushExpandStateForCloseAsync();
-            FolderMoveResult result =
-                await new FolderMoveService(vm.ConfigManager).MoveAsync(folder.FullPath, targetParentPath);
+            string oldPath = folder.FullPath;
+            FolderMoveResult result = await vm.ServerList.WithOrganizationUndoAsync(
+                () => new FolderMoveService(vm.ConfigManager).MoveAsync(oldPath, targetParentPath),
+                result => result.Status == FolderMoveStatus.Moved
+                    ? new FolderRenamePlan(result.NewPath!, oldPath) : null);
 
             switch (result.Status)
             {

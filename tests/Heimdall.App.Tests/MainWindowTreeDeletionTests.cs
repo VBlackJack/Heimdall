@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Windows.Input;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 
@@ -188,6 +189,40 @@ public sealed class MainWindowTreeDeletionTests
 
         Assert.False(handled);
         Assert.False(deleteSelection);
+    }
+
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(true, 3)]
+    [InlineData(false, 1)]
+    [InlineData(false, 3)]
+    public void Delete_InRenameEditor_LeavesTheKeyToTextEditing(bool folder, int selectionCount)
+    {
+        object node = folder ? CreateFolder() : CreateServer("editing");
+        Assert.Equal((false, false), MainWindow.ResolveTreeDeletion(
+            Key.Delete, ModifierKeys.None, node, selectionCount, isInlineRenameEditorSource: true));
+    }
+
+    [Fact]
+    public void SessionTreeKeyHandler_ForwardsEventAndResolvedDirectionToNudge()
+    {
+        string body = ExtractMethodBody(ReadTreeInteractionsSource(), KeyHandlerSignature);
+        string logic = "{" + ViewSource.WithoutCommentsAndLiterals(body) + "}";
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic,
+            "int nudgeDelta = ResolveTreeNudgeDelta(e, modifiers);"));
+        Assert.Equal("nudged, nudgeDelta", ExtractCallArguments(body, "NudgeServerAsync("));
+    }
+
+    [Fact]
+    public void SessionTreeKeyHandler_PassesEditorOwnershipToDeleteResolution()
+    {
+        string body = ExtractMethodBody(ReadTreeInteractionsSource(), KeyHandlerSignature);
+        string logic = "{" + string.Concat(ViewSource.WithoutCommentsAndLiterals(body)
+            .Where(character => !char.IsWhiteSpace(character))) + "}";
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic,
+            "(booldeleteHandled,booldeleteSelection)=ResolveTreeDeletion(e.Key,modifiers,"
+            + "FindAncestor<TreeViewItem>(Keyboard.FocusedElementasDependencyObject)?.DataContext,"
+            + "vm.ServerList.SelectionCount,IsInlineRenameEditorSource(e.OriginalSourceasDependencyObject));"));
     }
 
     private static (bool Handled, bool DeleteSelection) Resolve(

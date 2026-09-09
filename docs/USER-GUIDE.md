@@ -94,6 +94,14 @@ directly such as `admin@192.168.1.10`. It is the fastest way to reach something 
 
 ---
 
+### Find and organize sessions in the tree
+
+- Active filters appear below the search controls. Remove one with its cross, or use **Reset all filters** to clear the search and all filters. Display preferences are preserved.
+- Search results include the folder path and host address. Hover over that line to read the full values. If nothing matches, use **Clear search** or **Reset all filters**.
+- Select several sessions to show **Connect**, **Move**, and **More actions** below the selection count. These use the same checks as the context menu.
+- While dragging, a hint names the destination and the number of sessions, or the folder being moved. Hold over a closed folder to expand it; approach the top or bottom of the tree to scroll.
+- After a move, inline rename, or session reorder, use **Undo** to reverse the latest organization change. One step is kept during the current application session. Undo does not cover deletion, and refuses an incompatible later edit. For folders, a later organization or folder-defaults change prevents undo.
+
 ## Where your passwords are kept
 
 Passwords you save in a session are encrypted on your own machine, tied to your Windows account.

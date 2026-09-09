@@ -50,7 +50,10 @@ public partial class ServerListViewModel
         }
 
         // The tree's order, not the selection's: a set picked bottom-up lands top-down.
-        moving.Sort((left, right) => _stableServerOrder.IndexOf(left).CompareTo(_stableServerOrder.IndexOf(right)));
+        Dictionary<ServerItemViewModel, int> treeOrder = EnumerateCanonicalTreeServers(_stableTreeRoot)
+            .Select((server, index) => (server, index))
+            .ToDictionary(entry => entry.server, entry => entry.index);
+        moving.Sort((left, right) => treeOrder[left].CompareTo(treeOrder[right]));
 
         List<ServerItemViewModel> siblings = GetStableSiblings(anchor.Group)
             .Where(sibling => !moving.Contains(sibling))
@@ -117,6 +120,23 @@ public partial class ServerListViewModel
             cancellationToken);
     }
 
+    /// <summary>Traverses folders before their direct sessions, as the tree renders them.</summary>
+    private static IEnumerable<ServerItemViewModel> EnumerateCanonicalTreeServers(StableFolderNode node)
+    {
+        foreach (StableFolderNode child in node.Children)
+        {
+            foreach (ServerItemViewModel server in EnumerateCanonicalTreeServers(child))
+            {
+                yield return server;
+            }
+        }
+
+        foreach (ServerItemViewModel server in node.Servers)
+        {
+            yield return server;
+        }
+    }
+
     /// <summary>Every session of a folder, in the order the tree shows them, filter or not.</summary>
     private IReadOnlyList<ServerItemViewModel> GetStableSiblings(string? group)
     {
@@ -142,7 +162,11 @@ public partial class ServerListViewModel
         CancellationToken cancellationToken)
     {
         bool written = false;
-        await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
+        await WithOrganizationUndoAsync(async () =>
+        {
+            await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
+            return written;
+        }, serverIds: orderedSiblings.Select(server => server.Id).ToArray());
         return written;
 
         BulkMutationPlan? BuildPlan(List<ServerProfileDto> dtos)

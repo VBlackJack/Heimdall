@@ -12,7 +12,19 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-09-09: session tree navigation and organization (v2026.090902)
+
+### Session tree
+
+- Active filter chips support individual removal and a full reset; empty search results offer recovery actions.
+- The search field uses a short placeholder, with its scope and Ctrl+F shortcut in a tooltip.
+- Multiple selection exposes Connect, Move, and More actions, and search results show folder paths and host addresses.
+- Dragging shows the destination, expands hovered folders, and scrolls near the tree edges.
+- A session-local, one-step Undo restores moves, inline renames, and session ordering, with checks for incompatible later edits.
+- Alt+Up and Alt+Down now handle WPF system-key events when reordering sessions.
+- Delete remains a text-editing key while renaming a folder or session, including with multiple sessions selected.
+- Selection notifications expose the updated selection to accessibility clients.
+- Moving sessions from different folders preserves their relative order in the tree, including nested folders.
 
 ## 2026-09-09: SSH verification-code sign-in (v2026.090901)
 

@@ -975,6 +975,34 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         }
     }
 
+    [Fact]
+    public async Task SelectionNotifications_ExposeUpdatedHostMembership()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(fixture.ExpandGroups("ops"),
+            CreateServer("a", "A", "ops"), CreateServer("b", "B", "ops"));
+        Heimdall.App.Controls.ISessionTreeSelectionHost host = fixture.ViewModel;
+        List<(string Id, bool Row, bool Host)> notifications = [];
+        foreach (ServerItemViewModel server in fixture.ViewModel.Servers)
+        {
+            server.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ServerItemViewModel.IsSelected))
+                {
+                    notifications.Add((server.Id, server.IsSelected, host.IsItemSelected(server)));
+                }
+            };
+        }
+
+        fixture.ViewModel.SelectSingle(fixture.ServerById("a"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("b"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("b"));
+        fixture.ViewModel.ClearSelection();
+
+        Assert.Equal(new[] { ("a", true, true), ("b", true, true), ("a", false, false), ("b", false, false) },
+            notifications);
+    }
+
     private static ServerProfileDto CreateServer(string id, string displayName, string group, int sortOrder = 0) =>
         new()
         {
