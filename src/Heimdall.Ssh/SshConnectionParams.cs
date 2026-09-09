@@ -97,6 +97,13 @@ public sealed class SshConnectionParams
     /// </summary>
     public KeyboardInteractiveObservation KeyboardInteractive { get; init; } = new();
 
+    /// <summary>
+    /// Optional, attempt-scoped responder for server authentication questions. Called on
+    /// SSH.NET's authentication worker after host-key verification. Returning null cancels
+    /// authentication. Responses must never be persisted or logged by the caller.
+    /// </summary>
+    public Func<string, string?>? KeyboardInteractiveResponder { get; init; }
+
     /// <summary>Host identity used for host-key verification and storage.</summary>
     public string HostKeyVerificationHost =>
         string.IsNullOrWhiteSpace(LogicalHost) ? Host : LogicalHost;

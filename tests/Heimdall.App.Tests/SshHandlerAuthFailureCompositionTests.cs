@@ -185,11 +185,24 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
 
     private async Task<Harness> CreateHarnessAsync(
         IReadOnlyList<ISshAgent> agents,
-        bool leaveAPromptUnanswered = false)
+        bool leaveAPromptUnanswered = false,
+        bool interactiveAnswer = false)
     {
         LocalizationManager localizer = new LocalizationManager();
         await localizer.LoadAsync(_localesPath, "en");
-        return new Harness(localizer, agents, leaveAPromptUnanswered);
+        return new Harness(localizer, agents, leaveAPromptUnanswered, interactiveAnswer);
+    }
+
+    [Fact]
+    public async Task RejectedInteractiveAnswer_DoesNotRetryAnotherAuthenticationClient()
+    {
+        using Harness harness = await CreateHarnessAsync([], interactiveAnswer: true);
+
+        ConnectionResult result = await harness.ConnectAsync();
+
+        Assert.False(result.Success);
+        Assert.DoesNotContain(RetryingViaPlinkStatus, harness.Statuses);
+        Assert.Equal(AuthRejectedSentence, result.ErrorMessage);
     }
 
     private sealed class Harness : IDisposable
@@ -201,7 +214,8 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
         public Harness(
             LocalizationManager localizer,
             IReadOnlyList<ISshAgent> agents,
-            bool leaveAPromptUnanswered = false)
+            bool leaveAPromptUnanswered = false,
+            bool interactiveAnswer = false)
         {
             ConnectionStates = new ConnectionStateMachine();
             _handler = new SshHandler(
@@ -223,6 +237,12 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
                 agentRegistryFactory: _ => new SshAgentRegistry(agents),
                 connectShellSession: (_, connectionParams, _, _, _, _, _) =>
                 {
+                    if (interactiveAnswer)
+                    {
+                        Assert.NotNull(connectionParams.KeyboardInteractiveResponder);
+                        connectionParams.KeyboardInteractive.RecordInteractiveAnswer();
+                    }
+
                     if (!leaveAPromptUnanswered)
                     {
                         throw new SshAuthenticationException(RefusalFromServer);

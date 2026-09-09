@@ -125,6 +125,15 @@ public static class FailureClassifier
     {
         string msg = ex.Message ?? "";
 
+        if (connectionParams?.KeyboardInteractive.HasInteractiveAnswer == true)
+        {
+            return new SshFailureInfo(
+                SshFailureCode.AuthRejected,
+                "Server rejected SSH authentication.",
+                true,
+                ex);
+        }
+
         // SSH.NET exposes no typed granularity for these auth sub-cases, so
         // message inspection is a deliberate last resort. The default arm is
         // fatal, so a wording change can only make the message less precise;

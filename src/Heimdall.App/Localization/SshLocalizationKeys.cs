@@ -24,6 +24,8 @@ namespace Heimdall.App.Localization;
 /// </summary>
 internal static class SshLocalizationKeys
 {
+    public const string InteractivePromptTitle = "SshInteractivePromptTitle";
+    public const string InteractivePromptMessage = "SshInteractivePromptMessage";
     public const string ErrorConnectionFailed = "ErrorConnectionFailed";
     public const string ErrorHostKeyMismatch = "ErrorHostKeyMismatch";
     public const string ErrorHostKeyMismatchDetail = "ErrorHostKeyMismatchDetail";

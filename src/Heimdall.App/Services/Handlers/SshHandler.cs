@@ -34,6 +34,7 @@ namespace Heimdall.App.Services.Handlers;
 /// </summary>
 internal sealed class SshHandler : IProtocolHandler, IDisposable
 {
+    private static readonly TimeSpan InteractiveAuthenticationTimeout = TimeSpan.FromMinutes(2);
     /// <summary>
     /// Opens the embedded shell session. Replaced in tests so the refusal
     /// branches below can be reached without a live SSH server: everything the
@@ -193,7 +194,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorConnectionFailed, keyPathMessage));
         }
 
-        var sshParams = new SshConnectionParams
+        using CancellationTokenSource promptLifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        SshConnectionParams sshParams = new()
         {
             Host = targetHost,
             Port = targetPort,
@@ -208,7 +210,22 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             LegacyCredentialName = server.DisplayName,
             AgentForwarding = server.SshAgentForwarding,
             Compression = server.SshCompression,
-            X11Forwarding = server.SshX11Forwarding
+            X11Forwarding = server.SshX11Forwarding,
+            ConnectTimeout = InteractiveAuthenticationTimeout,
+            KeyboardInteractiveResponder = request =>
+            {
+                // SSH.NET invokes this synchronous event on its own authentication worker.
+                // WPF marshals the dialog to the dispatcher; the UI thread never waits here.
+                promptLifetime.Token.ThrowIfCancellationRequested();
+                return _dialogService.ShowPasswordInputAsync(
+                    _localizer[SshLocalizationKeys.InteractivePromptTitle],
+                    string.Format(
+                        _localizer[SshLocalizationKeys.InteractivePromptMessage],
+                        server.RemoteServer,
+                        server.SshUsername,
+                        request),
+                    promptLifetime.Token).GetAwaiter().GetResult();
+            }
         };
 
         var agentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
@@ -336,11 +353,13 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         }
         catch (Exception ex)
         {
+            promptLifetime.Cancel();
             session.Dispose();
             var failure = FailureClassifier.Classify(ex, sshParams);
             SshFailureInfo localizedFailure = LocalizeFailure(failure, targetHost);
 
-            if (SshPlinkRetryPolicy.AllowsPlinkRetry(failure.Code))
+            if (!sshParams.KeyboardInteractive.HasInteractiveAnswer
+                && SshPlinkRetryPolicy.AllowsPlinkRetry(failure.Code))
             {
                 var fallbackAgentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
                 if (!fallbackAgentRegistry.HasPlinkCompatibleAgent() && fallbackAgentRegistry.HasAnyNonPlinkAgent())

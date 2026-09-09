@@ -1,4 +1,6 @@
 {
+  "SshInteractivePromptTitle": "Authentification SSH",
+  "SshInteractivePromptMessage": "Serveur : {0}\nCompte : {1}\n\nLe serveur demande :\n{2}\n\nCette réponse est utilisée uniquement pour cette connexion et n'est pas enregistrée.",
   "RdpCopyAnonymous": "Copier le rapport anonymisé",
   "RdpCopyAnonymousHeader": "Rapport de diagnostic RDP (anonymisé)",
   "RdpCopyAnonymousHint": "Contient la date, la version et les codes RDP disponibles. Exclut les adresses, les comptes et le texte des erreurs.",
