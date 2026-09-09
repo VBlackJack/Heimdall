@@ -30,6 +30,7 @@ public partial class PasswordInputDialog : Window
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
         Loaded += (_, _) => PasswordBox.Focus();
+        Closed += (_, _) => PasswordBox.Clear();
     }
 
     public string Prompt

@@ -140,7 +140,23 @@ public sealed class WpfDialogService(
                     Owner = GetOwnerWindow()
                 };
 
-                return dialog.ShowDialog() == true ? dialog.ResultPassword : null;
+                using CancellationTokenRegistration registration = cancellationToken.Register(() =>
+                {
+                    if (!dialog.Dispatcher.HasShutdownStarted)
+                    {
+                        _ = dialog.Dispatcher.BeginInvoke(() =>
+                        {
+                            if (dialog.IsVisible)
+                            {
+                                dialog.Close();
+                            }
+                        });
+                    }
+                });
+                cancellationToken.ThrowIfCancellationRequested();
+                string? result = dialog.ShowDialog() == true ? dialog.ResultPassword : null;
+                cancellationToken.ThrowIfCancellationRequested();
+                return result;
             },
             cancellationToken);
     }

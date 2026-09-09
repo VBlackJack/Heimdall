@@ -36,7 +36,7 @@ It is free, open source, and runs on Windows 10 and 11.
 | | For |
 |---|---|
 | **RDP** | Windows desktops, embedded in a tab or opened full screen |
-| **SSH** | Linux servers, switches, firewalls, anything with a shell |
+| **SSH** | Linux servers, switches and firewalls, including verification-code prompts in the embedded terminal |
 | **SFTP** and **FTP** | Moving files, with a two-panel browser and drag and drop |
 | **VNC** | Screens on Linux, macOS, appliances |
 | **Telnet** | Older network gear |

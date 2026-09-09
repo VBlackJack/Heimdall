@@ -14,6 +14,18 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+## 2026-09-09: SSH verification-code sign-in (v2026.090901)
+
+### SSH interactive authentication
+
+- Embedded SSH terminals can answer verification-code prompts, including private-key
+  authentication followed by keyboard-interactive authentication. Responses are masked,
+  scoped to one attempt and never saved to the profile or vault.
+- Cancelling a connection closes its authentication dialog. Rejected interactive answers
+  end the attempt without retrying Plink, and are reported as authentication refusals.
+- Verified the RDP host pool against two live Windows targets: four logins, two control
+  reuses and release of both idle controls after the five-minute expiry.
+
 ## 2026-09-08: gateway diagnostics, session recovery and safer transfers (v2026.090801)
 
 ### Recovery actions in SSH, SFTP and RDP

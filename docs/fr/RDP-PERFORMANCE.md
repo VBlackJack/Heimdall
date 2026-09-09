@@ -110,7 +110,16 @@ nouvelles valeurs. Les contrôles inactifs sont aussi rendus à la fermeture de 
 Un Heimdall qui a servi se tient donc toujours plus haut qu'un Heimdall fraîchement démarré, mais
 seulement le temps que dit l'expiration, et l'expiration est à vous.
 
+Une vérification des composants le 2026-09-09 a confirmé l'expiration à cinq minutes sur
+deux bureaux Windows Server réels. Un hôte WinForms isolé utilisant le contrôle RDP et
+le pool courants a effectué quatre connexions en deux cycles, réutilisé les deux contrôles,
+puis détruit les deux à expiration. La mémoire privée mesurée était d'environ 345 Mio
+avec deux sessions, 75 Mio après fermeture et 36 Mio après expiration. Ces valeurs
+concernent le banc isolé, pas le processus Heimdall complet mesuré ci-dessus. Cette passe
+ne couvre ni RD Gateway, ni reprise après coupure réseau, ni transfert par périphérique redirigé.
+
 ## Face aux autres clients
+
 
 Face à `mstsc.exe`, lancé par Heimdall en mode externe sur la même cible : une session coûte
 moins cher au client natif, parce que Heimdall porte son propre socle applicatif ; à partir de

@@ -166,41 +166,29 @@ strip, and preserves every line Heimdall did not originate (including
 `@cert-authority`, `@revoked`, hashed entries, and any multi-host line whose
 aliases are not all managed) verbatim.
 
-Password authentication registers both `password` and `keyboard-interactive`.
-The keyboard-interactive handler answers a round that asks a single question with
-the stored password, whatever that question is; in a round that asks several, only
-the prompts that read as a password request are answered, and the rest are left
-empty and recorded. The refusal that follows an unanswered prompt is reported as an
-unanswered question (`KeyboardInteractiveUnsupportedPrompt`) rather than as a
-rejected password.
+Embedded SSH terminals support keyboard-interactive authentication, including a private
+key followed by a verification code. After host-key verification, recognized password
+questions can receive the saved password once. Other questions open a masked dialog
+showing the destination and account, even when the server asks only one question.
+Responses are used for the current attempt and are not saved to the profile or vault.
+Cancelling the dialog aborts authentication; cancelling the connection closes the dialog.
+Embedded SSH uses a two-minute SSH.NET connection timeout to allow time for input.
 
-One consequence is worth stating plainly, because the wording above used to hide
-it: a server whose only question is a verification code receives the stored
-password as the answer to that question. The attempt fails and the server records a
-failed second-factor attempt. Second-factor entry is not supported.
+A rejected interactive answer ends the attempt without an automatic Plink retry. This
+avoids submitting another authentication attempt after a refused code. An authentication
+refusal does not prove whether the key, password, code or server policy caused it.
 
-A server that authenticates in stages is treated differently. The stored password is
-spent at most once per connection attempt, so when a password round is followed by a
-second round asking for a verification code, that second round is refused rather
-than answered with the password again, and the refusal is reported as an unanswered
-question. Heimdall then retries the connection through the embedded Plink, which
-runs with a real console in the terminal pane. That retry happens when Pageant is
-available or when no SSH agent is running; with the Windows OpenSSH agent running
-and Pageant absent, no retry is attempted and the refusal stands.
+This interactive entry applies to the SSH.NET embedded terminal path. SFTP, SSH gateway
+creation and diagnostic probes retain their existing non-interactive behavior. Callers
+without an interactive responder still answer a first single-question round with the
+stored password regardless of wording, and refuse subsequent questions. They therefore
+must not be treated as supporting verification-code entry. Agent-forwarding sessions
+that use Plink remain a separate authentication path.
 
-What the retry reaches depends on what the server asks next, and this was measured
-rather than assumed. Against a server whose remaining question is a password, the
-bundled Plink asks it in the terminal pane and waits for an answer. Against a server
-that offers a verification code over keyboard-interactive, the bundled Plink refuses
-with "No supported authentication methods available" and the connection ends there.
-So a second factor delivered that way is still not reachable: the retry replaces a
-silent misuse of the password with an honest refusal, which is an improvement, but
-it is not a way in.
-
-Two costs of that retry, stated rather than left implicit. The second round is now a
-refusal where it used to be an answer. And the number of authentication attempts a
-server counts for one connection goes up, because the embedded client's attempt and
-Plink's are counted separately; on an account with a lockout threshold that matters.
+An earlier Plink test returned "No supported authentication methods available". That
+result is specific to the tested setup, not a general incompatibility with MFA. The
+local test environment was found with PAM disabled on 2026-09-09; keyboard-interactive
+and its authentication backend must both be enabled for a meaningful MFA test.
 
 The key generator writes both files as UTF-8 without a byte order mark with LF
 line endings, and creates the private key through the same restrictive-ACL

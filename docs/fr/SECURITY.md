@@ -181,44 +181,31 @@ OpenSSH ne retire pas, et préserve mot pour mot chaque ligne dont Heimdall
 n'est pas à l'origine (y compris `@cert-authority`, `@revoked`, les entrées
 hachées et toute ligne multi-hôtes dont les alias ne sont pas tous gérés).
 
-L'authentification par mot de passe enregistre à la fois `password` et
-`keyboard-interactive`. Le handler keyboard-interactive répond avec le mot de passe
-stocké à un tour qui ne pose qu'une seule question, quelle que soit cette question ;
-dans un tour qui en pose plusieurs, seules les demandes qui se lisent comme une
-demande de mot de passe reçoivent une réponse, les autres sont laissées vides et
-enregistrées. Le refus qui suit une demande sans réponse est signalé comme une
-question sans réponse (`KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un
-mot de passe rejeté.
+Le terminal SSH intégré prend en charge l'authentification keyboard-interactive,
+y compris une clé privée suivie d'un code de vérification. Après vérification de la clé
+d'hôte, une demande reconnue de mot de passe peut recevoir une fois le mot de passe
+stocké. Les autres questions ouvrent une saisie masquée indiquant la destination et le
+compte, même si le serveur ne pose qu'une question. La réponse sert uniquement à la
+tentative en cours et n'est enregistrée ni dans le profil ni dans le coffre.
+Annuler l'invite interrompt l'authentification ; annuler la connexion ferme l'invite.
+Le terminal SSH intégré utilise un délai de connexion SSH.NET de deux minutes pour laisser le temps de saisir la réponse.
 
-Une conséquence mérite d'être dite clairement, car la formulation précédente la
-masquait : un serveur dont la seule question est un code de vérification reçoit le
-mot de passe stocké en réponse à cette question. La tentative échoue et le serveur
-enregistre un second facteur en échec. La saisie d'un second facteur n'est pas prise
-en charge.
+Une réponse interactive refusée termine la tentative sans reprise automatique avec
+Plink, afin de ne pas soumettre une nouvelle authentification après un code refusé.
+Un refus ne permet pas de déterminer si la clé, le mot de passe, le code ou une règle
+serveur en est la cause.
 
-Un serveur qui authentifie par étapes est traité autrement. Le mot de passe stocké
-n'est dépensé qu'une fois par tentative de connexion : lorsqu'un tour de mot de passe
-est suivi d'un second tour demandant un code de vérification, ce second tour est
-refusé plutôt que répondu de nouveau avec le mot de passe, et le refus est signalé
-comme une question sans réponse. Heimdall retente alors la connexion via le Plink
-embarqué, qui tourne avec une vraie console dans le volet terminal. Cette reprise a
-lieu quand Pageant est disponible ou qu'aucun agent SSH ne tourne ; avec l'agent
-OpenSSH de Windows et sans Pageant, aucune reprise n'est tentée et le refus subsiste.
+Cette saisie concerne le terminal intégré utilisant SSH.NET. SFTP, la création des
+passerelles SSH et les sondes de diagnostic conservent leur fonctionnement non interactif.
+Sans mécanisme de saisie, le premier tour à question unique reçoit toujours le mot de
+passe enregistré, quel que soit son libellé, puis les questions suivantes sont refusées.
+Ces chemins ne prennent donc pas en charge la saisie d'un code de vérification. Les
+sessions utilisant Plink pour le transfert d'agent restent un chemin distinct.
 
-Ce que la reprise permet d'atteindre dépend de ce que le serveur demande ensuite, et
-cela a été mesuré plutôt que supposé. Face à un serveur dont la question restante est
-un mot de passe, le Plink embarqué la pose dans le volet terminal et attend une
-réponse. Face à un serveur qui propose un code de vérification en clavier-interactif,
-le Plink embarqué refuse avec "No supported authentication methods available" et la
-connexion s'arrête là. Un second facteur fourni de cette manière reste donc
-inatteignable : la reprise remplace un usage silencieux et fautif du mot de passe par
-un refus honnête, ce qui est un progrès, mais ce n'est pas une porte d'entrée.
-
-Deux coûts de cette reprise, énoncés plutôt que laissés implicites. Le second tour
-est désormais un refus là où il était une réponse. Et le nombre de tentatives
-d'authentification que le serveur compte pour une seule connexion augmente, car la
-tentative du client embarqué et celle de Plink sont comptées séparément ; sur un
-compte doté d'un seuil de verrouillage, cela compte.
+Un test précédent de Plink a renvoyé "No supported authentication methods available".
+Ce résultat concerne la configuration testée et ne prouve pas une incompatibilité
+générale avec MFA. Le 2026-09-09, PAM était désactivé sur le banc local ; une validation
+MFA exige que keyboard-interactive et son mécanisme d'authentification soient activés.
 
 Le générateur de clés écrit les deux fichiers en UTF-8 sans marque d'ordre des
 octets avec des fins de ligne LF, et crée la clé privée par le même écrivain à

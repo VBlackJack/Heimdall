@@ -21,13 +21,9 @@ namespace Heimdall.Ssh;
 /// could not be answered.
 /// </summary>
 /// <remarks>
-/// The handler answers a round that asks a SINGLE question with the stored password,
-/// whatever that question is, and in a round that asks several it answers only the
-/// prompts that read as a password request, leaving the rest empty and recording the
-/// first of them here. So this observation is made on the multi-prompt shape only: a
-/// server whose sole question is a verification code receives the stored password as
-/// the answer to it and nothing is recorded, which is why this class cannot be read as
-/// evidence that a second factor was never answered wrongly.
+/// Records only whether input was supplied, never its value. Legacy callers can still map
+/// an ambiguous first single-question round to the password, so this observation alone does
+/// not prove that every authentication question was answered with the intended secret.
 /// </remarks>
 public sealed class KeyboardInteractiveObservation
 {
@@ -35,6 +31,14 @@ public sealed class KeyboardInteractiveObservation
 
     /// <summary>0 while the stored password has not been given yet, 1 once it has.</summary>
     private int _passwordAnswered;
+
+    private int _interactiveAnswers;
+
+    /// <summary>Whether a user supplied an answer during this attempt.</summary>
+    public bool HasInteractiveAnswer => Volatile.Read(ref _interactiveAnswers) != 0;
+
+    /// <summary>Records an answer without retaining its text.</summary>
+    public void RecordInteractiveAnswer() => Interlocked.Increment(ref _interactiveAnswers);
 
     /// <summary>The first prompt left unanswered, trimmed, or null when every prompt was answered.</summary>
     public string? UnansweredPrompt => Volatile.Read(ref _unansweredPrompt);
@@ -49,21 +53,6 @@ public sealed class KeyboardInteractiveObservation
     /// <summary>
     /// Claims the one chance this attempt has to answer with the stored password.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// True the first time and false afterwards, for the whole connection attempt. A server that
-    /// authenticates in stages asks twice: the password, then a verification code, each as its
-    /// own single-prompt round. The second round is indistinguishable from the first by wording
-    /// alone, so without this the stored password was sent as the answer to the code prompt -
-    /// which fails, and which the server records as a failed second factor.
-    /// </para>
-    /// <para>
-    /// Refusing the second round is what lets the refusal be classified as an unanswered
-    /// question rather than a rejected password, and that classification is what routes the host
-    /// to the interactive client that CAN answer it. The two halves only work together: refusing
-    /// without the routing would take a working route away from these hosts.
-    /// </para>
-    /// </remarks>
     public bool TryTakePasswordAnswer() =>
         Interlocked.CompareExchange(ref _passwordAnswered, 1, 0) == 0;
 
@@ -72,5 +61,6 @@ public sealed class KeyboardInteractiveObservation
     {
         Volatile.Write(ref _unansweredPrompt, null);
         Volatile.Write(ref _passwordAnswered, 0);
+        Volatile.Write(ref _interactiveAnswers, 0);
     }
 }

@@ -647,6 +647,10 @@ public static class SshConnectionFactory
         {
             AddPasswordMethods(methods, connectionParams);
         }
+        else if (connectionParams.KeyboardInteractiveResponder is not null)
+        {
+            AddKeyboardInteractiveMethod(methods, connectionParams);
+        }
 
         // SSH agent key authentication. Always add agent keys as supplementary
         // auth methods when available, so SSH.NET can fall back to an agent if
@@ -763,44 +767,34 @@ public static class SshConnectionFactory
         string password = connectionParams.Password!;
         methods.Add(new PasswordAuthenticationMethod(username, password));
 
-        var capturedPassword = password; // Captured in closure - avoid re-reading mutable param.
+        AddKeyboardInteractiveMethod(methods, connectionParams);
+    }
+
+    private static void AddKeyboardInteractiveMethod(
+        ICollection<AuthenticationMethod> methods,
+        SshConnectionParams connectionParams)
+    {
+        string capturedPassword = connectionParams.Password ?? string.Empty;
         KeyboardInteractiveObservation observation = connectionParams.KeyboardInteractive;
         observation.Reset();
-        var kbdInteractive = new KeyboardInteractiveAuthenticationMethod(username);
+        KeyboardInteractiveAuthenticationMethod kbdInteractive = new(connectionParams.Username);
         kbdInteractive.AuthenticationPrompt += (_, e) =>
-            AnswerKeyboardInteractivePrompts(e.Prompts, capturedPassword, observation);
+            AnswerKeyboardInteractivePrompts(
+                e.Prompts, capturedPassword, observation, connectionParams.KeyboardInteractiveResponder);
         methods.Add(kbdInteractive);
     }
 
     /// <summary>
-    /// Answers a keyboard-interactive round, spending the stored password at most once.
+    /// Answers an authentication round. A supplied responder handles questions that cannot
+    /// use the stored password; callers without a responder retain the legacy single-question
+    /// password mapping. The stored password is spent at most once per connection attempt.
+    /// A null interactive response cancels the exchange before any response packet is sent.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// A prompt that asks for a password gets the stored password; anything else, a verification
-    /// code or a challenge, is left empty and recorded, so the refusal that follows names the
-    /// question instead of blaming a password that may have been right. A round with a single
-    /// prompt is taken to be the password prompt whatever its wording, since servers phrase it
-    /// freely and the password is the only answer this client has.
-    /// </para>
-    /// <para>
-    /// That last rule is why the password can be spent at most once per attempt. A server that
-    /// authenticates in stages asks the password and then the verification code as two separate
-    /// single-prompt rounds, and the second is indistinguishable from the first by wording. The
-    /// password used to be sent to both. Now the second round is refused and recorded, which is
-    /// what lets the failure be classified as an unanswered question and routed to the client
-    /// that can actually ask the user.
-    /// </para>
-    /// <para>
-    /// A round carrying two password-looking prompts would see only the first answered. No
-    /// server is known to do that, and answering the second would be spending the password on a
-    /// question this client did not understand, which is the thing being stopped.
-    /// </para>
-    /// </remarks>
     internal static void AnswerKeyboardInteractivePrompts(
         IReadOnlyList<AuthenticationPrompt> prompts,
         string password,
-        KeyboardInteractiveObservation observation)
+        KeyboardInteractiveObservation observation,
+        Func<string, string?>? responder = null)
     {
         ArgumentNullException.ThrowIfNull(prompts);
         ArgumentNullException.ThrowIfNull(observation);
@@ -808,10 +802,23 @@ public static class SshConnectionFactory
         bool single = prompts.Count == 1;
         foreach (AuthenticationPrompt prompt in prompts)
         {
-            bool asksForThePassword = single || LooksLikePasswordPrompt(prompt.Request);
-            if (asksForThePassword && observation.TryTakePasswordAnswer())
+            // Interactive callers can ask the user about ambiguous wording instead of
+            // spending a stored password on a first-round verification-code challenge.
+            bool asksForThePassword = (responder is null && single) || LooksLikePasswordPrompt(prompt.Request);
+            if (asksForThePassword && !string.IsNullOrEmpty(password) && observation.TryTakePasswordAnswer())
             {
                 prompt.Response = password;
+            }
+            else if (responder is not null)
+            {
+                string? response = responder(prompt.Request);
+                if (response is null)
+                {
+                    throw new OperationCanceledException("SSH authentication input was cancelled.");
+                }
+
+                observation.RecordInteractiveAnswer();
+                prompt.Response = response;
             }
             else
             {

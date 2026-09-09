@@ -29,6 +29,96 @@ namespace Heimdall.Ssh.Tests;
 public sealed class KeyboardInteractivePromptTests
 {
     [Fact]
+    public void InteractiveCodeOnlyRound_DoesNotSpendStoredPassword()
+    {
+        KeyboardInteractiveObservation observation = new();
+        AuthenticationPrompt code = new(0, false, "Verification code: ");
+        string? requested = null;
+
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([code], "stored-password", observation,
+            request => { requested = request; return "123456"; });
+
+        Assert.Equal("Verification code: ", requested);
+        Assert.Equal("123456", code.Response);
+        Assert.True(observation.HasInteractiveAnswer);
+        Assert.True(observation.TryTakePasswordAnswer());
+        Assert.Null(observation.UnansweredPrompt);
+    }
+
+    [Fact]
+    public void InteractiveTwoRounds_UsesStoredPasswordThenAsksForCode()
+    {
+        KeyboardInteractiveObservation observation = new();
+        AuthenticationPrompt password = new(0, false, "Password: ");
+        AuthenticationPrompt code = new(0, false, "Verification code: ");
+        int questions = 0;
+        string? Answer(string request) { questions++; return "654321"; }
+
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([password], "stored-password", observation, Answer);
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([code], "stored-password", observation, Answer);
+
+        Assert.Equal("stored-password", password.Response);
+        Assert.Equal("654321", code.Response);
+        Assert.Equal(1, questions);
+    }
+
+    [Fact]
+    public void InteractiveWithoutStoredPassword_AsksInsteadOfSendingEmptyAnswer()
+    {
+        KeyboardInteractiveObservation observation = new();
+        AuthenticationPrompt prompt = new(0, false, "Password: ");
+
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([prompt], string.Empty, observation, _ => "typed-value");
+
+        Assert.Equal("typed-value", prompt.Response);
+        Assert.True(observation.HasInteractiveAnswer);
+    }
+
+    [Fact]
+    public void InteractiveCancellation_StopsBeforeAnsweringRemainingQuestions()
+    {
+        KeyboardInteractiveObservation observation = new();
+        AuthenticationPrompt first = new(0, false, "Verification code: ");
+        AuthenticationPrompt second = new(1, false, "Recovery code: ");
+        int questions = 0;
+
+        Assert.Throws<OperationCanceledException>(() =>
+            SshConnectionFactory.AnswerKeyboardInteractivePrompts([first, second], "stored", observation,
+                _ => { questions++; return null; }));
+
+        Assert.Equal(1, questions);
+        Assert.False(observation.HasInteractiveAnswer);
+        Assert.Null(second.Response);
+    }
+
+    [Fact]
+    public void InteractiveNewAttempt_DoesNotReusePreviousCode()
+    {
+        KeyboardInteractiveObservation observation = new();
+        AuthenticationPrompt first = new(0, false, "Code: ");
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([first], "stored", observation, _ => "111111");
+        observation.Reset();
+        Assert.False(observation.HasInteractiveAnswer);
+        AuthenticationPrompt next = new(0, false, "Code: ");
+
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([next], "stored", observation, _ => "222222");
+
+        Assert.Equal("222222", next.Response);
+    }
+
+    [Fact]
+    public void RejectedInteractiveCode_IsNotReportedAsMissingPassword()
+    {
+        SshConnectionParams parameters = new() { Host = "fixture.test", Username = "audit" };
+        parameters.KeyboardInteractive.RecordInteractiveAnswer();
+
+        SshFailureInfo result = FailureClassifier.Classify(
+            new SshAuthenticationException("Permission denied (keyboard-interactive)."), parameters);
+
+        Assert.Equal(SshFailureCode.AuthRejected, result.Code);
+    }
+
+    [Fact]
     public void ASinglePrompt_GetsThePasswordWhateverItsWording()
     {
         KeyboardInteractiveObservation observation = new();

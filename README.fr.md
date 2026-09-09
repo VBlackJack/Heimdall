@@ -37,7 +37,7 @@ C'est gratuit, open source, et cela tourne sur Windows 10 et 11.
 | | Pour |
 |---|---|
 | **RDP** | Bureaux Windows, intégrés dans un onglet ou ouverts en plein écran |
-| **SSH** | Serveurs Linux, commutateurs, pare-feu, tout ce qui a un shell |
+| **SSH** | Serveurs Linux, commutateurs et pare-feu, avec saisie des codes de vérification dans le terminal intégré |
 | **SFTP** et **FTP** | Déplacer des fichiers, avec un navigateur à deux panneaux et le glisser-déposer |
 | **VNC** | Écrans sous Linux, macOS, équipements divers |
 | **Telnet** | Matériel réseau plus ancien |

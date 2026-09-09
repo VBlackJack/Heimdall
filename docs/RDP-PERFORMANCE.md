@@ -100,6 +100,14 @@ next expiry check read the new values. The idle controls are also released when 
 So a Heimdall that has been used still sits higher than one just started, but only for as long
 as the expiry says, and the expiry is yours to set.
 
+A component-level check on 2026-09-09 confirmed the five-minute expiry against two live
+Windows Server desktops. An isolated WinForms host using the current RDP control and pool
+completed four logins over two cycles, reused both controls, then disposed both on expiry.
+Private commit measured about 345 MiB with two sessions, 75 MiB after closing them, and
+36 MiB after expiry. These values describe the isolated component harness, not the full
+Heimdall process measured above. The check did not cover RD Gateway, network-loss recovery
+or data transfer through redirected devices.
+
 ## Against other clients
 
 Against `mstsc.exe`, launched by Heimdall in external mode on the same target: one session is
