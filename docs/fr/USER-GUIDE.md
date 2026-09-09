@@ -100,13 +100,13 @@ que vous utilisez souvent.
 
 ---
 
-### Retrouver et organiser les sessions dans l’arbre
+### Retrouver et organiser les sessions dans l'arbre
 
-- Les filtres actifs apparaissent sous la recherche. Retirez-en un avec sa croix, ou utilisez **Réinitialiser les filtres** pour effacer la recherche et tous les filtres. Les préférences d’affichage sont conservées.
-- Les résultats de recherche affichent le chemin du dossier et l’adresse de l’hôte. Survolez cette ligne pour lire les valeurs complètes. Sans résultat, utilisez **Effacer la recherche** ou **Réinitialiser les filtres**.
+- Les filtres actifs apparaissent sous la recherche. Retirez-en un avec sa croix, ou utilisez **Réinitialiser les filtres** pour effacer la recherche et tous les filtres. Les préférences d'affichage sont conservées.
+- Les résultats de recherche affichent le chemin du dossier et l'adresse de l'hôte. Survolez cette ligne pour lire les valeurs complètes. Sans résultat, utilisez **Effacer la recherche** ou **Réinitialiser les filtres**.
 - Sélectionnez plusieurs sessions pour afficher les actions **Connecter**, **Déplacer** et **Autres actions** sous le compteur de sélection. Elles utilisent les mêmes contrôles que le menu contextuel.
-- Pendant un glisser-déposer, une indication précise la destination et le nombre de sessions, ou le dossier déplacé. Maintenez le pointeur sur un dossier fermé pour l’ouvrir ; approchez du haut ou du bas de l’arbre pour faire défiler.
-- Après un déplacement, un renommage dans l’arbre ou un réordonnancement de sessions, **Annuler** rétablit la dernière modification d’organisation. Une seule étape est conservée pendant la session courante de l’application. L’annulation ne couvre pas la suppression et refuse une modification ultérieure incompatible. Pour les dossiers, un changement ultérieur d’organisation ou de valeurs par défaut empêche l’annulation.
+- Pendant un glisser-déposer, une indication précise la destination et le nombre de sessions, ou le dossier déplacé. Maintenez le pointeur sur un dossier fermé pour l'ouvrir ; approchez du haut ou du bas de l'arbre pour faire défiler.
+- Après un déplacement, un renommage dans l'arbre ou un réordonnancement de sessions, **Annuler** rétablit la dernière modification d'organisation. Une seule étape est conservée pendant la session courante de l'application. L'annulation ne couvre pas la suppression et refuse une modification ultérieure incompatible. Pour les dossiers, un changement ultérieur d'organisation ou de valeurs par défaut empêche l'annulation.
 
 ## Où vivent vos mots de passe
 
