@@ -34,8 +34,8 @@ namespace Heimdall.App.Tests;
 /// <c>hamecon</c>, and the Spanish list is built from words that need no accent rather than from
 /// accented words with their accents stripped, which would simply be misspelled.</para>
 /// <para>The advertised strength is computed as <c>log2(distinct words) * word count</c>, so the
-/// size of these files is not cosmetic. A file that fails to load costs roughly three bits per
-/// word, silently, because the generator falls back to a fifty-word array.</para>
+/// size of these files is not cosmetic. A file that fails to load costs six bits per word on the
+/// English list, silently, because the generator falls back to a fifty-word array.</para>
 /// </remarks>
 public sealed class PassphraseWordListGuardTests
 {
@@ -44,10 +44,23 @@ public sealed class PassphraseWordListGuardTests
     private const int MaximumWordLength = 12;
 
     /// <summary>
-    /// Floor on a shipped list. Well below the ~500 each carries, and well above the fifty-word
-    /// fallback, so this fails if a list is ever replaced by its own fallback.
+    /// Floor on any shipped list, well above the fifty-word fallback, so this fails if a list is
+    /// ever replaced by its own fallback.
     /// </summary>
     private const int MinimumWords = 400;
+
+    /// <summary>
+    /// Floor per list, under what each file ships today and over <see cref="MinimumWords"/>. The
+    /// general floor only catches a list that collapsed to its fallback; these catch the English
+    /// and French lists being reverted to the five-hundred-word versions they grew from, which
+    /// costs nearly three bits per word and would otherwise pass every assertion here in silence.
+    /// </summary>
+    private static readonly Dictionary<string, int> MinimumWordsPerList = new()
+    {
+        ["wordlist_en.txt"] = 3000,
+        ["wordlist_fr.txt"] = 2500,
+        ["wordlist_es.txt"] = 700,
+    };
 
     public static TheoryData<string> ShippedWordLists()
     {
@@ -78,6 +91,31 @@ public sealed class PassphraseWordListGuardTests
         Assert.Contains("wordlist_es.txt", files);
     }
 
+    /// <summary>
+    /// A list absent from <see cref="MinimumWordsPerList"/> would throw rather than assert, and a
+    /// floor at or under <see cref="MinimumWords"/> would add nothing to the general floor, so a
+    /// shrunk list would read as covered while nothing measured its size.
+    /// </summary>
+    [Fact]
+    public void EveryDeclaredLanguageCarriesItsOwnFloor()
+    {
+        List<string> unfloored = PasswordGeneratorViewModel.PassphraseLanguages
+            .Select(language => language.FileName)
+            .Where(fileName => !MinimumWordsPerList.ContainsKey(fileName))
+            .ToList();
+
+        Assert.True(
+            unfloored.Count == 0,
+            "these lists have no floor of their own: " + string.Join(", ", unfloored));
+
+        Assert.Equal(
+            PasswordGeneratorViewModel.PassphraseLanguages.Length,
+            MinimumWordsPerList.Count);
+        Assert.All(MinimumWordsPerList, entry => Assert.True(
+            entry.Value > MinimumWords,
+            $"{entry.Key} is floored at {entry.Value}, which the general floor already covers"));
+    }
+
     [Theory]
     [MemberData(nameof(ShippedWordLists))]
     public void AWordListHoldsTypeableWordsAndNoRepeats(string fileName)
@@ -87,6 +125,12 @@ public sealed class PassphraseWordListGuardTests
         Assert.True(
             words.Length >= MinimumWords,
             $"{fileName} holds {words.Length} words, at or below the fallback array's worth");
+
+        int floor = MinimumWordsPerList[fileName];
+        Assert.True(
+            words.Length >= floor,
+            $"{fileName} holds {words.Length} words, under the {floor} it ships, so a passphrase "
+            + $"drawn from it is weaker than the tool says");
 
         List<string> untypeable = words
             .Where(word => !word.All(character => character is >= 'a' and <= 'z'))

@@ -12,6 +12,26 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### Larger passphrase word lists
+
+- The English and French word lists grow from 515 and 507 words to 3525 and 2774. A word is
+  worth 11.8 bits in English and 11.4 in French, against 9.0 before, so a four-word passphrase
+  gains about eleven bits without getting one character longer. The added words come from the
+  dictionaries of genpwd-pro, the same author's password generator, kept only where they are
+  plain lowercase ASCII of four to twelve letters: that is what the loader keeps, and what a
+  passphrase read off one screen and typed on another keyboard needs.
+- The Spanish list is unchanged at 725 words, and is now the smallest of the three rather than
+  the largest. A Spanish passphrase is worth about two bits less per word than an English one.
+  The strength figure the tool shows is computed from the list actually in use, so it says so,
+  but the release note of v2026.091801 stated the opposite ordering and that ordering no longer
+  holds.
+- Each list now carries a size floor of its own in the test suite. The floor that existed only
+  caught a list that had collapsed to its fifty-word fallback, so either list could have been
+  reverted to its five-hundred-word version, at a cost of nearly three bits per word, without a
+  single test failing.
+
 ## 2026-09-18: the passphrase generator speaks Spanish (v2026.091801)
 
 ### Spanish passphrases
