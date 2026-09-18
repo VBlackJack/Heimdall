@@ -800,6 +800,7 @@
                                    Margin="0,12,0,0">
                             <Button x:Name="CertificatePromptRefuseButton"
                                     TabIndex="0"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
                                     KeyboardNavigation.AcceptsReturn="True"
                                     MinWidth="140"
                                     Margin="0,0,8,0"
