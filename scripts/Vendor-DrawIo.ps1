@@ -77,6 +77,7 @@ $COPY_FILES = @(
     'resources/README.md',
     'resources/dia.txt',
     'resources/dia_fr.txt',
+    'resources/dia_es.txt',
     'resources/dia_i18n.txt'
 )
 

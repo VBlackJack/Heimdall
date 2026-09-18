@@ -275,10 +275,13 @@ public sealed class DrawioAssetGuardTests
 
     /// <summary>
     /// Every action the context menu offers must have a key the shipped
-    /// catalogues can translate, in both languages Heimdall speaks.
+    /// catalogues can translate. Re-vendoring must preserve those catalogues.
     /// </summary>
-    [Fact]
-    public void HostPage_ContextMenuActionsAreTranslatableInBothLanguages()
+    [Theory]
+    [InlineData("dia.txt")]
+    [InlineData("dia_fr.txt")]
+    [InlineData("dia_es.txt")]
+    public void HostPage_ContextMenuActionsAreTranslatableInShippedLanguages(string catalogue)
     {
         string host = ReadAsset("heimdall-host.html");
 
@@ -305,17 +308,15 @@ public sealed class DrawioAssetGuardTests
         // carries "line" on it, and that is what the host resolves.
         keys = keys.Select(key => key == "insertEdge" ? "line" : key).ToList();
 
-        foreach (string catalogue in new[] { "dia.txt", "dia_fr.txt" })
-        {
-            string text = ReadAsset("resources", catalogue);
-            var missing = keys
-                .Where(key => !Regex.IsMatch(text, $@"^{Regex.Escape(key)}=", RegexOptions.Multiline))
-                .ToList();
+        string text = ReadAsset("resources", catalogue);
+        var missing = keys
+            .Where(key => !Regex.IsMatch(text, $@"^{Regex.Escape(key)}=", RegexOptions.Multiline))
+            .ToList();
 
-            Assert.True(missing.Count == 0,
-                $"{catalogue} cannot translate: {string.Join(", ", missing)}. "
-                    + "Those entries would show their resource key.");
-        }
+        Assert.True(missing.Count == 0,
+            $"{catalogue} cannot translate: {string.Join(", ", missing)}. "
+                + "Those entries would show their resource key.");
+        Assert.Contains($"'resources/{catalogue}'", ReadRepositoryFile("scripts/Vendor-DrawIo.ps1"));
     }
 
     /// <summary>
