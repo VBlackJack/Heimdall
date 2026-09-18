@@ -12,6 +12,21 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### The placement bar is one bar again
+
+- The two rows of the placement bar read the same 0 to 100 scale, but they had stopped starting
+  at the same place or being the same length, so a cursor at half way on one sat nowhere near
+  half way on the other. The label widening released in v2026.091802 had matched a width
+  belonging to a column rather than to the label it aimed at, and the specials row's label took
+  half the row. Both rows now size that column together, in any language.
+- Dragging a cursor wrote its position on every mouse move, which regenerated the password each
+  time - twenty of them when a batch had been asked for - and snapped the cursor onto a grid a
+  tenth of a percent wide before measuring the next move from it. The cursor now follows the
+  pointer and the password is drawn once, when the cursor is dropped. The arrow keys and the
+  wheel still act immediately, one press being one move.
+
 ## 2026-09-18: the password generator, rebuilt (v2026.091802)
 
 ### One hour is not one hours

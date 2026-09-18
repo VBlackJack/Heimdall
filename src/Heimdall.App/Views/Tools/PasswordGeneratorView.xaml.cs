@@ -800,6 +800,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
             DescribeCursor(cursor, index, percents[index]);
             cursor.DragDelta += OnPlacementCursorDrag;
+            cursor.DragCompleted += OnPlacementCursorDropped;
             cursor.KeyDown += OnPlacementCursorKey;
             cursor.MouseWheel += OnPlacementCursorWheel;
 
@@ -864,6 +865,20 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         }
     }
 
+    /// <summary>
+    /// Moves the cursor under the pointer, and nothing else, for as long as the drag lasts.
+    /// </summary>
+    /// <remarks>
+    /// <para>This used to write the position on every mouse move. Two things followed from that,
+    /// and both were felt rather than seen. Writing the position regenerates the password, so the
+    /// machine drew a new one on every WM_MOUSEMOVE, and twenty of them when a batch had been
+    /// asked for. And the write rounded the position to a tenth of a percent and put the cursor
+    /// back on that grid, while the next mouse move measured its delta from the position it had
+    /// just been moved to: the cursor pulled against the pointer and the two drifted apart.</para>
+    /// <para>The cursor now follows the pointer in pixels and the position is written once, when
+    /// the drag ends. The keyboard and the wheel still write immediately, because a key press is
+    /// one discrete move and one password, which is the behaviour anyone would expect of it.</para>
+    /// </remarks>
     private void OnPlacementCursorDrag(object sender, DragDeltaEventArgs e)
     {
         if (sender is not Thumb { Tag: PlacementCursor slot } cursor
@@ -873,8 +888,25 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         }
 
         double usable = Math.Max(1, track.ActualWidth - PlacementCursorWidth);
-        double moved = Canvas.GetLeft(cursor) + e.HorizontalChange;
-        MovePlacementCursor(slot, moved / usable * 100.0);
+        double moved = Math.Clamp(Canvas.GetLeft(cursor) + e.HorizontalChange, 0, usable);
+
+        Canvas.SetLeft(cursor, moved);
+        DescribeCursor(cursor, slot.Index, moved / usable * 100.0);
+    }
+
+    /// <summary>
+    /// Commits where the cursor was dropped: one position, one password.
+    /// </summary>
+    private void OnPlacementCursorDropped(object sender, DragCompletedEventArgs e)
+    {
+        if (sender is not Thumb { Tag: PlacementCursor slot } cursor
+            || cursor.Parent is not Canvas track)
+        {
+            return;
+        }
+
+        double usable = Math.Max(1, track.ActualWidth - PlacementCursorWidth);
+        MovePlacementCursor(slot, Canvas.GetLeft(cursor) / usable * 100.0);
     }
 
     private void OnPlacementCursorKey(object sender, KeyEventArgs e)
