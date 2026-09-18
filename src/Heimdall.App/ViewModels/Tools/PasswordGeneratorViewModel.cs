@@ -63,13 +63,21 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         public bool PpDigit { get; set; } = true;
         public bool PpSpecial { get; set; } = true;
         public int PpPlacement { get; set; }
+        public string LeetBaseWord { get; set; } = string.Empty;
+        public bool LeetRandomWord { get; set; } = true;
+        public bool LeetFullSubstitution { get; set; } = true;
+        public int LeetDigits { get; set; } = 2;
+        public int LeetSpecials { get; set; } = 1;
+        public int LeetPlacement { get; set; }
+        public int LeetCase { get; set; }
     }
 
     internal enum GeneratorMode
     {
         Random,
         Syllable,
-        Passphrase
+        Passphrase,
+        Leet
     }
 
     internal enum SyllableCase
@@ -102,6 +110,33 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private const string LayoutUnsafeChars = "aqwzmAQWZM";
     private const int HistoryMaxSize = 10;
     private const double BruteForceGuessesPerSecond = 10_000_000_000;
+
+    /// <summary>
+    /// The letters a leet password rewrites, and what each one becomes. The table is fixed and
+    /// public knowledge: rewriting a word this way hides it from nobody and is worth no entropy,
+    /// which is why <see cref="GenerateLeetPassword"/> credits the substitution itself with
+    /// nothing and the word it starts from with the size of the list it was drawn out of.
+    /// </summary>
+    private static readonly Dictionary<char, char> LeetSubstitutions = new()
+    {
+        ['a'] = '@',
+        ['b'] = '8',
+        ['e'] = '3',
+        ['g'] = '9',
+        ['i'] = '1',
+        ['l'] = '!',
+        ['o'] = '0',
+        ['s'] = '5',
+        ['t'] = '7',
+    };
+
+    /// <summary>
+    /// What one letter is worth under <see cref="SyllableCase.Mixed"/>, which uppercases a
+    /// character one time in four: -(0.25*log2(0.25) + 0.75*log2(0.75)), rounded down. The
+    /// syllable generator credits mixed case one bit per syllable instead, which is the same
+    /// deliberate understatement applied to a coarser unit.
+    /// </summary>
+    private const double MixedCaseBitsPerLetter = 0.81;
 
     private static readonly Dictionary<char, string> NatoAlphabet = new()
     {
@@ -316,6 +351,15 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     [ObservableProperty] private bool _passphraseAddSpecial = true;
     [ObservableProperty] private int _passphrasePlacementIndex;
 
+    [ObservableProperty] private string _leetBaseWord = string.Empty;
+    [ObservableProperty] private bool _leetRandomWord = true;
+    [ObservableProperty] private bool _leetFullSubstitution = true;
+    [ObservableProperty] private int _leetDigits = 2;
+    [ObservableProperty] private int _leetSpecials = 1;
+    [ObservableProperty] private int _leetPlacementIndex;
+    [ObservableProperty] private int _leetCaseIndex;
+    [ObservableProperty] private string _leetWordSource = string.Empty;
+
     [ObservableProperty] private bool _clipboardAutoClear;
 
     [ObservableProperty] private string _generatedPassword = string.Empty;
@@ -343,24 +387,37 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         {
             1 => GeneratorMode.Syllable,
             2 => GeneratorMode.Passphrase,
+            3 => GeneratorMode.Leet,
             _ => GeneratorMode.Random
         };
 
     public bool IsRandomMode => CurrentMode == GeneratorMode.Random;
     public bool IsSyllableMode => CurrentMode == GeneratorMode.Syllable;
     public bool IsPassphraseMode => CurrentMode == GeneratorMode.Passphrase;
-    public bool ShowLayoutSafe => CurrentMode != GeneratorMode.Passphrase;
+    public bool IsLeetMode => CurrentMode == GeneratorMode.Leet;
+
+    /// <summary>
+    /// Layout-safe drops the letters that move on an AZERTY keyboard, which only the generators
+    /// that choose their own letters can honour. A passphrase and a leet password take theirs
+    /// from a word list, so the box would promise a restriction neither one applies.
+    /// </summary>
+    public bool ShowLayoutSafe =>
+        CurrentMode is GeneratorMode.Random or GeneratorMode.Syllable;
     public bool ShowExcludeAmbiguous => CurrentMode == GeneratorMode.Random;
     public bool ShowPhonetic => !string.IsNullOrEmpty(PhoneticText);
     public bool ShowSyllableStructure => IsSyllableMode && !string.IsNullOrEmpty(SyllableStructureText);
     public bool ShowStrength => !string.IsNullOrEmpty(GeneratedPassword);
     public bool ShowSyllablePlacement => IsSyllableMode && (SyllableDigits > 0 || SyllableSpecials > 0);
     public bool ShowPassphrasePlacement => IsPassphraseMode && (PassphraseAddDigit || PassphraseAddSpecial);
+    public bool ShowLeetPlacement => IsLeetMode && (LeetDigits > 0 || LeetSpecials > 0);
+    public bool ShowLeetBaseWord => IsLeetMode && !LeetRandomWord;
+    public bool ShowLeetWordSource => IsLeetMode && !string.IsNullOrEmpty(LeetWordSource);
     public bool HasActiveSpecials => CurrentMode switch
     {
         GeneratorMode.Random => IncludeSymbols,
         GeneratorMode.Syllable => SyllableSpecials > 0,
         GeneratorMode.Passphrase => PassphraseAddSpecial,
+        GeneratorMode.Leet => LeetSpecials > 0,
         _ => false
     };
 
@@ -429,6 +486,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         PpDigit = PassphraseAddDigit,
         PpSpecial = PassphraseAddSpecial,
         PpPlacement = PassphrasePlacementIndex,
+        LeetBaseWord = LeetBaseWord,
+        LeetRandomWord = LeetRandomWord,
+        LeetFullSubstitution = LeetFullSubstitution,
+        LeetDigits = LeetDigits,
+        LeetSpecials = LeetSpecials,
+        LeetPlacement = LeetPlacementIndex,
+        LeetCase = LeetCaseIndex,
     };
 
     internal void ApplyPreset(PasswordPreset preset)
@@ -463,6 +527,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             PassphraseAddDigit = preset.PpDigit;
             PassphraseAddSpecial = preset.PpSpecial;
             PassphrasePlacementIndex = preset.PpPlacement;
+            LeetBaseWord = preset.LeetBaseWord;
+            LeetRandomWord = preset.LeetRandomWord;
+            LeetFullSubstitution = preset.LeetFullSubstitution;
+            LeetDigits = preset.LeetDigits;
+            LeetSpecials = preset.LeetSpecials;
+            LeetPlacementIndex = preset.LeetPlacement;
+            LeetCaseIndex = preset.LeetCase;
         }
         finally
         {
@@ -585,6 +656,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             case GeneratorMode.Passphrase:
                 GeneratePassphrase();
                 break;
+            case GeneratorMode.Leet:
+                GenerateLeetPassword();
+                break;
         }
 
         RaiseVisibilityProperties();
@@ -627,6 +701,18 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnPassphraseAddDigitChanged(bool value) => RegenerateIfReady();
     partial void OnPassphraseAddSpecialChanged(bool value) => RegenerateIfReady();
     partial void OnPassphrasePlacementIndexChanged(int value) => RegenerateIfReady();
+    partial void OnLeetBaseWordChanged(string value) => RegenerateIfReady();
+    partial void OnLeetFullSubstitutionChanged(bool value) => RegenerateIfReady();
+    partial void OnLeetDigitsChanged(int value) => RegenerateIfReady();
+    partial void OnLeetSpecialsChanged(int value) => RegenerateIfReady();
+    partial void OnLeetPlacementIndexChanged(int value) => RegenerateIfReady();
+    partial void OnLeetCaseIndexChanged(int value) => RegenerateIfReady();
+
+    partial void OnLeetRandomWordChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowLeetBaseWord));
+        RegenerateIfReady();
+    }
 
     private void RegenerateIfReady()
     {
@@ -644,6 +730,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRandomMode));
         OnPropertyChanged(nameof(IsSyllableMode));
         OnPropertyChanged(nameof(IsPassphraseMode));
+        OnPropertyChanged(nameof(IsLeetMode));
         OnPropertyChanged(nameof(ShowLayoutSafe));
         OnPropertyChanged(nameof(ShowExcludeAmbiguous));
         OnPropertyChanged(nameof(ShowPhonetic));
@@ -651,6 +738,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowStrength));
         OnPropertyChanged(nameof(ShowSyllablePlacement));
         OnPropertyChanged(nameof(ShowPassphrasePlacement));
+        OnPropertyChanged(nameof(ShowLeetPlacement));
+        OnPropertyChanged(nameof(ShowLeetBaseWord));
+        OnPropertyChanged(nameof(ShowLeetWordSource));
         OnPropertyChanged(nameof(HasActiveSpecials));
     }
 
@@ -964,6 +1054,164 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         UpdatePhoneticDisplay(finalPassword);
     }
 
+    /// <summary>
+    /// Builds a leet password: one word, rewritten through <see cref="LeetSubstitutions"/>,
+    /// cased, then given digits and specials at the chosen placement.
+    /// </summary>
+    /// <remarks>
+    /// <para>What the strength figure credits is the part of the result that was actually drawn
+    /// at random. A word drawn from the list is worth the size of that list; a word typed by the
+    /// operator is worth nothing, because an attacker guesses the word, not the spelling. The
+    /// substitution table is public, so applying all of it is worth nothing either; applying it
+    /// letter by letter on a coin toss is worth one bit per letter it could have touched.</para>
+    /// <para>This is the mode that produces the weakest passwords of the four, and the figure
+    /// says so rather than counting the result as if every character had been drawn at
+    /// random.</para>
+    /// </remarks>
+    private void GenerateLeetPassword()
+    {
+        SyllableStructureText = string.Empty;
+        SyllableTotalLength = 0;
+
+        var typed = SanitizeLeetBaseWord(LeetBaseWord);
+        var drawn = LeetRandomWord || typed.Length == 0;
+        string baseWord;
+        double wordEntropy;
+
+        if (drawn)
+        {
+            var wordList = SelectedWordList();
+            if (wordList.Length == 0)
+            {
+                SetEmptyOutput();
+                return;
+            }
+
+            baseWord = wordList[CryptoRandomInt(wordList.Length)];
+            wordEntropy = Math.Log2(wordList.Length);
+        }
+        else
+        {
+            baseWord = typed;
+            wordEntropy = 0;
+        }
+
+        var effectiveSymbols = GetEffectiveSymbols();
+        var substituted = ApplyLeetSubstitutions(baseWord, out var substitutable);
+        var cased = ApplyLeetCase(substituted, (SyllableCase)LeetCaseIndex, out var casedLetters);
+
+        var chars = new List<char>(cased);
+        InsertExtras(
+            chars,
+            LeetDigits,
+            LeetSpecials,
+            (Placement)LeetPlacementIndex,
+            effectiveSymbols);
+
+        var finalPassword = new string(chars.ToArray());
+        GeneratedPassword = finalPassword;
+        LeetWordSource = drawn ? baseWord : string.Empty;
+        OnPropertyChanged(nameof(ShowLeetWordSource));
+
+        var entropy = wordEntropy;
+        if (!LeetFullSubstitution) entropy += substitutable;
+        if ((SyllableCase)LeetCaseIndex == SyllableCase.Mixed) entropy += MixedCaseBitsPerLetter * casedLetters;
+        if (LeetDigits > 0) entropy += Math.Log2(DigitChars.Length) * LeetDigits;
+        if (LeetSpecials > 0 && effectiveSymbols.Length > 0) entropy += Math.Log2(effectiveSymbols.Length) * LeetSpecials;
+
+        UpdateStrengthIndicator(entropy);
+        UpdatePhoneticDisplay(finalPassword);
+    }
+
+    /// <summary>
+    /// Keeps the letters of a typed base word and drops everything else, so that what the
+    /// generator rewrites is a word rather than whatever was pasted into the box.
+    /// </summary>
+    private static string SanitizeLeetBaseWord(string? word)
+    {
+        if (string.IsNullOrWhiteSpace(word))
+        {
+            return string.Empty;
+        }
+
+        return new string(word.Where(char.IsLetter).ToArray());
+    }
+
+    /// <summary>
+    /// Rewrites the letters the substitution table covers, all of them or one in two, and reports
+    /// how many letters it could have rewritten.
+    /// </summary>
+    /// <remarks>
+    /// A substitution whose replacement a shell would read as syntax is skipped while CLI-safe is
+    /// on, and is not counted as substitutable: <c>l</c> becomes <c>!</c>, which is history
+    /// expansion in an interactive shell, and the point of the box is that the result can be
+    /// pasted into one.
+    /// </remarks>
+    private string ApplyLeetSubstitutions(string word, out int substitutable)
+    {
+        substitutable = 0;
+        var builder = new StringBuilder(word.Length);
+
+        foreach (var character in word)
+        {
+            var lowered = char.ToLowerInvariant(character);
+            if (!LeetSubstitutions.TryGetValue(lowered, out var replacement)
+                || (CliSafe && ShellDangerousChars.Contains(replacement)))
+            {
+                builder.Append(character);
+                continue;
+            }
+
+            substitutable++;
+            var substitute = LeetFullSubstitution || CryptoRandomInt(2) == 0;
+            builder.Append(substitute ? replacement : character);
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// Applies a case mode to a single word and reports how many letters were still letters when
+    /// it ran, which is what mixed case is paid on.
+    /// </summary>
+    private string ApplyLeetCase(string word, SyllableCase caseMode, out int letters)
+    {
+        letters = word.Count(char.IsLetter);
+        var builder = new StringBuilder(word.Length);
+
+        for (var index = 0; index < word.Length; index++)
+        {
+            var character = word[index];
+            switch (caseMode)
+            {
+                case SyllableCase.Upper:
+                case SyllableCase.Inverse:
+                    character = char.ToUpperInvariant(character);
+                    break;
+                case SyllableCase.Title:
+                case SyllableCase.WordCase:
+                    if (index == 0) character = char.ToUpperInvariant(character);
+                    break;
+                case SyllableCase.Mixed:
+                    if (CryptoRandomInt(4) == 0) character = char.ToUpperInvariant(character);
+                    break;
+                case SyllableCase.Alternating:
+                    if (index % 2 != 0) character = char.ToUpperInvariant(character);
+                    break;
+            }
+
+            builder.Append(character);
+        }
+
+        var result = builder.ToString();
+        if (caseMode == SyllableCase.Inverse && result.Length > 0)
+        {
+            result = result[..^1] + char.ToLowerInvariant(result[^1]);
+        }
+
+        return result;
+    }
+
     private void UpdateStrengthIndicator(double entropy)
     {
         if (string.IsNullOrEmpty(GeneratedPassword))
@@ -1075,6 +1323,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         if (GeneratedPassword.Length < 8)
         {
             issues.Add(L("ToolPwdGenIssueTooShort"));
+        }
+
+        if (CurrentMode == GeneratorMode.Leet
+            && !LeetRandomWord
+            && SanitizeLeetBaseWord(LeetBaseWord).Length > 0)
+        {
+            issues.Add(L("ToolPwdGenIssueChosenWord"));
         }
 
         if (CurrentMode == GeneratorMode.Random)

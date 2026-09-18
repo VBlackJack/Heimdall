@@ -32,6 +32,26 @@ All notable changes to Heimdall are documented in this file.
   reverted to its five-hundred-word version, at a cost of nearly three bits per word, without a
   single test failing.
 
+### A fourth generation mode: leet
+
+- The generator has a leet mode: one word, rewritten through the usual substitution table (a
+  becomes @, e becomes 3, l becomes !), cased, then given digits and special characters at the
+  placement of your choice. The mode comes from genpwd-pro, where it already existed.
+- The word is drawn from the word list of the selected language unless you type one yourself,
+  and the tool shows which word it drew, so a password you are about to memorise is readable.
+- The strength figure credits what was drawn at random and nothing else. A word drawn from the
+  list is worth the size of that list. A word you typed is worth zero bits, and the issue line
+  under the figure says so: an attacker guesses the word, not its spelling. The substitution
+  table is public, so applying all of it is worth nothing either; applying it letter by letter
+  on a coin toss, which is what leaving the second box unticked does, is worth one bit for each
+  letter the table covers. This mode produces the weakest passwords of the four, and the figure
+  says so rather than counting the result as though every character had been drawn at random.
+- CLI-safe keeps the l to ! substitution out of the result, since the point of that box is a
+  password that can be pasted into a shell, and ! is history expansion in an interactive one.
+- Layout-safe is no longer offered in passphrase mode or in leet mode. It restricts the letters
+  a generator picks, and neither of those two picks its own letters: the box promised a
+  restriction that the passphrase mode has never applied.
+
 ## 2026-09-18: the passphrase generator speaks Spanish (v2026.091801)
 
 ### Spanish passphrases

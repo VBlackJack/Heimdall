@@ -209,7 +209,7 @@ flèches comprises dans le refus. `scripts/NotesTypographyGuard.ps1` y fait auto
 ## Localisation et i18n
 
 L'interface existe en anglais, en français et en espagnol. Chaque catalogue sous
-`locales/` porte les mêmes 6 371 clés, et `LocaleCatalogueParityTests` l'impose dans
+`locales/` porte les mêmes 6 378 clés, et `LocaleCatalogueParityTests` l'impose dans
 les deux sens et sur les paramètres de format. Ajouter une langue fait l'objet d'une
 liste de contrôle dans [CONTRIBUTING.fr.md](../../CONTRIBUTING.fr.md).
 

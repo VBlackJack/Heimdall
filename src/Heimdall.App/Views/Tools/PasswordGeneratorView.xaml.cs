@@ -100,6 +100,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         CmbMode.Items.Add(L("ToolPwdGenModeRandom"));
         CmbMode.Items.Add(L("ToolPwdGenModeSyllable"));
         CmbMode.Items.Add(L("ToolPwdGenModePassphrase"));
+        CmbMode.Items.Add(L("ToolPwdGenModeLeet"));
         CmbMode.SelectedIndex = 0;
 
         CmbSylCase.Items.Clear();
@@ -138,6 +139,33 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
         CmbPpLanguage.SelectedIndex =
             PasswordGeneratorViewModel.PassphraseLanguageIndexFor(_localizer?.CurrentLocale);
+
+        // The leet panel reads the same case, placement and language vocabulary as the two
+        // panels above it, and the language box is bound to the same index, so a language
+        // chosen for passphrases is the language a drawn base word comes from.
+        CmbLeetCase.Items.Clear();
+        foreach (object? item in CmbSylCase.Items)
+        {
+            CmbLeetCase.Items.Add(item);
+        }
+
+        CmbLeetCase.SelectedIndex = 0;
+
+        CmbLeetPlacement.Items.Clear();
+        foreach (object? item in CmbSylPlacement.Items)
+        {
+            CmbLeetPlacement.Items.Add(item);
+        }
+
+        CmbLeetPlacement.SelectedIndex = 0;
+
+        CmbLeetLanguage.Items.Clear();
+        foreach (object? item in CmbPpLanguage.Items)
+        {
+            CmbLeetLanguage.Items.Add(item);
+        }
+
+        CmbLeetLanguage.SelectedIndex = CmbPpLanguage.SelectedIndex;
     }
 
     private void ApplyLocalization()
@@ -200,6 +228,15 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         SylDigitsLabel.Text = L("ToolPwdGenDigits");
         SylSpecialsLabel.Text = L("ToolPwdGenSymbols");
         SylPlacementLabel.Text = L("ToolPwdGenPlacement");
+        ChkLeetRandomWord.Content = L("ToolPwdGenLeetRandomWord");
+        ChkLeetFullSubstitution.Content = L("ToolPwdGenLeetFullSubstitution");
+        LeetWordLabel.Text = L("ToolPwdGenLeetWord");
+        LeetLanguageLabel.Text = L("ToolPwdGenLanguage");
+        LeetCaseLabel.Text = L("ToolPwdGenCase");
+        LeetDigitsLabel.Text = L("ToolPwdGenDigits");
+        LeetSpecialsLabel.Text = L("ToolPwdGenSymbols");
+        LeetPlacementLabel.Text = L("ToolPwdGenPlacement");
+        LeetWordSourceLabel.Text = L("ToolPwdGenLeetWordSource");
         SylStructureLabel.Text = L("ToolPwdGenSylStructure");
 
         // Passphrase mode
@@ -237,6 +274,12 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(PpWordCountSlider, L("ToolPwdGenWordCount"));
         System.Windows.Automation.AutomationProperties.SetName(TxtPpSeparator, L("ToolPwdGenSeparator"));
         System.Windows.Automation.AutomationProperties.SetName(CmbPpLanguage, L("ToolPwdGenLanguage"));
+        System.Windows.Automation.AutomationProperties.SetName(CmbLeetLanguage, L("ToolPwdGenLanguage"));
+        System.Windows.Automation.AutomationProperties.SetName(CmbLeetCase, L("ToolPwdGenCase"));
+        System.Windows.Automation.AutomationProperties.SetName(CmbLeetPlacement, L("ToolPwdGenPlacement"));
+        System.Windows.Automation.AutomationProperties.SetName(TxtLeetWord, L("ToolPwdGenLeetWord"));
+        System.Windows.Automation.AutomationProperties.SetName(LeetDigitsSlider, L("ToolPwdGenDigits"));
+        System.Windows.Automation.AutomationProperties.SetName(LeetSpecialsSlider, L("ToolPwdGenSymbols"));
         System.Windows.Automation.AutomationProperties.SetName(ChkPpCapitalize, L("ToolPwdGenCapitalize"));
         System.Windows.Automation.AutomationProperties.SetName(ChkPpDigit, L("ToolPwdGenAddDigit"));
         System.Windows.Automation.AutomationProperties.SetName(ChkPpSpecial, L("ToolPwdGenAddSpecial"));
@@ -335,6 +378,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             PasswordGeneratorViewModel.GeneratorMode.Random => L("ToolPwdGenModeRandomDesc"),
             PasswordGeneratorViewModel.GeneratorMode.Syllable => L("ToolPwdGenModeSyllableDesc"),
             PasswordGeneratorViewModel.GeneratorMode.Passphrase => L("ToolPwdGenModePassphraseDesc"),
+            PasswordGeneratorViewModel.GeneratorMode.Leet => L("ToolPwdGenModeLeetDesc"),
             _ => string.Empty
         };
     }
