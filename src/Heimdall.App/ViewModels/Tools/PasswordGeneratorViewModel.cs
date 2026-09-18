@@ -71,6 +71,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         public int LeetPlacement { get; set; }
         public int LeetCase { get; set; }
         public int EntropyFloor { get; set; }
+        public string CaseBlocks { get; set; } = DefaultCaseBlocks;
+        public bool CaseBlocksAutoSync { get; set; } = true;
     }
 
     internal enum GeneratorMode
@@ -81,6 +83,10 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         Leet
     }
 
+    /// <summary>
+    /// How a generated word is cased. Appended to, never reordered: the index is persisted
+    /// inside saved presets.
+    /// </summary>
     internal enum SyllableCase
     {
         Mixed,
@@ -89,7 +95,10 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         Title,
         Alternating,
         WordCase,
-        Inverse
+        Inverse,
+
+        /// <summary>Cases each unit from <see cref="CaseBlocks"/>, one token per unit.</summary>
+        Blocks
     }
 
     internal enum Placement
@@ -138,6 +147,24 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// deliberate understatement applied to a coarser unit.
     /// </summary>
     private const double MixedCaseBitsPerLetter = 0.81;
+
+    /// <summary>
+    /// What a case block can say: <c>U</c> uppercases its unit, <c>l</c> lowercases it, and
+    /// <c>T</c> uppercases the first letter of it. The pattern repeats when the password has
+    /// more units than the pattern has blocks.
+    /// </summary>
+    /// <remarks>
+    /// A block pattern is chosen, not drawn, so it is worth no entropy at all and the strength
+    /// figure credits it with nothing. Mixed case is the only case mode that is paid for,
+    /// because it is the only one that is random.
+    /// </remarks>
+    internal const string CaseBlockTokens = "UlT";
+    internal const string DefaultCaseBlocks = "Tl";
+    internal const int MinimumCaseBlocks = 1;
+    internal const int MaximumCaseBlocks = 10;
+
+    /// <summary>Characters one syllable block covers, which is one open syllable.</summary>
+    private const int CharactersPerSyllableBlock = 2;
 
     /// <summary>
     /// The entropy floors the box offers, in bits, the first meaning no floor at all. A floor
@@ -393,6 +420,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     [ObservableProperty] private int _entropyFloorIndex;
 
+    [ObservableProperty] private string _caseBlocks = DefaultCaseBlocks;
+    [ObservableProperty] private bool _caseBlocksAutoSync = true;
+
     [ObservableProperty] private bool _clipboardAutoClear;
 
     [ObservableProperty] private string _generatedPassword = string.Empty;
@@ -447,6 +477,26 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     public bool ShowLeetBaseWord => IsLeetMode && !LeetRandomWord;
     public bool ShowLeetWordSource => IsLeetMode && !string.IsNullOrEmpty(LeetWordSource);
     public bool ShowFloorNotice => !string.IsNullOrEmpty(FloorNoticeText);
+
+    /// <summary>The case mode of the mode on screen, or <c>null</c> where there is none.</summary>
+    internal SyllableCase? CurrentCaseMode => CurrentMode switch
+    {
+        GeneratorMode.Syllable => CaseModeAt(SyllableCaseIndex),
+        GeneratorMode.Leet => CaseModeAt(LeetCaseIndex),
+        _ => null
+    };
+
+    public bool ShowCaseBlocks => CurrentCaseMode == SyllableCase.Blocks;
+
+    /// <summary>
+    /// Keeping the block count equal to the syllable count only means anything where the number
+    /// of units is known before the password is built. A leet password has as many units as the
+    /// drawn word has letters, which is not known until it is drawn.
+    /// </summary>
+    public bool ShowCaseBlocksAutoSync => ShowCaseBlocks && IsSyllableMode;
+
+    internal static SyllableCase CaseModeAt(int index) =>
+        (SyllableCase)Math.Clamp(index, 0, (int)SyllableCase.Blocks);
 
     /// <summary>The floor in bits, zero when the box is on its first entry.</summary>
     internal int EntropyFloorBits =>
@@ -552,6 +602,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         LeetPlacement = LeetPlacementIndex,
         LeetCase = LeetCaseIndex,
         EntropyFloor = EntropyFloorIndex,
+        CaseBlocks = CaseBlocks,
+        CaseBlocksAutoSync = CaseBlocksAutoSync,
     };
 
     internal void ApplyPreset(PasswordPreset preset)
@@ -594,6 +646,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             LeetPlacementIndex = preset.LeetPlacement;
             LeetCaseIndex = preset.LeetCase;
             EntropyFloorIndex = preset.EntropyFloor;
+            CaseBlocks = SanitizeCaseBlocks(preset.CaseBlocks);
+            CaseBlocksAutoSync = preset.CaseBlocksAutoSync;
         }
         finally
         {
@@ -945,6 +999,127 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private void NoteFloorRaise(string chosen, string used)
         => FloorNoticeText = string.Format(L("ToolPwdGenFloorRaised"), chosen, used);
 
+    /// <summary>Adds one block, up to the ten the editor shows.</summary>
+    internal void AddCaseBlock()
+    {
+        if (CaseBlocks.Length >= MaximumCaseBlocks)
+        {
+            return;
+        }
+
+        CaseBlocksAutoSync = false;
+        CaseBlocks += CaseBlockTokens[1];
+    }
+
+    internal void RemoveCaseBlock()
+    {
+        if (CaseBlocks.Length <= MinimumCaseBlocks)
+        {
+            return;
+        }
+
+        CaseBlocksAutoSync = false;
+        CaseBlocks = CaseBlocks[..^1];
+    }
+
+    /// <summary>Draws a token for every block, which is a shortcut, not a source of entropy.</summary>
+    internal void RandomizeCaseBlocks()
+    {
+        var drawn = new StringBuilder(CaseBlocks.Length);
+        for (var index = 0; index < CaseBlocks.Length; index++)
+        {
+            drawn.Append(CaseBlockTokens[CryptoRandomInt(CaseBlockTokens.Length)]);
+        }
+
+        CaseBlocks = drawn.ToString();
+    }
+
+    /// <summary>Sets every block to one token.</summary>
+    internal void SetAllCaseBlocks(char token)
+    {
+        if (!CaseBlockTokens.Contains(token))
+        {
+            return;
+        }
+
+        CaseBlocks = new string(token, CaseBlocks.Length);
+    }
+
+    /// <summary>Moves one block on to the next token, which is what clicking it does.</summary>
+    internal void CycleCaseBlock(int index)
+    {
+        if (index < 0 || index >= CaseBlocks.Length)
+        {
+            return;
+        }
+
+        var current = CaseBlockTokens.IndexOf(CaseBlocks[index]);
+        var next = CaseBlockTokens[(current + 1) % CaseBlockTokens.Length];
+        var tokens = CaseBlocks.ToCharArray();
+        tokens[index] = next;
+        CaseBlocks = new string(tokens);
+    }
+
+    /// <summary>
+    /// Keeps the pattern as long as the password has syllables, so that a pattern read left to
+    /// right lines up with the syllables read left to right instead of wrapping half way.
+    /// </summary>
+    private void SyncCaseBlocksToSyllableCount()
+    {
+        if (!CaseBlocksAutoSync || !IsSyllableMode || CurrentCaseMode != SyllableCase.Blocks)
+        {
+            return;
+        }
+
+        var wanted = Math.Clamp(
+            (int)Math.Ceiling(SyllableLength / (double)CharactersPerSyllableBlock),
+            MinimumCaseBlocks,
+            MaximumCaseBlocks);
+
+        if (wanted == CaseBlocks.Length)
+        {
+            return;
+        }
+
+        CaseBlocks = wanted < CaseBlocks.Length
+            ? CaseBlocks[..wanted]
+            : CaseBlocks + new string(CaseBlockTokens[1], wanted - CaseBlocks.Length);
+    }
+
+    /// <summary>
+    /// A pattern read off disk, held to what the editor can produce: between one and ten blocks,
+    /// each one of the three tokens.
+    /// </summary>
+    internal static string SanitizeCaseBlocks(string? pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            return DefaultCaseBlocks;
+        }
+
+        var kept = new string(pattern.Where(CaseBlockTokens.Contains).ToArray());
+        if (kept.Length == 0)
+        {
+            return DefaultCaseBlocks;
+        }
+
+        return kept.Length > MaximumCaseBlocks ? kept[..MaximumCaseBlocks] : kept;
+    }
+
+    /// <summary>Applies the block token for <paramref name="unitIndex"/> to one unit.</summary>
+    private string ApplyCaseBlock(string unit, int unitIndex)
+    {
+        var pattern = SanitizeCaseBlocks(CaseBlocks);
+        return pattern[unitIndex % pattern.Length] switch
+        {
+            'U' => unit.ToUpperInvariant(),
+            'T' => unit.Length > 0
+                ? char.ToUpperInvariant(unit[0]) + unit[1..].ToLowerInvariant()
+                : unit,
+            _ => unit.ToLowerInvariant()
+        };
+    }
+
     [RelayCommand]
     private void ClearHistory()
     {
@@ -967,8 +1142,18 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnCliSafeChanged(bool value) => RegenerateIfReady();
     partial void OnLayoutSafeChanged(bool value) => RegenerateIfReady();
     partial void OnCustomSpecialsChanged(string value) => RegenerateIfReady();
-    partial void OnSyllableLengthChanged(int value) => RegenerateIfReady();
-    partial void OnSyllableCaseIndexChanged(int value) => RegenerateIfReady();
+    partial void OnSyllableLengthChanged(int value)
+    {
+        SyncCaseBlocksToSyllableCount();
+        RegenerateIfReady();
+    }
+    partial void OnSyllableCaseIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowCaseBlocks));
+        OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
+        SyncCaseBlocksToSyllableCount();
+        RegenerateIfReady();
+    }
     partial void OnSyllableDigitsChanged(int value) => RegenerateIfReady();
     partial void OnSyllableSpecialsChanged(int value) => RegenerateIfReady();
     partial void OnSyllablePlacementIndexChanged(int value) => RegenerateIfReady();
@@ -986,8 +1171,22 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnLeetDigitsChanged(int value) => RegenerateIfReady();
     partial void OnLeetSpecialsChanged(int value) => RegenerateIfReady();
     partial void OnLeetPlacementIndexChanged(int value) => RegenerateIfReady();
-    partial void OnLeetCaseIndexChanged(int value) => RegenerateIfReady();
+    partial void OnLeetCaseIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowCaseBlocks));
+        OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
+        RegenerateIfReady();
+    }
     partial void OnEntropyFloorIndexChanged(int value) => RegenerateIfReady();
+
+    partial void OnCaseBlocksChanged(string value) => RegenerateIfReady();
+
+    partial void OnCaseBlocksAutoSyncChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
+        SyncCaseBlocksToSyllableCount();
+        RegenerateIfReady();
+    }
 
     partial void OnLeetRandomWordChanged(bool value)
     {
@@ -1023,6 +1222,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowLeetBaseWord));
         OnPropertyChanged(nameof(ShowLeetWordSource));
         OnPropertyChanged(nameof(ShowFloorNotice));
+        OnPropertyChanged(nameof(ShowCaseBlocks));
+        OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
         OnPropertyChanged(nameof(HasActiveSpecials));
     }
 
@@ -1168,6 +1369,16 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         for (var groupIndex = 0; groupIndex < groups.Count; groupIndex++)
         {
             var group = groups[groupIndex];
+
+            // A block covers a whole syllable, which is the unit the structure line shows and
+            // the unit a pattern read left to right is meant to line up with.
+            if (caseMode == SyllableCase.Blocks)
+            {
+                groups[groupIndex] = ApplyCaseBlock(group, groupIndex);
+                charIndex += group.Length;
+                continue;
+            }
+
             var sb = new StringBuilder(group.Length);
             for (var charPos = 0; charPos < group.Length; charPos++)
             {
@@ -1464,9 +1675,26 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         letters = word.Count(char.IsLetter);
         var builder = new StringBuilder(word.Length);
 
+        // A leet password has no syllables to hang a pattern on, so a block covers one letter.
+        // A character the substitution turned into a digit is not a letter and does not consume
+        // a block: the pattern stays on the letters it can actually case.
+        var blockIndex = 0;
+
         for (var index = 0; index < word.Length; index++)
         {
             var character = word[index];
+            if (caseMode == SyllableCase.Blocks)
+            {
+                if (char.IsLetter(character))
+                {
+                    character = ApplyCaseBlock(character.ToString(), blockIndex)[0];
+                    blockIndex++;
+                }
+
+                builder.Append(character);
+                continue;
+            }
+
             switch (caseMode)
             {
                 case SyllableCase.Upper:

@@ -79,6 +79,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             _vm.SetDialogService((title, message) => dialogService.ShowConfirmAsync(title, message, "warning"));
         }
         _viewInitialized = true;
+        RebuildCaseBlockButtons();
         RebuildCustomPresetButtons();
         UpdateModeDescription();
         UpdateSyllableUiHints();
@@ -111,6 +112,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         CmbSylCase.Items.Add(L("ToolPwdGenCaseAlternating"));
         CmbSylCase.Items.Add(L("ToolPwdGenCaseWordCase"));
         CmbSylCase.Items.Add(L("ToolPwdGenCaseInverse"));
+        CmbSylCase.Items.Add(L("ToolPwdGenCaseBlocks"));
         CmbSylCase.SelectedIndex = 0;
 
         // Syllable placement
@@ -248,6 +250,10 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         LeetPlacementLabel.Text = L("ToolPwdGenPlacement");
         LeetWordSourceLabel.Text = L("ToolPwdGenLeetWordSource");
         EntropyFloorLabel.Text = L("ToolPwdGenEntropyFloor");
+        CaseBlocksLabel.Text = L("ToolPwdGenBlocks");
+        CaseBlocksHint.Text = L("ToolPwdGenBlocksHint");
+        BtnCaseBlocksRandom.Content = L("ToolPwdGenBlocksRandom");
+        ChkCaseBlocksAutoSync.Content = L("ToolPwdGenBlocksAutoSync");
         SylStructureLabel.Text = L("ToolPwdGenSylStructure");
 
         // Passphrase mode
@@ -287,6 +293,11 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(CmbPpLanguage, L("ToolPwdGenLanguage"));
         System.Windows.Automation.AutomationProperties.SetName(CmbLeetLanguage, L("ToolPwdGenLanguage"));
         System.Windows.Automation.AutomationProperties.SetName(CmbEntropyFloor, L("ToolPwdGenEntropyFloor"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlockAdd, L("ToolPwdGenBlocksAdd"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlockRemove, L("ToolPwdGenBlocksRemove"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlocksAllUpper, L("ToolPwdGenBlocksAllUpper"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlocksAllLower, L("ToolPwdGenBlocksAllLower"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlocksAllTitle, L("ToolPwdGenBlocksAllTitle"));
         System.Windows.Automation.AutomationProperties.SetName(CmbLeetCase, L("ToolPwdGenCase"));
         System.Windows.Automation.AutomationProperties.SetName(CmbLeetPlacement, L("ToolPwdGenPlacement"));
         System.Windows.Automation.AutomationProperties.SetName(TxtLeetWord, L("ToolPwdGenLeetWord"));
@@ -334,6 +345,12 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.Length), StringComparison.Ordinal))
         {
             UpdateQuickLengthHighlight();
+        }
+        else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.CaseBlocks), StringComparison.Ordinal))
+        {
+            // The pattern also changes without a click here: the syllable slider resizes it
+            // while it is synced, and a preset brings its own.
+            RebuildCaseBlockButtons();
         }
         else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.StrengthLevel), StringComparison.Ordinal))
         {
@@ -578,6 +595,82 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         if (string.IsNullOrEmpty(name)) return;
 
         _vm.SavePreset(name);
+    }
+
+    private void OnCaseBlockAdd(object sender, RoutedEventArgs e)
+    {
+        _vm.AddCaseBlock();
+        RebuildCaseBlockButtons();
+    }
+
+    private void OnCaseBlockRemove(object sender, RoutedEventArgs e)
+    {
+        _vm.RemoveCaseBlock();
+        RebuildCaseBlockButtons();
+    }
+
+    private void OnCaseBlocksRandom(object sender, RoutedEventArgs e)
+    {
+        _vm.RandomizeCaseBlocks();
+        RebuildCaseBlockButtons();
+    }
+
+    private void OnCaseBlocksAllUpper(object sender, RoutedEventArgs e) => SetAllCaseBlocks('U');
+
+    private void OnCaseBlocksAllLower(object sender, RoutedEventArgs e) => SetAllCaseBlocks('l');
+
+    private void OnCaseBlocksAllTitle(object sender, RoutedEventArgs e) => SetAllCaseBlocks('T');
+
+    private void SetAllCaseBlocks(char token)
+    {
+        _vm.SetAllCaseBlocks(token);
+        RebuildCaseBlockButtons();
+    }
+
+    private void OnCaseBlockClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: int index })
+        {
+            _vm.CycleCaseBlock(index);
+            RebuildCaseBlockButtons();
+        }
+    }
+
+    /// <summary>
+    /// Rebuilds one button per block. Each one shows its own token and cycles to the next when
+    /// clicked, so the pattern is edited where it is read rather than typed into a box.
+    /// </summary>
+    private void RebuildCaseBlockButtons()
+    {
+        if (!_viewInitialized)
+        {
+            return;
+        }
+
+        CaseBlocksPanel.Children.Clear();
+
+        string pattern = _vm.CaseBlocks;
+        for (int index = 0; index < pattern.Length; index++)
+        {
+            var button = new Button
+            {
+                Content = pattern[index].ToString(),
+                Tag = index,
+                MinWidth = 34,
+                Style = (Style)FindResource("SecondaryButtonStyle"),
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                Margin = new Thickness(0, 0, 6, 4),
+                Padding = (Thickness)FindResource("PaddingButtonPreset"),
+                FontSize = (double)FindResource("FontSizeBodyLarge")
+            };
+
+            System.Windows.Automation.AutomationProperties.SetName(
+                button,
+                string.Format(L("ToolPwdGenBlockButtonName"), index + 1, pattern[index]));
+            button.ToolTip = L("ToolPwdGenBlocksHint");
+            button.Click += OnCaseBlockClick;
+            CaseBlocksPanel.Children.Add(button);
+        }
     }
 
     private void RebuildCustomPresetButtons()

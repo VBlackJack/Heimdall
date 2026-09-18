@@ -411,6 +411,8 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             source.LeetPlacementIndex = 2;
             source.LeetCaseIndex = 5;
             source.EntropyFloorIndex = 2;
+            source.CaseBlocks = "UUlT";
+            source.CaseBlocksAutoSync = false;
         }
         finally
         {
@@ -454,6 +456,8 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(source.LeetPlacementIndex, target.LeetPlacementIndex);
         Assert.Equal(source.LeetCaseIndex, target.LeetCaseIndex);
         Assert.Equal(source.EntropyFloorIndex, target.EntropyFloorIndex);
+        Assert.Equal(source.CaseBlocks, target.CaseBlocks);
+        Assert.Equal(source.CaseBlocksAutoSync, target.CaseBlocksAutoSync);
     }
 
     [Fact]
@@ -1131,6 +1135,243 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.NotEmpty(sut.FloorNoticeText);
         Assert.Equal(sut.EffectiveLength, sut.GeneratedPassword.Length);
         Assert.All(sut.GeneratedPassword, character => Assert.True(char.IsDigit(character)));
+    }
+
+    /// <summary>
+    /// A block covers a whole syllable, and the pattern repeats when there are more syllables than
+    /// blocks.
+    /// </summary>
+    /// <remarks>
+    /// Closed syllables are off and the length is fixed, so the password is six open syllables of
+    /// two letters: the pattern "UlT" lands on syllables 1, 2, 3 and again on 4, 5, 6.
+    /// </remarks>
+    [Fact]
+    public void CaseBlocks_CaseOneSyllableEach_AndRepeatWhenTheyRunOut()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 12;
+            sut.SyllableCvc = false;
+            sut.SyllableDigits = 0;
+            sut.SyllableSpecials = 0;
+            sut.SyllableSeparator = "-";
+            sut.CaseBlocksAutoSync = false;
+            sut.CaseBlocks = "UlT";
+            sut.SyllableCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        var syllables = sut.GeneratedPassword.Split('-', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(6, syllables.Length);
+        for (var index = 0; index < syllables.Length; index++)
+        {
+            var syllable = syllables[index];
+            switch ("UlT"[index % 3])
+            {
+                case 'U':
+                    Assert.Equal(syllable.ToUpperInvariant(), syllable);
+                    break;
+                case 'l':
+                    Assert.Equal(syllable.ToLowerInvariant(), syllable);
+                    break;
+                default:
+                    Assert.True(char.IsUpper(syllable[0]), $"'{syllable}' does not start in title case");
+                    Assert.Equal(syllable[1..].ToLowerInvariant(), syllable[1..]);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// In a leet password a block covers one letter, and a letter the substitution turned into a
+    /// digit consumes no block: the pattern stays on the letters it can case.
+    /// </summary>
+    [Fact]
+    public void CaseBlocks_CaseOneLetterEachInALeetPassword()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 3;
+            sut.LeetRandomWord = false;
+            sut.LeetBaseWord = "rhythm";
+            sut.LeetFullSubstitution = true;
+            sut.LeetDigits = 0;
+            sut.LeetSpecials = 0;
+            sut.CaseBlocksAutoSync = false;
+            sut.CaseBlocks = "Ul";
+            sut.LeetCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        // Only the t of "rhythm" is in the substitution table, and it keeps its place. The
+        // letters the pattern reaches are r h y h m, alternating upper and lower from the
+        // first one, and the 7 between them consumes no block.
+        Assert.Equal("RhY7hM", sut.GeneratedPassword);
+    }
+
+    /// <summary>
+    /// A pattern is chosen rather than drawn, so it is worth nothing and the figure says the same
+    /// for every pattern. Mixed case is the only case mode that is paid for.
+    /// </summary>
+    [Fact]
+    public void CaseBlocks_AreWorthNoEntropy()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 16;
+            sut.SyllableCvc = false;
+            sut.SyllableDigits = 0;
+            sut.SyllableSpecials = 0;
+            sut.CaseBlocksAutoSync = false;
+            sut.CaseBlocks = "l";
+            sut.SyllableCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        var allLower = sut.LastEntropyBits;
+
+        sut.CaseBlocks = "UlTUlTUl";
+        var mixedPattern = sut.LastEntropyBits;
+
+        sut.SyllableCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Lower;
+        var plainLowercase = sut.LastEntropyBits;
+
+        sut.SyllableCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Mixed;
+        var randomCase = sut.LastEntropyBits;
+
+        Assert.Equal(allLower, mixedPattern);
+        Assert.Equal(plainLowercase, mixedPattern);
+        Assert.True(randomCase > mixedPattern, "mixed case is drawn, so it is worth more than a pattern");
+    }
+
+    /// <summary>
+    /// The editor's operations: a block cycles through the three tokens, the pattern grows and
+    /// shrinks between one and ten blocks, and setting them all writes one token everywhere.
+    /// </summary>
+    [Fact]
+    public void CaseBlocks_EditorOperationsStayWithinTheirBounds()
+    {
+        var sut = CreateInitializedVm();
+        sut.CaseBlocksAutoSync = false;
+        sut.CaseBlocks = "Tl";
+
+        sut.CycleCaseBlock(0);
+        Assert.Equal("Ul", sut.CaseBlocks);
+        sut.CycleCaseBlock(0);
+        Assert.Equal("ll", sut.CaseBlocks);
+        sut.CycleCaseBlock(0);
+        Assert.Equal("Tl", sut.CaseBlocks);
+
+        sut.CycleCaseBlock(-1);
+        sut.CycleCaseBlock(9);
+        Assert.Equal("Tl", sut.CaseBlocks);
+
+        for (var added = 0; added < 20; added++)
+        {
+            sut.AddCaseBlock();
+        }
+
+        Assert.Equal(PasswordGeneratorViewModel.MaximumCaseBlocks, sut.CaseBlocks.Length);
+
+        for (var removed = 0; removed < 20; removed++)
+        {
+            sut.RemoveCaseBlock();
+        }
+
+        Assert.Equal(PasswordGeneratorViewModel.MinimumCaseBlocks, sut.CaseBlocks.Length);
+
+        sut.AddCaseBlock();
+        sut.SetAllCaseBlocks('U');
+        Assert.Equal("UU", sut.CaseBlocks);
+
+        sut.SetAllCaseBlocks('x');
+        Assert.Equal("UU", sut.CaseBlocks);
+
+        sut.RandomizeCaseBlocks();
+        Assert.Equal(2, sut.CaseBlocks.Length);
+        Assert.All(sut.CaseBlocks, token => Assert.Contains(token, PasswordGeneratorViewModel.CaseBlockTokens));
+    }
+
+    /// <summary>
+    /// While the pattern is synced, it holds one block per syllable, so a pattern read left to
+    /// right lines up with the syllables read left to right. Editing a block by hand ends the sync,
+    /// because the operator has said what they want.
+    /// </summary>
+    [Fact]
+    public void CaseBlocks_SyncedPatternFollowsTheSyllableCount()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
+            sut.CaseBlocksAutoSync = true;
+            sut.SyllableLength = 12;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(6, sut.CaseBlocks.Length);
+
+        sut.SyllableLength = 8;
+        Assert.Equal(4, sut.CaseBlocks.Length);
+
+        // The slider reaches 32, which is sixteen syllables, and the editor shows ten blocks.
+        sut.SyllableLength = 32;
+        Assert.Equal(PasswordGeneratorViewModel.MaximumCaseBlocks, sut.CaseBlocks.Length);
+
+        // At the cap there is nothing to add, so nothing is edited and the sync stands.
+        sut.AddCaseBlock();
+        Assert.True(sut.CaseBlocksAutoSync);
+
+        sut.SyllableLength = 12;
+        Assert.Equal(6, sut.CaseBlocks.Length);
+
+        sut.AddCaseBlock();
+        Assert.False(sut.CaseBlocksAutoSync);
+
+        var afterHand = sut.CaseBlocks;
+        sut.SyllableLength = 10;
+        Assert.Equal(afterHand, sut.CaseBlocks);
+    }
+
+    /// <summary>
+    /// A pattern read off disk is held to what the editor can produce.
+    /// </summary>
+    [Theory]
+    [InlineData(null, "Tl")]
+    [InlineData("", "Tl")]
+    [InlineData("xyz", "Tl")]
+    [InlineData("U l T", "UlT")]
+    [InlineData("UUUUUUUUUUUUUUU", "UUUUUUUUUU")]
+    public void CaseBlocks_ReadFromAPresetAreHeldToWhatTheEditorCanProduce(string? stored, string expected)
+    {
+        Assert.Equal(expected, PasswordGeneratorViewModel.SanitizeCaseBlocks(stored));
     }
 
     private PasswordGeneratorViewModel CreateInitializedVm()
