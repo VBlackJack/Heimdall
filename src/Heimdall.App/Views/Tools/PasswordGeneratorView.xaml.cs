@@ -15,8 +15,10 @@
  */
 
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -34,6 +36,12 @@ namespace Heimdall.App.Views.Tools;
 public partial class PasswordGeneratorView : UserControl, IToolView
 {
     private const int ClipboardClearDelaySeconds = 30;
+
+    /// <summary>The width of a placement cursor, which the track has to leave room for.</summary>
+    private const double PlacementCursorWidth = 14;
+
+    /// <summary>How far one arrow key or one wheel notch moves a cursor.</summary>
+    private const double PlacementKeyStepPercent = 2;
 
     private LocalizationManager? _localizer;
     private readonly PasswordGeneratorViewModel _vm;
@@ -80,6 +88,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         }
         _viewInitialized = true;
         RebuildCaseBlockButtons();
+        RebuildPlacementCursors();
         RebuildCustomPresetButtons();
         UpdateModeDescription();
         UpdateSyllableUiHints();
@@ -121,6 +130,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         CmbSylPlacement.Items.Add(L("ToolPwdGenPlacementStart"));
         CmbSylPlacement.Items.Add(L("ToolPwdGenPlacementEnd"));
         CmbSylPlacement.Items.Add(L("ToolPwdGenPlacementMiddle"));
+        CmbSylPlacement.Items.Add(L("ToolPwdGenPlacementPositions"));
         CmbSylPlacement.SelectedIndex = 0;
 
         // Passphrase placement
@@ -129,6 +139,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         CmbPpPlacement.Items.Add(L("ToolPwdGenPlacementStart"));
         CmbPpPlacement.Items.Add(L("ToolPwdGenPlacementEnd"));
         CmbPpPlacement.Items.Add(L("ToolPwdGenPlacementMiddle"));
+        CmbPpPlacement.Items.Add(L("ToolPwdGenPlacementPositions"));
         CmbPpPlacement.SelectedIndex = 0;
 
         TxtCustomSpecials.Text = PasswordGeneratorViewModel.DefaultSymbolChars;
@@ -251,6 +262,11 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         LeetWordSourceLabel.Text = L("ToolPwdGenLeetWordSource");
         EntropyFloorLabel.Text = L("ToolPwdGenEntropyFloor");
         CaseBlocksLabel.Text = L("ToolPwdGenBlocks");
+        PlacementBarLabel.Text = L("ToolPwdGenPlacementBar");
+        PlacementBarHint.Text = L("ToolPwdGenPlacementBarHint");
+        PlacementDigitsLabel.Text = L("ToolPwdGenDigits");
+        PlacementSpecialsLabel.Text = L("ToolPwdGenSymbols");
+        BtnPlacementDistribute.Content = L("ToolPwdGenPlacementDistribute");
         CaseBlocksHint.Text = L("ToolPwdGenBlocksHint");
         BtnCaseBlocksRandom.Content = L("ToolPwdGenBlocksRandom");
         ChkCaseBlocksAutoSync.Content = L("ToolPwdGenBlocksAutoSync");
@@ -348,9 +364,14 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         }
         else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.CaseBlocks), StringComparison.Ordinal))
         {
-            // The pattern also changes without a click here: the syllable slider resizes it
-            // while it is synced, and a preset brings its own.
             RebuildCaseBlockButtons();
+        }
+        else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.DigitPositions), StringComparison.Ordinal)
+            || string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.SpecialPositions), StringComparison.Ordinal))
+        {
+            // The lists also change without a drag: a slider adds a character, and the strength
+            // floor buys one of its own.
+            RebuildPlacementCursors();
         }
         else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.StrengthLevel), StringComparison.Ordinal))
         {
@@ -672,6 +693,205 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             CaseBlocksPanel.Children.Add(button);
         }
     }
+
+    private void OnPlacementDistribute(object sender, RoutedEventArgs e)
+    {
+        _vm.DistributePositionsEvenly();
+        RebuildPlacementCursors();
+    }
+
+    /// <summary>
+    /// Rebuilds one cursor per character on each of the two tracks. A cursor is a thumb the
+    /// operator drags; it also takes the arrow keys once focused and the wheel while hovered, so
+    /// the bar is not a mouse-only control.
+    /// </summary>
+    private void RebuildPlacementCursors()
+    {
+        if (!_viewInitialized)
+        {
+            return;
+        }
+
+        BuildCursors(PlacementDigitsTrack, digits: true, _vm.DigitPositions);
+        BuildCursors(PlacementSpecialsTrack, digits: false, _vm.SpecialPositions);
+
+        PlacementDigitsRow.Visibility = _vm.CurrentDigitCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+        PlacementSpecialsRow.Visibility = _vm.CurrentSpecialCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Rebuilds a track only when the number of cursors on it changed, and otherwise moves the
+    /// ones already there.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilding on every move destroyed the thumb that had the focus, so a second arrow key
+    /// went nowhere and the bar worked once per click for anyone driving it from the keyboard.
+    /// </remarks>
+    private void BuildCursors(Canvas track, bool digits, string positions)
+    {
+        double[] percents = PasswordGeneratorViewModel.ParsePositions(positions);
+
+        if (track.Children.Count == percents.Length)
+        {
+            for (int index = 0; index < percents.Length; index++)
+            {
+                if (track.Children[index] is Thumb existing)
+                {
+                    DescribeCursor(existing, index, percents[index]);
+                    PositionCursor(track, existing, percents[index]);
+                }
+            }
+
+            return;
+        }
+
+        track.Children.Clear();
+
+        for (int index = 0; index < percents.Length; index++)
+        {
+            var cursor = new Thumb
+            {
+                Width = PlacementCursorWidth,
+                Height = 22,
+                Tag = new PlacementCursor(digits, index),
+                Style = (Style)FindResource("PlacementCursorStyle")
+            };
+
+            DescribeCursor(cursor, index, percents[index]);
+            cursor.DragDelta += OnPlacementCursorDrag;
+            cursor.KeyDown += OnPlacementCursorKey;
+            cursor.MouseWheel += OnPlacementCursorWheel;
+
+            // A Thumb captures the mouse without taking the focus, so a cursor that had just
+            // been dragged ignored the arrow keys: the bar read as mouse-only to anyone who
+            // tried the keyboard after touching it.
+            cursor.PreviewMouseLeftButtonDown += OnPlacementCursorPressed;
+            Canvas.SetTop(cursor, 3);
+            track.Children.Add(cursor);
+            PositionCursor(track, cursor, percents[index]);
+        }
+
+        track.SizeChanged -= OnPlacementTrackResized;
+        track.SizeChanged += OnPlacementTrackResized;
+    }
+
+    /// <summary>Names a cursor after where it sits, for the tooltip and for assistive technology.</summary>
+    private void DescribeCursor(Thumb cursor, int index, double percent)
+    {
+        string description = string.Format(
+            CultureInfo.CurrentCulture,
+            L("ToolPwdGenPlacementCursorName"),
+            index + 1,
+            percent);
+
+        cursor.ToolTip = description;
+        System.Windows.Automation.AutomationProperties.SetName(cursor, description);
+    }
+
+    private void OnPlacementTrackResized(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is not Canvas track)
+        {
+            return;
+        }
+
+        foreach (Thumb cursor in track.Children.OfType<Thumb>())
+        {
+            if (cursor.Tag is PlacementCursor slot)
+            {
+                double[] percents = PasswordGeneratorViewModel.ParsePositions(
+                    slot.Digits ? _vm.DigitPositions : _vm.SpecialPositions);
+                if (slot.Index < percents.Length)
+                {
+                    PositionCursor(track, cursor, percents[slot.Index]);
+                }
+            }
+        }
+    }
+
+    private static void PositionCursor(Canvas track, Thumb cursor, double percent)
+    {
+        double usable = Math.Max(0, track.ActualWidth - PlacementCursorWidth);
+        Canvas.SetLeft(cursor, usable * percent / 100.0);
+    }
+
+    private static void OnPlacementCursorPressed(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Thumb cursor)
+        {
+            cursor.Focus();
+        }
+    }
+
+    private void OnPlacementCursorDrag(object sender, DragDeltaEventArgs e)
+    {
+        if (sender is not Thumb { Tag: PlacementCursor slot } cursor
+            || cursor.Parent is not Canvas track)
+        {
+            return;
+        }
+
+        double usable = Math.Max(1, track.ActualWidth - PlacementCursorWidth);
+        double moved = Canvas.GetLeft(cursor) + e.HorizontalChange;
+        MovePlacementCursor(slot, moved / usable * 100.0);
+    }
+
+    private void OnPlacementCursorKey(object sender, KeyEventArgs e)
+    {
+        if (sender is not Thumb { Tag: PlacementCursor slot })
+        {
+            return;
+        }
+
+        double step = e.Key switch
+        {
+            Key.Left or Key.Down => -PlacementKeyStepPercent,
+            Key.Right or Key.Up => PlacementKeyStepPercent,
+            Key.Home => -100,
+            Key.End => 100,
+            _ => 0
+        };
+
+        if (step == 0)
+        {
+            return;
+        }
+
+        double[] percents = PasswordGeneratorViewModel.ParsePositions(
+            slot.Digits ? _vm.DigitPositions : _vm.SpecialPositions);
+        if (slot.Index < percents.Length)
+        {
+            MovePlacementCursor(slot, percents[slot.Index] + step);
+            e.Handled = true;
+        }
+    }
+
+    private void OnPlacementCursorWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is not Thumb { Tag: PlacementCursor slot })
+        {
+            return;
+        }
+
+        double[] percents = PasswordGeneratorViewModel.ParsePositions(
+            slot.Digits ? _vm.DigitPositions : _vm.SpecialPositions);
+        if (slot.Index < percents.Length)
+        {
+            MovePlacementCursor(
+                slot,
+                percents[slot.Index] + (e.Delta > 0 ? PlacementKeyStepPercent : -PlacementKeyStepPercent));
+            e.Handled = true;
+        }
+    }
+
+    private void MovePlacementCursor(PlacementCursor slot, double percent)
+    {
+        _vm.MovePosition(slot.Digits, slot.Index, percent);
+        RebuildPlacementCursors();
+    }
+
+    /// <summary>Which track a cursor belongs to, and which character on it.</summary>
+    private readonly record struct PlacementCursor(bool Digits, int Index);
 
     private void RebuildCustomPresetButtons()
     {

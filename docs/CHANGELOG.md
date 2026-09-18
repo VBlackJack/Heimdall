@@ -14,6 +14,25 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Placing the digits and the special characters by hand
+
+- The placement box of the syllable, passphrase and leet modes offers a fifth entry, By
+  position. It opens a bar with one cursor per character the mode inserts: one row for the
+  digits, one for the specials. Each cursor sits where its character will go, as a percentage
+  of the password, and drags along the bar.
+- A cursor also takes the keyboard once it has focus, with the arrows moving it two percent at
+  a time and Home and End sending it to either end, and the wheel while the pointer is over it.
+  A button spreads every cursor out again, each one in the middle of its own share of the bar.
+- The bar always carries one cursor per character, however that count changed: a slider, a
+  preset, or the minimum strength buying a digit of its own. New cursors are spread evenly and
+  the ones already placed stay where they were put.
+- The digits go in first and the specials are then placed on the password the digits are
+  already in, which is what a bar showing one row above the other reads as. Within one row the
+  positions are all measured against the same length, so two cursors left at the same percent
+  stay next to each other.
+- The positions are saved with a preset, and a list read back from a file is held to the bar:
+  numbers only, inside its two ends.
+
 ### A case pattern, block by block
 
 - The case box of the syllable and leet modes offers a ninth entry, Pattern. It opens an

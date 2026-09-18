@@ -413,6 +413,8 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             source.EntropyFloorIndex = 2;
             source.CaseBlocks = "UUlT";
             source.CaseBlocksAutoSync = false;
+            source.DigitPositions = "10,90";
+            source.SpecialPositions = "40";
         }
         finally
         {
@@ -458,6 +460,8 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(source.EntropyFloorIndex, target.EntropyFloorIndex);
         Assert.Equal(source.CaseBlocks, target.CaseBlocks);
         Assert.Equal(source.CaseBlocksAutoSync, target.CaseBlocksAutoSync);
+        Assert.Equal(source.DigitPositions, target.DigitPositions);
+        Assert.Equal(source.SpecialPositions, target.SpecialPositions);
     }
 
     [Fact]
@@ -1372,6 +1376,241 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     public void CaseBlocks_ReadFromAPresetAreHeldToWhatTheEditorCanProduce(string? stored, string expected)
     {
         Assert.Equal(expected, PasswordGeneratorViewModel.SanitizeCaseBlocks(stored));
+    }
+
+    /// <summary>
+    /// A digit set to nought percent opens the password and one set to a hundred closes it.
+    /// </summary>
+    /// <remarks>
+    /// The syllable password itself is all letters, so where the digits landed can be read off the
+    /// result without knowing what they are.
+    /// </remarks>
+    [Fact]
+    public void Positions_PutEachDigitWhereItsCursorIs()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 12;
+            sut.SyllableCvc = false;
+            sut.SyllableCaseIndex = 1;
+            sut.SyllableSeparator = string.Empty;
+            sut.SyllableDigits = 2;
+            sut.SyllableSpecials = 0;
+            sut.SyllablePlacementIndex = (int)PasswordGeneratorViewModel.Placement.Positions;
+            sut.DigitPositions = "0,100";
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        var password = sut.GeneratedPassword;
+
+        Assert.Equal(14, password.Length);
+        Assert.True(char.IsDigit(password[0]), $"'{password}' does not open on a digit");
+        Assert.True(char.IsDigit(password[^1]), $"'{password}' does not close on a digit");
+        Assert.All(password[1..^1], character => Assert.True(char.IsLetter(character)));
+    }
+
+    /// <summary>
+    /// A cursor in the middle of the bar puts its character in the middle of the password.
+    /// </summary>
+    [Fact]
+    public void Positions_PutADigitInTheMiddleWhenItsCursorIsInTheMiddle()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 10;
+            sut.SyllableCvc = false;
+            sut.SyllableCaseIndex = 1;
+            sut.SyllableSeparator = string.Empty;
+            sut.SyllableDigits = 1;
+            sut.SyllableSpecials = 0;
+            sut.SyllablePlacementIndex = (int)PasswordGeneratorViewModel.Placement.Positions;
+            sut.DigitPositions = "50";
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        var password = sut.GeneratedPassword;
+
+        Assert.Equal(11, password.Length);
+        Assert.True(char.IsDigit(password[5]), $"'{password}' has no digit in the middle");
+    }
+
+    /// <summary>
+    /// Digits and specials are placed from their own rows of the bar, and the specials are placed
+    /// on the password the digits have already been written into.
+    /// </summary>
+    [Fact]
+    public void Positions_PlaceSpecialsOnTheStringTheDigitsAreAlreadyIn()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 8;
+            sut.SyllableCvc = false;
+            sut.SyllableCaseIndex = 1;
+            sut.SyllableSeparator = string.Empty;
+            sut.SyllableDigits = 1;
+            sut.SyllableSpecials = 1;
+            sut.CustomSpecials = "!";
+            sut.SyllablePlacementIndex = (int)PasswordGeneratorViewModel.Placement.Positions;
+            sut.DigitPositions = "0";
+            sut.SpecialPositions = "100";
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        var password = sut.GeneratedPassword;
+
+        Assert.Equal(10, password.Length);
+        Assert.True(char.IsDigit(password[0]), $"'{password}' does not open on a digit");
+        Assert.Equal('!', password[^1]);
+    }
+
+    /// <summary>
+    /// The bar always carries one cursor per character the mode inserts, however the count changed:
+    /// a slider, a preset, or the strength floor buying a digit of its own.
+    /// </summary>
+    [Fact]
+    public void Positions_KeepOneCursorPerCharacterTheModeInserts()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableDigits = 3;
+            sut.SyllableSpecials = 2;
+            sut.SyllablePlacementIndex = (int)PasswordGeneratorViewModel.Placement.Positions;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(3, PasswordGeneratorViewModel.ParsePositions(sut.DigitPositions).Length);
+        Assert.Equal(2, PasswordGeneratorViewModel.ParsePositions(sut.SpecialPositions).Length);
+
+        sut.SyllableDigits = 6;
+        Assert.Equal(6, PasswordGeneratorViewModel.ParsePositions(sut.DigitPositions).Length);
+
+        sut.SyllableSpecials = 0;
+        Assert.Empty(PasswordGeneratorViewModel.ParsePositions(sut.SpecialPositions));
+    }
+
+    /// <summary>
+    /// Moving one cursor leaves the others where they were, and a cursor cannot be pushed off
+    /// either end of the bar.
+    /// </summary>
+    [Fact]
+    public void Positions_MoveOneCursorAndClampItToTheBar()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableDigits = 3;
+            sut.SyllableSpecials = 0;
+            sut.SyllablePlacementIndex = (int)PasswordGeneratorViewModel.Placement.Positions;
+            sut.DigitPositions = "10,50,90";
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.MovePosition(digit: true, index: 1, percent: 73.25);
+        Assert.Equal([10, 73.3, 90], PasswordGeneratorViewModel.ParsePositions(sut.DigitPositions));
+
+        sut.MovePosition(digit: true, index: 0, percent: -40);
+        Assert.Equal([0, 73.3, 90], PasswordGeneratorViewModel.ParsePositions(sut.DigitPositions));
+
+        sut.MovePosition(digit: true, index: 2, percent: 250);
+        Assert.Equal([0, 73.3, 100], PasswordGeneratorViewModel.ParsePositions(sut.DigitPositions));
+
+        sut.MovePosition(digit: true, index: 7, percent: 50);
+        Assert.Equal([0, 73.3, 100], PasswordGeneratorViewModel.ParsePositions(sut.DigitPositions));
+    }
+
+    /// <summary>
+    /// Spreading puts each cursor in the middle of its own share of the bar, so one character sits
+    /// at the centre rather than pinned to an end nobody chose.
+    /// </summary>
+    [Theory]
+    [InlineData(1, new double[] { 50 })]
+    [InlineData(2, new double[] { 25, 75 })]
+    [InlineData(4, new double[] { 12.5, 37.5, 62.5, 87.5 })]
+    public void Positions_SpreadEvenlyAroundTheMiddleOfEachShare(int count, double[] expected)
+    {
+        Assert.Equal(expected, PasswordGeneratorViewModel.DistributeEvenly(count));
+    }
+
+    /// <summary>
+    /// A position list read off disk is held to the bar: numbers only, inside its two ends.
+    /// </summary>
+    [Theory]
+    [InlineData(null, new double[0])]
+    [InlineData("", new double[0])]
+    [InlineData("nonsense", new double[0])]
+    [InlineData(" 10 , 20 ", new double[] { 10, 20 })]
+    [InlineData("-5,250", new double[] { 0, 100 })]
+    [InlineData("33.333", new double[] { 33.3 })]
+    public void Positions_ReadFromAPresetAreHeldToTheBar(string? stored, double[] expected)
+    {
+        Assert.Equal(expected, PasswordGeneratorViewModel.ParsePositions(stored));
+    }
+
+    /// <summary>
+    /// The bar is only offered where there is something to place.
+    /// </summary>
+    [Fact]
+    public void Positions_BarIsShownOnlyWhenTheModePlacesSomethingByPosition()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableDigits = 2;
+            sut.SyllableSpecials = 0;
+            sut.SyllablePlacementIndex = (int)PasswordGeneratorViewModel.Placement.Random;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.False(sut.ShowPlacementBar);
+
+        sut.SyllablePlacementIndex = (int)PasswordGeneratorViewModel.Placement.Positions;
+        Assert.True(sut.ShowPlacementBar);
+
+        sut.SyllableDigits = 0;
+        Assert.False(sut.ShowPlacementBar);
+
+        sut.SelectedModeIndex = 0;
+        Assert.False(sut.ShowPlacementBar);
     }
 
     private PasswordGeneratorViewModel CreateInitializedVm()
