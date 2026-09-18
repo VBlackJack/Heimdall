@@ -14,6 +14,20 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The generator uses the width it has
+
+- The panel put 42 to 46 controls in a single column down the left, and in the syllable and
+  leet modes it ran past the bottom of the window while a third of the width sat empty.
+- What the tool can tell you about the password it produced - the syllables it was built from,
+  how it reads aloud, the others in the batch, the ones before it - moves into a second column
+  beside the generator. Both modes now fit without scrolling.
+- The second column is not a tab and nothing moved behind one. A setting or a reading that is
+  in effect but out of sight is how a generator ends up lying to the person using it, which is
+  the thing the last three changes were all about.
+- Under 980 pixels of panel the second column goes back under the generator, because a tool can
+  be opened into a split pane a third of the screen wide. It is the panel's own width that
+  decides, not the window's.
+
 ### A ticked box is now a promise
 
 - Ticking `Digits (0-9)` put digits in the bag the password was drawn from. It did not put one in
