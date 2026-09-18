@@ -63,6 +63,16 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         public bool PpCapitalize { get; set; } = true;
         public bool PpDigit { get; set; } = true;
         public bool PpSpecial { get; set; } = true;
+
+        /// <summary>
+        /// Counts, written since the passphrase stopped being limited to one of each. A file
+        /// written before that carries neither, so they start below zero and
+        /// <see cref="ApplyPreset"/> falls back to the two flags above. Both are still
+        /// written, so a preset saved here still says something to an older build.
+        /// </summary>
+        public int PpDigits { get; set; } = -1;
+        public int PpSpecials { get; set; } = -1;
+        public int PpCase { get; set; } = -1;
         public int PpPlacement { get; set; }
         public string LeetBaseWord { get; set; } = string.Empty;
         public bool LeetRandomWord { get; set; } = true;
@@ -422,9 +432,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     [ObservableProperty] private int _passphraseWordCount = 4;
     [ObservableProperty] private string _passphraseSeparator = DefaultPassphraseSeparator;
     [ObservableProperty] private int _passphraseLanguageIndex;
-    [ObservableProperty] private bool _passphraseCapitalize = true;
-    [ObservableProperty] private bool _passphraseAddDigit = true;
-    [ObservableProperty] private bool _passphraseAddSpecial = true;
+    [ObservableProperty] private int _passphraseCaseIndex = (int)SyllableCase.WordCase;
+    [ObservableProperty] private int _passphraseDigits = 1;
+    [ObservableProperty] private int _passphraseSpecials = 1;
     [ObservableProperty] private int _passphrasePlacementIndex;
 
     [ObservableProperty] private string _leetBaseWord = string.Empty;
@@ -497,7 +507,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     public bool ShowSyllableStructure => IsSyllableMode && !string.IsNullOrEmpty(SyllableStructureText);
     public bool ShowStrength => !string.IsNullOrEmpty(GeneratedPassword);
     public bool ShowSyllablePlacement => IsSyllableMode && (SyllableDigits > 0 || SyllableSpecials > 0);
-    public bool ShowPassphrasePlacement => IsPassphraseMode && (PassphraseAddDigit || PassphraseAddSpecial);
+    public bool ShowPassphrasePlacement =>
+        IsPassphraseMode && (PassphraseDigits > 0 || PassphraseSpecials > 0);
     public bool ShowLeetPlacement =>
         IsLeetMode && (EffectiveLeetDigits > 0 || EffectiveLeetSpecials > 0);
     public bool ShowLeetBaseWord => IsLeetMode && !LeetRandomWord;
@@ -508,6 +519,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     internal SyllableCase? CurrentCaseMode => CurrentMode switch
     {
         GeneratorMode.Syllable => CaseModeAt(SyllableCaseIndex),
+        GeneratorMode.Passphrase => CaseModeAt(PassphraseCaseIndex),
         GeneratorMode.Leet => CaseModeAt(LeetCaseIndex),
         _ => null
     };
@@ -530,7 +542,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     internal int CurrentDigitCount => CurrentMode switch
     {
         GeneratorMode.Syllable => SyllableDigits,
-        GeneratorMode.Passphrase => PassphraseAddDigit ? 1 : 0,
+        GeneratorMode.Passphrase => PassphraseDigits,
         GeneratorMode.Leet => EffectiveLeetDigits,
         _ => 0
     };
@@ -539,7 +551,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     internal int CurrentSpecialCount => GetEffectiveSymbols().Length == 0 ? 0 : CurrentMode switch
     {
         GeneratorMode.Syllable => SyllableSpecials,
-        GeneratorMode.Passphrase => PassphraseAddSpecial ? 1 : 0,
+        GeneratorMode.Passphrase => PassphraseSpecials,
         GeneratorMode.Leet => EffectiveLeetSpecials,
         _ => 0
     };
@@ -552,7 +564,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// of units is known before the password is built. A leet password has as many units as the
     /// drawn word has letters, which is not known until it is drawn.
     /// </summary>
-    public bool ShowCaseBlocksAutoSync => ShowCaseBlocks && IsSyllableMode;
+    public bool ShowCaseBlocksAutoSync =>
+        ShowCaseBlocks && (IsSyllableMode || IsPassphraseMode);
 
     internal static SyllableCase CaseModeAt(int index) =>
         (SyllableCase)Math.Clamp(index, 0, (int)SyllableCase.Blocks);
@@ -583,7 +596,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     {
         GeneratorMode.Random => IncludeSymbols,
         GeneratorMode.Syllable => SyllableSpecials > 0,
-        GeneratorMode.Passphrase => PassphraseAddSpecial,
+        GeneratorMode.Passphrase => PassphraseSpecials > 0,
         GeneratorMode.Leet => EffectiveLeetSpecials > 0,
         _ => false
     };
@@ -649,9 +662,12 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         PpWordCount = PassphraseWordCount,
         PpSeparator = PassphraseSeparator,
         PpLanguage = PassphraseLanguageIndex,
-        PpCapitalize = PassphraseCapitalize,
-        PpDigit = PassphraseAddDigit,
-        PpSpecial = PassphraseAddSpecial,
+        PpCapitalize = CaseModeAt(PassphraseCaseIndex) == SyllableCase.WordCase,
+        PpDigit = PassphraseDigits > 0,
+        PpSpecial = PassphraseSpecials > 0,
+        PpDigits = PassphraseDigits,
+        PpSpecials = PassphraseSpecials,
+        PpCase = PassphraseCaseIndex,
         PpPlacement = PassphrasePlacementIndex,
         LeetBaseWord = LeetBaseWord,
         LeetRandomWord = LeetRandomWord,
@@ -695,9 +711,12 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             PassphraseWordCount = preset.PpWordCount;
             PassphraseSeparator = preset.PpSeparator;
             PassphraseLanguageIndex = preset.PpLanguage;
-            PassphraseCapitalize = preset.PpCapitalize;
-            PassphraseAddDigit = preset.PpDigit;
-            PassphraseAddSpecial = preset.PpSpecial;
+            // A preset written before the passphrase had counts carries the two flags only.
+            PassphraseDigits = preset.PpDigits >= 0 ? preset.PpDigits : (preset.PpDigit ? 1 : 0);
+            PassphraseSpecials = preset.PpSpecials >= 0 ? preset.PpSpecials : (preset.PpSpecial ? 1 : 0);
+            PassphraseCaseIndex = preset.PpCase >= 0
+                ? preset.PpCase
+                : (int)(preset.PpCapitalize ? SyllableCase.WordCase : SyllableCase.Lower);
             PassphrasePlacementIndex = preset.PpPlacement;
             LeetBaseWord = preset.LeetBaseWord;
             LeetRandomWord = preset.LeetRandomWord;
@@ -768,9 +787,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         {
             SelectedModeIndex = 2;
             PassphraseWordCount = wordCount;
-            PassphraseCapitalize = true;
-            PassphraseAddDigit = true;
-            PassphraseAddSpecial = true;
+            PassphraseCaseIndex = (int)SyllableCase.WordCase;
+            PassphraseDigits = 1;
+            PassphraseSpecials = 1;
             PassphraseSeparator = separator;
         }
         finally
@@ -1030,7 +1049,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         }
 
         return Math.Log2(wordList.Length) * wordCount
-            + ExtrasBits(PassphraseAddDigit ? 1 : 0, PassphraseAddSpecial ? 1 : 0);
+            + ExtrasBits(PassphraseDigits, PassphraseSpecials);
     }
 
     /// <summary>
@@ -1258,20 +1277,32 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Keeps the pattern as long as the password has syllables, so that a pattern read left to
-    /// right lines up with the syllables read left to right instead of wrapping half way.
+    /// Keeps the pattern as long as the password has units, so that a pattern read left to
+    /// right lines up with the password read left to right instead of wrapping half way. A
+    /// unit is a syllable in the syllable mode and a word in the passphrase; a leet password
+    /// has as many as the drawn word has letters, which is not known until it is drawn.
     /// </summary>
-    private void SyncCaseBlocksToSyllableCount()
+    private void SyncCaseBlocksToUnitCount()
     {
-        if (!CaseBlocksAutoSync || !IsSyllableMode || CurrentCaseMode != SyllableCase.Blocks)
+        if (!CaseBlocksAutoSync || CurrentCaseMode != SyllableCase.Blocks)
         {
             return;
         }
 
-        var wanted = Math.Clamp(
-            (int)Math.Ceiling(SyllableLength / (double)CharactersPerSyllableBlock),
-            MinimumCaseBlocks,
-            MaximumCaseBlocks);
+        var units = CurrentMode switch
+        {
+            GeneratorMode.Syllable =>
+                (int)Math.Ceiling(SyllableLength / (double)CharactersPerSyllableBlock),
+            GeneratorMode.Passphrase => PassphraseWordCount,
+            _ => 0
+        };
+
+        if (units <= 0)
+        {
+            return;
+        }
+
+        var wanted = Math.Clamp(units, MinimumCaseBlocks, MaximumCaseBlocks);
 
         if (wanted == CaseBlocks.Length)
         {
@@ -1341,14 +1372,14 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnCustomSpecialsChanged(string value) => RegenerateIfReady();
     partial void OnSyllableLengthChanged(int value)
     {
-        SyncCaseBlocksToSyllableCount();
+        SyncCaseBlocksToUnitCount();
         RegenerateIfReady();
     }
     partial void OnSyllableCaseIndexChanged(int value)
     {
         OnPropertyChanged(nameof(ShowCaseBlocks));
         OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
-        SyncCaseBlocksToSyllableCount();
+        SyncCaseBlocksToUnitCount();
         RegenerateIfReady();
     }
     partial void OnSyllableDigitsChanged(int value) => RegenerateIfReady();
@@ -1356,12 +1387,23 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnSyllablePlacementIndexChanged(int value) => RegenerateIfReady();
     partial void OnSyllableSeparatorChanged(string value) => RegenerateIfReady();
     partial void OnSyllableCvcChanged(bool value) => RegenerateIfReady();
-    partial void OnPassphraseWordCountChanged(int value) => RegenerateIfReady();
+    partial void OnPassphraseWordCountChanged(int value)
+    {
+        SyncCaseBlocksToUnitCount();
+        RegenerateIfReady();
+    }
     partial void OnPassphraseSeparatorChanged(string value) => RegenerateIfReady();
     partial void OnPassphraseLanguageIndexChanged(int value) => RegenerateIfReady();
-    partial void OnPassphraseCapitalizeChanged(bool value) => RegenerateIfReady();
-    partial void OnPassphraseAddDigitChanged(bool value) => RegenerateIfReady();
-    partial void OnPassphraseAddSpecialChanged(bool value) => RegenerateIfReady();
+    partial void OnPassphraseDigitsChanged(int value) => RegenerateIfReady();
+    partial void OnPassphraseSpecialsChanged(int value) => RegenerateIfReady();
+
+    partial void OnPassphraseCaseIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowCaseBlocks));
+        OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
+        SyncCaseBlocksToUnitCount();
+        RegenerateIfReady();
+    }
     partial void OnPassphrasePlacementIndexChanged(int value) => RegenerateIfReady();
     partial void OnLeetBaseWordChanged(string value) => RegenerateIfReady();
     partial void OnLeetFullSubstitutionChanged(bool value) => RegenerateIfReady();
@@ -1383,7 +1425,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnCaseBlocksAutoSyncChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
-        SyncCaseBlocksToSyllableCount();
+        SyncCaseBlocksToUnitCount();
         RegenerateIfReady();
     }
 
@@ -1739,6 +1781,46 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Cases one word of a passphrase, where the unit a case mode works on is the word and
+    /// <paramref name="wordIndex"/> is its place in the phrase.
+    /// </summary>
+    /// <remarks>
+    /// Title and word case do the same thing here, since a word is the whole unit, and that is
+    /// what the box used to call capitalising the words. Inverse uppercases every word but the
+    /// last letter of the last one, so it needs to know where it is in the phrase.
+    /// </remarks>
+    private string ApplyWordCase(string word, int wordIndex)
+    {
+        if (word.Length == 0)
+        {
+            return word;
+        }
+
+        var caseMode = CaseModeAt(PassphraseCaseIndex);
+        if (caseMode == SyllableCase.Blocks)
+        {
+            return ApplyCaseBlock(word, wordIndex);
+        }
+
+        var titled = char.ToUpperInvariant(word[0]) + word[1..].ToLowerInvariant();
+        return caseMode switch
+        {
+            SyllableCase.Upper => word.ToUpperInvariant(),
+            SyllableCase.Title or SyllableCase.WordCase => titled,
+            SyllableCase.Alternating => wordIndex % 2 == 0 ? word.ToLowerInvariant() : word.ToUpperInvariant(),
+            SyllableCase.Inverse => wordIndex == EffectivePassphraseWordCount - 1
+                ? word[..^1].ToUpperInvariant() + char.ToLowerInvariant(word[^1])
+                : word.ToUpperInvariant(),
+            SyllableCase.Mixed => new string(word
+                .Select(character => CryptoRandomInt(4) == 0
+                    ? char.ToUpperInvariant(character)
+                    : char.ToLowerInvariant(character))
+                .ToArray()),
+            _ => word.ToLowerInvariant()
+        };
+    }
+
     private void GeneratePassphrase()
     {
         SyllableStructureText = string.Empty;
@@ -1770,22 +1852,16 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             }
 
             usedIndices.Add(index);
-            var word = wordList[index];
-            if (PassphraseCapitalize && word.Length > 0)
-            {
-                word = char.ToUpperInvariant(word[0]) + word[1..];
-            }
-
-            words[i] = word;
+            words[i] = ApplyWordCase(wordList[index], i);
         }
 
         var passphraseChars = new List<char>(string.Join(PassphraseSeparator, words));
         var effectiveSymbols = GetEffectiveSymbols();
-        var placement = (Placement)PassphrasePlacementIndex;
+        var placement = PlacementAt(PassphrasePlacementIndex);
         InsertExtras(
             passphraseChars,
-            PassphraseAddDigit ? 1 : 0,
-            PassphraseAddSpecial ? 1 : 0,
+            PassphraseDigits,
+            PassphraseSpecials,
             placement,
             effectiveSymbols);
 
@@ -1793,8 +1869,16 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         GeneratedPassword = finalPassword;
 
         var entropy = Math.Log2(wordList.Length) * EffectivePassphraseWordCount;
-        if (PassphraseAddDigit) entropy += Math.Log2(DigitChars.Length);
-        if (PassphraseAddSpecial && effectiveSymbols.Length > 0) entropy += Math.Log2(effectiveSymbols.Length);
+        if (PassphraseDigits > 0) entropy += Math.Log2(DigitChars.Length) * PassphraseDigits;
+        if (PassphraseSpecials > 0 && effectiveSymbols.Length > 0)
+        {
+            entropy += Math.Log2(effectiveSymbols.Length) * PassphraseSpecials;
+        }
+
+        if (CaseModeAt(PassphraseCaseIndex) == SyllableCase.Mixed)
+        {
+            entropy += MixedCaseBitsPerLetter * words.Sum(word => word.Count(char.IsLetter));
+        }
 
         UpdateStrengthIndicator(entropy);
         UpdatePhoneticDisplay(finalPassword);

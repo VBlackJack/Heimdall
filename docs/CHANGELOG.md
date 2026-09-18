@@ -14,6 +14,23 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The passphrase gets the controls the other modes had
+
+- Digits and special characters are counts from zero to six, on a slider each, where there
+  were two checkboxes offering one of each. The syllable and leet modes have counted them all
+  along.
+- The passphrase has a case box of its own, with the same nine entries the other modes have:
+  mixed, lower, upper, title, alternating, word case, inverse and the block pattern. It
+  replaces the single "Capitalize words" box, which is what word case does.
+- A case block covers one word here, as it covers one syllable in the syllable mode, and the
+  box that keeps one block per unit says which unit it means.
+- Mixed case is credited on a passphrase as it is elsewhere: it is drawn at generation time,
+  so it is worth bits. Every other case mode is chosen, and is worth none.
+- **Presets saved before this keep meaning what they said.** They carry three flags and no
+  counts, so a ticked digit box reads as one digit, a ticked special box as one special, and
+  capitalised words as word case. A preset saved now writes both the counts and the old flags,
+  so it still says something to a build that predates them.
+
 ### Placing the digits and the special characters by hand
 
 - The placement box of the syllable, passphrase and leet modes offers a fifth entry, By
