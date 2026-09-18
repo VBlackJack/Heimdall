@@ -410,6 +410,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             source.LeetSpecials = 3;
             source.LeetPlacementIndex = 2;
             source.LeetCaseIndex = 5;
+            source.EntropyFloorIndex = 2;
         }
         finally
         {
@@ -452,6 +453,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(source.LeetSpecials, target.LeetSpecials);
         Assert.Equal(source.LeetPlacementIndex, target.LeetPlacementIndex);
         Assert.Equal(source.LeetCaseIndex, target.LeetCaseIndex);
+        Assert.Equal(source.EntropyFloorIndex, target.EntropyFloorIndex);
     }
 
     [Fact]
@@ -695,6 +697,440 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         sut.SelectedModeIndex = 3;
         Assert.False(sut.ShowLayoutSafe);
+    }
+
+    /// <summary>
+    /// With no floor set, the size is the operator's and nothing moves it.
+    /// </summary>
+    /// <remarks>
+    /// The control for every other test here: a floor that raised the length unconditionally would
+    /// satisfy all of them.
+    /// </remarks>
+    [Fact]
+    public void EntropyFloor_Off_LeavesTheSizeWhereItWasSet()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.Length = 8;
+
+        Assert.Equal(0, sut.EntropyFloorBits);
+        Assert.Equal(8, sut.Length);
+        Assert.Equal(8, sut.EffectiveLength);
+        Assert.Equal(8, sut.GeneratedPassword.Length);
+        Assert.Empty(sut.FloorNoticeText);
+    }
+
+    /// <summary>
+    /// A floor generates at the size it needs and takes the smallest size that carries it.
+    /// </summary>
+    /// <remarks>
+    /// Minimality is the assertion that matters. Without it, a floor that jumped straight to the
+    /// longest password the slider allows would pass every other assertion here and hand out 128
+    /// characters to meet 60 bits.
+    /// </remarks>
+    [Theory]
+    [InlineData(1, 60)]
+    [InlineData(2, 80)]
+    [InlineData(3, 100)]
+    [InlineData(4, 128)]
+    public void EntropyFloor_GeneratesAtTheSmallestSizeThatCarriesTheFloor(int floorIndex, int floorBits)
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 4;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = floorIndex;
+
+        double bitsPerCharacter = sut.LastEntropyBits / sut.EffectiveLength;
+
+        Assert.Equal(floorBits, sut.EntropyFloorBits);
+        Assert.True(sut.LastEntropyBits >= floorBits, $"the figure is {sut.LastEntropyBits}");
+        Assert.True(
+            bitsPerCharacter * (sut.EffectiveLength - 1) < floorBits,
+            $"{sut.EffectiveLength} characters is one more than the floor needed");
+        Assert.Equal(sut.EffectiveLength, sut.GeneratedPassword.Length);
+        Assert.DoesNotContain("ToolPwdGenIssueFloorUnreachable", sut.IssuesText);
+    }
+
+    /// <summary>
+    /// The floor never writes to the control the operator set, and clearing it returns the tool to
+    /// what they asked for, immediately and without them having to put the value back.
+    /// </summary>
+    /// <remarks>
+    /// The first version of this raised the slider itself. That looked honest - the length you
+    /// would have to type was on screen - but it was one-way: the operator's own setting was gone,
+    /// turning the floor off restored nothing, and dragging the slider back down fought the floor
+    /// writing it up again on every mouse move.
+    /// </remarks>
+    [Fact]
+    public void EntropyFloor_LeavesTheOperatorsOwnSettingAloneAndIsUndoneByClearingIt()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 6;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 4;
+
+        Assert.Equal(6, sut.Length);
+        Assert.True(sut.EffectiveLength > 6);
+        Assert.NotEmpty(sut.FloorNoticeText);
+
+        sut.EntropyFloorIndex = 0;
+
+        Assert.Equal(6, sut.Length);
+        Assert.Equal(6, sut.EffectiveLength);
+        Assert.Equal(6, sut.GeneratedPassword.Length);
+        Assert.Empty(sut.FloorNoticeText);
+    }
+
+    /// <summary>
+    /// A floor out of reach changes nothing at all and says so.
+    /// </summary>
+    /// <remarks>
+    /// A charset of one character carries no bits at any length, so no length reaches the floor.
+    /// The earlier version raised the length to its maximum on the way to finding that out, and
+    /// left it there.
+    /// </remarks>
+    [Fact]
+    public void EntropyFloor_OutOfReach_ChangesNothingAndSaysSo()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 10;
+            sut.IncludeUppercase = false;
+            sut.IncludeLowercase = false;
+            sut.IncludeDigits = false;
+            sut.IncludeSymbols = true;
+            sut.CustomSpecials = "!";
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 1;
+
+        Assert.Equal(10, sut.Length);
+        Assert.Equal(10, sut.EffectiveLength);
+        Assert.Equal(10, sut.GeneratedPassword.Length);
+        Assert.Empty(sut.FloorNoticeText);
+        Assert.Contains("ToolPwdGenIssueFloorUnreachable", sut.IssuesText);
+    }
+
+    /// <summary>
+    /// A floor that would need a longer password than the slider allows changes nothing either.
+    /// </summary>
+    /// <remarks>
+    /// Asserted on the decision itself, with a 256-bit floor. The box offers 128 at most and the
+    /// length slider reaches 128, so a two-character alphabet carries the highest floor on offer
+    /// exactly: through the interface, the only random password that cannot reach its floor is one
+    /// whose alphabet holds a single character, and that is the case the test above covers. This
+    /// one keeps the other branch honest for the day a higher floor is offered.
+    /// </remarks>
+    [Fact]
+    public void EntropyFloor_NeedingMoreLengthThanTheSliderAllows_ChangesNothing()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 12;
+            sut.IncludeUppercase = false;
+            sut.IncludeLowercase = false;
+            sut.IncludeDigits = false;
+            sut.IncludeSymbols = true;
+            sut.CustomSpecials = "!?";
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(12, sut.EffectiveLength);
+
+        InvokePrivate(sut, "ResolveRandomFloor", 256);
+
+        Assert.Equal(12, sut.Length);
+        Assert.Equal(12, sut.EffectiveLength);
+        Assert.True(sut.FloorOutOfReach);
+        Assert.Empty(sut.FloorNoticeText);
+    }
+
+    /// <summary>
+    /// A passphrase reaches the floor by gaining words, and the words stay words.
+    /// </summary>
+    [Fact]
+    public void EntropyFloor_GivesAPassphraseMoreWordsRatherThanARandomTail()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 2;
+            sut.PassphraseWordCount = 2;
+            sut.PassphraseSeparator = "-";
+            sut.PassphraseAddDigit = false;
+            sut.PassphraseAddSpecial = false;
+            sut.PassphraseCapitalize = false;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 2;
+
+        var words = sut.GeneratedPassword.Split('-', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.True(sut.LastEntropyBits >= 80, $"the figure is {sut.LastEntropyBits}");
+        Assert.Equal(2, sut.PassphraseWordCount);
+        Assert.True(sut.EffectivePassphraseWordCount > 2);
+        Assert.Equal(sut.EffectivePassphraseWordCount, words.Length);
+        Assert.All(words, word => Assert.All(word, character => Assert.True(char.IsLetter(character))));
+    }
+
+    /// <summary>
+    /// A passphrase floor that no word count can carry leaves the word count alone.
+    /// </summary>
+    [Fact]
+    public void EntropyFloor_OutOfReachForAPassphrase_LeavesTheWordCountAlone()
+    {
+        string[][] lists =
+        [
+            ["alfa", "bravo", "charlie", "delta"],
+            ["golf", "hotel", "india", "juliet"],
+            ["mike", "november", "oscar", "papa"],
+            ["sierra", "tango", "uniform", "victor"],
+        ];
+
+        var sut = CreateInitializedVm();
+        ForceWordLists(sut, lists);
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 2;
+            sut.PassphraseWordCount = 2;
+            sut.PassphraseSeparator = "-";
+            sut.PassphraseAddDigit = false;
+            sut.PassphraseAddSpecial = false;
+            sut.PassphraseLanguageIndex = 0;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 4;
+
+        // Four words to choose from is two bits each, so even eight words is sixteen bits.
+        Assert.Equal(2, sut.PassphraseWordCount);
+        Assert.Equal(2, sut.EffectivePassphraseWordCount);
+        Assert.Contains("ToolPwdGenIssueFloorUnreachable", sut.IssuesText);
+    }
+
+    /// <summary>
+    /// A syllable password reaches the floor by gaining syllables, two characters at a time, which
+    /// is the step its own slider moves in.
+    /// </summary>
+    [Fact]
+    public void EntropyFloor_GivesASyllablePasswordMoreSyllables()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 8;
+            sut.SyllableDigits = 0;
+            sut.SyllableSpecials = 0;
+            sut.SyllableCvc = false;
+            sut.SyllableCaseIndex = 1;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 1;
+
+        Assert.Equal(8, sut.SyllableLength);
+        Assert.True(sut.EffectiveSyllableLength > 8);
+        Assert.Equal(0, sut.EffectiveSyllableLength % 2);
+        Assert.True(sut.LastEntropyBits >= 60, $"the figure is {sut.LastEntropyBits}");
+        Assert.Equal(sut.EffectiveSyllableLength, sut.GeneratedPassword.Length);
+    }
+
+    /// <summary>
+    /// A leet password cannot grow its word, so the floor buys digits first and specials only once
+    /// the digits are spent, and it buys as few as will do.
+    /// </summary>
+    [Fact]
+    public void EntropyFloor_GivesALeetPasswordDigitsBeforeSpecials()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 3;
+            sut.LeetRandomWord = true;
+            sut.LeetDigits = 0;
+            sut.LeetSpecials = 0;
+            sut.LeetCaseIndex = 1;
+            sut.PassphraseLanguageIndex = 0;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 1;
+
+        // An English word is worth about 11.8 bits and a digit 3.3, so the six digits the slider
+        // allows leave a 60-bit floor short and the specials, worth about 4.9 each, make up the
+        // rest. At this floor both end up at the maximum, so minimality is asserted as "one fewer
+        // special would have missed" rather than as a number.
+        Assert.Equal(0, sut.LeetDigits);
+        Assert.Equal(0, sut.LeetSpecials);
+        Assert.Equal(6, sut.EffectiveLeetDigits);
+        Assert.True(sut.EffectiveLeetSpecials > 0, "the specials were never reached");
+        Assert.True(sut.LastEntropyBits >= 60, $"the figure is {sut.LastEntropyBits}");
+
+        double oneSpecial = sut.LastEntropyBits / sut.EffectiveLeetSpecials;
+        Assert.True(
+            sut.LastEntropyBits - oneSpecial < 60,
+            $"{sut.EffectiveLeetSpecials} specials is more than the floor needed");
+    }
+
+    /// <summary>
+    /// The order the floor spends in, asserted on the decision itself because no floor the box
+    /// offers is low enough to leave a leet password with room to spare.
+    /// </summary>
+    /// <remarks>
+    /// Driving the private decision with a 40-bit floor is the only way to see the order: at 60,
+    /// the lowest the interface offers, an English word needs every digit and every special the
+    /// sliders allow, and spending specials first would reach the same pair. A test that asserted
+    /// the order at 60 would pass with the two arms swapped.
+    /// </remarks>
+    [Fact]
+    public void EntropyFloor_SpendsLeetDigitsBeforeLeetSpecials()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 3;
+            sut.LeetRandomWord = true;
+            sut.LeetDigits = 0;
+            sut.LeetSpecials = 0;
+            sut.LeetCaseIndex = 1;
+            sut.PassphraseLanguageIndex = 0;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(0, sut.EffectiveLeetDigits);
+        Assert.Equal(0, sut.EffectiveLeetSpecials);
+
+        InvokePrivate(sut, "ResolveLeetFloor", 40);
+
+        // 11.8 for the word, 19.9 for six digits, and two specials at 4.9 to clear 40. One special
+        // would have stopped at 36.6, and the seventh digit does not exist.
+        Assert.Equal(6, sut.EffectiveLeetDigits);
+        Assert.Equal(2, sut.EffectiveLeetSpecials);
+    }
+
+    /// <summary>
+    /// The floor is decided from the settings, so pressing Generate again produces another password
+    /// at the same size rather than walking the size upwards.
+    /// </summary>
+    /// <remarks>
+    /// A leet password's case and a syllable password's closed syllables are worth a different
+    /// number of bits on every draw. A floor that read the password rather than the settings moved
+    /// the size on a click that was only meant to reroll, and never moved it back.
+    /// </remarks>
+    [Fact]
+    public void EntropyFloor_DecidesFromTheSettingsSoRerollingDoesNotWalkTheSizeUp()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 3;
+            sut.LeetRandomWord = true;
+            sut.LeetDigits = 0;
+            sut.LeetSpecials = 0;
+            sut.LeetCaseIndex = 0;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 1;
+
+        var digits = sut.EffectiveLeetDigits;
+        var specials = sut.EffectiveLeetSpecials;
+
+        for (var reroll = 0; reroll < 12; reroll++)
+        {
+            sut.Generate();
+
+            Assert.Equal(digits, sut.EffectiveLeetDigits);
+            Assert.Equal(specials, sut.EffectiveLeetSpecials);
+            Assert.Equal(0, sut.LeetDigits);
+            Assert.Equal(0, sut.LeetSpecials);
+        }
+    }
+
+    /// <summary>
+    /// A quick preset is the configuration the operator clicked for. A floor changes what comes out
+    /// of it, and that is visible rather than silent.
+    /// </summary>
+    [Fact]
+    public void EntropyFloor_OverAQuickPreset_KeepsThePresetAndSaysWhatItGeneratedInstead()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.EntropyFloorIndex = 4;
+        sut.ApplyRandomPreset(4, upper: false, lower: false, digits: true, symbols: false);
+
+        Assert.Equal(4, sut.Length);
+        Assert.True(sut.EffectiveLength > 4);
+        Assert.NotEmpty(sut.FloorNoticeText);
+        Assert.Equal(sut.EffectiveLength, sut.GeneratedPassword.Length);
+        Assert.All(sut.GeneratedPassword, character => Assert.True(char.IsDigit(character)));
     }
 
     private PasswordGeneratorViewModel CreateInitializedVm()

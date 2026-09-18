@@ -70,6 +70,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         public int LeetSpecials { get; set; } = 1;
         public int LeetPlacement { get; set; }
         public int LeetCase { get; set; }
+        public int EntropyFloor { get; set; }
     }
 
     internal enum GeneratorMode
@@ -137,6 +138,26 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// deliberate understatement applied to a coarser unit.
     /// </summary>
     private const double MixedCaseBitsPerLetter = 0.81;
+
+    /// <summary>
+    /// The entropy floors the box offers, in bits, the first meaning no floor at all. A floor
+    /// is a promise about the weakest password the tool will hand out, so the figures are the
+    /// ones people quote: 60 for something disposable, 80 for an account, 100 and 128 for a key
+    /// that has to outlive the hardware.
+    /// </summary>
+    internal static readonly int[] EntropyFloorChoices = [0, 60, 80, 100, 128];
+
+    /// <summary>
+    /// The ceilings the floor may raise a mode's own size control to, each one the maximum of
+    /// the slider a person drags by hand. The floor moves that control and stops there: it
+    /// never reaches past what the interface itself allows.
+    /// </summary>
+    private const int MaximumLength = 128;
+    private const int MaximumSyllableLength = 32;
+    private const int SyllableLengthStep = 2;
+    private const int MaximumPassphraseWordCount = 8;
+    private const int MaximumLeetExtras = 6;
+
 
     private static readonly Dictionary<char, string> NatoAlphabet = new()
     {
@@ -370,6 +391,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     [ObservableProperty] private int _leetCaseIndex;
     [ObservableProperty] private string _leetWordSource = string.Empty;
 
+    [ObservableProperty] private int _entropyFloorIndex;
+
     [ObservableProperty] private bool _clipboardAutoClear;
 
     [ObservableProperty] private string _generatedPassword = string.Empty;
@@ -419,15 +442,40 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     public bool ShowStrength => !string.IsNullOrEmpty(GeneratedPassword);
     public bool ShowSyllablePlacement => IsSyllableMode && (SyllableDigits > 0 || SyllableSpecials > 0);
     public bool ShowPassphrasePlacement => IsPassphraseMode && (PassphraseAddDigit || PassphraseAddSpecial);
-    public bool ShowLeetPlacement => IsLeetMode && (LeetDigits > 0 || LeetSpecials > 0);
+    public bool ShowLeetPlacement =>
+        IsLeetMode && (EffectiveLeetDigits > 0 || EffectiveLeetSpecials > 0);
     public bool ShowLeetBaseWord => IsLeetMode && !LeetRandomWord;
     public bool ShowLeetWordSource => IsLeetMode && !string.IsNullOrEmpty(LeetWordSource);
+    public bool ShowFloorNotice => !string.IsNullOrEmpty(FloorNoticeText);
+
+    /// <summary>The floor in bits, zero when the box is on its first entry.</summary>
+    internal int EntropyFloorBits =>
+        EntropyFloorChoices[Math.Clamp(EntropyFloorIndex, 0, EntropyFloorChoices.Length - 1)];
+
+    /// <summary>The figure the last generation advertised, in bits.</summary>
+    internal double LastEntropyBits { get; private set; }
+
+    /// <summary>
+    /// The sizes the last generation actually ran at. They equal the controls the operator set
+    /// unless the floor needed more, and the controls themselves are never written to.
+    /// </summary>
+    internal int EffectiveLength { get; private set; }
+    internal int EffectiveSyllableLength { get; private set; }
+    internal int EffectivePassphraseWordCount { get; private set; }
+    internal int EffectiveLeetDigits { get; private set; }
+    internal int EffectiveLeetSpecials { get; private set; }
+
+    /// <summary>Set when the floor cannot be carried by these settings at their maximum.</summary>
+    internal bool FloorOutOfReach { get; private set; }
+
+    /// <summary>What the floor did, in the operator's own units, or empty when it did nothing.</summary>
+    [ObservableProperty] private string _floorNoticeText = string.Empty;
     public bool HasActiveSpecials => CurrentMode switch
     {
         GeneratorMode.Random => IncludeSymbols,
         GeneratorMode.Syllable => SyllableSpecials > 0,
         GeneratorMode.Passphrase => PassphraseAddSpecial,
-        GeneratorMode.Leet => LeetSpecials > 0,
+        GeneratorMode.Leet => EffectiveLeetSpecials > 0,
         _ => false
     };
 
@@ -503,6 +551,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         LeetSpecials = LeetSpecials,
         LeetPlacement = LeetPlacementIndex,
         LeetCase = LeetCaseIndex,
+        EntropyFloor = EntropyFloorIndex,
     };
 
     internal void ApplyPreset(PasswordPreset preset)
@@ -544,6 +593,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             LeetSpecials = preset.LeetSpecials;
             LeetPlacementIndex = preset.LeetPlacement;
             LeetCaseIndex = preset.LeetCase;
+            EntropyFloorIndex = preset.EntropyFloor;
         }
         finally
         {
@@ -655,6 +705,15 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     [RelayCommand]
     private void GenerateCore()
     {
+        ResolveFloorSizes();
+        GenerateForCurrentMode();
+
+        RaiseVisibilityProperties();
+        AddToHistory(GeneratedPassword);
+    }
+
+    private void GenerateForCurrentMode()
+    {
         switch (CurrentMode)
         {
             case GeneratorMode.Random:
@@ -670,10 +729,221 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
                 GenerateLeetPassword();
                 break;
         }
-
-        RaiseVisibilityProperties();
-        AddToHistory(GeneratedPassword);
     }
+
+    /// <summary>
+    /// Decides the size this generation runs at, which is the operator's own setting unless the
+    /// floor needs more, and reports what it decided through the effective sizes.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The operator's controls are never written to.</b> The first version of this raised
+    /// the slider itself, one step at a time, regenerating as it went. That committed each raise
+    /// before knowing whether the climb would succeed, so a floor that turned out to be out of
+    /// reach left every control pinned at its maximum with no way back: turning the floor off
+    /// restored nothing. It also fought the mouse, since a drag writes the length on every mouse
+    /// move and the floor wrote it straight back.</para>
+    /// <para>What is decided here is decided from the settings alone, never from the password that
+    /// came out. A leet password's mixed case and a syllable password's closed syllables are worth
+    /// real bits, but a different number of them on every draw, and a floor that read them would
+    /// move the size on a click that was only meant to reroll. They are left out of the decision,
+    /// which therefore holds for every password these settings can produce, and left in the figure
+    /// on display, which describes the one password on screen.</para>
+    /// <para>When even the maximum cannot carry the floor, nothing is changed at all and the issue
+    /// line says so. A promise that cannot be kept is not kept quietly.</para>
+    /// </remarks>
+    private void ResolveFloorSizes()
+    {
+        EffectiveLength = Length;
+        EffectiveSyllableLength = SyllableLength;
+        EffectivePassphraseWordCount = PassphraseWordCount;
+        EffectiveLeetDigits = LeetDigits;
+        EffectiveLeetSpecials = LeetSpecials;
+        FloorOutOfReach = false;
+        FloorNoticeText = string.Empty;
+
+        var floor = EntropyFloorBits;
+        if (floor <= 0)
+        {
+            return;
+        }
+
+        switch (CurrentMode)
+        {
+            case GeneratorMode.Random:
+                ResolveRandomFloor(floor);
+                break;
+            case GeneratorMode.Syllable:
+                ResolveSyllableFloor(floor);
+                break;
+            case GeneratorMode.Passphrase:
+                ResolvePassphraseFloor(floor);
+                break;
+            case GeneratorMode.Leet:
+                ResolveLeetFloor(floor);
+                break;
+        }
+    }
+
+    private void ResolveRandomFloor(int floor)
+    {
+        var charsetSize = BuildCharset().Length;
+        var bitsPerCharacter = charsetSize > 1 ? Math.Log2(charsetSize) : 0;
+        if (bitsPerCharacter <= 0)
+        {
+            FloorOutOfReach = true;
+            return;
+        }
+
+        var required = (int)Math.Ceiling(floor / bitsPerCharacter);
+        if (required <= Length)
+        {
+            return;
+        }
+
+        if (required > MaximumLength)
+        {
+            FloorOutOfReach = true;
+            return;
+        }
+
+        EffectiveLength = required;
+        NoteFloorRaise(Length.ToString(), required.ToString());
+    }
+
+    private void ResolveSyllableFloor(int floor)
+    {
+        for (var candidate = SyllableLength;
+             candidate <= MaximumSyllableLength;
+             candidate += SyllableLengthStep)
+        {
+            if (GuaranteedSyllableBits(candidate) < floor)
+            {
+                continue;
+            }
+
+            if (candidate > SyllableLength)
+            {
+                EffectiveSyllableLength = candidate;
+                NoteFloorRaise(SyllableLength.ToString(), candidate.ToString());
+            }
+
+            return;
+        }
+
+        FloorOutOfReach = true;
+    }
+
+    private void ResolvePassphraseFloor(int floor)
+    {
+        for (var candidate = PassphraseWordCount;
+             candidate <= MaximumPassphraseWordCount;
+             candidate++)
+        {
+            if (GuaranteedPassphraseBits(candidate) < floor)
+            {
+                continue;
+            }
+
+            if (candidate > PassphraseWordCount)
+            {
+                EffectivePassphraseWordCount = candidate;
+                NoteFloorRaise(PassphraseWordCount.ToString(), candidate.ToString());
+            }
+
+            return;
+        }
+
+        FloorOutOfReach = true;
+    }
+
+    /// <summary>
+    /// A leet password cannot grow its word, so the floor buys digits first and specials after,
+    /// and takes the fewest of either that carries the floor.
+    /// </summary>
+    private void ResolveLeetFloor(int floor)
+    {
+        var digitRoom = MaximumLeetExtras - LeetDigits;
+        var specialRoom = MaximumLeetExtras - LeetSpecials;
+
+        for (var steps = 0; steps <= digitRoom + specialRoom; steps++)
+        {
+            var digits = LeetDigits + Math.Min(steps, digitRoom);
+            var specials = LeetSpecials + Math.Max(0, steps - digitRoom);
+
+            if (GuaranteedLeetBits(digits, specials) < floor)
+            {
+                continue;
+            }
+
+            if (steps > 0)
+            {
+                EffectiveLeetDigits = digits;
+                EffectiveLeetSpecials = specials;
+                NoteFloorRaise(
+                    $"{LeetDigits}+{LeetSpecials}",
+                    $"{digits}+{specials}");
+            }
+
+            return;
+        }
+
+        FloorOutOfReach = true;
+    }
+
+    /// <summary>
+    /// The bits a syllable password of this base length carries whatever the dice do: open
+    /// syllables only, which is the cheaper of the two shapes per character, and no credit for
+    /// mixed case.
+    /// </summary>
+    private double GuaranteedSyllableBits(int baseLength)
+    {
+        var consonants = LayoutSafe ? LayoutSafeConsonants : Consonants;
+        var vowels = LayoutSafe ? LayoutSafeVowels : Vowels;
+        var bits = Math.Log2(consonants.Length * vowels.Length) * (baseLength / 2);
+        return bits + ExtrasBits(SyllableDigits, SyllableSpecials);
+    }
+
+    private double GuaranteedPassphraseBits(int wordCount)
+    {
+        var wordList = SelectedWordList();
+        if (wordList.Length < 2)
+        {
+            return 0;
+        }
+
+        return Math.Log2(wordList.Length) * wordCount
+            + ExtrasBits(PassphraseAddDigit ? 1 : 0, PassphraseAddSpecial ? 1 : 0);
+    }
+
+    /// <summary>
+    /// The bits a leet password carries whatever word is drawn: the word itself when it is drawn
+    /// rather than typed, and the digits and specials, with nothing credited to the substitutions
+    /// or to the case, both of which depend on the letters that turn up.
+    /// </summary>
+    private double GuaranteedLeetBits(int digits, int specials)
+    {
+        var typed = SanitizeLeetBaseWord(LeetBaseWord);
+        var drawn = LeetRandomWord || typed.Length == 0;
+        var wordList = SelectedWordList();
+        var wordBits = drawn && wordList.Length > 1 ? Math.Log2(wordList.Length) : 0;
+
+        return wordBits + ExtrasBits(digits, specials);
+    }
+
+    private double ExtrasBits(int digits, int specials)
+    {
+        var bits = digits > 0 ? Math.Log2(DigitChars.Length) * digits : 0;
+        var symbols = GetEffectiveSymbols();
+        if (specials > 0 && symbols.Length > 0)
+        {
+            bits += Math.Log2(symbols.Length) * specials;
+        }
+
+        return bits;
+    }
+
+    private void NoteFloorRaise(string chosen, string used)
+        => FloorNoticeText = string.Format(L("ToolPwdGenFloorRaised"), chosen, used);
 
     [RelayCommand]
     private void ClearHistory()
@@ -717,6 +987,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnLeetSpecialsChanged(int value) => RegenerateIfReady();
     partial void OnLeetPlacementIndexChanged(int value) => RegenerateIfReady();
     partial void OnLeetCaseIndexChanged(int value) => RegenerateIfReady();
+    partial void OnEntropyFloorIndexChanged(int value) => RegenerateIfReady();
 
     partial void OnLeetRandomWordChanged(bool value)
     {
@@ -751,6 +1022,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowLeetPlacement));
         OnPropertyChanged(nameof(ShowLeetBaseWord));
         OnPropertyChanged(nameof(ShowLeetWordSource));
+        OnPropertyChanged(nameof(ShowFloorNotice));
         OnPropertyChanged(nameof(HasActiveSpecials));
     }
 
@@ -766,8 +1038,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             return;
         }
 
-        var password = new StringBuilder(Length);
-        for (var i = 0; i < Length; i++)
+        var password = new StringBuilder(EffectiveLength);
+        for (var i = 0; i < EffectiveLength; i++)
         {
             password.Append(charset[CryptoRandomInt(charset.Length)]);
         }
@@ -776,7 +1048,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         GeneratedPassword = finalPassword;
 
         var entropyPerChar = Math.Log2(charset.Length);
-        var totalEntropy = entropyPerChar * Length;
+        var totalEntropy = entropyPerChar * EffectiveLength;
         UpdateStrengthIndicator(totalEntropy);
         UpdatePhoneticDisplay(finalPassword);
     }
@@ -860,11 +1132,11 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         var groups = new List<string>();
         var totalSylChars = 0;
         var cvcCount = 0;
-        while (totalSylChars < SyllableLength)
+        while (totalSylChars < EffectiveSyllableLength)
         {
             var consonant = consonants[CryptoRandomInt(consonants.Length)];
             var vowel = vowels[CryptoRandomInt(vowels.Length)];
-            var remaining = SyllableLength - totalSylChars;
+            var remaining = EffectiveSyllableLength - totalSylChars;
 
             if (useCvc && remaining >= 3 && CryptoRandomInt(2) == 0)
             {
@@ -885,9 +1157,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             }
         }
 
-        if (totalSylChars > SyllableLength && groups.Count > 0)
+        if (totalSylChars > EffectiveSyllableLength && groups.Count > 0)
         {
-            var excess = totalSylChars - SyllableLength;
+            var excess = totalSylChars - EffectiveSyllableLength;
             var last = groups[^1];
             groups[^1] = last[..^excess];
         }
@@ -1015,9 +1287,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             return;
         }
 
-        var words = new string[PassphraseWordCount];
+        var words = new string[EffectivePassphraseWordCount];
         var usedIndices = new HashSet<int>();
-        for (var i = 0; i < PassphraseWordCount; i++)
+        for (var i = 0; i < EffectivePassphraseWordCount; i++)
         {
             int index;
             if (usedIndices.Count < wordList.Length)
@@ -1056,7 +1328,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         var finalPassword = new string(passphraseChars.ToArray());
         GeneratedPassword = finalPassword;
 
-        var entropy = Math.Log2(wordList.Length) * PassphraseWordCount;
+        var entropy = Math.Log2(wordList.Length) * EffectivePassphraseWordCount;
         if (PassphraseAddDigit) entropy += Math.Log2(DigitChars.Length);
         if (PassphraseAddSpecial && effectiveSymbols.Length > 0) entropy += Math.Log2(effectiveSymbols.Length);
 
@@ -1113,8 +1385,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         var chars = new List<char>(cased);
         InsertExtras(
             chars,
-            LeetDigits,
-            LeetSpecials,
+            EffectiveLeetDigits,
+            EffectiveLeetSpecials,
             (Placement)LeetPlacementIndex,
             effectiveSymbols);
 
@@ -1126,8 +1398,11 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         var entropy = wordEntropy;
         if (!LeetFullSubstitution) entropy += substitutable;
         if ((SyllableCase)LeetCaseIndex == SyllableCase.Mixed) entropy += MixedCaseBitsPerLetter * casedLetters;
-        if (LeetDigits > 0) entropy += Math.Log2(DigitChars.Length) * LeetDigits;
-        if (LeetSpecials > 0 && effectiveSymbols.Length > 0) entropy += Math.Log2(effectiveSymbols.Length) * LeetSpecials;
+        if (EffectiveLeetDigits > 0) entropy += Math.Log2(DigitChars.Length) * EffectiveLeetDigits;
+        if (EffectiveLeetSpecials > 0 && effectiveSymbols.Length > 0)
+        {
+            entropy += Math.Log2(effectiveSymbols.Length) * EffectiveLeetSpecials;
+        }
 
         UpdateStrengthIndicator(entropy);
         UpdatePhoneticDisplay(finalPassword);
@@ -1224,6 +1499,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     private void UpdateStrengthIndicator(double entropy)
     {
+        LastEntropyBits = entropy;
+
         if (string.IsNullOrEmpty(GeneratedPassword))
         {
             StrengthLevel = 0;
@@ -1333,6 +1610,11 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         if (GeneratedPassword.Length < 8)
         {
             issues.Add(L("ToolPwdGenIssueTooShort"));
+        }
+
+        if (FloorOutOfReach)
+        {
+            issues.Add(string.Format(L("ToolPwdGenIssueFloorUnreachable"), EntropyFloorBits));
         }
 
         if (CurrentMode == GeneratorMode.Leet
