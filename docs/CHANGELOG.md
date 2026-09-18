@@ -14,6 +14,19 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The diagram editor speaks Spanish
+
+- The embedded draw.io editor carries its Spanish resource file, so a Spanish profile gets a
+  Spanish editor: 2009 keys, the same set the English catalogue holds, from draw.io 31.4.5.
+  Contributed by Nestor (Anghios).
+- This closes a limit the v2026.091702 notes named rather than hid: "the embedded draw.io
+  editor ships English and French resources only, so its own menus stay English". Nothing else
+  had to be wired: the editor is already opened with the interface language, so the file being
+  there is the whole of it.
+- The vendoring script lists the new catalogue, so an upgrade to a later draw.io keeps it, and
+  the guard that checks the context menu can be translated now runs over all three catalogues
+  and fails if the script and the shipped files ever disagree.
+
 ### Specials you can type, and a clipboard delay you choose
 
 - A special character has to be ASCII punctuation now. Pasting a euro sign or a typographic
