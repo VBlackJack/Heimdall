@@ -18,7 +18,9 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
+
 using Heimdall.App.Services;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.App.ViewModels.Tools;
 
 namespace Heimdall.App.Tests;
@@ -162,9 +164,9 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         sut.SelectedModeIndex = 2;
         sut.PassphraseWordCount = 4;
         sut.PassphraseSeparator = "-";
-        sut.PassphraseAddDigit = false;
-        sut.PassphraseAddSpecial = false;
-        sut.PassphraseCapitalize = true;
+        sut.PassphraseDigits = 0;
+        sut.PassphraseSpecials = 0;
+        sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.WordCase;
         sut.PassphraseLanguageIndex = 1;
 
         var words = sut.GeneratedPassword.Split('-', StringSplitOptions.RemoveEmptyEntries);
@@ -211,9 +213,9 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         sut.SelectedModeIndex = 2;
         sut.PassphraseWordCount = 4;
         sut.PassphraseSeparator = "-";
-        sut.PassphraseAddDigit = false;
-        sut.PassphraseAddSpecial = false;
-        sut.PassphraseCapitalize = false;
+        sut.PassphraseDigits = 0;
+        sut.PassphraseSpecials = 0;
+        sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Lower;
         sut.PassphraseLanguageIndex = languageIndex;
 
         var words = sut.GeneratedPassword.Split('-', StringSplitOptions.RemoveEmptyEntries);
@@ -399,9 +401,9 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             source.PassphraseWordCount = 6;
             source.PassphraseSeparator = "_";
             source.PassphraseLanguageIndex = 1;
-            source.PassphraseCapitalize = false;
-            source.PassphraseAddDigit = false;
-            source.PassphraseAddSpecial = true;
+            source.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Alternating;
+            source.PassphraseDigits = 4;
+            source.PassphraseSpecials = 5;
             source.PassphrasePlacementIndex = 3;
             source.LeetBaseWord = "anchor";
             source.LeetRandomWord = false;
@@ -446,9 +448,9 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(source.PassphraseWordCount, target.PassphraseWordCount);
         Assert.Equal(source.PassphraseSeparator, target.PassphraseSeparator);
         Assert.Equal(source.PassphraseLanguageIndex, target.PassphraseLanguageIndex);
-        Assert.Equal(source.PassphraseCapitalize, target.PassphraseCapitalize);
-        Assert.Equal(source.PassphraseAddDigit, target.PassphraseAddDigit);
-        Assert.Equal(source.PassphraseAddSpecial, target.PassphraseAddSpecial);
+        Assert.Equal(source.PassphraseCaseIndex, target.PassphraseCaseIndex);
+        Assert.Equal(source.PassphraseDigits, target.PassphraseDigits);
+        Assert.Equal(source.PassphraseSpecials, target.PassphraseSpecials);
         Assert.Equal(source.PassphrasePlacementIndex, target.PassphrasePlacementIndex);
         Assert.Equal(source.LeetBaseWord, target.LeetBaseWord);
         Assert.Equal(source.LeetRandomWord, target.LeetRandomWord);
@@ -902,9 +904,9 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             sut.SelectedModeIndex = 2;
             sut.PassphraseWordCount = 2;
             sut.PassphraseSeparator = "-";
-            sut.PassphraseAddDigit = false;
-            sut.PassphraseAddSpecial = false;
-            sut.PassphraseCapitalize = false;
+            sut.PassphraseDigits = 0;
+            sut.PassphraseSpecials = 0;
+            sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Lower;
         }
         finally
         {
@@ -945,8 +947,8 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             sut.SelectedModeIndex = 2;
             sut.PassphraseWordCount = 2;
             sut.PassphraseSeparator = "-";
-            sut.PassphraseAddDigit = false;
-            sut.PassphraseAddSpecial = false;
+            sut.PassphraseDigits = 0;
+            sut.PassphraseSpecials = 0;
             sut.PassphraseLanguageIndex = 0;
         }
         finally
@@ -1611,6 +1613,255 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         sut.SelectedModeIndex = 0;
         Assert.False(sut.ShowPlacementBar);
+    }
+
+    /// <summary>
+    /// The passphrase takes digits and specials by the handful, not one of each.
+    /// </summary>
+    [Fact]
+    public void PassphraseMode_TakesAsManyDigitsAndSpecialsAsAsked()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 2;
+            sut.PassphraseWordCount = 3;
+            sut.PassphraseSeparator = "-";
+            sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Lower;
+            sut.CustomSpecials = "!";
+            sut.PassphraseDigits = 4;
+            sut.PassphraseSpecials = 3;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(4, sut.GeneratedPassword.Count(char.IsDigit));
+        Assert.Equal(3, sut.GeneratedPassword.Count(character => character == '!'));
+    }
+
+    /// <summary>
+    /// Each mode's own case box governs its own mode, and the passphrase cases whole words.
+    /// </summary>
+    [Fact]
+    public void PassphraseMode_CasesWholeWordsFromItsOwnCaseBox()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 2;
+            sut.PassphraseWordCount = 4;
+            sut.PassphraseSeparator = "-";
+            sut.PassphraseDigits = 0;
+            sut.PassphraseSpecials = 0;
+            sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Upper;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(sut.GeneratedPassword.ToUpperInvariant(), sut.GeneratedPassword);
+
+        sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Alternating;
+        var alternating = sut.GeneratedPassword.Split('-', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(4, alternating.Length);
+        for (var index = 0; index < alternating.Length; index++)
+        {
+            var word = alternating[index];
+            var expected = index % 2 == 0 ? word.ToLowerInvariant() : word.ToUpperInvariant();
+            Assert.Equal(expected, word);
+        }
+    }
+
+    /// <summary>
+    /// A block covers one word in a passphrase, and the pattern repeats over the words.
+    /// </summary>
+    [Fact]
+    public void PassphraseMode_CaseBlocksCoverOneWordEach()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 2;
+            sut.PassphraseWordCount = 4;
+            sut.PassphraseSeparator = "-";
+            sut.PassphraseDigits = 0;
+            sut.PassphraseSpecials = 0;
+            sut.CaseBlocksAutoSync = false;
+            sut.CaseBlocks = "Ul";
+            sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        var words = sut.GeneratedPassword.Split('-', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(4, words.Length);
+        Assert.Equal(words[0].ToUpperInvariant(), words[0]);
+        Assert.Equal(words[1].ToLowerInvariant(), words[1]);
+        Assert.Equal(words[2].ToUpperInvariant(), words[2]);
+        Assert.Equal(words[3].ToLowerInvariant(), words[3]);
+    }
+
+    /// <summary>
+    /// While the pattern is synced it holds one block per word, as it holds one per syllable in the
+    /// other mode.
+    /// </summary>
+    [Fact]
+    public void PassphraseMode_SyncedPatternFollowsTheWordCount()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 2;
+            sut.CaseBlocksAutoSync = true;
+            sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
+            sut.PassphraseWordCount = 5;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(5, sut.CaseBlocks.Length);
+
+        sut.PassphraseWordCount = 8;
+        Assert.Equal(8, sut.CaseBlocks.Length);
+    }
+
+    /// <summary>
+    /// A preset written before the passphrase had counts still means what it said: one digit, one
+    /// special, and words with a capital letter.
+    /// </summary>
+    /// <remarks>
+    /// Those presets are on the operator's disk and carry three flags and no counts. Reading them
+    /// as "nothing at all" would quietly weaken every passphrase preset ever saved.
+    /// </remarks>
+    [Fact]
+    public void PassphrasePreset_WrittenBeforeTheCounts_KeepsWhatItMeant()
+    {
+        var sut = CreateInitializedVm();
+
+        var old = new PasswordGeneratorViewModel.PasswordPreset
+        {
+            Name = "before",
+            Mode = 2,
+            PpWordCount = 5,
+            PpSeparator = "-",
+            PpDigit = true,
+            PpSpecial = false,
+            PpCapitalize = true,
+        };
+
+        sut.ApplyPreset(old);
+
+        Assert.Equal(1, sut.PassphraseDigits);
+        Assert.Equal(0, sut.PassphraseSpecials);
+        Assert.Equal((int)PasswordGeneratorViewModel.SyllableCase.WordCase, sut.PassphraseCaseIndex);
+
+        var saved = sut.SnapshotCurrentPreset("after");
+
+        Assert.Equal(1, saved.PpDigits);
+        Assert.Equal(0, saved.PpSpecials);
+        Assert.True(saved.PpDigit, "the flag an older build reads should still say there is a digit");
+        Assert.False(saved.PpSpecial);
+        Assert.True(saved.PpCapitalize);
+    }
+
+    /// <summary>
+    /// Mixed case is drawn at generation time, so a passphrase is credited for it as a syllable
+    /// password is. Every other case mode is chosen, and is worth nothing.
+    /// </summary>
+    /// <remarks>
+    /// The word lists are synthetic and every word is five letters long, so the letter count is
+    /// known and the credit can be asserted as a number rather than as "more than before".
+    /// </remarks>
+    [Fact]
+    public void PassphraseMode_CreditsMixedCaseAndNoOtherCaseMode()
+    {
+        string[] fiveLetters = ["alpha", "bravo", "delta", "gamma", "sigma", "omega"];
+        var sut = CreateInitializedVm();
+        ForceWordLists(sut, fiveLetters, fiveLetters, fiveLetters, fiveLetters);
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 2;
+            sut.PassphraseWordCount = 4;
+            sut.PassphraseSeparator = "-";
+            sut.PassphraseDigits = 0;
+            sut.PassphraseSpecials = 0;
+            sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Lower;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        double chosenCase = sut.LastEntropyBits;
+
+        sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Upper;
+        Assert.Equal(chosenCase, sut.LastEntropyBits);
+
+        sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
+        Assert.Equal(chosenCase, sut.LastEntropyBits);
+
+        sut.PassphraseCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Mixed;
+
+        // Four words of five letters, at the 0.81 bits a character uppercased one time in four is
+        // worth.
+        Assert.Equal(chosenCase + (0.81 * 20), sut.LastEntropyBits, 3);
+    }
+
+    /// <summary>
+    /// Every button of the generator names the style it is drawn with.
+    /// </summary>
+    /// <remarks>
+    /// <para>There is no implicit <c>Button</c> style in the theme: a button that names none is
+    /// drawn by WPF's own default, which is a pale grey slab that ignores the theme entirely. Seven
+    /// buttons shipped that way, and they are pale in a dark window and invisible in no test,
+    /// because nothing about them is wrong until someone looks.</para>
+    /// <para>This reads the markup rather than the live control because the view refuses to be
+    /// constructed outside the composition root.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryGeneratorButtonNamesItsStyle()
+    {
+        string markup = File.ReadAllText(Path.Combine(
+            ViewSource.RepoRoot(),
+            "src", "Heimdall.App", "Views", "Tools", "PasswordGeneratorView.xaml"));
+
+        List<string> unstyled = Regex
+            .Matches(markup, @"<Button\b[^>]*?/?>", RegexOptions.Singleline)
+            .Select(match => match.Value)
+            .Where(tag => !tag.Contains("Style=", StringComparison.Ordinal))
+            .Select(tag => Regex.Match(tag, @"x:Name=""([^""]+)""") is { Success: true } name
+                ? name.Groups[1].Value
+                : tag)
+            .ToList();
+
+        Assert.True(
+            unstyled.Count == 0,
+            "these buttons would be drawn by WPF's default template, which ignores the theme:\n"
+            + string.Join(Environment.NewLine, unstyled));
+
+        // The assertion above is satisfied by a file with no buttons at all, which this is not.
+        Assert.True(
+            Regex.Matches(markup, @"<Button\b").Count >= 20,
+            "the generator's markup no longer holds the buttons this guard is about");
     }
 
     private PasswordGeneratorViewModel CreateInitializedVm()

@@ -164,6 +164,14 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
         CmbLeetCase.SelectedIndex = 0;
 
+        CmbPpCase.Items.Clear();
+        foreach (object? item in CmbSylCase.Items)
+        {
+            CmbPpCase.Items.Add(item);
+        }
+
+        CmbPpCase.SelectedIndex = (int)PasswordGeneratorViewModel.SyllableCase.WordCase;
+
         CmbLeetPlacement.Items.Clear();
         foreach (object? item in CmbSylPlacement.Items)
         {
@@ -269,16 +277,16 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         BtnPlacementDistribute.Content = L("ToolPwdGenPlacementDistribute");
         CaseBlocksHint.Text = L("ToolPwdGenBlocksHint");
         BtnCaseBlocksRandom.Content = L("ToolPwdGenBlocksRandom");
-        ChkCaseBlocksAutoSync.Content = L("ToolPwdGenBlocksAutoSync");
+        UpdateCaseBlocksAutoSyncLabel();
         SylStructureLabel.Text = L("ToolPwdGenSylStructure");
 
         // Passphrase mode
         PpWordCountLabel.Text = L("ToolPwdGenWordCount");
         PpSeparatorLabel.Text = L("ToolPwdGenSeparator");
         PpLanguageLabel.Text = L("ToolPwdGenLanguage");
-        ChkPpCapitalize.Content = L("ToolPwdGenCapitalize");
-        ChkPpDigit.Content = L("ToolPwdGenAddDigit");
-        ChkPpSpecial.Content = L("ToolPwdGenAddSpecial");
+        PpCaseLabel.Text = L("ToolPwdGenCase");
+        PpDigitsLabel.Text = L("ToolPwdGenDigits");
+        PpSpecialsLabel.Text = L("ToolPwdGenSymbols");
         PpPlacementLabel.Text = L("ToolPwdGenPlacement");
 
         // Accessibility
@@ -319,9 +327,9 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(TxtLeetWord, L("ToolPwdGenLeetWord"));
         System.Windows.Automation.AutomationProperties.SetName(LeetDigitsSlider, L("ToolPwdGenDigits"));
         System.Windows.Automation.AutomationProperties.SetName(LeetSpecialsSlider, L("ToolPwdGenSymbols"));
-        System.Windows.Automation.AutomationProperties.SetName(ChkPpCapitalize, L("ToolPwdGenCapitalize"));
-        System.Windows.Automation.AutomationProperties.SetName(ChkPpDigit, L("ToolPwdGenAddDigit"));
-        System.Windows.Automation.AutomationProperties.SetName(ChkPpSpecial, L("ToolPwdGenAddSpecial"));
+        System.Windows.Automation.AutomationProperties.SetName(CmbPpCase, L("ToolPwdGenCase"));
+        System.Windows.Automation.AutomationProperties.SetName(PpDigitsSlider, L("ToolPwdGenDigits"));
+        System.Windows.Automation.AutomationProperties.SetName(PpSpecialsSlider, L("ToolPwdGenSymbols"));
         System.Windows.Automation.AutomationProperties.SetName(BtnPresetPin4, L("ToolPwdGenPresetPin4"));
         System.Windows.Automation.AutomationProperties.SetName(BtnPresetPin6, L("ToolPwdGenPresetPin6"));
         System.Windows.Automation.AutomationProperties.SetName(BtnPresetWifi, L("ToolPwdGenPresetWifi"));
@@ -388,6 +396,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.SelectedModeIndex), StringComparison.Ordinal))
         {
             UpdateModeDescription();
+            UpdateCaseBlocksAutoSyncLabel();
             UpdateSyllableUiHints();
             if (_viewInitialized)
             {
@@ -419,6 +428,17 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     {
         StrengthBarFillColumn.Width = new GridLength(_vm.StrengthPercent, GridUnitType.Star);
         StrengthBarEmptyColumn.Width = new GridLength(1 - _vm.StrengthPercent, GridUnitType.Star);
+    }
+
+    /// <summary>
+    /// A block covers a syllable in one mode and a word in the other, so the box beside the
+    /// pattern says which.
+    /// </summary>
+    private void UpdateCaseBlocksAutoSyncLabel()
+    {
+        ChkCaseBlocksAutoSync.Content = _vm.CurrentMode == PasswordGeneratorViewModel.GeneratorMode.Passphrase
+            ? L("ToolPwdGenBlocksAutoSyncWords")
+            : L("ToolPwdGenBlocksAutoSync");
     }
 
     private void UpdateModeDescription()
