@@ -156,7 +156,8 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             sut,
             PasswordGeneratorViewModel.FallbackEnglishWords,
             PasswordGeneratorViewModel.FallbackFrenchWords,
-            PasswordGeneratorViewModel.FallbackSpanishWords);
+            PasswordGeneratorViewModel.FallbackSpanishWords,
+            PasswordGeneratorViewModel.FallbackLatinWords);
 
         sut.SelectedModeIndex = 2;
         sut.PassphraseWordCount = 4;
@@ -188,6 +189,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
+    [InlineData(3)]
     public void PassphraseMode_DrawsFromTheWordListOfTheSelectedLanguage(int languageIndex)
     {
         string[][] lists =
@@ -195,6 +197,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             ["alfa", "bravo", "charlie", "delta", "echo", "foxtrot"],
             ["golf", "hotel", "india", "juliet", "kilo", "lima"],
             ["mike", "november", "oscar", "papa", "quebec", "romeo"],
+            ["sierra", "tango", "uniform", "victor", "whiskey", "xray"],
         ];
 
         Assert.Equal(PasswordGeneratorViewModel.PassphraseLanguages.Length, lists.Length);
@@ -228,6 +231,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     [InlineData("fr", 1)]
     [InlineData("es", 2)]
     [InlineData("ES", 2)]
+    [InlineData("la", 3)]
     [InlineData("de", 0)]
     [InlineData(null, 0)]
     public void PassphraseLanguageIndexFor_MapsTheInterfaceLocaleToItsWordList(string? locale, int expected)
@@ -244,7 +248,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     public void PassphraseLanguages_KeepTheOrderSavedPresetsWereWrittenAgainst()
     {
         Assert.Equal(
-            ["en", "fr", "es"],
+            ["en", "fr", "es", "la"],
             PasswordGeneratorViewModel.PassphraseLanguages.Select(language => language.Locale));
     }
 
@@ -500,6 +504,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
+    [InlineData(3)]
     public void LeetMode_DrawsItsBaseWordFromTheListOfTheSelectedLanguage(int languageIndex)
     {
         string[][] lists =
@@ -507,6 +512,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             ["alfa", "bravo", "delta"],
             ["golf", "hotel", "india"],
             ["mike", "oscar", "papa"],
+            ["sierra", "tango", "uniform"],
         ];
 
         var sut = CreateInitializedVm();
@@ -604,6 +610,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             ["alfa", "bravo", "delta", "echo", "golf", "hotel", "india", "kilo"],
             ["golf", "hotel", "india"],
             ["mike", "oscar", "papa"],
+            ["sierra", "tango", "uniform"],
         ];
 
         var sut = CreateInitializedVm();

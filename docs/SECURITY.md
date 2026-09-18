@@ -843,7 +843,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 6,378
+  parity (every catalogue holds exactly the English key set, currently 6,379
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on

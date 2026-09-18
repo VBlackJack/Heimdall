@@ -14,6 +14,18 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Latin passphrases
+
+- The passphrase and leet modes offer a fourth language, Latin, 3649 words, 11.8 bits each.
+  It is the largest list of the four. No interface language selects it on its own: it is there
+  to be chosen, for a passphrase of words that belong to no password list anyone maintains.
+- The list is Latin-flavoured and curated, not scholarly. It comes from genpwd-pro, ten plainly
+  English entries were removed on the way in, and about a hundred of the words it keeps are
+  spelled the same in English, mostly because English took them from Latin. What a passphrase
+  word has to be is typeable, countable and distinct, and these are.
+- The language is appended to the table, never inserted, so the index every saved preset holds
+  still points at the language it was saved with.
+
 ### Larger passphrase word lists
 
 - The English and French word lists grow from 515 and 507 words to 3525 and 2774. A word is

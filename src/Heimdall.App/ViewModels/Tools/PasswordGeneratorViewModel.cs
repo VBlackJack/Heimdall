@@ -255,6 +255,15 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         "esmeralda","espuma","estrella","fogata","frambuesa","gaviota","girasol","granito","hoguera","volcan"
     ];
 
+    internal static readonly string[] FallbackLatinWords =
+    [
+        "aqua","arbor","ardor","astrum","aurora","avis","bellum","caelum","campus","candela",
+        "carmen","castrum","causa","civis","clamor","corona","corpus","cursus","decus","dominus",
+        "donum","ferrum","fides","flamma","flumen","fortuna","forum","fulmen","gloria","gratia",
+        "herba","hortus","ignis","imperium","insula","lumen","luna","magister","mare","memoria",
+        "navis","nebula","nomen","oculus","populus","portus","ratio","regnum","sagitta","scutum"
+    ];
+
     /// <summary>One passphrase language: its locale, its label, and where its words come from.</summary>
     /// <param name="Locale">The locale code that selects this language on first use.</param>
     /// <param name="LabelKey">The catalogue key naming the language in the language box.</param>
@@ -281,6 +290,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         new("en", "ToolPwdGenLangEnglish", "wordlist_en.txt", FallbackEnglishWords),
         new("fr", "ToolPwdGenLangFrench", "wordlist_fr.txt", FallbackFrenchWords),
         new("es", "ToolPwdGenLangSpanish", "wordlist_es.txt", FallbackSpanishWords),
+        new("la", "ToolPwdGenLangLatin", "wordlist_la.txt", FallbackLatinWords),
     ];
 
     /// <summary>

@@ -60,6 +60,7 @@ public sealed class PassphraseWordListGuardTests
         ["wordlist_en.txt"] = 3000,
         ["wordlist_fr.txt"] = 2500,
         ["wordlist_es.txt"] = 700,
+        ["wordlist_la.txt"] = 3000,
     };
 
     public static TheoryData<string> ShippedWordLists()
@@ -85,10 +86,11 @@ public sealed class PassphraseWordListGuardTests
             .Select(language => language.FileName)
             .ToList();
 
-        Assert.Equal(3, files.Count);
+        Assert.Equal(4, files.Count);
         Assert.Contains("wordlist_en.txt", files);
         Assert.Contains("wordlist_fr.txt", files);
         Assert.Contains("wordlist_es.txt", files);
+        Assert.Contains("wordlist_la.txt", files);
     }
 
     /// <summary>
@@ -158,6 +160,48 @@ public sealed class PassphraseWordListGuardTests
             repeated.Count == 0,
             $"{fileName} repeats {repeated.Count} word(s). The loader removes them, so the file "
             + $"overstates the pool it provides: {string.Join(", ", repeated.Take(20))}");
+    }
+
+    /// <summary>
+    /// Two languages offer two different vocabularies. Every other assertion here reads one file
+    /// at a time, so a list copied over another would satisfy all of them: same size, same
+    /// alphabet, no repeats inside itself, and a language box offering the same words twice.
+    /// </summary>
+    /// <remarks>
+    /// The threshold is a quarter of the smaller list. What the shipped files actually share is
+    /// far below it - 8.3 percent between English and French, 3.3 between English and Latin,
+    /// which is English having taken the word from Latin - so this fails on a copy or a merge,
+    /// not on the ordinary kinship of neighbouring languages.
+    /// </remarks>
+    [Fact]
+    public void NoTwoWordListsAreTheSameVocabulary()
+    {
+        const double maximumSharedFraction = 0.25;
+
+        List<string> files = PasswordGeneratorViewModel.PassphraseLanguages
+            .Select(language => language.FileName)
+            .ToList();
+
+        List<string> tooAlike = [];
+        for (int first = 0; first < files.Count; first++)
+        {
+            for (int second = first + 1; second < files.Count; second++)
+            {
+                HashSet<string> left = new(ReadWordList(files[first]), System.StringComparer.Ordinal);
+                HashSet<string> right = new(ReadWordList(files[second]), System.StringComparer.Ordinal);
+                int shared = left.Count(right.Contains);
+                double fraction = (double)shared / Math.Min(left.Count, right.Count);
+
+                if (fraction > maximumSharedFraction)
+                {
+                    tooAlike.Add(
+                        $"{files[first]} and {files[second]} share {shared} words, "
+                        + $"{fraction:P0} of the smaller");
+                }
+            }
+        }
+
+        Assert.True(tooAlike.Count == 0, string.Join(Environment.NewLine, tooAlike));
     }
 
     /// <summary>
