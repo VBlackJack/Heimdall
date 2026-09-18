@@ -30,7 +30,8 @@ All notable changes to Heimdall are documented in this file.
 - A preset saved before this has its counts added back, so it keeps producing passwords of the
   length it used to produce. The separator is not added back: how many separators a password
   carries depends on how its syllables fall, which a preset does not record. The three built-in
-  syllable presets now state the length they produce.
+  syllable presets are named after the length they produce: `Easy 18`, `Balanced 24` and
+  `Strong 30`, which is the same password each of them made before, counted honestly.
 
 ### The generator panel reads properly
 
