@@ -1162,7 +1162,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         try
         {
             sut.SelectedModeIndex = 1;
-            sut.SyllableLength = 12;
+            sut.SyllableLength = 17;
             sut.SyllableCvc = false;
             sut.SyllableDigits = 0;
             sut.SyllableSpecials = 0;
@@ -1337,6 +1337,8 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             sut.SelectedModeIndex = 1;
             sut.SyllableCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
             sut.CaseBlocksAutoSync = true;
+            sut.SyllableDigits = 0;
+            sut.SyllableSpecials = 0;
             sut.SyllableLength = 12;
         }
         finally
@@ -1366,6 +1368,44 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         var afterHand = sut.CaseBlocks;
         sut.SyllableLength = 10;
         Assert.Equal(afterHand, sut.CaseBlocks);
+    }
+
+    /// <summary>
+    /// The block editor follows the syllables the password actually has, which is not the length
+    /// when some of that length is spent on digits, specials or separators.
+    /// </summary>
+    [Fact]
+    public void CaseBlocks_SyncedPatternCountsTheSyllablesAndNotTheLength()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableCaseIndex = (int)PasswordGeneratorViewModel.SyllableCase.Blocks;
+            sut.CaseBlocksAutoSync = true;
+            sut.SyllableSeparator = string.Empty;
+            sut.SyllableDigits = 0;
+            sut.SyllableSpecials = 0;
+            sut.SyllableLength = 16;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(8, sut.CaseBlocks.Length);
+
+        // Three of the sixteen characters go elsewhere, leaving thirteen for six syllables.
+        sut.SyllableDigits = 2;
+        sut.SyllableSpecials = 1;
+        Assert.Equal(6, sut.CaseBlocks.Length);
+
+        // A separator is a character of the password too: five of them between six syllables
+        // would not fit, so the password holds four.
+        sut.SyllableSeparator = "-";
+        Assert.Equal(4, sut.CaseBlocks.Length);
     }
 
     /// <summary>
@@ -1414,7 +1454,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         var password = sut.GeneratedPassword;
 
-        Assert.Equal(14, password.Length);
+        Assert.Equal(12, password.Length);
         Assert.True(char.IsDigit(password[0]), $"'{password}' does not open on a digit");
         Assert.True(char.IsDigit(password[^1]), $"'{password}' does not close on a digit");
         Assert.All(password[1..^1], character => Assert.True(char.IsLetter(character)));
@@ -1448,7 +1488,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         var password = sut.GeneratedPassword;
 
-        Assert.Equal(11, password.Length);
+        Assert.Equal(10, password.Length);
         Assert.True(char.IsDigit(password[5]), $"'{password}' has no digit in the middle");
     }
 
@@ -1483,7 +1523,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         var password = sut.GeneratedPassword;
 
-        Assert.Equal(10, password.Length);
+        Assert.Equal(8, password.Length);
         Assert.True(char.IsDigit(password[0]), $"'{password}' does not open on a digit");
         Assert.Equal('!', password[^1]);
     }
@@ -2163,6 +2203,207 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
                 ? replacement
                 : character)
             .ToArray());
+    }
+
+    /// <summary>
+    /// The length asked for is the length that comes out, whatever it is spent on.
+    /// </summary>
+    /// <remarks>
+    /// The digits, the specials and the separator are all characters of the password, so all
+    /// three are paid for out of the length rather than added to it. Each row draws a full batch,
+    /// because the shape of a syllable is a coin toss and one draw proves nothing about the next.
+    /// </remarks>
+    [Theory]
+    [InlineData(8, 0, 0, "", false)]
+    [InlineData(8, 2, 1, "", false)]
+    [InlineData(9, 2, 1, "", false)]
+    [InlineData(12, 2, 1, "-", false)]
+    [InlineData(12, 0, 0, "-", true)]
+    [InlineData(16, 3, 2, "-", true)]
+    [InlineData(17, 1, 0, "-", true)]
+    [InlineData(20, 1, 0, "..", true)]
+    [InlineData(24, 6, 6, "", true)]
+    [InlineData(32, 4, 4, "-", true)]
+    public void SyllableLength_IsTheLengthOfTheWholePassword(
+        int length, int digits, int specials, string separator, bool cvc)
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = length;
+            sut.SyllableDigits = digits;
+            sut.SyllableSpecials = specials;
+            sut.SyllableSeparator = separator;
+            sut.SyllableCvc = cvc;
+            sut.BatchCount = 12;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(length, sut.GeneratedPassword.Length);
+        Assert.Equal(length, sut.SyllableTotalLength);
+        Assert.Equal(12, sut.GeneratedBatch.Count);
+        foreach (var password in sut.GeneratedBatch)
+        {
+            Assert.Equal(length, password.Length);
+        }
+
+        Assert.Equal(digits, sut.EffectiveSyllableDigits);
+        Assert.Equal(specials, sut.EffectiveSyllableSpecials);
+        Assert.False(sut.ShowFloorNotice);
+    }
+
+    /// <summary>
+    /// The counts are what gives when they ask for more characters than the length holds.
+    /// </summary>
+    /// <remarks>
+    /// A length is exact and a count is a wish for how the length is spent, so the password stays
+    /// the size it was asked for. The cut takes from whichever count is larger, so one kind of
+    /// character does not disappear while the other keeps every place it asked for, and the notice
+    /// line says what it ended up with.
+    /// </remarks>
+    [Theory]
+    [InlineData(8, 6, 6, 3, 3)]
+    [InlineData(8, 1, 6, 1, 5)]
+    [InlineData(8, 6, 1, 5, 1)]
+    [InlineData(8, 4, 4, 3, 3)]
+    public void SyllableCounts_GiveWayToTheLength_AndSayThatTheyDid(
+        int length, int digits, int specials, int expectedDigits, int expectedSpecials)
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = length;
+            sut.SyllableDigits = digits;
+            sut.SyllableSpecials = specials;
+            sut.SyllableSeparator = string.Empty;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(expectedDigits, sut.EffectiveSyllableDigits);
+        Assert.Equal(expectedSpecials, sut.EffectiveSyllableSpecials);
+
+        // What was asked for is left alone: the cut is a decision about this generation, not a
+        // correction of the operator's sliders.
+        Assert.Equal(digits, sut.SyllableDigits);
+        Assert.Equal(specials, sut.SyllableSpecials);
+
+        Assert.Equal(length, sut.GeneratedPassword.Length);
+        Assert.True(sut.ShowFloorNotice);
+        Assert.NotEmpty(sut.FloorNoticeText);
+    }
+
+    /// <summary>
+    /// A cut that the floor undoes is not reported, because by the time the password is drawn it
+    /// did not happen.
+    /// </summary>
+    [Fact]
+    public void SyllableCounts_ThatTheFloorMakesRoomFor_AreNotReportedAsCut()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 8;
+            sut.SyllableDigits = 4;
+            sut.SyllableSpecials = 4;
+            sut.SyllableSeparator = string.Empty;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        // Eight characters have no room for eight of anything else, so two of each are cut.
+        Assert.Equal(3, sut.EffectiveSyllableDigits);
+        Assert.Equal(3, sut.EffectiveSyllableSpecials);
+        Assert.True(sut.ShowFloorNotice);
+
+        // A hundred bits cannot be carried by eight characters, so the floor raises the length,
+        // and the longer password has room for the counts the shorter one did not.
+        sut.EntropyFloorIndex = 3;
+
+        Assert.True(sut.EffectiveSyllableLength > 8, $"the floor did not raise: {sut.EffectiveSyllableLength}");
+        Assert.Equal(4, sut.EffectiveSyllableDigits);
+        Assert.Equal(4, sut.EffectiveSyllableSpecials);
+        Assert.Equal(sut.EffectiveSyllableLength, sut.GeneratedPassword.Length);
+    }
+
+    /// <summary>
+    /// A preset written before the length covered the digits and the specials keeps the password
+    /// length it used to produce.
+    /// </summary>
+    /// <remarks>
+    /// The separator is not added back: how many separators a password carries depends on how its
+    /// syllables fall, which a preset does not record. The migration therefore restores the count
+    /// of characters the preset explicitly asked for, not the exact length it happened to produce.
+    /// </remarks>
+    [Theory]
+    [InlineData(16, 2, 1, 19)]
+    [InlineData(8, 0, 0, 8)]
+    [InlineData(30, 3, 2, 32)]
+    public void ASyllablePresetWrittenBeforeTheChange_HasItsCountsAddedBack(
+        int stored, int digits, int specials, int expected)
+    {
+        var sut = CreateInitializedVm();
+
+        sut.ApplyPreset(new PasswordGeneratorViewModel.PasswordPreset
+        {
+            Name = "written before",
+            Mode = 1,
+            SylLength = stored,
+            SylDigits = digits,
+            SylSpecials = specials,
+
+            // What a file written before the change reads as, the property not being in it.
+            SylLengthIncludesExtras = false,
+        });
+
+        Assert.Equal(expected, sut.SyllableLength);
+    }
+
+    /// <summary>
+    /// A preset written since is taken at its word, and one written now says so.
+    /// </summary>
+    [Fact]
+    public void ASyllablePresetWrittenSinceTheChange_IsTakenAtItsWord()
+    {
+        var source = CreateInitializedVm();
+
+        source.SuspendRegeneration();
+        try
+        {
+            source.SelectedModeIndex = 1;
+            source.SyllableLength = 22;
+            source.SyllableDigits = 3;
+            source.SyllableSpecials = 2;
+        }
+        finally
+        {
+            source.ResumeRegeneration();
+        }
+
+        var preset = source.SnapshotCurrentPreset("written since");
+        Assert.True(preset.SylLengthIncludesExtras);
+
+        var target = CreateInitializedVm();
+        target.ApplyPreset(preset);
+
+        Assert.Equal(22, target.SyllableLength);
+        Assert.Equal(22, target.GeneratedPassword.Length);
     }
 
     private static void InvokePrivate(PasswordGeneratorViewModel sut, string methodName, params object[] args)
