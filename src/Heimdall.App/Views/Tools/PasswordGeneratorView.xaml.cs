@@ -37,7 +37,6 @@ namespace Heimdall.App.Views.Tools;
 /// </summary>
 public partial class PasswordGeneratorView : UserControl, IToolView
 {
-    private const int ClipboardClearDelaySeconds = 30;
 
     /// <summary>The width of a placement cursor, which the track has to leave room for.</summary>
     private const double PlacementCursorWidth = 14;
@@ -49,6 +48,8 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     private readonly PasswordGeneratorViewModel _vm;
     private bool _viewInitialized;
     private DispatcherTimer? _clipboardClearTimer;
+    private DispatcherTimer? _clipboardHintTimer;
+    private int _clipboardSecondsLeft;
     private string? _lastCopiedPassword;
 
     public PasswordGeneratorView()
@@ -199,6 +200,14 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         }
 
         CmbEntropyFloor.SelectedIndex = 0;
+
+        CmbClipboardDelay.Items.Clear();
+        foreach (int seconds in PasswordGeneratorViewModel.ClipboardClearChoices)
+        {
+            CmbClipboardDelay.Items.Add($"{seconds} {L("ToolPwdGenSeconds")}");
+        }
+
+        CmbClipboardDelay.SelectedIndex = 0;
     }
 
     private void ApplyLocalization()
@@ -325,6 +334,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(CmbLeetLanguage, L("ToolPwdGenLanguage"));
         System.Windows.Automation.AutomationProperties.SetName(CmbEntropyFloor, L("ToolPwdGenEntropyFloor"));
         System.Windows.Automation.AutomationProperties.SetName(BatchCountSlider, L("ToolPwdGenBatchCount"));
+        System.Windows.Automation.AutomationProperties.SetName(CmbClipboardDelay, L("ToolPwdGenClipboardDelay"));
         System.Windows.Automation.AutomationProperties.SetName(BtnBatchCopyAll, L("ToolPwdGenBatchCopyAll"));
         System.Windows.Automation.AutomationProperties.SetName(BtnBatchExport, L("ToolPwdGenBatchExport"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlockAdd, L("ToolPwdGenBlocksAdd"));
@@ -1046,22 +1056,52 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         HelpPanel.Visibility = Visibility.Collapsed;
     }
 
+    /// <summary>
+    /// Counts the copied password down to the moment it leaves the clipboard.
+    /// </summary>
+    /// <remarks>
+    /// The line used to say "will auto-clear" for three seconds and then go back to the keyboard
+    /// hint, which told the operator a delay was running but never how much of it was left. It now
+    /// ticks, and says so when the clipboard is cleared.
+    /// </remarks>
     private void ShowClipboardClearHint()
     {
-        if (!_vm.ClipboardAutoClear) return;
-
-        var originalText = L("ToolPwdGenKeyboardHint");
-        KeyboardHintText.Text = L("ToolPwdGenClipboardClearHint");
-
-        var revertTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-        revertTimer.Tick += (_, _) =>
+        if (!_vm.ClipboardAutoClear)
         {
-            revertTimer.Stop();
-            KeyboardHintText.Text = originalText;
-        };
-        revertTimer.Start();
-    }
+            return;
+        }
 
+        _clipboardHintTimer?.Stop();
+        _clipboardSecondsLeft = _vm.ClipboardClearSeconds;
+        KeyboardHintText.Text = string.Format(L("ToolPwdGenClipboardClearHint"), _clipboardSecondsLeft);
+
+        _clipboardHintTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _clipboardHintTimer.Tick += (_, _) =>
+        {
+            _clipboardSecondsLeft--;
+            if (_clipboardSecondsLeft > 0)
+            {
+                KeyboardHintText.Text = string.Format(
+                    L("ToolPwdGenClipboardClearHint"),
+                    _clipboardSecondsLeft);
+                return;
+            }
+
+            _clipboardHintTimer?.Stop();
+            KeyboardHintText.Text = L("ToolPwdGenClipboardCleared");
+
+            var revertTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            revertTimer.Tick += (_, _) =>
+            {
+                revertTimer.Stop();
+                KeyboardHintText.Text = L("ToolPwdGenKeyboardHint");
+            };
+
+            revertTimer.Start();
+        };
+
+        _clipboardHintTimer.Start();
+    }
     private void StartClipboardClearTimer(string password)
     {
         if (!_vm.ClipboardAutoClear) return;
@@ -1070,7 +1110,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         _clipboardClearTimer?.Stop();
         _clipboardClearTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(ClipboardClearDelaySeconds)
+            Interval = TimeSpan.FromSeconds(_vm.ClipboardClearSeconds)
         };
         _clipboardClearTimer.Tick += (_, _) =>
         {

@@ -1991,6 +1991,120 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(PasswordGeneratorViewModel.MinimumBatchCount, sut.BatchCount);
     }
 
+    /// <summary>
+    /// A special character has to be ASCII punctuation, each one counts once, and the box is read
+    /// only so far.
+    /// </summary>
+    [Theory]
+    [InlineData(null, "")]
+    [InlineData("", "")]
+    [InlineData("!@#", "!@#")]
+    [InlineData("!!!@@@", "!@")]
+    [InlineData("abc123", "")]
+    [InlineData("a!b@c#", "!@#")]
+    [InlineData("\u20ac\u00a3\u00a5", "")]
+    [InlineData("!\u20ac@", "!@")]
+    [InlineData("! @ #", "!@#")]
+    public void Specials_AreHeldToAsciiPunctuation(string? typed, string expected)
+    {
+        Assert.Equal(expected, PasswordGeneratorViewModel.SanitizeCustomSpecials(typed));
+    }
+
+    /// <summary>
+    /// Whatever is pasted into the box, what comes out of it is a subset of the allowed set, so it
+    /// needs no length cap of its own.
+    /// </summary>
+    /// <remarks>
+    /// A cap of thirty-two was written here first and removed: ASCII holds exactly thirty-two
+    /// punctuation characters, so the cap could never have bound anything.
+    /// </remarks>
+    [Fact]
+    public void Specials_CannotExceedTheAllowedSet()
+    {
+        string every = PasswordGeneratorViewModel.AllowedSpecialChars;
+        string pasted = string.Concat(Enumerable.Repeat(every + "abc123€", 20));
+
+        string usable = PasswordGeneratorViewModel.SanitizeCustomSpecials(pasted);
+
+        Assert.Equal(every.Length, usable.Length);
+        Assert.Equal(every.Length, usable.Distinct().Count());
+        Assert.All(usable, character => Assert.Contains(character, every));
+    }
+
+    /// <summary>
+    /// A password takes its specials from what the box is worth, not from what was typed into it.
+    /// </summary>
+    [Fact]
+    public void Specials_APasswordUsesOnlyWhatTheBoxIsWorth()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 64;
+            sut.IncludeUppercase = false;
+            sut.IncludeLowercase = false;
+            sut.IncludeDigits = false;
+            sut.IncludeSymbols = true;
+            sut.CustomSpecials = "!\u20ac@\u00a3#";
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.All(sut.GeneratedPassword, character => Assert.Contains(character, "!@#"));
+    }
+
+    /// <summary>
+    /// The box is left as typed, and a line under it says what survived, or that nothing did.
+    /// </summary>
+    [Fact]
+    public void Specials_NoticeSaysWhatWillBeUsed()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.CustomSpecials = "!@#";
+        Assert.Equal("!@#", sut.CustomSpecials);
+        Assert.False(sut.ShowCustomSpecialsNotice);
+        Assert.Empty(sut.CustomSpecialsNotice);
+
+        sut.CustomSpecials = "!abc@";
+        Assert.Equal("!abc@", sut.CustomSpecials);
+        Assert.True(sut.ShowCustomSpecialsNotice);
+        Assert.Contains("ToolPwdGenSpecialsUsable", sut.CustomSpecialsNotice);
+        Assert.Equal("!@", PasswordGeneratorViewModel.SanitizeCustomSpecials(sut.CustomSpecials));
+
+        sut.CustomSpecials = "\u20ac\u00a3\u00a5";
+        Assert.Equal("\u20ac\u00a3\u00a5", sut.CustomSpecials);
+        Assert.True(sut.ShowCustomSpecialsNotice);
+        Assert.Contains("ToolPwdGenSpecialsNoneUsable", sut.CustomSpecialsNotice);
+    }
+
+    /// <summary>
+    /// The clipboard delay is the one the box names, and the first entry is the thirty seconds the
+    /// tool has always used.
+    /// </summary>
+    [Theory]
+    [InlineData(0, 30)]
+    [InlineData(1, 10)]
+    [InlineData(2, 60)]
+    [InlineData(3, 120)]
+    // Either side by one. Minus four and ninety-nine would have been satisfied by a modulo as
+    // well as by a clamp, and a mutant that wrapped instead of clamping survived them.
+    [InlineData(-1, 30)]
+    [InlineData(4, 120)]
+    public void ClipboardDelay_IsTheOneTheBoxNames(int index, int expectedSeconds)
+    {
+        var sut = CreateInitializedVm();
+
+        sut.ClipboardClearIndex = index;
+
+        Assert.Equal(expectedSeconds, sut.ClipboardClearSeconds);
+    }
+
     private PasswordGeneratorViewModel CreateInitializedVm()
     {
         var sut = new PasswordGeneratorViewModel(new PasswordPresetStorage(_presetsDirectoryPath));

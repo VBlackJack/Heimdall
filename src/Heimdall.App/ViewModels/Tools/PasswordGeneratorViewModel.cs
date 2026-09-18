@@ -134,6 +134,26 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private const string LowercaseChars = "abcdefghijklmnopqrstuvwxyz";
     private const string DigitChars = "0123456789";
     public const string DefaultSymbolChars = "!@#$%^&*()-_=+[]{}|;:',.<>?/~`";
+
+    /// <summary>
+    /// Every special character a password may hold: the printable ASCII punctuation, and
+    /// nothing else.
+    /// </summary>
+    /// <remarks>
+    /// A password is read off one screen and typed on whatever keyboard is in front of the
+    /// person, which is the same reason the passphrase word lists carry no accent. Pasting a
+    /// euro sign or a typographic dash into the box used to put it in the password, where it
+    /// may be untypeable, may not survive a terminal, and may not come back the same from a
+    /// password field that normalises its input.
+    /// </remarks>
+    internal const string AllowedSpecialChars =
+        "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+
+    /// <summary>
+    /// How long a copied password may sit on the clipboard, in seconds. The first is what the
+    /// tool has always used.
+    /// </summary>
+    internal static readonly int[] ClipboardClearChoices = [30, 10, 60, 120];
     private const string AmbiguousChars = "0Oo1lI|";
     private const string ShellDangerousChars = "$^&*'\"\\|`(){}[]<>!~;";
     private const string DefaultPassphraseSeparator = "-";
@@ -471,6 +491,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     [ObservableProperty] private string _specialPositions = string.Empty;
 
     [ObservableProperty] private bool _clipboardAutoClear;
+    [ObservableProperty] private int _clipboardClearIndex;
     [ObservableProperty] private int _batchCount = MinimumBatchCount;
     [ObservableProperty] private bool _maskBatch;
 
@@ -501,6 +522,43 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     public ObservableCollection<string> BatchRows { get; } = new();
 
     public bool ShowBatch => GeneratedBatch.Count > 1;
+
+    /// <summary>The delay the clipboard timer runs on, in seconds.</summary>
+    internal int ClipboardClearSeconds =>
+        ClipboardClearChoices[Math.Clamp(ClipboardClearIndex, 0, ClipboardClearChoices.Length - 1)];
+
+    /// <summary>
+    /// What the generator will actually use out of the custom specials box, when that differs
+    /// from what was typed into it. Empty when the two agree.
+    /// </summary>
+    /// <remarks>
+    /// The box is left exactly as typed. Rewriting what someone is still typing fights them,
+    /// and silently dropping half of it tells them nothing: the line under the box says what
+    /// survived, or that none of it did.
+    /// </remarks>
+    public string CustomSpecialsNotice
+    {
+        get
+        {
+            var typed = CustomSpecials ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(typed))
+            {
+                return string.Empty;
+            }
+
+            var usable = SanitizeCustomSpecials(typed);
+            if (string.Equals(usable, typed, StringComparison.Ordinal))
+            {
+                return string.Empty;
+            }
+
+            return usable.Length == 0
+                ? L("ToolPwdGenSpecialsNoneUsable")
+                : string.Format(L("ToolPwdGenSpecialsUsable"), usable);
+        }
+    }
+
+    public bool ShowCustomSpecialsNotice => !string.IsNullOrEmpty(CustomSpecialsNotice);
 
     /// <summary>The batch as it is copied and exported, one password per line.</summary>
     internal string BatchAsText => string.Join(Environment.NewLine, GeneratedBatch);
@@ -1439,7 +1497,12 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnExcludeAmbiguousChanged(bool value) => RegenerateIfReady();
     partial void OnCliSafeChanged(bool value) => RegenerateIfReady();
     partial void OnLayoutSafeChanged(bool value) => RegenerateIfReady();
-    partial void OnCustomSpecialsChanged(string value) => RegenerateIfReady();
+    partial void OnCustomSpecialsChanged(string value)
+    {
+        OnPropertyChanged(nameof(CustomSpecialsNotice));
+        OnPropertyChanged(nameof(ShowCustomSpecialsNotice));
+        RegenerateIfReady();
+    }
     partial void OnSyllableLengthChanged(int value)
     {
         SyncCaseBlocksToUnitCount();
@@ -1617,6 +1680,28 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         return sb.ToString();
     }
 
+    /// <summary>
+    /// What the box is worth: the characters of <see cref="AllowedSpecialChars"/> it holds,
+    /// each one once.
+    /// </summary>
+    /// <remarks>
+    /// No length cap is needed and one was removed after it was written: ASCII holds exactly
+    /// thirty-two punctuation characters, so a deduplicated result cannot be longer than the
+    /// allowed set itself, whatever is pasted into the box.
+    /// </remarks>
+    internal static string SanitizeCustomSpecials(string? typed)
+    {
+        if (string.IsNullOrEmpty(typed))
+        {
+            return string.Empty;
+        }
+
+        return new string(typed
+            .Where(AllowedSpecialChars.Contains)
+            .Distinct()
+            .ToArray());
+    }
+
     private string GetEffectiveSymbols()
     {
         bool useCustom = CurrentMode == GeneratorMode.Random
@@ -1624,7 +1709,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             : !string.IsNullOrWhiteSpace(CustomSpecials);
 
         var symbols = useCustom
-            ? new string(CustomSpecials.Where(c => !char.IsLetterOrDigit(c) && !char.IsWhiteSpace(c)).Distinct().ToArray())
+            ? SanitizeCustomSpecials(CustomSpecials)
             : DefaultSymbolChars;
 
         if (CliSafe)
