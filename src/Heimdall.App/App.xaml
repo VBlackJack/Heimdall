@@ -14,6 +14,7 @@
             <!-- Value converters -->
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
             <converters:InvertBoolConverter x:Key="InvertBoolConverter"/>
+            <converters:NarrowPaneConverter x:Key="NarrowPaneConverter"/>
             <converters:ConnectionTypeToBrushConverter x:Key="ConnectionTypeToBrushConverter"/>
             <converters:ConnectionStateToBrushConverter x:Key="ConnectionStateToBrushConverter"/>
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
