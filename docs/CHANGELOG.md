@@ -14,6 +14,31 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A minimum strength the generator will not go under
+
+- The generator takes a minimum strength: none, 60, 80, 100 or 128 bits. Under it, the password
+  is generated at the size the floor needs rather than the size you set: a random password gains
+  characters, a passphrase gains words, a syllable password gains syllables, a leet password
+  gains digits and then specials. It takes the smallest size that carries the floor, and a line
+  under the strength figure says what it used and what you had set.
+- Your own setting is never written to. The slider stays where you put it, and clearing the
+  minimum returns the tool to what you asked for without you having to put the value back.
+- Nothing is appended to make the arithmetic work. genpwd-pro, where the idea comes from,
+  reached its floor by adding random characters to whatever had been generated, which turns a
+  passphrase someone asked for into a passphrase with a random tail. Here the password keeps
+  the shape its mode promises.
+- The size is decided from the settings, never from the password that came out. A leet
+  password's mixed case and a syllable password's closed syllables are worth real bits, but a
+  different number of them on every draw, so a floor that read them would move the size on a
+  click meant only to reroll. They stay out of the decision, which therefore holds for every
+  password those settings can produce, and stay in the figure on display, which describes the
+  one password on screen.
+- When even the maximum cannot carry the floor, nothing is changed at all and the issue line
+  says so. Two words drawn from a four-word list cannot be made to carry 128 bits, and a tool
+  that maxed out every control on its way to discovering that would leave you to put them back.
+- The floor never lowers anything: a configuration already above it is left alone. It is saved
+  with a preset like every other setting.
+
 ### Latin passphrases
 
 - The passphrase and leet modes offer a fourth language, Latin, 3649 words, 11.8 bits each.

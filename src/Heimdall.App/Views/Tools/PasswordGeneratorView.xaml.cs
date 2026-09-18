@@ -166,6 +166,16 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         }
 
         CmbLeetLanguage.SelectedIndex = CmbPpLanguage.SelectedIndex;
+
+        CmbEntropyFloor.Items.Clear();
+        foreach (int bits in PasswordGeneratorViewModel.EntropyFloorChoices)
+        {
+            CmbEntropyFloor.Items.Add(bits == 0
+                ? L("ToolPwdGenEntropyFloorOff")
+                : $"{bits} {L("ToolPwdGenBits")}");
+        }
+
+        CmbEntropyFloor.SelectedIndex = 0;
     }
 
     private void ApplyLocalization()
@@ -237,6 +247,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         LeetSpecialsLabel.Text = L("ToolPwdGenSymbols");
         LeetPlacementLabel.Text = L("ToolPwdGenPlacement");
         LeetWordSourceLabel.Text = L("ToolPwdGenLeetWordSource");
+        EntropyFloorLabel.Text = L("ToolPwdGenEntropyFloor");
         SylStructureLabel.Text = L("ToolPwdGenSylStructure");
 
         // Passphrase mode
@@ -275,6 +286,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(TxtPpSeparator, L("ToolPwdGenSeparator"));
         System.Windows.Automation.AutomationProperties.SetName(CmbPpLanguage, L("ToolPwdGenLanguage"));
         System.Windows.Automation.AutomationProperties.SetName(CmbLeetLanguage, L("ToolPwdGenLanguage"));
+        System.Windows.Automation.AutomationProperties.SetName(CmbEntropyFloor, L("ToolPwdGenEntropyFloor"));
         System.Windows.Automation.AutomationProperties.SetName(CmbLeetCase, L("ToolPwdGenCase"));
         System.Windows.Automation.AutomationProperties.SetName(CmbLeetPlacement, L("ToolPwdGenPlacement"));
         System.Windows.Automation.AutomationProperties.SetName(TxtLeetWord, L("ToolPwdGenLeetWord"));
