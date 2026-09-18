@@ -14,6 +14,31 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The generator panel reads properly
+
+- Nine labels were sized in pixels and clipped their own text. `Digits (0-9)` read
+  "Digits (0-9" in English and lost more in French and Spanish, where the same words are
+  longer; `Custom specials:` needed 26 characters of room in Spanish and had 120 pixels. They
+  are sized to their longest translation now and measured against all three catalogues.
+- The count of passwords to generate sat between the password and the strength figure that
+  describes it. It moves down beside the minimum strength, where the two things you ask of the
+  generator now sit together.
+- Layout-safe joins the other two character restrictions under Advanced. Advanced holds what
+  may appear in a password and what happens after copying it; the panel above holds what you
+  ask for and what you got.
+- One noun for one thing: the box that was labelled `Symbols (!@#$...)` says `Specials`, which
+  is what the custom box, the issue line and the leet description have always called them.
+
+### The generator says out loud what it shows
+
+- The password field announced itself as "Password Generator", the name of the whole tool. It
+  announces "Generated password".
+- Two buttons announced a name that did not carry their visible label, which is what WCAG 2.5.3
+  asks for and what a voice command needs: `Generate` announced "Regenerate", and
+  `Save Preset` announced "Save custom preset". Both now announce what they show.
+- The strength bar is named after the figure it shows and is refreshed on every generation. It
+  was initialised to "Strong" before any password existed.
+
 ### The diagram editor speaks Spanish
 
 - The embedded draw.io editor carries its Spanish resource file, so a Spanish profile gets a

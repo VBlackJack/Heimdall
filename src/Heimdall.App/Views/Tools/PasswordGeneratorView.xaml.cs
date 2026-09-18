@@ -306,9 +306,9 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         PpPlacementLabel.Text = L("ToolPwdGenPlacement");
 
         // Accessibility
-        System.Windows.Automation.AutomationProperties.SetName(BtnRegenerate, L("ToolPwdGenBtnRegenerate"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnRegenerate, L("ToolPwdGenBtnGenerate"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCopy, L("ToolPwdGenBtnCopy"));
-        System.Windows.Automation.AutomationProperties.SetName(PasswordOutput, L("ToolPwdGenTitle"));
+        System.Windows.Automation.AutomationProperties.SetName(PasswordOutput, L("ToolPwdGenOutputName"));
         System.Windows.Automation.AutomationProperties.SetName(CmbMode, L("ToolPwdGenMode"));
         System.Windows.Automation.AutomationProperties.SetName(LengthSlider, L("ToolPwdGenLength"));
         System.Windows.Automation.AutomationProperties.SetName(ChkUppercase, L("ToolPwdGenUppercase"));
@@ -364,7 +364,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
         BtnSavePreset.Content = L("ToolPwdGenBtnSavePreset");
         BtnSavePreset.ToolTip = L("TooltipSavePreset");
-        System.Windows.Automation.AutomationProperties.SetName(BtnSavePreset, L("TooltipSavePreset"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnSavePreset, L("ToolPwdGenBtnSavePreset"));
         BtnClearHistory.ToolTip = L("TooltipClearHistory");
         System.Windows.Automation.AutomationProperties.SetName(BtnClearHistory, L("TooltipClearHistory"));
 
@@ -380,8 +380,9 @@ public partial class PasswordGeneratorView : UserControl, IToolView
                 System.Windows.Automation.AutomationProperties.SetName(btn, $"{lengthLabel} {tagStr}");
         }
 
-        // Strength bar accessibility
-        System.Windows.Automation.AutomationProperties.SetName(StrengthBar, L("ToolPwdGenStrengthStrong"));
+        // The strength bar is named after the figure it shows, which UpdateStrengthBarBrush
+        // refreshes on every generation. Until the first one there is no figure to give.
+        System.Windows.Automation.AutomationProperties.SetName(StrengthBar, L("ToolPwdGenStrength"));
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)

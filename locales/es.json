@@ -3762,6 +3762,8 @@
   "FileBrowserFilterPlaceholder": "Filtrar...",
 
   "ToolPwdGenTitle": "Generador de contraseñas",
+  "ToolPwdGenOutputName": "Contraseña generada",
+  "ToolPwdGenStrength": "Fuerza",
   "ToolPwdGenBtnGenerate": "Generar",
   "ToolPwdGenBtnCopy": "Copiar",
   "ToolPwdGenLength": "Longitud",
@@ -3770,7 +3772,7 @@
   "ToolPwdGenUppercase": "Mayúsculas (A-Z)",
   "ToolPwdGenLowercase": "Minúsculas (a-z)",
   "ToolPwdGenDigits": "Dígitos (0-9)",
-  "ToolPwdGenSymbols": "Símbolos (!@#$...)",
+  "ToolPwdGenSymbols": "Especiales (!@#$...)",
   "ToolPwdGenModeRandom": "Aleatorio",
   "ToolPwdGenModeSyllable": "Sílabas",
   "ToolPwdGenModePassphrase": "Frase de contraseña",
@@ -3863,7 +3865,6 @@
   "ToolPwdGenSpecialsNoneUsable": "Ninguno de estos se puede usar: un carácter especial debe ser puntuación ASCII, escribible en cualquier teclado",
   "ToolPwdGenAdvanced": "Avanzado",
   "ToolPwdGenQuickPresets": "Preajustes rápidos:",
-  "ToolPwdGenBtnRegenerate": "Regenerar",
   "ToolPwdGenMode": "Modo:",
 
   "ToolBase64Title": "Codificador / decodificador Base64",
