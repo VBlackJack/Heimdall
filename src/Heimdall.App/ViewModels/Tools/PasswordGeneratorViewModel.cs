@@ -57,6 +57,14 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         public int SylPlacement { get; set; }
         public string SylSeparator { get; set; } = string.Empty;
         public bool SylCvc { get; set; }
+
+        /// <summary>
+        /// Written since <see cref="SylLength"/> became the length of the whole password
+        /// rather than the length before the digits and the specials were added to it. A file
+        /// written before that carries false, and <see cref="ApplyPreset"/> adds the counts
+        /// back, so a preset keeps producing passwords of about the length it used to.
+        /// </summary>
+        public bool SylLengthIncludesExtras { get; set; }
         public int PpWordCount { get; set; } = 4;
         public string PpSeparator { get; set; } = "-";
         public int PpLanguage { get; set; }
@@ -240,6 +248,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// </summary>
     private const int MaximumLength = 128;
     private const int MaximumSyllableLength = 32;
+
+    /// <summary>
+    /// The room a syllable password keeps for its own letters, whatever the counts ask for.
+    /// Two characters is one consonant-vowel pair, the smallest thing that still reads as a
+    /// syllable rather than as punctuation around a number.
+    /// </summary>
+    private const int MinimumSyllablePortion = 2;
     private const int SyllableLengthStep = 2;
     private const int MaximumPassphraseWordCount = 8;
     private const int MaximumLeetExtras = 6;
@@ -672,6 +687,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// </summary>
     internal int EffectiveLength { get; private set; }
     internal int EffectiveSyllableLength { get; private set; }
+
+    /// <summary>The digits this generation has room for, which is what was asked for unless
+    /// the length could not hold them all.</summary>
+    internal int EffectiveSyllableDigits { get; private set; }
+
+    /// <summary>The specials this generation has room for.</summary>
+    internal int EffectiveSyllableSpecials { get; private set; }
     internal int EffectivePassphraseWordCount { get; private set; }
     internal int EffectiveLeetDigits { get; private set; }
     internal int EffectiveLeetSpecials { get; private set; }
@@ -747,6 +769,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         SylSpecials = SyllableSpecials,
         SylPlacement = SyllablePlacementIndex,
         SylSeparator = SyllableSeparator,
+        SylLengthIncludesExtras = true,
         SylCvc = SyllableCvc,
         PpWordCount = PassphraseWordCount,
         PpSeparator = PassphraseSeparator,
@@ -791,7 +814,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             {
                 CustomSpecials = preset.CustomSpecials;
             }
-            SyllableLength = preset.SylLength;
+            // A preset written before the length covered the digits and the specials meant
+            // the letters alone, so the counts are added back rather than taken out of it.
+            SyllableLength = preset.SylLengthIncludesExtras
+                ? preset.SylLength
+                : Math.Min(
+                    preset.SylLength + Math.Max(preset.SylDigits, 0) + Math.Max(preset.SylSpecials, 0),
+                    MaximumSyllableLength);
             SyllableCaseIndex = preset.SylCase;
             SyllableDigits = preset.SylDigits;
             SyllableSpecials = preset.SylSpecials;
@@ -1027,26 +1056,47 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         FloorNoticeText = string.Empty;
 
         var floor = EntropyFloorBits;
-        if (floor <= 0)
+        if (floor > 0)
+        {
+            switch (CurrentMode)
+            {
+                case GeneratorMode.Random:
+                    ResolveRandomFloor(floor);
+                    break;
+                case GeneratorMode.Syllable:
+                    ResolveSyllableFloor(floor);
+                    break;
+                case GeneratorMode.Passphrase:
+                    ResolvePassphraseFloor(floor);
+                    break;
+                case GeneratorMode.Leet:
+                    ResolveLeetFloor(floor);
+                    break;
+            }
+        }
+
+        // Last, because the floor may have just made the password longer, and a longer
+        // password has room for counts that did not fit in the one that was asked for.
+        ResolveSyllableCounts();
+    }
+
+    /// <summary>
+    /// Decides how many digits and specials the length this generation runs at has room for,
+    /// and says so when it is fewer than were asked for.
+    /// </summary>
+    private void ResolveSyllableCounts()
+    {
+        var (_, digits, specials) = ResolveSyllableShape(EffectiveSyllableLength);
+        EffectiveSyllableDigits = digits;
+        EffectiveSyllableSpecials = specials;
+
+        if (CurrentMode != GeneratorMode.Syllable
+            || (digits == SyllableDigits && specials == SyllableSpecials))
         {
             return;
         }
 
-        switch (CurrentMode)
-        {
-            case GeneratorMode.Random:
-                ResolveRandomFloor(floor);
-                break;
-            case GeneratorMode.Syllable:
-                ResolveSyllableFloor(floor);
-                break;
-            case GeneratorMode.Passphrase:
-                ResolvePassphraseFloor(floor);
-                break;
-            case GeneratorMode.Leet:
-                ResolveLeetFloor(floor);
-                break;
-        }
+        NoteCountsCut(digits, specials);
     }
 
     private void ResolveRandomFloor(int floor)
@@ -1156,16 +1206,70 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The bits a syllable password of this base length carries whatever the dice do: open
-    /// syllables only, which is the cheaper of the two shapes per character, and no credit for
-    /// mixed case.
+    /// Splits a chosen length between the syllables and the characters placed into them.
     /// </summary>
-    private double GuaranteedSyllableBits(int baseLength)
+    /// <remarks>
+    /// <para>A digit is a character of the password, not an addition to it: sixteen characters
+    /// with two digits is fourteen characters of syllable and two digits, and what comes out is
+    /// as long as what was asked for. The separator is counted too, being as much a character
+    /// of the password as the letters it sits between; it is spent inside the portion returned
+    /// here rather than counted here, because how many separators there are depends on how the
+    /// syllables fall.</para>
+    /// <para>When the counts ask for more characters than the password can hold, the counts are
+    /// what gives. A length is exact and a count is a wish for how the length is spent, so the
+    /// password stays the size it was asked for and the notice line says what was cut. The cut
+    /// takes from whichever count is larger, so one kind of character does not disappear
+    /// entirely while the other keeps every place it asked for.</para>
+    /// </remarks>
+    private (int Portion, int Digits, int Specials) ResolveSyllableShape(int total)
+    {
+        var digits = Math.Max(SyllableDigits, 0);
+        var specials = Math.Max(SyllableSpecials, 0);
+
+        while (total - digits - specials < MinimumSyllablePortion && digits + specials > 0)
+        {
+            if (specials >= digits)
+            {
+                specials--;
+            }
+            else
+            {
+                digits--;
+            }
+        }
+
+        return (Math.Max(total - digits - specials, 0), digits, specials);
+    }
+
+    /// <summary>
+    /// How many syllables a chosen length holds, which is what the build produces and what the
+    /// block editor lines its pattern up with.
+    /// </summary>
+    /// <remarks>
+    /// Every syllable is a consonant-vowel pair, the shape the build falls back to and the
+    /// cheapest one per character, so this is a count the password always reaches and never
+    /// exceeds. Each pair after the first pays for its separator as well as its two letters,
+    /// the separator being a character of the password like any other; with no separator this
+    /// is the portion halved, which is what the count has always been.
+    /// </remarks>
+    private int SyllableCountFor(int totalLength)
+    {
+        var (portion, _, _) = ResolveSyllableShape(totalLength);
+        var separatorLength = (SyllableSeparator ?? string.Empty).Length;
+        return (portion + separatorLength) / (CharactersPerSyllableBlock + separatorLength);
+    }
+
+    /// <summary>
+    /// The bits a syllable password of this length carries whatever the dice do: open syllables
+    /// only, which is the cheaper of the two shapes per character, and no credit for mixed case.
+    /// </summary>
+    private double GuaranteedSyllableBits(int totalLength)
     {
         var consonants = LayoutSafe ? LayoutSafeConsonants : Consonants;
         var vowels = LayoutSafe ? LayoutSafeVowels : Vowels;
-        var bits = Math.Log2(consonants.Length * vowels.Length) * (baseLength / 2);
-        return bits + ExtrasBits(SyllableDigits, SyllableSpecials);
+        var (_, digits, specials) = ResolveSyllableShape(totalLength);
+        var bits = Math.Log2(consonants.Length * vowels.Length) * SyllableCountFor(totalLength);
+        return bits + ExtrasBits(digits, specials);
     }
 
     private double GuaranteedPassphraseBits(int wordCount)
@@ -1209,6 +1313,21 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     private void NoteFloorRaise(string chosen, string used)
         => FloorNoticeText = string.Format(L("ToolPwdGenFloorRaised"), chosen, used);
+
+    /// <summary>
+    /// Says how many digits and specials the chosen length had room for, when it had room for
+    /// fewer than were asked for.
+    /// </summary>
+    private void NoteCountsCut(int digits, int specials)
+    {
+        var cut = string.Format(L("ToolPwdGenCountsCut"), digits.ToString(), specials.ToString());
+
+        // The floor may have written the line first. Both things happened, so the line says
+        // both rather than the second one silently taking the place of the first.
+        FloorNoticeText = string.IsNullOrEmpty(FloorNoticeText)
+            ? cut
+            : FloorNoticeText + " " + cut;
+    }
 
     /// <summary>
     /// Brings the two position lists to the number of characters the current mode inserts,
@@ -1419,8 +1538,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
         var units = CurrentMode switch
         {
-            GeneratorMode.Syllable =>
-                (int)Math.Ceiling(SyllableLength / (double)CharactersPerSyllableBlock),
+            GeneratorMode.Syllable => SyllableCountFor(SyllableLength),
             GeneratorMode.Passphrase => PassphraseWordCount,
             _ => 0
         };
@@ -1515,10 +1633,27 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         SyncCaseBlocksToUnitCount();
         RegenerateIfReady();
     }
-    partial void OnSyllableDigitsChanged(int value) => RegenerateIfReady();
-    partial void OnSyllableSpecialsChanged(int value) => RegenerateIfReady();
+    // The counts and the separator are spent out of the length, so they decide how many
+    // syllables there are just as the length does, and the block editor follows them too.
+    partial void OnSyllableDigitsChanged(int value)
+    {
+        SyncCaseBlocksToUnitCount();
+        RegenerateIfReady();
+    }
+
+    partial void OnSyllableSpecialsChanged(int value)
+    {
+        SyncCaseBlocksToUnitCount();
+        RegenerateIfReady();
+    }
+
     partial void OnSyllablePlacementIndexChanged(int value) => RegenerateIfReady();
-    partial void OnSyllableSeparatorChanged(string value) => RegenerateIfReady();
+
+    partial void OnSyllableSeparatorChanged(string value)
+    {
+        SyncCaseBlocksToUnitCount();
+        RegenerateIfReady();
+    }
     partial void OnSyllableCvcChanged(bool value) => RegenerateIfReady();
     partial void OnPassphraseWordCountChanged(int value)
     {
@@ -1734,39 +1869,64 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             ? EndingConsonants.Where(c => !LayoutUnsafeChars.Contains(c[0])).ToArray()
             : EndingConsonants;
 
+        // Decided once for the whole batch by ResolveSyllableCounts, so twenty passwords are
+        // twenty draws of one shape rather than twenty chances to disagree about it.
+        var digitCount = EffectiveSyllableDigits;
+        var specialCount = EffectiveSyllableSpecials;
+        var portion = Math.Max(EffectiveSyllableLength - digitCount - specialCount, 0);
+
+        // The portion is the whole syllable part of the password, separators included, so the
+        // room a separator takes is room the letters do not get. Each syllable after the first
+        // is therefore asked what it costs with its separator in front of it.
+        var separatorLength = separator.Length;
         var groups = new List<string>();
-        var totalSylChars = 0;
+        var writtenChars = 0;
         var cvcCount = 0;
-        while (totalSylChars < EffectiveSyllableLength)
+        while (writtenChars < portion)
         {
+            var cost = groups.Count > 0 ? separatorLength : 0;
+            var remaining = portion - writtenChars - cost;
+            if (remaining < CharactersPerSyllableBlock)
+            {
+                break;
+            }
+
             var consonant = consonants[CryptoRandomInt(consonants.Length)];
             var vowel = vowels[CryptoRandomInt(vowels.Length)];
-            var remaining = EffectiveSyllableLength - totalSylChars;
 
             if (useCvc && remaining >= 3 && CryptoRandomInt(2) == 0)
             {
                 var ending = endings[CryptoRandomInt(endings.Length)];
                 groups.Add(consonant + vowel + ending);
-                totalSylChars += 3;
+                writtenChars += cost + 3;
                 cvcCount++;
-            }
-            else if (remaining >= 2)
-            {
-                groups.Add(consonant + vowel);
-                totalSylChars += 2;
             }
             else
             {
-                groups.Add(consonant);
-                totalSylChars += 1;
+                groups.Add(consonant + vowel);
+                writtenChars += cost + 2;
             }
         }
 
-        if (totalSylChars > EffectiveSyllableLength && groups.Count > 0)
+        // What is left over is less than one more syllable: a character too few to open one, or
+        // too few to pay for a separator and open one. It goes on the end of the last syllable,
+        // where a consonant still reads as part of it, rather than standing alone as a syllable
+        // of one letter or coming off a length that was asked for exactly.
+        for (var shortfall = portion - writtenChars; shortfall > 0; shortfall--)
         {
-            var excess = totalSylChars - EffectiveSyllableLength;
-            var last = groups[^1];
-            groups[^1] = last[..^excess];
+            var leftover = endings[CryptoRandomInt(endings.Length)];
+
+            // A length with no room for even one syllable still has to produce a password.
+            if (groups.Count == 0)
+            {
+                groups.Add(leftover);
+            }
+            else
+            {
+                groups[^1] += leftover;
+            }
+
+            writtenChars++;
         }
 
         var charIndex = 0;
@@ -1828,15 +1988,15 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         var structure = string.Join(" \u00b7 ", groups);
         var joined = string.Join(separator, groups);
         var chars = new List<char>(joined);
-        InsertExtras(chars, SyllableDigits, SyllableSpecials, placement, effectiveSymbols);
+        InsertExtras(chars, digitCount, specialCount, placement, effectiveSymbols);
 
         var finalPassword = new string(chars.ToArray());
         GeneratedPassword = finalPassword;
         SyllableTotalLength = finalPassword.Length;
 
-        if (SyllableDigits > 0 || SyllableSpecials > 0)
+        if (digitCount > 0 || specialCount > 0)
         {
-            structure += $"  + {SyllableDigits}# {SyllableSpecials}!";
+            structure += $"  + {digitCount}# {specialCount}!";
         }
 
         SyllableStructureText = structure;
@@ -1846,8 +2006,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         var cvGroups = groups.Count - cvcCount;
         var entropy = Math.Log2(cvPool) * cvGroups + Math.Log2(cvcPool) * cvcCount;
         if (useCvc) entropy += groups.Count;
-        if (SyllableDigits > 0) entropy += Math.Log2(DigitChars.Length) * SyllableDigits;
-        if (SyllableSpecials > 0 && effectiveSymbols.Length > 0) entropy += Math.Log2(effectiveSymbols.Length) * SyllableSpecials;
+        if (digitCount > 0) entropy += Math.Log2(DigitChars.Length) * digitCount;
+        if (specialCount > 0 && effectiveSymbols.Length > 0) entropy += Math.Log2(effectiveSymbols.Length) * specialCount;
         if (caseMode == SyllableCase.Mixed) entropy += groups.Count;
 
         UpdateStrengthIndicator(entropy);

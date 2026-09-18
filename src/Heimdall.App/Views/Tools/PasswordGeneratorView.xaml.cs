@@ -261,7 +261,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         KeyboardHintText.Text = L("ToolPwdGenKeyboardHint");
 
         // Syllable mode
-        SylLengthLabel.Text = L("ToolPwdGenBaseLength");
+        SylLengthLabel.Text = L("ToolPwdGenLength");
         SylStepNote.Text = ChkSylCvc.IsChecked == true ? L("ToolPwdGenSylStepNoteCvc") : L("ToolPwdGenSylStepNote");
         SylSeparatorLabel.Text = L("ToolPwdGenSeparator");
         SylCaseLabel.Text = L("ToolPwdGenCase");
@@ -322,7 +322,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(CmbSylPlacement, L("ToolPwdGenPlacement"));
         System.Windows.Automation.AutomationProperties.SetName(CmbPpPlacement, L("ToolPwdGenPlacement"));
         System.Windows.Automation.AutomationProperties.SetName(ChkLayoutSafe, L("ToolPwdGenLayoutSafe"));
-        System.Windows.Automation.AutomationProperties.SetName(SylLengthSlider, L("ToolPwdGenBaseLength"));
+        System.Windows.Automation.AutomationProperties.SetName(SylLengthSlider, L("ToolPwdGenLength"));
         System.Windows.Automation.AutomationProperties.SetName(CmbSylCase, L("ToolPwdGenCase"));
         System.Windows.Automation.AutomationProperties.SetName(SylDigitsSlider, L("ToolPwdGenDigits"));
         System.Windows.Automation.AutomationProperties.SetName(SylSpecialsSlider, L("ToolPwdGenSymbols"));
@@ -602,13 +602,13 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         ApplyPresetAndUpdateView(() => _vm.ApplyRandomPreset(20, true, true, true, true));
 
     private void OnPresetSylEasy(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(12, 3, 1, 0, "-"));
+        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(18, 3, 1, 0, "-"));
 
     private void OnPresetSylBalanced(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(16, 0, 2, 1, "-", true));
+        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(24, 0, 2, 1, "-", true));
 
     private void OnPresetSylStrong(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(24, 0, 3, 2, "", true));
+        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(30, 0, 3, 2, "", true));
 
     private void OnPresetPassphrase6(object sender, RoutedEventArgs e) =>
         ApplyPresetAndUpdateView(() => _vm.ApplyPassphrasePreset(6));

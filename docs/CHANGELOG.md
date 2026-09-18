@@ -14,6 +14,25 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The length you choose is the length you get
+
+- In syllable mode the length was a length before the rest: asking for 16 characters with two
+  digits, one special and a separator produced 24. The digits, the specials and the separator
+  are characters of the password, so they are now paid for out of the length rather than added
+  to it, and 16 means 16. The slider says `Length` where it said `Base length`.
+- When the counts ask for more characters than the length holds, the counts are what gives:
+  the password stays the size it was asked for, the cut takes from whichever count is larger so
+  that neither kind of character disappears entirely, and the notice line says what the length
+  had room for. The sliders themselves are left alone.
+- The block editor counts the syllables the password actually has rather than halving the
+  length, so a pattern still lines up with what it is read against once a separator or a count
+  has taken its share.
+- A preset saved before this has its counts added back, so it keeps producing passwords of the
+  length it used to produce. The separator is not added back: how many separators a password
+  carries depends on how its syllables fall, which a preset does not record. The three built-in
+  syllable presets are named after the length they produce: `Easy 18`, `Balanced 24` and
+  `Strong 30`, which is the same password each of them made before, counted honestly.
+
 ### The generator panel reads properly
 
 - Nine labels were sized in pixels and clipped their own text. `Digits (0-9)` read
