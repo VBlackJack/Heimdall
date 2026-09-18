@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-09-18: the password generator, rebuilt (v2026.091802)
 
 ### One hour is not one hours
 
