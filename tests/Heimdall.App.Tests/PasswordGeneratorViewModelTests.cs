@@ -17,6 +17,7 @@
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 using Heimdall.App.Services;
@@ -2855,6 +2856,78 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         sut.SelectedModeIndex = 2;
         Assert.DoesNotContain("{0}", sut.WordListSummaryText);
         Assert.DoesNotContain("{1}", sut.WordListSummaryText);
+    }
+
+    /// <summary>
+    /// Each unit of the crack time is spelled the way its own count calls for.
+    /// </summary>
+    /// <remarks>
+    /// The figure read "1 hours". Each count is taken at one and a half units and two and a half,
+    /// rather than at the boundaries, so that a figure recovered through a logarithm cannot land a
+    /// hair under a whole number and test the branch next door.
+    /// </remarks>
+    [Fact]
+    public async Task EveryUnitOfTheCrackTime_TakesTheSpellingItsCountCallsFor()
+    {
+        var sut = await CreateSpeakingVmAsync();
+
+        var rate = (double)typeof(PasswordGeneratorViewModel)
+            .GetField("BruteForceGuessesPerSecond", BindingFlags.Static | BindingFlags.NonPublic)!
+            .GetRawConstantValue()!;
+
+        (double Seconds, string One, string Many)[] units =
+        [
+            (1, "1 second", "2 seconds"),
+            (60, "1 minute", "2 minutes"),
+            (3600, "1 hour", "2 hours"),
+            (86400, "1 day", "2 days"),
+            (365.25 * 86400, "1 year", "2 years"),
+            (100 * 365.25 * 86400, "1 century", "2 centuries"),
+        ];
+
+        foreach ((double seconds, string one, string many) in units)
+        {
+            InvokePrivate(sut, "UpdateCrackTimeEstimate", Math.Log2(1.5 * seconds * 2 * rate));
+            Assert.Contains(one, sut.CrackTimeText);
+
+            // The defect itself: the plural worn by a count of one.
+            Assert.DoesNotContain(many.Replace("2 ", "1 "), sut.CrackTimeText);
+
+            InvokePrivate(sut, "UpdateCrackTimeEstimate", Math.Log2(2.5 * seconds * 2 * rate));
+            Assert.Contains(many, sut.CrackTimeText);
+        }
+    }
+
+    /// <summary>
+    /// A singular that was copied from its plural would satisfy the parity guard and still read
+    /// "1 hours", so the two are held to being different words in every language.
+    /// </summary>
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    public void TheSingularAndThePluralOfAUnit_AreDifferentInEveryCatalogue(string locale)
+    {
+        using JsonDocument catalogue = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(ViewSource.RepoRoot(), "locales", locale + ".json")));
+
+        string[] units = ["Second", "Minute", "Hour", "Day", "Year", "Century"];
+        string[] plurals = ["Seconds", "Minutes", "Hours", "Days", "Years", "Centuries"];
+
+        for (var index = 0; index < units.Length; index++)
+        {
+            Assert.True(
+                catalogue.RootElement.TryGetProperty(
+                    "ToolPwdGenCrack" + units[index], out JsonElement singular),
+                $"{locale}: no singular for {units[index]}");
+            Assert.True(
+                catalogue.RootElement.TryGetProperty(
+                    "ToolPwdGenCrack" + plurals[index], out JsonElement plural),
+                $"{locale}: no plural for {units[index]}");
+
+            Assert.NotEqual(singular.GetString(), plural.GetString());
+            Assert.Contains("{0}", singular.GetString()!, StringComparison.Ordinal);
+        }
     }
 
     private static void InvokePrivate(PasswordGeneratorViewModel sut, string methodName, params object[] args)
