@@ -14,6 +14,12 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### One hour is not one hours
+
+- The crack time had one spelling per unit and used it for a count of one as well as for many,
+  in all three languages: `1 hours`, `1 heures`, `1 horas`. Every unit from seconds to
+  centuries now takes the spelling its own count calls for.
+
 ### The generator uses the width it has
 
 - The panel put 42 to 46 controls in a single column down the left, and in the syllable and

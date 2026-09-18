@@ -2655,6 +2655,18 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             : string.Create(CultureInfo.InvariantCulture, $"{mantissa:0.#} x 10^{exponent}");
     }
 
+    /// <summary>
+    /// A count and its unit, in the spelling that count takes.
+    /// </summary>
+    /// <remarks>
+    /// Every count that reaches here is at least one: each branch of the estimate is entered only
+    /// once the figure has passed that unit's first whole value, so one is the singular and
+    /// everything else the plural, which is the same rule in the three languages the tool speaks.
+    /// French would also want the singular for zero and never gets the chance.
+    /// </remarks>
+    private string Counted(int value, string singularKey, string pluralKey)
+        => string.Format(L(value == 1 ? singularKey : pluralKey), value);
+
     private void UpdateCrackTimeEstimate(double entropy)
     {
         if (entropy <= 0)
@@ -2674,27 +2686,31 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         }
         else if (secondsAvg < 60)
         {
-            timeStr = string.Format(L("ToolPwdGenCrackSeconds"), (int)secondsAvg);
+            timeStr = Counted((int)secondsAvg, "ToolPwdGenCrackSecond", "ToolPwdGenCrackSeconds");
         }
         else if (secondsAvg < 3600)
         {
-            timeStr = string.Format(L("ToolPwdGenCrackMinutes"), (int)(secondsAvg / 60));
+            timeStr = Counted((int)(secondsAvg / 60), "ToolPwdGenCrackMinute", "ToolPwdGenCrackMinutes");
         }
         else if (secondsAvg < 86400)
         {
-            timeStr = string.Format(L("ToolPwdGenCrackHours"), (int)(secondsAvg / 3600));
+            timeStr = Counted((int)(secondsAvg / 3600), "ToolPwdGenCrackHour", "ToolPwdGenCrackHours");
         }
         else if (secondsAvg < 365.25 * 86400)
         {
-            timeStr = string.Format(L("ToolPwdGenCrackDays"), (int)(secondsAvg / 86400));
+            timeStr = Counted((int)(secondsAvg / 86400), "ToolPwdGenCrackDay", "ToolPwdGenCrackDays");
         }
         else if (secondsAvg < 100 * 365.25 * 86400)
         {
-            timeStr = string.Format(L("ToolPwdGenCrackYears"), (int)(secondsAvg / (365.25 * 86400)));
+            timeStr = Counted(
+                (int)(secondsAvg / (365.25 * 86400)), "ToolPwdGenCrackYear", "ToolPwdGenCrackYears");
         }
         else if (secondsAvg < 1_000_000 * 365.25 * 86400)
         {
-            timeStr = string.Format(L("ToolPwdGenCrackCenturies"), (int)(secondsAvg / (100 * 365.25 * 86400)));
+            timeStr = Counted(
+                (int)(secondsAvg / (100 * 365.25 * 86400)),
+                "ToolPwdGenCrackCentury",
+                "ToolPwdGenCrackCenturies");
         }
         else
         {
