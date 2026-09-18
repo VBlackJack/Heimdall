@@ -12,6 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### Notches on the placement bar, and a panel that holds still
+
+- The placement bar asked for a percentage and what you are placing is a character. The track
+  now shows a notch at every place a character can go, taller every fifth one so a row of them
+  can be counted, and a dragged cursor settles on one. The specials row carries two more
+  notches than the digits row when two digits are asked for, because the specials are placed
+  into the password the digits are already in.
+- The panel resized itself while you used it. Two causes, both measured on the width of the
+  password box: the vertical scrollbar appeared as soon as the content outgrew the panel and
+  took its width off every control (579 pixels, one click, 563), and the readouts column sized
+  itself to its own contents, so a longer password in the recent list moved everything on the
+  left (554 then 562). The scrollbar's place is now always reserved and the readouts column has
+  a width of its own. Four generations in a row, the box measures 566 every time.
+
+### The placement bar is one bar again
+
+- The two rows of the placement bar read the same 0 to 100 scale, but they had stopped starting
+  at the same place or being the same length, so a cursor at half way on one sat nowhere near
+  half way on the other. The label widening released in v2026.091802 had matched a width
+  belonging to a column rather than to the label it aimed at, and the specials row's label took
+  half the row. Both rows now size that column together, in any language.
+- Dragging a cursor wrote its position on every mouse move, which regenerated the password each
+  time - twenty of them when a batch had been asked for - and snapped the cursor onto a grid a
+  tenth of a percent wide before measuring the next move from it. The cursor now follows the
+  pointer and the password is drawn once, when the cursor is dropped. The arrow keys and the
+  wheel still act immediately, one press being one move.
+
 ## 2026-09-18: the password generator, rebuilt (v2026.091802)
 
 ### One hour is not one hours
