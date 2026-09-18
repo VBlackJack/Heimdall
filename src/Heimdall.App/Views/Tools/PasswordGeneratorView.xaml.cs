@@ -276,6 +276,8 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
         // Syllable mode
         SylLengthLabel.Text = L("ToolPwdGenLength");
+        ChkRememberSettings.Content = L("ToolPwdGenRememberSettings");
+        RememberSettingsNote.Text = L("ToolPwdGenRememberSettingsNote");
         SylStepNote.Text = ChkSylCvc.IsChecked == true ? L("ToolPwdGenSylStepNoteCvc") : L("ToolPwdGenSylStepNote");
         SylSeparatorLabel.Text = L("ToolPwdGenSeparator");
         SylCaseLabel.Text = L("ToolPwdGenCase");
@@ -1163,10 +1165,27 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     private void RebuildCustomPresetButtons()
     {
         PanelCustomPresets.Children.Clear();
+        SavedPresetsLabel.Visibility = Visibility.Collapsed;
+        SavedPresetsElsewhereText.Visibility = Visibility.Collapsed;
         if (!_viewInitialized) return;
 
         var filtered = _vm.GetCustomPresetsForCurrentMode();
+        int elsewhere = _vm.CustomPresetCount - filtered.Count;
+
+        // A preset saved in another mode is not shown here, and used to be shown nowhere: the
+        // operator saved one, came back to a different mode, and found an empty row.
+        if (elsewhere > 0)
+        {
+            SavedPresetsElsewhereText.Text = string.Format(
+                L("ToolPwdGenSavedPresetsElsewhere"),
+                elsewhere.ToString(CultureInfo.InvariantCulture));
+            SavedPresetsElsewhereText.Visibility = Visibility.Visible;
+        }
+
         if (filtered.Count == 0) return;
+
+        SavedPresetsLabel.Text = L("ToolPwdGenSavedPresets");
+        SavedPresetsLabel.Visibility = Visibility.Visible;
 
         foreach (var preset in filtered)
         {
@@ -1196,6 +1215,22 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             btn.ContextMenu.Items.Add(deleteItem);
 
             PanelCustomPresets.Children.Add(btn);
+        }
+    }
+
+    /// <summary>
+    /// Writes down where the tool was left, when it has been told to.
+    /// </summary>
+    /// <remarks>
+    /// The settings are saved here rather than on every change: a file written whenever a slider
+    /// moves is a file written on every pixel of a drag. Unloading covers closing the tab, closing
+    /// the window and switching away from the tool, which is every way of leaving it that matters.
+    /// </remarks>
+    private void OnViewUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_viewInitialized)
+        {
+            _vm.PersistSettingsIfRemembering();
         }
     }
 

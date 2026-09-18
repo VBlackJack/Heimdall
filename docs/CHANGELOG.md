@@ -14,6 +14,24 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A preset you can find, and settings the tool keeps only if you ask
+
+- A saved preset appeared as an unlabelled button under the Save button, showing only the ones
+  belonging to the mode you were in and saying that nowhere. Saving one in syllable mode and
+  coming back in random mode showed an empty row: the preset was on disk and out of reach. The
+  row has a heading now, and a line saying how many are saved in other modes.
+- **Remember my settings**, off until you ask for it, under Advanced. The tool reopens where you
+  left it: the mode, the length, the counts, the placement, everything a preset holds. It is
+  written when you turn the switch on and when you leave the tool, not on every change.
+- **What the tool keeps between runs is now sealed**, through the same protector as a session's
+  password: the vault's key when the vault is unlocked, this Windows account's own otherwise. A
+  preset holds no password, but it does describe the shape of the ones you make, your own set of
+  special characters, and whatever word you typed for the leet mode. A file written before this
+  is read once and written back sealed, so nothing saved is lost.
+- A consequence worth knowing: a sealed file belongs to the Windows account that wrote it. Copied
+  to another machine or opened under another account, the presets in it cannot be read, and the
+  log says so rather than the tool starting empty without explanation.
+
 ### Notches on the placement bar, and a panel that holds still
 
 - The placement bar asked for a percentage and what you are placing is a character. The track
