@@ -178,6 +178,17 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     /// <summary>What a masked row shows instead of the password.</summary>
     private const char MaskCharacter = '\u2022';
+    /// <summary>
+    /// The guessing rate the crack time is worked out at: an offline attack on a stolen hash that
+    /// was cheap to compute, which is the scenario a password has to survive on its own.
+    /// </summary>
+    /// <remarks>
+    /// It is one scenario among several and the figure means nothing without it. The same password
+    /// that falls in a day here stands for millennia against a hash deliberately made slow, five
+    /// orders of magnitude further down, and the reader cannot tell which number they are being
+    /// shown. <see cref="CrackTimeAssumptionText"/> therefore states the rate on screen, formatted
+    /// from this constant so the two can never drift apart.
+    /// </remarks>
     private const double BruteForceGuessesPerSecond = 10_000_000_000;
 
     /// <summary>
@@ -255,6 +266,19 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// syllable rather than as punctuation around a number.
     /// </summary>
     private const int MinimumSyllablePortion = 2;
+
+    /// <summary>
+    /// How many times a random password is drawn before the promise that every selected class
+    /// appears is given up on.
+    /// </summary>
+    /// <remarks>
+    /// The share of draws that qualify is at its worst when there are as many classes as there
+    /// are characters to put them in, which is four of each: about seven draws in a hundred
+    /// qualify, so ten thousand attempts miss by a margin no one will ever observe. It is a bound
+    /// rather than a loop without one because an unbounded retry is a hang waiting for a charset
+    /// nobody anticipated.
+    /// </remarks>
+    private const int MaximumGuaranteeDraws = 10_000;
     private const int SyllableLengthStep = 2;
     private const int MaximumPassphraseWordCount = 8;
     private const int MaximumLeetExtras = 6;
@@ -516,6 +540,12 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     [ObservableProperty] private string _strengthText = string.Empty;
     [ObservableProperty] private double _strengthPercent;
     [ObservableProperty] private string _crackTimeText = string.Empty;
+
+    /// <summary>The attack the crack time above it is worked out against.</summary>
+    [ObservableProperty] private string _crackTimeAssumptionText = string.Empty;
+
+    /// <summary>How big the chosen language's word list is, and what that is worth a word.</summary>
+    [ObservableProperty] private string _wordListSummaryText = string.Empty;
     [ObservableProperty] private string _issuesText = string.Empty;
     [ObservableProperty] private string _syllableStructureText = string.Empty;
     [ObservableProperty] private int _syllableTotalLength;
@@ -722,6 +752,10 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         LoadWordLists();
 
         PassphraseLanguageIndex = PassphraseLanguageIndexFor(localizer?.CurrentLocale);
+
+        // The setter above only reports when the index changes, and it starts on the first
+        // language, so the summary is written here rather than left blank for that one case.
+        UpdateWordListSummary();
 
         if (context?.Argument is { } arg && int.TryParse(arg, out var len))
         {
@@ -1099,30 +1133,38 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         NoteCountsCut(digits, specials);
     }
 
+    /// <remarks>
+    /// The length is walked up rather than divided into the floor, because the bits a length
+    /// carries are no longer proportional to it: promising every class costs a share of the draws
+    /// that shrinks as the password grows. Walking asks the same question the strength figure
+    /// answers, so the floor cannot promise bits the figure will not show.
+    /// </remarks>
     private void ResolveRandomFloor(int floor)
     {
-        var charsetSize = BuildCharset().Length;
-        var bitsPerCharacter = charsetSize > 1 ? Math.Log2(charsetSize) : 0;
-        if (bitsPerCharacter <= 0)
+        var classes = BuildCharsetClasses();
+        if (classes.Count == 0)
         {
             FloorOutOfReach = true;
             return;
         }
 
-        var required = (int)Math.Ceiling(floor / bitsPerCharacter);
-        if (required <= Length)
+        for (var candidate = Math.Max(Length, 1); candidate <= MaximumLength; candidate++)
         {
+            if (GuaranteedRandomBits(classes, candidate) < floor)
+            {
+                continue;
+            }
+
+            if (candidate > Length)
+            {
+                EffectiveLength = candidate;
+                NoteFloorRaise(Length.ToString(), candidate.ToString());
+            }
+
             return;
         }
 
-        if (required > MaximumLength)
-        {
-            FloorOutOfReach = true;
-            return;
-        }
-
-        EffectiveLength = required;
-        NoteFloorRaise(Length.ToString(), required.ToString());
+        FloorOutOfReach = true;
     }
 
     private void ResolveSyllableFloor(int floor)
@@ -1319,15 +1361,27 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// fewer than were asked for.
     /// </summary>
     private void NoteCountsCut(int digits, int specials)
-    {
-        var cut = string.Format(L("ToolPwdGenCountsCut"), digits.ToString(), specials.ToString());
+        => AppendNotice(string.Format(
+            L("ToolPwdGenCountsCut"), digits.ToString(), specials.ToString()));
 
-        // The floor may have written the line first. Both things happened, so the line says
-        // both rather than the second one silently taking the place of the first.
-        FloorNoticeText = string.IsNullOrEmpty(FloorNoticeText)
-            ? cut
-            : FloorNoticeText + " " + cut;
-    }
+    /// <summary>
+    /// Says that this password is not the promised one, which is the only way that can be true
+    /// without anybody noticing.
+    /// </summary>
+    private void NoteClassesNotPromised()
+        => AppendNotice(L("ToolPwdGenClassesNotPromised"));
+
+    /// <summary>
+    /// Adds a sentence to the notice line, keeping what is already on it.
+    /// </summary>
+    /// <remarks>
+    /// The floor may have written first. Both things happened, so the line says both rather than
+    /// the second one silently taking the place of the first.
+    /// </remarks>
+    private void AppendNotice(string sentence)
+        => FloorNoticeText = string.IsNullOrEmpty(FloorNoticeText)
+            ? sentence
+            : FloorNoticeText + " " + sentence;
 
     /// <summary>
     /// Brings the two position lists to the number of characters the current mode inserts,
@@ -1661,7 +1715,11 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         RegenerateIfReady();
     }
     partial void OnPassphraseSeparatorChanged(string value) => RegenerateIfReady();
-    partial void OnPassphraseLanguageIndexChanged(int value) => RegenerateIfReady();
+    partial void OnPassphraseLanguageIndexChanged(int value)
+    {
+        UpdateWordListSummary();
+        RegenerateIfReady();
+    }
     partial void OnPassphraseDigitsChanged(int value) => RegenerateIfReady();
     partial void OnPassphraseSpecialsChanged(int value) => RegenerateIfReady();
 
@@ -1749,70 +1807,212 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         SyllableStructureText = string.Empty;
         SyllableTotalLength = 0;
 
-        var charset = BuildCharset();
+        var classes = BuildCharsetClasses();
+        var charset = string.Concat(classes);
         if (charset.Length == 0)
         {
             SetEmptyOutput();
             return;
         }
 
-        var password = new StringBuilder(EffectiveLength);
-        for (var i = 0; i < EffectiveLength; i++)
+        // A ticked box says the password carries that kind of character. It used to say only that
+        // the kind was in the bag drawn from, which at eight characters left two passwords in five
+        // with no digit in them at all. The draw is repeated until the promise holds, which is a
+        // uniform draw over the passwords that keep it rather than a fix-up of one that does not.
+        var promised = classes.Count <= EffectiveLength;
+        var finalPassword = string.Empty;
+        var kept = false;
+
+        for (var attempt = 0; attempt < MaximumGuaranteeDraws; attempt++)
         {
-            password.Append(charset[CryptoRandomInt(charset.Length)]);
+            var password = new StringBuilder(EffectiveLength);
+            for (var i = 0; i < EffectiveLength; i++)
+            {
+                password.Append(charset[CryptoRandomInt(charset.Length)]);
+            }
+
+            finalPassword = password.ToString();
+
+            if (!promised)
+            {
+                break;
+            }
+
+            if (CarriesEveryClass(finalPassword, classes))
+            {
+                kept = true;
+                break;
+            }
         }
 
-        var finalPassword = password.ToString();
         GeneratedPassword = finalPassword;
 
-        var entropyPerChar = Math.Log2(charset.Length);
-        var totalEntropy = entropyPerChar * EffectiveLength;
+        if (!kept)
+        {
+            // Either the length cannot hold one of every kind, or ten thousand draws all missed.
+            // Whichever it was, this password is an ordinary draw and the figure says so.
+            NoteClassesNotPromised();
+        }
+
+        var totalEntropy = kept
+            ? GuaranteedRandomBits(classes, EffectiveLength)
+            : Math.Log2(charset.Length) * EffectiveLength;
         UpdateStrengthIndicator(totalEntropy);
         UpdatePhoneticDisplay(finalPassword);
     }
 
-    private string BuildCharset()
+    private string BuildCharset() => string.Concat(BuildCharsetClasses());
+
+    /// <summary>
+    /// What each selected class still contributes once the exclusions have run.
+    /// </summary>
+    /// <remarks>
+    /// <para>The classes are kept apart rather than poured into one string because a box that is
+    /// ticked is a promise that the password carries that kind of character, and a promise has to
+    /// know what it is about. The custom specials are held to punctuation on the way in, so the
+    /// four lists never share a character.</para>
+    /// <para>A class the exclusions empty out is not in the list at all: layout-safe and the
+    /// ambiguous filter cut into the classes themselves, and a class with nothing left in it can
+    /// be neither drawn from nor promised.</para>
+    /// </remarks>
+    private List<string> BuildCharsetClasses()
     {
-        var sb = new StringBuilder();
-        if (IncludeUppercase) sb.Append(UppercaseChars);
-        if (IncludeLowercase) sb.Append(LowercaseChars);
-        if (IncludeDigits) sb.Append(DigitChars);
-        if (IncludeSymbols)
+        var classes = new List<string>(4);
+
+        void Take(string characters)
         {
-            var effectiveSymbols = GetEffectiveSymbols();
-            if (effectiveSymbols.Length > 0)
+            var kept = new StringBuilder(characters.Length);
+            foreach (var character in characters)
             {
-                sb.Append(effectiveSymbols);
+                if (ExcludeAmbiguous && AmbiguousChars.Contains(character))
+                {
+                    continue;
+                }
+
+                if (LayoutSafe && LayoutUnsafeChars.Contains(character))
+                {
+                    continue;
+                }
+
+                kept.Append(character);
+            }
+
+            if (kept.Length > 0)
+            {
+                classes.Add(kept.ToString());
             }
         }
 
-        if (ExcludeAmbiguous)
+        if (IncludeUppercase) Take(UppercaseChars);
+        if (IncludeLowercase) Take(LowercaseChars);
+        if (IncludeDigits) Take(DigitChars);
+        if (IncludeSymbols) Take(GetEffectiveSymbols());
+
+        return classes;
+    }
+
+    /// <summary>
+    /// The share of unconstrained draws that carry at least one character of every class.
+    /// </summary>
+    /// <remarks>
+    /// Counted by inclusion and exclusion over the classes: each term is the share of draws that
+    /// avoid one set of classes entirely, added and subtracted by how many classes that set holds.
+    /// It is computed as a share rather than as a count of passwords so that nothing overflows at
+    /// a hundred and twenty-eight characters. More classes than characters is not a near miss but
+    /// an impossibility, and says so rather than leaving rounding to answer.
+    /// </remarks>
+    private static double ValidDrawShare(IReadOnlyList<string> classes, int length)
+    {
+        if (classes.Count == 0 || length <= 0 || classes.Count > length)
         {
-            var charset = sb.ToString();
-            sb.Clear();
-            foreach (var c in charset)
+            return 0;
+        }
+
+        var total = 0;
+        foreach (var characters in classes)
+        {
+            total += characters.Length;
+        }
+
+        if (total == 0)
+        {
+            return 0;
+        }
+
+        var share = 0.0;
+        for (var subset = 0; subset < (1 << classes.Count); subset++)
+        {
+            var avoided = 0;
+            var avoidedClasses = 0;
+            for (var index = 0; index < classes.Count; index++)
             {
-                if (!AmbiguousChars.Contains(c))
+                if ((subset & (1 << index)) == 0)
                 {
-                    sb.Append(c);
+                    continue;
+                }
+
+                avoided += classes[index].Length;
+                avoidedClasses++;
+            }
+
+            var term = Math.Pow((double)(total - avoided) / total, length);
+            share += avoidedClasses % 2 == 0 ? term : -term;
+        }
+
+        return share;
+    }
+
+    /// <summary>
+    /// The bits a random password of this length carries when every selected class is promised.
+    /// </summary>
+    /// <remarks>
+    /// Drawing again until the promise holds is a uniform draw over the passwords that keep it, so
+    /// the figure is the log of how many of those there are: the unconstrained figure plus the log
+    /// of the share that qualify. The promise costs about one bit at eight characters with all
+    /// four classes, and about a thirtieth of a bit at twenty-four. It is subtracted rather than
+    /// ignored because a figure that credits passwords the generator refuses to produce is wrong
+    /// in the direction that flatters it.
+    /// </remarks>
+    private static double GuaranteedRandomBits(IReadOnlyList<string> classes, int length)
+    {
+        var total = 0;
+        foreach (var characters in classes)
+        {
+            total += characters.Length;
+        }
+
+        if (total == 0 || length <= 0)
+        {
+            return 0;
+        }
+
+        var unconstrained = Math.Log2(total) * length;
+        var share = ValidDrawShare(classes, length);
+        return share <= 0 ? unconstrained : unconstrained + Math.Log2(share);
+    }
+
+    /// <summary>Whether the password carries at least one character of every class.</summary>
+    private static bool CarriesEveryClass(string password, IReadOnlyList<string> classes)
+    {
+        foreach (var characters in classes)
+        {
+            var found = false;
+            foreach (var character in password)
+            {
+                if (characters.Contains(character))
+                {
+                    found = true;
+                    break;
                 }
             }
-        }
 
-        if (LayoutSafe)
-        {
-            var charset = sb.ToString();
-            sb.Clear();
-            foreach (var c in charset)
+            if (!found)
             {
-                if (!LayoutUnsafeChars.Contains(c))
-                {
-                    sb.Append(c);
-                }
+                return false;
             }
         }
 
-        return sb.ToString();
+        return true;
     }
 
     /// <summary>
@@ -2394,6 +2594,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             StrengthText = string.Empty;
             StrengthPercent = 0;
             CrackTimeText = string.Empty;
+            CrackTimeAssumptionText = string.Empty;
             IssuesText = string.Empty;
             return;
         }
@@ -2437,11 +2638,29 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         UpdateIssuesList();
     }
 
+    /// <summary>
+    /// The guessing rate as a power of ten, which is how a number that large is read.
+    /// </summary>
+    /// <remarks>
+    /// Derived from the constant rather than written out beside it, so that changing the rate
+    /// changes the sentence. A rate that is not a round power of ten keeps its leading figure.
+    /// </remarks>
+    private static string GuessRateText()
+    {
+        var exponent = (int)Math.Floor(Math.Log10(BruteForceGuessesPerSecond));
+        var mantissa = BruteForceGuessesPerSecond / Math.Pow(10, exponent);
+
+        return Math.Abs(mantissa - 1) < 0.001
+            ? string.Create(CultureInfo.InvariantCulture, $"10^{exponent}")
+            : string.Create(CultureInfo.InvariantCulture, $"{mantissa:0.#} x 10^{exponent}");
+    }
+
     private void UpdateCrackTimeEstimate(double entropy)
     {
         if (entropy <= 0)
         {
             CrackTimeText = string.Empty;
+            CrackTimeAssumptionText = string.Empty;
             return;
         }
 
@@ -2483,6 +2702,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         }
 
         CrackTimeText = string.Format(L("ToolPwdGenCrackTime"), timeStr);
+        CrackTimeAssumptionText = string.Format(L("ToolPwdGenCrackAssumption"), GuessRateText());
     }
 
     private void UpdateIssuesList()
@@ -2589,6 +2809,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         StrengthText = string.Empty;
         StrengthPercent = 0;
         CrackTimeText = string.Empty;
+        CrackTimeAssumptionText = string.Empty;
         IssuesText = string.Empty;
         SyllableStructureText = string.Empty;
         SyllableTotalLength = 0;
@@ -2654,6 +2875,29 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         }
 
         return _wordLists[Math.Clamp(PassphraseLanguageIndex, 0, _wordLists.Length - 1)];
+    }
+
+    /// <summary>
+    /// What the chosen language is worth: how many words it draws from, and the bits one draw
+    /// carries.
+    /// </summary>
+    /// <remarks>
+    /// The lists are not the same size, and a passphrase of four words is worth what its own list
+    /// gives it: 47 bits drawn from the English list of 3525 words, 38 from the Spanish list of
+    /// 725. The strength figure has always counted this correctly and the minimum strength has
+    /// always enforced it, but neither of them says why one language needs a longer passphrase
+    /// than another, and the language box is where that is decided.
+    /// </remarks>
+    private void UpdateWordListSummary()
+    {
+        var words = SelectedWordList();
+
+        WordListSummaryText = words.Length < 2
+            ? string.Empty
+            : string.Format(
+                L("ToolPwdGenWordListSize"),
+                words.Length.ToString(CultureInfo.InvariantCulture),
+                Math.Log2(words.Length).ToString("0.0", CultureInfo.InvariantCulture));
     }
 
     private static string[] LoadWordListFile(string fileName, string[] fallback)

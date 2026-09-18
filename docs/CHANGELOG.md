@@ -14,6 +14,40 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A ticked box is now a promise
+
+- Ticking `Digits (0-9)` put digits in the bag the password was drawn from. It did not put one in
+  the password. At eight characters with all four kinds ticked, two passwords in five carried no
+  digit at all and one in two was missing one of the four kinds; at the default twenty-four it was
+  still one in sixteen. A site that requires a digit refused them, and nothing on screen had
+  suggested it might.
+- The password is now drawn again until every ticked kind is in it, which is a fair draw among the
+  passwords that keep the promise rather than a patch-up of one that does not.
+- The strength figure pays for the promise instead of pretending it is free: it drops by the share
+  of draws the promise rules out, which is 1.09 bits at eight characters and 0.10 at twenty-four.
+  The minimum strength asks the same question the figure answers, so it can no longer stop a
+  hundredth of a bit short of the floor it named.
+- A length too short to hold one of every ticked kind gets an ordinary draw and says so, rather
+  than keeping a promise nobody could have kept.
+
+### The crack time says what it is a crack time for
+
+- `Crack time: 243 days` was one scenario presented as a fact. The same password stands for
+  millennia against a hash deliberately made slow to compute, five orders of magnitude further
+  down, and the line gave the reader no way to tell which number they were looking at.
+- The attack is now named under the figure: average case, at 10^10 guesses per second against a
+  stolen hash. The rate is spelled from the constant the arithmetic uses, so the sentence and the
+  calculation cannot drift apart.
+
+### The language box says what the language is worth
+
+- The four passphrase word lists are not the same size, and the same four words are worth 47 bits
+  in English and 38 in Spanish. The strength figure has always counted this correctly and the
+  minimum strength has always enforced it, but neither said why one language needed a longer
+  passphrase than another.
+- The language box now says how many words it draws from and what one draw is worth, in both the
+  passphrase and the leet mode.
+
 ### The length you choose is the length you get
 
 - In syllable mode the length was a length before the rest: asking for 16 characters with two
