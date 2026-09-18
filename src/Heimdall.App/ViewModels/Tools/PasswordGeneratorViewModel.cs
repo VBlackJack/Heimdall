@@ -15,6 +15,7 @@
  */
 
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -73,6 +74,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         public int EntropyFloor { get; set; }
         public string CaseBlocks { get; set; } = DefaultCaseBlocks;
         public bool CaseBlocksAutoSync { get; set; } = true;
+        public string DigitPositions { get; set; } = string.Empty;
+        public string SpecialPositions { get; set; } = string.Empty;
     }
 
     internal enum GeneratorMode
@@ -101,12 +104,19 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         Blocks
     }
 
+    /// <summary>
+    /// Where the digits and the special characters go. Appended to, never reordered: the index
+    /// is persisted inside saved presets.
+    /// </summary>
     internal enum Placement
     {
         Random,
         Start,
         End,
-        Middle
+        Middle,
+
+        /// <summary>One position per character, each one set on the placement bar.</summary>
+        Positions
     }
 
     private const string UppercaseChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -165,6 +175,14 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     /// <summary>Characters one syllable block covers, which is one open syllable.</summary>
     private const int CharactersPerSyllableBlock = 2;
+
+    /// <summary>
+    /// A position on the placement bar, as a percentage of the password built so far, kept to
+    /// one decimal because that is finer than a bar of any usable width can be dragged.
+    /// </summary>
+    private const double MinimumPositionPercent = 0;
+    private const double MaximumPositionPercent = 100;
+    private const int PositionPercentDecimals = 1;
 
     /// <summary>
     /// The entropy floors the box offers, in bits, the first meaning no floor at all. A floor
@@ -423,6 +441,14 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     [ObservableProperty] private string _caseBlocks = DefaultCaseBlocks;
     [ObservableProperty] private bool _caseBlocksAutoSync = true;
 
+    /// <summary>
+    /// The positions of the digits and of the specials, in percent, comma separated. One entry
+    /// per character the current mode inserts, held in that shape so a preset carries them as
+    /// text and a test can state them in one string.
+    /// </summary>
+    [ObservableProperty] private string _digitPositions = string.Empty;
+    [ObservableProperty] private string _specialPositions = string.Empty;
+
     [ObservableProperty] private bool _clipboardAutoClear;
 
     [ObservableProperty] private string _generatedPassword = string.Empty;
@@ -487,6 +513,39 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     };
 
     public bool ShowCaseBlocks => CurrentCaseMode == SyllableCase.Blocks;
+
+    /// <summary>The placement of the mode on screen, or <c>null</c> where there is none.</summary>
+    internal Placement? CurrentPlacement => CurrentMode switch
+    {
+        GeneratorMode.Syllable => PlacementAt(SyllablePlacementIndex),
+        GeneratorMode.Passphrase => PlacementAt(PassphrasePlacementIndex),
+        GeneratorMode.Leet => PlacementAt(LeetPlacementIndex),
+        _ => null
+    };
+
+    internal static Placement PlacementAt(int index) =>
+        (Placement)Math.Clamp(index, 0, (int)Placement.Positions);
+
+    /// <summary>How many digits the mode on screen inserts.</summary>
+    internal int CurrentDigitCount => CurrentMode switch
+    {
+        GeneratorMode.Syllable => SyllableDigits,
+        GeneratorMode.Passphrase => PassphraseAddDigit ? 1 : 0,
+        GeneratorMode.Leet => EffectiveLeetDigits,
+        _ => 0
+    };
+
+    /// <summary>How many special characters the mode on screen inserts.</summary>
+    internal int CurrentSpecialCount => GetEffectiveSymbols().Length == 0 ? 0 : CurrentMode switch
+    {
+        GeneratorMode.Syllable => SyllableSpecials,
+        GeneratorMode.Passphrase => PassphraseAddSpecial ? 1 : 0,
+        GeneratorMode.Leet => EffectiveLeetSpecials,
+        _ => 0
+    };
+
+    public bool ShowPlacementBar =>
+        CurrentPlacement == Placement.Positions && CurrentDigitCount + CurrentSpecialCount > 0;
 
     /// <summary>
     /// Keeping the block count equal to the syllable count only means anything where the number
@@ -604,6 +663,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         EntropyFloor = EntropyFloorIndex,
         CaseBlocks = CaseBlocks,
         CaseBlocksAutoSync = CaseBlocksAutoSync,
+        DigitPositions = DigitPositions,
+        SpecialPositions = SpecialPositions,
     };
 
     internal void ApplyPreset(PasswordPreset preset)
@@ -648,6 +709,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             EntropyFloorIndex = preset.EntropyFloor;
             CaseBlocks = SanitizeCaseBlocks(preset.CaseBlocks);
             CaseBlocksAutoSync = preset.CaseBlocksAutoSync;
+            DigitPositions = FormatPositions(ParsePositions(preset.DigitPositions));
+            SpecialPositions = FormatPositions(ParsePositions(preset.SpecialPositions));
         }
         finally
         {
@@ -760,6 +823,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private void GenerateCore()
     {
         ResolveFloorSizes();
+        ResolvePositionCounts();
         GenerateForCurrentMode();
 
         RaiseVisibilityProperties();
@@ -999,6 +1063,139 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private void NoteFloorRaise(string chosen, string used)
         => FloorNoticeText = string.Format(L("ToolPwdGenFloorRaised"), chosen, used);
 
+    /// <summary>
+    /// Brings the two position lists to the number of characters the current mode inserts,
+    /// spreading any new ones evenly and keeping the ones already placed.
+    /// </summary>
+    /// <remarks>
+    /// Called before every generation rather than from each control that changes a count, so a
+    /// list can never be shorter than the characters it has to place, whichever way the count
+    /// changed - a slider, a preset, or the strength floor buying a digit of its own.
+    /// </remarks>
+    private void ResolvePositionCounts()
+    {
+        var digits = ResizePositions(ParsePositions(DigitPositions), CurrentDigitCount);
+        var specials = ResizePositions(ParsePositions(SpecialPositions), CurrentSpecialCount);
+
+        // Writing the two properties from inside a generation would ask for another one, so
+        // the regeneration is held off exactly as the strength floor holds it off.
+        var wasSuspended = _isSuspended;
+        _isSuspended = true;
+        try
+        {
+            DigitPositions = FormatPositions(digits);
+            SpecialPositions = FormatPositions(specials);
+        }
+        finally
+        {
+            _isSuspended = wasSuspended;
+        }
+    }
+
+    private static double[] ResizePositions(double[] current, int count)
+    {
+        if (count <= 0)
+        {
+            return [];
+        }
+
+        if (current.Length == count)
+        {
+            return current;
+        }
+
+        if (current.Length > count)
+        {
+            return current[..count];
+        }
+
+        var spread = DistributeEvenly(count);
+        Array.Copy(current, spread, current.Length);
+        return spread;
+    }
+
+    /// <summary>
+    /// Spreads <paramref name="count"/> positions over the bar, each one in the middle of its
+    /// own share of it, so one character sits at the centre and none starts out pinned to an
+    /// end that the operator has not chosen.
+    /// </summary>
+    internal static double[] DistributeEvenly(int count)
+    {
+        if (count <= 0)
+        {
+            return [];
+        }
+
+        var spread = new double[count];
+        for (var index = 0; index < count; index++)
+        {
+            spread[index] = ClampPercent((index + 0.5) / count * MaximumPositionPercent);
+        }
+
+        return spread;
+    }
+
+    /// <summary>
+    /// Rounds away from zero rather than to even, so half a tenth of a percent goes the way the
+    /// cursor was dragged and matches the rounding that turns a percent into an index.
+    /// </summary>
+    internal static double ClampPercent(double percent) =>
+        Math.Round(
+            Math.Clamp(percent, MinimumPositionPercent, MaximumPositionPercent),
+            PositionPercentDecimals,
+            MidpointRounding.AwayFromZero);
+
+    internal static double[] ParsePositions(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        return text
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(entry => double.TryParse(
+                entry,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var value) ? ClampPercent(value) : (double?)null)
+            .OfType<double>()
+            .ToArray();
+    }
+
+    internal static string FormatPositions(IEnumerable<double> positions) =>
+        string.Join(
+            ',',
+            positions.Select(value => ClampPercent(value).ToString(CultureInfo.InvariantCulture)));
+
+    /// <summary>Moves one cursor of one kind, which is what dragging it does.</summary>
+    internal void MovePosition(bool digit, int index, double percent)
+    {
+        var positions = ParsePositions(digit ? DigitPositions : SpecialPositions);
+        if (index < 0 || index >= positions.Length)
+        {
+            return;
+        }
+
+        positions[index] = ClampPercent(percent);
+        var text = FormatPositions(positions);
+        if (digit)
+        {
+            DigitPositions = text;
+        }
+        else
+        {
+            SpecialPositions = text;
+        }
+    }
+
+    /// <summary>Spreads every cursor out again, which is what the bar's own button does.</summary>
+    internal void DistributePositionsEvenly()
+    {
+        DigitPositions = FormatPositions(DistributeEvenly(CurrentDigitCount));
+        SpecialPositions = FormatPositions(DistributeEvenly(CurrentSpecialCount));
+    }
+
     /// <summary>Adds one block, up to the ten the editor shows.</summary>
     internal void AddCaseBlock()
     {
@@ -1180,6 +1377,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnEntropyFloorIndexChanged(int value) => RegenerateIfReady();
 
     partial void OnCaseBlocksChanged(string value) => RegenerateIfReady();
+    partial void OnDigitPositionsChanged(string value) => RegenerateIfReady();
+    partial void OnSpecialPositionsChanged(string value) => RegenerateIfReady();
 
     partial void OnCaseBlocksAutoSyncChanged(bool value)
     {
@@ -1224,6 +1423,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowFloorNotice));
         OnPropertyChanged(nameof(ShowCaseBlocks));
         OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
+        OnPropertyChanged(nameof(ShowPlacementBar));
         OnPropertyChanged(nameof(HasActiveSpecials));
     }
 
@@ -1450,21 +1650,74 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         UpdatePhoneticDisplay(finalPassword);
     }
 
-    private void InsertExtras(List<char> chars, int digitCount, int specialCount, Placement placement, string symbols)
+    /// <summary>
+    /// Inserts each character at its own position, read as a percentage of the string as it
+    /// stands when the insertion starts.
+    /// </summary>
+    /// <remarks>
+    /// The positions are taken against one length, not recomputed as the string grows, so two
+    /// cursors set to the same percent stay next to each other instead of drifting apart. The
+    /// running offset is what keeps the later insertions where the earlier ones left them.
+    /// </remarks>
+    private static void InsertAtPositions(
+        List<char> chars,
+        IReadOnlyList<char> extras,
+        IReadOnlyList<double> percents)
     {
-        var extras = new List<char>();
-        for (var i = 0; i < digitCount; i++)
+        if (extras.Count == 0)
         {
-            extras.Add(DigitChars[CryptoRandomInt(DigitChars.Length)]);
+            return;
         }
 
+        var length = chars.Count;
+        var placed = extras
+            .Select((character, index) => (
+                Character: character,
+                At: (int)Math.Round(
+                    (index < percents.Count ? percents[index] : MaximumPositionPercent)
+                    / MaximumPositionPercent * length,
+                    MidpointRounding.AwayFromZero),
+                Order: index))
+            .OrderBy(entry => entry.At)
+            .ThenBy(entry => entry.Order)
+            .ToList();
+
+        for (var index = 0; index < placed.Count; index++)
+        {
+            var at = Math.Clamp(placed[index].At + index, 0, chars.Count);
+            chars.Insert(at, placed[index].Character);
+        }
+    }
+
+    private void InsertExtras(List<char> chars, int digitCount, int specialCount, Placement placement, string symbols)
+    {
+        var digits = new List<char>();
+        for (var i = 0; i < digitCount; i++)
+        {
+            digits.Add(DigitChars[CryptoRandomInt(DigitChars.Length)]);
+        }
+
+        var specials = new List<char>();
         if (symbols.Length > 0)
         {
             for (var i = 0; i < specialCount; i++)
             {
-                extras.Add(symbols[CryptoRandomInt(symbols.Length)]);
+                specials.Add(symbols[CryptoRandomInt(symbols.Length)]);
             }
         }
+
+        if (placement == Placement.Positions)
+        {
+            // The digits go in first and the specials are then placed on the longer string, which
+            // is what a bar showing one row above the other reads as: the second row measures the
+            // password the first row has already been written into.
+            InsertAtPositions(chars, digits, ParsePositions(DigitPositions));
+            InsertAtPositions(chars, specials, ParsePositions(SpecialPositions));
+            return;
+        }
+
+        var extras = new List<char>(digits);
+        extras.AddRange(specials);
 
         switch (placement)
         {
