@@ -1826,44 +1826,6 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(chosenCase + (0.81 * 20), sut.LastEntropyBits, 3);
     }
 
-    /// <summary>
-    /// Every button of the generator names the style it is drawn with.
-    /// </summary>
-    /// <remarks>
-    /// <para>There is no implicit <c>Button</c> style in the theme: a button that names none is
-    /// drawn by WPF's own default, which is a pale grey slab that ignores the theme entirely. Seven
-    /// buttons shipped that way, and they are pale in a dark window and invisible in no test,
-    /// because nothing about them is wrong until someone looks.</para>
-    /// <para>This reads the markup rather than the live control because the view refuses to be
-    /// constructed outside the composition root.</para>
-    /// </remarks>
-    [Fact]
-    public void EveryGeneratorButtonNamesItsStyle()
-    {
-        string markup = File.ReadAllText(Path.Combine(
-            ViewSource.RepoRoot(),
-            "src", "Heimdall.App", "Views", "Tools", "PasswordGeneratorView.xaml"));
-
-        List<string> unstyled = Regex
-            .Matches(markup, @"<Button\b[^>]*?/?>", RegexOptions.Singleline)
-            .Select(match => match.Value)
-            .Where(tag => !tag.Contains("Style=", StringComparison.Ordinal))
-            .Select(tag => Regex.Match(tag, @"x:Name=""([^""]+)""") is { Success: true } name
-                ? name.Groups[1].Value
-                : tag)
-            .ToList();
-
-        Assert.True(
-            unstyled.Count == 0,
-            "these buttons would be drawn by WPF's default template, which ignores the theme:\n"
-            + string.Join(Environment.NewLine, unstyled));
-
-        // The assertion above is satisfied by a file with no buttons at all, which this is not.
-        Assert.True(
-            Regex.Matches(markup, @"<Button\b").Count >= 20,
-            "the generator's markup no longer holds the buttons this guard is about");
-    }
-
     private PasswordGeneratorViewModel CreateInitializedVm()
     {
         var sut = new PasswordGeneratorViewModel(new PasswordPresetStorage(_presetsDirectoryPath));

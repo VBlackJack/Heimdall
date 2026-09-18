@@ -14,6 +14,18 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Every button is drawn by the theme
+
+- The Refuse button of the certificate question was drawn by WPF's own default template, a
+  pale grey slab beside the two themed buttons next to it. It now takes the same style as the
+  Trust once button beside it. It was the last one in the application.
+- A guard reads every piece of markup and fails on any button that names no style, counting a
+  style named as an attribute, as a child element, or inherited from an implicit style an
+  ancestor declares. The guard scoped to the password generator is folded into it.
+- There is no implicit button style in this theme and there never has been, so a button that
+  names none is not a theme problem to be fixed in the theme: it is a button to be fixed. Of
+  the 704 buttons the application carries, one was left.
+
 ### The passphrase gets the controls the other modes had
 
 - Digits and special characters are counts from zero to six, on a slider each, where there
