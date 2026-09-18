@@ -86,6 +86,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         public bool CaseBlocksAutoSync { get; set; } = true;
         public string DigitPositions { get; set; } = string.Empty;
         public string SpecialPositions { get; set; } = string.Empty;
+        public int BatchCount { get; set; } = 1;
     }
 
     internal enum GeneratorMode
@@ -139,6 +140,16 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private const int PhoneticMaxLength = 32;
     private const string LayoutUnsafeChars = "aqwzmAQWZM";
     private const int HistoryMaxSize = 10;
+
+    /// <summary>
+    /// How many passwords one click can produce. Twenty is what the tool this idea comes from
+    /// offers, and it is about as many as anyone reads off a screen before copying the lot.
+    /// </summary>
+    internal const int MinimumBatchCount = 1;
+    internal const int MaximumBatchCount = 20;
+
+    /// <summary>What a masked row shows instead of the password.</summary>
+    private const char MaskCharacter = '\u2022';
     private const double BruteForceGuessesPerSecond = 10_000_000_000;
 
     /// <summary>
@@ -460,6 +471,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     [ObservableProperty] private string _specialPositions = string.Empty;
 
     [ObservableProperty] private bool _clipboardAutoClear;
+    [ObservableProperty] private int _batchCount = MinimumBatchCount;
+    [ObservableProperty] private bool _maskBatch;
 
     [ObservableProperty] private string _generatedPassword = string.Empty;
     [ObservableProperty] private string _phoneticText = string.Empty;
@@ -473,6 +486,24 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     public bool IsInitialized => _isInitialized;
     public ObservableCollection<string> PasswordHistory { get; } = new();
+
+    /// <summary>
+    /// The passwords the last click produced, the one on display first. It always holds as many
+    /// entries as the count asks for, so a batch of one is the single password and nothing else.
+    /// </summary>
+    internal ObservableCollection<string> GeneratedBatch { get; } = new();
+
+    /// <summary>
+    /// What the list shows, which is the batch itself or a row of dots per password. The batch
+    /// above is never masked: hiding a password on screen must not hide it from the button that
+    /// copies it.
+    /// </summary>
+    public ObservableCollection<string> BatchRows { get; } = new();
+
+    public bool ShowBatch => GeneratedBatch.Count > 1;
+
+    /// <summary>The batch as it is copied and exported, one password per line.</summary>
+    internal string BatchAsText => string.Join(Environment.NewLine, GeneratedBatch);
     public bool IsHistoryEmpty => PasswordHistory.Count == 0;
 
     /// <summary>
@@ -681,6 +712,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         CaseBlocksAutoSync = CaseBlocksAutoSync,
         DigitPositions = DigitPositions,
         SpecialPositions = SpecialPositions,
+        BatchCount = BatchCount,
     };
 
     internal void ApplyPreset(PasswordPreset preset)
@@ -730,6 +762,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             CaseBlocksAutoSync = preset.CaseBlocksAutoSync;
             DigitPositions = FormatPositions(ParsePositions(preset.DigitPositions));
             SpecialPositions = FormatPositions(ParsePositions(preset.SpecialPositions));
+            BatchCount = Math.Clamp(preset.BatchCount, MinimumBatchCount, MaximumBatchCount);
         }
         finally
         {
@@ -836,6 +869,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     public void ClearOutput()
     {
         SetEmptyOutput();
+        GeneratedBatch.Clear();
+        RefreshBatchRows();
     }
 
     [RelayCommand]
@@ -843,10 +878,45 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     {
         ResolveFloorSizes();
         ResolvePositionCounts();
+
+        // The extra passwords are generated first and the one on display last, so the strength
+        // figure, the phonetic reading and the syllable structure all describe the password in
+        // the box rather than the last of a batch nobody asked to see.
+        var wanted = Math.Clamp(BatchCount, MinimumBatchCount, MaximumBatchCount);
+        var extras = new List<string>(Math.Max(0, wanted - 1));
+        for (var index = 1; index < wanted; index++)
+        {
+            GenerateForCurrentMode();
+            extras.Add(GeneratedPassword);
+        }
+
         GenerateForCurrentMode();
 
+        GeneratedBatch.Clear();
+        GeneratedBatch.Add(GeneratedPassword);
+        foreach (var extra in extras)
+        {
+            GeneratedBatch.Add(extra);
+        }
+
+        RefreshBatchRows();
         RaiseVisibilityProperties();
+
+        // Only the password on display enters the history. A batch of twenty would otherwise
+        // push out everything generated before it.
         AddToHistory(GeneratedPassword);
+    }
+
+    /// <summary>Rebuilds what the list shows from the batch and the mask.</summary>
+    private void RefreshBatchRows()
+    {
+        BatchRows.Clear();
+        foreach (var password in GeneratedBatch)
+        {
+            BatchRows.Add(MaskBatch ? new string(MaskCharacter, password.Length) : password);
+        }
+
+        OnPropertyChanged(nameof(ShowBatch));
     }
 
     private void GenerateForCurrentMode()
@@ -1421,6 +1491,12 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     partial void OnCaseBlocksChanged(string value) => RegenerateIfReady();
     partial void OnDigitPositionsChanged(string value) => RegenerateIfReady();
     partial void OnSpecialPositionsChanged(string value) => RegenerateIfReady();
+    partial void OnBatchCountChanged(int value) => RegenerateIfReady();
+
+    /// <summary>
+    /// Masking hides what is already on screen; it does not ask for other passwords.
+    /// </summary>
+    partial void OnMaskBatchChanged(bool value) => RefreshBatchRows();
 
     partial void OnCaseBlocksAutoSyncChanged(bool value)
     {
@@ -1466,6 +1542,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowCaseBlocks));
         OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
         OnPropertyChanged(nameof(ShowPlacementBar));
+        OnPropertyChanged(nameof(ShowBatch));
         OnPropertyChanged(nameof(HasActiveSpecials));
     }
 

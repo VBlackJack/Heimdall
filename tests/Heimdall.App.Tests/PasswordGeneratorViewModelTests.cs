@@ -417,6 +417,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
             source.CaseBlocksAutoSync = false;
             source.DigitPositions = "10,90";
             source.SpecialPositions = "40";
+            source.BatchCount = 6;
         }
         finally
         {
@@ -464,6 +465,7 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(source.CaseBlocksAutoSync, target.CaseBlocksAutoSync);
         Assert.Equal(source.DigitPositions, target.DigitPositions);
         Assert.Equal(source.SpecialPositions, target.SpecialPositions);
+        Assert.Equal(source.BatchCount, target.BatchCount);
     }
 
     [Fact]
@@ -1824,6 +1826,169 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         // Four words of five letters, at the 0.81 bits a character uppercased one time in four is
         // worth.
         Assert.Equal(chosenCase + (0.81 * 20), sut.LastEntropyBits, 3);
+    }
+
+    /// <summary>
+    /// One click produces as many passwords as the count asks for, and they are all different.
+    /// </summary>
+    /// <remarks>
+    /// Twenty random passwords of twenty-four characters colliding would mean the generator is not
+    /// random, so distinctness is a fair thing to assert here even though it is a probabilistic
+    /// claim: the chance of a false failure is far below that of the hardware faulting.
+    /// </remarks>
+    [Fact]
+    public void Batch_ProducesAsManyPasswordsAsAsked()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.BatchCount = 20;
+
+        Assert.Equal(20, sut.GeneratedBatch.Count);
+        Assert.Equal(20, sut.BatchRows.Count);
+        Assert.True(sut.ShowBatch);
+        Assert.All(sut.GeneratedBatch, password => Assert.Equal(sut.Length, password.Length));
+        Assert.Equal(20, sut.GeneratedBatch.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    /// <summary>
+    /// The password on display is the first of the batch, and the figures beside it describe that
+    /// one rather than the last of a batch nobody asked to see.
+    /// </summary>
+    [Fact]
+    public void Batch_PutsThePasswordOnDisplayFirst()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.BatchCount = 6;
+
+        Assert.Equal(sut.GeneratedPassword, sut.GeneratedBatch[0]);
+        Assert.Equal(sut.GeneratedPassword.Length, sut.Length);
+    }
+
+    /// <summary>
+    /// A batch of one is the single password and nothing else: no list, and the tool reads as it
+    /// always has.
+    /// </summary>
+    [Fact]
+    public void Batch_OfOne_ShowsNoList()
+    {
+        var sut = CreateInitializedVm();
+
+        Assert.Equal(1, sut.BatchCount);
+        Assert.Single(sut.GeneratedBatch);
+        Assert.False(sut.ShowBatch);
+        Assert.Equal(sut.GeneratedPassword, sut.GeneratedBatch[0]);
+    }
+
+    /// <summary>
+    /// Only the password on display enters the history. A batch of twenty would otherwise push out
+    /// everything generated before it.
+    /// </summary>
+    [Fact]
+    public void Batch_AddsOnlyThePasswordOnDisplayToTheHistory()
+    {
+        var sut = CreateInitializedVm();
+        sut.ClearHistoryCommand.Execute(null);
+
+        sut.BatchCount = 8;
+
+        Assert.Single(sut.PasswordHistory);
+        Assert.Equal(sut.GeneratedPassword, sut.PasswordHistory[0]);
+    }
+
+    /// <summary>
+    /// Hiding the batch changes what is shown and nothing else: the passwords themselves are still
+    /// there for the button that copies them.
+    /// </summary>
+    [Fact]
+    public void Batch_Masked_HidesTheRowsAndKeepsThePasswords()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.BatchCount = 4;
+        var generated = sut.GeneratedBatch.ToList();
+
+        sut.MaskBatch = true;
+
+        Assert.Equal(generated, sut.GeneratedBatch);
+        Assert.Equal(4, sut.BatchRows.Count);
+        for (var index = 0; index < sut.BatchRows.Count; index++)
+        {
+            Assert.Equal(generated[index].Length, sut.BatchRows[index].Length);
+            Assert.All(sut.BatchRows[index], character => Assert.Equal('\u2022', character));
+        }
+
+        // What is copied is the password, not the dots: hiding a batch on screen must not hide it
+        // from the button that copies it.
+        Assert.Equal(string.Join(Environment.NewLine, generated), sut.BatchAsText);
+
+        sut.MaskBatch = false;
+
+        Assert.Equal(generated, sut.BatchRows);
+    }
+
+    /// <summary>
+    /// Masking hides what is on screen; it does not ask for other passwords.
+    /// </summary>
+    [Fact]
+    public void Batch_Masking_DoesNotRegenerate()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.BatchCount = 5;
+        var generated = sut.GeneratedBatch.ToList();
+
+        sut.MaskBatch = true;
+        sut.MaskBatch = false;
+
+        Assert.Equal(generated, sut.GeneratedBatch);
+        Assert.Equal(generated[0], sut.GeneratedPassword);
+    }
+
+    /// <summary>
+    /// What is copied and exported is one password per line, in the order shown.
+    /// </summary>
+    [Fact]
+    public void Batch_IsCopiedOnePasswordPerLine()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.BatchCount = 7;
+
+        var lines = sut.BatchAsText.Split(Environment.NewLine);
+
+        Assert.Equal(7, lines.Length);
+        Assert.Equal(sut.GeneratedBatch, lines);
+    }
+
+    /// <summary>
+    /// The count is held to what the slider offers, whichever way it arrives.
+    /// </summary>
+    [Fact]
+    public void Batch_CountFromAPresetIsHeldToTheSlider()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.ApplyPreset(new PasswordGeneratorViewModel.PasswordPreset
+        {
+            Name = "too many",
+            Mode = 0,
+            Length = 12,
+            BatchCount = 500,
+        });
+
+        Assert.Equal(PasswordGeneratorViewModel.MaximumBatchCount, sut.BatchCount);
+        Assert.Equal(PasswordGeneratorViewModel.MaximumBatchCount, sut.GeneratedBatch.Count);
+
+        sut.ApplyPreset(new PasswordGeneratorViewModel.PasswordPreset
+        {
+            Name = "none",
+            Mode = 0,
+            Length = 12,
+            BatchCount = 0,
+        });
+
+        Assert.Equal(PasswordGeneratorViewModel.MinimumBatchCount, sut.BatchCount);
     }
 
     private PasswordGeneratorViewModel CreateInitializedVm()
