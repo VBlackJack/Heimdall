@@ -3761,6 +3761,8 @@
   "FileBrowserFilterPlaceholder": "Filtrer...",
 
   "ToolPwdGenTitle": "G\u00e9n\u00e9rateur de mot de passe",
+  "ToolPwdGenOutputName": "Mot de passe g\u00e9n\u00e9r\u00e9",
+  "ToolPwdGenStrength": "Force",
   "ToolPwdGenBtnGenerate": "G\u00e9n\u00e9rer",
   "ToolPwdGenBtnCopy": "Copier",
   "ToolPwdGenLength": "Longueur",
@@ -3769,7 +3771,7 @@
   "ToolPwdGenUppercase": "Majuscules (A-Z)",
   "ToolPwdGenLowercase": "Minuscules (a-z)",
   "ToolPwdGenDigits": "Chiffres (0-9)",
-  "ToolPwdGenSymbols": "Symboles (!@#$...)",
+  "ToolPwdGenSymbols": "Sp\u00e9ciaux (!@#$...)",
   "ToolPwdGenModeRandom": "Al\u00e9atoire",
   "ToolPwdGenModeSyllable": "Syllabique",
   "ToolPwdGenModePassphrase": "Phrase de passe",
@@ -3862,7 +3864,6 @@
   "ToolPwdGenSpecialsNoneUsable": "Aucun de ceux-ci n'est utilisable : un caractère spécial doit être une ponctuation ASCII, tapable sur tout clavier",
   "ToolPwdGenAdvanced": "Avanc\u00e9",
   "ToolPwdGenQuickPresets": "Pr\u00e9r\u00e9glages rapides :",
-  "ToolPwdGenBtnRegenerate": "Reg\u00e9n\u00e9rer",
   "ToolPwdGenMode": "Mode :",
 
   "ToolBase64Title": "Encodeur / D\u00e9codeur Base64",
