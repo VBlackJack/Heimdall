@@ -14,6 +14,29 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A case pattern, block by block
+
+- The case box of the syllable and leet modes offers a ninth entry, Pattern. It opens an
+  editor of blocks, each block saying what its share of the password looks like: `U` in
+  uppercase, `l` in lowercase, `T` with a capital first letter. Click a block to move it on to
+  the next token. The pattern repeats when the password has more units than the pattern has
+  blocks, so `Ul` alternates for as long as the password lasts.
+- A block covers one syllable in the syllable mode, which is the unit the structure line
+  already shows, and one letter in the leet mode, which has no syllables to hang a pattern on.
+  A letter the leet substitution turned into a digit consumes no block: the pattern stays on
+  the letters it can actually case.
+- The editor adds and removes blocks between one and ten, shuffles them, and sets them all to
+  one token at a time. In the syllable mode it keeps one block per syllable while the box
+  beside it is ticked, so a pattern read left to right lines up with the password read left to
+  right; adding or removing a block by hand unticks it, because you have said what you want.
+- **A pattern is worth no entropy and the figure says so.** It is chosen, not drawn, and the
+  same is true of the shuffle button, which picks the pattern once rather than picking it per
+  password. Mixed case remains the only case mode worth any bits, because it is the only one
+  that is decided at generation time.
+- The pattern and the state of its sync box are saved with a preset. A pattern read back from
+  a file is held to what the editor can produce: one to ten blocks, each one of the three
+  tokens, anything else falls back to the default.
+
 ### A minimum strength the generator will not go under
 
 - The generator takes a minimum strength: none, 60, 80, 100 or 128 bits. Under it, the password
