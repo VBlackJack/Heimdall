@@ -2930,6 +2930,140 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// What the tool keeps between runs is sealed, the way a session's password is.
+    /// </summary>
+    /// <remarks>
+    /// A preset holds no password. It does hold the shape of the ones this person makes, their
+    /// custom set of specials and whatever word they typed for the leet mode, which is enough to
+    /// narrow a search and enough to be worth sealing. The file is written through the same
+    /// protector as a session's credentials: the vault's key when it is unlocked, the Windows
+    /// account's own otherwise.
+    /// </remarks>
+    [Fact]
+    public void WhatIsKeptBetweenRuns_IsSealedOnDisk()
+    {
+        var sut = CreateInitializedVm();
+        sut.SelectedModeIndex = 1;
+        sut.SavePreset("sealed one");
+
+        string path = Path.Combine(_presetsDirectoryPath, "password-presets.json");
+        Assert.True(File.Exists(path));
+
+        string raw = File.ReadAllText(path).Trim();
+        Assert.False(raw.StartsWith('{'), "the file is plain JSON");
+        Assert.False(raw.StartsWith('['), "the file is plain JSON");
+        Assert.DoesNotContain("sealed one", raw, StringComparison.Ordinal);
+
+        // And it is the tool that can read it back, not just anybody with the file.
+        var reopened = CreateInitializedVm();
+        reopened.SelectedModeIndex = 1;
+        Assert.Contains(
+            reopened.GetCustomPresetsForCurrentMode(),
+            preset => preset.Name == "sealed one");
+    }
+
+    /// <summary>
+    /// A file written before any of this is read once and written back sealed, so nobody loses
+    /// what they had saved.
+    /// </summary>
+    [Fact]
+    public void APlainFileFromBefore_IsReadOnceAndSealedOnTheWayBack()
+    {
+        Directory.CreateDirectory(_presetsDirectoryPath);
+        string path = Path.Combine(_presetsDirectoryPath, "password-presets.json");
+
+        // The shape the file had: a bare array, in the clear.
+        File.WriteAllText(
+            path,
+            """[{"Name":"from before","Mode":1,"SylLength":20,"SylDigits":1,"SylSpecials":1}]""");
+
+        var sut = CreateInitializedVm();
+        sut.SelectedModeIndex = 1;
+
+        Assert.Contains(
+            sut.GetCustomPresetsForCurrentMode(),
+            preset => preset.Name == "from before");
+
+        string raw = File.ReadAllText(path).Trim();
+        Assert.False(raw.StartsWith('['), "the file was left in the clear");
+        Assert.DoesNotContain("from before", raw, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The tool keeps nothing until it is told to, and then keeps it.
+    /// </summary>
+    [Fact]
+    public void TheSettings_AreRememberedOnlyWhenAsked()
+    {
+        var sut = CreateInitializedVm();
+        Assert.False(sut.RememberSettings);
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 26;
+            sut.SyllableDigits = 3;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        // Nothing was asked for, so a new tool opens on its defaults.
+        var forgetful = CreateInitializedVm();
+        Assert.False(forgetful.RememberSettings);
+        Assert.NotEqual(26, forgetful.SyllableLength);
+
+        sut.RememberSettings = true;
+
+        // On disk as well as in the next run: a snapshot kept while the switch is off would be a
+        // tool writing down what someone was making after being told not to.
+        Assert.NotNull(new PasswordPresetStorage(_presetsDirectoryPath).Load().Settings);
+
+        var remembering = CreateInitializedVm();
+        Assert.True(remembering.RememberSettings);
+        Assert.Equal(1, remembering.SelectedModeIndex);
+        Assert.Equal(26, remembering.SyllableLength);
+        Assert.Equal(3, remembering.SyllableDigits);
+
+        // And turning it off forgets, rather than leaving the last snapshot on disk.
+        remembering.RememberSettings = false;
+
+        Assert.Null(new PasswordPresetStorage(_presetsDirectoryPath).Load().Settings);
+
+        var forgottenAgain = CreateInitializedVm();
+        Assert.False(forgottenAgain.RememberSettings);
+        Assert.NotEqual(26, forgottenAgain.SyllableLength);
+    }
+
+    /// <summary>
+    /// Saved presets are shown for the mode they belong to, and the ones that belong elsewhere are
+    /// counted rather than hidden.
+    /// </summary>
+    /// <remarks>
+    /// A preset saved in one mode and looked for in another was shown nowhere and explained
+    /// nowhere, which is how a preset gets saved and lost.
+    /// </remarks>
+    [Fact]
+    public void PresetsSavedInAnotherMode_AreCountedRatherThanHidden()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SelectedModeIndex = 1;
+        sut.SavePreset("in syllable");
+        sut.SelectedModeIndex = 2;
+        sut.SavePreset("in passphrase");
+
+        Assert.Equal(2, sut.CustomPresetCount);
+        Assert.Single(sut.GetCustomPresetsForCurrentMode());
+
+        sut.SelectedModeIndex = 0;
+        Assert.Empty(sut.GetCustomPresetsForCurrentMode());
+        Assert.Equal(2, sut.CustomPresetCount);
+    }
+
     private static void InvokePrivate(PasswordGeneratorViewModel sut, string methodName, params object[] args)
     {
         typeof(PasswordGeneratorViewModel)

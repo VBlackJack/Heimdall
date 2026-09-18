@@ -461,7 +461,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private bool _isSuspended;
     private Func<string, string, Task<bool>>? _confirmAsync;
     private readonly IPasswordPresetStorage _presetStorage;
-    private List<PasswordPreset>? _cachedPresets;
+    private PasswordGeneratorStore? _cachedStore;
     private string[][] _wordLists = [];
 
     /// <summary>Creates the view model over the supplied preset storage.</summary>
@@ -546,6 +546,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     /// <summary>How big the chosen language's word list is, and what that is worth a word.</summary>
     [ObservableProperty] private string _wordListSummaryText = string.Empty;
+
+    /// <summary>
+    /// Whether the tool reopens where it was left. Off until it is asked for: a generator that
+    /// silently remembers what someone was making is a generator that writes their habits down
+    /// without being told to.
+    /// </summary>
+    [ObservableProperty] private bool _rememberSettings;
     [ObservableProperty] private string _issuesText = string.Empty;
     [ObservableProperty] private string _syllableStructureText = string.Empty;
     [ObservableProperty] private int _syllableTotalLength;
@@ -753,6 +760,18 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
         PassphraseLanguageIndex = PassphraseLanguageIndexFor(localizer?.CurrentLocale);
 
+        // Where the tool was left, when it was told to remember. Applied before the first draw so
+        // that the password on screen is the one these settings make, not one from the defaults.
+        var store = LoadStore();
+        if (store.RememberSettings)
+        {
+            RememberSettings = true;
+            if (store.Settings is { } remembered)
+            {
+                ApplyPreset(remembered);
+            }
+        }
+
         // The setter above only reports when the index changes, and it starts on the first
         // language, so the summary is written here rather than left blank for that one case.
         UpdateWordListSummary();
@@ -954,6 +973,9 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     internal IReadOnlyList<PasswordPreset> GetCustomPresetsForCurrentMode()
         => LoadCustomPresets().Where(p => p.Mode == SelectedModeIndex).ToList().AsReadOnly();
+
+    /// <summary>How many presets are saved in all, across every mode.</summary>
+    internal int CustomPresetCount => LoadCustomPresets().Count;
 
     internal void SavePreset(string name)
     {
@@ -2857,21 +2879,43 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     private string L(string key) => _localizer?[key] ?? key;
 
-    private List<PasswordPreset> LoadCustomPresets()
-    {
-        if (_cachedPresets is not null)
-        {
-            return _cachedPresets;
-        }
+    private PasswordGeneratorStore LoadStore()
+        => _cachedStore ??= _presetStorage.Load();
 
-        return _cachedPresets = _presetStorage.Load();
-    }
+    private List<PasswordPreset> LoadCustomPresets() => LoadStore().Presets;
 
     private void SaveCustomPresets(List<PasswordPreset> presets)
     {
-        _cachedPresets = null;
-        _presetStorage.Save(presets);
+        var store = LoadStore();
+        store.Presets = presets;
+        _presetStorage.Save(store);
     }
+
+    /// <summary>
+    /// Writes down where the tool was left, or forgets it.
+    /// </summary>
+    /// <remarks>
+    /// Called when the switch is turned, and when the tool is put away. It is not called on every
+    /// change: a file written on every slider movement would be a file written on every pixel of a
+    /// drag, and the whole of this setting is a convenience.
+    /// </remarks>
+    internal void PersistSettingsIfRemembering()
+    {
+        // Nothing is written while the tool is still being set up. Turning the switch on during a
+        // restore would otherwise save the defaults over the very snapshot being restored, which
+        // is what it did: the settings came back for exactly as long as it took to overwrite them.
+        if (!_isInitialized)
+        {
+            return;
+        }
+
+        var store = LoadStore();
+        store.RememberSettings = RememberSettings;
+        store.Settings = RememberSettings ? SnapshotCurrentPreset(string.Empty) : null;
+        _presetStorage.Save(store);
+    }
+
+    partial void OnRememberSettingsChanged(bool value) => PersistSettingsIfRemembering();
 
     private void LoadWordLists()
         => _wordLists =
