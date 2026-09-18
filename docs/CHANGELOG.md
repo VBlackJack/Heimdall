@@ -14,6 +14,21 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Specials you can type, and a clipboard delay you choose
+
+- A special character has to be ASCII punctuation now. Pasting a euro sign or a typographic
+  dash into the custom specials box used to put it in the password, where it may be
+  untypeable on the next keyboard, may not survive a terminal, and may not come back the same
+  from a field that normalises what it is given. It is the same rule the passphrase word lists
+  follow, for the same reason.
+- The box is left exactly as typed, and a line under it says what the generator will actually
+  use, or that none of it can be used. Rewriting what someone is still typing fights them, and
+  dropping half of it silently tells them nothing.
+- The clipboard delay is a choice of 30, 10, 60 or 120 seconds where it was thirty seconds in
+  the code, and the line under the password counts it down second by second and then says the
+  clipboard has been cleared. It used to say "will auto-clear" for three seconds and then go
+  back to the keyboard hint, which told you a delay was running but never how much was left.
+
 ### One click, as many passwords as you need
 
 - A count beside the output asks for one to twenty passwords. Above one, a list appears under
