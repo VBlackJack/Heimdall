@@ -14,6 +14,24 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### One click, as many passwords as you need
+
+- A count beside the output asks for one to twenty passwords. Above one, a list appears under
+  the strength figure with every password of the batch, a copy button on each row, Copy all,
+  and Export to a text file, one password per line.
+- The password in the box is the first of the batch, and the strength figure, the phonetic
+  reading and the syllable structure beside it describe that one. The extras are generated
+  first and the one on display last, so those figures are never the last of a batch nobody
+  asked to see. Every password of a batch is built from the same settings, so the figure holds
+  for all of them.
+- Only the password on display enters the history. A batch of twenty would otherwise push out
+  everything generated before it.
+- A Hide box covers the list with dots, for a screen somebody else can see. It hides what is
+  shown and nothing else: the copy buttons and the export still carry the passwords, and
+  ticking it does not ask for new ones.
+- The count is saved with a preset, and a count read back from a file is held to what the
+  slider offers.
+
 ### Every button is drawn by the theme
 
 - The Refuse button of the certificate question was drawn by WPF's own default template, a

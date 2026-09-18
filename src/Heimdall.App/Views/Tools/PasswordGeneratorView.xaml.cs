@@ -16,6 +16,8 @@
 
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -270,6 +272,11 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         LeetWordSourceLabel.Text = L("ToolPwdGenLeetWordSource");
         EntropyFloorLabel.Text = L("ToolPwdGenEntropyFloor");
         CaseBlocksLabel.Text = L("ToolPwdGenBlocks");
+        BatchCountLabel.Text = L("ToolPwdGenBatchCount");
+        BatchLabel.Text = L("ToolPwdGenBatch");
+        ChkBatchMask.Content = L("ToolPwdGenBatchMask");
+        BtnBatchCopyAll.Content = L("ToolPwdGenBatchCopyAll");
+        BtnBatchExport.Content = L("ToolPwdGenBatchExport");
         PlacementBarLabel.Text = L("ToolPwdGenPlacementBar");
         PlacementBarHint.Text = L("ToolPwdGenPlacementBarHint");
         PlacementDigitsLabel.Text = L("ToolPwdGenDigits");
@@ -317,6 +324,9 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(CmbPpLanguage, L("ToolPwdGenLanguage"));
         System.Windows.Automation.AutomationProperties.SetName(CmbLeetLanguage, L("ToolPwdGenLanguage"));
         System.Windows.Automation.AutomationProperties.SetName(CmbEntropyFloor, L("ToolPwdGenEntropyFloor"));
+        System.Windows.Automation.AutomationProperties.SetName(BatchCountSlider, L("ToolPwdGenBatchCount"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnBatchCopyAll, L("ToolPwdGenBatchCopyAll"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnBatchExport, L("ToolPwdGenBatchExport"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlockAdd, L("ToolPwdGenBlocksAdd"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlockRemove, L("ToolPwdGenBlocksRemove"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCaseBlocksAllUpper, L("ToolPwdGenBlocksAllUpper"));
@@ -912,6 +922,74 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
     /// <summary>Which track a cursor belongs to, and which character on it.</summary>
     private readonly record struct PlacementCursor(bool Digits, int Index);
+
+    private void OnBatchCopyAll(object sender, RoutedEventArgs e)
+    {
+        CopyBatchText(_vm.BatchAsText, sender as Button);
+    }
+
+    private void OnBatchCopyRow(object sender, RoutedEventArgs e)
+    {
+        // The row shows dots while the batch is masked, so what is copied is read from the batch
+        // itself, by the place the row sits in.
+        if (sender is Button { Tag: string row } button)
+        {
+            int index = _vm.BatchRows.IndexOf(row);
+            if (index >= 0 && index < _vm.GeneratedBatch.Count)
+            {
+                CopyBatchText(_vm.GeneratedBatch[index], button);
+            }
+        }
+    }
+
+    private void CopyBatchText(string text, Button? source)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(text);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            return;
+        }
+
+        StartClipboardClearTimer(text);
+        ShowClipboardClearHint();
+        CopyFeedbackHelper.ShowCopyFeedback(source);
+    }
+
+    private void OnBatchExport(object sender, RoutedEventArgs e)
+    {
+        if (_vm.GeneratedBatch.Count == 0)
+        {
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = L("FileDialogTextFilter"),
+            FileName = $"passwords_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, _vm.BatchAsText, Encoding.UTF8);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            BatchLabel.Text = string.Format(L("ToolPwdGenBatchExportFailed"), exception.Message);
+        }
+    }
 
     private void RebuildCustomPresetButtons()
     {
