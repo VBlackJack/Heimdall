@@ -22,6 +22,7 @@ using System.Text.RegularExpressions;
 using Heimdall.App.Services;
 using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.App.ViewModels.Tools;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.App.Tests;
 
@@ -2153,6 +2154,25 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     }
 
     /// <summary>
+    /// The same view-model with a catalogue behind it, for the few tests that are about what a
+    /// sentence says rather than about what the generator did.
+    /// </summary>
+    /// <remarks>
+    /// Without one, every localized string is its own key, so a line that should read "3525 words,
+    /// 11.8 bits each" reads "ToolPwdGenWordListSize" and an assertion on its content passes on
+    /// nothing. The catalogue is the shipped one, copied beside the test binary.
+    /// </remarks>
+    private async Task<PasswordGeneratorViewModel> CreateSpeakingVmAsync(string locale = "en")
+    {
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+
+        var sut = new PasswordGeneratorViewModel(new PasswordPresetStorage(_presetsDirectoryPath));
+        sut.Initialize(context: null, localizer: localizer);
+        return sut;
+    }
+
+    /// <summary>
     /// Replaces the loaded word lists, one per entry of
     /// <c>PasswordGeneratorViewModel.PassphraseLanguages</c> and in that order, so a test can say
     /// which words a passphrase is allowed to be built from.
@@ -2404,6 +2424,437 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         Assert.Equal(22, target.SyllableLength);
         Assert.Equal(22, target.GeneratedPassword.Length);
+    }
+
+    /// <summary>
+    /// A ticked box is a promise: every selected class appears in every password.
+    /// </summary>
+    /// <remarks>
+    /// The lengths are the ones where the promise used to fail often enough to matter. Drawn from
+    /// the whole bag, a password of eight characters carried no digit two times in five; twenty
+    /// batches of twenty is four hundred draws, which that generator would survive with a
+    /// probability of about ten to the power of minus eighty.
+    /// </remarks>
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(12)]
+    [InlineData(24)]
+    public void EverySelectedClass_AppearsInEveryRandomPassword(int length)
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = length;
+            sut.IncludeUppercase = true;
+            sut.IncludeLowercase = true;
+            sut.IncludeDigits = true;
+            sut.IncludeSymbols = true;
+            sut.ExcludeAmbiguous = false;
+            sut.CliSafe = false;
+            sut.LayoutSafe = false;
+            sut.BatchCount = 20;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        for (var round = 0; round < 20; round++)
+        {
+            sut.GenerateCoreCommand.Execute(null);
+
+            Assert.Equal(20, sut.GeneratedBatch.Count);
+            foreach (var password in sut.GeneratedBatch)
+            {
+                Assert.Equal(length, password.Length);
+                Assert.True(password.Any(char.IsUpper), $"'{password}' carries no uppercase");
+                Assert.True(password.Any(char.IsLower), $"'{password}' carries no lowercase");
+                Assert.True(password.Any(char.IsDigit), $"'{password}' carries no digit");
+                Assert.True(
+                    password.Any(character => PasswordGeneratorViewModel.DefaultSymbolChars.Contains(character)),
+                    $"'{password}' carries no special");
+            }
+        }
+
+        Assert.False(sut.ShowFloorNotice);
+    }
+
+    /// <summary>
+    /// The promise is paid for out of the figure, not out of the reader's trust.
+    /// </summary>
+    /// <remarks>
+    /// Drawing again until every class appears is a uniform draw over the passwords that qualify,
+    /// so the figure is the unconstrained one plus the log of the share that do. With the four
+    /// classes and their default characters that share is 0.469126 at eight characters, which is
+    /// 52.19 - 1.09 = 51.10 bits; the number is checked against an exact enumeration of the same
+    /// count on small alphabets. An implementation that ignored the cost would report 52.19, and
+    /// one that charged the cost twice 50.01.
+    /// </remarks>
+    [Theory]
+    [InlineData(8, 51.10)]
+    [InlineData(12, 77.79)]
+    [InlineData(16, 104.11)]
+    [InlineData(24, 156.47)]
+    public void TheStrengthFigure_PaysForThePromise(int length, double expectedBits)
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = length;
+            sut.IncludeUppercase = true;
+            sut.IncludeLowercase = true;
+            sut.IncludeDigits = true;
+            sut.IncludeSymbols = true;
+            sut.CustomSpecials = PasswordGeneratorViewModel.DefaultSymbolChars;
+            sut.ExcludeAmbiguous = false;
+            sut.CliSafe = false;
+            sut.LayoutSafe = false;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(expectedBits, sut.LastEntropyBits, 1);
+        Assert.True(
+            sut.LastEntropyBits < Math.Log2(92) * length,
+            $"the figure {sut.LastEntropyBits} does not pay for the promise");
+    }
+
+    /// <summary>
+    /// One class is one promise: a class the exclusions empty out is not promised, and the other
+    /// three still are.
+    /// </summary>
+    [Fact]
+    public void AClassTheExclusionsEmptyOut_IsNotPromisedAndDoesNotBlockTheOthers()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 12;
+            sut.IncludeUppercase = true;
+            sut.IncludeLowercase = true;
+            sut.IncludeDigits = true;
+            sut.IncludeSymbols = true;
+
+            // The only special allowed is one the ambiguous filter then takes away.
+            sut.CustomSpecials = "|";
+            sut.ExcludeAmbiguous = true;
+            sut.BatchCount = 10;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        foreach (var password in sut.GeneratedBatch)
+        {
+            Assert.Equal(12, password.Length);
+            Assert.True(password.Any(char.IsUpper), $"'{password}' carries no uppercase");
+            Assert.True(password.Any(char.IsLower), $"'{password}' carries no lowercase");
+            Assert.True(password.Any(char.IsDigit), $"'{password}' carries no digit");
+            Assert.DoesNotContain('|', password);
+            Assert.All(password, character => Assert.DoesNotContain(character, AmbiguousChars));
+        }
+
+        // Three classes were promised and all three were kept, so there is nothing to report.
+        Assert.False(sut.ShowFloorNotice);
+    }
+
+    /// <summary>
+    /// A length that cannot hold one of every kind gets an ordinary draw, and is told so.
+    /// </summary>
+    [Fact]
+    public void ALengthTooShortForThePromise_SaysSoInsteadOfPretending()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 3;
+            sut.IncludeUppercase = true;
+            sut.IncludeLowercase = true;
+            sut.IncludeDigits = true;
+            sut.IncludeSymbols = true;
+            sut.ExcludeAmbiguous = false;
+            sut.LayoutSafe = false;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Equal(3, sut.GeneratedPassword.Length);
+        Assert.True(sut.ShowFloorNotice);
+        Assert.NotEmpty(sut.FloorNoticeText);
+
+        // An ordinary draw is worth the ordinary figure: nothing is subtracted for a promise that
+        // was not made.
+        Assert.Equal(Math.Log2(92) * 3, sut.LastEntropyBits, 1);
+    }
+
+    /// <summary>
+    /// The floor asks the same question the figure answers.
+    /// </summary>
+    /// <remarks>
+    /// The bits a length carries are no longer proportional to it, so a floor that divided would
+    /// stop one character short of what the figure then reports. The floor's own length is held to
+    /// the floor by the figure itself.
+    /// </remarks>
+    [Theory]
+    [InlineData(1, 60)]
+    [InlineData(2, 80)]
+    [InlineData(3, 100)]
+    [InlineData(4, 128)]
+    public void TheRandomFloor_ReachesTheBitsItPromises(int floorIndex, int floorBits)
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 4;
+            sut.IncludeUppercase = true;
+            sut.IncludeLowercase = true;
+            sut.IncludeDigits = true;
+            sut.IncludeSymbols = true;
+            sut.ExcludeAmbiguous = false;
+            sut.LayoutSafe = false;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = floorIndex;
+
+        Assert.False(sut.FloorOutOfReach);
+        Assert.True(sut.EffectiveLength > 4);
+        Assert.Equal(sut.EffectiveLength, sut.GeneratedPassword.Length);
+        Assert.True(
+            sut.LastEntropyBits >= floorBits,
+            $"{sut.EffectiveLength} characters carry {sut.LastEntropyBits} bits, under the {floorBits} asked for");
+
+        // And not a character more than the floor needs.
+        Assert.Equal(4, sut.Length);
+    }
+
+    /// <summary>
+    /// The case where dividing the floor by the bits per character falls short.
+    /// </summary>
+    /// <remarks>
+    /// With the ambiguous characters excluded the bag holds 85, so a hundred and twenty-eight bits
+    /// divides into twenty characters. Twenty characters that must carry one of each of the four
+    /// kinds are worth 127.97 bits, which is not a hundred and twenty-eight. Twenty-one is. This
+    /// is the whole of what walking the length up buys over dividing into it: three hundredths of
+    /// a bit, on a promise that was stated exactly.
+    /// </remarks>
+    [Fact]
+    public void TheRandomFloor_DoesNotStopAHundredthOfABitShort()
+    {
+        var sut = CreateInitializedVm();
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 4;
+            sut.IncludeUppercase = true;
+            sut.IncludeLowercase = true;
+            sut.IncludeDigits = true;
+            sut.IncludeSymbols = true;
+            sut.CustomSpecials = PasswordGeneratorViewModel.DefaultSymbolChars;
+            sut.ExcludeAmbiguous = true;
+            sut.CliSafe = false;
+            sut.LayoutSafe = false;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 4;
+
+        Assert.False(sut.FloorOutOfReach);
+        Assert.Equal(21, sut.EffectiveLength);
+        Assert.True(sut.LastEntropyBits >= 128, $"{sut.LastEntropyBits} bits is under the floor");
+        Assert.Equal(21, sut.GeneratedPassword.Length);
+    }
+
+    /// <summary>
+    /// A crack time is one scenario, so it never appears without the scenario.
+    /// </summary>
+    /// <remarks>
+    /// The same password falls in a day against a stolen hash that was cheap to compute and stands
+    /// for millennia against one deliberately made slow. A figure shown on its own invites the
+    /// reader to take whichever of those they already believed, so the two lines live and die
+    /// together: whatever clears one clears the other.
+    /// </remarks>
+    [Fact]
+    public void TheCrackTime_NeverAppearsWithoutTheAttackItAssumes()
+    {
+        var sut = CreateInitializedVm();
+
+        Assert.NotEmpty(sut.GeneratedPassword);
+        Assert.NotEmpty(sut.CrackTimeText);
+        Assert.NotEmpty(sut.CrackTimeAssumptionText);
+
+        sut.ClearOutput();
+
+        Assert.Empty(sut.CrackTimeText);
+        Assert.Empty(sut.CrackTimeAssumptionText);
+
+        sut.GenerateCoreCommand.Execute(null);
+
+        Assert.NotEmpty(sut.CrackTimeText);
+        Assert.NotEmpty(sut.CrackTimeAssumptionText);
+
+        // A charset with nothing in it produces no password, and therefore no claim about one.
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.IncludeUppercase = false;
+            sut.IncludeLowercase = false;
+            sut.IncludeDigits = false;
+            sut.IncludeSymbols = false;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        Assert.Empty(sut.CrackTimeText);
+        Assert.Empty(sut.CrackTimeAssumptionText);
+    }
+
+    /// <summary>
+    /// The rate in the sentence is the rate in the arithmetic.
+    /// </summary>
+    /// <remarks>
+    /// Spelled from the constant rather than written out beside it, so the two cannot drift. This
+    /// pins today's rate: changing the constant is allowed and should fail here, because it means
+    /// the sentence on screen changed too and somebody should have looked at it.
+    /// </remarks>
+    [Fact]
+    public void TheStatedGuessRate_IsSpelledFromTheConstantItIsWorkedOutWith()
+    {
+        var spelled = typeof(PasswordGeneratorViewModel)
+            .GetMethod("GuessRateText", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, null);
+
+        Assert.Equal("10^10", spelled);
+
+        var rate = (double)typeof(PasswordGeneratorViewModel)
+            .GetField("BruteForceGuessesPerSecond", BindingFlags.Static | BindingFlags.NonPublic)!
+            .GetRawConstantValue()!;
+
+        Assert.Equal(1e10, rate);
+    }
+
+    /// <summary>
+    /// The language box says what the language it offers is worth.
+    /// </summary>
+    /// <remarks>
+    /// The four lists are not the same size: 3525 words in English against 725 in Spanish, which
+    /// is 11.8 bits a word against 9.5, so the same four words are 47 bits in one language and 38
+    /// in the other. The strength figure has always counted this correctly and the minimum
+    /// strength has always enforced it; neither said why one language needs a longer passphrase,
+    /// and this is where the language is chosen.
+    /// </remarks>
+    [Fact]
+    public async Task TheLanguageBox_SaysWhatTheChosenListIsWorth()
+    {
+        var sut = await CreateSpeakingVmAsync();
+
+        sut.SelectedModeIndex = 2;
+
+        var seen = new List<string>();
+        for (var language = 0; language < PasswordGeneratorViewModel.PassphraseLanguages.Length; language++)
+        {
+            sut.PassphraseLanguageIndex = language;
+
+            var summary = sut.WordListSummaryText;
+            Assert.False(string.IsNullOrWhiteSpace(summary), $"language {language} says nothing");
+            Assert.DoesNotContain("ToolPwdGen", summary);
+
+            var words = PasswordGeneratorViewModel.PassphraseLanguages[language].FileName;
+            var count = File.ReadAllLines(Path.Combine(
+                    ViewSource.RepoRoot(), "src", "Heimdall.App", "Assets", words))
+                .Select(line => line.Trim())
+                .Where(line => line.Length > 0)
+                .Distinct(StringComparer.Ordinal)
+                .Count();
+
+            Assert.Contains(count.ToString(CultureInfo.InvariantCulture), summary);
+            Assert.Contains(
+                Math.Log2(count).ToString("0.0", CultureInfo.InvariantCulture),
+                summary);
+
+            seen.Add(summary);
+        }
+
+        // Four languages, four different things to say: a caption that did not follow the box
+        // would repeat itself.
+        Assert.Equal(seen.Count, seen.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    /// <summary>
+    /// The two sentences this change added read as sentences, in every language the tool speaks.
+    /// </summary>
+    /// <remarks>
+    /// A format string whose placeholders do not match what is passed to it throws or, worse,
+    /// prints the braces. Both are invisible to a test that only checks the text is not empty.
+    /// </remarks>
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    public async Task TheAddedSentences_AreFilledInEveryLanguage(string locale)
+    {
+        var sut = await CreateSpeakingVmAsync(locale);
+
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 0;
+            sut.Length = 3;
+            sut.IncludeUppercase = true;
+            sut.IncludeLowercase = true;
+            sut.IncludeDigits = true;
+            sut.IncludeSymbols = true;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        // Three characters cannot hold one of each of four kinds, so the notice is on.
+        Assert.True(sut.ShowFloorNotice);
+        Assert.DoesNotContain("ToolPwdGen", sut.FloorNoticeText);
+        Assert.DoesNotContain("{0}", sut.FloorNoticeText);
+
+        Assert.NotEmpty(sut.CrackTimeAssumptionText);
+        Assert.DoesNotContain("ToolPwdGen", sut.CrackTimeAssumptionText);
+        Assert.DoesNotContain("{0}", sut.CrackTimeAssumptionText);
+        Assert.Contains("10^10", sut.CrackTimeAssumptionText);
+
+        sut.SelectedModeIndex = 2;
+        Assert.DoesNotContain("{0}", sut.WordListSummaryText);
+        Assert.DoesNotContain("{1}", sut.WordListSummaryText);
     }
 
     private static void InvokePrivate(PasswordGeneratorViewModel sut, string methodName, params object[] args)
