@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using TwinShell.Core.Enums;
+
 namespace Heimdall.App.ViewModels.CommandLibrary;
 
 /// <summary>
@@ -31,4 +33,45 @@ public sealed class CommandLibraryHistoryEntry
 
     /// <summary>Pre-formatted local timestamp string ("g" pattern).</summary>
     public string Timestamp { get; init; } = string.Empty;
+
+    /// <summary>
+    /// False when the stored command could not be opened, for instance because the
+    /// master-password vault that sealed it is locked. <see cref="GeneratedCommand"/> is
+    /// then empty and the row must not offer to copy it.
+    /// </summary>
+    /// <remarks>
+    /// Carried rather than inferred from an empty command: the two are different facts,
+    /// and a row that says "this cannot be shown" is honest where a blank line is just
+    /// confusing. The title and the timestamp stay in clear precisely so such a row still
+    /// tells the user what ran and when.
+    /// </remarks>
+    public bool IsReadable { get; init; } = true;
+
+    /// <summary>True when this row has a command the user can act on.</summary>
+    public bool IsUnreadable => !IsReadable;
+
+    /// <summary>Identifier of the action this row came from, used to replay it.</summary>
+    public string ActionId { get; init; } = string.Empty;
+
+    /// <summary>Platform whose template produced the command.</summary>
+    /// <remarks>
+    /// Replay has to pick the same one. An action can carry a Windows and a Linux
+    /// template, and re-running a row against the other platform would quietly produce a
+    /// different command under the same history line.
+    /// </remarks>
+    public Platform Platform { get; init; }
+
+    /// <summary>Parameter values as they were when the command was produced.</summary>
+    public IReadOnlyDictionary<string, string> Parameters { get; init; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// True when this row can be put back into the generator: it has to be readable, and
+    /// it has to know which action it came from.
+    /// </summary>
+    /// <remarks>
+    /// Rows written before the history recorded an action id would replay into nothing,
+    /// so the offer is withheld rather than made and then refused.
+    /// </remarks>
+    public bool CanReplay => IsReadable && !string.IsNullOrEmpty(ActionId);
 }

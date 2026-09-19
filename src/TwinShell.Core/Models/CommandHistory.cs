@@ -49,6 +49,17 @@ public sealed class CommandHistory
     public string GeneratedCommand { get; set; } = string.Empty;
 
     /// <summary>
+    /// False when the stored command could not be opened, for instance because the vault
+    /// that sealed it is locked. <see cref="GeneratedCommand"/> is then empty.
+    /// </summary>
+    /// <remarks>
+    /// Carried on the model rather than inferred from an empty command, because "the
+    /// command is empty" and "the command cannot be shown" are different facts and a
+    /// caller that guessed between them would eventually guess wrong.
+    /// </remarks>
+    public bool IsReadable { get; set; } = true;
+
+    /// <summary>
     /// Parameters used to generate the command (stored as dictionary)
     /// </summary>
     public Dictionary<string, string> Parameters { get; set; } = new();

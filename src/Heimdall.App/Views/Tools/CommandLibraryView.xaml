@@ -662,10 +662,25 @@
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <DockPanel>
+                                <!-- Replay sits before Copy, so the two read left to right in
+                                     increasing commitment: put it back in the generator, or
+                                     just take the text. -->
+                                <Button DockPanel.Dock="Right"
+                                        Content="&#xE72C;" FontFamily="Segoe MDL2 Assets"
+                                        Command="{Binding DataContext.ReplayHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        Visibility="{Binding CanReplay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTip="{loc:Translate ToolCmdLibHistoryReplay}"
+                                        AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryReplay}"
+                                        Style="{DynamicResource GhostButtonStyle}"
+                                        FontSize="11" Width="22" Height="22"
+                                        Padding="2" VerticalAlignment="Center"
+                                        Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <Button DockPanel.Dock="Right"
                                         Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
                                         Command="{Binding DataContext.CopyHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding GeneratedCommand}"
+                                        Visibility="{Binding IsReadable, Converter={StaticResource BoolToVisibilityConverter}}"
                                         ToolTip="{loc:Translate ToolCmdLibBtnCopy}"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopy}"
                                         Style="{DynamicResource GhostButtonStyle}"
@@ -684,13 +699,23 @@
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                TextTrimming="CharacterEllipsis"/>
                                     <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                                  VerticalScrollBarVisibility="Disabled">
+                                                  VerticalScrollBarVisibility="Disabled"
+                                                  Visibility="{Binding IsReadable, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <TextBlock Text="{Binding GeneratedCommand}"
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    FontFamily="Consolas"
                                                    Foreground="{DynamicResource AccentBrush}"
                                                    TextWrapping="NoWrap"/>
                                     </ScrollViewer>
+                                    <!-- A sealed row whose key is gone. The title and the
+                                         timestamp above still say what ran and when, which is
+                                         why they are kept in clear. -->
+                                    <TextBlock Text="{loc:Translate ToolCmdLibHistoryLocked}"
+                                               Visibility="{Binding IsUnreadable, Converter={StaticResource BoolToVisibilityConverter}}"
+                                               FontSize="{StaticResource FontSizeCaption}"
+                                               FontStyle="Italic"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="NoWrap"/>
                                 </StackPanel>
                             </DockPanel>
                         </DataTemplate>
