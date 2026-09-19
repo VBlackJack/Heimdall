@@ -212,9 +212,13 @@
         </Border>
 
         <!-- Loading indicator -->
+        <!-- Shown for a Git sync too: it reloads the whole library and takes longer than
+             any of the local operations, and the status text beside the title is easy to
+             miss while the list sits there looking idle. IsLibraryIdle already means
+             "neither busy nor syncing". -->
         <ProgressBar Grid.Row="3"
                      Style="{StaticResource ToolLoadingBarStyle}"
-                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                     Visibility="{Binding IsOperationRunning, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
         <!-- ═══════════ ROW 4 - ACTION LIST ═══════════ -->
         <ListView Grid.Row="4"
@@ -549,6 +553,8 @@
                         <Button x:Name="BtnCopy"
                                 Command="{Binding CopyCommand}"
                                 IsEnabled="{Binding IsCommandValid}"
+                                ToolTip="{Binding CopyTooltip}"
+                                ToolTipService.ShowOnDisabled="True"
                                 Content="{loc:Translate ToolCmdLibBtnCopy}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopy}"
                                 Style="{DynamicResource SecondaryButtonStyle}"

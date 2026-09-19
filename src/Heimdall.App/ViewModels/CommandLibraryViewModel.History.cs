@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.ViewModels.CommandLibrary;
@@ -62,7 +63,11 @@ public sealed partial class CommandLibraryViewModel
                 {
                     ActionTitle = h.ActionTitle,
                     GeneratedCommand = h.GeneratedCommand,
-                    Timestamp = h.CreatedAt.ToLocalTime().ToString("g")
+                    // Explicit CurrentCulture, matching every other formatting site in the
+                    // app. Heimdall has no mapping from its own locale to a CultureInfo,
+                    // so introducing one here would make this the only surface that
+                    // disagrees with the rest of the application.
+                    Timestamp = h.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
                 });
             }
 
