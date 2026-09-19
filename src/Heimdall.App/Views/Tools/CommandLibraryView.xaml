@@ -9,6 +9,16 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              Background="{DynamicResource BackgroundBrush}">
+    <!-- Scoped to this view, so they only fire while the tool has focus. Every key here
+         was checked against what the window already takes: Ctrl+B/E/F/N/O/S/T/W/Tab are
+         registered globally, and the window's preview handler only claims Apps, Shift+F10,
+         F11 and Escape-while-fullscreen. Return and Ctrl+Return match the convention the
+         other tools already use for a primary and a consequential action. -->
+    <UserControl.InputBindings>
+        <KeyBinding Key="Return" Command="{Binding CopyCommand}"/>
+        <KeyBinding Key="Return" Modifiers="Control" Command="{Binding SendCommand}"/>
+        <KeyBinding Key="D" Modifiers="Control" Command="{Binding DuplicateSelectedCommand}"/>
+    </UserControl.InputBindings>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -538,6 +548,17 @@
                                 FontSize="14" MinWidth="28" Height="28"
                                 Padding="4"
                                 Margin="{StaticResource MarginInlineXs}" TabIndex="7"/>
+                        <!-- Unlike Edit and Delete this has no visibility gate: copying a
+                             shipped action into your own library is the only way to get a
+                             variant of one, since they cannot be edited. -->
+                        <Button Command="{Binding DuplicateSelectedCommand}"
+                                Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
+                                ToolTip="{loc:Translate ToolCmdLibDuplicate}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibDuplicate}"
+                                Style="{DynamicResource GhostButtonStyle}"
+                                FontSize="14" MinWidth="28" Height="28"
+                                Padding="4"
+                                Margin="{StaticResource MarginInlineXs}" TabIndex="9"/>
                         <Button Command="{Binding DeleteSelectedCommand}"
                                 Content="&#xE74D;" FontFamily="Segoe MDL2 Assets"
                                 Visibility="{Binding CanEditSelected, Converter={StaticResource BoolToVisibilityConverter}}"
