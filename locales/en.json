@@ -3812,7 +3812,7 @@
   "ToolPwdGenLayoutSafe": "Layout-safe (AZERTY/QWERTY compatible)",
   "ToolPwdGenEntropyFloor": "Minimum strength:",
   "ToolPwdGenEntropyFloorOff": "No minimum",
-  "ToolPwdGenIssueFloorUnreachable": "These settings cannot guarantee {0} bits, even at their maximum, so nothing was changed",
+  "ToolPwdGenIssueFloorUnreachable": "These settings cannot guarantee {0} bits. The most they can reach is {1}, so nothing was changed",
   "ToolPwdGenClassesNotPromised": "This password is an ordinary draw: the length cannot hold one of every kind selected.",
   "ToolPwdGenSavedPresets": "Saved presets",
   "ToolPwdGenSavedPresetsElsewhere": "{0} more saved in other modes.",
@@ -6609,6 +6609,5 @@
   "ToolPwdGenFloorSetLength": "Length set to {0} to guarantee {1} bits.",
   "ToolPwdGenFloorSetSyllable": "Set to {0} characters with {1} digits and {2} specials, to guarantee {3} bits.",
   "ToolPwdGenFloorSetPassphrase": "Set to {0} words with {1} digits and {2} specials, to guarantee {3} bits.",
-  "ToolPwdGenFloorSetLeet": "Set to {0} digits and {1} specials, to guarantee {2} bits.",
-  "ToolPwdGenFloorCeiling": "These settings cannot guarantee {0} bits. The most they can reach is {1}, so nothing was changed."
+  "ToolPwdGenFloorSetLeet": "Set to {0} digits and {1} specials, to guarantee {2} bits."
 }

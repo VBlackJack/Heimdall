@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-09-19: the password generator, finished by hand (v2026.091901)
 
 ### Asking for a minimum strength now sets the generator to reach it
 
@@ -25,9 +25,11 @@ All notable changes to Heimdall are documented in this file.
 - **It can be taken back.** The settings you had are kept, so clearing the minimum puts them back
   exactly, and lowering it lowers them rather than leaving them where a higher one put them. Move
   a control yourself and what is on screen becomes the new starting point.
-- **When nothing can reach it, nothing is changed and the line says how far these settings do
-  reach.** A hundred and twenty eight bits cannot be guaranteed by syllables however they are
-  arranged, and being told the ceiling is 118 is the difference between a refusal and an answer.
+- **When nothing can reach it, nothing is changed and the line that already said so now says how
+  far these settings do reach.** A hundred and twenty eight bits cannot be guaranteed by syllables
+  however they are arranged, and being told the ceiling is 118 is the difference between a refusal
+  and an answer. It is said once, in the line that has always carried it, rather than twice in two
+  colours.
 - What it will not do: turn on a class of characters you turned off, change the word list, or take
   away digits you asked for. Those are what the password is made of rather than how much of it
   there is. A passphrase reaches a minimum by taking more words before it takes any punctuation,

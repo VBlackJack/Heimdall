@@ -3350,12 +3350,15 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(2, sut.SyllableDigits);
         Assert.Equal(1, sut.SyllableSpecials);
 
-        Assert.Contains("cannot guarantee", sut.FloorSearchNoticeText, StringComparison.OrdinalIgnoreCase);
+        // Said once, in the line that has always said it. A second sentence of its own, in its
+        // own colour under the first, reads as a second problem.
+        Assert.Empty(sut.FloorSearchNoticeText);
+        Assert.Contains("cannot guarantee", sut.IssuesText, StringComparison.OrdinalIgnoreCase);
 
         // Two figures: what was asked for, and how far these settings actually reach. The second
         // is the whole point of the sentence, so it is what is asserted, not its neighbours.
         var figures = System.Text.RegularExpressions.Regex
-            .Matches(sut.FloorSearchNoticeText, "[0-9]+")
+            .Matches(sut.IssuesText, "[0-9]+")
             .Select(match => int.Parse(match.Value, CultureInfo.InvariantCulture))
             .ToList();
 

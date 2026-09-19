@@ -1556,16 +1556,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
                 _ => default,
             };
 
-            if (!found.Reached)
-            {
-                // Saying how far these settings do reach is the difference between a refusal and
-                // an answer. Rounded down, because a ceiling rounded up is not one.
-                sentence = string.Format(
-                    L("ToolPwdGenFloorCeiling"),
-                    floor.ToString(CultureInfo.InvariantCulture),
-                    ((int)Math.Floor(found.Ceiling)).ToString(CultureInfo.InvariantCulture));
-            }
-            else if (found.Apply is not null)
+            if (found.Reached && found.Apply is not null)
             {
                 // One write, with the generation held off until every part of the shape is in
                 // place: a password drawn halfway through comes from a shape nobody chose.
@@ -1596,6 +1587,30 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         RegenerateIfReady();
         _beforeFloor = undo;
         FloorSearchNoticeText = sentence;
+    }
+
+    /// <summary>
+    /// The most these settings can guarantee, whatever is asked of them.
+    /// </summary>
+    /// <remarks>
+    /// Worked out here rather than remembered from the last search, because the settings move
+    /// between one and the next and a remembered ceiling would go quietly out of date. The search
+    /// is a few thousand arithmetic operations over a space the sliders bound, so it costs
+    /// nothing to run again.
+    /// </remarks>
+    private double FloorCeilingBits()
+    {
+        var floor = EntropyFloorBits;
+        var found = CurrentMode switch
+        {
+            GeneratorMode.Random => SearchRandomFloor(floor),
+            GeneratorMode.Syllable => SearchSyllableFloor(floor),
+            GeneratorMode.Passphrase => SearchPassphraseFloor(floor),
+            GeneratorMode.Leet => SearchLeetFloor(floor),
+            _ => default,
+        };
+
+        return found.Ceiling;
     }
 
     private FloorFound SearchRandomFloor(int floor)
@@ -3352,7 +3367,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
         if (FloorOutOfReach)
         {
-            issues.Add(string.Format(L("ToolPwdGenIssueFloorUnreachable"), EntropyFloorBits));
+            // How far these settings do reach is the difference between a refusal and an answer,
+            // and it belongs in the sentence that was already saying the refusal. Said twice, in
+            // two places, in two colours, it reads as two different problems.
+            issues.Add(string.Format(
+                L("ToolPwdGenIssueFloorUnreachable"),
+                EntropyFloorBits,
+                (int)Math.Floor(FloorCeilingBits())));
         }
 
         if (CurrentMode == GeneratorMode.Leet
