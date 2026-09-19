@@ -446,12 +446,25 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- ═══════════ VALIDATION ERROR ═══════════ -->
-        <TextBlock Grid.Row="1" Text="{Binding ValidationError}"
-                   Foreground="{DynamicResource ErrorTextBrush}"
-                   FontSize="{StaticResource FontSizeBody}"
-                   Margin="0,8,0,0" TextWrapping="Wrap"
-                   Visibility="{Binding ValidationError, Converter={StaticResource NullToVis}}"/>
+        <!-- ═══════════ VALIDATION ═══════════ -->
+        <!-- Stacked, because the two can apply at once and they say different things: the
+             first refuses the save, the second only reports. -->
+        <StackPanel Grid.Row="1">
+            <TextBlock Text="{Binding ValidationError}"
+                       Foreground="{DynamicResource ErrorTextBrush}"
+                       FontSize="{StaticResource FontSizeBody}"
+                       Margin="0,8,0,0" TextWrapping="Wrap"
+                       Visibility="{Binding ValidationError, Converter={StaticResource NullToVis}}"/>
+
+            <!-- Warning colours, not error colours, and no effect on the Save button. Half
+                 of what this reports is a reading of intent - braces are ordinary shell
+                 punctuation - and a guess must not refuse somebody's work. -->
+            <TextBlock Text="{Binding ConsistencyWarning}"
+                       Foreground="{DynamicResource WarningTextBrush}"
+                       FontSize="{StaticResource FontSizeCaption}"
+                       Margin="0,8,0,0" TextWrapping="Wrap"
+                       Visibility="{Binding HasConsistencyWarning, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        </StackPanel>
 
         <!-- ═══════════ BUTTONS ═══════════ -->
         <StackPanel Grid.Row="2" Orientation="Horizontal"

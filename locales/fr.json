@@ -5686,6 +5686,8 @@
   "PaletteToolCmdLibWith": "Biblioth\u00e8que de commandes : {0}",
   "ToolDescCMDLIB": "Biblioth\u00e8que de 500+ commandes PowerShell et Bash avec g\u00e9n\u00e9ration param\u00e9tr\u00e9e",
   "ToolCmdLibTitle": "Biblioth\u00e8que de commandes",
+  "ToolCmdLibWarnUndeclaredPlaceholders": "\u00c9crits dans la commande mais non d\u00e9clar\u00e9s comme param\u00e8tres, donc laiss\u00e9s tels quels : {0}",
+  "ToolCmdLibWarnUnusedParameters": "D\u00e9clar\u00e9s comme param\u00e8tres mais \u00e9crits nulle part dans la commande, donc les remplir ne change rien : {0}",
   "ToolCmdLibSearchPlaceholder": "Rechercher des commandes...",
   "ToolCmdLibFilterPlatformAll": "Toutes les plateformes",
   "ToolCmdLibPlatformWindows": "Windows",

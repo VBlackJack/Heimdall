@@ -14,6 +14,24 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The editor tells you when a command and its parameters disagree
+
+- **A name written in braces that you never declared as a parameter is now pointed out.**
+  Nothing substitutes it, so it reaches the terminal with its braces still on. Until now the
+  only way to find out was to run it.
+- **A parameter that appears nowhere in the command is pointed out too.** It gives you a box
+  to fill that changes nothing.
+- **It says so, it does not refuse.** Braces are ordinary punctuation in a shell, and the
+  rule about which ones look like a parameter is a reading of what you probably meant. It
+  would be wrong occasionally, and a guess has no business blocking your work. So the
+  message sits under the editor in warning colours and Save still works.
+- Deliberately quiet about the braces people actually write: `awk '{print $1}'`,
+  `jq '{a: .b}'`, `${HOME}`, `{a,b}`, `{1..10}`, `a{2,3}` and `find -exec {} \;` are all
+  left alone.
+- The message follows what you type, and names the platform when the action carries both a
+  Windows and a Linux command, since a parameter declared for one says nothing about the
+  other.
+
 ### Duplicate an action instead of retyping it
 
 - **Any action can now be copied into your own library, including the ones Heimdall ships.**
