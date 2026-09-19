@@ -145,6 +145,7 @@ public sealed class CommandLibraryBroadcastTests
         using var _ = viewModel;
 
         viewModel.GeneratedCommand = "uptime";
+        viewModel.IsCommandValid = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t3").IsSelected = true;
 
         await viewModel.BroadcastAsync();
@@ -165,6 +166,7 @@ public sealed class CommandLibraryBroadcastTests
         using var _ = viewModel;
 
         viewModel.GeneratedCommand = "uptime";
+        viewModel.IsCommandValid = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t2").IsSelected = true;
 
         await viewModel.BroadcastAsync();
@@ -188,6 +190,7 @@ public sealed class CommandLibraryBroadcastTests
         using var _ = viewModel;
 
         viewModel.GeneratedCommand = "uptime";
+        viewModel.IsCommandValid = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t2").IsSelected = true;
 
         Assert.Equal(2, viewModel.SelectedBroadcastCount);
@@ -207,6 +210,7 @@ public sealed class CommandLibraryBroadcastTests
         using var _ = viewModel;
 
         viewModel.GeneratedCommand = "rm -rf /tmp/x";
+        viewModel.IsCommandValid = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t2").IsSelected = true;
 
         await viewModel.BroadcastAsync();
@@ -223,6 +227,7 @@ public sealed class CommandLibraryBroadcastTests
         using var _ = viewModel;
 
         viewModel.GeneratedCommand = "uptime";
+        viewModel.IsCommandValid = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t1").IsSelected = false;
 
         Assert.False(viewModel.BroadcastCommand.CanExecute(null));
@@ -247,6 +252,7 @@ public sealed class CommandLibraryBroadcastTests
         using var _ = viewModel;
 
         viewModel.GeneratedCommand = "uptime";
+        viewModel.IsCommandValid = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t2").IsSelected = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t3").IsSelected = true;
 
@@ -264,6 +270,7 @@ public sealed class CommandLibraryBroadcastTests
         using var _ = viewModel;
 
         viewModel.GeneratedCommand = "uptime";
+        viewModel.IsCommandValid = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t2").IsSelected = true;
 
         await viewModel.BroadcastAsync();
@@ -284,6 +291,7 @@ public sealed class CommandLibraryBroadcastTests
         using var _ = viewModel;
 
         viewModel.GeneratedCommand = "uptime";
+        viewModel.IsCommandValid = true;
         viewModel.BroadcastTargets.Single(t => t.Id == "t2").IsSelected = true;
 
         await viewModel.BroadcastAsync();
@@ -294,73 +302,15 @@ public sealed class CommandLibraryBroadcastTests
 
     // -- Harness ----------------------------------------------------
 
-    private static FakeBroadcaster Broadcaster(params (string Id, string Name, bool IsOrigin)[] targets)
-    {
-        var fake = new FakeBroadcaster();
-        foreach (var (id, name, isOrigin) in targets)
-        {
-            fake.Targets.Add(new CommandBroadcastTarget(id, name, "SSH", isOrigin));
-        }
-
-        return fake;
-    }
+    private static CommandLibraryBroadcastHarness.FakeBroadcaster Broadcaster(
+        params (string Id, string Name, bool IsOrigin)[] targets)
+        => CommandLibraryBroadcastHarness.Broadcaster(targets);
 
     private static Task<CommandLibraryViewModel> CreateAsync(
-        FakeBroadcaster? broadcaster, bool confirm = true)
-        => CreateAsync(broadcaster, new SilentDialogService { ConfirmResult = confirm });
+        CommandLibraryBroadcastHarness.FakeBroadcaster? broadcaster, bool confirm = true)
+        => CommandLibraryBroadcastHarness.CreateAsync(broadcaster, confirm);
 
-    private static async Task<CommandLibraryViewModel> CreateAsync(
-        FakeBroadcaster? broadcaster, SilentDialogService dialog)
-    {
-        var action = CommandLibraryTestHelpers.CreateLinuxAction("a", "Alpha", "uptime");
-
-        var services = new ServiceCollection();
-        services.AddSingleton<ILocalizationService, FakeTwinShellLocalizationService>();
-        services.AddScoped<IActionService>(_ => new FakeActionService([action]));
-        services.AddScoped<IFavoritesService, FakeFavoritesService>();
-        services.AddScoped<ISearchService, SearchService>();
-        services.AddScoped<ICommandGeneratorService, CommandGeneratorService>();
-
-        var viewModel = new CommandLibraryViewModel(
-            services.BuildServiceProvider(),
-            configManager: null!,
-            await CommandLibraryTestHelpers.CreateAppLocalizerAsync(),
-            dialog,
-            gitSyncService: null!,
-            transferService: null!)
-        {
-            CommandBroadcaster = broadcaster
-        };
-
-        await viewModel.InitializeAsync(targetHost: null);
-        viewModel.RefreshBroadcastTargets();
-        return viewModel;
-    }
-
-    /// <summary>
-    /// Stands in for the session manager's broadcaster. It records what it was asked to send in
-    /// order, which is what separates "reached three terminals" from "reached one, three times".
-    /// </summary>
-    private sealed class FakeBroadcaster : ICommandBroadcaster
-    {
-        public List<CommandBroadcastTarget> Targets { get; } = [];
-
-        /// <summary>Target ids that report the command was not delivered.</summary>
-        public HashSet<string> Refuse { get; } = new(StringComparer.Ordinal);
-
-        public List<(string TargetId, string Command)> Sent { get; } = [];
-
-        public IReadOnlyList<CommandBroadcastTarget> GetTargets() => [.. Targets];
-
-        public bool Send(string targetId, string command)
-        {
-            if (Refuse.Contains(targetId) || !Targets.Any(t => t.Id == targetId))
-            {
-                return false;
-            }
-
-            Sent.Add((targetId, command));
-            return true;
-        }
-    }
+    private static Task<CommandLibraryViewModel> CreateAsync(
+        CommandLibraryBroadcastHarness.FakeBroadcaster? broadcaster, SilentDialogService dialog)
+        => CommandLibraryBroadcastHarness.CreateAsync(broadcaster, dialog);
 }

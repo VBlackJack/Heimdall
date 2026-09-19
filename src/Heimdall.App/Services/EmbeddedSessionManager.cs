@@ -1552,6 +1552,84 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     }
 
     /// <summary>
+    /// The one pane a broadcast treats as its origin: the first terminal of the originating tab,
+    /// which is the pane the Send button would have reached.
+    /// </summary>
+    /// <remarks>
+    /// The origin is a <b>pane</b>, not a tab. Comparing the tab pre-ticked every terminal in it,
+    /// so a split holding a second server arrived pre-selected and one glance at the count was
+    /// enough to run a command on a machine the operator never chose. It also made the stated
+    /// justification false: Send stops at the first sink in the tab
+    /// (<see cref="TrySendCommandToFirstSink"/>), so it reaches one pane while the pre-tick
+    /// reached all of them.
+    /// </remarks>
+    internal static SessionPaneModel? ResolveOriginPane(
+        IReadOnlyList<(SessionTabViewModel Session, SessionPaneModel Pane)> candidates,
+        SessionTabViewModel? origin)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+
+        if (origin is null)
+        {
+            return null;
+        }
+
+        foreach (var candidate in candidates)
+        {
+            if (ReferenceEquals(candidate.Session, origin))
+            {
+                return candidate.Pane;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Numbers any label that appears more than once, so no two rows in the broadcast list read
+    /// the same.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The per-pane suffix is not enough on its own. Three shapes defeat it, all reachable: a tab
+    /// split with the <b>same</b> server as its primary, where the pane title equals the tab title
+    /// and the suffix is suppressed as a repeat; a three-way split holding two panes on one
+    /// server; and two separate tabs on one profile, or renamed to the same custom title, which
+    /// the per-session suffix never sees because it is computed within a tab.
+    /// </para>
+    /// <para>
+    /// Two rows reading "web-01" are worse than a dropped pane: the operator believes they chose
+    /// between them. The connection type cannot disambiguate either - it is the tab's, so it is
+    /// identical for every pane of a tab.
+    /// </para>
+    /// </remarks>
+    internal static IReadOnlyList<string> DisambiguateBroadcastLabels(IReadOnlyList<string> labels)
+    {
+        ArgumentNullException.ThrowIfNull(labels);
+
+        var totals = labels
+            .GroupBy(label => label, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        var result = new List<string>(labels.Count);
+
+        foreach (var label in labels)
+        {
+            if (totals[label] == 1)
+            {
+                result.Add(label);
+                continue;
+            }
+
+            seen[label] = seen.TryGetValue(label, out int previous) ? previous + 1 : 1;
+            result.Add($"{label} #{seen[label]}");
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Resolves broadcast ids against the live pane list, so a pane closed since the list was
     /// drawn stops resolving instead of resolving to whatever took its place.
     /// </summary>
@@ -1562,22 +1640,30 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         {
             var candidates = manager.BroadcastCandidates();
 
+            SessionPaneModel? originPane = ResolveOriginPane(candidates, origin);
+
             // "Split" here means more than one TERMINAL in the tab, not more than one pane: a
             // terminal beside a file browser needs no disambiguating suffix.
             var terminalsPerSession = candidates
                 .GroupBy(candidate => candidate.Session)
                 .ToDictionary(group => group.Key, group => group.Count());
 
+            var labels = candidates
+                .Select(candidate => DescribeBroadcastPane(
+                    candidate.Session,
+                    candidate.Pane,
+                    terminalsPerSession[candidate.Session] > 1))
+                .ToList();
+
+            var names = DisambiguateBroadcastLabels(labels);
+
             return
             [
-                .. candidates.Select(candidate => new CommandBroadcastTarget(
+                .. candidates.Select((candidate, index) => new CommandBroadcastTarget(
                     candidate.Pane.PaneId,
-                    DescribeBroadcastPane(
-                        candidate.Session,
-                        candidate.Pane,
-                        terminalsPerSession[candidate.Session] > 1),
+                    names[index],
                     candidate.Session.ConnectionType,
-                    ReferenceEquals(candidate.Session, origin)))
+                    ReferenceEquals(candidate.Pane, originPane)))
             ];
         }
 

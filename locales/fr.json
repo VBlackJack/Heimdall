@@ -5720,6 +5720,7 @@
   "ToolCmdLibBtnCopyExample": "Copier l'exemple",
   "ToolCmdLibApplyExample": "Appliquer l'exemple",
   "ToolCmdLibBroadcastToggleTooltip": "Envoyer vers plusieurs terminaux ouverts",
+  "ToolCmdLibBroadcastNoTerminals": "Aucun terminal ouvert ne peut recevoir une commande pour le moment.",
   "ToolCmdLibBroadcastHeader": "Terminaux ouverts",
   "ToolCmdLibBroadcastSelectAll": "Tous",
   "ToolCmdLibBroadcastSelectNone": "Aucun",

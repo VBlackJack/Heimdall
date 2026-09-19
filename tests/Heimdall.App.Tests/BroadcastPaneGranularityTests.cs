@@ -153,6 +153,112 @@ public sealed class BroadcastPaneGranularityTests
         Assert.Equal("web-01", described);
     }
 
+    // -- Which pane counts as the origin ----------------------------
+
+    /// <summary>
+    /// The origin is ONE pane. It used to be compared by tab, so a split tab pre-ticked every
+    /// terminal in it - and a split holds a second server as often as not.
+    /// </summary>
+    [Fact]
+    public void OnlyTheFirstTerminalOfTheOriginTabIsTheOrigin()
+    {
+        var origin = Tab("web-01", Split(Terminal(), Terminal()));
+        var other = Tab("web-02", Terminal());
+        var panes = PanesOf(origin, other);
+
+        var originPane = EmbeddedSessionManager.ResolveOriginPane(panes, origin);
+
+        // The first of the two terminals in the origin tab, and not the second.
+        Assert.Same(panes[0].Pane, originPane);
+        Assert.NotSame(panes[1].Pane, originPane);
+    }
+
+    /// <summary>
+    /// It has to be the pane Send would have reached, which is the first sink in the tab -
+    /// that is the claim the pre-tick rests on.
+    /// </summary>
+    [Fact]
+    public void TheOriginIsThePaneSendWouldHaveReached()
+    {
+        var origin = Tab("web-01", Split(Leaf(new object()), Terminal()));
+        var panes = PanesOf(origin);
+
+        var originPane = EmbeddedSessionManager.ResolveOriginPane(panes, origin);
+
+        // The non-terminal pane is not a candidate, so the origin is the terminal after it -
+        // exactly what TrySendCommandToFirstSink walks to.
+        Assert.Same(panes[0].Pane, originPane);
+    }
+
+    /// <summary>
+    /// Opened outside a session, or from a tab with no terminal, nothing is the origin and
+    /// nothing may start ticked.
+    /// </summary>
+    [Fact]
+    public void WithNoOriginTabNothingIsTheOrigin()
+    {
+        var panes = PanesOf(Tab("web-01", Terminal()));
+
+        Assert.Null(EmbeddedSessionManager.ResolveOriginPane(panes, origin: null));
+        Assert.Null(EmbeddedSessionManager.ResolveOriginPane(panes, Tab("elsewhere", Terminal())));
+    }
+
+    // -- Disambiguation, where the suffix alone is not enough -------
+
+    /// <summary>
+    /// The per-pane suffix is suppressed when the pane title equals the tab title, which is
+    /// exactly what a tab split with its OWN server produces: both panes carry the same name and
+    /// both rows then read the same.
+    /// </summary>
+    [Fact]
+    public void TwoPanesWithTheSameNameAreNumbered()
+    {
+        var labels = EmbeddedSessionManager.DisambiguateBroadcastLabels(
+            ["web-01", "web-01", "db-01"]);
+
+        Assert.Equal(["web-01 #1", "web-01 #2", "db-01"], labels);
+    }
+
+    /// <summary>
+    /// Control: a name that appears once is left alone, or every row would carry a number and the
+    /// number would stop meaning anything.
+    /// </summary>
+    [Fact]
+    public void AUniqueNameIsLeftAlone()
+    {
+        var labels = EmbeddedSessionManager.DisambiguateBroadcastLabels(["web-01", "db-01"]);
+
+        Assert.Equal(["web-01", "db-01"], labels);
+    }
+
+    /// <summary>
+    /// Two tabs on one profile collide across tabs, where the per-session suffix never looks.
+    /// </summary>
+    [Fact]
+    public void ACollisionAcrossTabsIsNumberedToo()
+    {
+        var labels = EmbeddedSessionManager.DisambiguateBroadcastLabels(
+            ["web-01", "db-01", "web-01"]);
+
+        Assert.Equal(["web-01 #1", "db-01", "web-01 #2"], labels);
+    }
+
+    /// <summary>
+    /// Whatever the input, no two rows may read the same: that is the property, and the numbering
+    /// is only how it is met.
+    /// </summary>
+    [Theory]
+    [InlineData("a", "a", "a")]
+    [InlineData("a", "b", "a", "b")]
+    [InlineData("x", "x", "y", "y", "x")]
+    public void NoTwoRowsEverReadTheSame(params string[] input)
+    {
+        var labels = EmbeddedSessionManager.DisambiguateBroadcastLabels(input);
+
+        Assert.Equal(input.Length, labels.Count);
+        Assert.Equal(labels.Count, labels.Distinct(StringComparer.Ordinal).Count());
+    }
+
     // -- Identity ---------------------------------------------------
 
     /// <summary>
