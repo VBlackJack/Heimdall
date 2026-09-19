@@ -1668,6 +1668,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         if (commit)
         {
             AddToHistory(rebuilt[0]);
+            RaiseSettingsChanged();
         }
 
         return true;
@@ -1943,6 +1944,18 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         RegenerateIfReady();
     }
 
+    /// <summary>
+    /// Raised when one of the settings a preset holds has been changed.
+    /// </summary>
+    /// <remarks>
+    /// Rerolling is not a change: the same settings are asked for another password, and a preset
+    /// named on screen is still the one in force. What this reports is the operator moving a
+    /// control, which is the moment the settings stop being the preset they came from.
+    /// </remarks>
+    internal event EventHandler? SettingsChanged;
+
+    private void RaiseSettingsChanged() => SettingsChanged?.Invoke(this, EventArgs.Empty);
+
     private void RegenerateIfReady()
     {
         if (!_isInitialized || _isSuspended)
@@ -1950,6 +1963,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             return;
         }
 
+        RaiseSettingsChanged();
         GenerateCore();
     }
 

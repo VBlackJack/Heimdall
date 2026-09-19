@@ -45,6 +45,15 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     /// <summary>How far down the track the notches hang from.</summary>
     private const double PlacementTickBaseline = 28;
 
+    /// <summary>What each row of the preset list does, in the order the list shows them.</summary>
+    private readonly List<PresetEntry?> _presetEntries = [];
+
+    /// <summary>Set while the list is being filled, so filling it is not read as a choice.</summary>
+    private bool _rebuildingPresets;
+
+    /// <summary>Set while a preset is being applied, so its own writes are not read as edits.</summary>
+    private bool _applyingPreset;
+
     /// <summary>How many places each track was last drawn with, so it is not redrawn for nothing.</summary>
     private int _lastDigitSlots = -1;
     private int _lastSpecialSlots = -1;
@@ -63,6 +72,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         _vm = new PasswordGeneratorViewModel(ResolvePresetStorage());
         DataContext = _vm;
         _vm.PropertyChanged += OnVmPropertyChanged;
+        _vm.SettingsChanged += OnSettingsChanged;
     }
 
     /// <summary>The one place the production preset location is reached.</summary>
@@ -87,7 +97,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         _localizer = localizer;
         PopulateComboBoxes();
         ApplyLocalization();
-        RebuildCustomPresetButtons();
+        RebuildPresetList();
         _vm.Initialize(context, localizer);
         var dialogService = (Application.Current as App)?.Services?.GetService<IDialogService>();
         if (dialogService is not null)
@@ -97,7 +107,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         _viewInitialized = true;
         RebuildCaseBlockButtons();
         RebuildPlacementCursors();
-        RebuildCustomPresetButtons();
+        RebuildPresetList();
         UpdateModeDescription();
         UpdateSyllableUiHints();
         UpdateStrengthBarBrush();
@@ -233,25 +243,22 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         ChkSymbols.Content = L("ToolPwdGenSymbols");
 
         // Advanced options
-        AdvancedExpander.Header = L("ToolPwdGenAdvanced");
+        BtnAdvanced.Content = L("ToolPwdGenAdvanced");
+        BtnAdvanced.ToolTip = L("ToolPwdGenAdvancedTooltip");
+        System.Windows.Automation.AutomationProperties.SetName(BtnAdvanced, L("ToolPwdGenAdvanced"));
         ChkExcludeAmbiguous.Content = L("ToolPwdGenExcludeAmbiguous");
         ChkCliSafe.Content = L("ToolPwdGenCliSafe");
         ChkClipboardAutoClear.Content = L("ToolPwdGenClipboardAutoClear");
         CustomSpecialsLabel.Text = L("ToolPwdGenCustomSpecials");
 
         // Presets
-        PresetsLabel.Text = L("ToolPwdGenQuickPresets");
-        BtnPresetPin4.Content = L("ToolPwdGenPresetPin4");
-        BtnPresetPin6.Content = L("ToolPwdGenPresetPin6");
-        BtnPresetWifi.Content = L("ToolPwdGenPresetWifi");
-        BtnPresetApiKey.Content = L("ToolPwdGenPresetApiKey");
-        BtnPresetMysql.Content = L("ToolPwdGenPresetMysql");
-        BtnPresetPassphrase4.Content = L("ToolPwdGenPresetPassphrase4");
-        BtnPresetPassphrase6.Content = L("ToolPwdGenPresetPassphrase6");
-        BtnPresetSsh.Content = L("ToolPwdGenPresetSsh");
-        BtnPresetSylEasy.Content = L("ToolPwdGenPresetSylEasy");
-        BtnPresetSylBalanced.Content = L("ToolPwdGenPresetSylBalanced");
-        BtnPresetSylStrong.Content = L("ToolPwdGenPresetSylStrong");
+        PresetsLabel.Text = L("ToolPwdGenPresetLabel");
+        CmbPreset.ToolTip = L("ToolPwdGenPresetTooltip");
+        System.Windows.Automation.AutomationProperties.SetName(CmbPreset, L("ToolPwdGenPresetLabel"));
+        BtnDeletePreset.Content = L("ToolPwdGenBtnDeletePreset");
+        BtnDeletePreset.ToolTip = L("ToolPwdGenDeletePresetTooltip");
+        System.Windows.Automation.AutomationProperties.SetName(
+            BtnDeletePreset, L("ToolPwdGenDeletePresetTooltip"));
         QuickLengthLabel.Text = L("ToolPwdGenQuickLength");
         HistoryLabel.Text = L("ToolPwdGenHistory");
         BtnClearHistory.Content = L("ToolPwdGenClearHistory");
@@ -357,21 +364,12 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(CmbPpCase, L("ToolPwdGenCase"));
         System.Windows.Automation.AutomationProperties.SetName(PpDigitsSlider, L("ToolPwdGenDigits"));
         System.Windows.Automation.AutomationProperties.SetName(PpSpecialsSlider, L("ToolPwdGenSymbols"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetPin4, L("ToolPwdGenPresetPin4"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetPin6, L("ToolPwdGenPresetPin6"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetWifi, L("ToolPwdGenPresetWifi"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetApiKey, L("ToolPwdGenPresetApiKey"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetMysql, L("ToolPwdGenPresetMysql"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetPassphrase4, L("ToolPwdGenPresetPassphrase4"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetPassphrase6, L("ToolPwdGenPresetPassphrase6"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetSsh, L("ToolPwdGenPresetSsh"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetSylEasy, L("ToolPwdGenPresetSylEasy"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetSylBalanced, L("ToolPwdGenPresetSylBalanced"));
-        System.Windows.Automation.AutomationProperties.SetName(BtnPresetSylStrong, L("ToolPwdGenPresetSylStrong"));
-
         BtnSavePreset.Content = L("ToolPwdGenBtnSavePreset");
         BtnSavePreset.ToolTip = L("TooltipSavePreset");
         System.Windows.Automation.AutomationProperties.SetName(BtnSavePreset, L("ToolPwdGenBtnSavePreset"));
+
+        // The entries carry their own names, so a language change has to refill the list.
+        RebuildPresetList();
         BtnClearHistory.ToolTip = L("TooltipClearHistory");
         System.Windows.Automation.AutomationProperties.SetName(BtnClearHistory, L("TooltipClearHistory"));
 
@@ -435,12 +433,12 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             UpdateSyllableUiHints();
             if (_viewInitialized)
             {
-                RebuildCustomPresetButtons();
+                RebuildPresetList();
             }
         }
         else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.CustomPresetsChanged), StringComparison.Ordinal))
         {
-            RebuildCustomPresetButtons();
+            RebuildPresetList();
         }
     }
 
@@ -588,44 +586,64 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     private void ApplyPresetAndUpdateView(Action applyAction)
     {
         if (!_viewInitialized) return;
-        applyAction();
+
+        // The preset writes the very settings whose movement takes the list back to Custom, so
+        // for the length of the application those writes are not edits.
+        _applyingPreset = true;
+        try
+        {
+            applyAction();
+        }
+        finally
+        {
+            _applyingPreset = false;
+        }
+
         UpdateQuickLengthHighlight();
         UpdateModeDescription();
         UpdateSyllableUiHints();
     }
 
-    private void OnPresetPin4(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplyRandomPreset(4, false, false, true, false));
+    /// <summary>One entry of the preset list: what it is called, and what it does.</summary>
+    /// <param name="Saved">
+    /// The saved preset this entry stands for, or null for one of the built-in ones. It is what
+    /// tells Delete whether there is anything to delete.
+    /// </param>
+    private sealed record PresetEntry(string Label, Action Apply, PasswordGeneratorViewModel.PasswordPreset? Saved = null);
 
-    private void OnPresetPin6(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplyRandomPreset(6, false, false, true, false));
-
-    private void OnPresetWifi(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplyRandomPreset(63, true, true, true, true));
-
-    private void OnPresetApiKey(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplyRandomPreset(32, true, false, true, false));
-
-    private void OnPresetMysql(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplyRandomPreset(16, true, true, true, false));
-
-    private void OnPresetPassphrase4(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplyPassphrasePreset(4));
-
-    private void OnPresetSsh(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplyRandomPreset(20, true, true, true, true));
-
-    private void OnPresetSylEasy(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(18, 3, 1, 0, "-"));
-
-    private void OnPresetSylBalanced(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(24, 0, 2, 1, "-", true));
-
-    private void OnPresetSylStrong(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplySyllablePreset(30, 0, 3, 2, "", true));
-
-    private void OnPresetPassphrase6(object sender, RoutedEventArgs e) =>
-        ApplyPresetAndUpdateView(() => _vm.ApplyPassphrasePreset(6));
+    /// <summary>
+    /// The presets the tool ships with, by the mode they belong to.
+    /// </summary>
+    /// <remarks>
+    /// These were eleven buttons in the markup, each with a handler of its own, and the six that
+    /// did not belong to the mode on screen were hidden rather than absent. A table is the same
+    /// eleven decisions in the place they can be read together.
+    /// </remarks>
+    private IReadOnlyList<PresetEntry> BuiltInPresets(PasswordGeneratorViewModel.GeneratorMode mode) =>
+        mode switch
+        {
+            PasswordGeneratorViewModel.GeneratorMode.Random =>
+            [
+                new(L("ToolPwdGenPresetPin4"), () => _vm.ApplyRandomPreset(4, false, false, true, false)),
+                new(L("ToolPwdGenPresetPin6"), () => _vm.ApplyRandomPreset(6, false, false, true, false)),
+                new(L("ToolPwdGenPresetWifi"), () => _vm.ApplyRandomPreset(63, true, true, true, true)),
+                new(L("ToolPwdGenPresetApiKey"), () => _vm.ApplyRandomPreset(32, true, false, true, false)),
+                new(L("ToolPwdGenPresetMysql"), () => _vm.ApplyRandomPreset(16, true, true, true, false)),
+                new(L("ToolPwdGenPresetSsh"), () => _vm.ApplyRandomPreset(20, true, true, true, true)),
+            ],
+            PasswordGeneratorViewModel.GeneratorMode.Syllable =>
+            [
+                new(L("ToolPwdGenPresetSylEasy"), () => _vm.ApplySyllablePreset(18, 3, 1, 0, "-")),
+                new(L("ToolPwdGenPresetSylBalanced"), () => _vm.ApplySyllablePreset(24, 0, 2, 1, "-", true)),
+                new(L("ToolPwdGenPresetSylStrong"), () => _vm.ApplySyllablePreset(30, 0, 3, 2, "", true)),
+            ],
+            PasswordGeneratorViewModel.GeneratorMode.Passphrase =>
+            [
+                new(L("ToolPwdGenPresetPassphrase4"), () => _vm.ApplyPassphrasePreset(4)),
+                new(L("ToolPwdGenPresetPassphrase6"), () => _vm.ApplyPassphrasePreset(6)),
+            ],
+            _ => [],
+        };
 
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
@@ -1204,60 +1222,140 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         }
     }
 
-    private void RebuildCustomPresetButtons()
+    /// <summary>
+    /// Fills the preset list with the ones the tool ships and the ones the operator saved.
+    /// </summary>
+    /// <remarks>
+    /// <para>One list rather than a row of buttons per mode plus a second row underneath. Eleven
+    /// buttons took a band across the page to say what a closed list says in one line, and the
+    /// saved ones could only be deleted by a right click that a tooltip mentioned.</para>
+    /// <para>The first entry stands for settings that are nobody's preset, and is what the list
+    /// falls back to as soon as a control is touched. A list that went on naming a preset the
+    /// settings had left would be the only thing on the page saying something untrue.</para>
+    /// </remarks>
+    private void RebuildPresetList()
     {
-        PanelCustomPresets.Children.Clear();
-        SavedPresetsLabel.Visibility = Visibility.Collapsed;
-        SavedPresetsElsewhereText.Visibility = Visibility.Collapsed;
         if (!_viewInitialized) return;
 
-        var filtered = _vm.GetCustomPresetsForCurrentMode();
-        int elsewhere = _vm.CustomPresetCount - filtered.Count;
-
-        // A preset saved in another mode is not shown here, and used to be shown nowhere: the
-        // operator saved one, came back to a different mode, and found an empty row.
-        if (elsewhere > 0)
+        _presetEntries.Clear();
+        _rebuildingPresets = true;
+        try
         {
-            SavedPresetsElsewhereText.Text = string.Format(
-                L("ToolPwdGenSavedPresetsElsewhere"),
-                elsewhere.ToString(CultureInfo.InvariantCulture));
-            SavedPresetsElsewhereText.Visibility = Visibility.Visible;
-        }
+            CmbPreset.Items.Clear();
+            AddPresetItem(L("ToolPwdGenPresetCustom"), entry: null);
 
-        if (filtered.Count == 0) return;
-
-        SavedPresetsLabel.Text = L("ToolPwdGenSavedPresets");
-        SavedPresetsLabel.Visibility = Visibility.Visible;
-
-        foreach (var preset in filtered)
-        {
-            var btn = new Button
+            var builtIn = BuiltInPresets(_vm.CurrentMode);
+            if (builtIn.Count > 0)
             {
-                Content = preset.Name,
-                Tag = preset,
-                Style = (Style)FindResource("SecondaryButtonStyle"),
-                Padding = new Thickness(8, 2, 8, 2),
-                Margin = new Thickness(0, 0, 6, 4),
-                FontSize = (double)FindResource("FontSizeCaption"),
-            };
-            btn.Click += (_, _) => ApplyPresetAndUpdateView(() => _vm.ApplyPreset(preset));
-            btn.ToolTip = L("ToolPwdGenPresetRightClickHint");
-            System.Windows.Automation.AutomationProperties.SetName(btn, preset.Name);
-
-            var deleteItem = new MenuItem { Header = L("ToolPwdGenDeletePreset") };
-            var capturedPreset = preset;
-            deleteItem.Click += async (_, _) =>
-            {
-                if (await _vm.DeletePresetAsync(capturedPreset.Name))
+                AddPresetHeader(L("ToolPwdGenPresetsBuiltInGroup"));
+                foreach (var entry in builtIn)
                 {
-                    RebuildCustomPresetButtons();
+                    AddPresetItem(entry.Label, entry);
                 }
-            };
-            btn.ContextMenu = new ContextMenu();
-            btn.ContextMenu.Items.Add(deleteItem);
+            }
 
-            PanelCustomPresets.Children.Add(btn);
+            var saved = _vm.GetCustomPresetsForCurrentMode();
+            if (saved.Count > 0)
+            {
+                AddPresetHeader(L("ToolPwdGenPresetsSavedGroup"));
+                foreach (var preset in saved)
+                {
+                    var captured = preset;
+                    AddPresetItem(
+                        preset.Name,
+                        new PresetEntry(preset.Name, () => _vm.ApplyPreset(captured), captured));
+                }
+            }
+
+            CmbPreset.SelectedIndex = 0;
         }
+        finally
+        {
+            _rebuildingPresets = false;
+        }
+
+        // A preset saved in another mode is not in this list, and used to be shown nowhere at
+        // all: the operator saved one, came back in a different mode, and found an empty row.
+        int elsewhere = _vm.CustomPresetCount - _vm.GetCustomPresetsForCurrentMode().Count;
+        SavedPresetsElsewhereText.Text = elsewhere > 0
+            ? string.Format(
+                L("ToolPwdGenSavedPresetsElsewhere"),
+                elsewhere.ToString(CultureInfo.InvariantCulture))
+            : string.Empty;
+        SavedPresetsElsewhereText.Visibility = elsewhere > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        UpdateDeletePresetState();
+    }
+
+    private void AddPresetHeader(string text)
+    {
+        CmbPreset.Items.Add(new ComboBoxItem
+        {
+            Content = text,
+            IsEnabled = false,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (Brush)FindResource("TextSecondaryBrush"),
+        });
+    }
+
+    private void AddPresetItem(string label, PresetEntry? entry)
+    {
+        var item = new ComboBoxItem { Content = label, Tag = entry };
+        System.Windows.Automation.AutomationProperties.SetName(item, label);
+        CmbPreset.Items.Add(item);
+        _presetEntries.Add(entry);
+    }
+
+    /// <summary>Delete only means something when a saved preset is the one selected.</summary>
+    private void UpdateDeletePresetState()
+    {
+        BtnDeletePreset.IsEnabled = SelectedSavedPreset() is not null;
+    }
+
+    private PasswordGeneratorViewModel.PasswordPreset? SelectedSavedPreset() =>
+        (CmbPreset.SelectedItem as ComboBoxItem)?.Tag is PresetEntry entry ? entry.Saved : null;
+
+    private void OnPresetSelected(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateDeletePresetState();
+        if (_rebuildingPresets) return;
+
+        if ((CmbPreset.SelectedItem as ComboBoxItem)?.Tag is PresetEntry entry)
+        {
+            ApplyPresetAndUpdateView(entry.Apply);
+        }
+    }
+
+    private async void OnDeletePresetClick(object sender, RoutedEventArgs e)
+    {
+        var preset = SelectedSavedPreset();
+        if (preset is null) return;
+
+        if (await _vm.DeletePresetAsync(preset.Name))
+        {
+            RebuildPresetList();
+        }
+    }
+
+    /// <summary>
+    /// Takes the list back to Custom, because the settings are no longer the preset's.
+    /// </summary>
+    private void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        if (_applyingPreset || _rebuildingPresets || !_viewInitialized) return;
+        if (CmbPreset.SelectedIndex == 0) return;
+
+        _rebuildingPresets = true;
+        try
+        {
+            CmbPreset.SelectedIndex = 0;
+        }
+        finally
+        {
+            _rebuildingPresets = false;
+        }
+
+        UpdateDeletePresetState();
     }
 
     /// <summary>
@@ -1365,6 +1463,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     public void Dispose()
     {
         _vm.PropertyChanged -= OnVmPropertyChanged;
+        _vm.SettingsChanged -= OnSettingsChanged;
         _clipboardClearTimer?.Stop();
         GC.SuppressFinalize(this);
     }
