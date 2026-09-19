@@ -53,6 +53,7 @@ public static class MessageKeys
     public const string ValidationParameterInvalidHostname = "Validation.ParameterInvalidHostname";
     public const string ValidationParameterInvalidIPAddress = "Validation.ParameterInvalidIPAddress";
     public const string ValidationParameterInvalidPath = "Validation.ParameterInvalidPath";
+    public const string ValidationParameterNotAnOfferedValue = "Validation.ParameterNotAnOfferedValue";
 
     // Execution messages
     public const string ExecutionError = "Execution.Error";

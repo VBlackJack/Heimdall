@@ -44,8 +44,26 @@ public sealed partial class CommandLibraryParameterEntry : ObservableObject
     /// <summary>Optional human-readable description shown as a tooltip.</summary>
     public string? Description { get; init; }
 
-    /// <summary>Parameter type hint (string, int, hostname, ipaddress, ...).</summary>
+    /// <summary>Parameter type hint (string, int, hostname, ipaddress, choice, ...).</summary>
     public string Type { get; init; } = "string";
+
+    /// <summary>
+    /// The values this parameter offers, when it offers a fixed set. Empty otherwise.
+    /// </summary>
+    public IReadOnlyList<string> AllowedValues { get; init; } = [];
+
+    /// <summary>
+    /// True when the panel should offer a list to pick from rather than a box to type in.
+    /// </summary>
+    /// <remarks>
+    /// A choice with nothing left to offer falls back to a box, matching what the
+    /// generator does: it validates membership only when there is a set to be a member of,
+    /// so a panel that offered an empty list would refuse what the generator accepts.
+    /// </remarks>
+    public bool IsChoice => AllowedValues.Count > 0;
+
+    /// <summary>True when the panel should offer a box to type in.</summary>
+    public bool IsFreeText => !IsChoice;
 
     /// <summary>
     /// Display label used by the parameter editor; appends a "*" marker for

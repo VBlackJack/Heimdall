@@ -187,6 +187,17 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             {
                 var value = parameterValues[parameter.Name];
 
+                // A fixed set is checked before the type switch, because "choice" carries
+                // no shape of its own: what makes a value right is membership, not form.
+                if (parameter.IsChoice && !IsOfferedValue(parameter, value))
+                {
+                    errors.Add(_localizationService.GetFormattedString(
+                        MessageKeys.ValidationParameterNotAnOfferedValue,
+                        parameter.Label,
+                        string.Join(", ", parameter.AllowedValues!)));
+                    continue;
+                }
+
                 switch (parameter.Type.ToLowerInvariant())
                 {
                     case "int":
@@ -277,9 +288,38 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     /// <summary>
     /// Validates a parameter value based on its type
     /// </summary>
+    /// <summary>
+    /// True when <paramref name="value"/> is one of the values a choice parameter offers.
+    /// </summary>
+    /// <remarks>
+    /// Compared without regard to case or surrounding space, the way the offered values
+    /// were typed by a person into an editor. An empty value passes: whether it is allowed
+    /// to be empty is what <c>Required</c> decides, and two rules answering the same
+    /// question is how they end up disagreeing.
+    /// </remarks>
+    private static bool IsOfferedValue(TemplateParameter parameter, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        return parameter.AllowedValues!.Any(
+            offered => string.Equals(offered?.Trim(), value.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
     private bool ValidateParameterValue(TemplateParameter parameter, string value, out string error)
     {
         error = string.Empty;
+
+        if (parameter.IsChoice && !IsOfferedValue(parameter, value))
+        {
+            error = _localizationService.GetFormattedString(
+                MessageKeys.ValidationParameterNotAnOfferedValue,
+                parameter.Label,
+                string.Join(", ", parameter.AllowedValues!));
+            return false;
+        }
 
         switch (parameter.Type.ToLower())
         {

@@ -91,6 +91,29 @@ public sealed class CommandLibraryFilterPersistenceTests
         });
     }
 
+    [Fact]
+    public void TagFilterSelectionSurvivesAReload()
+    {
+        StaDispatcherRunner.Run(async () =>
+        {
+            var viewModel = await CreateLoadedViewModelAsync();
+            using var _ = viewModel;
+
+            var combo = BindCombo(
+                viewModel,
+                nameof(CommandLibraryViewModel.TagFilterItems),
+                nameof(CommandLibraryViewModel.TagFilterIndex));
+
+            combo.SelectedIndex = 1;
+            Assert.Equal(1, viewModel.TagFilterIndex);
+
+            await viewModel.ReloadAsync();
+
+            Assert.Equal(1, viewModel.TagFilterIndex);
+            Assert.Equal(1, combo.SelectedIndex);
+        });
+    }
+
     /// <summary>
     /// Positive control for the mechanism the two tests above rely on: the category
     /// combo is bound the same way and has always restored its index, so if this one
@@ -174,6 +197,7 @@ public sealed class CommandLibraryFilterPersistenceTests
             CommandLibraryTestHelpers.CreateLinuxAction("b", "Bravo", "echo b")
         };
         actions[1].Category = "Other";
+        actions[0].Tags = ["prod"];
 
         var services = new ServiceCollection();
         services.AddSingleton<ILocalizationService, FakeTwinShellLocalizationService>();

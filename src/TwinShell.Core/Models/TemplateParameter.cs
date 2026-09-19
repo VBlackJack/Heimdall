@@ -54,6 +54,31 @@ public sealed class TemplateParameter
     public string? Description { get; set; }
 
     /// <summary>
+    /// The values a <c>choice</c> parameter accepts, in the order they should be offered.
+    /// </summary>
+    /// <remarks>
+    /// Null or empty for every other type. A choice with no values left to offer behaves
+    /// like a free-text parameter rather than refusing everything: an action that arrived
+    /// that way is worth less, not worth nothing.
+    /// </remarks>
+    public List<string>? AllowedValues { get; set; }
+
+    /// <summary>
+    /// True when this parameter offers a fixed set of values rather than free text.
+    /// </summary>
+    /// <remarks>
+    /// One predicate for the question, because four places ask it: the generator when it
+    /// validates, the editor when it decides what to show, the panel when it renders a
+    /// list instead of a box, and the import door when it checks what arrived.
+    /// </remarks>
+    public bool IsChoice =>
+        string.Equals(Type, ChoiceTypeName, StringComparison.OrdinalIgnoreCase)
+        && AllowedValues is { Count: > 0 };
+
+    /// <summary>The type name identifying a fixed-set parameter.</summary>
+    public const string ChoiceTypeName = "choice";
+
+    /// <summary>
     /// Optional quoting behavior override for command generation.
     /// </summary>
     public QuotingMode? Quoting { get; set; }
