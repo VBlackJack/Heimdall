@@ -5775,6 +5775,7 @@
   "ConfirmDangerousSendTitle": "Run this dangerous command?",
   "ConfirmDangerousSendMessage": "This command is flagged as dangerous and will run immediately on the session. Continue?",
   "ToolCmdLibDialogTitleAdd": "Add Command",
+  "ToolCmdLibDialogTitleDuplicate": "Duplicate action",
   "ToolCmdLibDialogTitleEdit": "Edit Command",
   "ToolCmdLibDialogLblTitle": "Title",
   "ToolCmdLibDialogLblCategory": "Category",
@@ -5814,6 +5815,8 @@
   "ToolCmdLibValidationLinksMaxCount": "Cannot have more than 10 links.",
   "ToolCmdLibFavoriteAdd": "Add to favorites",
   "ToolCmdLibFavoriteRemove": "Remove from favorites",
+  "ToolCmdLibDuplicate": "Duplicate into my library",
+  "ToolCmdLibDuplicateTitleFormat": "{0} (copy)",
   "ToolCmdLibEmptyLibrary": "The command library is empty. Click + to add commands or import a JSON file.",
   "ToolHelpCMDLIB": "Searchable library of PowerShell and Bash commands.\\nFilter by platform, category, or risk level.\\nClick a command to see its template, fill in parameters, and view notes and examples.\\nUse 'Copy' or 'Send to Terminal' to use the generated command.\\nClick + to add commands. Select a command then use the pencil/trash icons to edit or delete.",
 

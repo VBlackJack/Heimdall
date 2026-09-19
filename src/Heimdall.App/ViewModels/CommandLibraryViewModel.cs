@@ -253,6 +253,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// <summary>Currently selected entry in the action list (bound from the view).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEditSelected))]
+    [NotifyPropertyChangedFor(nameof(CanDuplicateSelected))]
     private CommandLibraryActionEntry? _selectedEntry;
 
     /// <summary>Notes text for the currently selected action (empty when none).</summary>
@@ -559,6 +560,8 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     {
         OnPropertyChanged(nameof(IsLibraryIdle));
         OnPropertyChanged(nameof(IsOperationRunning));
+        OnPropertyChanged(nameof(CanDuplicateSelected));
+        DuplicateSelectedCommand.NotifyCanExecuteChanged();
         AddActionCommand.NotifyCanExecuteChanged();
         EditSelectedCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
@@ -591,6 +594,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     partial void OnSelectedEntryChanged(CommandLibraryActionEntry? value)
     {
+        DuplicateSelectedCommand.NotifyCanExecuteChanged();
         if (_loadingSelection) return;
         SelectAction(value);
     }

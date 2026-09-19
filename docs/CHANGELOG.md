@@ -14,6 +14,24 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Duplicate an action instead of retyping it
+
+- **Any action can now be copied into your own library, including the ones Heimdall ships.**
+  Those cannot be edited, so until now the only way to get a variant of one was to type it
+  out again from what you could see on screen. The copy opens in the editor ready to change,
+  keeps everything the original had, and is yours: saving it adds a new action and leaves
+  the original exactly as it was.
+
+### Three keyboard shortcuts
+
+- **Enter copies the command, Ctrl+Enter sends it, Ctrl+D duplicates the selected action.**
+  The tool had no shortcuts at all, which is a lot of reaching for the mouse in something
+  you open twenty times a day.
+- Ctrl+Enter still asks before running anything marked dangerous, exactly as the button
+  does.
+- They only apply while the Command Library has the focus, and none of them takes a key the
+  rest of the application already uses.
+
 ### The Command Library history remembers what you ran
 
 - **The history shows the command, not the template it came from.** It used to show

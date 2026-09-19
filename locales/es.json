@@ -5775,6 +5775,7 @@
   "ConfirmDangerousSendTitle": "¿Ejecutar este comando peligroso?",
   "ConfirmDangerousSendMessage": "Este comando está marcado como peligroso y se ejecutará inmediatamente en la sesión. ¿Continuar?",
   "ToolCmdLibDialogTitleAdd": "Añadir comando",
+  "ToolCmdLibDialogTitleDuplicate": "Duplicar la acción",
   "ToolCmdLibDialogTitleEdit": "Editar comando",
   "ToolCmdLibDialogLblTitle": "Título",
   "ToolCmdLibDialogLblCategory": "Categoría",
@@ -5814,6 +5815,8 @@
   "ToolCmdLibValidationLinksMaxCount": "No puede haber más de 10 enlaces.",
   "ToolCmdLibFavoriteAdd": "Añadir a favoritos",
   "ToolCmdLibFavoriteRemove": "Quitar de favoritos",
+  "ToolCmdLibDuplicate": "Duplicar en mi biblioteca",
+  "ToolCmdLibDuplicateTitleFormat": "{0} (copia)",
   "ToolCmdLibEmptyLibrary": "La biblioteca de comandos está vacía. Haz clic en + para añadir comandos o importar un archivo JSON.",
   "ToolHelpCMDLIB": "Biblioteca con búsqueda de comandos PowerShell y Bash.\\nFiltra por plataforma, categoría o nivel de riesgo.\\nHaz clic en un comando para ver su plantilla, rellenar parámetros y ver notas y ejemplos.\\nUsa \"Copiar\" o \"Enviar a la terminal\" para usar el comando generado.\\nHaz clic en + para añadir comandos. Selecciona un comando y usa los iconos de lápiz/papelera para editarlo o eliminarlo.",
 
