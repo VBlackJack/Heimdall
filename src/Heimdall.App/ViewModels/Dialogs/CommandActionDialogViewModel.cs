@@ -65,6 +65,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     private string _title = "";
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
     [MaxLength(2000, ErrorMessage = "Description must not exceed 2000 characters.")]
     private string _description = "";
 
@@ -87,6 +88,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     private string _tags = "";
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
     [MaxLength(5000, ErrorMessage = "Notes must not exceed 5000 characters.")]
     private string _notes = "";
 
@@ -159,7 +161,13 @@ public partial class CommandActionDialogViewModel : ObservableValidator
             return;
         }
 
-        ValidationError = TitleError ?? CategoryError;
+        // Description and Notes have their own length limits. They carry no inline error
+        // label of their own, so their message is surfaced through the shared line;
+        // without this the limits were decorative and an over-long value saved silently.
+        ValidationError = TitleError
+            ?? CategoryError
+            ?? GetLocalizedFieldError(nameof(Description))
+            ?? GetLocalizedFieldError(nameof(Notes));
     }
 
     partial void OnTitleChanged(string value)

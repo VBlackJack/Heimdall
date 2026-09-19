@@ -399,6 +399,11 @@ public sealed partial class CommandLibraryViewModel
                             LocalizeKey("ToolCmdLibImportError"),
                             LocalizeKey("ToolCmdLibImportFileTooLarge"));
                         return;
+                    case CommandLibraryImportOutcome.FileUnreadable:
+                        _dialogService.ShowError(
+                            LocalizeKey("ToolCmdLibImportError"),
+                            LocalizeKey("ToolCmdLibImportFileUnreadable"));
+                        return;
                     case CommandLibraryImportOutcome.InvalidFormat:
                         _dialogService.ShowError(
                             LocalizeKey("ToolCmdLibImportError"),

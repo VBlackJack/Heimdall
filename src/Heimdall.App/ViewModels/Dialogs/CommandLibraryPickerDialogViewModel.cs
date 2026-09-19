@@ -79,9 +79,12 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
 
     public string DialogTitle => _localizer["DialogTitleCommandLibraryPicker"];
 
+    // ICollectionView.IsEmpty answers this without walking the filtered view, which the
+    // enumerate-and-count form did on every keystroke and every filter change.
     public bool IsNoResultsVisible =>
         !IsLoading
-        && (ActionsView is null ? false : !ActionsView.Cast<object>().Any())
+        && ActionsView is not null
+        && ActionsView.IsEmpty
         && (!string.IsNullOrWhiteSpace(SearchText) || PlatformFilter is not null);
 
     public string? ResultActionId { get; private set; }

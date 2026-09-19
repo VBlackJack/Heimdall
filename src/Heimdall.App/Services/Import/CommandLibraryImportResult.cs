@@ -28,7 +28,10 @@ public enum CommandLibraryImportOutcome
     FileTooLarge,
 
     /// <summary>The file could not be parsed into a known action format.</summary>
-    InvalidFormat
+    InvalidFormat,
+
+    /// <summary>The file could not be read at all (missing, locked, or denied).</summary>
+    FileUnreadable
 }
 
 /// <summary>
@@ -52,6 +55,10 @@ public sealed class CommandLibraryImportResult
     /// <summary>Creates a file-too-large result.</summary>
     public static CommandLibraryImportResult FileTooLarge() =>
         new() { Outcome = CommandLibraryImportOutcome.FileTooLarge };
+
+    /// <summary>Creates a file-unreadable result.</summary>
+    public static CommandLibraryImportResult FileUnreadable() =>
+        new() { Outcome = CommandLibraryImportOutcome.FileUnreadable };
 
     /// <summary>Creates an invalid-format result.</summary>
     public static CommandLibraryImportResult InvalidFormat() =>
