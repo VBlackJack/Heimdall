@@ -169,4 +169,14 @@ public interface IEmbeddedSessionManager
     /// can accept a command (e.g. an RDP-only session).
     /// </returns>
     bool TrySendCommandToSession(SessionTabViewModel session, string command);
+
+    /// <summary>
+    /// Supplies the open session tabs, in tab order, that a Command Library broadcast may reach.
+    /// </summary>
+    /// <remarks>
+    /// The manager creates session views but does not own the collection they are put into, so
+    /// the owner hands it back. Left unset, a broadcast simply finds no targets and the feature
+    /// stays out of the way rather than reaching a stale list.
+    /// </remarks>
+    Func<IReadOnlyList<SessionTabViewModel>>? ActiveSessionsProvider { get; set; }
 }
