@@ -65,6 +65,9 @@ public sealed partial class CommandLibraryViewModel
                     ActionTitle = h.ActionTitle,
                     GeneratedCommand = h.GeneratedCommand,
                     IsReadable = h.IsReadable,
+                    ActionId = h.ActionId,
+                    Platform = h.Platform,
+                    Parameters = h.Parameters,
                     // Explicit CurrentCulture, matching every other formatting site in the
                     // app. Heimdall has no mapping from its own locale to a CultureInfo,
                     // so introducing one here would make this the only surface that
@@ -108,6 +111,62 @@ public sealed partial class CommandLibraryViewModel
                 $"[CommandLibrary] Failed to clear history: {ex.Message}");
             _dialogService.ShowError(LocalizeKey("ToolCmdLibErrorTitle"), ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Puts a history row back into the generator: selects the action it came from, picks
+    /// the template for the platform it ran on, and restores the parameter values.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is what the rest of the history work is for. Recording the real command made
+    /// the panel able to say what was done; this makes it able to do it again, which is
+    /// the reason to look at a history at all.
+    /// </para>
+    /// <para>
+    /// Three things can have changed since the row was written, and each is handled rather
+    /// than assumed away: the action can have been deleted, its templates can have changed
+    /// platform, and its parameters can have been renamed or removed. Values whose
+    /// parameter is gone are dropped silently - they have nowhere to go - and parameters
+    /// the row does not mention keep whatever the template defaults them to, rather than
+    /// being blanked. A replay that half-matches is still a better starting point than an
+    /// empty form, as long as the command line then shows exactly what will run.
+    /// </para>
+    /// </remarks>
+    [RelayCommand]
+    public void ReplayHistoryEntry(CommandLibraryHistoryEntry? entry)
+    {
+        if (entry is null || !entry.CanReplay) return;
+
+        var target = _allEntries.FirstOrDefault(
+            candidate => string.Equals(candidate.Source.Id, entry.ActionId, StringComparison.Ordinal));
+        if (target is null)
+        {
+            Heimdall.Core.Logging.FileLogger.Info(
+                $"[CommandLibrary] Replay skipped: action '{entry.ActionId}' no longer exists.");
+            _dialogService.ShowWarning(
+                LocalizeKey("ToolCmdLibHistoryReplayTitle"),
+                LocalizeKey("ToolCmdLibHistoryReplayMissingAction"));
+            return;
+        }
+
+        SelectedEntry = target;
+        if (!IsGeneratorVisible) return;
+
+        if (HasMultipleTemplates)
+        {
+            SelectTemplatePlatform(entry.Platform == TwinShell.Core.Enums.Platform.Windows);
+        }
+
+        foreach (var parameter in _parameters)
+        {
+            if (entry.Parameters.TryGetValue(parameter.Name, out var recorded))
+            {
+                parameter.Value = recorded;
+            }
+        }
+
+        IsHistoryVisible = false;
     }
 
     /// <summary>

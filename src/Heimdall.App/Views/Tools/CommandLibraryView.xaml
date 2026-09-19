@@ -662,6 +662,20 @@
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <DockPanel>
+                                <!-- Replay sits before Copy, so the two read left to right in
+                                     increasing commitment: put it back in the generator, or
+                                     just take the text. -->
+                                <Button DockPanel.Dock="Right"
+                                        Content="&#xE72C;" FontFamily="Segoe MDL2 Assets"
+                                        Command="{Binding DataContext.ReplayHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        Visibility="{Binding CanReplay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTip="{loc:Translate ToolCmdLibHistoryReplay}"
+                                        AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryReplay}"
+                                        Style="{DynamicResource GhostButtonStyle}"
+                                        FontSize="11" Width="22" Height="22"
+                                        Padding="2" VerticalAlignment="Center"
+                                        Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <Button DockPanel.Dock="Right"
                                         Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
                                         Command="{Binding DataContext.CopyHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
