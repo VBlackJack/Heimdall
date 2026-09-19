@@ -70,13 +70,28 @@ public sealed class CommandLibraryTransferService(
     /// <inheritdoc/>
     public async Task<CommandLibraryImportResult> ImportAsync(IActionService actionService, string path)
     {
-        var fileInfo = new FileInfo(path);
-        if (fileInfo.Length > maxImportFileSizeBytes)
+        string json;
+        try
         {
-            return CommandLibraryImportResult.FileTooLarge();
+            var fileInfo = new FileInfo(path);
+            if (fileInfo.Length > maxImportFileSizeBytes)
+            {
+                return CommandLibraryImportResult.FileTooLarge();
+            }
+
+            json = await File.ReadAllTextAsync(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            // Reading the length of a file that has gone away, or that another process
+            // holds, throws here rather than returning an outcome. Left uncaught it
+            // reached the view model's generic envelope, which showed the raw exception
+            // message - unlocalized, and carrying the full path into a dialog.
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[CommandLibrary] Import could not read the file: {ex.Message}");
+            return CommandLibraryImportResult.FileUnreadable();
         }
 
-        var json = await File.ReadAllTextAsync(path);
         var actions = ParseImportJson(json);
         if (actions is null || actions.Count == 0)
         {
