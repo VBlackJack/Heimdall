@@ -46,7 +46,7 @@ public sealed partial class CommandLibraryViewModel
         var copied = SetClipboardText?.Invoke(GeneratedCommand) ?? false;
         if (!copied) return;
 
-        ShowCopyFeedback?.Invoke("copy");
+        ShowCopyFeedback?.Invoke(CopyTarget);
         RecordHistory();
     }
 
@@ -75,20 +75,21 @@ public sealed partial class CommandLibraryViewModel
         }
 
         SendCommandHandler(GeneratedCommand);
-        ShowCopyFeedback?.Invoke("send");
+        ShowCopyFeedback?.Invoke(SendTarget);
         RecordHistory();
     }
 
     /// <summary>
-    /// Replaces the generator output with an example command and copies it
-    /// to the clipboard in one gesture (used by the example copy button).
+    /// Copies an example row's command to the clipboard, leaving the generator output
+    /// untouched. Clicking the row itself is the gesture that replaces the output; that
+    /// is <see cref="ApplyExample"/>.
     /// </summary>
     [RelayCommand]
     public void CopyExample(string? command)
     {
         if (string.IsNullOrEmpty(command)) return;
         var copied = SetClipboardText?.Invoke(command) ?? false;
-        if (copied) ShowCopyFeedback?.Invoke("example");
+        if (copied) ShowCopyFeedback?.Invoke(CopyExampleTarget);
     }
 
     /// <summary>
@@ -119,11 +120,11 @@ public sealed partial class CommandLibraryViewModel
     public void ClearSearch() => SearchText = string.Empty;
 
     /// <summary>Edits the currently selected action (bridges to the dialog callback).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsLibraryIdle))]
     public Task EditSelectedAsync() => EditActionAsync(SelectedEntry);
 
     /// <summary>Deletes the currently selected action (bridges to the dialog callback).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsLibraryIdle))]
     public Task DeleteSelectedAsync() => DeleteActionAsync(SelectedEntry);
 
     /// <summary>Toggles the favorite status of the action with the given ID.</summary>
@@ -215,11 +216,25 @@ public sealed partial class CommandLibraryViewModel
     /// import/export commands. The operation receives a scoped IActionService.
     /// Returns true when it completed without throwing, false otherwise.
     /// </summary>
+    /// <remarks>
+    /// Refuses to start while another operation holds <see cref="IsBusy"/>. The command
+    /// gate on <see cref="IsLibraryIdle"/> already keeps the buttons from firing twice,
+    /// but that only guards the UI door: the public entry points are reachable directly,
+    /// and every operation here shares one busy flag, so a second run would clear it on
+    /// its own exit while the first is still working.
+    /// </remarks>
     private async Task<bool> RunActionServiceOperationAsync(
         Func<IActionService, Task> operation,
         string logLabel,
         string errorTitleKey)
     {
+        if (IsBusy)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[CommandLibrary] {logLabel} refused: another operation is already running.");
+            return false;
+        }
+
         IsBusy = true;
         try
         {
@@ -247,7 +262,7 @@ public sealed partial class CommandLibraryViewModel
     /// Opens the Add Action dialog via the view-installed callback and creates
     /// the action when the user saves.
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsLibraryIdle))]
     public async Task AddActionAsync()
     {
         if (ShowActionDialogAsync is null) return;
@@ -330,7 +345,7 @@ public sealed partial class CommandLibraryViewModel
     /// Prompts for a destination path and writes a JSON envelope containing
     /// every action currently in the database.
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsLibraryIdle))]
     public async Task ExportAsync()
     {
         if (ShowSaveFileDialog is null) return;
@@ -365,7 +380,7 @@ public sealed partial class CommandLibraryViewModel
     /// contained actions into the database. System (seed) actions are never
     /// overwritten.
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsLibraryIdle))]
     public async Task ImportAsync()
     {
         if (ShowOpenFileDialog is null) return;
@@ -410,7 +425,7 @@ public sealed partial class CommandLibraryViewModel
     /// repository, then reloads the library. Surfaces the result through the
     /// injected dialog service.
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsLibraryIdle))]
     public async Task SyncAsync()
     {
         var settings = await _configManager.LoadSettingsAsync();

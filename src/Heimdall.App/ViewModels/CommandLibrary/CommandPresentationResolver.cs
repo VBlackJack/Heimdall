@@ -70,35 +70,50 @@ public static class CommandPresentationResolver
     /// Risk brush resource key. Single source of truth shared with
     /// <see cref="CommandLibraryActionEntry.RiskBrushKey"/>.
     /// </summary>
+    /// <remarks>
+    /// See <see cref="ResolveRiskLabel"/> for why the default arm reads as dangerous.
+    /// </remarks>
     public static string ResolveRiskBrushKey(CriticalityLevel level) => level switch
     {
         CriticalityLevel.Info => "TextSecondaryBrush",
         CriticalityLevel.Run => "WarningBrush",
-        CriticalityLevel.Dangerous => "ErrorBrush",
-        _ => "TextSecondaryBrush"
+        _ => "ErrorBrush"
     };
 
     /// <summary>
     /// Localized long-form risk label. Single source of truth shared with
     /// <see cref="CommandLibraryActionEntry.RiskLabel"/>.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The default arm resolves to the <see cref="CriticalityLevel.Dangerous"/> text
+    /// rather than an empty string, so the display agrees with
+    /// <c>DangerousCommandGuard</c>, which prompts for anything at or above
+    /// <see cref="CriticalityLevel.Dangerous"/>. An action carrying a level outside the
+    /// declared enum - reachable through an import file, since the JSON enum converter
+    /// accepts raw numbers - would otherwise prompt on Send while rendering in the list
+    /// with no badge and the informational colour. Both halves of that one decision now
+    /// fail in the same direction.
+    /// </para>
+    /// </remarks>
     public static string ResolveRiskLabel(CriticalityLevel level, Func<string, string> localize) => level switch
     {
         CriticalityLevel.Info => localize("ToolCmdLibRiskInfo"),
         CriticalityLevel.Run => localize("ToolCmdLibRiskRun"),
-        CriticalityLevel.Dangerous => localize("ToolCmdLibRiskDangerous"),
-        _ => string.Empty
+        _ => localize("ToolCmdLibRiskDangerous")
     };
 
     /// <summary>
     /// Localized short risk badge. Single source of truth shared with
     /// <see cref="CommandLibraryActionEntry.RiskBadge"/>.
     /// </summary>
+    /// <remarks>
+    /// See <see cref="ResolveRiskLabel"/> for why the default arm reads as dangerous.
+    /// </remarks>
     public static string ResolveRiskBadge(CriticalityLevel level, Func<string, string> localize) => level switch
     {
         CriticalityLevel.Info => localize("ToolCmdLibRiskBadgeInfo"),
         CriticalityLevel.Run => localize("ToolCmdLibRiskBadgeRun"),
-        CriticalityLevel.Dangerous => localize("ToolCmdLibRiskBadgeDanger"),
-        _ => string.Empty
+        _ => localize("ToolCmdLibRiskBadgeDanger")
     };
 }

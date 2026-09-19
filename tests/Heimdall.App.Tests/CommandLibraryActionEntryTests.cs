@@ -22,11 +22,20 @@ namespace Heimdall.App.Tests;
 
 public sealed class CommandLibraryActionEntryTests
 {
+    /// <remarks>
+    /// The out-of-range row expects the dangerous brush, not the informational one. It
+    /// used to expect <c>TextSecondaryBrush</c>, which pinned a presentation that
+    /// contradicted the execution guard: <c>DangerousCommandGuard</c> prompts for
+    /// anything at or above <see cref="CriticalityLevel.Dangerous"/>, so a level outside
+    /// the enum - which an import file can supply, the JSON enum converter accepting raw
+    /// numbers - would have prompted on Send while rendering in the list as harmless.
+    /// See <c>CommandLibraryRiskDomainTests</c> for the agreement this now upholds.
+    /// </remarks>
     [Theory]
     [InlineData(CriticalityLevel.Info, "TextSecondaryBrush")]
     [InlineData(CriticalityLevel.Run, "WarningBrush")]
     [InlineData(CriticalityLevel.Dangerous, "ErrorBrush")]
-    [InlineData((CriticalityLevel)999, "TextSecondaryBrush")]
+    [InlineData((CriticalityLevel)999, "ErrorBrush")]
     public void RiskBrushKey_MapsCriticalityLevel_ToExpectedResourceKey(
         CriticalityLevel level,
         string expectedResourceKey)

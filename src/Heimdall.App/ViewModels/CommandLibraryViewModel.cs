@@ -452,10 +452,28 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// </summary>
     public Func<string, bool>? SetClipboardText { get; set; }
 
+    /// <summary>Feedback target for the generator's Copy button.</summary>
+    public const string CopyTarget = "copy";
+
+    /// <summary>Feedback target for the generator's Send button.</summary>
+    public const string SendTarget = "send";
+
+    /// <summary>Feedback target for copying an example row's command.</summary>
+    public const string CopyExampleTarget = "example";
+
     /// <summary>
-    /// Callback installed by the view to flash a transient "copied" animation
-    /// on a named button ("copy" / "send" / "example" / "history"). Optional.
+    /// Callback installed by the view to flash a transient "copied" animation on a named
+    /// button. The target is one of <see cref="CopyTarget"/>, <see cref="SendTarget"/> or
+    /// <see cref="CopyExampleTarget"/>. Optional.
     /// </summary>
+    /// <remarks>
+    /// The names are constants rather than literals because the producer here and the
+    /// consumer in the view's code-behind are two copies of one decision: an "example"
+    /// emitted here with no matching arm there produced no feedback and no error, which
+    /// is exactly how that gesture shipped silent. The history panel does not use this
+    /// callback at all - it has its own banner, driven by
+    /// <see cref="IsHistoryCopyFeedbackVisible"/>.
+    /// </remarks>
     public Action<string>? ShowCopyFeedback { get; set; }
 
     /// <summary>
@@ -481,6 +499,41 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// Wired from <see cref="Heimdall.Core.Models.IToolView.CanClose"/>.
     /// </summary>
     public bool CanClose => !IsBusy && !IsSyncing;
+
+    /// <summary>
+    /// True when no library-wide operation is already running, and therefore when a new
+    /// one may start.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Add / edit / delete / import / export all share one <see cref="IsBusy"/> flag and
+    /// one shared envelope, and Git sync reloads the whole library underneath them. Two
+    /// overlapping runs corrupt that shared state in a way no individual operation can
+    /// detect: the first to finish clears <see cref="IsBusy"/> for both, so the busy
+    /// indicator stops while work is still in flight, and two imports merge into the
+    /// same store concurrently.
+    /// </para>
+    /// <para>
+    /// This is the same condition as <see cref="CanClose"/> but a distinct decision -
+    /// one answers "may this tab go away", the other "may another operation start" -
+    /// so they are named separately even though they read alike today.
+    /// </para>
+    /// </remarks>
+    public bool IsLibraryIdle => !IsBusy && !IsSyncing;
+
+    /// <summary>
+    /// Re-evaluates every command gated on <see cref="IsLibraryIdle"/>.
+    /// </summary>
+    private void NotifyLibraryOperationCommands()
+    {
+        OnPropertyChanged(nameof(IsLibraryIdle));
+        AddActionCommand.NotifyCanExecuteChanged();
+        EditSelectedCommand.NotifyCanExecuteChanged();
+        DeleteSelectedCommand.NotifyCanExecuteChanged();
+        ImportCommand.NotifyCanExecuteChanged();
+        ExportCommand.NotifyCanExecuteChanged();
+        SyncCommand.NotifyCanExecuteChanged();
+    }
 
     // ── Partial property-change hooks ─────────────────────────────
 
@@ -514,6 +567,13 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     {
         CancelSyncCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanClose));
+        NotifyLibraryOperationCommands();
+    }
+
+    partial void OnIsBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanClose));
+        NotifyLibraryOperationCommands();
     }
 
     partial void OnUseWindowsTemplateChanged(bool value)
@@ -558,7 +618,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         EmptyStateMessage = LocalizeKey("ToolCmdLibStatusLoading");
         HelpContentText = LocalizeKey("ToolHelpCMDLIB").Replace("\\n", "\n");
 
-        PopulateStaticFilterItems(autoSelectPlatform: true);
+        PopulateStaticFilterItems();
 
         try
         {
@@ -630,14 +690,30 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     }
 
     /// <summary>
-    /// Populates the platform/risk filter combo items from current locale
-    /// strings and optionally auto-selects a platform based on the originating
-    /// connection type. Called on first init - combos are not rebuilt on
-    /// subsequent reloads because the preserved index avoids a re-select
-    /// flicker.
+    /// Rebuilds the platform and risk filter combo items from the current locale
+    /// strings, restoring the selected index afterwards.
     /// </summary>
-    private void PopulateStaticFilterItems(bool autoSelectPlatform)
+    /// <remarks>
+    /// <para>
+    /// This runs on every reload, which means after every add, edit, delete, import and
+    /// Git sync. Both collections are bound as <c>ItemsSource</c> with a two-way
+    /// <c>SelectedIndex</c>, so clearing them makes the <c>Selector</c> drop its
+    /// selection and write -1 back here. Restoring the index is therefore not a
+    /// nicety: without it the two combos come back blank and their filters are
+    /// silently switched off. Measured, not assumed - see
+    /// <c>CommandLibraryFilterPersistenceTests</c>.
+    /// </para>
+    /// <para>
+    /// The item counts are fixed, so the restore is a plain re-assignment; the category
+    /// combo in <see cref="PopulateCategoryFilterItems"/> has to clamp instead, because
+    /// its length follows the data.
+    /// </para>
+    /// </remarks>
+    private void PopulateStaticFilterItems()
     {
+        var previousPlatform = PlatformFilterIndex;
+        var previousRisk = RiskFilterIndex;
+
         PlatformFilterItems.Clear();
         PlatformFilterItems.Add(LocalizeKey("ToolCmdLibFilterPlatformAll"));
         PlatformFilterItems.Add(LocalizeKey("ToolCmdLibPlatformWindows"));
@@ -648,7 +724,17 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         RiskFilterItems.Add(LocalizeKey("ToolCmdLibRiskInfo"));
         RiskFilterItems.Add(LocalizeKey("ToolCmdLibRiskRun"));
         RiskFilterItems.Add(LocalizeKey("ToolCmdLibRiskDangerous"));
+
+        PlatformFilterIndex = ClampFilterIndex(previousPlatform, PlatformFilterItems.Count);
+        RiskFilterIndex = ClampFilterIndex(previousRisk, RiskFilterItems.Count);
     }
+
+    /// <summary>
+    /// Brings a filter index back into range after its item collection was rebuilt,
+    /// mapping the "no selection" value the <c>Selector</c> writes back to "All".
+    /// </summary>
+    private static int ClampFilterIndex(int index, int itemCount)
+        => index < 0 ? 0 : Math.Min(index, itemCount - 1);
 
     /// <summary>
     /// Rebuilds the category combo items after a library reload, preserving
@@ -656,15 +742,14 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// </summary>
     private void PopulateCategoryFilterItems()
     {
-        var prev = CategoryFilterIndex;
+        var previous = CategoryFilterIndex;
         CategoryFilterItems.Clear();
         CategoryFilterItems.Add(LocalizeKey("ToolCmdLibFilterCategoryAll"));
         foreach (var cat in _categoryList)
         {
             CategoryFilterItems.Add(cat);
         }
-        var max = CategoryFilterItems.Count - 1;
-        CategoryFilterIndex = prev < 0 ? 0 : Math.Min(prev, max);
+        CategoryFilterIndex = ClampFilterIndex(previous, CategoryFilterItems.Count);
     }
 
     /// <summary>
