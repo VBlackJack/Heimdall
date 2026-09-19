@@ -691,6 +691,16 @@
                             </StackPanel>
                         </DockPanel>
 
+                        <!-- The panel is offered whenever the library sits in a session, so it can
+                             legitimately open with nothing open to send to. Saying so is cheaper
+                             than a toggle that hides itself and cannot be found. -->
+                        <TextBlock Text="{loc:Translate ToolCmdLibBroadcastNoTerminals}"
+                                   AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastNoTerminals}"
+                                   Visibility="{Binding HasNoBroadcastTargets, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   TextWrapping="Wrap" Margin="0,2,0,2"/>
+
                         <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding BroadcastTargets}"
                                           AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastHeader}">
