@@ -833,6 +833,9 @@ public sealed class MainViewModelSettingsNavigationTests
 
     private sealed class StubEmbeddedSessionManager : IEmbeddedSessionManager
     {
+        /// <summary>Unused here: nothing in these tests broadcasts to other sessions.</summary>
+        public Func<IReadOnlyList<SessionTabViewModel>>? ActiveSessionsProvider { get; set; }
+
         public Action<byte[], object?>? BroadcastCallback { get; set; }
         public Action<SessionTabViewModel>? SplitRequestedCallback { get; set; }
         public Func<bool>? IsBroadcastActive { get; set; }

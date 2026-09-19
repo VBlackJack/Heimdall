@@ -2485,6 +2485,9 @@ public sealed class SplitServiceTests : IDisposable
 
     private sealed class FakeEmbeddedSessionManager : IEmbeddedSessionManager
     {
+        /// <summary>Unused here: nothing in these tests broadcasts to other sessions.</summary>
+        public Func<IReadOnlyList<SessionTabViewModel>>? ActiveSessionsProvider { get; set; }
+
         public Func<SessionTabViewModel, string, string, ISessionResult, AppSettings?, string?, object>? CreateHostControlCallback { get; set; }
         public Action<byte[], object?>? BroadcastCallback { get; set; }
         public Action<SessionTabViewModel>? SplitRequestedCallback { get; set; }

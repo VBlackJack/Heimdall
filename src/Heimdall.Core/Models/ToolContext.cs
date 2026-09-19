@@ -40,6 +40,7 @@ public sealed record ToolContext(
     Action<bool>? SetBusyAction = null,
     Action<string>? SendCommandAction = null,
     Func<bool>? CanSendToTerminal = null,
+    ICommandBroadcaster? CommandBroadcaster = null,
     string? InitialActionId = null,
     IGatewayInventory? GatewayInventory = null,
     string? DocumentContent = null);

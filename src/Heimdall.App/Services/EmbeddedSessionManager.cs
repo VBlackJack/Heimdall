@@ -1388,7 +1388,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         {
             SetBusyAction = busy => sessionTab.IsBusy = busy,
             SendCommandAction = command => TrySendCommandToSession(sessionTab, command),
-            CanSendToTerminal = () => SessionHasTerminalSink(sessionTab)
+            CanSendToTerminal = () => SessionHasTerminalSink(sessionTab),
+            CommandBroadcaster = new SessionBroadcaster(this, sessionTab)
         };
 
         view.Initialize(context, _localizer);
@@ -1464,5 +1465,58 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         }
 
         return null;
+    }
+
+    /// <inheritdoc />
+    public Func<IReadOnlyList<SessionTabViewModel>>? ActiveSessionsProvider { get; set; }
+
+    /// <summary>
+    /// The session tabs that currently hold a terminal a command can be written to, in tab order.
+    /// </summary>
+    /// <remarks>
+    /// A tab without a terminal sink - an RDP-only session, or one still connecting - is not a
+    /// target rather than a target that fails. Offering it and then reporting it as a failure
+    /// would put a red line in the summary for something the operator never chose.
+    /// </remarks>
+    internal IReadOnlyList<SessionTabViewModel> BroadcastCandidates()
+    {
+        IReadOnlyList<SessionTabViewModel>? sessions = ActiveSessionsProvider?.Invoke();
+        if (sessions is null || sessions.Count == 0)
+        {
+            return [];
+        }
+
+        return [.. sessions.Where(SessionHasTerminalSink)];
+    }
+
+    /// <summary>
+    /// Resolves broadcast ids against the live tab list, so a tab closed since the list was drawn
+    /// stops resolving instead of resolving to whatever took its place.
+    /// </summary>
+    private sealed class SessionBroadcaster(EmbeddedSessionManager manager, SessionTabViewModel origin)
+        : ICommandBroadcaster
+    {
+        public IReadOnlyList<CommandBroadcastTarget> GetTargets() =>
+        [
+            .. manager.BroadcastCandidates().Select(session => new CommandBroadcastTarget(
+                session.BroadcastId,
+                session.DisplayTitle,
+                session.ConnectionType,
+                ReferenceEquals(session, origin)))
+        ];
+
+        public bool Send(string targetId, string command)
+        {
+            if (string.IsNullOrEmpty(targetId))
+            {
+                return false;
+            }
+
+            SessionTabViewModel? session = manager.BroadcastCandidates()
+                .FirstOrDefault(candidate => string.Equals(
+                    candidate.BroadcastId, targetId, StringComparison.Ordinal));
+
+            return session is not null && manager.TrySendCommandToSession(session, command);
+        }
     }
 }

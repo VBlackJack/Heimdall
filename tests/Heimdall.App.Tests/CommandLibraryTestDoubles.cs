@@ -269,9 +269,13 @@ internal sealed class SilentDialogService : AppDialogService
     /// </summary>
     public List<string> Shown { get; } = [];
 
+    /// <summary>Every confirmation body, in the order it was shown.</summary>
+    public List<string> ConfirmMessages { get; } = [];
+
     public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
     {
         Shown.Add($"confirm:{title}");
+        ConfirmMessages.Add(message);
         return Task.FromResult(ConfirmResult);
     }
 

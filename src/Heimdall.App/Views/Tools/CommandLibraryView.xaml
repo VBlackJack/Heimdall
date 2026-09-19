@@ -383,6 +383,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
@@ -624,6 +625,17 @@
                                 Padding="{StaticResource PaddingButtonPrimary}"
                                 FontSize="{StaticResource FontSizeBody}"
                                 TabIndex="6"/>
+                        <ToggleButton x:Name="BtnBroadcastToggle"
+                                      Command="{Binding ToggleBroadcastPanelCommand}"
+                                      IsChecked="{Binding IsBroadcastPanelOpen, Mode=OneWay}"
+                                      Visibility="{Binding CanOfferBroadcast, Converter={StaticResource BoolToVisibilityConverter}}"
+                                      Content="&#xE8A7;" FontFamily="Segoe MDL2 Assets"
+                                      ToolTip="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"
+                                      AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"
+                                      Style="{DynamicResource ToolbarToggleButtonStyle}"
+                                      FontSize="14" MinWidth="28" Height="28"
+                                      Padding="4"
+                                      Margin="{StaticResource MarginInlineSm}" TabIndex="7"/>
                     </StackPanel>
                     <!-- Inline hint shown only for non-injectable sessions (RDP/VNC/etc.):
                          command is ready but there is no terminal sink to Send into,
@@ -638,6 +650,78 @@
                                VerticalAlignment="Center"
                                Margin="{StaticResource MarginInlineSm}"/>
                 </DockPanel>
+
+                <!-- Broadcast panel: the open terminals this command can be sent to at once.
+                     Shown only when there is more than one, because with a single terminal the
+                     Send button already is the whole feature. -->
+                <Border Grid.Row="2"
+                        Visibility="{Binding IsBroadcastPanelOpen, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="12">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,6">
+                            <TextBlock DockPanel.Dock="Left"
+                                       Text="{loc:Translate ToolCmdLibBroadcastHeader}"
+                                       FontWeight="SemiBold"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                        HorizontalAlignment="Right">
+                                <Button Command="{Binding SelectAllBroadcastTargetsCommand}"
+                                        Content="{loc:Translate ToolCmdLibBroadcastSelectAll}"
+                                        AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastSelectAll}"
+                                        Style="{DynamicResource GhostButtonStyle}"
+                                        FontSize="{StaticResource FontSizeCaption}"
+                                        Padding="6,2"
+                                        Margin="{StaticResource MarginInlineXs}"/>
+                                <Button Command="{Binding ClearBroadcastSelectionCommand}"
+                                        Content="{loc:Translate ToolCmdLibBroadcastSelectNone}"
+                                        AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastSelectNone}"
+                                        Style="{DynamicResource GhostButtonStyle}"
+                                        FontSize="{StaticResource FontSizeCaption}"
+                                        Padding="6,2"/>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding BroadcastTargets}"
+                                          AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastHeader}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  Content="{Binding AccessibleName}"
+                                                  AutomationProperties.Name="{Binding AccessibleName}"
+                                                  FontSize="{StaticResource FontSizeCaption}"
+                                                  Margin="0,2"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <DockPanel Margin="0,8,0,0">
+                            <Button DockPanel.Dock="Right"
+                                    x:Name="BtnBroadcast"
+                                    Command="{Binding BroadcastCommand}"
+                                    Content="{Binding BroadcastButtonText}"
+                                    AutomationProperties.Name="{Binding BroadcastButtonText}"
+                                    Style="{DynamicResource PrimaryButtonStyle}"
+                                    Padding="{StaticResource PaddingButtonPrimary}"
+                                    FontSize="{StaticResource FontSizeBody}"
+                                    HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding BroadcastStatus}"
+                                       Visibility="{Binding HasBroadcastStatus, Converter={StaticResource BoolToVisibilityConverter}}"
+                                       AutomationProperties.LiveSetting="Polite"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 

@@ -415,6 +415,11 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         ServerList = serverList;
         ServerList.ToolDescriptorResolver = toolRegistry.GetById;
         Connection = connection;
+
+        // The manager creates the session views; this view model owns the collection they live
+        // in. Handing the collection back is what lets a Command Library broadcast see tabs
+        // other than the one it was opened from.
+        _embeddedSessionManager.ActiveSessionsProvider = () => Connection.ActiveSessions;
         Settings = settings;
         Update = update;
         Sidebar = new SidebarViewModel(this, localizer, configManager, toolsTabPopulation, toolContextProvider, _uiDispatcher);

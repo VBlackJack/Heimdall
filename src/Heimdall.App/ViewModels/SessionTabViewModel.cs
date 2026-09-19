@@ -32,6 +32,15 @@ namespace Heimdall.App.ViewModels;
 public partial class SessionTabViewModel : ObservableObject
 {
     /// <summary>
+    /// Identifies this tab for the length of one Command Library broadcast.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ServerId"/> cannot serve: two tabs open on the same server share it, and a
+    /// broadcast that collapsed them would send once and report twice.
+    /// </remarks>
+    public string BroadcastId { get; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>
     /// The root of the recursive split pane tree.
     /// A single <see cref="SessionPaneModel"/> when unsplit, or a
     /// <see cref="SplitContainerModel"/> when split into multiple panes.

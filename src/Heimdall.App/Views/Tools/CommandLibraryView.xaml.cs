@@ -73,6 +73,7 @@ public partial class CommandLibraryView : UserControl, IToolView
 
         _viewModel.SendCommandHandler = context?.SendCommandAction;
         _viewModel.CanSendToTerminalProbe = context?.CanSendToTerminal;
+        _viewModel.CommandBroadcaster = context?.CommandBroadcaster;
         _viewModel.ShowActionDialogAsync = ShowActionDialogAsync;
         _viewModel.ShowSaveFileDialog = ShowSaveFileDialog;
         _viewModel.ShowOpenFileDialog = ShowOpenFileDialog;
@@ -81,6 +82,11 @@ public partial class CommandLibraryView : UserControl, IToolView
         _viewModel.LibraryReloaded += OnLibraryReloaded;
 
         DataContext = _viewModel;
+
+        // The toggle is hidden until there is more than one terminal to reach, so the targets
+        // are read once here rather than only when the panel is opened: a panel whose own
+        // opening gesture is invisible cannot be opened.
+        _viewModel.RefreshBroadcastTargets();
 
         _viewModel.AutoSelectPlatform(context?.ConnectionType);
         _ = _viewModel.InitializeAsync(context?.TargetHost, context?.InitialActionId);
