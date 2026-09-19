@@ -36,8 +36,14 @@ public enum BroadcastScope
     AllTabs,
 
     /// <summary>
-    /// Reserved for a future per-pane subset selection (Lot B). Until that
-    /// feature ships it resolves identically to <see cref="CurrentTab"/>.
+    /// Only the terminal panes the operator has marked receive the input, across every open
+    /// session tab. An empty selection therefore reaches nothing rather than falling back to a
+    /// wider scope.
     /// </summary>
+    /// <remarks>
+    /// This shipped. The comment here said it was reserved and resolved like
+    /// <see cref="CurrentTab"/> long after <c>BroadcastTargetResolver</c> had begun spanning every
+    /// tab for it, which is the opposite of what it does.
+    /// </remarks>
     SelectedPanes
 }
