@@ -96,6 +96,7 @@ public sealed class CommandLibraryTransferService(
                 continue;
             }
 
+            NormalizeEnumDomains(action);
             NormalizeParameterQuoting(action);
 
             var existing = await actionService.GetActionByPublicIdAsync(action.PublicId)
@@ -127,6 +128,40 @@ public sealed class CommandLibraryTransferService(
         }
 
         return CommandLibraryImportResult.Success(imported, updated, skipped);
+    }
+
+    /// <summary>
+    /// Brings <see cref="ActionModel.Level"/> and <see cref="ActionModel.Platform"/> back
+    /// inside their declared enum domains.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="JsonStringEnumConverter"/> accepts raw numbers as well as names and does
+    /// not check them against the enum, so an import file can declare <c>"level": 99</c>
+    /// and have it persist verbatim. Out-of-domain values then split decisions that are
+    /// meant to be one: the list filter matches the level exactly and never shows such an
+    /// action, while <c>DangerousCommandGuard</c> reads the same value as at-or-above
+    /// <see cref="CriticalityLevel.Dangerous"/> and prompts.
+    /// </para>
+    /// <para>
+    /// Each field is snapped to the safe end of its domain rather than rejecting the whole
+    /// action, matching what <see cref="NormalizeParameterQuoting"/> already does for
+    /// quoting: an unreadable risk becomes <see cref="CriticalityLevel.Dangerous"/>, and an
+    /// unreadable platform becomes <see cref="Platform.Both"/>, which is what the platform
+    /// label already displayed for unknown values.
+    /// </para>
+    /// </remarks>
+    private static void NormalizeEnumDomains(ActionModel action)
+    {
+        if (!Enum.IsDefined(action.Level))
+        {
+            action.Level = CriticalityLevel.Dangerous;
+        }
+
+        if (!Enum.IsDefined(action.Platform))
+        {
+            action.Platform = Platform.Both;
+        }
     }
 
     /// <summary>
