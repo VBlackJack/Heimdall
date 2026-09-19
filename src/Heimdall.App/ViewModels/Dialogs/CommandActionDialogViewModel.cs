@@ -329,6 +329,52 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         return action;
     }
 
+    /// <summary>
+    /// Builds a dialog for a new action that starts as a copy of <paramref name="action"/>,
+    /// carrying its content and none of its identity.
+    /// </summary>
+    /// <param name="action">The action to copy. It is not modified.</param>
+    /// <param name="title">Title for the copy, already localized by the caller.</param>
+    /// <remarks>
+    /// <para>
+    /// The point is the actions the library ships: they cannot be edited, so the only way
+    /// to get a variant of one was to retype it. A copy is a new action in every respect -
+    /// it mints its own identifiers when saved, and saving it leaves the original alone.
+    /// </para>
+    /// <para>
+    /// Everything that identifies the source is deliberately dropped: the action id, its
+    /// public id, its creation date, and the identifiers of both templates. Carrying any
+    /// one of them would make the save an update of the original rather than a new row,
+    /// which for a shipped action means silently editing something that is supposed to be
+    /// read-only.
+    /// </para>
+    /// </remarks>
+    public static CommandActionDialogViewModel AsCopyOf(ActionModel action, string title)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        var vm = FromAction(action);
+
+        vm._isInitializing = true;
+        vm.IsEditMode = false;
+        vm.Title = title;
+
+        vm._editActionId = null;
+        vm._editPublicId = null;
+        vm._editCreatedAt = null;
+        vm._editWinTemplateId = null;
+        vm._editWinTemplatePublicId = null;
+        vm._editLinuxTemplateId = null;
+        vm._editLinuxTemplatePublicId = null;
+        vm._isInitializing = false;
+
+        // A copy is unsaved work from the moment it exists, unlike an edit of something
+        // already stored.
+        vm.IsDirty = true;
+
+        return vm;
+    }
+
     public static CommandActionDialogViewModel FromAction(ActionModel action)
     {
         ArgumentNullException.ThrowIfNull(action);

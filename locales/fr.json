@@ -5774,6 +5774,7 @@
   "ConfirmDangerousSendTitle": "Ex\u00e9cuter cette commande dangereuse ?",
   "ConfirmDangerousSendMessage": "Cette commande est marqu\u00e9e comme dangereuse et s'ex\u00e9cutera imm\u00e9diatement sur la session. Continuer ?",
   "ToolCmdLibDialogTitleAdd": "Ajouter une commande",
+  "ToolCmdLibDialogTitleDuplicate": "Dupliquer l'action",
   "ToolCmdLibDialogTitleEdit": "\u00c9diter la commande",
   "ToolCmdLibDialogLblTitle": "Titre",
   "ToolCmdLibDialogLblCategory": "Cat\u00e9gorie",
@@ -5813,6 +5814,8 @@
   "ToolCmdLibValidationLinksMaxCount": "Impossible d'avoir plus de 10 liens.",
   "ToolCmdLibFavoriteAdd": "Ajouter aux favoris",
   "ToolCmdLibFavoriteRemove": "Retirer des favoris",
+  "ToolCmdLibDuplicate": "Dupliquer dans ma biblioth\u00e8que",
+  "ToolCmdLibDuplicateTitleFormat": "{0} (copie)",
   "ToolCmdLibEmptyLibrary": "La biblioth\u00e8que de commandes est vide. Cliquez + pour ajouter des commandes ou importez un fichier JSON.",
   "ToolHelpCMDLIB": "Biblioth\u00e8que de commandes PowerShell et Bash.\\nFiltrez par plateforme, cat\u00e9gorie ou niveau de risque.\\nCliquez sur une commande pour voir son mod\u00e8le, remplir les param\u00e8tres et consulter les notes et exemples.\\nUtilisez 'Copier' ou 'Envoyer au terminal' pour utiliser la commande g\u00e9n\u00e9r\u00e9e.\\nCliquez + pour ajouter des commandes. S\u00e9lectionnez une commande puis utilisez les ic\u00f4nes crayon/corbeille pour \u00e9diter ou supprimer.",
 

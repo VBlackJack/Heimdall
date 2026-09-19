@@ -289,6 +289,51 @@ public sealed partial class CommandLibraryViewModel
     }
 
     /// <summary>
+    /// Opens the Add dialog pre-filled with a copy of the selected action.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Offered for every action, including the ones the library ships. Those cannot be
+    /// edited, so before this the only way to get a variant of one was to retype it, which
+    /// is how people end up with a nearly-right command they typed from memory.
+    /// </para>
+    /// <para>
+    /// Unlike Edit, this is not gated on the selection being editable. It is gated on there
+    /// being a selection at all, and on no other library operation being in flight.
+    /// </para>
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanDuplicateSelected))]
+    public async Task DuplicateSelectedAsync()
+    {
+        var entry = SelectedEntry;
+        if (entry is null || ShowActionDialogAsync is null) return;
+
+        var vm = CommandActionDialogViewModel.AsCopyOf(
+            entry.Source,
+            string.Format(LocalizeKey("ToolCmdLibDuplicateTitleFormat"), entry.Title));
+        vm.DialogTitle = LocalizeKey("ToolCmdLibDialogTitleDuplicate");
+        vm.Localizer = _localizer;
+        vm.AvailableCategories = _categoryList.ToList();
+
+        var saved = await ShowActionDialogAsync(vm);
+        if (!saved) return;
+
+        await RunActionServiceOperationAsync(
+            async actionService =>
+            {
+                await actionService.CreateActionAsync(vm.ToAction());
+                await ReloadAsync();
+            },
+            "Duplicate action",
+            "ToolCmdLibErrorTitle");
+    }
+
+    /// <summary>
+    /// True when there is an action to copy and nothing else is running.
+    /// </summary>
+    public bool CanDuplicateSelected => SelectedEntry is not null && IsLibraryIdle;
+
+    /// <summary>
     /// Opens the Edit Action dialog for <paramref name="entry"/> and persists
     /// the changes when the user saves.
     /// </summary>
