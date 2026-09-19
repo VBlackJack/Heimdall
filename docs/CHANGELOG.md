@@ -14,6 +14,35 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### An import that cannot be read says so
+
+- **A file that has moved, or that another program is holding open, now gets its own
+  message.** It used to come back as whatever the operating system said, in English,
+  with the full path in it. Exporting a library, leaving the file open, and importing it
+  back is the way most people meet this.
+
+### Copy explains itself when it is greyed out
+
+- **The Copy button now carries the same kind of tooltip Send already had**, and it stays
+  readable while the button is disabled. A greyed-out button with no explanation is the
+  same amount of work as no button at all.
+- **The progress bar also shows during a Git sync.** Sync reloads the whole library and
+  takes longer than anything else in the tool, and the only sign of it was a short line of
+  text beside the title.
+
+### The Add and Edit dialog enforces the limits it states
+
+- **An over-long description or note is now refused instead of being saved.** The limits
+  were declared, shown in no error message, and checked by nothing, so 5001 characters of
+  notes went into the database exactly like 5000.
+
+### Fixed
+
+- Searching a large library no longer re-scans the result list once per row while sorting.
+- The result counter no longer walks the whole filtered list twice every time a filter
+  changes.
+- Removed four command-library texts that nothing had displayed for some time.
+
 ### The Command Library keeps the filters you set
 
 - **Platform and Risk no longer empty themselves.** Adding, editing or deleting an action,
