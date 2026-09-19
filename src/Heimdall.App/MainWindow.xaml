@@ -1349,14 +1349,41 @@
                                                 <!-- Broadcast target marker: pick this session as a SelectedPanes broadcast
                                                      target straight from the tab strip. Visible only in SelectedPanes mode
                                                      for sessions that have a terminal pane. -->
-                                                <CheckBox x:Name="Mw_SessionTabBroadcastTarget"
-                                                          VerticalAlignment="Center" Margin="0,0,6,0"
-                                                          IsChecked="{Binding IsBroadcastTarget, Mode=OneWay}"
-                                                          Visibility="{Binding ShowBroadcastTargetMarker, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                          Command="{Binding DataContext.Session.ToggleSessionBroadcastTargetCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
-                                                          CommandParameter="{Binding}"
-                                                          ToolTip="{loc:Translate BroadcastTabTargetTooltip}"
-                                                          AutomationProperties.Name="{loc:Translate A11yBroadcastTabTarget}"/>
+                                                <!-- A Button, not a CheckBox, although it draws as one.
+                                                     IsBroadcastTarget is DERIVED from the panes and
+                                                     recomputed by RefreshBroadcastTabMarkers, so nothing
+                                                     may write it back: the command is the only way to
+                                                     change the selection. A CheckBox would offer the UIA
+                                                     Toggle pattern over that derived state, and Toggle
+                                                     flips the control without raising Click - leaving the
+                                                     marker ticked over a pane that was never selected.
+                                                     The inner CheckBox is the drawing only, kept out of
+                                                     the accessibility tree so it offers no Toggle. -->
+                                                <Button x:Name="Mw_SessionTabBroadcastTarget"
+                                                        VerticalAlignment="Center" Margin="0,0,6,0"
+                                                        Padding="0" BorderThickness="0" Background="Transparent"
+                                                        Visibility="{Binding ShowBroadcastTargetMarker, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        Command="{Binding DataContext.Session.ToggleSessionBroadcastTargetCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="{loc:Translate BroadcastTabTargetTooltip}"
+                                                        AutomationProperties.Name="{Binding BroadcastTargetAccessibleName}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <ContentPresenter/>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <Border Width="14" Height="14" CornerRadius="2"
+                                                            BorderThickness="1"
+                                                            BorderBrush="{DynamicResource BorderBrush}"
+                                                            Background="Transparent">
+                                                        <TextBlock Text="&#xE73E;" FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="9"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   Visibility="{Binding IsBroadcastTarget, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    </Border>
+                                                </Button>
                                                 <Grid Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0">
                                                     <Path Data="{Binding ConnectionType, Converter={StaticResource TypeToGeoConverter}}"
                                                           Style="{StaticResource GeoIconSmall}">

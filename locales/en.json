@@ -2005,6 +2005,8 @@
   "BroadcastTargetToggleTooltip": "Include this terminal pane as a broadcast target",
   "A11yBroadcastTargetToggle": "Toggle broadcast target for this pane",
   "BroadcastTabTargetTooltip": "Send broadcast input to this session (broadcast target)",
+  "A11yBroadcastTabTargetSelected": "{0}, selected as a broadcast target",
+  "A11yBroadcastTabTargetNotSelected": "{0}, not selected as a broadcast target",
   "A11yBroadcastTabTarget": "Toggle broadcast target for this session",
 
   "WorkspaceSave": "Save Workspace",

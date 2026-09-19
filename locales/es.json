@@ -2005,6 +2005,8 @@
   "BroadcastTargetToggleTooltip": "Incluir este panel de terminal como destino de difusión",
   "A11yBroadcastTargetToggle": "Alternar el destino de difusión para este panel",
   "BroadcastTabTargetTooltip": "Enviar la entrada de difusión a esta sesión (destino de difusión)",
+  "A11yBroadcastTabTargetSelected": "{0}, seleccionado como destino de difusion",
+  "A11yBroadcastTabTargetNotSelected": "{0}, no seleccionado como destino de difusion",
   "A11yBroadcastTabTarget": "Alternar el destino de difusión para esta sesión",
 
   "WorkspaceSave": "Guardar espacio de trabajo",
