@@ -129,8 +129,45 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Variables d'environnement HEIMDALL_* injectées pour le scripting contextuel
 
 ### Diffusion Multi-Exec
-- Envoie les frappes clavier simultanément à plusieurs sessions SSH actives
-- Indicateurs visuels : bordure colorée et badge BROADCAST sur les terminaux destinataires
+- Envoie les frappes clavier simultanément à plusieurs panneaux de terminal ouverts : ce que vous tapez une fois les atteint tous
+- L'unité est le **panneau**, pas l'onglet : les deux moitiés d'un split reçoivent
+- Trois portées, que l'on fait défiler depuis la barre d'état : **Onglet courant**, **Tous les onglets** et **Panneaux sélectionnés**
+- **Tous les onglets** demande confirmation avant de démarrer, parce qu'il atteint des terminaux que vous ne regardez pas ; **Onglet courant** ne demande jamais rien
+- **Panneaux sélectionnés** est un sous-ensemble explicite : cochez les panneaux depuis le terminal lui-même ou depuis la barre d'onglets, et une sélection vide n'atteint rien plutôt que de retomber sur une portée plus large
+- La portée choisie est mémorisée d'une exécution à l'autre
+- Indicateurs visuels : bordure colorée et badge BROADCAST sur les terminaux destinataires, plus un marqueur dans la barre d'onglets pendant le choix d'un sous-ensemble
+- Les surfaces non-terminal (RDP, VNC, SFTP, FTP, Citrix) ne sont jamais ciblées, et le panneau dans lequel vous tapez ne reçoit jamais sa propre saisie en retour
+
+### Command Library
+Un catalogue de commandes prêtes à l'emploi, avec variantes Windows et Linux, modèles de
+paramètres et un générateur qui produit la commande finale à votre place.
+
+**Trouver une commande**
+- Recherche plein texte avec classement par pertinence sur les titres, les tags, les descriptions et le texte des commandes
+- Filtres par catégorie, tag, plateforme et niveau de risque ; chaque filtre conserve sa sélection après un rechargement de la bibliothèque
+- Favoris, et badge de risque par action (info, run, dangereux)
+
+**Construire la commande**
+- Paramètres typés : texte, entier, booléen, nom d'hôte, adresse IP, chemin, et **choice** (un jeu fixe de valeurs proposé en liste déroulante)
+- Un paramètre choice n'accepte que ce qu'il propose, la correspondance ignorant la casse et les espaces autour ; savoir si une valeur peut être absente reste du ressort de l'indicateur Requis du paramètre
+- L'éditeur signale quand le motif de commande et les paramètres déclarés divergent : un `{placeholder}` sans paramètre, ou un paramètre que le motif n'utilise jamais. Il avertit et ne bloque jamais, parce que les accolades sont de la ponctuation shell ordinaire
+- Aperçu en direct de la commande générée, avec échappement shell appliqué aux valeurs substituées
+
+**L'exécuter**
+- Copier dans le presse-papiers, ou envoyer vers le terminal de la session depuis laquelle la bibliothèque a été ouverte
+- Les commandes marquées dangereuses demandent confirmation avant envoi
+- **Envoyer vers plusieurs terminaux ouverts** : cochez les terminaux dans un panneau à côté du bouton Envoyer et la même commande part vers chacun. Elle atteint des terminaux déjà ouverts et n'en connecte jamais aucun ; tous reçoivent le même texte ; une seule confirmation nomme combien vont recevoir, quel que soit le risque déclaré de l'action ; et un terminal qui refuse n'arrête pas les autres : le résumé nomme ceux qui n'ont pas reçu
+- Clavier : `Entrée` copie, `Ctrl+Entrée` envoie, `Ctrl+D` duplique l'action sélectionnée
+
+**Historique**
+- Chaque commande copiée ou envoyée est enregistrée avec son titre, sa catégorie et son horodatage
+- La commande elle-même et les valeurs de ses paramètres sont chiffrées avant d'atteindre la base, sous le coffre à mot de passe maître quand il est configuré et via DPAPI sinon
+- Rejouez une commande passée dans le générateur, avec ses paramètres
+- Rien n'est enregistré coffre verrouillé, et les lignes sont purgées au-delà de 90 jours
+
+**Partager**
+- Import et export en JSON, et synchronisation Git pour une bibliothèque d'équipe
+- Les actions issues d'un import voient leur niveau de risque et leur plateforme ramenés à des valeurs connues : un niveau non reconnu est traité comme dangereux plutôt qu'anodin
 
 ### Connexion rapide (Ctrl+K)
 - Palette de commandes pour des connexions ponctuelles sans enregistrer de profil de serveur

@@ -129,8 +129,45 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - HEIMDALL_* environment variables injected for contextual scripting
 
 ### Multi-Exec Broadcast
-- Send keystrokes simultaneously to multiple active SSH sessions
-- Visual indicators: colored border and BROADCAST badge on receiving terminals
+- Send keystrokes simultaneously to several open terminal panes: what you type once reaches all of them
+- The unit is the **pane**, not the tab, so both halves of a split receive
+- Three scopes, cycled from the status bar: **Current tab**, **All tabs**, and **Selected panes**
+- **All tabs** asks for confirmation before it starts, because it reaches terminals you are not looking at; **Current tab** never prompts
+- **Selected panes** is an explicit subset: tick the panes from the terminal itself or from the tab strip, and an empty selection reaches nothing rather than falling back to a wider scope
+- The chosen scope is remembered between runs
+- Visual indicators: colored border and BROADCAST badge on receiving terminals, plus a marker in the tab strip while a subset is being picked
+- Non-terminal surfaces (RDP, VNC, SFTP, FTP, Citrix) are never targeted, and the pane you are typing in never receives its own input back
+
+### Command Library
+A catalogue of ready-made commands with Windows and Linux variants, parameter templates and a
+generator that produces the final command for you.
+
+**Finding a command**
+- Full-text search with relevance ranking over titles, tags, descriptions and command text
+- Filter by category, tag, platform and risk level; every filter keeps its selection across a library reload
+- Favorites, and a per-action risk badge (info, run, dangerous)
+
+**Building the command**
+- Typed parameters: text, integer, boolean, hostname, IP address, path, and **choice** (a fixed set of values offered as a drop-down)
+- A choice parameter accepts only what it offers, matched without regard to case or surrounding space; whether a value may be absent is left to the parameter's own Required flag
+- The editor warns when the command pattern and the declared parameters disagree - a `{placeholder}` with no parameter, or a parameter the pattern never uses. It warns and never blocks, because braces are ordinary shell punctuation
+- Live preview of the generated command, with shell quoting applied to substituted values
+
+**Running it**
+- Copy to the clipboard, or send to the terminal of the session the library was opened from
+- Commands flagged dangerous require confirmation before they are sent
+- **Send to several open terminals**: tick the terminals from a panel beside the Send button and the same command goes to each. It reaches terminals that are already open and never connects one; every target receives the same text; one confirmation names how many will receive it, whatever the action's declared risk; and a terminal that refuses does not stop the others - the summary names which did not receive it
+- Keyboard: `Enter` copies, `Ctrl+Enter` sends, `Ctrl+D` duplicates the selected action
+
+**History**
+- Every command you copy or send is recorded with its title, category and timestamp
+- The command itself and its parameter values are encrypted before they reach the database, under the master-password vault when one is set and DPAPI otherwise
+- Replay a past command back into the generator, with its parameters
+- Nothing is recorded while the vault is locked, and rows are pruned after 90 days
+
+**Sharing**
+- Import and export as JSON, and Git synchronization for a shared team library
+- Actions that arrive from an import have their risk level and platform clamped to known values, so an unrecognized level is treated as dangerous rather than harmless
 
 ### Quick Connect (Ctrl+K)
 - Command palette for ad-hoc connections without saving a server profile
