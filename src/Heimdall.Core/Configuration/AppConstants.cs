@@ -49,6 +49,18 @@ public static class AppConstants
     public const long MaxSeedFileSizeBytes = 100 * 1024;
 
     /// <summary>Maximum accepted length of an imported action Title.</summary>
+    /// <summary>
+    /// How long a command-history entry is kept, in days.
+    /// </summary>
+    /// <remarks>
+    /// History holds what the operator actually typed, sealed at rest but still a record
+    /// of it, and nothing pruned it before: the table grew for the life of the install.
+    /// A bounded window is part of recording real commands rather than a separate tidiness
+    /// concern. Ninety days is the value the cleanup routine has always defaulted to, kept
+    /// so that wiring it changes when rows disappear and not by how much.
+    /// </remarks>
+    public const int CommandHistoryRetentionDays = 90;
+
     public const int MaxImportActionTitleLength = 200;
 
     /// <summary>Maximum accepted length of an imported action Category.</summary>

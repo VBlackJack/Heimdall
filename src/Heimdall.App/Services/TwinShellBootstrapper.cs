@@ -18,6 +18,7 @@ using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using Heimdall.App.Logging;
+using Heimdall.Core.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -119,6 +120,8 @@ internal static class TwinShellBootstrapper
 
         await context.Database.EnsureCreatedAsync();
         await SchemaUpgrader.UpgradeAsync(context, TwinShellSchema.Steps);
+
+        await PruneCommandHistoryAsync(scope.ServiceProvider);
 
         // Seed only if the database is empty
         var repo = scope.ServiceProvider.GetRequiredService<IActionRepository>();
@@ -293,5 +296,51 @@ internal static class TwinShellBootstrapper
                     $"[TwinShell] Settings bridge refresh failed: {ex.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Drops command-history entries older than
+    /// <see cref="AppConstants.CommandHistoryRetentionDays"/>, once per run.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The cleanup routine has existed since the history was written and was never called,
+    /// so the table grew for the life of the install. That mattered little while history
+    /// stored an un-substituted pattern; it matters now that it stores what the operator
+    /// actually typed.
+    /// </para>
+    /// <para>
+    /// Startup is the right moment because it happens once, before any tab exists, and the
+    /// database is already open here. A failure is logged and swallowed: a history that
+    /// could not be pruned is not a reason to refuse to start.
+    /// </para>
+    /// </remarks>
+    internal static async Task PruneCommandHistoryAsync(IServiceProvider scopedProvider)
+    {
+        try
+        {
+            await PruneOlderThanRetentionAsync(
+                scopedProvider.GetRequiredService<ICommandHistoryService>());
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[TwinShell] Could not prune command history: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Applies the declared retention window.
+    /// </summary>
+    /// <remarks>
+    /// One line, in a method of its own, so a guard can read it. The window has to be
+    /// passed rather than left to the service default, and those two happen to be the same
+    /// number today: a test of the recorded value cannot tell them apart, so the decision
+    /// is pinned where it is actually made. Inside the caller's try block the statement
+    /// sits one level too deep for the source predicate to see it.
+    /// </remarks>
+    private static async Task PruneOlderThanRetentionAsync(ICommandHistoryService history)
+    {
+        await history.CleanupOldEntriesAsync(AppConstants.CommandHistoryRetentionDays);
     }
 }
