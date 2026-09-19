@@ -625,9 +625,14 @@
                                 Padding="{StaticResource PaddingButtonPrimary}"
                                 FontSize="{StaticResource FontSizeBody}"
                                 TabIndex="6"/>
+                        <!-- IsChecked is the only mutator, and it is two-way on purpose. With a
+                             one-way IsChecked beside a Command, anything that drives the control
+                             through the UIA Toggle pattern - an automation client, a screen reader -
+                             flips the button's own state without ever running the Command, and the
+                             button then reads "on" over a closed panel. Measured on the running app
+                             on 2026-09-19. -->
                         <ToggleButton x:Name="BtnBroadcastToggle"
-                                      Command="{Binding ToggleBroadcastPanelCommand}"
-                                      IsChecked="{Binding IsBroadcastPanelOpen, Mode=OneWay}"
+                                      IsChecked="{Binding IsBroadcastPanelOpen, Mode=TwoWay}"
                                       Visibility="{Binding CanOfferBroadcast, Converter={StaticResource BoolToVisibilityConverter}}"
                                       Content="&#xE8A7;" FontFamily="Segoe MDL2 Assets"
                                       ToolTip="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"

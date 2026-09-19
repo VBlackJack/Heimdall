@@ -148,12 +148,18 @@ public sealed partial class CommandLibraryViewModel
         NotifyBroadcastState();
     }
 
-    [RelayCommand]
-    private void ToggleBroadcastPanel()
+    /// <summary>
+    /// Opening the panel re-reads the terminals, so what it lists is what is open now.
+    /// </summary>
+    /// <remarks>
+    /// This hangs off the property rather than off a command because the toggle in the view binds
+    /// <c>IsChecked</c> two-way and nothing else sets it. A command beside a one-way IsChecked lets
+    /// a UIA client flip the button through the Toggle pattern without running the command, and the
+    /// button then reads "on" over a closed panel.
+    /// </remarks>
+    partial void OnIsBroadcastPanelOpenChanged(bool value)
     {
-        IsBroadcastPanelOpen = !IsBroadcastPanelOpen;
-
-        if (IsBroadcastPanelOpen)
+        if (value)
         {
             RefreshBroadcastTargets();
         }

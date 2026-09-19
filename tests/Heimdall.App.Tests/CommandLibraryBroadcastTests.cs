@@ -77,9 +77,11 @@ public sealed class CommandLibraryBroadcastTests
         Assert.True(viewModel.CanOfferBroadcast);
 
         broadcaster.Targets.Add(new CommandBroadcastTarget("t2", "web-02", "SSH", false));
-        viewModel.ToggleBroadcastPanelCommand.Execute(null);
 
-        Assert.True(viewModel.IsBroadcastPanelOpen);
+        // Setting the property IS the gesture: the toggle binds IsChecked two-way and nothing
+        // else opens the panel.
+        viewModel.IsBroadcastPanelOpen = true;
+
         Assert.Equal(["t1", "t2"], viewModel.BroadcastTargets.Select(t => t.Id));
     }
 
