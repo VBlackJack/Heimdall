@@ -283,6 +283,18 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     private const int MaximumPassphraseWordCount = 8;
     private const int MaximumLeetExtras = 6;
 
+    /// <summary>
+    /// The most digits, and the most special characters, a syllable password takes.
+    /// </summary>
+    /// <remarks>
+    /// The two sliders read their maximum from this, so the search below cannot look at a
+    /// combination the operator has no way of asking for.
+    /// </remarks>
+    internal const int MaximumSyllableExtras = 6;
+
+    /// <summary>The same ceiling, for the two sliders to read rather than carry a copy of.</summary>
+    public int MaximumSyllableExtrasValue => MaximumSyllableExtras;
+
 
     private static readonly Dictionary<char, string> NatoAlphabet = new()
     {
@@ -655,6 +667,21 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     public bool ShowLeetBaseWord => IsLeetMode && !LeetRandomWord;
     public bool ShowLeetWordSource => IsLeetMode && !string.IsNullOrEmpty(LeetWordSource);
     public bool ShowFloorNotice => !string.IsNullOrEmpty(FloorNoticeText);
+
+    /// <summary>
+    /// What asking for a minimum did to the settings, or why it could not.
+    /// </summary>
+    /// <remarks>
+    /// Kept apart from <see cref="FloorNoticeText"/>, which every generation clears because it
+    /// describes that generation. This one describes a change to the settings, so it outlives the
+    /// password it produced and goes when the operator moves a control of their own.
+    /// </remarks>
+    [ObservableProperty] private string _floorSearchNoticeText = string.Empty;
+
+    public bool ShowFloorSearchNotice => !string.IsNullOrEmpty(FloorSearchNoticeText);
+
+    partial void OnFloorSearchNoticeTextChanged(string value)
+        => OnPropertyChanged(nameof(ShowFloorSearchNotice));
 
     /// <summary>The case mode of the mode on screen, or <c>null</c> where there is none.</summary>
     internal SyllableCase? CurrentCaseMode => CurrentMode switch
@@ -1302,9 +1329,13 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// entirely while the other keeps every place it asked for.</para>
     /// </remarks>
     private (int Portion, int Digits, int Specials) ResolveSyllableShape(int total)
+        => ResolveSyllableShape(total, SyllableDigits, SyllableSpecials);
+
+    private static (int Portion, int Digits, int Specials) ResolveSyllableShape(
+        int total, int wantedDigits, int wantedSpecials)
     {
-        var digits = Math.Max(SyllableDigits, 0);
-        var specials = Math.Max(SyllableSpecials, 0);
+        var digits = Math.Max(wantedDigits, 0);
+        var specials = Math.Max(wantedSpecials, 0);
 
         while (total - digits - specials < MinimumSyllablePortion && digits + specials > 0)
         {
@@ -1333,8 +1364,20 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// is the portion halved, which is what the count has always been.
     /// </remarks>
     private int SyllableCountFor(int totalLength)
+        => SyllableCountFor(totalLength, SyllableDigits, SyllableSpecials);
+
+    /// <summary>
+    /// How many syllable blocks a password of this shape holds.
+    /// </summary>
+    /// <remarks>
+    /// The shape has to be passed in, not read off the properties. A search that asks what six
+    /// digits would be worth while this counts the blocks left by two is counting those four
+    /// characters twice, once as digits and once as the syllables they displaced, and it says a
+    /// minimum is reachable when it is not.
+    /// </remarks>
+    private int SyllableCountFor(int totalLength, int wantedDigits, int wantedSpecials)
     {
-        var (portion, _, _) = ResolveSyllableShape(totalLength);
+        var (portion, _, _) = ResolveSyllableShape(totalLength, wantedDigits, wantedSpecials);
         var separatorLength = (SyllableSeparator ?? string.Empty).Length;
         return (portion + separatorLength) / (CharactersPerSyllableBlock + separatorLength);
     }
@@ -1344,15 +1387,26 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// only, which is the cheaper of the two shapes per character, and no credit for mixed case.
     /// </summary>
     private double GuaranteedSyllableBits(int totalLength)
+        => GuaranteedSyllableBits(totalLength, SyllableDigits, SyllableSpecials);
+
+    /// <summary>
+    /// What a syllable password of this shape is worth, without it having to be the shape on
+    /// screen, so a search can ask about one it has not committed to.
+    /// </summary>
+    private double GuaranteedSyllableBits(int totalLength, int wantedDigits, int wantedSpecials)
     {
         var consonants = LayoutSafe ? LayoutSafeConsonants : Consonants;
         var vowels = LayoutSafe ? LayoutSafeVowels : Vowels;
-        var (_, digits, specials) = ResolveSyllableShape(totalLength);
-        var bits = Math.Log2(consonants.Length * vowels.Length) * SyllableCountFor(totalLength);
+        var (_, digits, specials) = ResolveSyllableShape(totalLength, wantedDigits, wantedSpecials);
+        var bits = Math.Log2(consonants.Length * vowels.Length)
+            * SyllableCountFor(totalLength, wantedDigits, wantedSpecials);
         return bits + ExtrasBits(digits, specials);
     }
 
     private double GuaranteedPassphraseBits(int wordCount)
+        => GuaranteedPassphraseBits(wordCount, PassphraseDigits, PassphraseSpecials);
+
+    private double GuaranteedPassphraseBits(int wordCount, int digits, int specials)
     {
         var wordList = SelectedWordList();
         if (wordList.Length < 2)
@@ -1360,8 +1414,7 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
             return 0;
         }
 
-        return Math.Log2(wordList.Length) * wordCount
-            + ExtrasBits(PassphraseDigits, PassphraseSpecials);
+        return Math.Log2(wordList.Length) * wordCount + ExtrasBits(digits, specials);
     }
 
     /// <summary>
@@ -1389,6 +1442,346 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         }
 
         return bits;
+    }
+
+
+    /// <summary>
+    /// What a search for the minimum found: whether it got there, the most it could reach, and
+    /// the writing of what it found.
+    /// </summary>
+    private readonly record struct FloorFound(bool Reached, double Ceiling, Func<string>? Apply);
+
+    /// <summary>
+    /// The settings as they stood before a minimum moved them, which is everything a search is
+    /// allowed to write and nothing else.
+    /// </summary>
+    private readonly record struct FloorUndo(
+        int Length,
+        int SyllableLength,
+        int SyllableDigits,
+        int SyllableSpecials,
+        int PassphraseWordCount,
+        int PassphraseDigits,
+        int PassphraseSpecials,
+        int LeetDigits,
+        int LeetSpecials);
+
+    /// <summary>
+    /// Where the controls were before the minimum in force moved them, or null when it has not.
+    /// </summary>
+    /// <remarks>
+    /// This is what makes the minimum something that can be taken back. Without it, asking for a
+    /// hundred bits and then changing your mind leaves the settings wherever the search put them,
+    /// and there is nothing on screen to say what they used to be. It is also what the next
+    /// search starts from, so lowering the minimum lowers the settings instead of ratcheting them
+    /// up for the rest of the session.
+    /// </remarks>
+    private FloorUndo? _beforeFloor;
+
+    private FloorUndo CaptureBeforeFloor() => new(
+        Length,
+        SyllableLength,
+        SyllableDigits,
+        SyllableSpecials,
+        PassphraseWordCount,
+        PassphraseDigits,
+        PassphraseSpecials,
+        LeetDigits,
+        LeetSpecials);
+
+    private void RestoreBeforeFloor(FloorUndo undo)
+    {
+        Length = undo.Length;
+        SyllableLength = undo.SyllableLength;
+        SyllableDigits = undo.SyllableDigits;
+        SyllableSpecials = undo.SyllableSpecials;
+        PassphraseWordCount = undo.PassphraseWordCount;
+        PassphraseDigits = undo.PassphraseDigits;
+        PassphraseSpecials = undo.PassphraseSpecials;
+        LeetDigits = undo.LeetDigits;
+        LeetSpecials = undo.LeetSpecials;
+    }
+
+    /// <summary>
+    /// Puts the settings where they have to be to guarantee the minimum, in one write.
+    /// </summary>
+    /// <remarks>
+    /// <para>Asking for a hundred bits used to be a question the tool answered rather than a thing
+    /// it did. When the answer was no, nothing moved and the operator was left to find the
+    /// combination by hand, one slider at a time, with no way of knowing which one was in the way.
+    /// The search here tries every shape the controls can be put in, and writes the first one that
+    /// reaches the minimum.</para>
+    /// <para><b>It commits once or not at all.</b> An older version of the floor raised the
+    /// slider itself, one step at a time, regenerating as it went; a minimum that turned out to be
+    /// out of reach left every control pinned at its maximum with no way back. Everything here is
+    /// computed before anything is written, and when nothing reaches the minimum nothing is
+    /// written at all.</para>
+    /// <para><b>What it will not do</b> is turn a class of characters on, change the word list, or
+    /// take away digits the operator asked for. Those are what the password is made of, not how
+    /// much of it there is. It will also not count what varies between draws, such as closed
+    /// syllables or mixed case, because the minimum is a guarantee: see ResolveFloorSizes.</para>
+    /// <para>Of the shapes that reach the minimum it takes the shortest, and of those the one that
+    /// adds the fewest digits and special characters.</para>
+    /// </remarks>
+    internal void ApplyFloorToSettings()
+    {
+        var floor = EntropyFloorBits;
+        var sentence = string.Empty;
+        var undo = _beforeFloor;
+
+        // Back to the operator's own settings before deciding anything. A search that started
+        // from where the last minimum left things could only ever push them further up, so
+        // lowering the minimum would never lower anything.
+        if (undo is not null)
+        {
+            _isSuspended = true;
+            try
+            {
+                RestoreBeforeFloor(undo.Value);
+            }
+            finally
+            {
+                _isSuspended = false;
+            }
+        }
+
+        if (floor > 0)
+        {
+            var found = CurrentMode switch
+            {
+                GeneratorMode.Random => SearchRandomFloor(floor),
+                GeneratorMode.Syllable => SearchSyllableFloor(floor),
+                GeneratorMode.Passphrase => SearchPassphraseFloor(floor),
+                GeneratorMode.Leet => SearchLeetFloor(floor),
+                _ => default,
+            };
+
+            if (!found.Reached)
+            {
+                // Saying how far these settings do reach is the difference between a refusal and
+                // an answer. Rounded down, because a ceiling rounded up is not one.
+                sentence = string.Format(
+                    L("ToolPwdGenFloorCeiling"),
+                    floor.ToString(CultureInfo.InvariantCulture),
+                    ((int)Math.Floor(found.Ceiling)).ToString(CultureInfo.InvariantCulture));
+            }
+            else if (found.Apply is not null)
+            {
+                // One write, with the generation held off until every part of the shape is in
+                // place: a password drawn halfway through comes from a shape nobody chose.
+                undo ??= CaptureBeforeFloor();
+                _isSuspended = true;
+                try
+                {
+                    sentence = found.Apply();
+                }
+                finally
+                {
+                    _isSuspended = false;
+                }
+            }
+        }
+        else
+        {
+            // No minimum asked for, so there is nothing of the operator's being held.
+            undo = null;
+        }
+
+        // The sentence goes on after the generation, never before, because the generation
+        // announces that the settings moved and that announcement is what clears this line. Both
+        // endings of the search come through here: the first version wrote the ceiling and
+        // returned, and the caller's generation wiped it before anybody read it.
+        // Both of these go on after the generation, never before: the generation announces that
+        // the settings moved, and that announcement clears them both.
+        RegenerateIfReady();
+        _beforeFloor = undo;
+        FloorSearchNoticeText = sentence;
+    }
+
+    private FloorFound SearchRandomFloor(int floor)
+    {
+        var classes = BuildCharsetClasses();
+        if (classes.Count == 0)
+        {
+            return new FloorFound(false, 0, null);
+        }
+
+        var ceiling = 0.0;
+        for (var candidate = Math.Max(Length, 1); candidate <= MaximumLength; candidate++)
+        {
+            var bits = GuaranteedRandomBits(classes, candidate);
+            ceiling = Math.Max(ceiling, bits);
+            if (bits < floor)
+            {
+                continue;
+            }
+
+            if (candidate == Length)
+            {
+                return new FloorFound(true, ceiling, null);
+            }
+
+            var chosen = candidate;
+            return new FloorFound(true, ceiling, () =>
+            {
+                Length = chosen;
+                return string.Format(
+                    L("ToolPwdGenFloorSetLength"),
+                    chosen.ToString(CultureInfo.InvariantCulture),
+                    floor.ToString(CultureInfo.InvariantCulture));
+            });
+        }
+
+        return new FloorFound(false, ceiling, null);
+    }
+
+    private FloorFound SearchSyllableFloor(int floor)
+    {
+        var ceiling = 0.0;
+        for (var length = SyllableLength; length <= MaximumSyllableLength; length += SyllableLengthStep)
+        {
+            var room = (MaximumSyllableExtras - SyllableDigits) + (MaximumSyllableExtras - SyllableSpecials);
+            for (var added = 0; added <= Math.Max(room, 0); added++)
+            {
+                for (var moreDigits = 0; moreDigits <= added; moreDigits++)
+                {
+                    var digits = SyllableDigits + moreDigits;
+                    var specials = SyllableSpecials + (added - moreDigits);
+                    if (digits > MaximumSyllableExtras || specials > MaximumSyllableExtras)
+                    {
+                        continue;
+                    }
+
+                    var bits = GuaranteedSyllableBits(length, digits, specials);
+                    ceiling = Math.Max(ceiling, bits);
+                    if (bits < floor)
+                    {
+                        continue;
+                    }
+
+                    if (length == SyllableLength && digits == SyllableDigits && specials == SyllableSpecials)
+                    {
+                        return new FloorFound(true, ceiling, null);
+                    }
+
+                    var (l, d, s) = (length, digits, specials);
+                    return new FloorFound(true, ceiling, () =>
+                    {
+                        SyllableLength = l;
+                        SyllableDigits = d;
+                        SyllableSpecials = s;
+                        return string.Format(
+                            L("ToolPwdGenFloorSetSyllable"),
+                            l.ToString(CultureInfo.InvariantCulture),
+                            d.ToString(CultureInfo.InvariantCulture),
+                            s.ToString(CultureInfo.InvariantCulture),
+                            floor.ToString(CultureInfo.InvariantCulture));
+                    });
+                }
+            }
+        }
+
+        return new FloorFound(false, ceiling, null);
+    }
+
+    private FloorFound SearchPassphraseFloor(int floor)
+    {
+        var ceiling = 0.0;
+        var room = (MaximumLeetExtras - PassphraseDigits) + (MaximumLeetExtras - PassphraseSpecials);
+
+        // Words before extras, which is the other way round from the syllable search above. A
+        // passphrase is words: reaching a minimum by hanging digits and punctuation off the end
+        // of it takes away the one thing it is for, so every word count is tried before the first
+        // extra character is.
+        for (var added = 0; added <= Math.Max(room, 0); added++)
+        {
+            for (var words = PassphraseWordCount; words <= MaximumPassphraseWordCount; words++)
+            {
+                for (var moreDigits = 0; moreDigits <= added; moreDigits++)
+                {
+                    var digits = PassphraseDigits + moreDigits;
+                    var specials = PassphraseSpecials + (added - moreDigits);
+                    if (digits > MaximumLeetExtras || specials > MaximumLeetExtras)
+                    {
+                        continue;
+                    }
+
+                    var bits = GuaranteedPassphraseBits(words, digits, specials);
+                    ceiling = Math.Max(ceiling, bits);
+                    if (bits < floor)
+                    {
+                        continue;
+                    }
+
+                    if (words == PassphraseWordCount
+                        && digits == PassphraseDigits
+                        && specials == PassphraseSpecials)
+                    {
+                        return new FloorFound(true, ceiling, null);
+                    }
+
+                    var (w, d, s) = (words, digits, specials);
+                    return new FloorFound(true, ceiling, () =>
+                    {
+                        PassphraseWordCount = w;
+                        PassphraseDigits = d;
+                        PassphraseSpecials = s;
+                        return string.Format(
+                            L("ToolPwdGenFloorSetPassphrase"),
+                            w.ToString(CultureInfo.InvariantCulture),
+                            d.ToString(CultureInfo.InvariantCulture),
+                            s.ToString(CultureInfo.InvariantCulture),
+                            floor.ToString(CultureInfo.InvariantCulture));
+                    });
+                }
+            }
+        }
+
+        return new FloorFound(false, ceiling, null);
+    }
+
+    private FloorFound SearchLeetFloor(int floor)
+    {
+        var ceiling = 0.0;
+        var room = (MaximumLeetExtras - LeetDigits) + (MaximumLeetExtras - LeetSpecials);
+        for (var added = 0; added <= Math.Max(room, 0); added++)
+        {
+            for (var moreDigits = 0; moreDigits <= added; moreDigits++)
+            {
+                var digits = LeetDigits + moreDigits;
+                var specials = LeetSpecials + (added - moreDigits);
+                if (digits > MaximumLeetExtras || specials > MaximumLeetExtras)
+                {
+                    continue;
+                }
+
+                var bits = GuaranteedLeetBits(digits, specials);
+                ceiling = Math.Max(ceiling, bits);
+                if (bits < floor)
+                {
+                    continue;
+                }
+
+                if (digits == LeetDigits && specials == LeetSpecials)
+                {
+                    return new FloorFound(true, ceiling, null);
+                }
+
+                var (d, s) = (digits, specials);
+                return new FloorFound(true, ceiling, () =>
+                {
+                    LeetDigits = d;
+                    LeetSpecials = s;
+                    return string.Format(
+                        L("ToolPwdGenFloorSetLeet"),
+                        d.ToString(CultureInfo.InvariantCulture),
+                        s.ToString(CultureInfo.InvariantCulture),
+                        floor.ToString(CultureInfo.InvariantCulture));
+                });
+            }
+        }
+
+        return new FloorFound(false, ceiling, null);
     }
 
     private void NoteFloorRaise(string chosen, string used)
@@ -1919,7 +2312,23 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowCaseBlocksAutoSync));
         RegenerateIfReady();
     }
-    partial void OnEntropyFloorIndexChanged(int value) => RegenerateIfReady();
+    /// <summary>
+    /// Asking for a minimum puts the settings where they have to be for it.
+    /// </summary>
+    /// <remarks>
+    /// Only when the operator asks. A preset carries a minimum of its own and writes it with the
+    /// generation held off, and searching from there would throw away the very settings the preset
+    /// was chosen for.
+    /// </remarks>
+    partial void OnEntropyFloorIndexChanged(int value)
+    {
+        if (_isSuspended || !_isInitialized)
+        {
+            return;
+        }
+
+        ApplyFloorToSettings();
+    }
 
     partial void OnCaseBlocksChanged(string value) => RegenerateIfReady();
     partial void OnDigitPositionsChanged(string value) => RegenerateIfReady();
@@ -1954,7 +2363,15 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// </remarks>
     internal event EventHandler? SettingsChanged;
 
-    private void RaiseSettingsChanged() => SettingsChanged?.Invoke(this, EventArgs.Empty);
+    private void RaiseSettingsChanged()
+    {
+        // A control moved by hand makes both of these stale at once: the sentence describes
+        // settings that have since changed, and the way back leads somewhere the operator has
+        // left. What is on screen now is what they want, and it becomes the new starting point.
+        FloorSearchNoticeText = string.Empty;
+        _beforeFloor = null;
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     private void RegenerateIfReady()
     {

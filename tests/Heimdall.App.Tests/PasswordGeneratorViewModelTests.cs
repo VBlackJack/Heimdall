@@ -803,16 +803,27 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         sut.EntropyFloorIndex = 4;
 
-        Assert.Equal(6, sut.Length);
-        Assert.True(sut.EffectiveLength > 6);
-        Assert.NotEmpty(sut.FloorNoticeText);
+        Assert.True(sut.Length > 6);
+        Assert.Equal(sut.Length, sut.EffectiveLength);
+        Assert.NotEmpty(sut.FloorSearchNoticeText);
 
+        // Lowering it lowers the settings, rather than leaving them where the higher one put them.
+        // A search that started from what the last one wrote could only ratchet upwards.
+        sut.EntropyFloorIndex = 1;
+        int atSixty = sut.Length;
+        Assert.True(atSixty < 128, $"the length is {atSixty}");
+
+        sut.EntropyFloorIndex = 4;
+        Assert.True(sut.Length > atSixty);
+
+        // And clearing it puts back exactly what the operator had asked for.
         sut.EntropyFloorIndex = 0;
 
         Assert.Equal(6, sut.Length);
         Assert.Equal(6, sut.EffectiveLength);
         Assert.Equal(6, sut.GeneratedPassword.Length);
         Assert.Empty(sut.FloorNoticeText);
+        Assert.Empty(sut.FloorSearchNoticeText);
     }
 
     /// <summary>
@@ -922,9 +933,9 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         var words = sut.GeneratedPassword.Split('-', StringSplitOptions.RemoveEmptyEntries);
 
         Assert.True(sut.LastEntropyBits >= 80, $"the figure is {sut.LastEntropyBits}");
-        Assert.Equal(2, sut.PassphraseWordCount);
-        Assert.True(sut.EffectivePassphraseWordCount > 2);
-        Assert.Equal(sut.EffectivePassphraseWordCount, words.Length);
+        Assert.True(sut.PassphraseWordCount > 2);
+        Assert.Equal(sut.PassphraseWordCount, sut.EffectivePassphraseWordCount);
+        Assert.Equal(sut.PassphraseWordCount, words.Length);
         Assert.All(words, word => Assert.All(word, character => Assert.True(char.IsLetter(character))));
     }
 
@@ -994,11 +1005,11 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         sut.EntropyFloorIndex = 1;
 
-        Assert.Equal(8, sut.SyllableLength);
-        Assert.True(sut.EffectiveSyllableLength > 8);
-        Assert.Equal(0, sut.EffectiveSyllableLength % 2);
+        Assert.True(sut.SyllableLength > 8);
+        Assert.Equal(0, sut.SyllableLength % 2);
+        Assert.Equal(sut.SyllableLength, sut.EffectiveSyllableLength);
         Assert.True(sut.LastEntropyBits >= 60, $"the figure is {sut.LastEntropyBits}");
-        Assert.Equal(sut.EffectiveSyllableLength, sut.GeneratedPassword.Length);
+        Assert.Equal(sut.SyllableLength, sut.GeneratedPassword.Length);
     }
 
     /// <summary>
@@ -1031,16 +1042,16 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         // allows leave a 60-bit floor short and the specials, worth about 4.9 each, make up the
         // rest. At this floor both end up at the maximum, so minimality is asserted as "one fewer
         // special would have missed" rather than as a number.
-        Assert.Equal(0, sut.LeetDigits);
-        Assert.Equal(0, sut.LeetSpecials);
-        Assert.Equal(6, sut.EffectiveLeetDigits);
-        Assert.True(sut.EffectiveLeetSpecials > 0, "the specials were never reached");
+        Assert.Equal(6, sut.LeetDigits);
+        Assert.Equal(sut.LeetDigits, sut.EffectiveLeetDigits);
+        Assert.True(sut.LeetSpecials > 0, "the specials were never reached");
+        Assert.Equal(sut.LeetSpecials, sut.EffectiveLeetSpecials);
         Assert.True(sut.LastEntropyBits >= 60, $"the figure is {sut.LastEntropyBits}");
 
-        double oneSpecial = sut.LastEntropyBits / sut.EffectiveLeetSpecials;
+        double oneSpecial = sut.LastEntropyBits / sut.LeetSpecials;
         Assert.True(
             sut.LastEntropyBits - oneSpecial < 60,
-            $"{sut.EffectiveLeetSpecials} specials is more than the floor needed");
+            $"{sut.LeetSpecials} specials is more than the minimum needed");
     }
 
     /// <summary>
@@ -1114,17 +1125,20 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
 
         sut.EntropyFloorIndex = 1;
 
-        var digits = sut.EffectiveLeetDigits;
-        var specials = sut.EffectiveLeetSpecials;
+        // Where the minimum put them, once. Asking for the settings to be moved is one act, and
+        // asking for another password is another: a reroll that moved them again would walk the
+        // controls up the screen while nobody touched them.
+        var digits = sut.LeetDigits;
+        var specials = sut.LeetSpecials;
 
         for (var reroll = 0; reroll < 12; reroll++)
         {
             sut.Generate();
 
+            Assert.Equal(digits, sut.LeetDigits);
+            Assert.Equal(specials, sut.LeetSpecials);
             Assert.Equal(digits, sut.EffectiveLeetDigits);
             Assert.Equal(specials, sut.EffectiveLeetSpecials);
-            Assert.Equal(0, sut.LeetDigits);
-            Assert.Equal(0, sut.LeetSpecials);
         }
     }
 
@@ -2643,14 +2657,21 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         sut.EntropyFloorIndex = floorIndex;
 
         Assert.False(sut.FloorOutOfReach);
-        Assert.True(sut.EffectiveLength > 4);
-        Assert.Equal(sut.EffectiveLength, sut.GeneratedPassword.Length);
+
+        // The control says what is being generated. It used to stay at 4 while the generator
+        // quietly worked at another size, so the only honest reading of the page was the password
+        // itself.
+        Assert.True(sut.Length > 4);
+        Assert.Equal(sut.Length, sut.EffectiveLength);
+        Assert.Equal(sut.Length, sut.GeneratedPassword.Length);
         Assert.True(
             sut.LastEntropyBits >= floorBits,
-            $"{sut.EffectiveLength} characters carry {sut.LastEntropyBits} bits, under the {floorBits} asked for");
+            $"{sut.Length} characters carry {sut.LastEntropyBits} bits, under the {floorBits} asked for");
 
-        // And not a character more than the floor needs.
-        Assert.Equal(4, sut.Length);
+        // And not a character more than the minimum needs.
+        Assert.True(
+            sut.Length == 1 || GuaranteedRandomBitsAt(sut, sut.Length - 1) < floorBits,
+            $"{sut.Length - 1} characters would have been enough");
     }
 
     /// <summary>
@@ -3213,6 +3234,229 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         // Nine places asked for, and the character visited more than the first of them.
         Assert.True(seen.Distinct().Count() > 2, string.Join(",", seen));
         Assert.Equal(0, seen[^1]);
+    }
+
+    /// <summary>
+    /// A syllable generator set up the way the tool opens, with both safety options on, which is
+    /// where a minimum is hardest to reach.
+    /// </summary>
+    private PasswordGeneratorViewModel CreateGuardedSyllableVm()
+    {
+        var sut = CreateInitializedVm();
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableSeparator = string.Empty;
+            sut.SyllableLength = 24;
+            sut.SyllableDigits = 2;
+            sut.SyllableSpecials = 1;
+            sut.LayoutSafe = true;
+            sut.CliSafe = true;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        return sut;
+    }
+
+    /// <summary>What a random password of this length guarantees, whatever length is on screen.</summary>
+    private static double GuaranteedRandomBitsAt(PasswordGeneratorViewModel sut, int length)
+    {
+        var classes = typeof(PasswordGeneratorViewModel)
+            .GetMethod("BuildCharsetClasses", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(sut, null)!;
+
+        return (double)typeof(PasswordGeneratorViewModel)
+            .GetMethod("GuaranteedRandomBits", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, [classes, length])!;
+    }
+
+    private static double GuaranteedSyllableBits(PasswordGeneratorViewModel sut, int totalLength)
+        => (double)typeof(PasswordGeneratorViewModel)
+            .GetMethod("GuaranteedSyllableBits", BindingFlags.Instance | BindingFlags.NonPublic, [typeof(int)])!
+            .Invoke(sut, [totalLength])!;
+
+    private static double GuaranteedSyllableBits(
+        PasswordGeneratorViewModel sut, int totalLength, int digits, int specials)
+        => (double)typeof(PasswordGeneratorViewModel)
+            .GetMethod(
+                "GuaranteedSyllableBits",
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                [typeof(int), typeof(int), typeof(int)])!
+            .Invoke(sut, [totalLength, digits, specials])!;
+
+    /// <summary>
+    /// Asking for a minimum puts the settings where they have to be for it.
+    /// </summary>
+    /// <remarks>
+    /// It used to be a question rather than an instruction: the tool worked out whether the
+    /// settings reached the minimum, raised the size it generated at behind the scenes, and left
+    /// the controls saying something else. When even that could not reach it, nothing moved at
+    /// all and the operator was left to find the combination one slider at a time.
+    /// </remarks>
+    [Fact]
+    public void AskingForAMinimum_PutsTheSettingsWhereItNeedsThem()
+    {
+        var sut = CreateGuardedSyllableVm();
+
+        // Out of reach at the length it opens at: this is the case that used to give up.
+        Assert.True(GuaranteedSyllableBits(sut, 24) < 100);
+
+        sut.EntropyFloorIndex = 3;
+        Assert.Equal(100, sut.EntropyFloorBits);
+
+        // The controls now say what is being generated, and what they say reaches the minimum.
+        Assert.True(
+            GuaranteedSyllableBits(sut, sut.SyllableLength) >= 100,
+            $"len={sut.SyllableLength} d={sut.SyllableDigits} s={sut.SyllableSpecials}");
+        Assert.NotEqual(24, sut.SyllableLength);
+        Assert.NotEqual(string.Empty, sut.FloorSearchNoticeText);
+    }
+
+    /// <summary>
+    /// A minimum nothing can reach changes nothing, and says how far these settings do reach.
+    /// </summary>
+    /// <remarks>
+    /// The figure is the point. A refusal that only repeats what was asked for leaves the operator
+    /// to discover by hand that no combination of these controls gets there.
+    /// </remarks>
+    [Fact]
+    public async Task AMinimumOutOfReach_ChangesNothing_AndSaysHowFarItGets()
+    {
+        var sut = await CreateSpeakingVmAsync("en");
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableSeparator = string.Empty;
+            sut.SyllableLength = 24;
+            sut.SyllableDigits = 2;
+            sut.SyllableSpecials = 1;
+            sut.LayoutSafe = true;
+            sut.CliSafe = true;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.EntropyFloorIndex = 4;
+        Assert.Equal(128, sut.EntropyFloorBits);
+
+        Assert.Equal(24, sut.SyllableLength);
+        Assert.Equal(2, sut.SyllableDigits);
+        Assert.Equal(1, sut.SyllableSpecials);
+
+        Assert.Contains("cannot guarantee", sut.FloorSearchNoticeText, StringComparison.OrdinalIgnoreCase);
+
+        // Two figures: what was asked for, and how far these settings actually reach. The second
+        // is the whole point of the sentence, so it is what is asserted, not its neighbours.
+        var figures = System.Text.RegularExpressions.Regex
+            .Matches(sut.FloorSearchNoticeText, "[0-9]+")
+            .Select(match => int.Parse(match.Value, CultureInfo.InvariantCulture))
+            .ToList();
+
+        Assert.Equal(2, figures.Count);
+        Assert.Equal(128, figures[0]);
+        Assert.InRange(figures[1], 60, 127);
+    }
+
+    /// <summary>
+    /// A minimum these settings already reach moves nothing and says nothing.
+    /// </summary>
+    [Fact]
+    public void AMinimumAlreadyMet_MovesNothing()
+    {
+        var sut = CreateGuardedSyllableVm();
+        Assert.True(GuaranteedSyllableBits(sut, 24) >= 60);
+
+        sut.EntropyFloorIndex = 1;
+
+        Assert.Equal(24, sut.SyllableLength);
+        Assert.Equal(2, sut.SyllableDigits);
+        Assert.Equal(1, sut.SyllableSpecials);
+        Assert.Equal(string.Empty, sut.FloorSearchNoticeText);
+    }
+
+    /// <summary>
+    /// Asking what a shape would be worth gives the same answer as putting the tool in it.
+    /// </summary>
+    /// <remarks>
+    /// This is what the search rests on, and it was false: the extras came from the shape being
+    /// asked about while the syllable count came from the shape on screen, so four characters
+    /// added as digits were counted twice, once as digits and once as the syllables they had
+    /// displaced. The search then reported reaching minimums that nothing can reach.
+    /// </remarks>
+    [Theory]
+    [InlineData(32, 6, 6)]
+    [InlineData(32, 0, 0)]
+    [InlineData(24, 4, 3)]
+    [InlineData(18, 6, 0)]
+    public void AskingAboutAShape_AgreesWithBeingInIt(int length, int digits, int specials)
+    {
+        var asking = CreateGuardedSyllableVm();
+        double asked = GuaranteedSyllableBits(asking, length, digits, specials);
+
+        var being = CreateGuardedSyllableVm();
+        being.SuspendRegeneration();
+        try
+        {
+            being.SyllableLength = length;
+            being.SyllableDigits = digits;
+            being.SyllableSpecials = specials;
+        }
+        finally
+        {
+            being.ResumeRegeneration();
+        }
+
+        Assert.Equal(GuaranteedSyllableBits(being, length), asked, 6);
+    }
+
+    /// <summary>
+    /// A preset that carries a minimum keeps its own settings.
+    /// </summary>
+    /// <remarks>
+    /// The preset's minimum is written along with everything else it holds. Searching from there
+    /// would throw away the very settings the preset was chosen for, and the result would depend
+    /// on which of the two was written last.
+    /// </remarks>
+    [Fact]
+    public void APresetCarryingAMinimum_KeepsItsOwnSettings()
+    {
+        var sut = CreateInitializedVm();
+
+        // A preset asking for a hundred bits out of settings that do not reach them. Saving one
+        // from the tool cannot produce this, because the search would have moved those settings
+        // first, which is exactly why a preset saved that way proves nothing here.
+        var preset = new PasswordGeneratorViewModel.PasswordPreset
+        {
+            Name = "asks for more than it carries",
+            Mode = 1,
+            SylLength = 18,
+            SylDigits = 1,
+            SylSpecials = 0,
+            SylSeparator = string.Empty,
+            // Without this the length is read as the syllables alone and the digit is added on
+            // top, which is the migration a preset written before that distinction goes through.
+            SylLengthIncludesExtras = true,
+            LayoutSafe = true,
+            CliSafe = true,
+            EntropyFloor = 3,
+        };
+
+        sut.ApplyPreset(preset);
+
+        Assert.Equal(3, sut.EntropyFloorIndex);
+        Assert.Equal(100, sut.EntropyFloorBits);
+        Assert.True(GuaranteedSyllableBits(sut, sut.SyllableLength) < 100);
+
+        Assert.Equal(18, sut.SyllableLength);
+        Assert.Equal(1, sut.SyllableDigits);
+        Assert.Equal(0, sut.SyllableSpecials);
     }
 
     private static void InvokePrivate(PasswordGeneratorViewModel sut, string methodName, params object[] args)

@@ -6605,5 +6605,10 @@
   "ToolPwdGenBtnDeletePreset": "Delete",
   "ToolPwdGenDeletePresetTooltip": "Delete the saved preset that is selected",
   "ToolPwdGenPresetTooltip": "Pick a preset, or Save to keep the settings you have now",
-  "ToolPwdGenAdvancedTooltip": "Open the advanced options"
+  "ToolPwdGenAdvancedTooltip": "Open the advanced options",
+  "ToolPwdGenFloorSetLength": "Length set to {0} to guarantee {1} bits.",
+  "ToolPwdGenFloorSetSyllable": "Set to {0} characters with {1} digits and {2} specials, to guarantee {3} bits.",
+  "ToolPwdGenFloorSetPassphrase": "Set to {0} words with {1} digits and {2} specials, to guarantee {3} bits.",
+  "ToolPwdGenFloorSetLeet": "Set to {0} digits and {1} specials, to guarantee {2} bits.",
+  "ToolPwdGenFloorCeiling": "These settings cannot guarantee {0} bits. The most they can reach is {1}, so nothing was changed."
 }

@@ -14,6 +14,30 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Asking for a minimum strength now sets the generator to reach it
+
+- **Minimum strength was a question, and is now an instruction.** It used to work out whether the
+  settings reached the minimum, generate at a bigger size behind the scenes, and leave the
+  controls saying something else. When even the biggest size could not reach it, nothing moved at
+  all and you were left to find the combination one slider at a time, with nothing to say which
+  one was in the way. Choosing a minimum now puts the controls where they have to be, in one
+  move, and they say what is being generated.
+- **It can be taken back.** The settings you had are kept, so clearing the minimum puts them back
+  exactly, and lowering it lowers them rather than leaving them where a higher one put them. Move
+  a control yourself and what is on screen becomes the new starting point.
+- **When nothing can reach it, nothing is changed and the line says how far these settings do
+  reach.** A hundred and twenty eight bits cannot be guaranteed by syllables however they are
+  arranged, and being told the ceiling is 118 is the difference between a refusal and an answer.
+- What it will not do: turn on a class of characters you turned off, change the word list, or take
+  away digits you asked for. Those are what the password is made of rather than how much of it
+  there is. A passphrase reaches a minimum by taking more words before it takes any punctuation,
+  because words are what a passphrase is for.
+- **Minimum strength sits with the presets** at the top of the tool, because it has become the
+  same kind of thing: a choice that puts the settings somewhere. It was in the middle of the page
+  among the per password controls, where it read as one of them.
+- Rerolling is still not a change of settings. The search runs when you ask for a minimum, once,
+  and twelve passwords in a row leave every control where it was.
+
 ### One row at the top, instead of a band of buttons and a drawer at the foot
 
 - **The presets are one list**, beside the mode, with Save and Delete next to it. They were

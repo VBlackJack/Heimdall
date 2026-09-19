@@ -6605,5 +6605,10 @@
   "ToolPwdGenBtnDeletePreset": "Eliminar",
   "ToolPwdGenDeletePresetTooltip": "Eliminar el preajuste guardado seleccionado",
   "ToolPwdGenPresetTooltip": "Elija un preajuste, o Guardar para conservar los ajustes actuales",
-  "ToolPwdGenAdvancedTooltip": "Abrir las opciones avanzadas"
+  "ToolPwdGenAdvancedTooltip": "Abrir las opciones avanzadas",
+  "ToolPwdGenFloorSetLength": "Longitud ajustada a {0} para garantizar {1} bits.",
+  "ToolPwdGenFloorSetSyllable": "Ajustado a {0} caracteres, {1} dígitos y {2} caracteres especiales, para garantizar {3} bits.",
+  "ToolPwdGenFloorSetPassphrase": "Ajustado a {0} palabras, {1} dígitos y {2} caracteres especiales, para garantizar {3} bits.",
+  "ToolPwdGenFloorSetLeet": "Ajustado a {0} dígitos y {1} caracteres especiales, para garantizar {2} bits.",
+  "ToolPwdGenFloorCeiling": "Estos ajustes no pueden garantizar {0} bits. Su máximo es {1}, así que no se cambió nada."
 }
