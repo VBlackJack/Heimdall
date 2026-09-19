@@ -5687,6 +5687,8 @@
   "PaletteToolCmdLibWith": "Biblioteca de comandos: {0}",
   "ToolDescCMDLIB": "Biblioteca con búsqueda de más de 500 comandos PowerShell y Bash con generación parametrizada",
   "ToolCmdLibTitle": "Biblioteca de comandos",
+  "ToolCmdLibWarnUndeclaredPlaceholders": "Escritos en el comando pero no declarados como parámetros, así que se dejan tal cual: {0}",
+  "ToolCmdLibWarnUnusedParameters": "Declarados como parámetros pero escritos en ninguna parte del comando, así que rellenarlos no cambia nada: {0}",
   "ToolCmdLibSearchPlaceholder": "Buscar comandos...",
   "ToolCmdLibFilterPlatformAll": "Todas las plataformas",
   "ToolCmdLibPlatformWindows": "Windows",

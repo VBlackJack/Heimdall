@@ -15,11 +15,14 @@
  */
 
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Localization;
 using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
 using TwinShell.Core.Models;
 using ActionModel = TwinShell.Core.Models.Action;
 
@@ -31,6 +34,21 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// </summary>
 public partial class CommandActionDialogViewModel : ObservableValidator
 {
+    /// <summary>
+    /// Watches the two parameter lists so the consistency warning stays live while the
+    /// action is being written.
+    /// </summary>
+    /// <remarks>
+    /// It has to be live rather than computed on save: the warning does not block, so a
+    /// dialog that only produced it on Save would close in the same gesture and the
+    /// operator would never read it.
+    /// </remarks>
+    public CommandActionDialogViewModel()
+    {
+        WindowsParameters.CollectionChanged += OnParameterListChanged;
+        LinuxParameters.CollectionChanged += OnParameterListChanged;
+    }
+
     public LocalizationManager? Localizer { get; set; }
 
     public List<string> AvailableCategories { get; set; } = [];
@@ -139,6 +157,35 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     [ObservableProperty]
     private string? _validationError;
 
+    /// <summary>
+    /// What the command pattern and the declared parameters disagree about, or null when
+    /// they agree.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately separate from <see cref="ValidationError"/>, which blocks the save.
+    /// Half of what this reports is a reading of intent rather than a fact - braces are
+    /// ordinary shell punctuation - and a guess must not refuse somebody's work. The other
+    /// half is certain but harmless. Both are worth saying; neither is worth stopping for.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasConsistencyWarning))]
+    private string? _consistencyWarning;
+
+    /// <summary>True when there is something to say about the pattern.</summary>
+    public bool HasConsistencyWarning => !string.IsNullOrEmpty(ConsistencyWarning);
+
+    /// <summary>
+    /// How many times the warning has been recomputed. Exposed for tests only.
+    /// </summary>
+    /// <remarks>
+    /// Unsubscribing a removed parameter changes nothing a caller can see: the recomputed
+    /// text is identical either way, because the entry is gone from the list the check
+    /// reads. Measured - a test written against the text alone passes with the
+    /// unsubscription deleted. The count is the only place the difference shows, so the
+    /// rule is stated against the count.
+    /// </remarks>
+    internal int ConsistencyRecomputeCount { get; private set; }
+
     [ObservableProperty]
     private string? _titleError;
 
@@ -190,8 +237,92 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         }
     }
 
+    partial void OnWindowsPatternChanged(string value) => RefreshConsistencyWarning();
+
+    partial void OnLinuxPatternChanged(string value) => RefreshConsistencyWarning();
+
+    private void OnParameterListChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        foreach (var entry in e.OldItems?.OfType<ParameterEntryVm>() ?? [])
+        {
+            entry.PropertyChanged -= OnParameterEntryChanged;
+        }
+
+        foreach (var entry in e.NewItems?.OfType<ParameterEntryVm>() ?? [])
+        {
+            entry.PropertyChanged += OnParameterEntryChanged;
+        }
+
+        RefreshConsistencyWarning();
+    }
+
+    private void OnParameterEntryChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Only the name decides whether a parameter matches the pattern.
+        if (e.PropertyName == nameof(ParameterEntryVm.Name))
+        {
+            RefreshConsistencyWarning();
+        }
+    }
+
+    /// <summary>
+    /// Recomputes what the patterns and their declared parameters disagree about.
+    /// </summary>
+    /// <remarks>
+    /// Each template is reported on its own, and named when the action carries both, since
+    /// a parameter declared for Linux says nothing about the Windows pattern.
+    /// </remarks>
+    private void RefreshConsistencyWarning()
+    {
+        ConsistencyRecomputeCount++;
+
+        var hasBoth = !string.IsNullOrWhiteSpace(WindowsPattern)
+            && !string.IsNullOrWhiteSpace(LinuxPattern);
+
+        var lines = new List<string>();
+        lines.AddRange(DescribeDrift(
+            WindowsPattern, WindowsParameters, hasBoth ? Localize("ToolCmdLibPlatformWindows") : null));
+        lines.AddRange(DescribeDrift(
+            LinuxPattern, LinuxParameters, hasBoth ? Localize("ToolCmdLibPlatformLinux") : null));
+
+        ConsistencyWarning = lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
+    }
+
+    private IEnumerable<string> DescribeDrift(
+        string pattern, IEnumerable<ParameterEntryVm> parameters, string? platformLabel)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            yield break;
+        }
+
+        var names = parameters.Select(parameter => parameter.Name).ToList();
+
+        var undeclared = CommandPatternQuoting.FindUndeclaredPlaceholders(pattern, names);
+        if (undeclared.Count > 0)
+        {
+            yield return Prefix(platformLabel, string.Format(
+                Localize("ToolCmdLibWarnUndeclaredPlaceholders"), string.Join(", ", undeclared)));
+        }
+
+        var unused = CommandPatternQuoting.FindUnusedParameters(pattern, names)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToList();
+        if (unused.Count > 0)
+        {
+            yield return Prefix(platformLabel, string.Format(
+                Localize("ToolCmdLibWarnUnusedParameters"), string.Join(", ", unused)));
+        }
+    }
+
+    private static string Prefix(string? platformLabel, string message) =>
+        platformLabel is null ? message : $"{platformLabel}: {message}";
+
+    private string Localize(string key) => Localizer?[key] ?? key;
+
     partial void OnPlatformChanged(Platform value)
     {
+        RefreshConsistencyWarning();
         OnPropertyChanged(nameof(ShowWindowsSection));
         OnPropertyChanged(nameof(ShowLinuxSection));
     }

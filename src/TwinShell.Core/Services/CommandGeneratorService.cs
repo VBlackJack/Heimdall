@@ -22,6 +22,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using TwinShell.Core.Constants;
 using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
 using TwinShell.Core.Models;
 
@@ -100,7 +101,9 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform, parameter.Quoting);
 
             // Replace {parameterName} with actual value using StringBuilder
-            var placeholder = $"{{{parameter.Name}}}";
+            // Built by the shared helper rather than spelled out here, so the substitution
+            // and the checks that reason about placeholders cannot drift apart.
+            var placeholder = CommandPatternQuoting.Placeholder(parameter.Name);
             command.Replace(placeholder, escapedValue);
         }
 
