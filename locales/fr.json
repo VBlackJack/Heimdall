@@ -3869,7 +3869,6 @@
   "ToolPwdGenSpecialsUsable": "Parmi ceux-ci, le générateur utilisera : {0}",
   "ToolPwdGenSpecialsNoneUsable": "Aucun de ceux-ci n'est utilisable : un caractère spécial doit être une ponctuation ASCII, tapable sur tout clavier",
   "ToolPwdGenAdvanced": "Avanc\u00e9",
-  "ToolPwdGenQuickPresets": "Pr\u00e9r\u00e9glages rapides :",
   "ToolPwdGenMode": "Mode :",
 
   "ToolBase64Title": "Encodeur / D\u00e9codeur Base64",
@@ -5032,7 +5031,6 @@
   "ToolHelpSSHCONFIG": "G\u00e9n\u00e9rateur de Config SSH\n\nG\u00e9n\u00e8re des fichiers de configuration client SSH.\n\nUtilisation :\nConfigurez les entr\u00e9es h\u00f4te avec nom, utilisateur, port, cl\u00e9 et proxy. Exportez au format ~/.ssh/config.",
   "ToolHelpCRONJOB": "Gestionnaire de T\u00e2ches Cron\n\nG\u00e8re et surveille les t\u00e2ches cron planifi\u00e9es sur les serveurs distants.\n\nUtilisation :\nConnectez-vous \u00e0 un serveur via SSH pour lister, modifier et surveiller les t\u00e2ches cron.",
   "ToolHelpSERVICES": "Tableau de Bord des Services\n\nSurveille le statut des services Windows.\n\nUtilisation :\nVisualisez les services en cours, leur statut et type de d\u00e9marrage. D\u00e9marrez, arr\u00eatez ou red\u00e9marrez les services directement.",
-  "ToolPwdGenPresetRightClickHint": "Cliquer pour appliquer - Clic droit pour supprimer",
   "ToolPwdGenPresetSylEasy": "Facile 18",
   "ToolPwdGenPresetSylBalanced": "\u00c9quilibr\u00e9 24",
   "ToolPwdGenPresetSylStrong": "Fort 30",
@@ -6598,5 +6596,13 @@
   "EmptyStateNoTrustedHostKeys": "Aucune cl\u00e9 d'h\u00f4te approuv\u00e9e",
   "EmptyStateNoTrustedHostKeysHint": "Connectez-vous d'abord \u00e0 un serveur ou importez des entr\u00e9es depuis known_hosts.",
   "HintTrustedHostKeysSearch": "Rechercher des h\u00f4tes approuv\u00e9s",
-  "A11yTrustedHostKeysGrid": "Cl\u00e9s d'h\u00f4tes SSH approuv\u00e9es"
+  "A11yTrustedHostKeysGrid": "Cl\u00e9s d'h\u00f4tes SSH approuv\u00e9es",
+  "ToolPwdGenPresetLabel": "Pr\u00e9r\u00e9glage :",
+  "ToolPwdGenPresetCustom": "Personnalis\u00e9",
+  "ToolPwdGenPresetsBuiltInGroup": "Fournis",
+  "ToolPwdGenPresetsSavedGroup": "Enregistr\u00e9s",
+  "ToolPwdGenBtnDeletePreset": "Supprimer",
+  "ToolPwdGenDeletePresetTooltip": "Supprimer le pr\u00e9r\u00e9glage enregistr\u00e9 s\u00e9lectionn\u00e9",
+  "ToolPwdGenPresetTooltip": "Choisissez un pr\u00e9r\u00e9glage, ou Enregistrer pour conserver les r\u00e9glages actuels",
+  "ToolPwdGenAdvancedTooltip": "Ouvrir les options avanc\u00e9es"
 }

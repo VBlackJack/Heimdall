@@ -3870,7 +3870,6 @@
   "ToolPwdGenSpecialsUsable": "De estos, el generador usará: {0}",
   "ToolPwdGenSpecialsNoneUsable": "Ninguno de estos se puede usar: un carácter especial debe ser puntuación ASCII, escribible en cualquier teclado",
   "ToolPwdGenAdvanced": "Avanzado",
-  "ToolPwdGenQuickPresets": "Preajustes rápidos:",
   "ToolPwdGenMode": "Modo:",
 
   "ToolBase64Title": "Codificador / decodificador Base64",
@@ -5033,7 +5032,6 @@
   "ToolHelpSSHCONFIG": "Generador de configuración SSH\n\nGenera archivos de configuración de cliente SSH.\n\nUso:\nConfigura entradas de host con nombre de host, usuario, puerto, archivo de clave y ajustes de proxy. Exporta al formato ~/.ssh/config.",
   "ToolHelpCRONJOB": "Gestor de tareas cron\n\nGestiona y supervisa tareas cron programadas en servidores remotos.\n\nUso:\nConecta a un servidor por SSH para listar, editar y supervisar tareas cron.",
   "ToolHelpSERVICES": "Panel de estado de servicios\n\nSupervisa el estado de los servicios de Windows con controles de inicio/detención.\n\nUso:\nVe los servicios en ejecución, su estado y el tipo de inicio. Inicia, detén o reinicia servicios directamente.",
-  "ToolPwdGenPresetRightClickHint": "Clic para aplicar - clic derecho para eliminar",
   "ToolPwdGenPresetSylEasy": "Fácil 18",
   "ToolPwdGenPresetSylBalanced": "Equilibrado 24",
   "ToolPwdGenPresetSylStrong": "Fuerte 30",
@@ -6599,5 +6597,13 @@
   "EmptyStateNoTrustedHostKeys": "No hay claves de host de confianza",
   "EmptyStateNoTrustedHostKeysHint": "Conecta primero a un servidor o importa entradas desde known_hosts.",
   "HintTrustedHostKeysSearch": "Buscar hosts de confianza",
-  "A11yTrustedHostKeysGrid": "Claves de host SSH de confianza"
+  "A11yTrustedHostKeysGrid": "Claves de host SSH de confianza",
+  "ToolPwdGenPresetLabel": "Preajuste:",
+  "ToolPwdGenPresetCustom": "Personalizado",
+  "ToolPwdGenPresetsBuiltInGroup": "Incluidos",
+  "ToolPwdGenPresetsSavedGroup": "Guardados",
+  "ToolPwdGenBtnDeletePreset": "Eliminar",
+  "ToolPwdGenDeletePresetTooltip": "Eliminar el preajuste guardado seleccionado",
+  "ToolPwdGenPresetTooltip": "Elija un preajuste, o Guardar para conservar los ajustes actuales",
+  "ToolPwdGenAdvancedTooltip": "Abrir las opciones avanzadas"
 }

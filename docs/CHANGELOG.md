@@ -14,6 +14,21 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### One row at the top, instead of a band of buttons and a drawer at the foot
+
+- **The presets are one list**, beside the mode, with Save and Delete next to it. They were
+  eleven buttons across a band of their own, six of them showing at a time and the other five
+  hidden because they belonged to another mode, with the ones you had saved on a second row
+  underneath.
+- **Deleting a saved preset is a button.** It was a right click, mentioned in the tooltip of the
+  preset it would delete. The button is there whether or not you think to try the right button,
+  and it is greyed out unless what is selected is one of yours.
+- **The advanced options open over the page** from a button at the right of the same row, rather
+  than sitting in an expander at the foot of it. Clicking anywhere else closes them.
+- The list says **Custom** as soon as you move a control, rather than going on naming the preset
+  the settings came from. Asking for another password is not moving a control: a reroll leaves
+  the preset where it is.
+
 ### The character moves while you drag it
 
 - Dragging a cursor no longer draws a new password. The characters the password is already made

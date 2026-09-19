@@ -3870,7 +3870,6 @@
   "ToolPwdGenSpecialsUsable": "Of these, the generator will use: {0}",
   "ToolPwdGenSpecialsNoneUsable": "None of these can be used: a special character has to be ASCII punctuation, typeable on any keyboard",
   "ToolPwdGenAdvanced": "Advanced",
-  "ToolPwdGenQuickPresets": "Quick presets:",
   "ToolPwdGenMode": "Mode:",
 
   "ToolBase64Title": "Base64 Encoder / Decoder",
@@ -5033,7 +5032,6 @@
   "ToolHelpSSHCONFIG": "SSH Config Generator\n\nGenerates SSH client configuration files.\n\nUsage:\nConfigure host entries with hostname, user, port, key file, and proxy settings. Export to ~/.ssh/config format.",
   "ToolHelpCRONJOB": "Cron Job Manager\n\nManages and monitors scheduled cron tasks on remote servers.\n\nUsage:\nConnect to a server via SSH to list, edit, and monitor cron jobs.",
   "ToolHelpSERVICES": "Service Status Dashboard\n\nMonitors Windows service status with start/stop controls.\n\nUsage:\nView running services, their status, and startup type. Start, stop, or restart services directly.",
-  "ToolPwdGenPresetRightClickHint": "Click to apply - Right-click to delete",
   "ToolPwdGenPresetSylEasy": "Easy 18",
   "ToolPwdGenPresetSylBalanced": "Balanced 24",
   "ToolPwdGenPresetSylStrong": "Strong 30",
@@ -6599,5 +6597,13 @@
   "EmptyStateNoTrustedHostKeys": "No trusted host keys",
   "EmptyStateNoTrustedHostKeysHint": "Connect to a server first or import entries from known_hosts.",
   "HintTrustedHostKeysSearch": "Search trusted hosts",
-  "A11yTrustedHostKeysGrid": "Trusted SSH host keys"
+  "A11yTrustedHostKeysGrid": "Trusted SSH host keys",
+  "ToolPwdGenPresetLabel": "Preset:",
+  "ToolPwdGenPresetCustom": "Custom",
+  "ToolPwdGenPresetsBuiltInGroup": "Built in",
+  "ToolPwdGenPresetsSavedGroup": "Saved",
+  "ToolPwdGenBtnDeletePreset": "Delete",
+  "ToolPwdGenDeletePresetTooltip": "Delete the saved preset that is selected",
+  "ToolPwdGenPresetTooltip": "Pick a preset, or Save to keep the settings you have now",
+  "ToolPwdGenAdvancedTooltip": "Open the advanced options"
 }
