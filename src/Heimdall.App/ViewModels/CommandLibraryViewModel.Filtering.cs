@@ -18,6 +18,7 @@ using System.ComponentModel;
 using System.Windows.Data;
 using Heimdall.App.ViewModels.CommandLibrary;
 using TwinShell.Core.Enums;
+using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.ViewModels;
 
@@ -67,8 +68,7 @@ public sealed partial class CommandLibraryViewModel
         if (trimmed.Length == 0)
         {
             _lastSearchTerm = string.Empty;
-            _searchRankedIds = null;
-            _searchMatchIds = null;
+            _searchRanks = null;
             ApplyGroupingForSearch(isSearching: false);
             RefreshActionsView();
             return;
@@ -95,8 +95,7 @@ public sealed partial class CommandLibraryViewModel
             // superseded result is dropped here rather than installed over the newer one.
             if (token.IsCancellationRequested) return;
 
-            _searchRankedIds = ranked.Select(static r => r.Id).ToList();
-            _searchMatchIds = new HashSet<string>(_searchRankedIds, StringComparer.Ordinal);
+            _searchRanks = BuildRanks(ranked);
 
             // Claimed only by the query whose results are actually installed. Assigning
             // this before the await was what made a stale result stick: the next
@@ -110,16 +109,34 @@ public sealed partial class CommandLibraryViewModel
 
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[CommandLibrary] Search failed: {ex.Message}");
-            _searchRankedIds = null;
-            _searchMatchIds = null;
+            _searchRanks = null;
 
             // A failed term is not claimed either, so retyping it retries the search
             // instead of short-circuiting into the unfiltered list.
             _lastSearchTerm = string.Empty;
         }
 
-        ApplyGroupingForSearch(isSearching: _searchMatchIds is not null);
+        ApplyGroupingForSearch(isSearching: _searchRanks is not null);
         RefreshActionsView();
+    }
+
+    /// <summary>
+    /// Turns the search service's ordered results into a rank-by-id lookup.
+    /// </summary>
+    /// <remarks>
+    /// A duplicate id keeps its best (lowest) rank rather than throwing: the ranking
+    /// comes from a service this view model does not own, and a duplicated result is a
+    /// reason to show the action once, not to drop the whole search.
+    /// </remarks>
+    private static Dictionary<string, int> BuildRanks(IReadOnlyList<ActionModel> ranked)
+    {
+        var ranks = new Dictionary<string, int>(ranked.Count, StringComparer.Ordinal);
+        for (var i = 0; i < ranked.Count; i++)
+        {
+            ranks.TryAdd(ranked[i].Id, i);
+        }
+
+        return ranks;
     }
 
     /// <summary>
@@ -203,7 +220,7 @@ public sealed partial class CommandLibraryViewModel
         }
 
         // Search filter (only consider entries the search service ranked)
-        if (_searchMatchIds is not null && !_searchMatchIds.Contains(entry.Source.Id))
+        if (_searchRanks is not null && !_searchRanks.ContainsKey(entry.Source.Id))
         {
             return false;
         }
@@ -235,8 +252,7 @@ public sealed partial class CommandLibraryViewModel
         _searchCts?.Cancel();
         _searchCts?.Dispose();
         _searchCts = null;
-        _searchRankedIds = null;
-        _searchMatchIds = null;
+        _searchRanks = null;
         _lastSearchTerm = string.Empty;
         SearchText = string.Empty;
     }

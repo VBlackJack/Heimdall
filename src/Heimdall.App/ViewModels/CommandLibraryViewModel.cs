@@ -79,8 +79,13 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private HashSet<string> _favoriteIds = new(StringComparer.Ordinal);
     private List<string> _categoryList = new();
 
-    private List<string>? _searchRankedIds;
-    private HashSet<string>? _searchMatchIds;
+    /// <summary>
+    /// Relevance rank per action id for the active search, or null when no search is
+    /// active. One dictionary rather than a ranked list plus a match set: the two were
+    /// always built from the same query and had to be nulled together, and the list cost
+    /// a linear scan on every rank lookup while the view sorts on that rank.
+    /// </summary>
+    private Dictionary<string, int>? _searchRanks;
     private string _lastSearchTerm = string.Empty;
     private CancellationTokenSource? _searchCts;
 
@@ -215,6 +220,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     [NotifyPropertyChangedFor(nameof(IsSendEnabled))]
     [NotifyPropertyChangedFor(nameof(SendTooltip))]
     [NotifyPropertyChangedFor(nameof(ShowCopyHint))]
+    [NotifyPropertyChangedFor(nameof(CopyTooltip))]
     private bool _isCommandValid;
 
     /// <summary>Multi-line validation error text (one bullet per error).</summary>
@@ -365,8 +371,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     {
         get
         {
-            var visible = _actionsView?.Cast<object>().Count() ?? _allEntries.Count;
-            return FormatResultCount(visible);
+            return FormatResultCount(VisibleCount);
         }
     }
 
@@ -375,10 +380,18 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     {
         get
         {
-            var visible = _actionsView?.Cast<object>().Count() ?? _allEntries.Count;
-            return visible == 0 && HasActiveFilters;
+            return VisibleCount == 0 && HasActiveFilters;
         }
     }
+
+    /// <summary>
+    /// Number of entries the filtered view currently renders.
+    /// </summary>
+    /// <remarks>
+    /// <c>ListCollectionView</c> maintains this itself; enumerating the view to count it
+    /// walked every entry, and both callers below run on every filter change.
+    /// </remarks>
+    private int VisibleCount => _actionsView?.Count ?? _allEntries.Count;
 
     /// <summary>True when the "empty library" placeholder should show.</summary>
     public bool IsEmptyStateVisible => _allEntries.Count == 0 || !IsReady;
@@ -393,7 +406,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// True when a non-empty search term is currently filtering the action list.
     /// Used by the view to decide whether to apply ranked-relevance sort.
     /// </summary>
-    public bool HasActiveSearch => _searchMatchIds is not null;
+    public bool HasActiveSearch => _searchRanks is not null;
 
     /// <summary>
     /// The handler invoked when the user clicks "Send" - populated by the
@@ -522,11 +535,30 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     public bool IsLibraryIdle => !IsBusy && !IsSyncing;
 
     /// <summary>
+    /// The negation of <see cref="IsLibraryIdle"/>, for the surfaces that show something
+    /// while work is in flight rather than hiding something.
+    /// </summary>
+    /// <remarks>
+    /// Declared as the negation rather than as its own expression so the progress bar and
+    /// the command gate cannot drift apart: one predicate, read from both directions.
+    /// </remarks>
+    public bool IsOperationRunning => !IsLibraryIdle;
+
+    /// <summary>
+    /// Tooltip for the Copy button. It stays visible while disabled, so it has to say why
+    /// rather than leaving the user with a dead control and no reason.
+    /// </summary>
+    public string CopyTooltip => IsCommandValid
+        ? LocalizeKey("ToolCmdLibBtnCopy")
+        : LocalizeKey("ToolCmdLibSendTooltipInvalid");
+
+    /// <summary>
     /// Re-evaluates every command gated on <see cref="IsLibraryIdle"/>.
     /// </summary>
     private void NotifyLibraryOperationCommands()
     {
         OnPropertyChanged(nameof(IsLibraryIdle));
+        OnPropertyChanged(nameof(IsOperationRunning));
         AddActionCommand.NotifyCanExecuteChanged();
         EditSelectedCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
@@ -1104,9 +1136,8 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// </summary>
     public int GetSearchRank(string actionId)
     {
-        if (_searchRankedIds is null) return int.MaxValue;
-        var idx = _searchRankedIds.IndexOf(actionId);
-        return idx >= 0 ? idx : int.MaxValue;
+        if (_searchRanks is null) return int.MaxValue;
+        return _searchRanks.TryGetValue(actionId, out var rank) ? rank : int.MaxValue;
     }
 
     /// <summary>Resolves a localization key against the injected localizer.</summary>
