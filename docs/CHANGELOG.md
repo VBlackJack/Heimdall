@@ -14,6 +14,35 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The Command Library history remembers what you ran
+
+- **The history shows the command, not the template it came from.** It used to show
+  `tail -f {path}`, braces and all, and its copy button handed that back to you. That was
+  on purpose: the database is a plain file, and writing what you had typed would have left
+  it sitting there in clear. So the safeguard is what changed, not the record. The command
+  and the values you filled in are now encrypted before they are stored, under your master
+  password if you have one and under your Windows account if you do not. Either way the
+  database file is no longer worth reading to someone who takes a copy of it.
+- **A row can be put back in the generator.** One button reselects the action, picks the
+  Windows or Linux version you actually used, and fills the boxes as they were. You are
+  left looking at the command that will run, one click from sending it again.
+- **What it does when the library has moved on.** An action you have since deleted says so
+  rather than leaving a button that does nothing. A field that has been renamed away is
+  dropped and the rest of the row is still restored. A field the row never mentioned keeps
+  its usual default instead of being emptied, because the row records what you set, not
+  what you left alone.
+- **A row it cannot decrypt says so instead of showing an empty line**, and offers neither
+  copy nor replay. The action name and the time are deliberately left unencrypted so that
+  such a row still tells you what ran and when.
+- **Nothing is recorded while your vault is locked.** The history then has a gap, which is
+  the honest outcome: the alternative was to quietly write a lesser row that looks like all
+  the others.
+- **History is kept for ninety days.** Nothing had ever removed an entry, so the table grew
+  for as long as the application had been installed. That mattered little when a row held a
+  template; it matters now that a row holds what you typed.
+- What this does not do: it does not go back and fill in the rows you already have. They
+  keep showing the template they were written with, and they stay readable.
+
 ### An import that cannot be read says so
 
 - **A file that has moved, or that another program is holding open, now gets its own
