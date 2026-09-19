@@ -1471,39 +1471,99 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     public Func<IReadOnlyList<SessionTabViewModel>>? ActiveSessionsProvider { get; set; }
 
     /// <summary>
-    /// The session tabs that currently hold a terminal a command can be written to, in tab order.
+    /// Every terminal pane a command can be written to, in tab order and then in split order.
     /// </summary>
     /// <remarks>
-    /// A tab without a terminal sink - an RDP-only session, or one still connecting - is not a
-    /// target rather than a target that fails. Offering it and then reporting it as a failure
-    /// would put a red line in the summary for something the operator never chose.
+    /// <para>
+    /// The unit is the <b>pane</b>, not the tab. A split tab holds two terminals and they are two
+    /// separate machines as often as not; enumerating tabs and writing to the first sink reached
+    /// the first of them and silently skipped the second, while reporting the tab as delivered.
+    /// It also puts this on the same footing as the terminal broadcast mode, which has resolved
+    /// per pane through <c>BroadcastTargetResolver</c> since it shipped.
+    /// </para>
+    /// <para>
+    /// A pane without a terminal sink - an RDP surface, a file browser, one still connecting - is
+    /// not a target rather than a target that fails. Offering it and then reporting it as a
+    /// failure would put a red line in the summary for something the operator never chose.
+    /// </para>
     /// </remarks>
-    internal IReadOnlyList<SessionTabViewModel> BroadcastCandidates()
+    internal IReadOnlyList<(SessionTabViewModel Session, SessionPaneModel Pane)> BroadcastCandidates()
+        => EnumerateBroadcastPanes(ActiveSessionsProvider?.Invoke());
+
+    /// <summary>
+    /// Pure helper behind <see cref="BroadcastCandidates"/>, so the enumeration can be tested
+    /// without standing up a manager and its ten dependencies.
+    /// </summary>
+    internal static IReadOnlyList<(SessionTabViewModel Session, SessionPaneModel Pane)>
+        EnumerateBroadcastPanes(IReadOnlyList<SessionTabViewModel>? sessions)
     {
-        IReadOnlyList<SessionTabViewModel>? sessions = ActiveSessionsProvider?.Invoke();
         if (sessions is null || sessions.Count == 0)
         {
             return [];
         }
 
-        return [.. sessions.Where(SessionHasTerminalSink)];
+        return
+        [
+            .. from session in sessions
+               from pane in SplitTreeHelper.EnumerateLeaves(session.RootContent)
+               where pane.HostControl is ITerminalCommandSink
+               select (session, pane)
+        ];
     }
 
     /// <summary>
-    /// Resolves broadcast ids against the live tab list, so a tab closed since the list was drawn
-    /// stops resolving instead of resolving to whatever took its place.
+    /// Names a terminal pane for the broadcast list: the tab's title, and the pane's own title
+    /// after it once the tab holds more than one terminal.
+    /// </summary>
+    /// <remarks>
+    /// Two rows reading "web-01" with no way to tell which half of the split each one is would be
+    /// worse than one row that silently dropped a pane, because the operator would believe they
+    /// had chosen.
+    /// </remarks>
+    internal static string DescribeBroadcastPane(
+        SessionTabViewModel session, SessionPaneModel pane, bool sessionIsSplit)
+    {
+        string tabTitle = session.DisplayTitle;
+
+        if (!sessionIsSplit || string.IsNullOrWhiteSpace(pane.Title))
+        {
+            return tabTitle;
+        }
+
+        return string.Equals(tabTitle, pane.Title, StringComparison.Ordinal)
+            ? tabTitle
+            : $"{tabTitle} - {pane.Title}";
+    }
+
+    /// <summary>
+    /// Resolves broadcast ids against the live pane list, so a pane closed since the list was
+    /// drawn stops resolving instead of resolving to whatever took its place.
     /// </summary>
     private sealed class SessionBroadcaster(EmbeddedSessionManager manager, SessionTabViewModel origin)
         : ICommandBroadcaster
     {
-        public IReadOnlyList<CommandBroadcastTarget> GetTargets() =>
-        [
-            .. manager.BroadcastCandidates().Select(session => new CommandBroadcastTarget(
-                session.BroadcastId,
-                session.DisplayTitle,
-                session.ConnectionType,
-                ReferenceEquals(session, origin)))
-        ];
+        public IReadOnlyList<CommandBroadcastTarget> GetTargets()
+        {
+            var candidates = manager.BroadcastCandidates();
+
+            // "Split" here means more than one TERMINAL in the tab, not more than one pane: a
+            // terminal beside a file browser needs no disambiguating suffix.
+            var terminalsPerSession = candidates
+                .GroupBy(candidate => candidate.Session)
+                .ToDictionary(group => group.Key, group => group.Count());
+
+            return
+            [
+                .. candidates.Select(candidate => new CommandBroadcastTarget(
+                    candidate.Pane.PaneId,
+                    DescribeBroadcastPane(
+                        candidate.Session,
+                        candidate.Pane,
+                        terminalsPerSession[candidate.Session] > 1),
+                    candidate.Session.ConnectionType,
+                    ReferenceEquals(candidate.Session, origin)))
+            ];
+        }
 
         public bool Send(string targetId, string command)
         {
@@ -1512,11 +1572,19 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 return false;
             }
 
-            SessionTabViewModel? session = manager.BroadcastCandidates()
+            // Writing to the resolved pane's own sink, not to the first sink in its tab: the two
+            // differ exactly when the tab is split, which is the case this change exists for.
+            var target = manager.BroadcastCandidates()
                 .FirstOrDefault(candidate => string.Equals(
-                    candidate.BroadcastId, targetId, StringComparison.Ordinal));
+                    candidate.Pane.PaneId, targetId, StringComparison.Ordinal));
 
-            return session is not null && manager.TrySendCommandToSession(session, command);
+            if (target.Pane?.HostControl is not ITerminalCommandSink sink)
+            {
+                return false;
+            }
+
+            sink.WriteCommand(command);
+            return true;
         }
     }
 }
