@@ -3812,7 +3812,7 @@
   "ToolPwdGenLayoutSafe": "Compatible con disposición de teclado (AZERTY/QWERTY)",
   "ToolPwdGenEntropyFloor": "Fuerza mínima:",
   "ToolPwdGenEntropyFloorOff": "Sin mínimo",
-  "ToolPwdGenIssueFloorUnreachable": "Estos ajustes no pueden garantizar {0} bits, ni siquiera al máximo; no se cambió nada",
+  "ToolPwdGenIssueFloorUnreachable": "Estos ajustes no pueden garantizar {0} bits. Su máximo es {1}, así que no se cambió nada",
   "ToolPwdGenClassesNotPromised": "Esta contraseña es un sorteo corriente: la longitud no puede llevar uno de cada tipo marcado.",
   "ToolPwdGenSavedPresets": "Ajustes guardados",
   "ToolPwdGenSavedPresetsElsewhere": "{0} más guardados en otros modos.",
@@ -6605,5 +6605,9 @@
   "ToolPwdGenBtnDeletePreset": "Eliminar",
   "ToolPwdGenDeletePresetTooltip": "Eliminar el preajuste guardado seleccionado",
   "ToolPwdGenPresetTooltip": "Elija un preajuste, o Guardar para conservar los ajustes actuales",
-  "ToolPwdGenAdvancedTooltip": "Abrir las opciones avanzadas"
+  "ToolPwdGenAdvancedTooltip": "Abrir las opciones avanzadas",
+  "ToolPwdGenFloorSetLength": "Longitud ajustada a {0} para garantizar {1} bits.",
+  "ToolPwdGenFloorSetSyllable": "Ajustado a {0} caracteres, {1} dígitos y {2} caracteres especiales, para garantizar {3} bits.",
+  "ToolPwdGenFloorSetPassphrase": "Ajustado a {0} palabras, {1} dígitos y {2} caracteres especiales, para garantizar {3} bits.",
+  "ToolPwdGenFloorSetLeet": "Ajustado a {0} dígitos y {1} caracteres especiales, para garantizar {2} bits."
 }

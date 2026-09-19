@@ -3811,7 +3811,7 @@
   "ToolPwdGenLayoutSafe": "Layout-safe (compatible AZERTY/QWERTY)",
   "ToolPwdGenEntropyFloor": "Force minimale :",
   "ToolPwdGenEntropyFloorOff": "Aucun minimum",
-  "ToolPwdGenIssueFloorUnreachable": "Ces réglages ne peuvent pas garantir {0} bits, même au maximum ; rien n'a été modifié",
+  "ToolPwdGenIssueFloorUnreachable": "Ces r\u00e9glages ne peuvent pas garantir {0} bits. Leur maximum est {1}, donc rien n'a \u00e9t\u00e9 chang\u00e9",
   "ToolPwdGenClassesNotPromised": "Ce mot de passe est un tirage ordinaire : la longueur ne peut pas porter un caract\u00e8re de chaque sorte coch\u00e9e.",
   "ToolPwdGenSavedPresets": "Préréglages enregistrés",
   "ToolPwdGenSavedPresetsElsewhere": "{0} autre(s) enregistré(s) dans d'autres modes.",
@@ -6604,5 +6604,9 @@
   "ToolPwdGenBtnDeletePreset": "Supprimer",
   "ToolPwdGenDeletePresetTooltip": "Supprimer le pr\u00e9r\u00e9glage enregistr\u00e9 s\u00e9lectionn\u00e9",
   "ToolPwdGenPresetTooltip": "Choisissez un pr\u00e9r\u00e9glage, ou Enregistrer pour conserver les r\u00e9glages actuels",
-  "ToolPwdGenAdvancedTooltip": "Ouvrir les options avanc\u00e9es"
+  "ToolPwdGenAdvancedTooltip": "Ouvrir les options avanc\u00e9es",
+  "ToolPwdGenFloorSetLength": "Longueur port\u00e9e \u00e0 {0} pour garantir {1} bits.",
+  "ToolPwdGenFloorSetSyllable": "R\u00e9gl\u00e9 sur {0} caract\u00e8res, {1} chiffres et {2} caract\u00e8res sp\u00e9ciaux, pour garantir {3} bits.",
+  "ToolPwdGenFloorSetPassphrase": "R\u00e9gl\u00e9 sur {0} mots, {1} chiffres et {2} caract\u00e8res sp\u00e9ciaux, pour garantir {3} bits.",
+  "ToolPwdGenFloorSetLeet": "R\u00e9gl\u00e9 sur {0} chiffres et {1} caract\u00e8res sp\u00e9ciaux, pour garantir {2} bits."
 }
