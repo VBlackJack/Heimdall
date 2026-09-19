@@ -12,6 +12,64 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### The Command Library keeps the filters you set
+
+- **Platform and Risk no longer empty themselves.** Adding, editing or deleting an action,
+  importing a file, or running a Git sync reloads the library, and the reload was rebuilding
+  those two dropdowns from scratch. They came back blank and their filters came back off, so a
+  list you had narrowed to Linux quietly went back to showing everything. Category was already
+  spared, because it alone put its selection back. All three now do.
+- What it will not do: remember a filter between sessions. Opening the tool still starts from
+  the platform your connection implies, and from All everywhere else.
+
+### Copying an example says so
+
+- **The copy button on an example row now flashes like every other copy button in the tool.** It
+  copied correctly and said nothing, which is indistinguishable from not having worked. It is the
+  Copy button below the command that flashes, because that is where the text has been staged and
+  it is on screen whenever an example is.
+
+### A command library row tells a screen reader what it is
+
+- **Each action in the list now announces its title, its risk and its platform.** The three were
+  painted into the row as text a sighted user reads at a glance, but none of it reached a screen
+  reader, which was left reading out an internal type name. The risk word is spoken before the
+  user acts on the row rather than after.
+- The description is left out of what is spoken: for most actions it restates the title, and
+  including it would push the risk word to the end of a long sentence.
+
+### An imported action with an unreadable risk now reads as dangerous
+
+- **The library and the confirmation prompt no longer disagree about the same action.** Sending a
+  command asks you to confirm anything at or above Dangerous, including a risk level outside the
+  three Heimdall defines, which an import file can carry. The list drew that same action with no
+  badge and in the colour it uses for informational commands. It now reads as dangerous on both
+  sides, and an import that carries such a value is brought back to Dangerous as it is read.
+- What this is not: a check on what a command does. A file you import is still a file you chose
+  to trust, and the export warning about secrets in free text is unchanged.
+
+### Search results match the search you are looking at
+
+- **A slow query can no longer overwrite a newer one.** Typing quickly could leave two searches
+  running at once, and if the earlier one finished last its results were the ones displayed,
+  under the newer term. Retyping that term did not help, because the tool believed it was already
+  showing it. A result that has been overtaken is now dropped, and a search that fails is not
+  remembered as done.
+
+### One library operation at a time
+
+- **Add, edit, delete, import, export and Git sync now wait for each other.** They shared a single
+  busy indicator, so starting a second one while the first was working cleared the indicator early
+  and let two imports merge into the same library at once. The buttons are disabled while an
+  operation runs.
+
+### Fixed
+
+- The command picker used when linking a post-connect step to a library action could fail while
+  loading its list, because it finished that load off the interface thread.
+
 ## 2026-09-19: the password generator, finished by hand (v2026.091901)
 
 ### Asking for a minimum strength now sets the generator to reach it
