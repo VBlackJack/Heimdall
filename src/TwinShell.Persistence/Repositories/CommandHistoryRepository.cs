@@ -30,18 +30,23 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
 {
     private readonly TwinShellDbContext _context;
     private readonly ILogger<CommandHistoryRepository> _logger;
+    private readonly ISecretProtector _protector;
 
-    public CommandHistoryRepository(TwinShellDbContext context, ILogger<CommandHistoryRepository> logger)
+    public CommandHistoryRepository(
+        TwinShellDbContext context,
+        ILogger<CommandHistoryRepository> logger,
+        ISecretProtector protector)
     {
         _context = context;
         _logger = logger;
+        _protector = protector;
     }
 
     public async Task AddAsync(CommandHistory history)
     {
         try
         {
-            var entity = CommandHistoryMapper.ToEntity(history);
+            var entity = CommandHistoryMapper.ToEntity(history, _protector);
             _context.CommandHistories.Add(entity);
             await _context.SaveChangesAsync();
         }
@@ -59,7 +64,7 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
     {
         try
         {
-            var entities = histories.Select(CommandHistoryMapper.ToEntity);
+            var entities = histories.Select(history => CommandHistoryMapper.ToEntity(history, _protector));
             _context.CommandHistories.AddRange(entities);
             await _context.SaveChangesAsync();
         }
@@ -74,7 +79,7 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
     {
         try
         {
-            var entity = CommandHistoryMapper.ToEntity(history);
+            var entity = CommandHistoryMapper.ToEntity(history, _protector);
             _context.CommandHistories.Update(entity);
             await _context.SaveChangesAsync();
         }
@@ -95,7 +100,7 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
             .Take(count)
             .ToListAsync();
 
-        return entities.Select(CommandHistoryMapper.ToModel);
+        return entities.Select(entity => CommandHistoryMapper.ToModel(entity, _protector));
     }
 
     public async Task<IEnumerable<CommandHistory>> SearchAsync(
@@ -146,7 +151,7 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
             .OrderByDescending(h => h.CreatedAt)
             .ToListAsync();
 
-        return entities.Select(CommandHistoryMapper.ToModel);
+        return entities.Select(entity => CommandHistoryMapper.ToModel(entity, _protector));
     }
 
     public async Task<CommandHistory?> GetByIdAsync(string id)
@@ -157,7 +162,7 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
             .Include(h => h.Action)
             .FirstOrDefaultAsync(h => h.Id == id);
 
-        return entity != null ? CommandHistoryMapper.ToModel(entity) : null;
+        return entity != null ? CommandHistoryMapper.ToModel(entity, _protector) : null;
     }
 
     public async Task DeleteAsync(string id)

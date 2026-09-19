@@ -18,6 +18,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.ViewModels.CommandLibrary;
+using Heimdall.Core.Security.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
 using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
@@ -113,11 +114,23 @@ public sealed partial class CommandLibraryViewModel
     /// failures are logged but never surfaced to the user.
     /// </summary>
     /// <remarks>
-    /// The history insert runs on a worker thread so the Copy/Send hot path
-    /// stays snappy. A new DI scope is created inside the <see cref="Task.Run"/>
-    /// closure to avoid sharing a <c>DbContext</c> with the UI thread. The
-    /// payload is built by <see cref="BuildSecretFreeHistoryPayload"/> so that
-    /// user-entered parameter values never reach the unencrypted history store.
+    /// <para>
+    /// The history insert runs on a worker thread so the Copy/Send hot path stays snappy.
+    /// A new DI scope is created inside the <see cref="Task.Run"/> closure to avoid
+    /// sharing a <c>DbContext</c> with the UI thread.
+    /// </para>
+    /// <para>
+    /// The command and the parameter values are what the user typed, and they are now
+    /// recorded as they are. They do not reach the database in clear: the persistence
+    /// layer seals both fields (see <c>HistorySecretEnvelope</c>). This replaces a payload
+    /// that stored the un-substituted pattern and dropped every value, which kept the
+    /// database safe by making the history unable to say what had been run.
+    /// </para>
+    /// <para>
+    /// The payload is captured here, on the UI thread, before the worker starts: the
+    /// parameter entries are observable and the user is free to keep editing them the
+    /// instant Copy returns.
+    /// </para>
     /// </remarks>
     private void RecordHistory()
     {
@@ -125,7 +138,14 @@ public sealed partial class CommandLibraryViewModel
         var template = _activeTemplate;
         if (action is null || template is null) return;
 
-        var (command, parameters) = BuildSecretFreeHistoryPayload(template);
+        var command = GeneratedCommand;
+        if (string.IsNullOrEmpty(command)) return;
+
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var parameter in _parameters)
+        {
+            parameters[parameter.Name] = parameter.Value;
+        }
 
         _ = Task.Run(async () =>
         {
@@ -137,24 +157,20 @@ public sealed partial class CommandLibraryViewModel
                     action.Id, command, parameters,
                     template.Platform, action.Title, action.Category);
             }
+            catch (VaultLockedException)
+            {
+                // Nothing is written while the vault is locked. Recording the secret-free
+                // payload instead would put two fidelities in one list with nothing to
+                // tell them apart, and writing the real one is what the vault forbids.
+                // A gap the user can explain beats a row that quietly means less.
+                Heimdall.Core.Logging.FileLogger.Info(
+                    "[CommandLibrary] History not recorded: the vault is locked.");
+            }
             catch (Exception ex)
             {
                 Heimdall.Core.Logging.FileLogger.Warn(
                     $"[CommandLibrary] Failed to record history: {ex.Message}");
             }
         });
-    }
-
-    /// <summary>
-    /// Builds the history payload for the active selection. The un-substituted
-    /// template pattern is stored and parameter values are intentionally dropped,
-    /// so user-entered secrets never reach the unencrypted history store
-    /// (<c>twinshell.db</c>). The entry still records which action ran and when.
-    /// </summary>
-    internal static (string Command, Dictionary<string, string> Parameters) BuildSecretFreeHistoryPayload(
-        CommandTemplate template)
-    {
-        ArgumentNullException.ThrowIfNull(template);
-        return (template.CommandPattern, new Dictionary<string, string>(StringComparer.Ordinal));
     }
 }

@@ -29,6 +29,7 @@ using TwinShell.Infrastructure.Services;
 using TwinShell.Persistence;
 using TwinShell.Persistence.Repositories;
 using TwinShell.Persistence.Schema;
+using TwinShell.Persistence.Security;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.Services;
@@ -67,6 +68,11 @@ internal static class TwinShellBootstrapper
         services.AddMemoryCache();
 
         // Repositories
+        // Stateless and holds no per-request state, so it is shared rather than rebuilt
+        // per scope. It is what keeps the two command-history fields that can carry what
+        // the user typed out of the plain SQLite file.
+        services.AddSingleton<ISecretProtector, CredentialProtectorAdapter>();
+
         services.AddScoped<IActionRepository, ActionRepository>();
         services.AddScoped<ICommandHistoryRepository, CommandHistoryRepository>();
         services.AddScoped<IFavoritesRepository, FavoritesRepository>();
