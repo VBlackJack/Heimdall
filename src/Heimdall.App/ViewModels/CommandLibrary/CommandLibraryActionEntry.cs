@@ -15,6 +15,7 @@
  */
 
 using CommunityToolkit.Mvvm.ComponentModel;
+using Heimdall.App.ViewModels;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.ViewModels.CommandLibrary;
@@ -30,7 +31,7 @@ namespace Heimdall.App.ViewModels.CommandLibrary;
 /// re-evaluates getters; the type only inherits <see cref="ObservableObject"/>
 /// to make Phase B's binding migration trivial.
 /// </remarks>
-public sealed partial class CommandLibraryActionEntry : ObservableObject
+public sealed partial class CommandLibraryActionEntry : ObservableObject, IAccessibleItemViewModel
 {
     private readonly CommandLibraryViewModel _viewModel;
 
@@ -102,4 +103,46 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject
     /// </summary>
     public string RiskBadge =>
         CommandPresentationResolver.ResolveRiskBadge(Source.Level, _viewModel.LocalizeKey);
+
+    /// <summary>
+    /// Identity announced by a screen reader for this row: title, then the two badges.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The row's data template paints the risk and platform badges into <c>TextBlock</c>s
+    /// inside a <c>Border</c> and a <c>DockPanel</c>. None of those has an automation
+    /// peer that contributes to the container's name, so a sighted user reads three
+    /// things and a screen-reader user heard the bound entry's class name. Both badges
+    /// belong in the spoken name because they are what tells the user, before they act,
+    /// whether the command is destructive and whether it applies to their host.
+    /// </para>
+    /// <para>
+    /// The description is deliberately left out: it repeats the title for most seeded
+    /// actions and would bury the risk word at the end of a long utterance.
+    /// </para>
+    /// </remarks>
+    public string AccessibleName
+    {
+        get
+        {
+            var parts = new List<string>(3) { Title };
+
+            var risk = RiskLabel;
+            if (!string.IsNullOrWhiteSpace(risk))
+            {
+                parts.Add(risk);
+            }
+
+            var platform = PlatformLabel;
+            if (!string.IsNullOrWhiteSpace(platform))
+            {
+                parts.Add(platform);
+            }
+
+            return string.Join(", ", parts);
+        }
+    }
+
+    /// <inheritdoc/>
+    public string? AccessibleHelpText => null;
 }
