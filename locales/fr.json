@@ -5759,6 +5759,7 @@
   "ToolCmdLibBtnDelete": "Supprimer",
   "ToolCmdLibBtnHistory": "Historique",
   "ToolCmdLibFilterFavorites": "Favoris",
+  "ToolCmdLibHistoryLocked": "Verrouill\u00e9 - d\u00e9verrouillez le coffre pour voir cette commande",
   "ToolCmdLibHistoryTitle": "Historique des commandes",
   "ToolCmdLibHistoryEmpty": "Aucune commande dans l'historique.",
   "ToolCmdLibHistoryClear": "Effacer l'historique",

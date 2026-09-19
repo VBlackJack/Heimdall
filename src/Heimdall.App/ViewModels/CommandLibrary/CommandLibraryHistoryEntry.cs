@@ -31,4 +31,20 @@ public sealed class CommandLibraryHistoryEntry
 
     /// <summary>Pre-formatted local timestamp string ("g" pattern).</summary>
     public string Timestamp { get; init; } = string.Empty;
+
+    /// <summary>
+    /// False when the stored command could not be opened, for instance because the
+    /// master-password vault that sealed it is locked. <see cref="GeneratedCommand"/> is
+    /// then empty and the row must not offer to copy it.
+    /// </summary>
+    /// <remarks>
+    /// Carried rather than inferred from an empty command: the two are different facts,
+    /// and a row that says "this cannot be shown" is honest where a blank line is just
+    /// confusing. The title and the timestamp stay in clear precisely so such a row still
+    /// tells the user what ran and when.
+    /// </remarks>
+    public bool IsReadable { get; init; } = true;
+
+    /// <summary>True when this row has a command the user can act on.</summary>
+    public bool IsUnreadable => !IsReadable;
 }

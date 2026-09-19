@@ -64,6 +64,7 @@ public sealed partial class CommandLibraryViewModel
                 {
                     ActionTitle = h.ActionTitle,
                     GeneratedCommand = h.GeneratedCommand,
+                    IsReadable = h.IsReadable,
                     // Explicit CurrentCulture, matching every other formatting site in the
                     // app. Heimdall has no mapping from its own locale to a CultureInfo,
                     // so introducing one here would make this the only surface that

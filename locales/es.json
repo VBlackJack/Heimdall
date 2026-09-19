@@ -5760,6 +5760,7 @@
   "ToolCmdLibBtnDelete": "Eliminar",
   "ToolCmdLibBtnHistory": "Historial",
   "ToolCmdLibFilterFavorites": "Favoritos",
+  "ToolCmdLibHistoryLocked": "Bloqueado: desbloquea la caja fuerte para ver este comando",
   "ToolCmdLibHistoryTitle": "Historial de comandos",
   "ToolCmdLibHistoryEmpty": "No hay comandos en el historial.",
   "ToolCmdLibHistoryClear": "Borrar historial",

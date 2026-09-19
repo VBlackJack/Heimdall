@@ -5760,6 +5760,7 @@
   "ToolCmdLibBtnDelete": "Delete",
   "ToolCmdLibBtnHistory": "History",
   "ToolCmdLibFilterFavorites": "Favorites",
+  "ToolCmdLibHistoryLocked": "Locked - unlock the vault to see this command",
   "ToolCmdLibHistoryTitle": "Command History",
   "ToolCmdLibHistoryEmpty": "No commands in history.",
   "ToolCmdLibHistoryClear": "Clear History",
