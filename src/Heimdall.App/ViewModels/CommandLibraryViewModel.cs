@@ -78,6 +78,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private readonly ObservableCollection<CommandLibraryParameterEntry> _parameters = new();
     private HashSet<string> _favoriteIds = new(StringComparer.Ordinal);
     private List<string> _categoryList = new();
+    private List<string> _tagList = new();
 
     /// <summary>
     /// Relevance rank per action id for the active search, or null when no search is
@@ -155,6 +156,10 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// <summary>0 = All, 1+ = index into <see cref="Categories"/>.</summary>
     [ObservableProperty]
     private int _categoryFilterIndex;
+
+    /// <summary>0 = All, 1+ = index into the loaded tag list.</summary>
+    [ObservableProperty]
+    private int _tagFilterIndex;
 
     /// <summary>0 = All, 1 = Windows, 2 = Linux.</summary>
     [ObservableProperty]
@@ -256,6 +261,15 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     [NotifyPropertyChangedFor(nameof(CanDuplicateSelected))]
     private CommandLibraryActionEntry? _selectedEntry;
 
+    /// <summary>
+    /// The selected action's tags, rendered as one line of hash-prefixed words, or empty
+    /// when it has none.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedTags))]
+    [NotifyPropertyChangedFor(nameof(HasDetailContent))]
+    private string _selectedActionTags = string.Empty;
+
     /// <summary>Notes text for the currently selected action (empty when none).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedNotes))]
@@ -288,6 +302,17 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     /// <summary>Localized items for the Category filter combo.</summary>
     public ObservableCollection<string> CategoryFilterItems { get; } = new();
+
+    /// <summary>
+    /// Items for the Tag filter combo: the "All" sentinel followed by every tag any loaded
+    /// action carries.
+    /// </summary>
+    /// <remarks>
+    /// Tags were already searchable - the relevance search ranks them just after the title -
+    /// but there was no way to ask for one without typing it and getting everything else
+    /// that mentions the word too.
+    /// </remarks>
+    public ObservableCollection<string> TagFilterItems { get; } = new();
 
     /// <summary>Localized items for the Platform filter combo.</summary>
     public ObservableCollection<string> PlatformFilterItems { get; } = new();
@@ -351,6 +376,9 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// <summary>True when the selected action can be edited or deleted.</summary>
     public bool CanEditSelected => IsSelectedActionEditable;
 
+    /// <summary>True when the current selection carries at least one tag.</summary>
+    public bool HasSelectedTags => !string.IsNullOrEmpty(SelectedActionTags);
+
     /// <summary>True when the current selection exposes notes text.</summary>
     public bool HasSelectedNotes => !string.IsNullOrEmpty(SelectedActionNotes);
 
@@ -360,6 +388,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// </summary>
     public bool HasDetailContent
         => HasSelectedNotes
+        || HasSelectedTags
         || SelectedActionExamples.Count > 0
         || SelectedActionLinks.Count > 0;
 
@@ -582,6 +611,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     }
 
     partial void OnCategoryFilterIndexChanged(int value) => RefreshActionsView();
+    partial void OnTagFilterIndexChanged(int value) => RefreshActionsView();
     partial void OnPlatformFilterIndexChanged(int value) => RefreshActionsView();
     partial void OnRiskFilterIndexChanged(int value) => RefreshActionsView();
     partial void OnFavoritesFilterActiveChanged(bool value) => RefreshActionsView();
@@ -686,7 +716,16 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
                 .OrderBy(c => c, StringComparer.Ordinal)
                 .ToList();
 
+            _tagList = actions
+                .SelectMany(a => a.Tags ?? [])
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Select(tag => tag.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
             PopulateCategoryFilterItems();
+            PopulateTagFilterItems();
 
             if (_actionsView is null)
             {
@@ -786,6 +825,27 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
             CategoryFilterItems.Add(cat);
         }
         CategoryFilterIndex = ClampFilterIndex(previous, CategoryFilterItems.Count);
+    }
+
+    /// <summary>
+    /// Rebuilds the tag combo after a load, restoring the selected index.
+    /// </summary>
+    /// <remarks>
+    /// Clamped like the others: the list length follows the data, so a tag that was
+    /// selected and then disappeared from every action falls back to "All" rather than
+    /// leaving the combo pointing past its end.
+    /// </remarks>
+    private void PopulateTagFilterItems()
+    {
+        var previous = TagFilterIndex;
+        TagFilterItems.Clear();
+        TagFilterItems.Add(LocalizeKey("ToolCmdLibFilterTagAll"));
+        foreach (var tag in _tagList)
+        {
+            TagFilterItems.Add(tag);
+        }
+
+        TagFilterIndex = ClampFilterIndex(previous, TagFilterItems.Count);
     }
 
     /// <summary>
@@ -1019,7 +1079,8 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
                 Value = GetInitialParameterValue(p),
                 Required = p.Required,
                 Description = p.Description,
-                Type = p.Type ?? "string"
+                Type = p.Type ?? "string",
+                AllowedValues = p.IsChoice ? [.. p.AllowedValues!] : []
             };
             entry.PropertyChanged += OnParameterValueChanged;
             _parameters.Add(entry);
@@ -1041,6 +1102,14 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         SelectedActionNotes = action is null || string.IsNullOrWhiteSpace(action.Notes)
             ? string.Empty
             : action.Notes!.Trim();
+
+        // Hash-prefixed, the way the notes tool already renders its own tags, so the two
+        // surfaces read alike rather than each inventing a style.
+        var tags = (action?.Tags ?? [])
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => "#" + tag.Trim())
+            .ToList();
+        SelectedActionTags = string.Join("   ", tags);
 
         SelectedActionExamples.Clear();
         if (action is not null)
@@ -1094,6 +1163,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         _generatedFromExample = false;
 
         SelectedActionNotes = string.Empty;
+        SelectedActionTags = string.Empty;
         SelectedActionExamples.Clear();
         SelectedActionLinks.Clear();
         OnPropertyChanged(nameof(HasDetailContent));

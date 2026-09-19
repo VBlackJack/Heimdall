@@ -219,6 +219,24 @@ public sealed partial class CommandLibraryViewModel
             }
         }
 
+        // Tag filter (0 = All, 1..N = index into the loaded tag list). Matched without
+        // regard to case, because a tag is something a person typed twice.
+        if (TagFilterIndex > 0)
+        {
+            var index = TagFilterIndex - 1;
+            if (index >= _tagList.Count)
+            {
+                return false;
+            }
+
+            var wanted = _tagList[index];
+            if (!(entry.Source.Tags ?? []).Any(
+                    tag => string.Equals(tag?.Trim(), wanted, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+        }
+
         // Search filter (only consider entries the search service ranked)
         if (_searchRanks is not null && !_searchRanks.ContainsKey(entry.Source.Id))
         {
@@ -243,6 +261,7 @@ public sealed partial class CommandLibraryViewModel
     public bool HasActiveFilters
         => FavoritesFilterActive
         || CategoryFilterIndex > 0
+        || TagFilterIndex > 0
         || PlatformFilterIndex > 0
         || RiskFilterIndex > 0
         || !string.IsNullOrEmpty(_lastSearchTerm);

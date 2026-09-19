@@ -189,6 +189,19 @@
                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                               VerticalAlignment="Center"/>
                                 </Grid>
+                                <!-- Only for a choice: for every other type there is nothing
+                                     to choose from, and an always-present box would invite
+                                     values that are then ignored. -->
+                                <TextBox Text="{Binding AllowedValues, UpdateSourceTrigger=PropertyChanged}"
+                                         Visibility="{Binding IsChoice, Converter={StaticResource BoolToVisibilityConverter}}"
+                                         Style="{StaticResource WatermarkTextBoxStyle}"
+                                         Tag="{loc:Translate ToolCmdLibDialogParamAllowedValues}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogParamAllowedValues}"
+                                         Margin="0,2,4,0" Padding="4,3"
+                                         FontSize="{StaticResource FontSizeSmallCaption}"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
                                 <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource WatermarkTextBoxStyle}"
                                          Tag="{loc:Translate ToolCmdLibDialogParamDescription}"
@@ -297,6 +310,19 @@
                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                               VerticalAlignment="Center"/>
                                 </Grid>
+                                <!-- Only for a choice: for every other type there is nothing
+                                     to choose from, and an always-present box would invite
+                                     values that are then ignored. -->
+                                <TextBox Text="{Binding AllowedValues, UpdateSourceTrigger=PropertyChanged}"
+                                         Visibility="{Binding IsChoice, Converter={StaticResource BoolToVisibilityConverter}}"
+                                         Style="{StaticResource WatermarkTextBoxStyle}"
+                                         Tag="{loc:Translate ToolCmdLibDialogParamAllowedValues}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogParamAllowedValues}"
+                                         Margin="0,2,4,0" Padding="4,3"
+                                         FontSize="{StaticResource FontSizeSmallCaption}"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
                                 <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource WatermarkTextBoxStyle}"
                                          Tag="{loc:Translate ToolCmdLibDialogParamDescription}"

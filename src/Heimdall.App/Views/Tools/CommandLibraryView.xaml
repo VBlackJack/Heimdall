@@ -203,20 +203,27 @@
                               ToolTip="{loc:Translate ToolCmdLibDialogLblCategory}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblCategory}"
                               TabIndex="1"/>
+                    <ComboBox Width="150" Margin="0,2,8,2"
+                              FontSize="{StaticResource FontSizeBody}"
+                              ItemsSource="{Binding TagFilterItems}"
+                              SelectedIndex="{Binding TagFilterIndex, Mode=TwoWay}"
+                              ToolTip="{loc:Translate ToolCmdLibDialogLblTags}"
+                              AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblTags}"
+                              TabIndex="2"/>
                     <ComboBox Width="130" Margin="0,2,8,2"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding PlatformFilterItems}"
                               SelectedIndex="{Binding PlatformFilterIndex, Mode=TwoWay}"
                               ToolTip="{loc:Translate ToolCmdLibDialogLblPlatform}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblPlatform}"
-                              TabIndex="2"/>
+                              TabIndex="3"/>
                     <ComboBox Width="120" Margin="0,2,0,2"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding RiskFilterItems}"
                               SelectedIndex="{Binding RiskFilterIndex, Mode=TwoWay}"
                               ToolTip="{loc:Translate ToolCmdLibDialogLblRisk}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblRisk}"
-                              TabIndex="3"/>
+                              TabIndex="4"/>
                 </WrapPanel>
             </Grid>
         </Border>
@@ -237,7 +244,7 @@
                   ItemsSource="{Binding ActionsView}"
                   SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
                   AutomationProperties.Name="{loc:Translate ToolCmdLibTitle}"
-                  TabIndex="4">
+                  TabIndex="5">
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <!-- The row's text lives in TextBlocks inside a DockPanel, none of which
@@ -417,7 +424,21 @@
                                                    FontSize="{StaticResource FontSizeBody}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"/>
+                                        <!-- A parameter offering a fixed set gets a list to
+                                             pick from; everything else keeps its box. Both
+                                             are declared and one is collapsed, rather than
+                                             swapped by a template selector, because the two
+                                             bind to the same Value and the panel is small. -->
+                                        <ComboBox ItemsSource="{Binding AllowedValues}"
+                                                  Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  IsEditable="False"
+                                                  SelectedItem="{Binding Value, Mode=TwoWay}"
+                                                  Visibility="{Binding IsChoice, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                  ToolTip="{Binding DisplayTooltip}"
+                                                  AutomationProperties.Name="{Binding DisplayLabel}"
+                                                  FontSize="{StaticResource FontSizeBody}"/>
                                         <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Visibility="{Binding IsFreeText, Converter={StaticResource BoolToVisibilityConverter}}"
                                                  ToolTip="{Binding DisplayTooltip}"
                                                  AutomationProperties.Name="{Binding DisplayLabel}"
                                                  FontSize="{StaticResource FontSizeBody}"
@@ -456,6 +477,15 @@
                                        Visibility="{Binding HasSelectedNotes, Converter={StaticResource BoolToVisibilityConverter}}"
                                        TextWrapping="Wrap"
                                        FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="{StaticResource MarginLabelBottom}"/>
+                            <!-- Here rather than on the list row: that row already carries a
+                                 favourite toggle, a risk badge, a platform label, a title and
+                                 a description, and tags would crowd out the title. -->
+                            <TextBlock Text="{Binding SelectedActionTags}"
+                                       Visibility="{Binding HasSelectedTags, Converter={StaticResource BoolToVisibilityConverter}}"
+                                       TextWrapping="Wrap"
+                                       FontSize="{StaticResource FontSizeSmallCaption}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        Margin="{StaticResource MarginLabelBottom}"/>
                             <ItemsControl ItemsSource="{Binding SelectedActionExamples}">

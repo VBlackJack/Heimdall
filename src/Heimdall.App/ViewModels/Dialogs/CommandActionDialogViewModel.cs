@@ -601,7 +601,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
 public partial class ParameterEntryVm : ObservableObject
 {
     public static readonly string[] AvailableTypes =
-        ["string", "int", "bool", "hostname", "ipaddress", "path"];
+        ["string", "int", "bool", "hostname", "ipaddress", "path", TemplateParameter.ChoiceTypeName];
 
     [ObservableProperty] private string _name = "";
     [ObservableProperty] private string _label = "";
@@ -610,6 +610,24 @@ public partial class ParameterEntryVm : ObservableObject
     [ObservableProperty] private bool _required;
     [ObservableProperty] private string _description = "";
 
+    /// <summary>
+    /// The values a choice offers, as one comma-separated line.
+    /// </summary>
+    /// <remarks>
+    /// Typed rather than managed as a list, the same shape the Tags field already uses in
+    /// this dialog: a second nested editable list would cost more to build and to use than
+    /// the thing it edits.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsChoice))]
+    private string _allowedValues = "";
+
+    /// <summary>True when this row should offer a fixed set of values.</summary>
+    public bool IsChoice =>
+        string.Equals(Type, TemplateParameter.ChoiceTypeName, StringComparison.OrdinalIgnoreCase);
+
+    partial void OnTypeChanged(string value) => OnPropertyChanged(nameof(IsChoice));
+
     public TemplateParameter ToModel() => new()
     {
         Name = Name.Trim(),
@@ -617,8 +635,27 @@ public partial class ParameterEntryVm : ObservableObject
         Type = Type,
         DefaultValue = string.IsNullOrWhiteSpace(DefaultValue) ? null : DefaultValue.Trim(),
         Required = Required,
-        Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim()
+        Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
+        AllowedValues = ParseAllowedValues(AllowedValues)
     };
+
+    /// <summary>
+    /// Splits the typed line into the values a choice offers, or null when there are none.
+    /// </summary>
+    /// <remarks>
+    /// Null rather than an empty list, because <c>TemplateParameter.IsChoice</c> reads it
+    /// to decide whether a fixed set exists at all: a choice with nothing to offer falls
+    /// back to free text rather than refusing every value.
+    /// </remarks>
+    private static List<string>? ParseAllowedValues(string typed)
+    {
+        var values = typed
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return values.Count == 0 ? null : values;
+    }
 
     public static ParameterEntryVm FromModel(TemplateParameter p) => new()
     {
@@ -627,7 +664,8 @@ public partial class ParameterEntryVm : ObservableObject
         Type = p.Type ?? "string",
         DefaultValue = p.DefaultValue ?? "",
         Required = p.Required,
-        Description = p.Description ?? ""
+        Description = p.Description ?? "",
+        AllowedValues = p.AllowedValues is null ? "" : string.Join(", ", p.AllowedValues)
     };
 }
 
