@@ -1027,13 +1027,27 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         // the box rather than the last of a batch nobody asked to see.
         var wanted = Math.Clamp(BatchCount, MinimumBatchCount, MaximumBatchCount);
         var extras = new List<string>(Math.Max(0, wanted - 1));
+        var extraMaterial = new List<PlacementMaterial?>(Math.Max(0, wanted - 1));
         for (var index = 1; index < wanted; index++)
         {
             GenerateForCurrentMode();
             extras.Add(GeneratedPassword);
+            extraMaterial.Add(_currentMaterial);
         }
 
         GenerateForCurrentMode();
+
+        // The batch is rearranged as one or not at all: a bar that moved the digit in the password
+        // on display and left the nineteen below it alone would be showing two different rules at
+        // once.
+        _batchMaterial.Clear();
+        _materialPassword = null;
+        if (_currentMaterial is not null && extraMaterial.TrueForAll(material => material is not null))
+        {
+            _batchMaterial.Add(_currentMaterial);
+            _batchMaterial.AddRange(extraMaterial.Select(material => material!));
+            _materialPassword = GeneratedPassword;
+        }
 
         GeneratedBatch.Clear();
         GeneratedBatch.Add(GeneratedPassword);
@@ -1064,6 +1078,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
     private void GenerateForCurrentMode()
     {
+        _currentMaterial = null;
+
         switch (CurrentMode)
         {
             case GeneratorMode.Random:
@@ -1529,6 +1545,144 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         {
             SpecialPositions = text;
         }
+    }
+
+    /// <summary>
+    /// What one password was made of, kept apart so the same characters can be put back together
+    /// in a different order.
+    /// </summary>
+    private sealed record PlacementMaterial(string Drawn, string Digits, string Specials);
+
+    /// <summary>The material behind each password on display, in the order the batch shows them.</summary>
+    private readonly List<PlacementMaterial> _batchMaterial = [];
+
+    /// <summary>The material of the generation running right now, or null if it kept none.</summary>
+    private PlacementMaterial? _currentMaterial;
+
+    /// <summary>
+    /// The password the material last put on the screen, which is how the material is known to
+    /// still describe what is there.
+    /// </summary>
+    private string? _materialPassword;
+
+    /// <summary>
+    /// Moves one character to another place in the passwords on display, using the characters they
+    /// already have rather than drawing new ones.
+    /// </summary>
+    /// <remarks>
+    /// <para>Writing a position regenerates, so the only way to see what moving a cursor did was
+    /// to compare two passwords that had nothing in common but their shape. What makes the bar
+    /// readable is the opposite: one character travels while every other one holds still, and it
+    /// does so under the mouse rather than after it.</para>
+    /// <para>The material is checked against the password on display before it is trusted, by
+    /// remembering which password it last produced. Asking the saved positions to rebuild it
+    /// instead looks like the same check and is not: an uncommitted preview is a display that has
+    /// deliberately run ahead of the settings, so that check called the material stale the moment
+    /// the first preview succeeded and the cursor froze one notch along. What makes material
+    /// unusable is the password on screen no longer being the one it made, which is the question
+    /// asked here.</para>
+    /// </remarks>
+    /// <param name="commit">
+    /// Whether the position is written down. A drag previews on every move and commits once, on
+    /// the drop, so what is written is the password that was on screen when the mouse came up.
+    /// </param>
+    /// <returns>False when there is nothing to rearrange, or the material no longer fits.</returns>
+    internal bool TryMoveInPlace(bool digit, int index, double percent, bool commit)
+    {
+        if (_batchMaterial.Count == 0 || _batchMaterial.Count != GeneratedBatch.Count)
+        {
+            return false;
+        }
+
+        var positions = ParsePositions(digit ? DigitPositions : SpecialPositions);
+        if (index < 0 || index >= positions.Length)
+        {
+            return false;
+        }
+
+        if (!string.Equals(_materialPassword, GeneratedPassword, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var currentDigits = ParsePositions(DigitPositions);
+        var currentSpecials = ParsePositions(SpecialPositions);
+
+        positions[index] = ClampPercent(percent);
+        var text = FormatPositions(positions);
+        var rebuilt = _batchMaterial
+            .Select(material => Rearrange(
+                material,
+                digit ? positions : currentDigits,
+                digit ? currentSpecials : positions))
+            .ToList();
+
+        if (commit)
+        {
+            // Both lists are settings, and writing one regenerates. What is wanted here is the
+            // setting written down and the password left as it was shown, so the generation is
+            // held off and the hold lifted without one.
+            _isSuspended = true;
+            try
+            {
+                if (digit)
+                {
+                    DigitPositions = text;
+                }
+                else
+                {
+                    SpecialPositions = text;
+                }
+            }
+            finally
+            {
+                _isSuspended = false;
+            }
+        }
+
+        // Replaced one by one rather than cleared and refilled: this runs on every mouse move of
+        // a drag, and emptying a list of twenty on each of them is what a drag felt like before.
+        for (var row = 0; row < rebuilt.Count; row++)
+        {
+            GeneratedBatch[row] = rebuilt[row];
+        }
+
+        if (BatchRows.Count == rebuilt.Count)
+        {
+            for (var row = 0; row < rebuilt.Count; row++)
+            {
+                BatchRows[row] = MaskBatch
+                    ? new string(MaskCharacter, rebuilt[row].Length)
+                    : rebuilt[row];
+            }
+        }
+        else
+        {
+            RefreshBatchRows();
+        }
+
+        GeneratedPassword = rebuilt[0];
+        _materialPassword = rebuilt[0];
+        UpdatePhoneticDisplay(rebuilt[0]);
+
+        if (commit)
+        {
+            AddToHistory(rebuilt[0]);
+        }
+
+        return true;
+    }
+
+    /// <summary>Puts one password's characters back together at these positions.</summary>
+    private static string Rearrange(
+        PlacementMaterial material,
+        IReadOnlyList<double> digits,
+        IReadOnlyList<double> specials)
+    {
+        var chars = new List<char>(material.Drawn);
+        InsertAtPositions(chars, material.Digits.ToCharArray(), digits);
+        InsertAtPositions(chars, material.Specials.ToCharArray(), specials);
+        return new string(chars.ToArray());
     }
 
     /// <summary>Spreads every cursor out again, which is what the bar's own button does.</summary>
@@ -2294,6 +2448,14 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
 
         if (placement == Placement.Positions)
         {
+            // What the password is made of, kept before any of it is put together, so the cursors
+            // can be dragged afterwards without the generator running again. Only this placement
+            // keeps it: it is the only one with a bar to drag.
+            _currentMaterial = new PlacementMaterial(
+                new string(chars.ToArray()),
+                new string(digits.ToArray()),
+                new string(specials.ToArray()));
+
             // The digits go in first and the specials are then placed on the longer string, which
             // is what a bar showing one row above the other reads as: the second row measures the
             // password the first row has already been written into.

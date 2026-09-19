@@ -3064,6 +3064,157 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
         Assert.Equal(2, sut.CustomPresetCount);
     }
 
+    /// <summary>
+    /// A password whose digits are placed one by one, ready to have one of them dragged.
+    /// </summary>
+    private PasswordGeneratorViewModel CreatePlacedVm()
+    {
+        var sut = CreateInitializedVm();
+        sut.SuspendRegeneration();
+        try
+        {
+            sut.SelectedModeIndex = 1;
+            sut.SyllableLength = 20;
+            sut.SyllableDigits = 2;
+            sut.SyllableSpecials = 0;
+            sut.SyllablePlacementIndex = (int)PasswordGeneratorViewModel.Placement.Positions;
+        }
+        finally
+        {
+            sut.ResumeRegeneration();
+        }
+
+        sut.DistributePositionsEvenly();
+        return sut;
+    }
+
+    private static string Sorted(string text) => string.Concat(text.OrderBy(character => character));
+
+    /// <summary>
+    /// Moving a cursor moves the character that is already in the password.
+    /// </summary>
+    /// <remarks>
+    /// Writing a position regenerated, so the only way to see what a drag had done was to compare
+    /// two passwords with nothing in common but their shape. Watching one character travel through
+    /// a password whose other characters hold still is the entire reason the bar exists.
+    /// </remarks>
+    [Fact]
+    public void MovingACursor_MovesTheCharacterThatIsThere_WithoutDrawingANewPassword()
+    {
+        var sut = CreatePlacedVm();
+        string before = sut.GeneratedPassword;
+
+        Assert.True(sut.TryMoveInPlace(digit: true, index: 0, percent: 100, commit: true));
+
+        string after = sut.GeneratedPassword;
+
+        // Not one character of it was drawn again: the same ones came back in another order.
+        Assert.Equal(Sorted(before), Sorted(after));
+
+        // And they came back in the order that was asked for, which puts that digit last.
+        Assert.True(char.IsDigit(after[^1]), after);
+        Assert.Equal(100, PasswordGeneratorViewModel.ParsePositions(sut.DigitPositions)[0]);
+    }
+
+    /// <summary>
+    /// What a drag shows on the way is not written down until it is dropped.
+    /// </summary>
+    [Fact]
+    public void APreview_ShowsTheMove_WithoutWritingItDown()
+    {
+        var sut = CreatePlacedVm();
+        string before = sut.GeneratedPassword;
+        string positionsBefore = sut.DigitPositions;
+
+        Assert.True(sut.TryMoveInPlace(digit: true, index: 0, percent: 100, commit: false));
+
+        Assert.Equal(positionsBefore, sut.DigitPositions);
+        Assert.Equal(Sorted(before), Sorted(sut.GeneratedPassword));
+        Assert.True(char.IsDigit(sut.GeneratedPassword[^1]), sut.GeneratedPassword);
+    }
+
+    /// <summary>
+    /// Every password on display is rearranged, not just the one in the box.
+    /// </summary>
+    /// <remarks>
+    /// A bar that moved the digit in the password on display and left the nineteen listed under it
+    /// alone would be showing two rules at once, and the list is where a batch is read from.
+    /// </remarks>
+    [Fact]
+    public void ABatch_IsRearrangedWholeOrNotAtAll()
+    {
+        var sut = CreatePlacedVm();
+        sut.BatchCount = 5;
+
+        var before = sut.GeneratedBatch.ToList();
+        Assert.Equal(5, before.Count);
+
+        Assert.True(sut.TryMoveInPlace(digit: true, index: 0, percent: 100, commit: true));
+
+        Assert.Equal(5, sut.GeneratedBatch.Count);
+        for (int row = 0; row < before.Count; row++)
+        {
+            Assert.Equal(Sorted(before[row]), Sorted(sut.GeneratedBatch[row]));
+            Assert.True(char.IsDigit(sut.GeneratedBatch[row][^1]), sut.GeneratedBatch[row]);
+        }
+
+        Assert.Equal(sut.GeneratedBatch[0], sut.GeneratedPassword);
+        Assert.Equal(sut.GeneratedBatch.Count, sut.BatchRows.Count);
+    }
+
+    /// <summary>
+    /// Material that did not make the password on screen is refused rather than used.
+    /// </summary>
+    /// <remarks>
+    /// The characters kept aside are only worth anything while the password in the box is the one
+    /// they were taken from. Once something else has put a password there they describe nothing on
+    /// screen, and using them would replace it with one the operator never asked for, silently, on
+    /// a mouse move.
+    /// </remarks>
+    [Fact]
+    public void MaterialThatDidNotMakeThePasswordOnScreen_IsRefused()
+    {
+        var sut = CreatePlacedVm();
+        sut.GeneratedPassword = "something else entirely";
+
+        Assert.False(sut.TryMoveInPlace(digit: true, index: 0, percent: 50, commit: true));
+        Assert.Equal("something else entirely", sut.GeneratedPassword);
+    }
+
+    /// <summary>
+    /// A drag keeps working all the way across the bar.
+    /// </summary>
+    /// <remarks>
+    /// This is the gesture, not one step of it. The first version checked the material by asking
+    /// the saved positions to rebuild the password on screen, which an uncommitted preview makes
+    /// false by design: the first move succeeded, every later one was refused, and the character
+    /// stopped one place along while the cursor swept the whole bar. Moving once and asserting on
+    /// it cannot see that, so this moves the way a hand does.
+    /// </remarks>
+    [Fact]
+    public void ADragAcrossTheWholeBar_KeepsMovingTheCharacter()
+    {
+        var sut = CreatePlacedVm();
+        string start = sut.GeneratedPassword;
+
+        // Where the digit sits in the password, counted from the left.
+        static int DigitAt(string password) => password.IndexOfAny("0123456789".ToCharArray());
+
+        var seen = new List<int>();
+        foreach (double percent in new[] { 44.44, 38.89, 33.33, 27.78, 22.22, 16.67, 11.11, 5.56, 0 })
+        {
+            Assert.True(
+                sut.TryMoveInPlace(digit: true, index: 0, percent: percent, commit: false),
+                $"refused at {percent}");
+            seen.Add(DigitAt(sut.GeneratedPassword));
+            Assert.Equal(Sorted(start), Sorted(sut.GeneratedPassword));
+        }
+
+        // Nine places asked for, and the character visited more than the first of them.
+        Assert.True(seen.Distinct().Count() > 2, string.Join(",", seen));
+        Assert.Equal(0, seen[^1]);
+    }
+
     private static void InvokePrivate(PasswordGeneratorViewModel sut, string methodName, params object[] args)
     {
         typeof(PasswordGeneratorViewModel)

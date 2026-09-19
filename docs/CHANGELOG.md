@@ -14,6 +14,23 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The character moves while you drag it
+
+- Dragging a cursor no longer draws a new password. The characters the password is already made
+  of are put back in the order you are asking for, so one digit travels through a password whose
+  other characters hold still, under the mouse rather than after it. What is on screen when you
+  let go is what is kept. A batch is rearranged whole, not just the one in the box.
+- A password that something else has put on screen is left alone: the characters set aside are
+  only used while the password in the box is the one they were taken from, and otherwise the
+  position is written the old way and a new password comes out. A fresh password is a fair
+  outcome of a drag, a wrong one is not.
+- One arrow key press, or one wheel notch, moves a cursor by one place. It used to move a fixed
+  two percent of the bar, which lands between two notches on any password shorter than fifty
+  characters, and a cursor between two notches is at a position no character can be placed at.
+- The notches stayed as they were while you moved the length slider. There were also only ever
+  five of them once the places got close together, spread evenly across the bar, and four of the
+  five sat where no character could go.
+
 ### A preset you can find, and settings the tool keeps only if you ask
 
 - A saved preset appeared as an unlabelled button under the Save button, showing only the ones
@@ -35,10 +52,10 @@ All notable changes to Heimdall are documented in this file.
 ### Notches on the placement bar, and a panel that holds still
 
 - The placement bar asked for a percentage and what you are placing is a character. The track
-  now shows a notch at every place a character can go, taller every fifth one so a row of them
-  can be counted, and a dragged cursor settles on one. The specials row carries two more
-  notches than the digits row when two digits are asked for, because the specials are placed
-  into the password the digits are already in.
+  now shows one notch at every place a character can go, and a dragged cursor settles on one.
+  The specials row carries two more notches than the digits row when two digits are asked for,
+  because the specials are placed into the password the digits are already in. The notches are
+  counted from the password on screen, so a longer one has more of them.
 - The panel resized itself while you used it. Two causes, both measured on the width of the
   password box: the vertical scrollbar appeared as soon as the content outgrew the panel and
   took its width off every control (579 pixels, one click, 563), and the readouts column sized
@@ -56,8 +73,8 @@ All notable changes to Heimdall are documented in this file.
 - Dragging a cursor wrote its position on every mouse move, which regenerated the password each
   time - twenty of them when a batch had been asked for - and snapped the cursor onto a grid a
   tenth of a percent wide before measuring the next move from it. The cursor now follows the
-  pointer and the password is drawn once, when the cursor is dropped. The arrow keys and the
-  wheel still act immediately, one press being one move.
+  pointer, and no password is drawn by a drag at all. The arrow keys and the wheel still act
+  immediately, one press being one move.
 
 ## 2026-09-18: the password generator, rebuilt (v2026.091802)
 

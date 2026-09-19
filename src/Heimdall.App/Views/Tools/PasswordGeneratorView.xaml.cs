@@ -40,23 +40,14 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 {
 
     /// <summary>The width of a placement cursor, which the track has to leave room for.</summary>
-    private const double PlacementCursorWidth = 14;
+    private const double PlacementCursorWidth = PlacementBarGeometry.CursorWidth;
 
-    /// <summary>
-    /// The narrowest a gap between two notches may be before they stop being drawn one per
-    /// character. Below this they read as a hatched band rather than as places to put something.
-    /// </summary>
-    private const double PlacementTickMinimumGap = 7;
+    /// <summary>How far down the track the notches hang from.</summary>
+    private const double PlacementTickBaseline = 28;
 
-    /// <summary>How tall a notch is, and how tall the one at each quarter is.</summary>
-    private const double PlacementTickHeight = 5;
-    private const double PlacementLandmarkHeight = 11;
-
-    /// <summary>How many notches apart the taller ones are.</summary>
-    private const int PlacementLandmarkEvery = 5;
-
-    /// <summary>How far one arrow key or one wheel notch moves a cursor.</summary>
-    private const double PlacementKeyStepPercent = 2;
+    /// <summary>How many places each track was last drawn with, so it is not redrawn for nothing.</summary>
+    private int _lastDigitSlots = -1;
+    private int _lastSpecialSlots = -1;
 
     private LocalizationManager? _localizer;
     private readonly PasswordGeneratorViewModel _vm;
@@ -418,6 +409,13 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             // floor buys one of its own.
             RebuildPlacementCursors();
         }
+        else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.GeneratedPassword), StringComparison.Ordinal))
+        {
+            // How many places there are is read off the password, so a longer one has more of
+            // them. The notches were only ever redrawn when a cursor moved, which is why they sat
+            // still while the length slider ran.
+            RefreshPlacementTicks();
+        }
         else if (string.Equals(e.PropertyName, nameof(PasswordGeneratorViewModel.StrengthLevel), StringComparison.Ordinal))
         {
             UpdateStrengthBarBrush();
@@ -773,16 +771,38 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     /// each is read against is recovered from the password on screen rather than kept in a second
     /// place that could disagree with it.
     /// </remarks>
-    private int PlacementSlotCount(bool digits)
+    private int PlacementSlotCount(bool digits) => PlacementBarGeometry.SlotCount(
+        _vm.GeneratedPassword.Length,
+        _vm.CurrentDigitCount,
+        _vm.CurrentSpecialCount,
+        digits);
+
+    /// <summary>
+    /// Redraws the notches without touching the cursors.
+    /// </summary>
+    /// <remarks>
+    /// This runs on every password, which includes every mouse move of a drag, so it does nothing
+    /// when the number of places has not changed. Rebuilding the cursors here instead would take
+    /// the thumb out from under the mouse.
+    /// </remarks>
+    private void RefreshPlacementTicks()
     {
-        int placed = _vm.CurrentDigitCount + _vm.CurrentSpecialCount;
-        int drawn = _vm.GeneratedPassword.Length - placed;
-        if (drawn < 1)
+        if (!_viewInitialized)
         {
-            return 0;
+            return;
         }
 
-        return (digits ? drawn : drawn + _vm.CurrentDigitCount) + 1;
+        int digits = PlacementSlotCount(true);
+        int specials = PlacementSlotCount(false);
+        if (digits == _lastDigitSlots && specials == _lastSpecialSlots)
+        {
+            return;
+        }
+
+        _lastDigitSlots = digits;
+        _lastSpecialSlots = specials;
+        BuildTicks(PlacementDigitsTrack, digits: true);
+        BuildTicks(PlacementSpecialsTrack, digits: false);
     }
 
     private void RebuildPlacementCursors()
@@ -792,6 +812,8 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             return;
         }
 
+        _lastDigitSlots = PlacementSlotCount(true);
+        _lastSpecialSlots = PlacementSlotCount(false);
         BuildTicks(PlacementDigitsTrack, digits: true);
         BuildTicks(PlacementSpecialsTrack, digits: false);
         BuildCursors(PlacementDigitsTrack, digits: true, _vm.DigitPositions);
@@ -864,13 +886,15 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     }
 
     /// <summary>
-    /// Draws a notch at every place a character can go, and a taller one at each quarter.
+    /// Draws one notch at every place a character can go, and nothing else.
     /// </summary>
     /// <remarks>
-    /// The notches are what makes the bar readable: without them a cursor sits at an eyeballed
-    /// fraction of a bar and the only way to know what that means is to read the password that
-    /// comes out. They are drawn behind the cursors, and they are the positions a drag settles
-    /// on, so what is shown and what is possible are the same set of places.
+    /// <para>There used to be a taller notch every fifth, to be counted. Counting them is not how
+    /// this bar is read: the password sits above it and the character travels through it as the
+    /// cursor moves, so where a cursor is gets read off the password. What the notches are for is
+    /// saying that the bar has discrete places at all, and how far apart they are.</para>
+    /// <para>They are drawn behind the cursors, and they are the places a drag settles on, so what
+    /// is shown and what is possible are the same set of places.</para>
     /// </remarks>
     private void BuildTicks(Canvas track, bool digits)
     {
@@ -880,35 +904,27 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         }
 
         int slots = PlacementSlotCount(digits);
-        double usable = Math.Max(1, track.ActualWidth - PlacementCursorWidth);
-        if (slots < 2 || usable / (slots - 1) < PlacementTickMinimumGap)
+        int ticks = PlacementBarGeometry.TickCount(slots, track.ActualWidth);
+        if (ticks == 0)
         {
-            // Too many characters to mark one by one: the quarters still say where the middle is.
-            slots = 5;
+            return;
         }
 
         var brush = (Brush)FindResource("TextSecondaryBrush");
 
-        for (int slot = 0; slot < slots; slot++)
+        for (int slot = 0; slot < ticks; slot++)
         {
-            double fraction = (double)slot / (slots - 1);
-            // Every fifth notch stands taller, which is what makes a row of them countable at a
-            // glance. A quarter of the bar is not used as the landmark because a quarter almost
-            // never falls on a character boundary, and a landmark nothing can settle on is a
-            // mark in the wrong place.
-            bool landmark = slot % PlacementLandmarkEvery == 0 || slot == slots - 1;
-            double height = landmark ? PlacementLandmarkHeight : PlacementTickHeight;
-            double x = PlacementCursorWidth / 2 + usable * fraction;
+            double x = PlacementBarGeometry.TickX(slot, ticks, track.ActualWidth);
 
             var tick = new Line
             {
                 X1 = x,
                 X2 = x,
-                Y1 = 28 - height,
-                Y2 = 28,
+                Y1 = PlacementTickBaseline - PlacementBarGeometry.TickHeight,
+                Y2 = PlacementTickBaseline,
                 Stroke = brush,
                 StrokeThickness = 1,
-                Opacity = landmark ? 0.75 : 0.35,
+                Opacity = PlacementBarGeometry.TickOpacity,
                 IsHitTestVisible = false,
             };
 
@@ -919,17 +935,8 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     /// <summary>
     /// The nearest notch to a percentage, so a dragged cursor lands where a character can go.
     /// </summary>
-    private double SnapToSlot(bool digits, double percent)
-    {
-        int slots = PlacementSlotCount(digits);
-        if (slots < 2)
-        {
-            return percent;
-        }
-
-        double step = 100.0 / (slots - 1);
-        return Math.Clamp(Math.Round(percent / step) * step, 0, 100);
-    }
+    private double SnapToSlot(bool digits, double percent) =>
+        PlacementBarGeometry.SnapToSlot(PlacementSlotCount(digits), percent);
 
     /// <summary>Names a cursor after where it sits, for the tooltip and for assistive technology.</summary>
     private void DescribeCursor(Thumb cursor, int index, double percent)
@@ -964,6 +971,15 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
         foreach (Thumb cursor in track.Children.OfType<Thumb>())
         {
+            // The one under the mouse is where the mouse put it, which is not yet written down.
+            // The panel above this one relays out as the password changes, so a resize can arrive
+            // in the middle of a drag, and putting every thumb back where the settings say would
+            // take that one out from under the hand holding it.
+            if (cursor.IsDragging)
+            {
+                continue;
+            }
+
             if (cursor.Tag is PlacementCursor slot)
             {
                 double[] percents = PasswordGeneratorViewModel.ParsePositions(
@@ -978,8 +994,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
     private static void PositionCursor(Canvas track, Thumb cursor, double percent)
     {
-        double usable = Math.Max(0, track.ActualWidth - PlacementCursorWidth);
-        Canvas.SetLeft(cursor, usable * percent / 100.0);
+        Canvas.SetLeft(cursor, PlacementBarGeometry.CursorLeft(percent, track.ActualWidth));
     }
 
     private static void OnPlacementCursorPressed(object sender, MouseButtonEventArgs e)
@@ -1012,14 +1027,22 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             return;
         }
 
-        double usable = Math.Max(1, track.ActualWidth - PlacementCursorWidth);
+        // The change a Thumb reports is where the pointer now sits relative to where it took
+        // hold, measured against the thumb as it currently stands. Adding it to the thumb's own
+        // left edge therefore gives the pointer itself: nothing is accumulated, and the part of a
+        // move that snapping does not use is still there to be counted on the next one.
+        double usable = PlacementBarGeometry.Usable(track.ActualWidth);
         double moved = Math.Clamp(Canvas.GetLeft(cursor) + e.HorizontalChange, 0, usable);
         double percent = SnapToSlot(slot.Digits, moved / usable * 100.0);
 
         // The cursor settles on the notch rather than following the pointer between two of them,
         // so what it shows is a place a character can actually go.
-        Canvas.SetLeft(cursor, usable * percent / 100.0);
+        Canvas.SetLeft(cursor, PlacementBarGeometry.CursorLeft(percent, track.ActualWidth));
         DescribeCursor(cursor, slot.Index, percent);
+
+        // And the password on screen shows the character at that place, straight away. It is the
+        // one already in it that moves; nothing new is drawn until the operator asks for it.
+        _vm.TryMoveInPlace(slot.Digits, slot.Index, percent, commit: false);
     }
 
     /// <summary>
@@ -1033,8 +1056,9 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             return;
         }
 
-        double usable = Math.Max(1, track.ActualWidth - PlacementCursorWidth);
-        MovePlacementCursor(slot, SnapToSlot(slot.Digits, Canvas.GetLeft(cursor) / usable * 100.0));
+        MovePlacementCursor(slot, SnapToSlot(
+            slot.Digits,
+            Canvas.GetLeft(cursor) / PlacementBarGeometry.Usable(track.ActualWidth) * 100.0));
     }
 
     private void OnPlacementCursorKey(object sender, KeyEventArgs e)
@@ -1044,10 +1068,13 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             return;
         }
 
+        // One press moves by one place. A fixed slice of the bar lands between two notches as
+        // soon as the password is not fifty characters long, which is a place no character goes.
+        double one = PlacementBarGeometry.StepPercent(PlacementSlotCount(slot.Digits));
         double step = e.Key switch
         {
-            Key.Left or Key.Down => -PlacementKeyStepPercent,
-            Key.Right or Key.Up => PlacementKeyStepPercent,
+            Key.Left or Key.Down => -one,
+            Key.Right or Key.Up => one,
             Key.Home => -100,
             Key.End => 100,
             _ => 0
@@ -1062,7 +1089,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             slot.Digits ? _vm.DigitPositions : _vm.SpecialPositions);
         if (slot.Index < percents.Length)
         {
-            MovePlacementCursor(slot, percents[slot.Index] + step);
+            MovePlacementCursor(slot, SnapToSlot(slot.Digits, percents[slot.Index] + step));
             e.Handled = true;
         }
     }
@@ -1074,20 +1101,35 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             return;
         }
 
+        double one = PlacementBarGeometry.StepPercent(PlacementSlotCount(slot.Digits));
         double[] percents = PasswordGeneratorViewModel.ParsePositions(
             slot.Digits ? _vm.DigitPositions : _vm.SpecialPositions);
-        if (slot.Index < percents.Length)
+        if (slot.Index < percents.Length && one > 0)
         {
             MovePlacementCursor(
                 slot,
-                percents[slot.Index] + (e.Delta > 0 ? PlacementKeyStepPercent : -PlacementKeyStepPercent));
+                SnapToSlot(slot.Digits, percents[slot.Index] + (e.Delta > 0 ? one : -one)));
             e.Handled = true;
         }
     }
 
+    /// <summary>
+    /// Writes down where a cursor ended up, keeping the password that was shown while it moved.
+    /// </summary>
+    /// <remarks>
+    /// Writing the position regenerates, and a drag that previews one password and commits another
+    /// is worse than one that previews nothing. The characters already drawn are put back in the
+    /// new order instead. When that cannot be done, because the material behind the password on
+    /// screen no longer describes it, the position is written the old way and a new password comes
+    /// out: a fresh password is a fair outcome, a wrong one is not.
+    /// </remarks>
     private void MovePlacementCursor(PlacementCursor slot, double percent)
     {
-        _vm.MovePosition(slot.Digits, slot.Index, percent);
+        if (!_vm.TryMoveInPlace(slot.Digits, slot.Index, percent, commit: true))
+        {
+            _vm.MovePosition(slot.Digits, slot.Index, percent);
+        }
+
         RebuildPlacementCursors();
     }
 
