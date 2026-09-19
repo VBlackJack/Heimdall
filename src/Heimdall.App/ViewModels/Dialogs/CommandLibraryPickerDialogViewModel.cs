@@ -183,7 +183,13 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
         {
             using var scope = _scopeFactory.CreateScope();
             var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-            var items = (await actionService.GetAllActionsAsync().ConfigureAwait(false))
+
+            // No ConfigureAwait(false) here: everything below this await mutates the
+            // dispatcher-owned Actions collection and the ListCollectionView built over
+            // it, so the continuation has to resume on the thread that created them.
+            // ActionService already applies ConfigureAwait(false) internally, which means
+            // the caller's await is the only thing that can bring the flow back.
+            var items = (await actionService.GetAllActionsAsync())
                 .Select(action => new CommandLibraryPickerItem
                 {
                     ActionId = action.Id,
