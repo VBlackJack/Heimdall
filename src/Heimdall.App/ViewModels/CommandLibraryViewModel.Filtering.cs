@@ -85,21 +85,37 @@ public sealed partial class CommandLibraryViewModel
 
         if (_searchService is null) return;
 
-        _lastSearchTerm = trimmed;
-
         try
         {
             var sources = _allEntries.Select(static e => e.Source).ToList();
             var ranked = (await _searchService.SearchAsync(sources, trimmed)).ToList();
+
+            // The debounce above cancels the delay, not the query: once a search is in
+            // flight nothing stops it, so two can overlap and finish out of order. A
+            // superseded result is dropped here rather than installed over the newer one.
+            if (token.IsCancellationRequested) return;
+
             _searchRankedIds = ranked.Select(static r => r.Id).ToList();
             _searchMatchIds = new HashSet<string>(_searchRankedIds, StringComparer.Ordinal);
+
+            // Claimed only by the query whose results are actually installed. Assigning
+            // this before the await was what made a stale result stick: the next
+            // identical term short-circuited on this field and re-published the state
+            // the losing query had left behind.
+            _lastSearchTerm = trimmed;
         }
         catch (Exception ex)
         {
+            if (token.IsCancellationRequested) return;
+
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[CommandLibrary] Search failed: {ex.Message}");
             _searchRankedIds = null;
             _searchMatchIds = null;
+
+            // A failed term is not claimed either, so retyping it retries the search
+            // instead of short-circuiting into the unfiltered list.
+            _lastSearchTerm = string.Empty;
         }
 
         ApplyGroupingForSearch(isSearching: _searchMatchIds is not null);

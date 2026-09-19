@@ -126,19 +126,45 @@ public partial class CommandLibraryView : UserControl, IToolView
     /// Flashes the "copied" visual feedback on the requested button. The VM
     /// invokes this via the <c>ShowCopyFeedback</c> callback after Copy/Send.
     /// </summary>
+    /// <remarks>
+    /// An example row's own copy button lives inside an <c>ItemsControl</c> template and
+    /// has no field to flash, so <see cref="CommandLibraryViewModel.CopyExampleTarget"/>
+    /// is routed to the generator's Copy button instead: that is the control the copied
+    /// text has just been staged for, and it is on screen whenever an example row is.
+    /// Leaving the target unmapped is what made copying an example the one copy gesture
+    /// in this tool with no acknowledgement at all.
+    /// </remarks>
     private void OnCopyFeedbackRequested(string target)
     {
-        Button? button = target switch
-        {
-            "copy" => BtnCopy,
-            "send" => BtnSend,
-            _ => null
-        };
+        var button = ResolveFeedbackButton(target);
         if (button is not null)
         {
             CopyFeedbackHelper.ShowCopyFeedback(button);
         }
+        else
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[CommandLibrary] No copy-feedback control for target '{target}'.");
+        }
     }
+
+    /// <summary>
+    /// Maps a feedback target to the button that flashes for it, or <c>null</c> when the
+    /// view has nothing to flash.
+    /// </summary>
+    /// <remarks>
+    /// Kept separate from <see cref="OnCopyFeedbackRequested"/> so the mapping can be
+    /// asserted directly. The decision lives in two places by nature - the view model
+    /// names a target, this view resolves it - and the half that was missing failed
+    /// silently, which is the only reason the gesture shipped without acknowledgement.
+    /// </remarks>
+    internal Button? ResolveFeedbackButton(string target) => target switch
+    {
+        CommandLibraryViewModel.CopyTarget => BtnCopy,
+        CommandLibraryViewModel.SendTarget => BtnSend,
+        CommandLibraryViewModel.CopyExampleTarget => BtnCopy,
+        _ => null
+    };
 
     /// <summary>
     /// Thin wrapper around <see cref="Clipboard.SetText"/> that swallows the
