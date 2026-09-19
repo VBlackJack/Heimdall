@@ -455,6 +455,11 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             tab.IsBroadcastTarget = BroadcastTargetSelection.IsSessionTargeted(
                 tab.RootContent, static p => p.HostControl is EmbeddedSshView);
             tab.ShowBroadcastTargetMarker = selectionActive && canTarget;
+            tab.BroadcastTargetAccessibleName = _localizer.Format(
+                tab.IsBroadcastTarget
+                    ? "A11yBroadcastTabTargetSelected"
+                    : "A11yBroadcastTabTargetNotSelected",
+                tab.DisplayTitle);
         }
     }
 

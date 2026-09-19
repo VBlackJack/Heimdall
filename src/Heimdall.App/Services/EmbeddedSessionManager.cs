@@ -323,6 +323,9 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 return infoPanel;
             }
 
+            // Without an endpoint the view falls back to its "via Plink" label, which is what a
+            // local shell was announcing: there is no Plink and no remote host in this path at
+            // all. The executable is what the operator chose, so it is what the header says.
             var termView = CreateTerminalSshView(
                 sessionTab,
                 localBundle.Session!,
@@ -330,6 +333,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 0,
                 settings,
                 localBundle.IsElevated,
+                endpoint: DescribeLocalShellEndpoint(localBundle.ShellExecutable),
                 sessionLoggingOverride: localBundle.SessionLoggingOverride);
 
             // Auto-attach local file browser panel in a vertical split
@@ -1520,6 +1524,18 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     /// worse than one row that silently dropped a pane, because the operator would believe they
     /// had chosen.
     /// </remarks>
+    /// <summary>
+    /// The endpoint a local shell shows in its header: the shell it is running, with no path.
+    /// </summary>
+    /// <remarks>
+    /// A local shell has no endpoint in the sense the SSH views mean, and passing none made the
+    /// view fall back to "via Plink" - a remote transport that is not involved.
+    /// </remarks>
+    internal static string DescribeLocalShellEndpoint(string? executable)
+        => string.IsNullOrWhiteSpace(executable)
+            ? string.Empty
+            : System.IO.Path.GetFileName(executable.Trim());
+
     internal static string DescribeBroadcastPane(
         SessionTabViewModel session, SessionPaneModel pane, bool sessionIsSplit)
     {

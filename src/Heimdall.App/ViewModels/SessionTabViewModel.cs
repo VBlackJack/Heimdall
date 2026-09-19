@@ -133,6 +133,19 @@ public partial class SessionTabViewModel : ObservableObject
     private bool _isBroadcastTarget;
 
     /// <summary>
+    /// What a screen reader reads for the tab-strip broadcast marker, state included. Written by
+    /// <c>SessionCoordinator.RefreshBroadcastTabMarkers</c>, which owns the localizer and already
+    /// computes the rest of this tab's marker state in the same pass.
+    /// </summary>
+    /// <remarks>
+    /// The marker is a Button rather than a CheckBox, because <see cref="IsBroadcastTarget"/> is
+    /// derived from the panes and nothing may write it back. A Button announces no checked state
+    /// of its own, so the state is carried in the name rather than left unsaid.
+    /// </remarks>
+    [ObservableProperty]
+    private string _broadcastTargetAccessibleName = string.Empty;
+
+    /// <summary>
     /// True when the tab-strip target marker should be shown for this session
     /// (broadcast SelectedPanes mode active AND <see cref="CanBeBroadcastTarget"/>).
     /// Pushed by <c>SessionCoordinator</c> so the marker stays uncluttered otherwise.

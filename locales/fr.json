@@ -2005,6 +2005,8 @@
   "BroadcastTargetToggleTooltip": "Inclure ce panneau de terminal comme cible de diffusion",
   "A11yBroadcastTargetToggle": "Activer/d\u00e9sactiver la cible de diffusion pour ce panneau",
   "BroadcastTabTargetTooltip": "Envoyer la diffusion vers cette session (cible de diffusion)",
+  "A11yBroadcastTabTargetSelected": "{0}, sélectionné comme cible de diffusion",
+  "A11yBroadcastTabTargetNotSelected": "{0}, non sélectionné comme cible de diffusion",
   "A11yBroadcastTabTarget": "Activer/d\u00e9sactiver la cible de diffusion pour cette session",
 
   "WorkspaceSave": "Sauvegarder l'espace de travail",
