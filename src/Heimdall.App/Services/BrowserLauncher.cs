@@ -20,15 +20,19 @@ using Heimdall.Core.Logging;
 namespace Heimdall.App.Services;
 
 /// <summary>
-/// Default <see cref="IBrowserLauncher"/>. Validates the URL is absolute http/https,
-/// then hands it to the shell. Reuses the canonical open-url pattern from the views.
+/// Default <see cref="IBrowserLauncher"/>. Asks
+/// <see cref="ExternalUrlPolicy"/> whether the URL may be launched, then hands it to the shell.
 /// </summary>
+/// <remarks>
+/// The scheme test used to be spelled here, and identically in two views. It was also
+/// untested: no test constructs this class, and the six that name it all use a double that
+/// records the URL and decides nothing. See <see cref="ExternalUrlPolicy"/>.
+/// </remarks>
 public sealed class BrowserLauncher : IBrowserLauncher
 {
     public void Open(string url)
     {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (!ExternalUrlPolicy.TryResolveLaunchable(url, out string? launchableUrl))
         {
             FileLogger.Warn("[Updates] refused to open a non-http(s) release URL.");
             return;
@@ -38,7 +42,7 @@ public sealed class BrowserLauncher : IBrowserLauncher
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = uri.AbsoluteUri,
+                FileName = launchableUrl,
                 UseShellExecute = true
             })?.Dispose();
         }

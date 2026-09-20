@@ -839,16 +839,16 @@ public partial class DiagramEditorView : UserControl, IToolView
 
     private static void OpenExternalLink(string? href)
     {
-        if (string.IsNullOrWhiteSpace(href)
-            || !Uri.TryCreate(href, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        // The href comes out of a diagram file, which may have been imported. One decision,
+        // shared with the release launcher and the terminal: see Services.ExternalUrlPolicy.
+        if (!Services.ExternalUrlPolicy.TryResolveLaunchable(href, out string? launchableUrl))
         {
             return;
         }
 
         try
         {
-            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(launchableUrl) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
