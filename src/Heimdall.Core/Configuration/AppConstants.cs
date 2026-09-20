@@ -82,6 +82,20 @@ public static class AppConstants
     public const int MaxConPtyBootstrapBufferBytes = 256 * 1024;
 
     /// <summary>
+    /// The shell a LOCAL profile runs when it names none.
+    /// </summary>
+    public const string DefaultLocalShellExecutable = "powershell.exe";
+
+    /// <summary>
+    /// Windows PowerShell's path relative to the system directory. The default shell is
+    /// resolved through this rather than left as a bare name: CreateProcessW with no
+    /// application name searches the application directory first, so a powershell.exe
+    /// dropped beside Heimdall.exe would be preferred over the system one.
+    /// </summary>
+    public const string WindowsPowerShellSystemRelativePath =
+        @"WindowsPowerShell\v1.0\powershell.exe";
+
+    /// <summary>
     /// Default maximum size in bytes of a single session log file before rollover (4 MiB).
     /// Chosen to bound per-file disk usage while keeping a whole interactive session readable
     /// in one file for typical workloads; longer sessions spill into ".N.log" continuations.

@@ -203,4 +203,68 @@ public sealed class LocalShellHandlerTests
         await manager.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
         return manager;
     }
+
+    /// <summary>
+    /// The default shell is resolved to its system path, never handed over as a bare name.
+    /// </summary>
+    /// <remarks>
+    /// The session passes the command line to CreateProcessW with no application name, and
+    /// that search order starts at the directory of the running executable. A bare
+    /// "powershell.exe" therefore prefers a file of that name dropped beside Heimdall.exe.
+    /// </remarks>
+    [Fact]
+    public void ResolveShellExecutable_Default_ReturnsTheSystemWindowsPowerShell()
+    {
+        string resolved = LocalShellHandler.ResolveShellExecutable(
+            AppConstants.DefaultLocalShellExecutable);
+
+        Assert.True(Path.IsPathRooted(resolved), $"expected a rooted path, got '{resolved}'");
+        Assert.Equal(
+            AppConstants.DefaultLocalShellExecutable,
+            Path.GetFileName(resolved),
+            ignoreCase: true);
+        Assert.StartsWith(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            resolved,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// An empty or absent executable falls back to the resolved default, not to the empty string.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ResolveShellExecutable_Blank_FallsBackToTheDefault(string executable)
+    {
+        string resolved = LocalShellHandler.ResolveShellExecutable(executable);
+
+        Assert.Equal(
+            AppConstants.DefaultLocalShellExecutable,
+            Path.GetFileName(resolved),
+            ignoreCase: true);
+    }
+
+    /// <summary>
+    /// A path the operator wrote out in full is theirs and is passed through untouched.
+    /// </summary>
+    [Theory]
+    [InlineData(@"C:\Tools\my shell.exe")]
+    [InlineData(@"..\relative\shell.exe")]
+    public void ResolveShellExecutable_PathWithADirectory_IsPassedThrough(string executable)
+    {
+        Assert.Equal(executable, LocalShellHandler.ResolveShellExecutable(executable));
+    }
+
+    /// <summary>
+    /// A bare name that is nowhere on PATH is passed through, so the operator still gets the
+    /// launch failure naming what they asked for.
+    /// </summary>
+    [Fact]
+    public void ResolveShellExecutable_UnknownBareName_IsPassedThrough()
+    {
+        const string unknown = "heimdall-no-such-shell.exe";
+
+        Assert.Equal(unknown, LocalShellHandler.ResolveShellExecutable(unknown));
+    }
 }

@@ -37,6 +37,20 @@ public sealed class ConPtySessionTests
     /// </summary>
     private static readonly TimeSpan ReplaySignalBackstop = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// The bytes conhost emits on its own account - win32-input-mode and focus-event enables -
+    /// the instant a pseudo console exists, whether or not a client ever attaches to it.
+    /// </summary>
+    private const string ConhostPreamble = "\u001b[?9001h\u001b[?1004h";
+
+    /// <summary>
+    /// How long a child that failed to attach to the pseudo console takes to die. Measured
+    /// 2026-09-20 over 55 such starts: Windows PowerShell between 457 and 1004 ms, cmd.exe
+    /// between 74 and 109 ms. The bound is twice the slowest observed death, which keeps it
+    /// discriminating; a healthy shell is alive for as long as the session is.
+    /// </summary>
+    private static readonly TimeSpan NonAttachedChildDeathWindow = TimeSpan.FromSeconds(2);
+
     [Fact]
     [Trait("Category", "CIUnstable")]
     public async Task StartAsync_LaunchesShell_DeliversInitialTerminalOutput()
@@ -357,6 +371,100 @@ public sealed class ConPtySessionTests
             session.Dispose();
         }
     }
+
+    /// <summary>
+    /// A live shell writes more than the preamble, and is still alive afterwards.
+    /// </summary>
+    /// <remarks>
+    /// <para><see cref="StartAsync_LaunchesShell_DeliversInitialTerminalOutput"/> asserts that
+    /// SOME bytes arrived and that the session was running at that instant. Neither holds the
+    /// session to anything: measured 2026-09-20, a child that never attaches to the pseudo
+    /// console still yields exactly the 16 bytes of <see cref="ConhostPreamble"/> within
+    /// milliseconds, and only exits, with code 0, some 500 ms later. Fifteen consecutive dead
+    /// sessions were measured in an environment where all seven tests in this class passed.</para>
+    /// <para>This test is the discriminating one: it requires output the shell itself produced,
+    /// and requires the shell to outlive the window such a child dies in.</para>
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "CIUnstable")]
+    public async Task StartAsync_InteractiveShell_OutlivesTheWindowAndWritesMoreThanThePreamble()
+    {
+        if (!ConPtySession.IsAvailable)
+        {
+            return;
+        }
+
+        ConPtySession session = new();
+        StringBuilder output = new();
+        object outputLock = new object();
+        TaskCompletionSource<string> shellOutputObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        session.DataReceived += data =>
+        {
+            lock (outputLock)
+            {
+                output.Append(Encoding.UTF8.GetString(data.Span));
+                string text = output.ToString();
+                if (StripPreamble(text).Length > 0)
+                {
+                    shellOutputObserved.TrySetResult(text);
+                }
+            }
+        };
+
+        try
+        {
+            await session.StartAsync(
+                TerminalTestHelpers.ResolvePowerShellExecutable(),
+                "-NoLogo -NoProfile");
+
+            string text = await TerminalTestHelpers.AwaitProcessEventAsync(
+                shellOutputObserved.Task,
+                "DataReceived beyond the conhost preamble");
+
+            Assert.NotEmpty(StripPreamble(text));
+
+            // A child that took the parent's console instead of the pseudo console dies
+            // inside this window. One that attached outlives it.
+            await Task.Delay(NonAttachedChildDeathWindow);
+            Assert.True(
+                session.IsRunning,
+                $"the shell exited within {NonAttachedChildDeathWindow.TotalMilliseconds} ms of start; "
+                + $"received {output.Length} chars");
+        }
+        finally
+        {
+            session.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// An executable carrying a quote is refused before any process is created.
+    /// </summary>
+    /// <remarks>
+    /// The command line is built by wrapping the executable in quotes, so a quote inside it
+    /// closes that token early and everything after it becomes arguments. A Windows path
+    /// cannot contain one, so it only ever arrives from a crafted profile.
+    /// </remarks>
+    [Fact]
+    public async Task StartAsync_ExecutableContainingAQuote_Throws()
+    {
+        if (!ConPtySession.IsAvailable)
+        {
+            return;
+        }
+
+        using ConPtySession session = new();
+
+        ArgumentException error = await Assert.ThrowsAsync<ArgumentException>(
+            () => session.StartAsync("C:\\Tools\\sh.exe\" & calc", string.Empty));
+
+        Assert.Equal("executable", error.ParamName);
+        Assert.Null(session.ProcessId);
+    }
+
+    private static string StripPreamble(string text)
+        => text.Replace(ConhostPreamble, string.Empty, StringComparison.Ordinal);
 
     private static string BuildEncodedPowerShellArguments(string command)
     {

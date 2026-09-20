@@ -14,13 +14,27 @@
  * limitations under the License.
  */
 
+using System.IO;
 using System.Text;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 
 internal static class TerminalCommandFormatter
 {
+    /// <summary>
+    /// The byte that submits a line to a console shell: carriage return, what the Enter key
+    /// sends.
+    /// </summary>
+    /// <remarks>
+    /// Measured 2026-09-20 against a live ConPTY: a command terminated with LF leaves Windows
+    /// PowerShell on its "&gt;&gt; " continuation prompt with the line unexecuted, while the
+    /// same command terminated with CR runs and returns a fresh prompt. The file browser's
+    /// "navigate here" and "run in shell" were typing their command and never sending it.
+    /// </remarks>
+    private const string SubmitKey = "\r";
+
     private enum LocalShellKind
     {
         Cmd,
@@ -48,7 +62,10 @@ internal static class TerminalCommandFormatter
 
     private static LocalShellKind DetectLocalShell(string? shellExecutable)
     {
-        string shellExe = (shellExecutable ?? "powershell.exe").ToLowerInvariant();
+        // The file name, not the whole path: matching anywhere in the path made
+        // C:\cmdtools\pwsh.exe a cmd shell and quoted its arguments the wrong way.
+        string shellExe = Path.GetFileName(
+            (shellExecutable ?? AppConstants.DefaultLocalShellExecutable).Trim()).ToLowerInvariant();
         if (shellExe.Contains("cmd", StringComparison.Ordinal))
         {
             return LocalShellKind.Cmd;
@@ -79,8 +96,8 @@ internal static class TerminalCommandFormatter
         LocalShellKind shellKind = DetectLocalShell(shellExecutable);
         string quotedPath = QuoteLocalPath(shellExecutable, path);
         return shellKind == LocalShellKind.Cmd
-            ? "cd /d " + quotedPath + "\n"
-            : "cd " + quotedPath + "\n";
+            ? "cd /d " + quotedPath + SubmitKey
+            : "cd " + quotedPath + SubmitKey;
     }
 
     public static string FormatRun(string? shellExecutable, string path)
@@ -88,8 +105,8 @@ internal static class TerminalCommandFormatter
         LocalShellKind shellKind = DetectLocalShell(shellExecutable);
         string quotedPath = QuoteLocalPath(shellExecutable, path);
         return shellKind == LocalShellKind.PowerShell
-            ? "& " + quotedPath + "\n"
-            : quotedPath + "\n";
+            ? "& " + quotedPath + SubmitKey
+            : quotedPath + SubmitKey;
     }
 
     public static string FormatRemoteCd(string path)

@@ -14,6 +14,24 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### A local shell that ended by itself, and three things around it
+
+- **The local shell no longer ends the moment it starts.** It could open, log that it had
+  started, and immediately report "Process exited with code 0" with an empty terminal. The
+  shell was being handed the application's own input and output instead of the terminal's,
+  read end-of-file on the first and stopped. It now gets the terminal's, every time. Whether
+  you saw this depended on how Heimdall itself had been started, which is why it looked
+  random.
+- **"Go to this folder" and "Run in shell" in the local file browser now run.** They typed
+  the command into the shell and never pressed Enter, so it sat there half entered. They send
+  the same key a keyboard does.
+- **The default shell is taken from the Windows folder.** It used to be looked up by name,
+  and that search begins next to Heimdall's own program, so a file with the right name
+  sitting there would have been run instead.
+- **A local profile that sets a working folder or asks to run as administrator now asks you
+  first.** Importing a profile already asked before running a custom command or arguments;
+  these two travelled with it unannounced.
+
 ### The editor tells you when a command and its parameters disagree
 
 - **A name written in braces that you never declared as a parameter is now pointed out.**

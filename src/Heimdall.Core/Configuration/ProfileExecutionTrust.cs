@@ -24,15 +24,24 @@ namespace Heimdall.Core.Configuration;
 public static class ProfileExecutionTrust
 {
     /// <summary>
-    /// Returns true when a LOCAL profile carries a custom local shell executable or arguments.
+    /// Returns true when a LOCAL profile carries a custom local shell executable, arguments,
+    /// working directory, or a request to run elevated.
     /// </summary>
+    /// <remarks>
+    /// The working directory and the elevation mode were outside this payload, so an imported
+    /// profile could set both without the confirmation prompt ever appearing. Elevation still
+    /// raises a UAC prompt of its own, but a consent dialog that arrives unannounced is the
+    /// thing this gate exists to prevent.
+    /// </remarks>
     public static bool CarriesLocalExecutionPayload(ServerProfileDto profile)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
         return string.Equals(profile.ConnectionType, "LOCAL", StringComparison.OrdinalIgnoreCase)
             && (!string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
-                || !string.IsNullOrWhiteSpace(profile.LocalShellArguments));
+                || !string.IsNullOrWhiteSpace(profile.LocalShellArguments)
+                || !string.IsNullOrWhiteSpace(profile.LocalShellWorkingDirectory)
+                || profile.EffectiveElevationMode != ElevationMode.None);
     }
 
     /// <summary>
