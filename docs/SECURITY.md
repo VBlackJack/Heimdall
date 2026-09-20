@@ -712,6 +712,34 @@ The `ls`-based listing used for sudo browsing is unaffected: it already skips an
 character is not one it recognises. Those lines are dropped from the listing entirely; they are not
 classified as unclassifiable, and this skip should not be read as producing that kind.
 
+### Opening a link outside Heimdall
+
+Three surfaces hand a URL to the shell: the update banner, from a GitHub release feed; the
+terminal, when a remote host prints an `open-url` message; and the diagram editor, when a cell in
+a possibly imported file carries a link. All three end at `Process.Start` with
+`UseShellExecute = true`, which is the call that lets Windows pick a handler by scheme, so a
+`javascript:` or a `file:` reaching it is a handler Heimdall never chose.
+
+One decision stands in front of all three. `ExternalUrlPolicy.TryResolveLaunchable` parses the
+string as an **absolute** URI, requires the scheme to be `http` or `https`, and hands back the
+parsed absolute form. The shell receives that resolved string, never the text that arrived. Two
+consequences worth stating: a relative or malformed URL is refused before parsing succeeds, and
+the scheme comparison is ordinal because `Uri` has already lowercased what it parsed.
+
+**The terminal surface is the one that matters most.** Its URL comes from whatever the machine you
+are connected to chose to print, so it is the only one of the three whose input an attacker
+selects. It was also the surface furthest from anyone's attention: the barrier was found while
+looking at the update banner.
+
+The decision used to be spelled three times, once per site, and the class comment described that
+duplication as reusing "the canonical open-url pattern from the views". Repairing one copy would
+have left the other two, which is the failure this repository has met more than once. The three
+sites now call the one predicate, and each call is pinned by a guard that reads the source,
+because none of the three is reachable from a test.
+
+What this does not do: it decides on the scheme alone. A well-formed `https` URL to a hostile host
+is launched, as it would be from any browser. Nothing here inspects the destination.
+
 ### Cross-endpoint clipboard paste
 
 A paste between two different remote endpoints downloads each source file and puts it on the

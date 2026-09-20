@@ -790,6 +790,36 @@ ligne dont le caractère de type n'est pas l'un de ceux qu'il reconnaît. Ces li
 écartées du listage ; elles ne sont pas classées comme inclassables, et cet écart ne doit pas être
 lu comme produisant ce type.
 
+### Ouvrir un lien hors de Heimdall
+
+Trois surfaces confient une URL au shell : la bannière de mise à jour, depuis un flux de release
+GitHub ; le terminal, quand un hôte distant imprime un message `open-url` ; et l'éditeur de
+diagramme, quand une cellule d'un fichier possiblement importé porte un lien. Les trois
+aboutissent à `Process.Start` avec `UseShellExecute = true`, l'appel qui laisse Windows choisir un
+gestionnaire d'après le schéma : un `javascript:` ou un `file:` qui l'atteint est un gestionnaire
+que Heimdall n'a jamais choisi.
+
+Une seule décision se tient devant les trois. `ExternalUrlPolicy.TryResolveLaunchable` analyse la
+chaîne comme une URI **absolue**, exige que le schéma soit `http` ou `https`, et rend la forme
+absolue analysée. Le shell reçoit cette chaîne résolue, jamais le texte arrivé. Deux conséquences
+à dire : une URL relative ou malformée est refusée avant même que l'analyse aboutisse, et la
+comparaison de schéma est ordinale parce qu'`Uri` a déjà mis en minuscules ce qu'il a analysé.
+
+**La surface du terminal est celle qui compte le plus.** Son URL vient de ce que la machine à
+laquelle vous êtes connecté a choisi d'imprimer : c'est la seule des trois dont un attaquant
+choisit l'entrée. C'était aussi la plus loin de l'attention de tous, la barrière ayant été
+trouvée en regardant la bannière de mise à jour.
+
+La décision s'épelait autrefois trois fois, une par site, et le commentaire de classe décrivait
+cette duplication comme la reprise du "canonical open-url pattern from the views". Réparer une
+copie aurait laissé les deux autres, ce qui est la défaillance que ce dépôt a rencontrée plus
+d'une fois. Les trois sites appellent désormais le même prédicat, et chaque appel est épinglé par
+une garde qui lit la source, parce qu'aucun des trois n'est atteignable depuis un test.
+
+Ce que cela ne fait pas : la décision porte sur le seul schéma. Une URL `https` bien formée vers
+un hôte hostile est lancée, comme elle le serait depuis n'importe quel navigateur. Rien ici
+n'inspecte la destination.
+
 ### Collage du presse-papiers entre endpoints distincts
 
 Un collage entre deux endpoints distants différents télécharge chaque fichier source et le dépose sur
