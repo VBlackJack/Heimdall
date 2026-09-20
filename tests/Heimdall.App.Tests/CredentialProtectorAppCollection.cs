@@ -62,6 +62,48 @@ public sealed class CredentialProtectorCollectionMembershipTests
 
     private const string ScopeTypeName = nameof(CredentialProtectorStateScope);
 
+    /// <summary>
+    /// Production types that reach the protector without the test having to name it. Building one
+    /// seals and unseals through the same process-global slots as calling the protector directly,
+    /// and it fails the same way: a value written under one key and read back under another.
+    /// </summary>
+    /// <remarks>
+    /// The census counted only files spelling <c>CredentialProtector.</c> until 2026-09-20.
+    /// <c>PasswordGeneratorViewModelTests</c> spells only <c>PasswordPresetStorage</c>, so it sat
+    /// outside the collection unseen, and lost its remembered settings whenever a member flipped
+    /// the legacy HMAC key between its write and its read. A type belongs on this list once it is
+    /// measured, not once it looks plausible; the entries are checked by
+    /// <see cref="TheScanReachesAClassThatOnlyNamesAnIndirectSealingType"/>.
+    /// </remarks>
+    private static readonly string[] IndirectSealingTypes = ["PasswordPresetStorage"];
+
+    /// <summary>
+    /// A test class that only names an indirect sealing type is still a member. Dies if the
+    /// census is narrowed back to files that spell the protector themselves.
+    /// </summary>
+    [Fact]
+    public void TheScanReachesAClassThatOnlyNamesAnIndirectSealingType()
+    {
+        List<MemberSource> members = MembersTouchingTheProtector();
+
+        Assert.Contains(
+            members,
+            member => Path.GetFileName(member.FilePath) == "PasswordGeneratorViewModelTests.cs");
+
+        // And that it is reached for the stated reason rather than by having since acquired a
+        // direct call, which would make the widened census look load-bearing when it is not.
+        MemberSource reached = members.Single(
+            member => Path.GetFileName(member.FilePath) == "PasswordGeneratorViewModelTests.cs");
+
+        Assert.DoesNotContain(
+            reached.Lines,
+            line => line.Contains("CredentialProtector.", StringComparison.Ordinal));
+    }
+
+    private static bool TouchesTheProtector(string line)
+        => line.Contains("CredentialProtector.", StringComparison.Ordinal)
+            || IndirectSealingTypes.Any(type => line.Contains($"new {type}(", StringComparison.Ordinal));
+
     [Fact]
     public void EveryTestClassTouchingTheProtectorJoinsTheSerializingCollection()
     {
@@ -118,7 +160,11 @@ public sealed class CredentialProtectorCollectionMembershipTests
             // The collection, the scope and this guard name the protector in their own prose
             // and code, so they would flag themselves.
             string name = Path.GetFileName(path);
-            if (name is "CredentialProtectorAppCollection.cs" or "CredentialProtectorStateScope.cs")
+            if (name is "CredentialProtectorAppCollection.cs"
+                or "CredentialProtectorStateScope.cs"
+                // Quotes the constructions it refuses inside its own pattern and its assertions,
+                // and performs none of them, so it seals nothing.
+                or "PasswordPresetStorageIsolationGuardTests.cs")
             {
                 continue;
             }
@@ -126,7 +172,7 @@ public sealed class CredentialProtectorCollectionMembershipTests
             // Matched line by line: the repository stores CRLF, and an anchored multiline regex
             // over the raw text silently never matches.
             string[] lines = File.ReadAllLines(path);
-            if (!lines.Any(line => line.Contains("CredentialProtector.", StringComparison.Ordinal)))
+            if (!lines.Any(TouchesTheProtector))
             {
                 continue;
             }

@@ -32,16 +32,35 @@ namespace Heimdall.App.Tests;
 /// extracted generation engine, visibility-driving state and the init /
 /// suspension guards that previously lived in the code-behind event cascade.
 /// </summary>
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class PasswordGeneratorViewModelTests : IDisposable
 {
     private const string AmbiguousChars = "0Oo1lI|";
     private const string ShellDangerousChars = "$^&*'\"\\|`(){}[]<>!~;";
     private const string LayoutUnsafeChars = "aqwzmAQWZM";
+
+    /// <summary>
+    /// The preset file is sealed on the way out and unsealed on the way in, so every test here
+    /// reads and writes the process-global <c>CredentialProtector</c> state without ever naming
+    /// it. The scope pins that state; the collection keeps a sibling from changing it mid-test.
+    /// </summary>
+    /// <remarks>
+    /// Neither was here until 2026-09-20. A preset file written while a sibling had its legacy
+    /// HMAC key installed, and read back after that sibling's own scope had called
+    /// <c>Initialize(null)</c>, unseals as nothing: the store comes back empty and the settings
+    /// that were just written read as absent. That is one failure of
+    /// <see cref="TheSettings_AreRememberedOnlyWhenAsked"/> in a full run and none when the test
+    /// is run alone.
+    /// </remarks>
+    private readonly CredentialProtectorStateScope _protectorState = new();
+
     private readonly string _presetsDirectoryPath =
         Path.Combine(Path.GetTempPath(), nameof(PasswordGeneratorViewModelTests), Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
+        _protectorState.Dispose();
+
         if (Directory.Exists(_presetsDirectoryPath))
         {
             Directory.Delete(_presetsDirectoryPath, recursive: true);
