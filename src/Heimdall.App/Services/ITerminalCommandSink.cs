@@ -26,9 +26,15 @@ namespace Heimdall.App.Services;
 public interface ITerminalCommandSink
 {
     /// <summary>
-    /// Writes the given command to the terminal session. The command is
-    /// forwarded as-is; the caller is responsible for validating it.
+    /// Writes the given command to the terminal session and submits it, as if the user had
+    /// pressed Enter. The command itself is forwarded as-is; the caller is responsible for
+    /// validating it, and must not append a terminator of its own.
     /// </summary>
+    /// <remarks>
+    /// Submitting is part of the contract, not of the caller's string. A test double that
+    /// only records the command therefore proves nothing about the terminator, which is why
+    /// the implementor sending LF on a ConPTY session went unnoticed.
+    /// </remarks>
     /// <param name="command">The command string to inject.</param>
     void WriteCommand(string command);
 }

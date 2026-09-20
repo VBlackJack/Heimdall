@@ -1845,12 +1845,21 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     }
 
     /// <summary>
-    /// Sends a command string followed by a newline to the active session.
-    /// Intended for external callers (e.g. SFTP "Open in Terminal").
+    /// Sends a command string to the active session, submitted as if the user had pressed
+    /// Enter. Used by the Command Library, the broadcast panel, and SFTP "Open in Terminal".
     /// </summary>
+    /// <remarks>
+    /// This terminated with LF, which a remote tty translates but a Windows console does not:
+    /// on a Local Shell or a WinRM session, both of which run PowerShell over ConPTY, the
+    /// command was typed into the prompt and left sitting on the "&gt;&gt; " continuation line,
+    /// unexecuted. The tests could not see it because every one of them writes through a fake
+    /// <see cref="Services.ITerminalCommandSink"/>, and the terminator lives here, below the
+    /// interface. It is now the shared <see cref="AppConstants.TerminalSubmitKey"/>, the same
+    /// byte <see cref="KeepAliveCr"/> already sends.
+    /// </remarks>
     public void WriteCommand(string command)
     {
-        WriteToSession(command + "\n");
+        WriteToSession(command + AppConstants.TerminalSubmitKey);
     }
 
     /// <summary>

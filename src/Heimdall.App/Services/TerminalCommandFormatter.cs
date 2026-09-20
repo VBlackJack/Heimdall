@@ -24,16 +24,10 @@ namespace Heimdall.App.Services;
 internal static class TerminalCommandFormatter
 {
     /// <summary>
-    /// The byte that submits a line to a console shell: carriage return, what the Enter key
-    /// sends.
+    /// The character that submits a line, shared with every other surface that sends one.
+    /// See <see cref="AppConstants.TerminalSubmitKey"/> for the measurement behind it.
     /// </summary>
-    /// <remarks>
-    /// Measured 2026-09-20 against a live ConPTY: a command terminated with LF leaves Windows
-    /// PowerShell on its "&gt;&gt; " continuation prompt with the line unexecuted, while the
-    /// same command terminated with CR runs and returns a fresh prompt. The file browser's
-    /// "navigate here" and "run in shell" were typing their command and never sending it.
-    /// </remarks>
-    private const string SubmitKey = "\r";
+    private const string SubmitKey = AppConstants.TerminalSubmitKey;
 
     private enum LocalShellKind
     {
