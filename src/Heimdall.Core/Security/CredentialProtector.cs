@@ -33,6 +33,23 @@ namespace Heimdall.Core.Security;
 [SupportedOSPlatform("windows")]
 public static class CredentialProtector
 {
+    /// <summary>
+    /// Raised on entry to every operation that reads the process-global key slots. Null in
+    /// production and never armed by shipping code; the test assemblies install an observer that
+    /// fails a test which reaches the protector without having pinned that state first.
+    /// </summary>
+    /// <remarks>
+    /// <para>Deliberately <b>not</b> <c>[Conditional("DEBUG")]</c>. CI builds and tests in
+    /// Release, so a conditional hook would be compiled out of precisely the configuration the
+    /// guard has to police, and the guard would pass by never running. The shipped cost is one
+    /// static field read and a null check per call, against a DPAPI or AES-GCM operation.</para>
+    /// <para>The alternative is a source census of which test classes might touch the protector,
+    /// which was measured on 2026-09-20 and is unsound: it flagged 13 classes of which 0 reach
+    /// the protector, and it cannot see a test added later to a class it has already excused.
+    /// The fact the guard needs is a runtime fact, so it is observed at runtime.</para>
+    /// </remarks>
+    internal static Action? CryptoCallObserver;
+
     private static string? _hmacKeyRaw;
 
     /// <summary>
@@ -113,6 +130,7 @@ public static class CredentialProtector
     /// <returns>Protected string (HMAC-wrapped if key available, plain DPAPI otherwise).</returns>
     public static string Protect(string plainText)
     {
+        CryptoCallObserver?.Invoke();
         ArgumentNullException.ThrowIfNull(plainText);
 
         // Vault mode: when a usable DEK is set, emit a version-2 secret blob.
@@ -175,6 +193,8 @@ public static class CredentialProtector
     /// <returns>Decrypted plaintext, or null on failure.</returns>
     public static string? Unprotect(string? protectedValue)
     {
+        CryptoCallObserver?.Invoke();
+
         if (string.IsNullOrWhiteSpace(protectedValue))
             return null;
 
@@ -237,6 +257,8 @@ public static class CredentialProtector
     /// </returns>
     public static byte[]? UnprotectToBytes(string? protectedValue)
     {
+        CryptoCallObserver?.Invoke();
+
         if (string.IsNullOrWhiteSpace(protectedValue))
         {
             return null;

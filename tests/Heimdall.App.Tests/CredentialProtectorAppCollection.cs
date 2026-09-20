@@ -164,7 +164,10 @@ public sealed class CredentialProtectorCollectionMembershipTests
                 or "CredentialProtectorStateScope.cs"
                 // Quotes the constructions it refuses inside its own pattern and its assertions,
                 // and performs none of them, so it seals nothing.
-                or "PasswordPresetStorageIsolationGuardTests.cs")
+                or "PasswordPresetStorageIsolationGuardTests.cs"
+                // Guard machinery rather than a test class: it arms the runtime observer that
+                // watches the calls this census can only guess at.
+                or "CredentialProtectorRuntimeGuard.cs")
             {
                 continue;
             }
