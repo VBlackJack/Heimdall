@@ -1209,14 +1209,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (message.StartsWith(MsgOpenUrl, StringComparison.Ordinal))
         {
             string url = message[MsgOpenUrl.Length..];
-            if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
-                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+
+            // The URL arrives from the terminal page, which renders whatever the remote host
+            // printed. One decision, shared: see Services.ExternalUrlPolicy.
+            if (Services.ExternalUrlPolicy.TryResolveLaunchable(url, out string? launchableUrl))
             {
                 try
                 {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                     {
-                        FileName = uri.AbsoluteUri,
+                        FileName = launchableUrl,
                         UseShellExecute = true
                     })?.Dispose();
                 }
