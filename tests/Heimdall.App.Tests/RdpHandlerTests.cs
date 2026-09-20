@@ -25,8 +25,18 @@ using Heimdall.Core.StateMachine;
 
 namespace Heimdall.App.Tests;
 
-public sealed class RdpHandlerTests
+[Collection(CredentialProtectorAppCollection.Name)]
+public sealed class RdpHandlerTests : IDisposable
 {
+
+    /// <summary>
+    /// This class reaches CredentialProtector through the code under test without naming it.
+    /// The runtime guard found it on 2026-09-20; the source census never nominated it.
+    /// </summary>
+    private readonly CredentialProtectorStateScope _protectorState = new();
+
+    /// <inheritdoc />
+    public void Dispose() => _protectorState.Dispose();
     [Fact]
     public async Task ProtectedFileFailureStopsLaunchAndReleasesOwnedCredential()
     {

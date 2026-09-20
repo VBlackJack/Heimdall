@@ -8,6 +8,9 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Heimdall.Core.Tests" />
+    <!-- The App-side runtime protector guard arms CredentialProtector.CryptoCallObserver.
+         Heimdall.Sftp and Heimdall.Ssh already expose their internals to this assembly. -->
+    <InternalsVisibleTo Include="Heimdall.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

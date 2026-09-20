@@ -49,8 +49,15 @@ namespace Heimdall.App.Tests;
 /// so touching one fails loudly instead of passing quietly.
 /// </para>
 /// </remarks>
+[Collection(CredentialProtectorAppCollection.Name)]
 public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
 {
+
+    /// <summary>
+    /// This class reaches CredentialProtector through the code under test without naming it.
+    /// The runtime guard found it on 2026-09-20; the source census never nominated it.
+    /// </summary>
+    private readonly CredentialProtectorStateScope _protectorState = new();
     private const string RefusalFromServer = "Permission denied.";
     private const string KeyboardInteractiveRefusal = "Permission denied (keyboard-interactive).";
     private const string VerificationCodePrompt = "Verification code:";
@@ -78,6 +85,8 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
 
     public void Dispose()
     {
+        _protectorState.Dispose();
+
         try
         {
             Directory.Delete(_localesPath, recursive: true);
