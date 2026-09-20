@@ -87,6 +87,24 @@ public static class AppConstants
     public const string DefaultLocalShellExecutable = "powershell.exe";
 
     /// <summary>
+    /// The character that submits a line to an interactive terminal: carriage return, which is
+    /// what the Enter key sends.
+    /// </summary>
+    /// <remarks>
+    /// <para>Measured 2026-09-20 against a live ConPTY: a command terminated with LF leaves
+    /// Windows PowerShell on its "&gt;&gt; " continuation prompt with the line typed and
+    /// unexecuted, three runs out of three, while the same command terminated with CR runs and
+    /// returns a fresh prompt.</para>
+    /// <para>It lives here because more than one surface has to agree on it. Each of them
+    /// spelled its own terminator, and they disagreed: the local file browser sent LF through
+    /// the command formatter, and the Command Library sent LF through the view's own
+    /// WriteCommand. Both were wrong on a ConPTY, and a fix to one would not have reached the
+    /// other. The SSH keepalive already sends this same byte, as
+    /// <c>EmbeddedSshView.KeepAliveCr</c>.</para>
+    /// </remarks>
+    public const string TerminalSubmitKey = "\r";
+
+    /// <summary>
     /// Windows PowerShell's path relative to the system directory. The default shell is
     /// resolved through this rather than left as a bare name: CreateProcessW with no
     /// application name searches the application directory first, so a powershell.exe

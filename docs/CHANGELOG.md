@@ -14,6 +14,16 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### The Command Library ran nothing on a local shell
+
+- **Sending a command to a Local Shell or a WinRM session now runs it.** The command arrived
+  in the terminal and stopped there, typed at the prompt and waiting, because it was sent
+  without the key that submits a line. Both the Send button and the broadcast panel were
+  affected. A shell reached over SSH was unaffected and still is.
+- **The same key is now used everywhere a command is sent.** The file browser's "go to this
+  folder" and the Command Library each decided the question for themselves, and both decided
+  it wrong for a local shell; fixing one would not have reached the other.
+
 ### A local shell that ended by itself, and three things around it
 
 - **The local shell no longer ends the moment it starts.** It could open, log that it had
