@@ -68,12 +68,27 @@ public sealed class CredentialProtectorCollectionMembershipTests
     /// and it fails the same way: a value written under one key and read back under another.
     /// </summary>
     /// <remarks>
-    /// The census counted only files spelling <c>CredentialProtector.</c> until 2026-09-20.
+    /// <para>The census counted only files spelling <c>CredentialProtector.</c> until 2026-09-20.
     /// <c>PasswordGeneratorViewModelTests</c> spells only <c>PasswordPresetStorage</c>, so it sat
     /// outside the collection unseen, and lost its remembered settings whenever a member flipped
     /// the legacy HMAC key between its write and its read. A type belongs on this list once it is
     /// measured, not once it looks plausible; the entries are checked by
-    /// <see cref="TheScanReachesAClassThatOnlyNamesAnIndirectSealingType"/>.
+    /// <see cref="TheScanReachesAClassThatOnlyNamesAnIndirectSealingType"/>.</para>
+    /// <para><b>This list is written by hand, and a green run here is not evidence that no other
+    /// indirect sealer exists.</b> It covers the names on it and nothing else. A future type that
+    /// calls the protector internally - and a test class that builds one of the other production
+    /// types already doing so - passes through exactly the hole this entry was added to close,
+    /// and the guard then certifies an absence it never looked for. Read a failure here as real
+    /// and a pass as silent.</para>
+    /// <para>Deriving the list instead of maintaining it was measured on 2026-09-20 and rejected
+    /// as unsound rather than rejected as hard. Walking <c>src/</c> for types naming the protector
+    /// does yield the set with no maintenance, 21 of them; but the census built on it flags 13
+    /// test classes, and instrumenting <c>Protect</c>/<c>Unprotect</c> and running each in
+    /// isolation showed <b>zero of the 13</b> ever reach the protector. The derived form would
+    /// demand 13 serializations that protect nothing, and invite a hand-written exclusion list in
+    /// their place. The fact this guard needs is a runtime fact, and source cannot supply it: what
+    /// closes the class of defect is removing the process-global state from the protector, not a
+    /// wider grep.</para>
     /// </remarks>
     private static readonly string[] IndirectSealingTypes = ["PasswordPresetStorage"];
 
