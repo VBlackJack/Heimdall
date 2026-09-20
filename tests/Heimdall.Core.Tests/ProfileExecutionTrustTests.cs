@@ -250,4 +250,67 @@ public sealed class ProfileExecutionTrustTests
         Assert.Throws<ArgumentNullException>(() => ProfileExecutionTrust.CarriesPostConnectPayload(null!));
         Assert.Throws<ArgumentNullException>(() => ProfileExecutionTrust.RequiresPostConnectConfirmation(null!));
     }
+
+    /// <summary>
+    /// A working directory is local-execution payload.
+    /// </summary>
+    /// <remarks>
+    /// It sat outside the payload, so an imported profile could point a shell at a directory
+    /// of its choosing and the confirmation prompt never appeared.
+    /// </remarks>
+    [Fact]
+    public void CarriesLocalExecutionPayload_LocalWorkingDirectoryOnly_ReturnsTrue()
+    {
+        ServerProfileDto profile = new()
+        {
+            ConnectionType = "LOCAL",
+            LocalShellWorkingDirectory = @"\\attacker\share"
+        };
+
+        Assert.True(ProfileExecutionTrust.CarriesLocalExecutionPayload(profile));
+        Assert.True(ProfileExecutionTrust.RequiresExecutionConfirmation(profile));
+    }
+
+    /// <summary>
+    /// A request to run elevated is local-execution payload.
+    /// </summary>
+    /// <remarks>
+    /// Elevation raises a UAC prompt of its own, but one that arrives with no preceding
+    /// confirmation is exactly what this gate exists to prevent. Both spellings count: the
+    /// explicit mode and the legacy boolean that <see cref="ServerProfileDto.EffectiveElevationMode"/>
+    /// maps to Auto.
+    /// </remarks>
+    [Theory]
+    [InlineData(ElevationMode.Gsudo, false)]
+    [InlineData(ElevationMode.Runas, false)]
+    [InlineData(ElevationMode.None, true)]
+    public void CarriesLocalExecutionPayload_LocalElevationOnly_ReturnsTrue(
+        ElevationMode mode, bool legacyElevated)
+    {
+        ServerProfileDto profile = new()
+        {
+            ConnectionType = "LOCAL",
+            ElevationMode = mode,
+            LocalShellElevated = legacyElevated
+        };
+
+        Assert.True(ProfileExecutionTrust.CarriesLocalExecutionPayload(profile));
+        Assert.True(ProfileExecutionTrust.RequiresExecutionConfirmation(profile));
+    }
+
+    /// <summary>
+    /// A non-LOCAL profile carrying the same fields is still not local-execution payload.
+    /// </summary>
+    [Fact]
+    public void CarriesLocalExecutionPayload_SshProfileWithLocalFields_ReturnsFalse()
+    {
+        ServerProfileDto profile = new()
+        {
+            ConnectionType = "SSH",
+            LocalShellWorkingDirectory = @"C:\Temp",
+            ElevationMode = ElevationMode.Gsudo
+        };
+
+        Assert.False(ProfileExecutionTrust.CarriesLocalExecutionPayload(profile));
+    }
 }

@@ -28,15 +28,33 @@ namespace Heimdall.Terminal.ConPty;
 /// </summary>
 public sealed class ConPtySession : ITerminalSession
 {
+    /// <summary>Buffer size for both the pipe FileStreams and the read loop.</summary>
+    private const int PipeBufferBytes = 4096;
+
+    /// <summary>Exit code reported for a child this session terminated itself.</summary>
+    private const uint KillExitCode = 1;
+
+    /// <summary>How long the read loop lets a child finalize before reading its exit code.</summary>
+    private const uint ExitFinalizeWaitMilliseconds = 1000;
+
+    /// <summary>
+    /// Reported when the exit code could not be established. A failed query is not an exit
+    /// code, and reporting one would make the terminal announce an end that never happened.
+    /// </summary>
+    private const int UnknownExitCode = -1;
+
+    /// <summary>Failure bound on joining a lifecycle thread in <see cref="Dispose"/>.</summary>
+    private static readonly TimeSpan LoopJoinTimeout = TimeSpan.FromMilliseconds(500);
+
     private SafePseudoConsoleHandle? _pseudoConsole;
-    private IntPtr _processHandle;
-    private IntPtr _threadHandle;
+    private SafeProcessHandle? _processHandle;
     private IntPtr _attrList;
     private int _processId;
 
     // Pipe endpoints owned by this session:
-    // - _pipeInputRead / _pipeOutputWrite are the child-side ends passed to ConPTY,
-    //   kept alive for the console's lifetime.
+    // - _pipeInputRead / _pipeOutputWrite are the child-side ends handed to ConPTY. The
+    //   pseudo console duplicates them, so our copies are released as soon as it exists;
+    //   these fields only carry them far enough for the failure path to clean up.
     // - _pipeInputWrite / _pipeOutputRead own parent-side pipe handles until
     //   FileStream construction succeeds and takes ownership.
     // - _outputReader / _inputWriter are the parent-side FileStreams.
@@ -47,8 +65,11 @@ public sealed class ConPtySession : ITerminalSession
     private FileStream? _outputReader;
     private FileStream? _inputWriter;
 
-    private Task? _readLoop;
-    private Task? _exitWatchLoop;
+    // Dedicated threads, not pool work items: the output pipe is synchronous, so its read
+    // blocks for the whole session, and the exit watch blocks on an infinite wait. Two pool
+    // threads parked per open shell is a starvation source this codebase already pays for.
+    private Thread? _readLoop;
+    private Thread? _exitWatchLoop;
     private CancellationTokenSource? _cts;
 
     private volatile bool _disposed;
@@ -181,11 +202,21 @@ public sealed class ConPtySession : ITerminalSession
     {
         get
         {
-            if (_disposed || _processHandle == IntPtr.Zero)
+            SafeProcessHandle? handle = _processHandle;
+            if (_disposed || handle is null || handle.IsInvalid)
                 return false;
 
-            NativeMethods.GetExitCodeProcess(_processHandle, out uint exitCode);
-            return exitCode == NativeMethods.STILL_ACTIVE;
+            try
+            {
+                // A failed query is not evidence of an exit. Reporting "not running" for it
+                // made a transient failure indistinguishable from the shell ending.
+                return !NativeMethods.GetExitCodeProcess(handle, out uint exitCode)
+                    || exitCode == NativeMethods.STILL_ACTIVE;
+            }
+            catch (ObjectDisposedException)
+            {
+                return false;
+            }
         }
     }
 
@@ -230,7 +261,7 @@ public sealed class ConPtySession : ITerminalSession
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(executable);
 
-        if (_processHandle != IntPtr.Zero)
+        if (_processHandle is not null)
             throw new InvalidOperationException("Session already started. Dispose and create a new instance.");
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -248,13 +279,22 @@ public sealed class ConPtySession : ITerminalSession
         try
         {
             CreatePseudoConsole(columns, rows, inputRead, outputWrite);
+
+            // Release our copies of the child-side ends now that the pseudo console owns
+            // duplicates. Holding the output write end kept a writer on the pipe alive for
+            // the session's whole life, so the read loop could never see EOF and could only
+            // ever end at Dispose.
+            _pipeInputRead = null;
+            inputRead.Dispose();
+            _pipeOutputWrite = null;
+            outputWrite.Dispose();
+
             SetupProcessAttributeList();
 
             // Wrap parent-side pipe ends in FileStreams for managed I/O.
-            const int bufferSize = 4096;
-            _inputWriter = new FileStream(inputWrite, FileAccess.Write, bufferSize);
+            _inputWriter = new FileStream(inputWrite, FileAccess.Write, PipeBufferBytes);
             _pipeInputWrite = null;
-            _outputReader = new FileStream(outputRead, FileAccess.Read, bufferSize);
+            _outputReader = new FileStream(outputRead, FileAccess.Read, PipeBufferBytes);
             _pipeOutputRead = null;
 
             LaunchProcess(executable, arguments, workingDirectory);
@@ -321,14 +361,10 @@ public sealed class ConPtySession : ITerminalSession
     /// <inheritdoc />
     public void Kill()
     {
-        if (_disposed || _processHandle == IntPtr.Zero)
+        if (_disposed)
             return;
 
-        NativeMethods.GetExitCodeProcess(_processHandle, out uint exitCode);
-        if (exitCode == NativeMethods.STILL_ACTIVE)
-        {
-            NativeMethods.TerminateProcess(_processHandle, 1);
-        }
+        TerminateIfRunning();
     }
 
     /// <inheritdoc />
@@ -366,30 +402,33 @@ public sealed class ConPtySession : ITerminalSession
         _pipeOutputRead?.Dispose();
         _pipeOutputRead = null;
 
-        // Close child-side pipe ends kept alive for the console.
+        // Close any child-side pipe ends the failure path left behind; on the success
+        // path StartAsync already released them to the pseudo console.
         _pipeInputRead?.Dispose();
         _pipeInputRead = null;
         _pipeOutputWrite?.Dispose();
         _pipeOutputWrite = null;
 
-        // Terminate the child process if still running.
-        TerminateAndCloseProcess();
+        // Terminate the child process if still running. The handle stays open until the
+        // lifecycle threads have been joined below: the exit watch is blocked inside an
+        // infinite wait on it, and terminating is what releases that wait.
+        TerminateIfRunning();
 
         // Free the attribute list.
         FreeAttributeList();
 
-        // Wait briefly for lifecycle tasks to complete.
-        if (_readLoop is not null)
-        {
-            try { _readLoop.Wait(TimeSpan.FromMilliseconds(500)); }
-            catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] Dispose read loop wait: {ex.Message}"); }
-        }
+        // Wait briefly for the lifecycle threads to finish.
+        JoinLoopThread(_readLoop, "read loop");
+        JoinLoopThread(_exitWatchLoop, "exit watch");
+        _readLoop = null;
+        _exitWatchLoop = null;
 
-        if (_exitWatchLoop is not null)
-        {
-            try { _exitWatchLoop.Wait(TimeSpan.FromMilliseconds(500)); }
-            catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] Dispose exit watch wait: {ex.Message}"); }
-        }
+        // Only now is no thread able to enter an interop call with this handle. The
+        // SafeProcessHandle would defer the close for an in-flight call anyway, which is
+        // the point of carrying one: a raw handle closed here could be reused by Windows
+        // for an unrelated object while another thread still held its numeric value.
+        _processHandle?.Dispose();
+        _processHandle = null;
 
         _cts?.Dispose();
         _cts = null;
@@ -403,10 +442,14 @@ public sealed class ConPtySession : ITerminalSession
         out SafeFileHandle inputRead, out SafeFileHandle inputWrite,
         out SafeFileHandle outputRead, out SafeFileHandle outputWrite)
     {
+        // Non-inheritable: CreateProcessW is called with bInheritHandles = false, so marking
+        // them inheritable bought nothing and leaked all four ends into every unrelated child
+        // the application starts with inheritance on. One such child holding the output write
+        // end keeps this session's pipe alive long after its shell has died.
         var sa = new NativeMethods.SECURITY_ATTRIBUTES
         {
             nLength = (uint)Marshal.SizeOf<NativeMethods.SECURITY_ATTRIBUTES>(),
-            bInheritHandle = 1 // TRUE
+            bInheritHandle = 0 // FALSE
         };
 
         if (!NativeMethods.CreatePipe(out inputRead, out inputWrite, ref sa, 0))
@@ -461,6 +504,14 @@ public sealed class ConPtySession : ITerminalSession
 
     private void LaunchProcess(string executable, string arguments, string? workingDirectory = null)
     {
+        // A Windows path cannot contain a quote, so one here only ever arrives from a profile
+        // trying to close the quoted program token and append its own command.
+        if (executable.Contains('"', StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Executable path must not contain a quote character.", nameof(executable));
+        }
+
         string cmdLine = string.IsNullOrEmpty(arguments)
             ? $"\"{executable}\""
             : $"\"{executable}\" {arguments}";
@@ -470,6 +521,24 @@ public sealed class ConPtySession : ITerminalSession
             lpAttributeList = _attrList
         };
         si.StartupInfo.cb = (uint)Marshal.SizeOf<NativeMethods.STARTUPINFOEX>();
+
+        // Declare the standard handles, and declare them empty. Without STARTF_USESTDHANDLES,
+        // CreateProcessW propagates the parent's own standard handles into the child, and the
+        // pseudo console attribute does not override them. When the parent's handles are pipes
+        // rather than console handles - a redirected host, a test runner, a service - the shell
+        // takes the pipes, reads end-of-file on its input and exits cleanly. That is the
+        // "Local shell started ... [Session ended: Process exited with code 0]" report: the
+        // session received exactly the sixteen bytes conhost emits on its own account and
+        // nothing the shell wrote, because the shell was never on the other end of it.
+        //
+        // Measured 2026-09-20 in such a host: without the flag, four starts out of four exited
+        // with code 0 after roughly 750 ms having delivered 16 bytes; with it, four out of four
+        // stayed alive and delivered the full 121-byte prompt. Leaving the three handles null
+        // is what makes conhost hand the child the pseudo console's own.
+        si.StartupInfo.dwFlags = NativeMethods.STARTF_USESTDHANDLES;
+        si.StartupInfo.hStdInput = IntPtr.Zero;
+        si.StartupInfo.hStdOutput = IntPtr.Zero;
+        si.StartupInfo.hStdError = IntPtr.Zero;
 
         uint flags = NativeMethods.EXTENDED_STARTUPINFO_PRESENT
                    | NativeMethods.CREATE_UNICODE_ENVIRONMENT;
@@ -493,9 +562,15 @@ public sealed class ConPtySession : ITerminalSession
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessW failed.");
             }
 
-            _processHandle = pi.hProcess;
-            _threadHandle = pi.hThread;
+            _processHandle = new SafeProcessHandle(pi.hProcess, ownsHandle: true);
             _processId = (int)pi.dwProcessId;
+
+            // Nothing resumes or waits on the primary thread, so close it here rather than
+            // carry a second raw handle for the session's lifetime.
+            if (pi.hThread != IntPtr.Zero)
+            {
+                NativeMethods.CloseHandle(pi.hThread);
+            }
         }
         finally
         {
@@ -549,17 +624,20 @@ public sealed class ConPtySession : ITerminalSession
     private void StartReadLoop()
     {
         _cts = new CancellationTokenSource();
-        var token = _cts.Token;
-        var reader = _outputReader!;
+        CancellationToken token = _cts.Token;
+        FileStream reader = _outputReader!;
 
-        _readLoop = Task.Run(async () =>
+        _readLoop = StartLoopThread("Heimdall ConPTY read", () =>
         {
-            byte[] buffer = new byte[4096];
+            byte[] buffer = new byte[PipeBufferBytes];
             try
             {
                 while (!token.IsCancellationRequested)
                 {
-                    int bytesRead = await reader.ReadAsync(buffer, token).ConfigureAwait(false);
+                    // A blocking read on purpose: the pipe handle is synchronous, so the
+                    // async overload would block a pool thread just the same, only less
+                    // visibly. This thread exists to be blocked.
+                    int bytesRead = reader.Read(buffer, 0, buffer.Length);
                     if (bytesRead <= 0)
                         break;
 
@@ -576,47 +654,27 @@ public sealed class ConPtySession : ITerminalSession
             // Raise ProcessExited with the child's exit code.
             if (!_disposed)
             {
-                int exitCode = -1;
-                if (_processHandle != IntPtr.Zero)
-                {
-                    // Give the process a moment to finalize.
-                    NativeMethods.WaitForSingleObject(_processHandle, 1000);
-                    if (NativeMethods.GetExitCodeProcess(_processHandle, out uint ec))
-                        exitCode = (int)ec;
-                }
-                SafeInvokeProcessExitedOnce(exitCode);
+                SafeInvokeProcessExitedOnce(ReadExitCode(ExitFinalizeWaitMilliseconds));
             }
-        }, token);
+        });
     }
 
     private void StartExitWatchLoop()
     {
-        IntPtr processHandle = _processHandle;
-        if (processHandle == IntPtr.Zero)
+        SafeProcessHandle? handle = _processHandle;
+        if (handle is null || handle.IsInvalid)
         {
             return;
         }
 
-        IntPtr currentProcess = NativeMethods.GetCurrentProcess();
-        if (!NativeMethods.DuplicateHandle(
-            currentProcess,
-            processHandle,
-            currentProcess,
-            out IntPtr watchHandle,
-            0,
-            false,
-            NativeMethods.DUPLICATE_SAME_ACCESS))
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"[ConPtySession] Duplicate process handle failed: {Marshal.GetLastWin32Error()}");
-            return;
-        }
-
-        _exitWatchLoop = Task.Run(() =>
+        // No duplicate is needed any more: the SafeProcessHandle keeps the underlying handle
+        // alive for the whole of the interop call below, so a concurrent Dispose defers the
+        // close rather than pulling the handle out from under this wait.
+        _exitWatchLoop = StartLoopThread("Heimdall ConPTY exit watch", () =>
         {
             try
             {
-                uint waitResult = NativeMethods.WaitForSingleObject(watchHandle, NativeMethods.INFINITE);
+                uint waitResult = NativeMethods.WaitForSingleObject(handle, NativeMethods.INFINITE);
                 if (waitResult == NativeMethods.WAIT_FAILED)
                 {
                     Heimdall.Core.Logging.FileLogger.Warn(
@@ -624,27 +682,91 @@ public sealed class ConPtySession : ITerminalSession
                     return;
                 }
 
-                int exitCode = -1;
-                if (NativeMethods.GetExitCodeProcess(watchHandle, out uint ec))
-                {
-                    exitCode = (int)ec;
-                }
-
                 if (!_disposed)
                 {
-                    SafeInvokeProcessExitedOnce(exitCode);
+                    SafeInvokeProcessExitedOnce(ReadExitCode(0));
                 }
             }
+            catch (ObjectDisposedException) { /* Expected when disposing during the wait */ }
             catch (Exception ex)
             {
                 Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] Exit watch: {ex.Message}");
             }
-            finally
-            {
-                try { NativeMethods.CloseHandle(watchHandle); }
-                catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] Close watch handle: {ex.Message}"); }
-            }
         });
+    }
+
+    /// <summary>
+    /// Starts a background thread for one of the session's lifecycle loops.
+    /// </summary>
+    private static Thread StartLoopThread(string name, Action body)
+    {
+        Thread thread = new Thread(() => body())
+        {
+            IsBackground = true,
+            Name = name
+        };
+        thread.Start();
+        return thread;
+    }
+
+    /// <summary>
+    /// Waits, bounded, for a lifecycle thread to finish. The bound is a failure bound: on the
+    /// normal path the child is already terminated and both threads return at once.
+    /// </summary>
+    private static void JoinLoopThread(Thread? thread, string what)
+    {
+        if (thread is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!thread.Join(LoopJoinTimeout))
+            {
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"[ConPtySession] Dispose {what} did not finish within {LoopJoinTimeout.TotalMilliseconds} ms.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] Dispose {what} join: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Reads the child's exit code, first giving it <paramref name="finalizeWaitMilliseconds"/>
+    /// to finalize. Returns <see cref="UnknownExitCode"/> when the query fails or the child is
+    /// still running: neither is an exit code, and passing one off as a code made the terminal
+    /// announce an end that had not happened.
+    /// </summary>
+    private int ReadExitCode(uint finalizeWaitMilliseconds)
+    {
+        SafeProcessHandle? handle = _processHandle;
+        if (handle is null || handle.IsInvalid)
+        {
+            return UnknownExitCode;
+        }
+
+        try
+        {
+            if (finalizeWaitMilliseconds > 0)
+            {
+                NativeMethods.WaitForSingleObject(handle, finalizeWaitMilliseconds);
+            }
+
+            if (!NativeMethods.GetExitCodeProcess(handle, out uint exitCode)
+                || exitCode == NativeMethods.STILL_ACTIVE)
+            {
+                return UnknownExitCode;
+            }
+
+            return (int)exitCode;
+        }
+        catch (ObjectDisposedException)
+        {
+            return UnknownExitCode;
+        }
     }
 
     /// <summary>
@@ -761,26 +883,30 @@ public sealed class ConPtySession : ITerminalSession
         }
     }
 
-    private void TerminateAndCloseProcess()
+    /// <summary>
+    /// Terminates the child if it is still running, leaving the handle open for the callers
+    /// that still need it. A failed exit-code query is treated as "still running": skipping
+    /// the terminate on a query failure orphaned the child.
+    /// </summary>
+    private void TerminateIfRunning()
     {
-        if (_processHandle != IntPtr.Zero)
+        SafeProcessHandle? handle = _processHandle;
+        if (handle is null || handle.IsInvalid)
         {
-            try
-            {
-                NativeMethods.GetExitCodeProcess(_processHandle, out uint exitCode);
-                if (exitCode == NativeMethods.STILL_ACTIVE)
-                    NativeMethods.TerminateProcess(_processHandle, 1);
-            }
-            catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] TerminateAndCloseProcess: {ex.Message}"); }
-
-            NativeMethods.CloseHandle(_processHandle);
-            _processHandle = IntPtr.Zero;
+            return;
         }
 
-        if (_threadHandle != IntPtr.Zero)
+        try
         {
-            NativeMethods.CloseHandle(_threadHandle);
-            _threadHandle = IntPtr.Zero;
+            if (!NativeMethods.GetExitCodeProcess(handle, out uint exitCode)
+                || exitCode == NativeMethods.STILL_ACTIVE)
+            {
+                NativeMethods.TerminateProcess(handle, KillExitCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] TerminateIfRunning: {ex.Message}");
         }
     }
 

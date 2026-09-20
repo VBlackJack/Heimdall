@@ -48,14 +48,14 @@ public sealed class TerminalCommandFormatterTests
     {
         string command = TerminalCommandFormatter.FormatCd("powershell.exe", @"C:\Temp\o'brien");
 
-        Assert.Equal("cd 'C:\\Temp\\o''brien'\n", command);
+        Assert.Equal("cd 'C:\\Temp\\o''brien'\r", command);
     }
 
     [Fact]
     public void FormatCd_PowerShell_NeutralizesDoubleQuoteInjection()
     {
         string path = "x\";calc;\"";
-        string expected = "cd '" + path.Replace("'", "''", StringComparison.Ordinal) + "'\n";
+        string expected = "cd '" + path.Replace("'", "''", StringComparison.Ordinal) + "'\r";
 
         string command = TerminalCommandFormatter.FormatCd("powershell.exe", path);
 
@@ -67,7 +67,7 @@ public sealed class TerminalCommandFormatterTests
     {
         string command = TerminalCommandFormatter.FormatCd("cmd.exe", "x\";dir;\"");
 
-        Assert.Equal("cd /d \"x;dir;\"\n", command);
+        Assert.Equal("cd /d \"x;dir;\"\r", command);
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class TerminalCommandFormatterTests
 
         string command = TerminalCommandFormatter.FormatCd("/bin/bash", path);
 
-        Assert.Equal("cd " + InputValidator.EscapeShellArg(path) + "\n", command);
+        Assert.Equal("cd " + InputValidator.EscapeShellArg(path) + "\r", command);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public sealed class TerminalCommandFormatterTests
     {
         string command = TerminalCommandFormatter.FormatRun("powershell.exe", @"C:\Tools\a b.exe");
 
-        Assert.Equal("& 'C:\\Tools\\a b.exe'\n", command);
+        Assert.Equal("& 'C:\\Tools\\a b.exe'\r", command);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public sealed class TerminalCommandFormatterTests
     {
         string command = TerminalCommandFormatter.FormatCd(null, @"C:\Temp");
 
-        Assert.Equal("cd 'C:\\Temp'\n", command);
+        Assert.Equal("cd 'C:\\Temp'\r", command);
     }
 
     [Fact]
@@ -101,6 +101,45 @@ public sealed class TerminalCommandFormatterTests
     {
         string command = TerminalCommandFormatter.FormatCd("bash", "/var/log");
 
-        Assert.Equal("cd '/var/log'\n", command);
+        Assert.Equal("cd '/var/log'\r", command);
+    }
+
+    /// <summary>
+    /// Carriage return submits the line; line feed does not.
+    /// </summary>
+    /// <remarks>
+    /// Measured 2026-09-20 against a live ConPTY: the same command terminated with LF leaves
+    /// Windows PowerShell on its ">> " continuation prompt with nothing executed, three runs
+    /// out of three, while CR runs it and returns a fresh prompt. The file browser's
+    /// "navigate here" and "run in shell" typed their command and never sent it.
+    /// </remarks>
+    [Theory]
+    [InlineData("powershell.exe")]
+    [InlineData("cmd.exe")]
+    [InlineData("bash.exe")]
+    public void FormatCdAndRun_EndWithCarriageReturn_NotLineFeed(string shell)
+    {
+        string cd = TerminalCommandFormatter.FormatCd(shell, @"C:\Temp");
+        string run = TerminalCommandFormatter.FormatRun(shell, @"C:\Temp\tool.exe");
+
+        Assert.EndsWith("\r", cd, StringComparison.Ordinal);
+        Assert.EndsWith("\r", run, StringComparison.Ordinal);
+        Assert.DoesNotContain('\n', cd);
+        Assert.DoesNotContain('\n', run);
+    }
+
+    /// <summary>
+    /// The shell kind comes from the file name, not from anywhere in the path.
+    /// </summary>
+    /// <remarks>
+    /// Matching "cmd" anywhere made C:\cmdtools\pwsh.exe a cmd shell, which quotes with double
+    /// quotes and strips apostrophes instead of doubling them.
+    /// </remarks>
+    [Fact]
+    public void FormatCd_ShellInADirectoryNamedAfterAnotherShell_UsesTheFileName()
+    {
+        string command = TerminalCommandFormatter.FormatCd(@"C:\cmdtools\powershell.exe", @"C:\Temp\o'brien");
+
+        Assert.Equal(@"cd 'C:\Temp\o''brien'" + "\r", command);
     }
 }

@@ -55,8 +55,22 @@ internal sealed class LocalShellHandler : IProtocolHandler
         _connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig);
         _connectionSm.TryTransition(server.Id, ConnectionState.LaunchingLocal);
 
-        string executable = server.LocalShellExecutable ?? "powershell.exe";
+        string executable = ResolveShellExecutable(
+            server.LocalShellExecutable ?? AppConstants.DefaultLocalShellExecutable);
         string arguments = server.LocalShellArguments ?? string.Empty;
+
+        // A Windows path cannot hold a quote, so one here is a profile trying to close the
+        // quoted program token and append its own command. The session refuses it too, but
+        // the elevation wrappers embed the executable inside their argument string, where
+        // that refusal would not reach it.
+        if (executable.Contains('\"', StringComparison.Ordinal))
+        {
+            Core.Logging.FileLogger.Warn(
+                "Local shell executable contains a quote character; refusing to launch.");
+            string quoteMessage = _localizer["ErrorLocalShellLaunchFailed"];
+            _connectionSm.SetError(server.Id, quoteMessage);
+            return new ConnectionResult(false, quoteMessage, null);
+        }
 
         if (IsPowerShellExecutable(executable))
         {
@@ -280,6 +294,59 @@ internal sealed class LocalShellHandler : IProtocolHandler
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Turns a shell name into a full path so the launch does not depend on the process
+    /// search order.
+    /// </summary>
+    /// <remarks>
+    /// The session hands the command line to CreateProcessW with no application name, and
+    /// that search order begins with the directory of the running executable and the parent
+    /// process's current directory. A bare "powershell.exe" therefore prefers anything of
+    /// that name sitting next to Heimdall.exe. Resolving here uses the system directory for
+    /// Windows PowerShell and PATH for everything else; a name found nowhere is passed
+    /// through unchanged so the failure stays the operator's clear "not found".
+    /// </remarks>
+    internal static string ResolveShellExecutable(string executable)
+    {
+        if (string.IsNullOrWhiteSpace(executable))
+        {
+            executable = AppConstants.DefaultLocalShellExecutable;
+        }
+
+        string candidate = executable.Trim();
+
+        // Anything carrying a directory is already the operator's explicit choice.
+        if (Path.IsPathRooted(candidate)
+            || candidate.Contains(Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            || candidate.Contains(Path.AltDirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            return candidate;
+        }
+
+        if (string.Equals(candidate, AppConstants.DefaultLocalShellExecutable, StringComparison.OrdinalIgnoreCase))
+        {
+            string system32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
+            string windowsPowerShell = Path.Combine(
+                system32, AppConstants.WindowsPowerShellSystemRelativePath);
+            if (File.Exists(windowsPowerShell))
+            {
+                return windowsPowerShell;
+            }
+        }
+
+        try
+        {
+            // PATH only: unlike the CreateProcessW search order, this never reaches the
+            // application directory or the current directory.
+            return ConnectionHelpers.FindInPath(candidate) ?? candidate;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"[LocalShellHandler] Shell PATH lookup: {ex.Message}");
+            return candidate;
+        }
     }
 
     internal static bool IsPowerShellExecutable(string executable)

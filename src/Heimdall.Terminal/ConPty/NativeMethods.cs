@@ -77,34 +77,24 @@ internal static partial class NativeMethods
     // Process lifecycle
     // ========================================================================
 
+    // The process handle travels as a SafeProcessHandle so the interop marshaller holds a
+    // reference for the duration of every call. A Dispose racing a blocked WaitForSingleObject
+    // then defers the real CloseHandle instead of closing a handle another thread is still
+    // using, whose numeric value Windows is free to hand to an unrelated object.
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static partial bool TerminateProcess(IntPtr hProcess, uint uExitCode);
+    internal static partial bool TerminateProcess(SafeProcessHandle hProcess, uint uExitCode);
 
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static partial bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
+    internal static partial bool GetExitCodeProcess(SafeProcessHandle hProcess, out uint lpExitCode);
 
     [LibraryImport("kernel32.dll", SetLastError = true)]
-    internal static partial uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+    internal static partial uint WaitForSingleObject(SafeProcessHandle hHandle, uint dwMilliseconds);
 
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool CloseHandle(IntPtr hObject);
-
-    [LibraryImport("kernel32.dll")]
-    internal static partial IntPtr GetCurrentProcess();
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    internal static partial bool DuplicateHandle(
-        IntPtr hSourceProcessHandle,
-        IntPtr hSourceHandle,
-        IntPtr hTargetProcessHandle,
-        out IntPtr lpTargetHandle,
-        uint dwDesiredAccess,
-        [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle,
-        uint dwOptions);
 
     // ========================================================================
     // Thread attribute list (pseudo console assignment)
@@ -147,11 +137,17 @@ internal static partial class NativeMethods
     // ========================================================================
 
     internal const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
+
+    /// <summary>
+    /// STARTUPINFO.dwFlags bit declaring that the three standard handles in the structure are
+    /// the ones to use. Setting it with all three left null is what stops CreateProcessW
+    /// handing the child the parent's own standard handles.
+    /// </summary>
+    internal const int STARTF_USESTDHANDLES = 0x00000100;
     internal const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
     internal const uint STILL_ACTIVE = 259;
     internal const uint INFINITE = 0xFFFFFFFF;
     internal const uint WAIT_FAILED = 0xFFFFFFFF;
-    internal const uint DUPLICATE_SAME_ACCESS = 0x00000002;
 
     internal static readonly nuint PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = 0x00020016;
 
