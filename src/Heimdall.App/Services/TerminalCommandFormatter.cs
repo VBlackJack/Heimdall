@@ -24,10 +24,35 @@ namespace Heimdall.App.Services;
 internal static class TerminalCommandFormatter
 {
     /// <summary>
-    /// The character that submits a line, shared with every other surface that sends one.
-    /// See <see cref="AppConstants.TerminalSubmitKey"/> for the measurement behind it.
+    /// Terminates a command so the shell runs it, exactly once.
     /// </summary>
-    private const string SubmitKey = AppConstants.TerminalSubmitKey;
+    /// <remarks>
+    /// <para>Any terminator the caller left is removed first, then
+    /// <see cref="AppConstants.TerminalSubmitKey"/> is appended. Leaving an already-terminated
+    /// command alone would have been the obvious reading of "do not submit twice", and it
+    /// reintroduces the defect this exists to close: a command arriving with LF - the
+    /// convention every caller used until 2026-09-20 - would be forwarded intact, and LF does
+    /// not submit on a ConPTY. Stripping first leaves no incorrect form reachable.</para>
+    /// <para>The cost is that a caller mixing conventions is now silent rather than broken. At
+    /// this boundary the operator comes first, so the debug line below is the whole of what is
+    /// left of the complaint. It cannot be noisy: nothing is stripped from a caller that
+    /// follows the contract, so a correct call never logs.</para>
+    /// </remarks>
+    public static string Submit(string command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        string line = command.TrimEnd('\r', '\n');
+        if (line.Length != command.Length)
+        {
+            Heimdall.Core.Logging.FileLogger.Debug(
+                "[TerminalCommandFormatter] A caller submitted a command that already carried "
+                + $"{command.Length - line.Length} terminator character(s); "
+                + "they were replaced with the canonical submit key.");
+        }
+
+        return line + AppConstants.TerminalSubmitKey;
+    }
 
     private enum LocalShellKind
     {
@@ -89,18 +114,18 @@ internal static class TerminalCommandFormatter
     {
         LocalShellKind shellKind = DetectLocalShell(shellExecutable);
         string quotedPath = QuoteLocalPath(shellExecutable, path);
-        return shellKind == LocalShellKind.Cmd
-            ? "cd /d " + quotedPath + SubmitKey
-            : "cd " + quotedPath + SubmitKey;
+        return Submit(shellKind == LocalShellKind.Cmd
+            ? "cd /d " + quotedPath
+            : "cd " + quotedPath);
     }
 
     public static string FormatRun(string? shellExecutable, string path)
     {
         LocalShellKind shellKind = DetectLocalShell(shellExecutable);
         string quotedPath = QuoteLocalPath(shellExecutable, path);
-        return shellKind == LocalShellKind.PowerShell
-            ? "& " + quotedPath + SubmitKey
-            : quotedPath + SubmitKey;
+        return Submit(shellKind == LocalShellKind.PowerShell
+            ? "& " + quotedPath
+            : quotedPath);
     }
 
     public static string FormatRemoteCd(string path)

@@ -68,6 +68,63 @@ public sealed class TerminalSubmitKeyTests
     }
 
     /// <summary>
+    /// A command that already carries a terminator is submitted with the canonical key, not
+    /// forwarded as it arrived.
+    /// </summary>
+    /// <remarks>
+    /// <para>This is the whole reason the rule is "strip, then append" rather than "if it
+    /// already ends with a terminator, leave it". The second reading looks equivalent and is
+    /// not: a command arriving with LF - the convention every caller here used until
+    /// 2026-09-20 - would be forwarded intact, and LF does not submit on a ConPTY. The defect
+    /// would come back through the guard meant to prevent it.</para>
+    /// <para>The discriminating mutant is exactly that reading:
+    /// <c>if (command.EndsWith(SubmitKey) || command.EndsWith("\n")) return command;</c>.
+    /// Measured: it leaves the LF rows below unchanged and they fail.</para>
+    /// </remarks>
+    [Theory]
+    [InlineData("echo hi\n")]
+    [InlineData("echo hi\r")]
+    [InlineData("echo hi\r\n")]
+    [InlineData("echo hi\n\n")]
+    [InlineData("echo hi\r\r\n")]
+    public void Submit_ACommandThatArrivesTerminated_IsSubmittedWithTheCanonicalKey(string command)
+    {
+        string submitted = TerminalCommandFormatter.Submit(command);
+
+        Assert.Equal("echo hi" + AppConstants.TerminalSubmitKey, submitted);
+        Assert.DoesNotContain('\n', submitted);
+    }
+
+    /// <summary>
+    /// A command that follows the contract is submitted once, unchanged apart from the key.
+    /// </summary>
+    [Fact]
+    public void Submit_ABareCommand_GetsExactlyOneSubmitKey()
+    {
+        string submitted = TerminalCommandFormatter.Submit("echo hi");
+
+        Assert.Equal("echo hi" + AppConstants.TerminalSubmitKey, submitted);
+    }
+
+    /// <summary>
+    /// Nothing but terminators is a bare Enter, which is what an empty line means.
+    /// </summary>
+    [Fact]
+    public void Submit_OnlyTerminators_BecomesOneBareSubmit()
+    {
+        Assert.Equal(AppConstants.TerminalSubmitKey, TerminalCommandFormatter.Submit("\r\n"));
+    }
+
+    /// <summary>
+    /// A null command is the caller's bug, not an empty line.
+    /// </summary>
+    [Fact]
+    public void Submit_Null_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => TerminalCommandFormatter.Submit(null!));
+    }
+
+    /// <summary>
     /// The view's WriteCommand appends the shared key, and nothing else.
     /// </summary>
     /// <remarks>
@@ -77,7 +134,7 @@ public sealed class TerminalSubmitKeyTests
     /// what the real implementor sent. That is exactly how the line feed survived.</para>
     /// <para><see cref="SourceStatements.ViewLogic"/> blanks literals, so a revert to a
     /// <c>"\n"</c> literal reads as <c>+ ""</c> here and the anchor fails. That is the
-    /// discriminating mutant, and the reason the decision had to become a named constant
+    /// discriminating mutant, and the reason the decision had to become a named identifier
     /// before it could be guarded at all.</para>
     /// </remarks>
     [Fact]
@@ -89,6 +146,6 @@ public sealed class TerminalSubmitKeyTests
 
         SourceStatements.AssertStatementChain(
             logic,
-            "WriteToSession(command + AppConstants.TerminalSubmitKey);");
+            "WriteToSession(Services.TerminalCommandFormatter.Submit(command));");
     }
 }

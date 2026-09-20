@@ -1857,9 +1857,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// interface. It is now the shared <see cref="AppConstants.TerminalSubmitKey"/>, the same
     /// byte <see cref="KeepAliveCr"/> already sends.
     /// </remarks>
+    /// <remarks>
+    /// Two conventions reach this class: strings the formatter already terminated, written
+    /// straight to the session, and bare strings arriving here. Nothing stops a caller passing
+    /// one where the other is expected, and a doubled Enter is invisible to a test that writes
+    /// through a fake sink. <see cref="Services.TerminalCommandFormatter.Submit"/> makes the
+    /// question moot by stripping whatever terminator arrived before adding the canonical one.
+    /// </remarks>
     public void WriteCommand(string command)
     {
-        WriteToSession(command + AppConstants.TerminalSubmitKey);
+        WriteToSession(Services.TerminalCommandFormatter.Submit(command));
     }
 
     /// <summary>
