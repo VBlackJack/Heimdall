@@ -264,7 +264,8 @@ public sealed class SshHandlerAuthFailureCompositionTests : IDisposable
                     throw new SshAuthenticationException(KeyboardInteractiveRefusal);
                 },
                 startPipeModeSession: (_, _, _, _, _, _) =>
-                    throw new InvalidOperationException(PlinkReached));
+                    throw new InvalidOperationException(PlinkReached),
+                puttySessionRegistry: new InMemoryPuttySessionRegistry());
 
             _handler.SetStatusText = text => Statuses.Add(text);
         }

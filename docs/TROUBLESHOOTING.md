@@ -977,3 +977,19 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 3. If the copy is a portable zip or an MSI deployment, download the new archive or package from the release page.
 
 **Files**: `Heimdall.Core/Updates/UpdateRelaunchScript.cs`, `Heimdall.Core/Updates/UpdateOutcomeClassifier.cs`, `Services/UpdateRelaunchOutcomeText.cs`
+
+---
+
+## 54. SSH Terminal (Plink) - Long Lines Wrap at Column 80 or Overwrite the Prompt {#ssh-plink-terminal-width}
+
+**Symptom**: On a session that runs through the Plink fallback (Pageant-only authentication, or the retry after a refused sign-in), bash wraps at column 80 although the terminal is wider, and a long command line overwrites its own beginning.
+
+**Root cause**: Windows plink takes the remote PTY size only from its configuration (`TermWidth`/`TermHeight`), never from a console, and never sends a window change. Heimdall carries the initial size in a temporary PuTTY saved session (`HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-<random>`) passed with `-load`. When the registry refuses that session, the launch falls back to 80x24 and a warning `[PlinkSizeSession] Could not create the Plink size session` is written to the log.
+
+**Solution**:
+
+1. Check the log for the warning above. If it is there, check that the current user can write under `HKCU\Software\SimonTatham\PuTTY\Sessions` (a policy or security product may block it).
+2. Resize before connecting, not after: the size is taken once, at launch. Resizing the window after start cannot reach the remote PTY on this path; reconnect to apply a new size.
+3. In the remote shell, `stty cols <n> rows <m>` sets the size by hand for the current session.
+
+**Files**: `Services/Handlers/PlinkSizeSession.cs`, `Services/PlinkSizeSessionJanitor.cs`, `Services/Handlers/SshHandler.cs` (`ConnectSshViaPlinkAsync`, `BuildPipeModeArguments`), `Heimdall.Terminal/PipeModeSession.cs`

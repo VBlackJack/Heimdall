@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using FluentAssertions;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.Core.Configuration;
@@ -160,6 +161,218 @@ public sealed class SshHandlerInitialTerminalSizeTests
         }
     }
 
+    /// <summary>
+    /// Plink ignores the size it is started with, so the size travels in a temporary saved session
+    /// that the arguments load. It must exist, with the reported size, at the moment of the launch.
+    /// </summary>
+    [Fact]
+    public async Task ThePlinkLaunchLoadsATemporarySessionCarryingTheReportedSize()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        string? arguments = null;
+        IReadOnlyList<PuttyRegistryValue>? atLaunch = null;
+
+        ConnectionResult result = await ConnectViaPlinkAsync(
+            registry,
+            (_, _, args, _, _, _) =>
+            {
+                arguments = args;
+                string name = registry.Written.Single();
+                atLaunch = registry.ReadSession(name);
+                return Task.CompletedTask;
+            });
+
+        result.Success.Should().BeTrue(result.ErrorMessage);
+        string sessionName = registry.Written.Should().ContainSingle().Subject;
+        arguments.Should().StartWith($"-load {sessionName} ");
+        atLaunch.Should().ContainEquivalentOf(
+            new PuttyRegistryValue(PlinkSizeSession.TermWidthValueName, ReportedColumns, Microsoft.Win32.RegistryValueKind.DWord));
+        atLaunch.Should().ContainEquivalentOf(
+            new PuttyRegistryValue(PlinkSizeSession.TermHeightValueName, ReportedRows, Microsoft.Win32.RegistryValueKind.DWord));
+
+        // Not released by the launch itself: the process has not read it yet. The release on first
+        // output or exit is pinned against the handle in PlinkSizeSessionTests.
+        registry.Deleted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ALaunchFailureDeletesTheSizeSessionExactlyOnce()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+
+        ConnectionResult result = await ConnectViaPlinkAsync(
+            registry,
+            static (_, _, _, _, _, _) => throw new InvalidOperationException("launch refused"));
+
+        result.Success.Should().BeFalse();
+        string sessionName = registry.Written.Should().ContainSingle().Subject;
+        registry.Deleted.Should().Equal(sessionName);
+        registry.Contains(sessionName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CancellationAtTheLaunchDeletesTheSizeSessionExactlyOnce()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        using CancellationTokenSource cancellation = new();
+
+        Func<Task> connect = () => ConnectViaPlinkAsync(
+            registry,
+            (_, _, _, _, _, ct) =>
+            {
+                cancellation.Cancel();
+                ct.ThrowIfCancellationRequested();
+                return Task.CompletedTask;
+            },
+            cancellation.Token);
+
+        await connect.Should().ThrowAsync<OperationCanceledException>();
+        string sessionName = registry.Written.Should().ContainSingle().Subject;
+        registry.Deleted.Should().Equal(sessionName);
+    }
+
+    /// <summary>
+    /// Fail-open for the size only: a registry that refuses costs the terminal width, never the
+    /// connection, and the arguments are exactly the ones a launch without a size session builds.
+    /// </summary>
+    [Fact]
+    public async Task ARegistryRefusalLaunchesWithoutLoadAndStillConnects()
+    {
+        string keyPath = Path.GetTempFileName();
+        try
+        {
+            InMemoryPuttySessionRegistry working = new();
+            string? withSession = null;
+            await ConnectViaPlinkAsync(
+                working,
+                (_, _, args, _, _, _) =>
+                {
+                    withSession = args;
+                    return Task.CompletedTask;
+                },
+                sharedKeyPath: keyPath);
+
+            InMemoryPuttySessionRegistry refusing = new() { WriteFailure = new UnauthorizedAccessException("denied") };
+            string? withoutSession = null;
+            ConnectionResult result = await ConnectViaPlinkAsync(
+                refusing,
+                (_, _, args, _, _, _) =>
+                {
+                    withoutSession = args;
+                    return Task.CompletedTask;
+                },
+                sharedKeyPath: keyPath);
+
+            result.Success.Should().BeTrue(result.ErrorMessage);
+            withoutSession.Should().NotContain("-load");
+            string loadPrefix = $"-load {working.Written.Single()} ";
+            withSession.Should().StartWith(loadPrefix);
+            withoutSession.Should().Be(withSession![loadPrefix.Length..]);
+            refusing.Contains(refusing.Deleted.Should().ContainSingle().Subject).Should().BeFalse();
+        }
+        finally
+        {
+            File.Delete(keyPath);
+        }
+    }
+
+    [Fact]
+    public void ConstructingTheHandlerSweepsLeftoverSizeSessionsOnly()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        registry.Seed("prod-bastion");
+        registry.Seed($"{PlinkSizeSessionNaming.Prefix}leftover");
+
+        using SshHandler handler = CreateHandler(puttySessionRegistry: registry);
+
+        registry.GetSessionNames().Should().Equal("prod-bastion");
+    }
+
+    [Fact]
+    public void PipeModeArgumentsCarryLoadFirstWhenASessionWasCreated()
+    {
+        string withSession = SshHandler.BuildPipeModeArguments(
+            keyPath: null,
+            compression: true,
+            agentForwarding: false,
+            x11Forwarding: false,
+            port: 2222,
+            target: "operator@host.example.test",
+            hostKeyFingerprint: "SHA256:abc123",
+            passwordFilePath: "heimdall-pw",
+            sizeSessionName: "HeimdallPtySize-0123abcd");
+
+        withSession.Should().Be(
+            "-load HeimdallPtySize-0123abcd -ssh -t -no-antispoof -C -P 2222 -hostkey \"SHA256:abc123\" "
+            + "-pwfile \"heimdall-pw\" operator@host.example.test");
+    }
+
+    /// <summary>
+    /// Byte-identical to the arguments built before the size session existed, spelled out rather
+    /// than derived so a change to the no-session shape cannot pass unnoticed.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void PipeModeArgumentsAreUnchangedWithoutASession(string? sizeSessionName)
+    {
+        string arguments = SshHandler.BuildPipeModeArguments(
+            keyPath: null,
+            compression: true,
+            agentForwarding: false,
+            x11Forwarding: false,
+            port: 2222,
+            target: "operator@host.example.test",
+            hostKeyFingerprint: "SHA256:abc123",
+            passwordFilePath: "heimdall-pw",
+            sizeSessionName: sizeSessionName);
+
+        arguments.Should().Be(
+            "-ssh -t -no-antispoof -C -P 2222 -hostkey \"SHA256:abc123\" "
+            + "-pwfile \"heimdall-pw\" operator@host.example.test");
+    }
+
+    private async Task<ConnectionResult> ConnectViaPlinkAsync(
+        InMemoryPuttySessionRegistry registry,
+        SshHandler.StartPipeModeSession start,
+        CancellationToken cancellationToken = default,
+        string? sharedKeyPath = null)
+    {
+        string plinkPath = Path.GetTempFileName();
+        string keyPath = sharedKeyPath ?? Path.GetTempFileName();
+        ConnectionResult? result = null;
+        try
+        {
+            HostKeyStore hostKeyStore = new HostKeyStore();
+            hostKeyStore.Trust(TrustedHost, DefaultPorts.Ssh, TrustedFingerprint);
+            using SshHandler handler = CreateHandler(
+                hostKeyTrustService: new HostKeyTrustService(hostKeyStore),
+                startPipeModeSession: start,
+                puttySessionRegistry: registry);
+            handler.ResolveInitialTerminalSize = static _ => new TerminalSize(ReportedColumns, ReportedRows);
+
+            result = await handler.ConnectSshViaPlinkAsync(
+                CreateGatewayServer(keyPath),
+                new AppSettings { PlinkPath = plinkPath },
+                "127.0.0.1",
+                TunnelLocalPort,
+                usesTunnel: true,
+                originalFailure: null,
+                cancellationToken);
+            return result;
+        }
+        finally
+        {
+            DisposeSession(result);
+            File.Delete(plinkPath);
+            if (sharedKeyPath is null)
+            {
+                File.Delete(keyPath);
+            }
+        }
+    }
+
     private static void DisposeSession(ConnectionResult? result)
     {
         switch (result?.Session)
@@ -176,7 +389,8 @@ public sealed class SshHandlerInitialTerminalSizeTests
     private static SshHandler CreateHandler(
         SshHandler.ConnectShellSession? connectShellSession = null,
         SshHandler.StartPipeModeSession? startPipeModeSession = null,
-        IHostKeyTrustService? hostKeyTrustService = null)
+        IHostKeyTrustService? hostKeyTrustService = null,
+        IPuttySessionRegistry? puttySessionRegistry = null)
     {
         LocalizationManager localizer = new LocalizationManager();
         return new SshHandler(
@@ -193,7 +407,8 @@ public sealed class SshHandlerInitialTerminalSizeTests
             plinkAttestation: static _ => PlinkAttestationLease.NotAttested,
             agentRegistryFactory: static _ => new SshAgentRegistry([]),
             connectShellSession: connectShellSession,
-            startPipeModeSession: startPipeModeSession);
+            startPipeModeSession: startPipeModeSession,
+            puttySessionRegistry: puttySessionRegistry ?? new InMemoryPuttySessionRegistry());
     }
 
     private static ServerProfileDto CreateDirectServer() => new ServerProfileDto

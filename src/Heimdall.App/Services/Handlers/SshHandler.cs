@@ -78,6 +78,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly Func<SshAgentPreference, SshAgentRegistry> _agentRegistryFactory;
     private readonly ConnectShellSession _connectShellSession;
     private readonly StartPipeModeSession _startPipeModeSession;
+    private readonly IPuttySessionRegistry _puttySessionRegistry;
 
     internal Action<string>? SetStatusText { get; set; }
 
@@ -104,7 +105,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         Func<string?, PlinkAttestationLease>? plinkAttestation = null,
         Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null,
         ConnectShellSession? connectShellSession = null,
-        StartPipeModeSession? startPipeModeSession = null)
+        StartPipeModeSession? startPipeModeSession = null,
+        IPuttySessionRegistry? puttySessionRegistry = null)
     {
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
@@ -125,6 +127,11 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             nameof(PlinkPasswordFileJanitor),
             _plinkPasswordFileJanitor.SweepStale);
         _plinkPasswordFileJanitorScheduler.Start();
+        _puttySessionRegistry = puttySessionRegistry ?? new WindowsPuttySessionRegistry();
+
+        // Synchronous and before any launch, so the sweep can never delete a size session this
+        // process has just created for a Plink that has not read it yet.
+        new PlinkSizeSessionJanitor(_puttySessionRegistry).SweepLeftovers();
     }
 
     public string Protocol => "SSH";
@@ -462,7 +469,9 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     /// <remarks>
     /// The page's <c>ready:</c> size used to arrive before the session was attached and was
     /// dropped, so the remote PTY stayed at 80x24 until the first window resize. On the Plink
-    /// pipe path that was permanent, because that transport cannot resize after start.
+    /// pipe path, Plink ignores the size it is launched with: the size reaches the remote PTY only
+    /// through the temporary PuTTY saved session passed with <c>-load</c> (see
+    /// <see cref="PlinkSizeSession"/>). Resizing after start stays impossible on that transport.
     /// </remarks>
     private TerminalSize ResolveInitialTerminalSizeFor(ServerProfileDto server)
     {
@@ -887,6 +896,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             {
                 string? passwordFilePath = CreatePlinkPasswordFile(password);
 
+                // Plink takes the remote PTY size only from its saved-session configuration, and
+                // the pipe transport cannot resize after start, so the launch is the only moment
+                // the size can travel and a temporary saved session is the only way it does.
+                // Resolved as late as possible for that reason. A null session name means the
+                // registry refused and the launch goes ahead at Plink's default size.
+                TerminalSize initialSize = ResolveInitialTerminalSizeFor(server);
+                string? sizeSessionName = PlinkSizeSession.TryCreate(
+                    _puttySessionRegistry,
+                    initialSize.Columns,
+                    initialSize.Rows);
+
                 string args = BuildPipeModeArguments(
                     server.SshKeyPath,
                     server.SshCompression,
@@ -895,7 +915,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     targetPort,
                     target,
                     hostKeyArg,
-                    passwordFilePath);
+                    passwordFilePath,
+                    sizeSessionName);
 
                 PlinkPasswordFileReleaseHandle? passwordFileRelease = null;
                 if (!string.IsNullOrEmpty(passwordFilePath))
@@ -911,6 +932,18 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         attestation.FirstByteProvesConsumption);
                 }
 
+                // Same single release path and the same proof as the password file: -load is read
+                // in the command-line pass, so the first byte shows the session was loaded.
+                PlinkSizeSessionReleaseHandle? sizeSessionRelease = null;
+                if (sizeSessionName is not null)
+                {
+                    sizeSessionRelease = PlinkSizeSession.ArmRelease(
+                        terminalSession,
+                        sizeSessionName,
+                        name => PlinkSizeSession.Delete(_puttySessionRegistry, name),
+                        attestation.FirstByteProvesConsumption);
+                }
+
                 // The attested path comes from the pinned handle, with every junction already
                 // followed. Launching the configured string instead would resolve it a second time,
                 // and a junction repointed since the attestation makes that a different image -
@@ -918,10 +951,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 // there is nothing to bind to, so the configured path is used and the password file
                 // stays on the process-exit path.
                 string launchPath = attestation.LaunchPath ?? plinkPath;
-
-                // The pipe transport cannot resize after start, so the launch is the only
-                // moment the size can travel. Resolved as late as possible for that reason.
-                TerminalSize initialSize = ResolveInitialTerminalSizeFor(server);
 
                 try
                 {
@@ -939,12 +968,14 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 {
                     terminalSession.Dispose();
                     passwordFileRelease?.Release();
+                    sizeSessionRelease?.Release();
                     throw;
                 }
                 catch (Exception ex)
                 {
                     terminalSession.Dispose();
                     passwordFileRelease?.Release();
+                    sizeSessionRelease?.Release();
                     Core.Logging.FileLogger.Error("Plink SSH launch failed", ex);
                     _connectionSm.SetError(server.Id, ex.Message);
                     return new ConnectionResult(
@@ -1130,9 +1161,20 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         int port,
         string target,
         string? hostKeyFingerprint,
-        string? passwordFilePath = null)
+        string? passwordFilePath = null,
+        string? sizeSessionName = null)
     {
-        var argParts = new List<string> { "-ssh", "-t", "-no-antispoof" };
+        var argParts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(sizeSessionName))
+        {
+            // First, so every explicit flag below reads as applied on top of the loaded session.
+            // Plink replays its explicit options after -load whatever the order (measured: the
+            // size and -hostkey hold at any position); the order only keeps that obvious.
+            argParts.Add("-load");
+            argParts.Add(sizeSessionName);
+        }
+
+        argParts.AddRange(["-ssh", "-t", "-no-antispoof"]);
         if (!string.IsNullOrWhiteSpace(keyPath))
         {
             argParts.Add("-i");

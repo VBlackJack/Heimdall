@@ -147,11 +147,13 @@ public sealed class PipeModeSession : ITerminalSession
     /// <inheritdoc />
     /// <remarks>
     /// <paramref name="columns"/> and <paramref name="rows"/> are the size the caller knows
-    /// before the launch, and this is the only moment the size could matter: the pipe transport
-    /// has no channel to the remote PTY afterwards (see <see cref="Resize"/>). Plink negotiates the
-    /// PTY size from a console this process does not give it, so the remote side sees its own
-    /// default. The parameters are carried so the caller's path is right when the transport ever
-    /// grows a way to pass them; the limit is the transport's, not the caller's.
+    /// before the launch, and the launch is the only moment the size can matter: the pipe
+    /// transport has no channel to the remote PTY afterwards (see <see cref="Resize"/>). This
+    /// method does not deliver them to the child. Windows Plink builds its PTY request only from
+    /// its saved-session configuration (<c>TermWidth</c>/<c>TermHeight</c>), never from a console,
+    /// so the SSH handler carries the initial size in a temporary PuTTY saved session passed with
+    /// <c>-load</c> in <paramref name="arguments"/>. The parameters are kept so the size the caller
+    /// resolved stays visible at the launch boundary.
     /// </remarks>
     public Task StartAsync(
         string executable,
@@ -248,7 +250,8 @@ public sealed class PipeModeSession : ITerminalSession
     /// <remarks>
     /// A no-op by construction, not by omission. The child talks through anonymous pipes, and a
     /// pipe carries bytes only: there is no console handle to resize and no out-of-band message
-    /// Plink would read for a window change. The remote PTY keeps the size it was created with;
+    /// Plink would read for a window change, and Plink never sends one on its own. The remote PTY
+    /// keeps the size it was created with, which the initial temporary PuTTY session sets;
     /// ConPTY-backed sessions resize, this transport cannot.
     /// </remarks>
     public void Resize(int columns, int rows)

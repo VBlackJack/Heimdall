@@ -104,6 +104,8 @@ xterm.js  <--  stdout pipe <--  plink     <---------+
 
 ConPTY (`ConPtySession`) est conservé uniquement pour les scénarios de shell local.
 
+**Taille du terminal sur ce chemin** : plink sous Windows construit la demande de PTY distant uniquement à partir de sa configuration (`TermWidth`/`TermHeight`), jamais à partir d'une console, et n'envoie jamais de changement de taille de fenêtre. Avant chaque lancement, `PlinkSizeSession` crée une session enregistrée temporaire `HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-<aléatoire>` : une copie de toutes les valeurs de "Default Settings" (`-load` remplace entièrement "Default Settings"), puis `TermWidth`/`TermHeight` fixés à la taille rapportée par xterm.js, et jamais `HostName`. Les arguments commencent par `-load <nom>` ; toutes les autres options gardent leur sens, et `-hostkey` l'emporte toujours sur la session chargée. La clé est supprimée par un unique handle de libération, au premier octet de sortie pour un lanceur attesté, sinon à la sortie du processus, à l'échec du lancement ou à l'annulation. `PlinkSizeSessionJanitor` supprime les restes préfixés au démarrage du gestionnaire SSH, et l'import PuTTY les ignore. Si le registre refuse une étape, un avertissement est journalisé et plink démarre sans `-load`, en 80x24, exactement comme avant. Le redimensionnement après le démarrage reste impossible sur ce transport.
+
 ### 2b. Stratégie d'élévation du shell local
 
 **Problème** : le `ServiceHelper.StartService` de gsudo plante lorsque des gestionnaires de privilèges (AdminByRequest, CyberArk, BeyondTrust) interceptent l'invite UAC et invalident les handles de processus en cours d'élévation.
