@@ -170,8 +170,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _main.ServerList.ConnectionService.SetStatusText = s => _main.StatusText = s;
 
         // Wire the PTY-size relay: the SSH handler asks, just before it creates the PTY, what
-        // size the connecting view's page has already reported.
-        _main.ServerList.ConnectionService.ResolveInitialTerminalSize = ResolveConnectingTerminalSize;
+        // size the connecting view's page has reported, waiting for it on the Plink path.
+        _main.ServerList.ConnectionService.ResolveInitialTerminalSize = ResolveConnectingTerminalSizeAsync;
 
         // Wire connect-time execution-trust confirmation relay
         _main.ServerList.ConnectionService.ConfirmExecution =
@@ -1837,15 +1837,19 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// The size the connecting SSH view's page has already reported for a session id, or
-    /// <see langword="null"/> when the view is unknown or its page has not measured yet.
-    /// Called from the connect thread; the dictionary and the view's property are safe for it.
+    /// The size the connecting SSH view's page reported for a session id, waiting at most
+    /// <paramref name="wait"/> for its first report. Called from the connect thread; the
+    /// dictionary and the view's report are safe for it, and nothing here blocks the UI thread.
     /// </summary>
-    private TerminalSize? ResolveConnectingTerminalSize(string sessionId)
+    private Task<TerminalSizeLookup> ResolveConnectingTerminalSizeAsync(
+        string sessionId,
+        TimeSpan wait,
+        CancellationToken cancellationToken)
     {
-        return _connectingSshViews.TryGetValue(sessionId, out EmbeddedSshView? view)
-            ? view.LastKnownTerminalSize
+        TerminalSizeReport? report = _connectingSshViews.TryGetValue(sessionId, out EmbeddedSshView? view)
+            ? view.TerminalSizeReport
             : null;
+        return TerminalSizeReport.ResolveAsync(report, wait, cancellationToken);
     }
 
     private void TrackConnectingCancellation(

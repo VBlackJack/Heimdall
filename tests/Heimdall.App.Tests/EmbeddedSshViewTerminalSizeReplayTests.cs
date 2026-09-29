@@ -80,7 +80,7 @@ public sealed class EmbeddedSshViewTerminalSizeReplayTests
 
         SourceStatements.AssertStatementChain(
             logic,
-            "if (Volatile.Read(ref _lastKnownTerminalSize) is { } size)",
+            "if (TerminalSizeReport.Latest is { } size)",
             "ResizeSession(size.Columns, size.Rows);");
     }
 
@@ -96,6 +96,26 @@ public sealed class EmbeddedSshViewTerminalSizeReplayTests
 
         Assert.NotNull(property);
         Assert.Equal(typeof(TerminalSize), property.PropertyType);
+    }
+
+    /// <summary>
+    /// Every remembered size goes through the report the connect path awaits, so the first
+    /// <c>ready:</c> is what releases a Plink launch waiting for it.
+    /// </summary>
+    [Fact]
+    public void TheRememberedSizeFeedsTheReportTheConnectPathAwaits()
+    {
+        string logic = SourceStatements.Method(
+            SourceStatements.ViewLogic(),
+            "private void RememberTerminalSize(int columns, int rows)");
+
+        SourceStatements.AssertStatementChain(logic, "TerminalSizeReport.Remember(columns, rows);");
+
+        PropertyInfo? property = typeof(EmbeddedSshView).GetProperty(
+            "TerminalSizeReport",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(property);
+        Assert.Equal(typeof(TerminalSizeReport), property.PropertyType);
     }
 
     [Fact]

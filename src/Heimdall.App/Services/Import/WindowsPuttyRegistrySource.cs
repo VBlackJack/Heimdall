@@ -15,42 +15,51 @@
  */
 
 using Heimdall.Core.Ssh;
-using Microsoft.Win32;
+using Heimdall.Ssh.Plink;
 
 namespace Heimdall.App.Services.Import;
 
 /// <summary>
 /// Reads PuTTY sessions from HKCU in strict read-only mode.
 /// </summary>
+/// <remarks>
+/// Heimdall's own temporary Plink size sessions (<see cref="PlinkSizeSessionNaming.Prefix"/>) are
+/// skipped: one left behind by a crash is not a session the user saved and must never be offered
+/// for import.
+/// </remarks>
 public sealed class WindowsPuttyRegistrySource : IPuttySessionRegistrySource
 {
-    private const string SessionsRegistryPath = @"Software\SimonTatham\PuTTY\Sessions";
+    private readonly IPuttySessionRegistry _registry;
+
+    public WindowsPuttyRegistrySource(IPuttySessionRegistry registry)
+    {
+        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+    }
 
     public Task<IReadOnlyList<RawPuttySession>> ReadSessionsAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
-        using var root = Registry.CurrentUser.OpenSubKey(SessionsRegistryPath, writable: false);
-        if (root is null)
-        {
-            return Task.FromResult<IReadOnlyList<RawPuttySession>>([]);
-        }
-
         var sessions = new List<RawPuttySession>();
-        foreach (var subKeyName in root.GetSubKeyNames().OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+        foreach (var subKeyName in _registry.GetSessionNames().OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
         {
             ct.ThrowIfCancellationRequested();
 
-            using var subKey = root.OpenSubKey(subKeyName, writable: false);
-            if (subKey is null)
+            if (PlinkSizeSessionNaming.IsHeimdallSession(subKeyName))
+            {
+                continue;
+            }
+
+            var sessionValues = _registry.ReadSession(subKeyName);
+            if (sessionValues is null)
             {
                 continue;
             }
 
             var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var valueName in subKey.GetValueNames())
+            foreach (var value in sessionValues)
             {
-                values[valueName] = subKey.GetValue(valueName);
+                values[value.Name] = value.Value;
             }
 
             sessions.Add(new RawPuttySession(subKeyName, values));

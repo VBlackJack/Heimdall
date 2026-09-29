@@ -1043,7 +1043,8 @@ public sealed class SshHandlerConnectTests : IDisposable
             plinkPasswordFileJanitor:
                 plinkPasswordFileJanitor ?? CreateNoOpPlinkPasswordFileJanitor(),
             deletePlinkPasswordFile: deletePlinkPasswordFile,
-            plinkAttestation: plinkAttestation);
+            plinkAttestation: plinkAttestation,
+            puttySessionRegistry: new InMemoryPuttySessionRegistry());
     }
 
     private static PlinkPasswordFileJanitor CreateNoOpPlinkPasswordFileJanitor()

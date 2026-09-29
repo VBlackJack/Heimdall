@@ -82,6 +82,20 @@ public sealed class AppSettings
     public int TelnetConnectTimeoutMs { get; set; } = 15000;
     [SettingRange(1000, 120000)]
     public int CredentialProviderTimeoutMs { get; set; } = 10000;
+
+    /// <summary>
+    /// How long a Plink launch waits by default for the terminal page to report its size, in
+    /// milliseconds.
+    /// </summary>
+    public const int DefaultPlinkInitialSizeWaitMs = 3000;
+
+    /// <summary>
+    /// How long a Plink launch waits for the terminal page's first size report before it falls
+    /// back to 80x24. Plink cannot resize after start, so its PTY keeps the size it was launched
+    /// with; a fresh tab's page usually reports within a second. 0 disables the wait.
+    /// </summary>
+    [SettingRange(500, 30000, ZeroMeansOff = true)]
+    public int PlinkInitialSizeWaitMs { get; set; } = DefaultPlinkInitialSizeWaitMs;
     /// <summary>
     /// How long the credential autofill watcher searches for the remote logon prompt by default,
     /// in milliseconds. Restated here so the surfaces that fall back to it when no settings are

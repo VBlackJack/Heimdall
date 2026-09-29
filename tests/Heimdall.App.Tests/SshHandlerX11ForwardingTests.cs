@@ -190,7 +190,8 @@ public sealed class SshHandlerX11ForwardingTests
                 {
                     LaunchArguments = arguments;
                     return Task.CompletedTask;
-                });
+                },
+                puttySessionRegistry: new InMemoryPuttySessionRegistry());
         }
 
         public ServerProfileDto CreateServer(bool x11Forwarding) => new ServerProfileDto

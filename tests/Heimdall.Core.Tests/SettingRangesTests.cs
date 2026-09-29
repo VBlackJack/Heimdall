@@ -49,6 +49,7 @@ public sealed class SettingRangesTests
         (nameof(AppSettings.HostKeyProbeTimeoutMs), 1000, 120000, false),
         (nameof(AppSettings.TelnetConnectTimeoutMs), 1000, 120000, false),
         (nameof(AppSettings.CredentialProviderTimeoutMs), 1000, 120000, false),
+        (nameof(AppSettings.PlinkInitialSizeWaitMs), 500, 30000, true),
         (nameof(AppSettings.RdpCredentialAutofillTimeoutMs), 5000, 300000, false),
         (nameof(AppSettings.RdpArtifactCleanupDelayMs), 1000, 60000, false),
         (nameof(AppSettings.RdpResizeEnableDelayMs), 1000, 60000, true),
