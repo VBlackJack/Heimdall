@@ -292,16 +292,17 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private int _keepAliveIntervalSeconds;
 
     /// <summary>
-    /// The last size the page reported (<c>ready:</c> or <c>resize:</c>). Written on the UI
-    /// thread; read by the SSH handler from the connect thread just before it creates the PTY.
+    /// The sizes the page reported (<c>ready:</c> or <c>resize:</c>). Written on the UI thread;
+    /// read by the SSH handler from the connect thread just before it creates the PTY, and
+    /// awaited there on the Plink path when the page has not spoken yet.
     /// </summary>
-    private TerminalSize? _lastKnownTerminalSize;
+    internal TerminalSizeReport TerminalSizeReport { get; } = new();
 
     /// <summary>
     /// The last size the terminal page reported, or <see langword="null"/> before it has spoken.
     /// The SSH handler creates the PTY at this size when it is known before the connect.
     /// </summary>
-    internal TerminalSize? LastKnownTerminalSize => Volatile.Read(ref _lastKnownTerminalSize);
+    internal TerminalSize? LastKnownTerminalSize => TerminalSizeReport.Latest;
 
     /// <summary>Localizer for translating user-facing strings. Set by EmbeddedSessionManager.</summary>
     public Core.Localization.LocalizationManager? Localizer
@@ -1696,7 +1697,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// </summary>
     private void RememberTerminalSize(int columns, int rows)
     {
-        Volatile.Write(ref _lastKnownTerminalSize, new TerminalSize(columns, rows));
+        TerminalSizeReport.Remember(columns, rows);
     }
 
     /// <summary>
@@ -1704,7 +1705,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// </summary>
     private void ReplayLastKnownTerminalSize()
     {
-        if (Volatile.Read(ref _lastKnownTerminalSize) is { } size)
+        if (TerminalSizeReport.Latest is { } size)
         {
             ResizeSession(size.Columns, size.Rows);
         }

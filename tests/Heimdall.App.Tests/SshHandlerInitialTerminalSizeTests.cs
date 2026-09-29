@@ -55,16 +55,18 @@ public sealed class SshHandlerInitialTerminalSizeTests
     {
         (int Columns, int Rows)? opened = null;
         string? askedFor = null;
+        TimeSpan? waitAskedFor = null;
         using SshHandler handler = CreateHandler(
             connectShellSession: (_, _, _, _, columns, rows, _) =>
             {
                 opened = (columns, rows);
                 return Task.CompletedTask;
             });
-        handler.ResolveInitialTerminalSize = sessionId =>
+        handler.ResolveInitialTerminalSize = (sessionId, wait, _) =>
         {
             askedFor = sessionId;
-            return new TerminalSize(ReportedColumns, ReportedRows);
+            waitAskedFor = wait;
+            return Task.FromResult(TerminalSizeLookup.Reported(new TerminalSize(ReportedColumns, ReportedRows)));
         };
         ServerProfileDto server = CreateDirectServer();
 
@@ -74,6 +76,9 @@ public sealed class SshHandlerInitialTerminalSizeTests
         Assert.True(result.Success, result.ErrorMessage);
         Assert.Equal(server.Id, askedFor);
         Assert.Equal((ReportedColumns, ReportedRows), opened);
+
+        // SSH.NET resizes after start, so it never waits for the page.
+        Assert.Equal(TimeSpan.Zero, waitAskedFor);
     }
 
     [Fact]
@@ -86,7 +91,7 @@ public sealed class SshHandlerInitialTerminalSizeTests
                 opened = (columns, rows);
                 return Task.CompletedTask;
             });
-        handler.ResolveInitialTerminalSize = static _ => null;
+        handler.ResolveInitialTerminalSize = static (_, _, _) => Task.FromResult(TerminalSizeLookup.NotReportedYet);
 
         ConnectionResult result = await handler.ConnectAsync(CreateDirectServer(), new AppSettings(), CancellationToken.None);
         DisposeSession(result);
@@ -108,7 +113,7 @@ public sealed class SshHandlerInitialTerminalSizeTests
                 opened = (columns, rows);
                 return Task.CompletedTask;
             });
-        handler.ResolveInitialTerminalSize = static _ => throw new InvalidOperationException("no tab");
+        handler.ResolveInitialTerminalSize = static (_, _, _) => throw new InvalidOperationException("no tab");
 
         ConnectionResult result = await handler.ConnectAsync(CreateDirectServer(), new AppSettings(), CancellationToken.None);
         DisposeSession(result);
@@ -138,7 +143,8 @@ public sealed class SshHandlerInitialTerminalSizeTests
                     started = (columns, rows);
                     return Task.CompletedTask;
                 });
-            handler.ResolveInitialTerminalSize = static _ => new TerminalSize(ReportedColumns, ReportedRows);
+            handler.ResolveInitialTerminalSize = static (_, _, _) =>
+                Task.FromResult(TerminalSizeLookup.Reported(new TerminalSize(ReportedColumns, ReportedRows)));
             ServerProfileDto server = CreateGatewayServer(keyPath);
 
             result = await handler.ConnectSshViaPlinkAsync(
@@ -333,11 +339,148 @@ public sealed class SshHandlerInitialTerminalSizeTests
             + "-pwfile \"heimdall-pw\" operator@host.example.test");
     }
 
+    /// <summary>
+    /// The original race, reproduced. The connect path reaches the size lookup while the page is
+    /// still loading, and the page's first <c>ready:</c> lands only after that. The real producer is
+    /// <c>src/Heimdall.App/Assets/terminal.html:472</c>,
+    /// <c>postMessage('ready:' + term.cols + ',' + term.rows)</c>, posted at the end of
+    /// <c>initializeTerminal()</c> once xterm.js has opened and fitted; the view hands it to the
+    /// report in the <c>MsgReady</c> branch of <c>EmbeddedSshView.OnWebMessageReceived</c>
+    /// (<c>EmbeddedSshView.xaml.cs:1234</c>, through <c>RememberTerminalSize</c> at line 1698).
+    /// Here the report is released only once the connect path has asked, which is the order a
+    /// fresh tab measured in the product: no "at the reported" line before the launch.
+    /// </summary>
+    /// <remarks>
+    /// Before the bounded wait, the lookup read the report once, found nothing and launched at
+    /// 80x24. The same scenario written against the synchronous resolver of 7be87a84 fails there.
+    /// </remarks>
+    [Fact]
+    public async Task APlinkLaunchWaitsForASizeThePageReportsOnlyAfterTheConnectAsked()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        TerminalSizeReport report = new();
+        TaskCompletionSource asked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        (int Columns, int Rows)? started = null;
+        IReadOnlyList<PuttyRegistryValue>? atLaunch = null;
+
+        Task page = Task.Run(async () =>
+        {
+            await asked.Task;
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            report.Remember(ReportedColumns, ReportedRows);
+        });
+
+        ConnectionResult result = await ConnectViaPlinkAsync(
+            registry,
+            (_, _, _, columns, rows, _) =>
+            {
+                started = (columns, rows);
+                atLaunch = registry.ReadSession(registry.Written.Single());
+                return Task.CompletedTask;
+            },
+            resolve: (_, wait, ct) =>
+            {
+                asked.TrySetResult();
+                return TerminalSizeReport.ResolveAsync(report, wait, ct);
+            },
+            waitMs: 30000);
+        await page;
+
+        result.Success.Should().BeTrue(result.ErrorMessage);
+        started.Should().Be((ReportedColumns, ReportedRows));
+        atLaunch.Should().ContainEquivalentOf(
+            new PuttyRegistryValue(PlinkSizeSession.TermWidthValueName, ReportedColumns, Microsoft.Win32.RegistryValueKind.DWord));
+        atLaunch.Should().ContainEquivalentOf(
+            new PuttyRegistryValue(PlinkSizeSession.TermHeightValueName, ReportedRows, Microsoft.Win32.RegistryValueKind.DWord));
+    }
+
+    [Fact]
+    public async Task APlinkLaunchWithNoReportBeforeTheWaitEndsUsesTheDefaultAndLogsWhy()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        List<string> sizeLog = [];
+        (int Columns, int Rows)? started = null;
+        IReadOnlyList<PuttyRegistryValue>? atLaunch = null;
+
+        ConnectionResult result = await ConnectViaPlinkAsync(
+            registry,
+            (_, _, _, columns, rows, _) =>
+            {
+                started = (columns, rows);
+                atLaunch = registry.ReadSession(registry.Written.Single());
+                return Task.CompletedTask;
+            },
+            resolve: static (_, wait, ct) => TerminalSizeReport.ResolveAsync(new TerminalSizeReport(), wait, ct),
+            waitMs: 200,
+            sizeLog: sizeLog);
+
+        result.Success.Should().BeTrue(result.ErrorMessage);
+        started.Should().Be((TerminalSize.DefaultColumns, TerminalSize.DefaultRows));
+        atLaunch.Should().ContainEquivalentOf(
+            new PuttyRegistryValue(PlinkSizeSession.TermWidthValueName, TerminalSize.DefaultColumns, Microsoft.Win32.RegistryValueKind.DWord));
+        sizeLog.Should().ContainSingle().Which.Should()
+            .Contain("at the default 80x24").And.Contain("did not report its size within 200 ms");
+    }
+
+    [Fact]
+    public async Task APlinkLaunchWithNoViewUsesTheDefaultAndLogsWhy()
+    {
+        List<string> sizeLog = [];
+
+        ConnectionResult result = await ConnectViaPlinkAsync(
+            new InMemoryPuttySessionRegistry(),
+            static (_, _, _, _, _, _) => Task.CompletedTask,
+            resolve: static (_, wait, ct) => TerminalSizeReport.ResolveAsync(null, wait, ct),
+            sizeLog: sizeLog);
+
+        result.Success.Should().BeTrue(result.ErrorMessage);
+        sizeLog.Should().ContainSingle().Which.Should().Contain("no terminal view is connecting");
+    }
+
+    /// <summary>
+    /// A tab closed during the wait cancels the connection token: the wait ends, nothing is
+    /// launched, and since the wait precedes the size session no registry key was ever written.
+    /// </summary>
+    [Fact]
+    public async Task CancellingDuringTheWaitLaunchesNothingAndLeavesNoKey()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        using CancellationTokenSource cancellation = new();
+        List<string> sizeLog = [];
+        bool launched = false;
+
+        Task<ConnectionResult> connect = ConnectViaPlinkAsync(
+            registry,
+            (_, _, _, _, _, _) =>
+            {
+                launched = true;
+                return Task.CompletedTask;
+            },
+            cancellation.Token,
+            resolve: (_, wait, ct) =>
+            {
+                cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
+                return TerminalSizeReport.ResolveAsync(new TerminalSizeReport(), wait, ct);
+            },
+            waitMs: 30000,
+            sizeLog: sizeLog);
+
+        Func<Task> awaiting = () => connect;
+        await awaiting.Should().ThrowAsync<OperationCanceledException>();
+        launched.Should().BeFalse();
+        registry.Written.Should().BeEmpty();
+        registry.GetSessionNames().Should().BeEmpty();
+        sizeLog.Should().ContainSingle().Which.Should().Contain("cancelled");
+    }
+
     private async Task<ConnectionResult> ConnectViaPlinkAsync(
         InMemoryPuttySessionRegistry registry,
         SshHandler.StartPipeModeSession start,
         CancellationToken cancellationToken = default,
-        string? sharedKeyPath = null)
+        string? sharedKeyPath = null,
+        Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? resolve = null,
+        int? waitMs = null,
+        List<string>? sizeLog = null)
     {
         string plinkPath = Path.GetTempFileName();
         string keyPath = sharedKeyPath ?? Path.GetTempFileName();
@@ -350,11 +493,28 @@ public sealed class SshHandlerInitialTerminalSizeTests
                 hostKeyTrustService: new HostKeyTrustService(hostKeyStore),
                 startPipeModeSession: start,
                 puttySessionRegistry: registry);
-            handler.ResolveInitialTerminalSize = static _ => new TerminalSize(ReportedColumns, ReportedRows);
+            handler.ResolveInitialTerminalSize = resolve ?? (static (_, _, _) =>
+                Task.FromResult(TerminalSizeLookup.Reported(new TerminalSize(ReportedColumns, ReportedRows))));
+            if (sizeLog is not null)
+            {
+                handler.TerminalSizeLog = line =>
+                {
+                    lock (sizeLog)
+                    {
+                        sizeLog.Add(line);
+                    }
+                };
+            }
+
+            AppSettings settings = new() { PlinkPath = plinkPath };
+            if (waitMs is { } configuredWait)
+            {
+                settings.PlinkInitialSizeWaitMs = configuredWait;
+            }
 
             result = await handler.ConnectSshViaPlinkAsync(
                 CreateGatewayServer(keyPath),
-                new AppSettings { PlinkPath = plinkPath },
+                settings,
                 "127.0.0.1",
                 TunnelLocalPort,
                 usesTunnel: true,

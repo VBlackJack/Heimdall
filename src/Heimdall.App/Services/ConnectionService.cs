@@ -37,7 +37,7 @@ public sealed class ConnectionService : IConnectionService
     private readonly Dictionary<string, IProtocolHandler> _handlers;
     private Action<string>? _setStatusText;
     private Func<ServerProfileDto, Task<bool>>? _confirmExecution;
-    private Func<string, TerminalSize?>? _resolveInitialTerminalSize;
+    private Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? _resolveInitialTerminalSize;
 
     /// <summary>Cached snapshot of the latest application settings.</summary>
     private AppSettings? _currentSettings;
@@ -68,9 +68,9 @@ public sealed class ConnectionService : IConnectionService
 
     /// <summary>
     /// Relay wired by the shell so the SSH handler can create the PTY at the size the terminal
-    /// page already reported for a session id. Returns <see langword="null"/> when unknown.
+    /// page reported for a session id, waiting at most the given time for its first report.
     /// </summary>
-    internal Func<string, TerminalSize?>? ResolveInitialTerminalSize
+    internal Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? ResolveInitialTerminalSize
     {
         get => _resolveInitialTerminalSize;
         set

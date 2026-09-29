@@ -83,12 +83,18 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     internal Action<string>? SetStatusText { get; set; }
 
     /// <summary>
-    /// Resolves the terminal size the view already knows for a session id, or
-    /// <see langword="null"/> when the terminal has not reported one yet. Wired by the shell.
-    /// Consulted just before the PTY is created, because the page's <c>ready:</c> size usually
-    /// arrives while the connection is still being negotiated.
+    /// Resolves the terminal size the view reported for a session id, waiting at most the given
+    /// time for its first report, or says why there is none. Wired by the shell. Consulted just
+    /// before the PTY is created, because the page's <c>ready:</c> size usually arrives while the
+    /// connection is still being negotiated.
     /// </summary>
-    internal Func<string, TerminalSize?>? ResolveInitialTerminalSize { get; set; }
+    internal Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? ResolveInitialTerminalSize { get; set; }
+
+    /// <summary>
+    /// Receives the Info lines of the initial size resolution: the size used and, when it is the
+    /// default, why. Replaced in tests so the fallback line can be observed.
+    /// </summary>
+    internal Action<string> TerminalSizeLog { get; set; } = Core.Logging.FileLogger.Info;
 
     public SshHandler(
         ITunnelService tunnelService,
@@ -303,8 +309,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         try
         {
             // Resolved here, not at entry: the page's ready: size usually lands while the
-            // tunnel and the transport were being negotiated above.
-            TerminalSize initialSize = ResolveInitialTerminalSizeFor(server);
+            // tunnel and the transport were being negotiated above. Never waited for on this
+            // transport: the attach replays the page's size, and SSH.NET resizes after start.
+            TerminalSize initialSize = await ResolveInitialTerminalSizeForAsync(server, TimeSpan.Zero, ct)
+                .ConfigureAwait(false);
             await _connectShellSession(
                     session,
                     sshParams,
@@ -463,8 +471,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             cancellationToken: cancellationToken);
 
     /// <summary>
-    /// The size to create the PTY at: the one the terminal page already reported for this
-    /// session when the shell wired a resolver and the page has spoken, the default otherwise.
+    /// The size to create the PTY at: the one the terminal page reported for this session, waited
+    /// for at most <paramref name="wait"/>, or the default with the reason logged.
     /// </summary>
     /// <remarks>
     /// The page's <c>ready:</c> size used to arrive before the session was attached and was
@@ -472,32 +480,66 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     /// pipe path, Plink ignores the size it is launched with: the size reaches the remote PTY only
     /// through the temporary PuTTY saved session passed with <c>-load</c> (see
     /// <see cref="PlinkSizeSession"/>). Resizing after start stays impossible on that transport.
+    /// <para>On a fresh tab the page loads in parallel with the connect, and the Plink launch
+    /// reached this lookup before the page had spoken, every time. That path therefore waits for
+    /// the first report, bounded by <see cref="AppSettings.PlinkInitialSizeWaitMs"/>; SSH.NET passes
+    /// a zero wait, which completes synchronously and costs it nothing. Every fallback to the
+    /// default is logged with its reason, so the silent 80x24 cannot come back unseen.</para>
     /// </remarks>
-    private TerminalSize ResolveInitialTerminalSizeFor(ServerProfileDto server)
+    private async Task<TerminalSize> ResolveInitialTerminalSizeForAsync(
+        ServerProfileDto server,
+        TimeSpan wait,
+        CancellationToken ct)
     {
-        Func<string, TerminalSize?>? resolve = ResolveInitialTerminalSize;
+        Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? resolve = ResolveInitialTerminalSize;
         if (resolve is null)
         {
+            LogDefaultTerminalSize(server, "no size resolver is wired");
             return TerminalSize.Default;
         }
 
+        TerminalSizeLookup lookup;
         try
         {
-            TerminalSize? known = resolve(server.Id);
-            if (known is not null)
-            {
-                Core.Logging.FileLogger.Info(
-                    $"SSH opening the PTY for {server.DisplayName} at the reported {known.Columns}x{known.Rows}");
-                return known;
-            }
+            lookup = await resolve(server.Id, wait, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            TerminalSizeLog(
+                $"SSH initial terminal size wait for {server.DisplayName} cancelled; nothing was launched");
+            throw;
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn(
                 $"SSH initial terminal size lookup failed for {server.DisplayName}, using the default: {ex.Message}");
+            return TerminalSize.Default;
         }
 
+        if (lookup.Size is { } size)
+        {
+            TerminalSizeLog(
+                $"SSH opening the PTY for {server.DisplayName} at the reported {size.Columns}x{size.Rows}");
+            return size;
+        }
+
+        LogDefaultTerminalSize(server, DescribeMissingSize(lookup));
         return TerminalSize.Default;
+    }
+
+    internal static string DescribeMissingSize(TerminalSizeLookup lookup) => lookup.Source switch
+    {
+        TerminalSizeSource.NoView => "no terminal view is connecting for this session",
+        TerminalSizeSource.TimedOut =>
+            $"the terminal page did not report its size within {(int)lookup.Waited.TotalMilliseconds} ms",
+        _ => "the terminal page has not reported its size yet and this transport does not wait",
+    };
+
+    private void LogDefaultTerminalSize(ServerProfileDto server, string reason)
+    {
+        TerminalSizeLog(
+            $"SSH opening the PTY for {server.DisplayName} at the default "
+            + $"{TerminalSize.DefaultColumns}x{TerminalSize.DefaultRows}: {reason}");
     }
 
     /// <summary>
@@ -881,6 +923,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 }
             }
 
+            // Plink takes the remote PTY size only from its saved-session configuration, and the
+            // pipe transport cannot resize after start, so the launch is the only moment the size
+            // can travel. On a fresh tab the page is still loading here, so its first report is
+            // awaited, bounded. Placed before the password file and the attestation lease so the
+            // wait widens neither, and so a cancellation here leaves nothing to clean up.
+            TerminalSize initialSize = await ResolveInitialTerminalSizeForAsync(
+                    server,
+                    TimeSpan.FromMilliseconds(Math.Max(0, settings.PlinkInitialSizeWaitMs)),
+                    ct)
+                .ConfigureAwait(false);
+
             Heimdall.Terminal.PipeModeSession terminalSession = new Heimdall.Terminal.PipeModeSession();
             Core.Logging.FileLogger.Info(
                 $"SSH via Plink ({terminalSession.GetType().Name}) using {plinkPath} for {targetHost}:{targetPort}");
@@ -896,12 +949,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             {
                 string? passwordFilePath = CreatePlinkPasswordFile(password);
 
-                // Plink takes the remote PTY size only from its saved-session configuration, and
-                // the pipe transport cannot resize after start, so the launch is the only moment
-                // the size can travel and a temporary saved session is the only way it does.
-                // Resolved as late as possible for that reason. A null session name means the
-                // registry refused and the launch goes ahead at Plink's default size.
-                TerminalSize initialSize = ResolveInitialTerminalSizeFor(server);
+                // A temporary saved session is the only way the size reaches Plink. A null name
+                // means the registry refused and the launch goes ahead at Plink's default size.
                 string? sizeSessionName = PlinkSizeSession.TryCreate(
                     _puttySessionRegistry,
                     initialSize.Columns,

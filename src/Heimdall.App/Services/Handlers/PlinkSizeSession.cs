@@ -83,6 +83,11 @@ internal static class PlinkSizeSession
             values.Add(new PuttyRegistryValue(TermHeightValueName, rows, RegistryValueKind.DWord));
 
             registry.WriteSession(sessionName, values);
+
+            // The name is logged: it is random, carries nothing about the user or the target, and
+            // is what ties a leftover key found later to the launch that created it.
+            FileLogger.Info(
+                $"[{nameof(PlinkSizeSession)}] Created Plink size session {sessionName} carrying {columns}x{rows}");
             return sessionName;
         }
         catch (Exception ex)
