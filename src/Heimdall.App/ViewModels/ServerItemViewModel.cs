@@ -553,8 +553,39 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         return port > 0 ? $"{host}:{port}" : host;
     }
 
-    internal static string NormalizeSearchTerm(string? value) =>
-        value?.Trim().ToUpperInvariant() ?? "";
+    /// <summary>
+    /// Folds a search term or a searchable field to the form both sides are compared in: trimmed,
+    /// upper-cased with the invariant culture, and stripped of its diacritics.
+    /// </summary>
+    /// <remarks>
+    /// Without the fold a folder named with an accent could only be found by typing the accent,
+    /// which a French keyboard makes awkward on capitals and an English one makes impossible. The
+    /// fold decomposes each character (FormD) and drops the combining marks, so the accented and
+    /// the plain spelling meet on the plain one, whichever side carries the accent.
+    /// </remarks>
+    internal static string NormalizeSearchTerm(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        string decomposed = value.Trim().Normalize(System.Text.NormalizationForm.FormD);
+        var folded = new System.Text.StringBuilder(decomposed.Length);
+        foreach (char character in decomposed)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character)
+                != System.Globalization.UnicodeCategory.NonSpacingMark)
+            {
+                folded.Append(character);
+            }
+        }
+
+        return folded
+            .ToString()
+            .Normalize(System.Text.NormalizationForm.FormC)
+            .ToUpperInvariant();
+    }
 
     private void InvalidateSearchTextCache() => _searchTextCacheInvalid = true;
 
