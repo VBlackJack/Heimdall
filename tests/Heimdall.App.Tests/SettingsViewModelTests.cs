@@ -2385,6 +2385,71 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal("danger", confirm.Severity);
     }
 
+    // The confirmation is consent to a rewrite, so the number in it is the size of the rewrite:
+    // the sessions that will change, not every session of the type. Reading "3" before a change
+    // that touches 2 teaches the user that the number on a destructive prompt is decoration.
+    [Fact]
+    public async Task ApplyRdpModeToAll_ConfirmationCountsTheSessionsThatChange()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        var config = new FakeConfigManager
+        {
+            Servers =
+            [
+                new ServerProfileDto { ConnectionType = "RDP", RdpMode = "Embedded" },
+                new ServerProfileDto { ConnectionType = "RDP", RdpMode = "External" },
+                new ServerProfileDto { ConnectionType = "RDP", RdpMode = "Embedded" },
+            ]
+        };
+        var dialog = new FakeDialogService { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.RdpDefaultMode = "External";
+
+        await viewModel.ApplyRdpModeToAllCommand.ExecuteAsync(null);
+
+        var confirm = Assert.Single(dialog.ConfirmCalls);
+        Assert.Equal(
+            localizer.Format(
+                "SettingsApplyModeToAllConfirmBody",
+                localizer["SettingsRdpModeExternal"],
+                2,
+                3),
+            confirm.Message);
+    }
+
+    // SshMode is read by the SSH handler only. Writing it into an RDP or VNC profile changed
+    // nothing the user could see and counted those profiles in the confirmation as changes.
+    [Fact]
+    public async Task ApplySshModeToAll_RewritesSshSessionsOnlyAndNamesTheModeInTheUiLanguage()
+    {
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "fr");
+        var config = new FakeConfigManager
+        {
+            Servers =
+            [
+                new ServerProfileDto { Id = "ssh-1", ConnectionType = "SSH", SshMode = "Embedded" },
+                new ServerProfileDto { Id = "rdp-1", ConnectionType = "RDP", SshMode = "Embedded" },
+                new ServerProfileDto { Id = "ssh-2", ConnectionType = "SSH", SshMode = "External" },
+            ]
+        };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.SshDefaultMode = "External";
+        bool fullReload = false;
+        viewModel.ConfigurationChanged += () => fullReload = true;
+
+        await viewModel.ApplySshModeToAllCommand.ExecuteAsync(null);
+
+        Assert.Equal("External", config.Servers.Single(server => server.Id == "ssh-1").SshMode);
+        Assert.Equal("Embedded", config.Servers.Single(server => server.Id == "rdp-1").SshMode);
+        var confirm = Assert.Single(dialog.ConfirmCalls);
+        Assert.Contains(localizer["SettingsSshModeExternal"], confirm.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("'External'", confirm.Message, StringComparison.Ordinal);
+        Assert.Equal("External", config.Settings.SshDefaultMode);
+        Assert.False(fullReload);
+    }
+
     [Fact]
     public async Task ImportConfigCommand_RdpDelegatesToProfileImportService()
     {

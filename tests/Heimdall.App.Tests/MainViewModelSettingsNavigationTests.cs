@@ -438,6 +438,38 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
         Assert.Equal(3, harness.Dialog.SavePromptCount);
     }
 
+    /// <summary>
+    /// "Apply to all saved sessions" keeps every other pending edit and saves the mode it applies.
+    /// </summary>
+    /// <remarks>
+    /// The command used to raise the full configuration reload, which reseeds the panel from disk:
+    /// an unrelated field typed a moment before came back to its saved value, the dirty flag
+    /// dropped, and the default mode itself, never written, reverted on the spot.
+    /// </remarks>
+    [Fact]
+    public async Task ApplyRdpModeToAll_KeepsOtherPendingEditsAndSavesTheDefaultMode()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        await harness.Config.SaveServersAsync(
+            [new ServerProfileDto { Id = "rdp-1", ConnectionType = "RDP", RdpMode = "Embedded" }]);
+        harness.Main.Settings.LoadFromSettings(await harness.Config.LoadSettingsAsync());
+        int savedMaxSessions = harness.Main.Settings.MaxEmbeddedSessions;
+        harness.Main.Settings.MaxEmbeddedSessionsText = (savedMaxSessions + 1).ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        harness.Main.Settings.RdpDefaultMode = "External";
+
+        await harness.Main.Settings.ApplyRdpModeToAllCommand.ExecuteAsync(null);
+
+        Assert.Equal(savedMaxSessions + 1, harness.Main.Settings.MaxEmbeddedSessions);
+        Assert.True(harness.Main.Settings.IsDirty);
+        Assert.Equal("External", harness.Main.Settings.RdpDefaultMode);
+        AppSettings persisted = await harness.Config.LoadSettingsAsync();
+        Assert.Equal("External", persisted.RdpDefaultMode);
+        Assert.Equal(savedMaxSessions, persisted.MaxEmbeddedSessions);
+        Assert.Equal("External", Assert.Single(await harness.Config.LoadServersAsync()).RdpMode);
+        Assert.Equal(1, harness.Main.ServerCount);
+    }
+
     private sealed class TestHarness : IDisposable
     {
         private readonly string _rootPath;

@@ -1253,25 +1253,100 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     internal Func<GatewayOverviewMutationRequest, CancellationToken, Task<int>>? GatewayReferenceMutationHandler { get; set; }
 
+    /// <summary>The connection type whose saved sessions carry <see cref="ServerProfileDto.SshMode"/>.</summary>
+    private const string SshConnectionType = "SSH";
+
+    /// <summary>The connection type whose saved sessions carry <see cref="ServerProfileDto.RdpMode"/>.</summary>
+    private const string RdpConnectionType = "RDP";
+
     /// <summary>
-    /// Applies the current <see cref="SshDefaultMode"/> to every server in the inventory.
+    /// Raised after a write that changed saved sessions but none of the settings this panel edits
+    /// as pending values.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ConfigurationChanged"/> reloads this panel from disk, which is right after an
+    /// import and wrong here: the "apply to all" buttons sit in the middle of an editing visit, and a
+    /// reload threw away every other pending edit, dropped the dirty flag, and put back a language
+    /// or theme the user was still previewing.
+    /// </remarks>
+    public event Action? ServerInventoryChanged;
+
+    /// <summary>
+    /// Makes the current <see cref="SshDefaultMode"/> the saved default and rewrites it into every
+    /// saved SSH session.
     /// </summary>
     [RelayCommand]
-    private async Task ApplySshModeToAllAsync()
+    private Task ApplySshModeToAllAsync()
+        => ApplyModeToAllAsync(
+            SshConnectionType,
+            SshDefaultMode,
+            _localizer[SshModeDisplayKey(SshDefaultMode)],
+            server => server.SshMode,
+            (server, mode) => server.SshMode = mode,
+            (settings, mode) => settings.SshDefaultMode = mode,
+            "ConfirmApplyAllTitle",
+            "ConfirmApplySshModeMessage");
+
+    /// <summary>
+    /// Makes the current <see cref="RdpDefaultMode"/> the saved default and rewrites it into every
+    /// saved RDP session.
+    /// </summary>
+    [RelayCommand]
+    private Task ApplyRdpModeToAllAsync()
+        => ApplyModeToAllAsync(
+            RdpConnectionType,
+            RdpDefaultMode,
+            _localizer[RdpModeDisplayKey(RdpDefaultMode)],
+            server => server.RdpMode,
+            (server, mode) => server.RdpMode = mode,
+            (settings, mode) => settings.RdpDefaultMode = mode,
+            "SettingsApplyModeToAllConfirmTitle",
+            "SettingsApplyModeToAllConfirmBody");
+
+    private static string SshModeDisplayKey(string mode) =>
+        string.Equals(mode, "External", StringComparison.Ordinal)
+            ? "SettingsSshModeExternal"
+            : "SettingsSshModeEmbedded";
+
+    private static string RdpModeDisplayKey(string mode) =>
+        string.Equals(mode, "External", StringComparison.Ordinal)
+            ? "SettingsRdpModeExternal"
+            : "SettingsRdpModeEmbedded";
+
+    /// <summary>
+    /// Rewrites one mode into every saved session of one connection type, and saves that mode as
+    /// the default in the same gesture.
+    /// </summary>
+    /// <remarks>
+    /// The confirmation counts the sessions that will change, not the sessions of the type: the
+    /// user is agreeing to a rewrite, and the number they read is the size of it. Only the mode
+    /// field of the settings is written, so every other pending edit on the panel stays pending.
+    /// </remarks>
+    private async Task ApplyModeToAllAsync(
+        string connectionType,
+        string mode,
+        string modeDisplayName,
+        Func<ServerProfileDto, string?> readMode,
+        Action<ServerProfileDto, string> writeMode,
+        Action<AppSettings, string> writeDefault,
+        string titleKey,
+        string bodyKey)
     {
-        var servers = await _configManager.LoadServersAsync();
-        var mode = SshDefaultMode;
-        var changeCount = servers.Count(s => !string.Equals(s.SshMode, mode, StringComparison.Ordinal));
+        List<ServerProfileDto> servers = await _configManager.LoadServersAsync();
+        List<ServerProfileDto> ofType = servers
+            .Where(server => string.Equals(server.ConnectionType, connectionType, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        int changeCount = ofType.Count(server => !string.Equals(readMode(server), mode, StringComparison.Ordinal));
 
         if (changeCount == 0)
         {
-            FileLogger.Info("ApplySshModeToAll: no changes needed.");
+            FileLogger.Info($"ApplyModeToAll {connectionType}: no changes needed.");
             return;
         }
 
-        var confirmed = await _dialogService.ShowConfirmAsync(
-            _localizer["ConfirmApplyAllTitle"],
-            _localizer.Format("ConfirmApplySshModeMessage", mode, changeCount, servers.Count),
+        bool confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer[titleKey],
+            _localizer.Format(bodyKey, modeDisplayName, changeCount, ofType.Count),
             "danger");
 
         if (!confirmed) return;
@@ -1279,71 +1354,28 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         var update = await _configManager.MutateServersAsync(currentServers =>
         {
             int updatedCount = 0;
+            int totalCount = 0;
             foreach (ServerProfileDto server in currentServers)
             {
-                if (!string.Equals(server.SshMode, mode, StringComparison.Ordinal))
+                if (!string.Equals(server.ConnectionType, connectionType, StringComparison.OrdinalIgnoreCase))
                 {
-                    server.SshMode = mode;
+                    continue;
+                }
+
+                totalCount++;
+                if (!string.Equals(readMode(server), mode, StringComparison.Ordinal))
+                {
+                    writeMode(server, mode);
                     updatedCount++;
                 }
             }
 
-            return (UpdatedCount: updatedCount, TotalCount: currentServers.Count);
+            return (UpdatedCount: updatedCount, TotalCount: totalCount);
         });
-        ConfigurationChanged?.Invoke();
+        await _configManager.MergeSettingAsync(settings => writeDefault(settings, mode));
+        ServerInventoryChanged?.Invoke();
         FileLogger.Info(
-            $"Applied SSH mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} servers.");
-    }
-
-    /// <summary>
-    /// Applies the current <see cref="RdpDefaultMode"/> to every server in the inventory.
-    /// </summary>
-    [RelayCommand]
-    private async Task ApplyRdpModeToAllAsync()
-    {
-        var servers = await _configManager.LoadServersAsync();
-        var rdpServers = servers
-            .Where(s => string.Equals(s.ConnectionType, "RDP", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var mode = RdpDefaultMode;
-        var changeCount = rdpServers.Count(s => !string.Equals(s.RdpMode, mode, StringComparison.Ordinal));
-
-        if (changeCount == 0)
-        {
-            FileLogger.Info("ApplyRdpModeToAll: no changes needed.");
-            return;
-        }
-
-        var confirmed = await _dialogService.ShowConfirmAsync(
-            _localizer["SettingsApplyModeToAllConfirmTitle"],
-            _localizer.Format("SettingsApplyModeToAllConfirmBody", rdpServers.Count),
-            "danger");
-
-        if (!confirmed) return;
-
-        var update = await _configManager.MutateServersAsync(currentServers =>
-        {
-            List<ServerProfileDto> currentRdpServers = currentServers
-                .Where(server => string.Equals(
-                    server.ConnectionType,
-                    "RDP",
-                    StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            int updatedCount = 0;
-            foreach (ServerProfileDto server in currentRdpServers)
-            {
-                if (!string.Equals(server.RdpMode, mode, StringComparison.Ordinal))
-                {
-                    server.RdpMode = mode;
-                    updatedCount++;
-                }
-            }
-
-            return (UpdatedCount: updatedCount, TotalCount: currentRdpServers.Count);
-        });
-        ConfigurationChanged?.Invoke();
-        FileLogger.Info(
-            $"Applied RDP mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} RDP servers.");
+            $"Applied {connectionType} mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} saved sessions.");
     }
 
     /// <summary>
