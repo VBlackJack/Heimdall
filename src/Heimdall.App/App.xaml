@@ -30,6 +30,7 @@
             <converters:TunnelBadgeVisibilityConverter x:Key="TunnelBadgeVisibilityConverter"/>
             <converters:TunnelBadgeStateToBrushConverter x:Key="TunnelBadgeStateToBrushConverter"/>
             <converters:AccessibleRowNameConverter x:Key="AccessibleRowNameConverter"/>
+            <converters:AccessibleStateNameConverter x:Key="AccessibleStateNameConverter"/>
             <converters:BoolToLocalizedKeyConverter x:Key="ShareFolderLabelConverter"
                                                     FalseKey="ToolsShareFolder"
                                                     TrueKey="ToolsStopSharing"/>

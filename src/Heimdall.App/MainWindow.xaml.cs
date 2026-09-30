@@ -2635,6 +2635,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         Mw_SettingsBtnRescan.IsEnabled = true;
         Mw_SettingsExtProvStatus.Text = _externalToolSettingsService.BuildDetectedToolsStatus();
 
+        // Set by hand, so no binding raises the live region: the scan result is announced here.
+        Views.EmbeddedRdp.RdpLiveRegion.Announce(Mw_SettingsExtProvStatus);
+
         // Refresh tools tab to show newly detected tools
         vm.ToolsTab.OnExternalToolsChanged();
     }
