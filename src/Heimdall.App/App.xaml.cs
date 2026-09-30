@@ -984,22 +984,6 @@ public partial class App : System.Windows.Application
         store.LoadFromConfig(ReadTrustedRdpCertificates(settings));
     }
 
-    internal static async Task PersistTrustedRdpCertificatesAsync(
-        IConfigManager configManager,
-        RdpTrustKey key,
-        IReadOnlyCollection<RdpCertificateEntry> entries)
-    {
-        try
-        {
-            await RdpCertificatePersistence.PersistAsync(configManager, key, entries);
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn(
-                $"Failed to persist trusted RDP certificates for {key}: {ex.Message}");
-        }
-    }
-
     internal static async Task PersistRemovedHostKeyAsync(
         IConfigManager configManager,
         string key)

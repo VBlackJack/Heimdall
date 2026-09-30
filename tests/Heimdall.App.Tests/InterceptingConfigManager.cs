@@ -39,6 +39,15 @@ internal sealed class InterceptingConfigManager(IConfigManager inner) : IConfigM
     /// </summary>
     public Action? AfterLoadSettings { get; set; }
 
+    /// <summary>
+    /// Awaited before a targeted settings write reaches the real configuration, so a test can
+    /// hold the write open and observe what its caller does meanwhile.
+    /// </summary>
+    public Func<Task>? BeforeMergeSetting { get; set; }
+
+    /// <summary>Runs once a targeted settings write is on disk.</summary>
+    public Action? AfterMergeSetting { get; set; }
+
     public string ConfigPath => _inner.ConfigPath;
 
     public string SettingsPath => _inner.SettingsPath;
@@ -68,7 +77,16 @@ internal sealed class InterceptingConfigManager(IConfigManager inner) : IConfigM
     public Task<int> MergeTrustedHostKeysAsync(IEnumerable<KeyValuePair<string, string>> entries)
         => _inner.MergeTrustedHostKeysAsync(entries);
 
-    public Task MergeSettingAsync(Action<AppSettings> mutate) => _inner.MergeSettingAsync(mutate);
+    public async Task MergeSettingAsync(Action<AppSettings> mutate)
+    {
+        if (BeforeMergeSetting is { } before)
+        {
+            await before();
+        }
+
+        await _inner.MergeSettingAsync(mutate);
+        AfterMergeSetting?.Invoke();
+    }
 
     public Task<List<ServerProfileDto>> LoadServersAsync() => _inner.LoadServersAsync();
 

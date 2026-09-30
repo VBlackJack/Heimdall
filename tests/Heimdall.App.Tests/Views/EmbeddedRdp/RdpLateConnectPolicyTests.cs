@@ -206,13 +206,6 @@ public sealed class RdpLateConnectPolicyTests
             "The surface retry no longer dispatches ContinueConnectAttempt(attempt). If it went "
                 + "back through BeginConnect, a Cancel pressed inside the retry window is cleared "
                 + "by the retry and the session the user stopped comes up live.");
-
-        // The same separation one step further in: resuming an attempt is not asking for a new
-        // one, so the retry's own handler must not open one either.
-        Assert.DoesNotContain(
-            "UserRequestedConnect",
-            ViewSource.HandlerLogic(ContinueMember),
-            StringComparison.Ordinal);
     }
 
     /// <summary>

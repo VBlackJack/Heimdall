@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.IO;
+using Heimdall.App.Services;
 using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Ssh;
@@ -244,11 +245,11 @@ public sealed class AppStartupTests
             RdpTrustKey profileOwner = RdpTrustKey.ForProfile("prod.example");
             RdpTrustKey typedOwner = RdpTrustKey.ForTypedDestination("PROD.example");
 
-            await App.PersistTrustedRdpCertificatesAsync(
+            await RdpCertificatePersistence.PersistAsync(
                 configManager,
                 profileOwner,
                 [new RdpCertificateEntry("SHA256:AA:BB:01", stamp)]);
-            await App.PersistTrustedRdpCertificatesAsync(
+            await RdpCertificatePersistence.PersistAsync(
                 configManager,
                 typedOwner,
                 [new RdpCertificateEntry("SHA256:AA:BB:02", stamp)]);
@@ -268,7 +269,7 @@ public sealed class AppStartupTests
 
             // Forgetting the typed owner's last certificate leaves no host key behind, and does
             // not touch the profile's dictionary.
-            await App.PersistTrustedRdpCertificatesAsync(configManager, typedOwner, []);
+            await RdpCertificatePersistence.PersistAsync(configManager, typedOwner, []);
             AppSettings afterForget = await ReloadSettingsAsync(rootPath);
             Assert.DoesNotContain("prod.example", afterForget.TrustedRdpCertificatesForTypedDestinations);
             Assert.Single(afterForget.TrustedRdpCertificates["prod.example"]);
@@ -290,7 +291,7 @@ public sealed class AppStartupTests
             var configManager = new ConfigManager(rootPath);
             await configManager.InitializeAsync();
 
-            await App.PersistTrustedRdpCertificatesAsync(
+            await RdpCertificatePersistence.PersistAsync(
                 configManager,
                 RdpTrustKey.ForProfile(profileId),
                 [
@@ -327,12 +328,12 @@ public sealed class AppStartupTests
             const string profileId = "profile-to-empty";
             var configManager = new ConfigManager(rootPath);
             await configManager.InitializeAsync();
-            await App.PersistTrustedRdpCertificatesAsync(
+            await RdpCertificatePersistence.PersistAsync(
                 configManager,
                 RdpTrustKey.ForProfile(profileId),
                 [new RdpCertificateEntry("SHA256:AA:BB:01", DateTimeOffset.UtcNow)]);
 
-            await App.PersistTrustedRdpCertificatesAsync(configManager, RdpTrustKey.ForProfile(profileId), []);
+            await RdpCertificatePersistence.PersistAsync(configManager, RdpTrustKey.ForProfile(profileId), []);
 
             // An empty list left behind would be a profile that "has a trust set" holding
             // nothing - a distinction with no meaning that a settings screen would have to
@@ -344,19 +345,6 @@ public sealed class AppStartupTests
         {
             Directory.Delete(rootPath, recursive: true);
         }
-    }
-
-    [Fact]
-    public async Task PersistTrustedRdpCertificates_SwallowsMergeFailures()
-    {
-        var configManager = new ThrowingConfigManager();
-
-        // Failing to remember a trust decision must not take the application down; the
-        // user is asked again next time, which is the safe direction.
-        await App.PersistTrustedRdpCertificatesAsync(
-            configManager,
-            RdpTrustKey.ForProfile("profile"),
-            [new RdpCertificateEntry("SHA256:AA:BB:01", DateTimeOffset.UtcNow)]);
     }
 
     private static string CreateTemporaryRoot()

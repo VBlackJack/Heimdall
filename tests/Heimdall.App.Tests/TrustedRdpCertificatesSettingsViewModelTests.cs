@@ -167,11 +167,11 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
             await configManager.InitializeAsync();
             RdpTrustKey profileOwner = RdpTrustKey.ForProfile("prod.example");
             RdpTrustKey typedOwner = RdpTrustKey.ForTypedDestination("prod.example");
-            await App.PersistTrustedRdpCertificatesAsync(
+            await RdpCertificatePersistence.PersistAsync(
                 configManager,
                 profileOwner,
                 [new RdpCertificateEntry("SHA256:AA:BB:01", Stamp)]);
-            await App.PersistTrustedRdpCertificatesAsync(
+            await RdpCertificatePersistence.PersistAsync(
                 configManager,
                 typedOwner,
                 [new RdpCertificateEntry("SHA256:AA:BB:01", Stamp)]);
@@ -181,18 +181,11 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
             Assert.Single(settings.TrustedRdpCertificates["prod.example"]);
             Assert.Single(settings.TrustedRdpCertificatesForTypedDestinations["prod.example"]);
 
-            var fixture = await VmFixture.CreateAsync();
+            var store = new RdpCertificateTrustStore();
+            store.LoadFromConfig(App.ReadTrustedRdpCertificates(settings));
+            using var persistence = new RdpCertificatePersistence(store, configManager);
+            var fixture = await VmFixture.CreateAsync(persistence.RevokeAsync, store);
             fixture.Profiles.Add(Profile("prod.example", "Production"));
-            fixture.Store.LoadFromConfig(App.ReadTrustedRdpCertificates(settings));
-            var persisted = new TaskCompletionSource<bool>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-            fixture.Store.TrustChanged += (key, entries) =>
-            {
-                _ = App.PersistTrustedRdpCertificatesAsync(configManager, key, entries)
-                    .ContinueWith(
-                        _ => persisted.TrySetResult(true),
-                        TaskScheduler.Default);
-            };
 
             await fixture.ViewModel.RefreshAsync();
             Assert.Equal(2, fixture.ViewModel.Rows.Count);
@@ -203,8 +196,11 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
 
             fixture.Dialog.ConfirmResult = true;
             await fixture.ViewModel.ForgetCommand.ExecuteAsync(typedRow);
-            await persisted.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
+            // The command reports success only once the revocation is on disk. Withdrawing the
+            // row then raises the store's change event, which queues one more write of the same
+            // state; it is let finish so the reload does not race it for the file.
+            await persistence.PendingWrites.WaitAsync(TimeSpan.FromSeconds(30));
             var reloadedManager = new ConfigManager(rootPath);
             await reloadedManager.InitializeAsync();
             AppSettings reloaded = await reloadedManager.LoadSettingsAsync();
@@ -330,24 +326,21 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
     }
 
     /// <summary>
-    /// The removal must reach settings.json through <c>App.PersistTrustedRdpCertificatesAsync</c>,
-    /// the production method the application's startup handler calls.
+    /// The removal must reach settings.json through <see cref="RdpCertificatePersistence.RevokeAsync"/>,
+    /// the revocation the running application hands the screen.
     /// </summary>
     /// <remarks>
     /// <para>A screen that forgets only until the next restart is the same defect wearing a
-    /// different hat, and no double can catch it: the assertion is a reload from disk after the
-    /// real <c>App.PersistTrustedRdpCertificatesAsync</c> ran on the entries the store published,
-    /// with a real <c>ConfigManager</c> over a real directory.</para>
-    /// <para><b>What this does NOT prove.</b> The subscription itself. The production one is
-    /// created inside <c>App.OnStartup</c>, which needs an <c>Application</c> instance and a built
-    /// service provider, so no unit test reaches it; the lambda below is this test's own, and
-    /// deleting the real subscription in App.xaml.cs leaves this green. It measures the handler's
-    /// body and the store's event, not the line that joins them. Say so rather than let the name
-    /// promise it: an earlier version of this comment claimed "the very handler the application
-    /// wires", which is a label overstating a feature, in a test.</para>
+    /// different hat, and no double can catch it: the assertion is a reload from disk the moment
+    /// the command returns, with a real <c>RdpCertificatePersistence</c> and a real
+    /// <c>ConfigManager</c> over a real directory. RevokeAsync persists first and withdraws the
+    /// row after, so the command's completion is the acknowledgement of the disk write; a
+    /// revocation that did not wait for it would leave the reload reading the old file.</para>
+    /// <para><b>What this does NOT prove.</b> The dependency injection registration that builds
+    /// the screen with this persistence in the running application.</para>
     /// </remarks>
     [Fact]
-    public async Task Forget_Confirmed_PersistsThroughTheApplicationsPersistenceMethod()
+    public async Task Forget_Confirmed_PersistsThroughTheApplicationsRevocation()
     {
         string rootPath = Path.Combine(
             Path.GetTempPath(),
@@ -358,7 +351,7 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         {
             var configManager = new ConfigManager(rootPath);
             await configManager.InitializeAsync();
-            await App.PersistTrustedRdpCertificatesAsync(
+            await RdpCertificatePersistence.PersistAsync(
                 configManager,
                 RdpTrustKey.ForProfile("srv-1"),
                 [
@@ -375,26 +368,44 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
                 ["SHA256:AA:BB:01", "SHA256:AA:BB:02"],
                 settings.TrustedRdpCertificates["srv-1"].Select(e => e.Thumbprint));
 
-            var fixture = await VmFixture.CreateAsync();
-            fixture.Store.LoadFromConfig(App.ReadTrustedRdpCertificates(settings));
+            var store = new RdpCertificateTrustStore();
+            store.LoadFromConfig(App.ReadTrustedRdpCertificates(settings));
+            RdpTrustKey key = RdpTrustKey.ForProfile("srv-1");
 
-            var persisted = new TaskCompletionSource<bool>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-            fixture.Store.TrustChanged += (key, entries) =>
+            // The write is held open, and what the store holds at the instant it lands on disk
+            // is recorded: persist first, then withdraw, means the entry is still there then.
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool? heldWhenWritten = null;
+            var intercepting = new InterceptingConfigManager(configManager)
             {
-                _ = App.PersistTrustedRdpCertificatesAsync(configManager, key, entries)
-                    .ContinueWith(
-                        _ => persisted.TrySetResult(true),
-                        TaskScheduler.Default);
+                BeforeMergeSetting = () =>
+                {
+                    entered.TrySetResult();
+                    return release.Task;
+                },
+                AfterMergeSetting = () => heldWhenWritten =
+                    store.GetApproved(key).Any(e => e.Thumbprint == "SHA256:AA:BB:01"),
             };
+            using var persistence = new RdpCertificatePersistence(store, intercepting);
+            var fixture = await VmFixture.CreateAsync(persistence.RevokeAsync, store);
 
             await fixture.ViewModel.RefreshAsync();
             fixture.Dialog.ConfirmResult = true;
-            await fixture.ViewModel.ForgetCommand.ExecuteAsync(
+            Task forget = fixture.ViewModel.ForgetCommand.ExecuteAsync(
                 fixture.ViewModel.Rows.Single(r => r.Thumbprint == "SHA256:AA:BB:01"));
 
-            await persisted.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.False(forget.IsCompleted, "the screen reported the revocation before the write landed");
+            Assert.Equal(2, fixture.ViewModel.Rows.Count);
 
+            release.SetResult();
+            await forget.WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.True(heldWhenWritten, "the entry was withdrawn before its removal was on disk");
+
+            // Withdrawing the row queues one more write of the same state through the store's
+            // change event; it is let finish so the reload does not race it for the file.
+            await persistence.PendingWrites.WaitAsync(TimeSpan.FromSeconds(30));
             var reloadedManager = new ConfigManager(rootPath);
             await reloadedManager.InitializeAsync();
             AppSettings reloaded = await reloadedManager.LoadSettingsAsync();
@@ -817,9 +828,11 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         /// </remarks>
         public Task? ProfileLoadGate { get; set; }
 
-        public static async Task<VmFixture> CreateAsync(Func<RdpTrustKey, string, Task>? revoke = null)
+        public static async Task<VmFixture> CreateAsync(
+            Func<RdpTrustKey, string, Task>? revoke = null,
+            RdpCertificateTrustStore? trustStore = null)
         {
-            var store = new RdpCertificateTrustStore();
+            var store = trustStore ?? new RdpCertificateTrustStore();
             var localizer = new LocalizationManager();
             await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
             var dialog = new FakeDialogService();
