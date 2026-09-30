@@ -1906,6 +1906,7 @@
   "ValidationInlineTimeFormat": "Time must be in HH:MM format (00:00 - 23:59)",
   "ValidationInlineServerRequired": "A session must be selected",
   "ValidationInlineSshUserRequired": "SSH username is required",
+  "ValidationInlineWinRmUserInvalid": "Enter a WinRM user name such as operator, CONTOSO\\operator or operator@contoso.com.",
   "ValidationInlineSshUserFormat": "Invalid SSH username format",
 
   "SftpErrorDestinationChanged": "The destination is now occupied and was not replaced. Refresh the folder and retry with a new name or an explicit replacement choice.",

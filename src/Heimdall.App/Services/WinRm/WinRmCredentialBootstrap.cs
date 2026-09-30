@@ -217,6 +217,14 @@ internal sealed class WinRmCredentialBootstrap
         return string.Join("\r\n", lines) + "\r\n";
     }
 
+    /// <summary>
+    /// Whether a username can go into the stored-credential bootstrap. The server dialog judges
+    /// the field by this same predicate, so Save refuses exactly what a connection would.
+    /// </summary>
+    internal static bool IsValidUsername(string? username)
+        => !string.IsNullOrWhiteSpace(username)
+            && InputValidator.Validate(username, "Username");
+
     private static void ValidateCredentialProfile(ServerProfileDto server)
     {
         ArgumentNullException.ThrowIfNull(server);
@@ -229,8 +237,7 @@ internal sealed class WinRmCredentialBootstrap
                 "WinRM bootstrap is only valid for stored-credential profiles.");
         }
 
-        if (string.IsNullOrWhiteSpace(server.WinRmUsername)
-            || !InputValidator.Validate(server.WinRmUsername, "Username"))
+        if (!IsValidUsername(server.WinRmUsername))
         {
             throw new WinRmConfigurationException(
                 "ErrorWinRmInvalidUsername",

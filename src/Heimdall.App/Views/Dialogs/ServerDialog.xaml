@@ -895,6 +895,9 @@
                                                      AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicWinRmUsernameLabel}"
                                                      Text="{Binding WinRmUsername, UpdateSourceTrigger=PropertyChanged}"
                                                      Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                            <TextBlock Text="{Binding WinRmUsernameError}"
+                                                       Style="{StaticResource FieldValidationErrorStyle}"
+                                                       Visibility="{Binding WinRmUsernameError, Converter={StaticResource NullToVisibilityConverter}}"/>
                                             <TextBlock x:Name="DlgSrv_BasicWinRmPasswordLabel"
                                                        Text="{loc:Translate ServerDialogLabelPassword}"
                                                        Style="{StaticResource LabelStyle}"

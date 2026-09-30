@@ -1906,6 +1906,7 @@
   "ValidationInlineTimeFormat": "La hora debe tener el formato HH:MM (00:00 - 23:59)",
   "ValidationInlineServerRequired": "Debe seleccionarse una sesión",
   "ValidationInlineSshUserRequired": "El usuario SSH es obligatorio",
+  "ValidationInlineWinRmUserInvalid": "Introduce un nombre de usuario WinRM como operator, CONTOSO\\operator u operator@contoso.com.",
   "ValidationInlineSshUserFormat": "Formato de usuario SSH no válido",
 
   "SftpErrorDestinationChanged": "El destino ahora está ocupado y no se reemplazó. Actualiza la carpeta y vuelve a intentarlo con un nombre nuevo o una elección explícita de reemplazo.",
