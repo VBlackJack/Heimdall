@@ -20,13 +20,66 @@ namespace Heimdall.Sftp.Tests;
 
 public sealed class SftpAuditHardeningTests
 {
+    // A new file carries no consent to replace. That used to be refused outright on FTP, which has no
+    // exclusive publish, and routed through the exec-based publisher on SFTP, which needs an exec
+    // channel chrooted accounts refuse. The browser contract is now that a new file goes through the
+    // transport's own upload with a commit that refuses a destination it can see: the refusal for a
+    // missing publisher must not come back. A disconnected browser proves the call got past the
+    // publication choice to the transport, because the only thing left to refuse it is the missing
+    // connection.
     [Fact]
-    public async Task Ftp_ExclusiveUploadIsRefusedBeforeTransportWork()
+    public async Task Ftp_NewFileUploadReachesTheTransportInsteadOfBeingRefused()
     {
+        using TempFile source = new();
         using IRemoteBrowser browser = new FtpBrowser();
-        await Assert.ThrowsAsync<RemoteNoClobberPublishUnavailableException>(
-            async () => await browser.UploadFileAsync("synthetic-source", "/target", overwrite: false));
-        Assert.False(browser.IsConnected);
+
+        InvalidOperationException notConnected = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => browser.UploadFileAsync(source.Path, "/target", overwrite: false));
+
+        Assert.Contains("not connected", notConnected.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sftp_NewFileUploadNeedsNoExecChannel()
+    {
+        using TempFile source = new();
+        using IRemoteBrowser browser = new SftpBrowser();
+
+        // No pinned connection context exists, so anything that still wanted an exec channel would
+        // refuse with the unavailable-publisher exception before reaching the connection check.
+        InvalidOperationException notConnected = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => browser.UploadFileAsync(source.Path, "/target", overwrite: false));
+
+        Assert.Contains("not connected", notConnected.Message, StringComparison.Ordinal);
+    }
+
+    // The interface's default for a new file is the transport's ordinary upload, which replaces a
+    // destination that appeared after the listing. Each transport with a commit able to refuse that
+    // must therefore declare its own overload: dropping it compiles and passes every other test here.
+    [Theory]
+    [InlineData(typeof(SftpBrowser))]
+    [InlineData(typeof(FtpBrowser))]
+    public void Transports_DeclareTheirOwnCommitForANewFile(Type browserType)
+    {
+        System.Reflection.MethodInfo? overload = browserType.GetMethod(
+            nameof(IRemoteBrowser.UploadFileAsync),
+            [typeof(string), typeof(string), typeof(bool), typeof(CancellationToken)]);
+
+        Assert.NotNull(overload);
+        Assert.Equal(browserType, overload!.DeclaringType);
+    }
+
+    private sealed class TempFile : IDisposable
+    {
+        internal TempFile()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"Heimdall-NewFile-{Guid.NewGuid():N}.txt");
+            File.WriteAllText(Path, "payload");
+        }
+
+        internal string Path { get; }
+
+        public void Dispose() => File.Delete(Path);
     }
 
     [Theory]

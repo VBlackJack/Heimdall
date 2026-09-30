@@ -105,6 +105,53 @@ public static class FtpAtomicUpload
     }
 
     /// <summary>
+    /// Publishes the uploaded temp path at a destination the caller established was absent, and
+    /// refuses rather than replaces a destination that appeared since.
+    /// </summary>
+    /// <remarks>
+    /// FTP has no commit that fails on an existing name: RNTO replaces on most servers. So the
+    /// destination is checked again immediately before the move, after the transfer rather than
+    /// before it, which shrinks the window to the two commands of the commit. A file created
+    /// between that check and the move is still replaced; that residual race is documented and
+    /// accepted, because refusing every new file, as the upload once did, is worse. Unlike
+    /// <see cref="CommitRenameAsync"/>, nothing is ever moved aside here: an occupied destination
+    /// is a refusal, never a backup.
+    /// </remarks>
+    /// <exception cref="RemoteDestinationExistsException">The destination exists at commit time.</exception>
+    public static async Task CommitCreateAsync(
+        string tempRemotePath,
+        string finalRemotePath,
+        Func<string, CancellationToken, Task<bool>> remoteExistsAsync,
+        Func<string, string, CancellationToken, Task<bool>> moveRemoteAsync,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
+        ArgumentNullException.ThrowIfNull(remoteExistsAsync);
+        ArgumentNullException.ThrowIfNull(moveRemoteAsync);
+
+        if (await remoteExistsAsync(finalRemotePath, ct).ConfigureAwait(false))
+        {
+            throw new RemoteDestinationExistsException(finalRemotePath);
+        }
+
+        bool moved = await moveRemoteAsync(tempRemotePath, finalRemotePath, ct).ConfigureAwait(false);
+        if (moved)
+        {
+            return;
+        }
+
+        // A move that declined is classified, not guessed: a destination now present is the late
+        // collision, anything else is a failed commit.
+        if (await remoteExistsAsync(finalRemotePath, ct).ConfigureAwait(false))
+        {
+            throw new RemoteDestinationExistsException(finalRemotePath);
+        }
+
+        throw new IOException($"FTP upload commit move returned false for '{finalRemotePath}'.");
+    }
+
+    /// <summary>
     /// Invokes the replacement notification without ever letting a subscriber alter the outcome.
     /// </summary>
     /// <remarks>

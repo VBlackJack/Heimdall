@@ -376,9 +376,23 @@ public sealed class FtpBrowser : IRemoteBrowser
     }
 
     /// <inheritdoc/>
+    public Task UploadFileAsync(
+        string localPath,
+        string remotePath,
+        CancellationToken ct = default)
+        => UploadFileAsync(localPath, remotePath, overwrite: true, ct);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Without consent to replace, the commit re-checks the destination after the transfer and
+    /// refuses an occupied one instead of moving it aside. FTP offers no commit that fails on an
+    /// existing name, so a file created between that check and the move is still replaced: a
+    /// documented residual race, accepted because the caller's listing already proved absence.
+    /// </remarks>
     public async Task UploadFileAsync(
         string localPath,
         string remotePath,
+        bool overwrite,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
@@ -405,6 +419,18 @@ public sealed class FtpBrowser : IRemoteBrowser
                     ct).ConfigureAwait(false);
 
                 ThrowIfFailed(status, tempRemotePath, "upload");
+
+                if (!overwrite)
+                {
+                    await FtpAtomicUpload.CommitCreateAsync(
+                        tempRemotePath,
+                        remotePath,
+                        (path, token) => client.FileExists(path, token),
+                        (source, destination, token) =>
+                            client.MoveFile(source, destination, FtpRemoteExists.Skip, token),
+                        ct).ConfigureAwait(false);
+                    return;
+                }
 
                 await FtpAtomicUpload.CommitRenameAsync(
                     tempRemotePath,

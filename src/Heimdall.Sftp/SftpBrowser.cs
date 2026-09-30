@@ -358,6 +358,14 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
         /// rename is not a substitute for it.
         /// </summary>
         PublishByExclusiveLink,
+
+        /// <summary>
+        /// Publish an upload whose destination the caller's listing proved absent, with the SFTP
+        /// version 3 rename, which refuses an existing name and needs no exec channel. Never routed
+        /// through the replacing commit, and never used by the remote copy, whose stricter contract
+        /// only the link satisfies.
+        /// </summary>
+        PublishByExclusiveRename,
     }
 
     private static readonly TimeSpan DefaultDisconnectLockTimeout = TimeSpan.FromMilliseconds(250);
@@ -726,6 +734,26 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
         return UploadFileAsync(localPath, remotePath, UploadCommitMode.ReplaceExisting, ct);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Without consent to replace, the upload commits with the version 3 rename, which refuses a
+    /// destination that appeared after the caller's listing. It needs no exec channel and no second
+    /// connection: routing every new file through the exec-based publisher made uploads fail on
+    /// servers that refuse exec, and cost one SSH handshake per file.
+    /// </remarks>
+    public Task UploadFileAsync(
+        string localPath,
+        string remotePath,
+        bool overwrite,
+        CancellationToken ct = default)
+    {
+        return UploadFileAsync(
+            localPath,
+            remotePath,
+            overwrite ? UploadCommitMode.ReplaceExisting : UploadCommitMode.PublishByExclusiveRename,
+            ct);
+    }
+
     private async Task UploadFileAsync(
         string localPath,
         string remotePath,
@@ -825,11 +853,11 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                             },
                             ReadTargetAttributesAfterUpload: () =>
                             {
-                                // The no-clobber path is a creation or a refusal, never a
+                                // The no-clobber paths are a creation or a refusal, never a
                                 // replacement, so a destination that already exists must not have its
                                 // metadata copied onto the staging file. Reporting no target keeps the
-                                // creation semantics; the link, not this probe, decides the collision.
-                                if (commitMode == UploadCommitMode.PublishByExclusiveLink)
+                                // creation semantics; the commit, not this probe, decides the collision.
+                                if (commitMode != UploadCommitMode.ReplaceExisting)
                                 {
                                     return null;
                                 }
@@ -907,6 +935,18 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                                     EnsureReplacementPreservesMetadataAsync(remotePath, ct)
                                         .GetAwaiter()
                                         .GetResult();
+                                }
+
+                                // A new file commits by the version 3 rename, which refuses an
+                                // existing name; it must never reach the replacing commit either.
+                                if (commitMode == UploadCommitMode.PublishByExclusiveRename)
+                                {
+                                    SftpAtomicUpload.CommitCreate(
+                                        tempRemotePath,
+                                        remotePath,
+                                        plainRename: (temp, final) => client.RenameFile(temp, final, isPosix: false),
+                                        remoteExists: final => TryGetEntryWithoutFollowingTarget(client, final) is not null);
+                                    return;
                                 }
 
                                 // The no-clobber path commits by linking the temporary this upload
