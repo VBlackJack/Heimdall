@@ -2028,8 +2028,8 @@ internal static class SftpFileAttributesExtensions
 /// <param name="Size">File size in bytes (0 for directories).</param>
 /// <param name="LastModified">Last modification time (UTC).</param>
 /// <param name="Permissions">POSIX permission string, e.g., "rwxr-xr-x".</param>
-/// <param name="Owner">Numeric owner ID as a string.</param>
-/// <param name="Group">Numeric group ID as a string.</param>
+/// <param name="Owner">Owner as the listing reports it: the numeric ID over SFTP, the user name in a privileged listing (the number when the ID has no name).</param>
+/// <param name="Group">Group as the listing reports it: the numeric ID over SFTP, the group name in a privileged listing (the number when the ID has no name).</param>
 public sealed record SftpFileInfo(
     string Name,
     string FullPath,

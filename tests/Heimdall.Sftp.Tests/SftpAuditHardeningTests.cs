@@ -190,6 +190,47 @@ public sealed class SftpAuditHardeningTests
     public void SudoListing_RejectsIncompleteResponse(string output)
         => Assert.Throws<InvalidDataException>(() => SudoDirectoryListing.Parse(output, "/"));
 
+    // find does not follow a symbolic link given as its starting point unless told to, so a
+    // privileged listing of a link to a directory printed nothing and the pane showed an empty
+    // directory with status Ready. Measured on the docker bench: plain find lists 0 entries under the
+    // link, `find -H` lists the 2 the target holds, with GNU find and BusyBox 1.37 alike. -H follows
+    // the starting point only; the children are still reported as the links they are.
+    [Fact]
+    public void SudoListing_FollowsALinkGivenAsTheStartingPoint_AndOnlyThat()
+    {
+        string command = SudoDirectoryListing.Build("/srv/link");
+
+        Assert.StartsWith("LC_ALL=C find -H '/srv/link' -mindepth 1 -maxdepth 1 ", command, StringComparison.Ordinal);
+        Assert.DoesNotContain(" -L ", command, StringComparison.Ordinal);
+    }
+
+    // The unprivileged listing used to be `ls -la`, which named owners; the NUL-delimited records
+    // switched to numeric IDs, and a privileged pane showed "0 0" where an administrator reads
+    // "root root". %u and %g print the names, and the number for an ID with no name.
+    [Fact]
+    public void SudoListing_RequestsOwnerAndGroupNames()
+    {
+        string command = SudoDirectoryListing.Build("/srv");
+
+        Assert.Contains("%y\\0%m\\0%u\\0%g\\0%s", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("%U", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("%G", command, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("root", "root")]
+    [InlineData("www-data", "adm")]
+    [InlineData("1001", "1001")]
+    public void SudoListing_CarriesOwnerAndGroupAsReported(string owner, string group)
+    {
+        string record = string.Join('\0', "f", "640", owner, group, "7", "1234.5", "entry", "");
+
+        SftpFileInfo entry = Assert.Single(SudoDirectoryListing.Parse(record, "/srv"));
+
+        Assert.Equal(owner, entry.Owner);
+        Assert.Equal(group, entry.Group);
+    }
+
     [Fact]
     public void SudoListing_EmptyDirectoryAndInvariantNumbers()
     {
