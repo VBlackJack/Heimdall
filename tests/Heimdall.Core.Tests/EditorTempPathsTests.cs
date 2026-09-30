@@ -48,6 +48,30 @@ public sealed class EditorTempPathsTests
         }
     }
 
+    /// <remarks>
+    /// A failure to restrict the directory was logged and the directory returned anyway, so the
+    /// file, possibly a root-owned one read through sudo, was staged where every account able to
+    /// read the temporary folder could read it. The factory now refuses and removes what it made.
+    /// </remarks>
+    [Fact]
+    public void CreateWorkingDirectory_RestrictionFails_RefusesAndLeavesNothingBehind()
+    {
+        string? restricted = null;
+        UnauthorizedAccessException denied = new("access denied");
+
+        EditorWorkingDirectoryUnprotectedException refusal = Assert.Throws<EditorWorkingDirectoryUnprotectedException>(
+            () => EditorTempPaths.CreateWorkingDirectory(directory =>
+            {
+                restricted = directory;
+                throw denied;
+            }));
+
+        Assert.NotNull(restricted);
+        Assert.False(Directory.Exists(restricted), "the unprotected directory must not be left behind");
+        Assert.Same(denied, refusal.InnerException);
+        Assert.Equal(EditorWorkingDirectoryUnprotectedException.LocaleKey, refusal.MessageKey);
+    }
+
     [Fact]
     public void CreateWorkingDirectory_OnWindows_ProtectsTheDirectoryFromInheritedAccess()
     {

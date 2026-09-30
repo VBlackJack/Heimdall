@@ -977,6 +977,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return L10n("SftpErrorRemoteUploadTargetNotRegularFile");
         }
 
+        if (ex is EditorWorkingDirectoryUnprotectedException unprotected)
+        {
+            return L10n(unprotected.MessageKey);
+        }
+
         // Reached only where no privileged fallback took the refusal over, such as the external
         // editor's auto-upload. "Transfer failed" gave no hint that nothing would change on retry.
         if (ex is SftpPermissionDeniedException)

@@ -1042,6 +1042,21 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
+    public async Task DescribeTransferError_UnprotectedEditorFolder_ExplainsTheRefusal()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+
+        string message = viewModel.DescribeTransferError(
+            new Heimdall.Core.Utilities.EditorWorkingDirectoryUnprotectedException(new UnauthorizedAccessException()));
+
+        Assert.Equal(localizer[Heimdall.Core.Utilities.EditorWorkingDirectoryUnprotectedException.LocaleKey], message);
+        Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
+    }
+
+    [Fact]
     public async Task DescribeTransferError_InventoryFailure_NamesTheDirectory()
     {
         FakeUiDispatcher dispatcher = new();

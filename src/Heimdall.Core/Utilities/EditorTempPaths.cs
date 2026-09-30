@@ -41,25 +41,65 @@ public static class EditorTempPaths
     /// editor did not, so a root-owned file read through sudo landed in a directory inheriting the
     /// DACL of the temporary folder, readable by every account that can read it, and stayed there
     /// until the sweeper's retention ran out.
+    /// <para>
+    /// Fail closed: a directory that cannot be restricted is removed and the call refuses, rather
+    /// than returning a directory that would expose whatever is staged in it.
+    /// </para>
     /// </remarks>
+    /// <exception cref="EditorWorkingDirectoryUnprotectedException">
+    /// The directory could not be restricted; nothing was left behind.
+    /// </exception>
     public static string CreateWorkingDirectory()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return CreateWorkingDirectory(Security.AclEnforcer.SetDirectoryAcl);
+        }
+
+        return CreateWorkingDirectory(restrict: null);
+    }
+
+    /// <summary>
+    /// Creates one working directory under <see cref="Root"/> and restricts it with
+    /// <paramref name="restrict"/>, when one is given.
+    /// </summary>
+    internal static string CreateWorkingDirectory(Action<string>? restrict)
     {
         string directory = Path.Combine(Root, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
 
-        if (OperatingSystem.IsWindows())
+        if (restrict is not null)
         {
             try
             {
-                Security.AclEnforcer.SetDirectoryAcl(directory);
+                restrict(directory);
             }
             catch (Exception ex)
             {
                 Logging.FileLogger.Error(
-                    $"Failed to restrict the editor working directory ACL; staged files may be readable by other users: {ex.Message}");
+                    $"Failed to restrict the editor working directory ACL; refusing to stage the file ({ex.GetType().Name}): {ex.Message}");
+                RemoveUnprotectedDirectory(directory);
+                throw new EditorWorkingDirectoryUnprotectedException(ex);
             }
         }
 
         return directory;
+    }
+
+    /// <summary>
+    /// Removes a working directory that could not be restricted. It is empty, since nothing is
+    /// staged before the restriction; a failure here is logged and left to the startup sweeper.
+    /// </summary>
+    private static void RemoveUnprotectedDirectory(string directory)
+    {
+        try
+        {
+            Directory.Delete(directory, recursive: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logging.FileLogger.Warn(
+                $"Could not remove the unprotected editor working directory ({ex.GetType().Name}); the startup sweeper will.");
+        }
     }
 }

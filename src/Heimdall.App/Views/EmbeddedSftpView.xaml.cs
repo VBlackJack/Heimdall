@@ -1665,7 +1665,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         }
         catch (Exception ex)
         {
-            ShowError(ex is SudoEditFileTooLargeException
+            ShowError(ex is SudoEditFileTooLargeException or EditorWorkingDirectoryUnprotectedException
                 ? _viewModel.DescribeTransferError(ex)
                 : LF("SftpStatusEditOpenFailed", ex.Message));
             if (tempPath is not null)
