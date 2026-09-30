@@ -160,4 +160,64 @@ public sealed class RdpDisconnectActionPolicyTests
         Assert.True(sharedMessages > 0, "no message is shared by two codes, so nothing was compared");
         Assert.True(disagreements.Count == 0, string.Join("\n", disagreements));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ResolveTabOrder_ReachesEveryOverlayButtonExactlyOnce(bool editProfilePrimary)
+    {
+        IReadOnlyList<RdpOverlayButton> order = RdpDisconnectActionPolicy.ResolveTabOrder(
+            editProfilePrimary ? RdpOverlayPrimaryAction.EditProfile : RdpOverlayPrimaryAction.Reconnect);
+
+        Assert.Equal(
+            Enum.GetValues<RdpOverlayButton>().Order(),
+            order.Order());
+    }
+
+    [Fact]
+    public void ResolveTabOrder_ReconnectPrimary_FollowsTheVisualOrder()
+    {
+        Assert.Equal(
+            [
+                RdpOverlayButton.Reconnect,
+                RdpOverlayButton.CopyError,
+                RdpOverlayButton.CopyAnonymous,
+                RdpOverlayButton.EditProfile,
+                RdpOverlayButton.Close,
+            ],
+            RdpDisconnectActionPolicy.ResolveTabOrder(RdpOverlayPrimaryAction.Reconnect));
+    }
+
+    [Fact]
+    public void ResolveTabOrder_EditProfilePrimary_PutsItFirstThenTheVisualOrder()
+    {
+        Assert.Equal(
+            [
+                RdpOverlayButton.EditProfile,
+                RdpOverlayButton.Reconnect,
+                RdpOverlayButton.CopyError,
+                RdpOverlayButton.CopyAnonymous,
+                RdpOverlayButton.Close,
+            ],
+            RdpDisconnectActionPolicy.ResolveTabOrder(RdpOverlayPrimaryAction.EditProfile));
+    }
+
+    [Fact]
+    public void TheMarkupTabOrderIsTheVisualOrderBeforeAnyDisconnectIsShown()
+    {
+        // The overlay's buttons in document order, which is the order the WrapPanel lays them
+        // out in. Before the first disconnect reorders them, their declared TabIndex must walk
+        // them in that same order, or Tab jumps over a button and comes back to it last.
+        System.Xml.Linq.XElement panel = ViewSource.NamedElement("OverlayReconnectButton").Parent!;
+        int[] tabIndexes = panel
+            .Elements()
+            .Where(e => ViewSource.TagName(e) == "Button")
+            .Select(e => int.Parse(
+                (string?)e.Attribute("TabIndex") ?? "-1",
+                System.Globalization.CultureInfo.InvariantCulture))
+            .ToArray();
+
+        Assert.Equal(Enum.GetValues<RdpOverlayButton>().Length, tabIndexes.Length);
+        Assert.Equal(Enumerable.Range(0, tabIndexes.Length), tabIndexes);
+    }
 }

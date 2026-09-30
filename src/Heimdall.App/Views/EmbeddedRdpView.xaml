@@ -595,7 +595,7 @@
                                 FontSize="{StaticResource FontSizeBodyLarge}"
                                 Margin="8,0,0,0"/>
                         <Button x:Name="OverlayCopyAnonymousButton"
-                                TabIndex="4"
+                                TabIndex="2"
                                 Click="OnOverlayCopyAnonymousClick"
                                 Content="{loc:Translate RdpCopyAnonymous}"
                                 ToolTip="{loc:Translate RdpCopyAnonymousHint}"
@@ -605,7 +605,7 @@
                                 FontSize="{StaticResource FontSizeBodyLarge}"
                                 Margin="8,0,0,0"/>
                         <Button x:Name="OverlayEditProfileButton"
-                                TabIndex="2"
+                                TabIndex="3"
                                 Click="OnOverlayEditProfileClick"
                                 Content="{loc:Translate BtnEditProfileOverlay}"
                                 ToolTip="{loc:Translate TooltipEditProfileOverlay}"
@@ -616,7 +616,7 @@
                                 Margin="8,0,0,0"
                                 Visibility="Collapsed"/>
                         <Button x:Name="OverlayCloseButton"
-                                TabIndex="3"
+                                TabIndex="4"
                                 Click="OnOverlayCloseClick"
                                 Content="{loc:Translate BtnCloseOverlay}"
                                 AutomationProperties.Name="{loc:Translate A11yCloseOverlay}"

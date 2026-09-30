@@ -4523,20 +4523,29 @@ public partial class EmbeddedRdpView
         {
             ApplyOverlayButtonStyle(OverlayEditProfileButton, "PrimaryButtonStyle");
             ApplyOverlayButtonStyle(OverlayReconnectButton, "SecondaryButtonStyle");
-            OverlayEditProfileButton.TabIndex = 0;
-            OverlayReconnectButton.TabIndex = 1;
-            OverlayCopyErrorButton.TabIndex = 2;
-            OverlayCloseButton.TabIndex = 3;
-            return;
+        }
+        else
+        {
+            ApplyOverlayButtonStyle(OverlayReconnectButton, "PrimaryButtonStyle");
+            ApplyOverlayButtonStyle(OverlayEditProfileButton, "SecondaryButtonStyle");
         }
 
-        ApplyOverlayButtonStyle(OverlayReconnectButton, "PrimaryButtonStyle");
-        ApplyOverlayButtonStyle(OverlayEditProfileButton, "SecondaryButtonStyle");
-        OverlayReconnectButton.TabIndex = 0;
-        OverlayCopyErrorButton.TabIndex = 1;
-        OverlayEditProfileButton.TabIndex = 2;
-        OverlayCloseButton.TabIndex = 3;
+        IReadOnlyList<RdpOverlayButton> tabOrder = RdpDisconnectActionPolicy.ResolveTabOrder(primaryAction);
+        for (int tabIndex = 0; tabIndex < tabOrder.Count; tabIndex++)
+        {
+            OverlayButton(tabOrder[tabIndex]).TabIndex = tabIndex;
+        }
     }
+
+    private Button OverlayButton(RdpOverlayButton button) => button switch
+    {
+        RdpOverlayButton.Reconnect => OverlayReconnectButton,
+        RdpOverlayButton.CopyError => OverlayCopyErrorButton,
+        RdpOverlayButton.CopyAnonymous => OverlayCopyAnonymousButton,
+        RdpOverlayButton.EditProfile => OverlayEditProfileButton,
+        RdpOverlayButton.Close => OverlayCloseButton,
+        _ => throw new ArgumentOutOfRangeException(nameof(button), button, null),
+    };
 
     private void ApplyOverlayButtonStyle(Button button, string resourceKey)
     {
