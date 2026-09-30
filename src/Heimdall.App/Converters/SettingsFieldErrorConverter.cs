@@ -16,9 +16,9 @@
 
 using System.Globalization;
 using System.Windows;
-using WpfTextBox = System.Windows.Controls.TextBox;
 using System.Windows.Data;
 using Heimdall.App.ViewModels;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace Heimdall.App.Converters;
 
