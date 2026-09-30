@@ -1922,6 +1922,41 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal(3, loads);
     }
 
+    /// <summary>
+    /// A mistyped resolution preset is reported by name and refuses the save; it is never dropped.
+    /// </summary>
+    /// <remarks>
+    /// The setter used to filter the box on every keystroke, silently removing any line it could not
+    /// parse, and it checked no bound, so "99999x1" reached every RDP session menu.
+    /// </remarks>
+    [Fact]
+    public async Task ResolutionPresets_InvalidLinesAreNamedAndRefuseTheSave()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        string[] before = viewModel.RdpResolutionPresets;
+
+        viewModel.RdpResolutionPresetsText = "1920x1080" + Environment.NewLine + "99999x1" + Environment.NewLine + "wide";
+
+        Assert.Equal(before, viewModel.RdpResolutionPresets);
+        Assert.Contains("99999x1", viewModel.RdpResolutionPresetsText, StringComparison.Ordinal);
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.NotNull(viewModel.ValidationSummary);
+        Assert.Contains("99999x1", viewModel.ValidationSummary, StringComparison.Ordinal);
+        Assert.Contains("wide", viewModel.ValidationSummary, StringComparison.Ordinal);
+        Assert.True(viewModel.RdpTabErrorCount > 0);
+
+        viewModel.RdpResolutionPresetsText = "1920x1080" + Environment.NewLine + "1280x720";
+        Assert.Equal(new[] { "1920x1080", "1280x720" }, viewModel.RdpResolutionPresets);
+        Assert.True(await viewModel.TrySaveAsync());
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

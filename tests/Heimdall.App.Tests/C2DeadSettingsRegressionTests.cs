@@ -125,7 +125,7 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
         string xaml = ReadRepoFile("src", "Heimdall.App", "MainWindow.xaml");
 
         Assert.Contains(
-            "Text=\"{Binding Settings.RdpResolutionPresetsText, UpdateSourceTrigger=PropertyChanged}\"",
+            "Text=\"{Binding Settings.RdpResolutionPresetsText, UpdateSourceTrigger=LostFocus}\"",
             xaml,
             StringComparison.Ordinal);
         Assert.DoesNotContain("RdpResolutionPresetItems", xaml, StringComparison.Ordinal);
@@ -226,8 +226,11 @@ public sealed class C2DeadSettingsRegressionTests : IDisposable
             "RdpKeepAliveIntervalMs",
             "RdpDialogAdvancedDefault",
             "RdpResolutionPresets",
-            "RdpConnectWatchdogTimeoutMs",
         ];
+
+        // The watchdog lives on Advanced > Diagnostics; the RDP reset promises to leave it alone
+        // (G-21), and ResetRdpDefaultsCommand_LeavesTheWatchdogOnTheDiagnosticsTabAlone holds that.
+        Assert.DoesNotContain("RdpConnectWatchdogTimeoutMs = defaults.", body, StringComparison.Ordinal);
 
         foreach (string property in expectedProperties)
         {

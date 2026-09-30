@@ -525,50 +525,115 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _rdpDialogAdvancedDefault;
 
     /// <summary>
-    /// Multi-line text representation of <see cref="RdpResolutionPresets"/>
-    /// for the Settings UI: one preset per line, format <c>WIDTHxHEIGHT</c>.
-    /// Setter parses, trims, validates and rebuilds the array. Invalid lines
-    /// are silently dropped - the user keeps editing what's left in the box.
+    /// Multi-line text of <see cref="RdpResolutionPresets"/> for the Settings UI: one preset per
+    /// line, format <c>WIDTHxHEIGHT</c>.
     /// </summary>
-    public string RdpResolutionPresetsText
-    {
-        get => string.Join(Environment.NewLine, RdpResolutionPresets);
-        set
-        {
-            var parsed = (value ?? string.Empty)
-                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-                .Select(line => line.Trim())
-                .Where(line =>
-                {
-                    var parts = line.Split(['x', 'X', '\u00D7'], 2);
-                    return parts.Length == 2
-                        && int.TryParse(parts[0].Trim(), out var w) && w > 0
-                        && int.TryParse(parts[1].Trim(), out var h) && h > 0;
-                })
-                .ToArray();
+    /// <remarks>
+    /// The box commits when it loses focus and the text is validated as a whole. It used to commit
+    /// on every keystroke through a setter that dropped any line it could not parse, so typing
+    /// "1920x" removed the line under the caret and a mistyped preset vanished without a word; the
+    /// bounds were not checked at all, so "99999x1" was offered to every RDP session menu.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateResolutionPresetsText))]
+    private string _rdpResolutionPresetsText = string.Empty;
 
-            if (!parsed.SequenceEqual(RdpResolutionPresets))
-            {
-                RdpResolutionPresets = parsed;
-                OnPropertyChanged();
-            }
+    /// <summary>Set while the text is being rewritten from the preset list, so it is not parsed back.</summary>
+    private bool _syncingResolutionPresetsText;
+
+    /// <summary>Prefix of the error <see cref="ValidateResolutionPresetsText"/> raises; the bad lines follow it.</summary>
+    private const string ResolutionPresetsErrorPrefix = "RdpResolutionPresetsInvalid:";
+
+    /// <summary>Separator between the bad lines quoted in the preset error.</summary>
+    private const string ResolutionPresetsErrorSeparator = ", ";
+
+    partial void OnRdpResolutionPresetsTextChanged(string value)
+    {
+        if (_syncingResolutionPresetsText)
+        {
+            return;
+        }
+
+        string[] parsed = ParseResolutionPresets(value, out List<string> invalid);
+        if (invalid.Count == 0 && !parsed.SequenceEqual(RdpResolutionPresets))
+        {
+            RdpResolutionPresets = parsed;
         }
     }
 
     [RelayCommand]
     private void ResetRdpResolutionPresets()
     {
-        RdpResolutionPresets =
-        [
-            "1920x1080", "1680x1050", "1600x900", "1440x900", "1366x768",
-            "1280x1024", "1280x720", "1024x768", "2560x1440", "3840x2160"
-        ];
-        OnPropertyChanged(nameof(RdpResolutionPresetsText));
+        RdpResolutionPresets = [.. AppSettings.DefaultRdpResolutionPresets];
     }
 
     partial void OnRdpResolutionPresetsChanged(string[] value)
     {
-        OnPropertyChanged(nameof(RdpResolutionPresetsText));
+        string text = string.Join(Environment.NewLine, value);
+        if (string.Equals(text, RdpResolutionPresetsText, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _syncingResolutionPresetsText = true;
+        try
+        {
+            RdpResolutionPresetsText = text;
+        }
+        finally
+        {
+            _syncingResolutionPresetsText = false;
+        }
+    }
+
+    /// <summary>
+    /// Validates the preset box: every non-blank line must be <c>WIDTHxHEIGHT</c> within the fixed
+    /// desktop bounds an RDP session accepts.
+    /// </summary>
+    public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateResolutionPresetsText(
+        string? value,
+        ValidationContext context)
+    {
+        _ = context;
+        _ = ParseResolutionPresets(value, out List<string> invalid);
+        return invalid.Count == 0
+            ? System.ComponentModel.DataAnnotations.ValidationResult.Success
+            : new System.ComponentModel.DataAnnotations.ValidationResult(
+                ResolutionPresetsErrorPrefix + string.Join(ResolutionPresetsErrorSeparator, invalid));
+    }
+
+    /// <summary>Parses the preset box, returning the valid presets and collecting the lines that are not.</summary>
+    internal static string[] ParseResolutionPresets(string? text, out List<string> invalid)
+    {
+        invalid = [];
+        List<string> presets = [];
+        foreach (string raw in (text ?? string.Empty).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            string line = raw.Trim();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            string[] parts = line.Split(['x', 'X', '\u00D7'], 2);
+            if (parts.Length == 2
+                && int.TryParse(parts[0].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int width)
+                && int.TryParse(parts[1].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int height)
+                && width >= RdpDisplayLimits.MinimumFixedDimension
+                && width <= RdpDisplayLimits.MaximumFixedWidth
+                && height >= RdpDisplayLimits.MinimumFixedDimension
+                && height <= RdpDisplayLimits.MaximumFixedHeight)
+            {
+                presets.Add(string.Create(CultureInfo.InvariantCulture, $"{width}x{height}"));
+            }
+            else
+            {
+                invalid.Add(line);
+            }
+        }
+
+        return [.. presets];
     }
 
     // --- Security ---
@@ -3733,6 +3798,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(DefaultResolutionWidthText),
         nameof(DefaultResolutionHeight),
         nameof(DefaultResolutionHeightText),
+        nameof(RdpResolutionPresetsText),
     ];
 
     /// <summary>
@@ -3819,6 +3885,16 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         if (SettingsValidationKeyMap.TryGetValue(message, out var key))
         {
             return _localizer[key];
+        }
+
+        if (message.StartsWith(ResolutionPresetsErrorPrefix, StringComparison.Ordinal))
+        {
+            return _localizer.Format(
+                "ValidationSettingsRdpResolutionPresets",
+                message[ResolutionPresetsErrorPrefix.Length..],
+                RdpDisplayLimits.MinimumFixedDimension,
+                RdpDisplayLimits.MaximumFixedWidth,
+                RdpDisplayLimits.MaximumFixedHeight);
         }
 
         // A ranged field reports the settings property it is bound by; the numbers come from

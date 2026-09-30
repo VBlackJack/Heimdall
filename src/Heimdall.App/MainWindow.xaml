@@ -3311,7 +3311,7 @@
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    Margin="0,0,0,6"
                                                    TextWrapping="Wrap"/>
-                                        <TextBox Text="{Binding Settings.RdpResolutionPresetsText, UpdateSourceTrigger=PropertyChanged}"
+                                        <TextBox Text="{Binding Settings.RdpResolutionPresetsText, UpdateSourceTrigger=LostFocus}"
                                                  AcceptsReturn="True"
                                                  MinHeight="120"
                                                  VerticalScrollBarVisibility="Auto"

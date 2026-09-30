@@ -280,7 +280,13 @@ public sealed class AppSettings
     /// header's resolution menu. Values are formatted as "WIDTHxHEIGHT". Empty
     /// or null falls back to the built-in 10-preset set.
     /// </summary>
-    public string[] RdpResolutionPresets { get; set; } =
+    public string[] RdpResolutionPresets { get; set; } = [.. DefaultRdpResolutionPresets];
+
+    /// <summary>
+    /// The built-in resolution presets: the factory value of <see cref="RdpResolutionPresets"/>,
+    /// what the settings panel's reset puts back, and what the session menu falls back to.
+    /// </summary>
+    public static IReadOnlyList<string> DefaultRdpResolutionPresets { get; } =
     [
         "1920x1080", "1680x1050", "1600x900", "1440x900", "1366x768",
         "1280x1024", "1280x720", "1024x768", "2560x1440", "3840x2160"
