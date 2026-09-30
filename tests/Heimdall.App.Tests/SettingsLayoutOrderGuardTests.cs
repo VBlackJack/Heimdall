@@ -51,6 +51,42 @@ public sealed class SettingsLayoutOrderGuardTests
         Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
     }
 
+    /// <summary>
+    /// Cards sit where the user looks for them.
+    /// </summary>
+    /// <remarks>
+    /// L-7: General opened on the welcome tour, above Appearance. G-09: NLA and strict server
+    /// authentication sat under RDP > Performance, away from the certificate trust they govern.
+    /// I-08: auto-lock and disconnect on lock were hidden while the vault is off, so nothing said
+    /// they exist or what turns them on.
+    /// </remarks>
+    [Fact]
+    public void CardsSitWhereTheUserLooksForThem()
+    {
+        XDocument markup = XDocument.Load(
+            Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
+        XElement Named(string name) => markup.Descendants().Single(element => element.Attribute(Xaml + "Name")?.Value == name);
+
+        List<XElement> general = Named("Mw_SettingsTabGeneral").Descendants().ToList();
+        Assert.True(
+            general.IndexOf(Named("Mw_SettingsAppearanceTitle")) < general.IndexOf(Named("Mw_SettingsOnboardingTitle")),
+            "Appearance comes before the welcome tour on General");
+        XElement cards = Named("Mw_SettingsAppearanceTitle").Ancestors().First(element => element.Name.LocalName == "Border").Parent!;
+        XElement lastCard = cards.Elements().Last(element => element.Name.LocalName == "Border");
+        Assert.Contains(lastCard.Descendants(), element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsOnboardingTitle");
+
+        foreach (string security in new[] { "Mw_SettingsRdpNla", "Mw_SettingsRdpStrictServerAuth" })
+        {
+            string? tab = Named(security).Ancestors()
+                .FirstOrDefault(element => element.Name.LocalName == "TabItem")?.Attribute(Xaml + "Name")?.Value;
+            Assert.Equal("Mw_SettingsRdpSubTabCertificates", tab);
+        }
+
+        XElement autoLock = Named("Mw_SettingsAutoLockPanel");
+        Assert.Null(autoLock.Attribute("Visibility"));
+        Assert.Equal("{Binding Settings.IsVaultEnabled}", autoLock.Attribute("IsEnabled")?.Value);
+    }
+
     [Fact]
     public void TheCheckRefusesEachShape()
     {

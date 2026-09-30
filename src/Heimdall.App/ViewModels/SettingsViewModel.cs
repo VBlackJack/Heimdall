@@ -864,6 +864,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnIsVaultEnabledChanged(bool value)
     {
         OnPropertyChanged(nameof(VaultStatusText));
+        OnPropertyChanged(nameof(AutoLockAvailabilityHint));
         OnPropertyChanged(nameof(VaultDisabledActionsVisible));
         OnPropertyChanged(nameof(VaultEnabledActionsVisible));
         RefreshVaultHelloUiState();
@@ -872,6 +873,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     public string VaultStatusText => IsVaultEnabled
         ? _localizer["SettingsVaultStatusEnabled"]
         : _localizer["SettingsVaultStatusDisabled"];
+
+    /// <summary>
+    /// Why the auto-lock controls are disabled, for the accessible help text of their group; empty
+    /// when they are available.
+    /// </summary>
+    public string AutoLockAvailabilityHint => IsVaultEnabled
+        ? string.Empty
+        : _localizer["SettingsAutoLockRequiresVault"];
 
     /// <summary>Visibility flag for the "Enable" action (vault not yet configured).</summary>
     public bool VaultDisabledActionsVisible => !IsVaultEnabled;

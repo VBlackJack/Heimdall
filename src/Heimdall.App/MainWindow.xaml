@@ -2434,40 +2434,6 @@
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
-                                <!-- Replaying the tour is the only way back into it. One reflex
-                                     Escape used to end it permanently: Skip and Escape both call
-                                     CompleteAsync, which persists OnboardingCompleted, and that
-                                     flag had exactly one reader - the first-launch check. Nothing
-                                     anywhere offered to show it again. -->
-                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
-                                    <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsOnboardingTitle"
-                                                   Text="{loc:Translate SettingsSectionOnboarding}"
-                                                   FontSize="{StaticResource FontSizeSubtitle}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                   Margin="0,0,0,8"/>
-                                        <!-- Styled inline, not via DialogHintTextStyle: that key
-                                             lives in Themes/DialogCommonStyles.xaml, which is
-                                             merged by the dialogs and NOT by this window. A
-                                             StaticResource is resolved when the tree loads, so
-                                             the compiler cannot see the miss - it throws at
-                                             startup instead. -->
-                                        <TextBlock Text="{loc:Translate SettingsOnboardingReplayHint}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   FontSize="{StaticResource FontSizeCaption}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,0,0,12"/>
-                                        <Button x:Name="Mw_SettingsReplayOnboardingBtn"
-                                                HorizontalAlignment="Left"
-                                                MinWidth="180"
-                                                Content="{loc:Translate SettingsOnboardingReplayButton}"
-                                                Command="{Binding Settings.ReplayOnboardingCommand}"
-                                                Style="{DynamicResource SecondaryButtonStyle}"
-                                                AutomationProperties.Name="{loc:Translate SettingsOnboardingReplayButton}"
-                                                AutomationProperties.HelpText="{loc:Translate SettingsOnboardingReplayHint}"/>
-                                    </StackPanel>
-                                </Border>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsAppearanceTitle" Text="{loc:Translate SettingsSectionAppearance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -2608,7 +2574,8 @@
                                         Background="{DynamicResource CardBrush}"
                                         BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="{StaticResource CornerRadiusLg}">
+                                        CornerRadius="{StaticResource CornerRadiusLg}"
+                                        Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock Text="{loc:Translate SettingsSectionLegacyMigration}"
                                                    FontSize="{StaticResource FontSizeSubtitle}"
@@ -2635,6 +2602,41 @@
                                                    TextWrapping="Wrap"
                                                    Margin="0,8,0,0"
                                                    Visibility="{Binding Settings.LegacyMigrationReofferAvailable, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Replaying the tour is the only way back into it. One reflex
+                                     Escape used to end it permanently: Skip and Escape both call
+                                     CompleteAsync, which persists OnboardingCompleted, and that
+                                     flag had exactly one reader - the first-launch check. Nothing
+                                     anywhere offered to show it again. -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsOnboardingTitle"
+                                                   Text="{loc:Translate SettingsSectionOnboarding}"
+                                                   FontSize="{StaticResource FontSizeSubtitle}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   Margin="0,0,0,8"/>
+                                        <!-- Styled inline, not via DialogHintTextStyle: that key
+                                             lives in Themes/DialogCommonStyles.xaml, which is
+                                             merged by the dialogs and NOT by this window. A
+                                             StaticResource is resolved when the tree loads, so
+                                             the compiler cannot see the miss - it throws at
+                                             startup instead. -->
+                                        <TextBlock Text="{loc:Translate SettingsOnboardingReplayHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,12"/>
+                                        <Button x:Name="Mw_SettingsReplayOnboardingBtn"
+                                                HorizontalAlignment="Left"
+                                                MinWidth="180"
+                                                Content="{loc:Translate SettingsOnboardingReplayButton}"
+                                                Command="{Binding Settings.ReplayOnboardingCommand}"
+                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                AutomationProperties.Name="{loc:Translate SettingsOnboardingReplayButton}"
+                                                AutomationProperties.HelpText="{loc:Translate SettingsOnboardingReplayHint}"/>
                                     </StackPanel>
                                 </Border>
 
@@ -3287,8 +3289,6 @@
                                          <CheckBox x:Name="Mw_SettingsRdpCompression" Content="{loc:Translate SettingsLabelRdpCompression}" IsChecked="{Binding Settings.RdpDefaultCompression}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpCompressionHint}" AutomationProperties.HelpText="{loc:Translate RdpCompressionHint}"/>
                                          <CheckBox x:Name="Mw_SettingsRdpHardwareAcceleration" Content="{loc:Translate SettingsLabelRdpHardwareAcceleration}" IsChecked="{Binding Settings.RdpDefaultHardwareAcceleration}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpHardwareAccelerationHint}" AutomationProperties.HelpText="{loc:Translate RdpHardwareAccelerationHint}"/>
                                          <CheckBox x:Name="Mw_SettingsRdpAutoReconnect" Content="{loc:Translate SettingsLabelRdpAutoReconnect}" IsChecked="{Binding Settings.RdpDefaultAutoReconnect}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpAutoReconnectHint}" AutomationProperties.HelpText="{loc:Translate RdpAutoReconnectHint}"/>
-                                         <CheckBox x:Name="Mw_SettingsRdpNla" Content="{loc:Translate SettingsLabelRdpNla}" IsChecked="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpDefaultNlaHint}" AutomationProperties.HelpText="{loc:Translate RdpDefaultNlaHint}"/>
-                                         <CheckBox x:Name="Mw_SettingsRdpStrictServerAuth" Content="{loc:Translate SettingsLabelRdpStrictServerAuth}" IsChecked="{Binding Settings.RdpDefaultStrictServerAuthentication}" IsEnabled="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpStrictServerAuthHint}" AutomationProperties.HelpText="{loc:Translate RdpStrictServerAuthHint}"/>
 
                                          <TextBlock x:Name="Mw_SettingsRdpHostPoolCapacityLabel"
                                                     Text="{loc:Translate SettingsLabelRdpHostPoolCapacity}"
@@ -3439,6 +3439,15 @@
                                          Style="{StaticResource SegmentedTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                <!-- Connection security sits with the certificate trust it governs, not under
+                                     Performance, where NLA and strict server authentication used to be. -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsRdpSecurityTitle" Text="{loc:Translate SettingsSectionRdpSecurity}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <CheckBox x:Name="Mw_SettingsRdpNla" Content="{loc:Translate SettingsLabelRdpNla}" IsChecked="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpDefaultNlaHint}" AutomationProperties.HelpText="{loc:Translate RdpDefaultNlaHint}"/>
+                                        <CheckBox x:Name="Mw_SettingsRdpStrictServerAuth" Content="{loc:Translate SettingsLabelRdpStrictServerAuth}" IsChecked="{Binding Settings.RdpDefaultStrictServerAuthentication}" IsEnabled="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpStrictServerAuthHint}" AutomationProperties.HelpText="{loc:Translate RdpStrictServerAuthHint}"/>
+                                    </StackPanel>
+                                </Border>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
@@ -3732,9 +3741,20 @@
                                             </StackPanel>
                                         </StackPanel>
 
-                                        <!-- Auto-lock + D3 policy (only meaningful when the vault is enabled) -->
-                                        <StackPanel Margin="0,16,0,0"
-                                                    Visibility="{Binding Settings.VaultEnabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <!-- Auto-lock + D3 policy. Only meaningful with the vault on, but shown disabled
+                                             with the reason rather than hidden: hidden, a user looking for auto-lock had
+                                             no way to learn it exists or what turns it on. -->
+                                        <TextBlock x:Name="Mw_SettingsAutoLockRequiresVault"
+                                                   Text="{loc:Translate SettingsAutoLockRequiresVault}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,16,0,0"
+                                                   Visibility="{Binding Settings.VaultDisabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <StackPanel x:Name="Mw_SettingsAutoLockPanel"
+                                                    Margin="0,16,0,0"
+                                                    IsEnabled="{Binding Settings.IsVaultEnabled}"
+                                                    AutomationProperties.HelpText="{Binding Settings.AutoLockAvailabilityHint}">
                                             <TextBlock x:Name="Mw_SettingsAutoLockLabel" Text="{loc:Translate SettingsAutoLockLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBox x:Name="Mw_SettingsAutoLockMinutes" Text="{Binding Settings.AutoLockIdleMinutesText, UpdateSourceTrigger=PropertyChanged}" Width="80" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsAutoLockLabel}"/>
