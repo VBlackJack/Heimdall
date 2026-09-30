@@ -2113,6 +2113,39 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.True(viewModel.SshTabErrorCount > 0);
     }
 
+    // The tool paths were accepted as typed and failed only at use. A typed path with nothing
+    // behind it now says so beside the field, on load and after each edit; an empty one says
+    // nothing, since empty means "not used" or "look for it".
+    [Fact]
+    public void ToolPaths_SayWhenNothingIsThere()
+    {
+        FakeConfigManager config = new();
+        config.Settings.PlinkPath = @"C:\Tools\plink.exe";
+        config.Settings.SysinternalsPath = @"C:\Tools\Sysinternals";
+        SettingsViewModel viewModel = CreateViewModel(config);
+        HashSet<string> files = new(StringComparer.OrdinalIgnoreCase) { @"C:\Tools\plink.exe" };
+        HashSet<string> folders = new(StringComparer.OrdinalIgnoreCase);
+        viewModel.FileExists = files.Contains;
+        viewModel.DirectoryExists = folders.Contains;
+        List<string> raised = [];
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        viewModel.LoadFromSettings(config.Settings);
+
+        Assert.False(viewModel.IsPlinkPathMissing);
+        Assert.True(viewModel.IsSysinternalsPathMissing);
+        Assert.False(viewModel.IsPuttyPathMissing);
+        Assert.False(viewModel.IsNirSoftPathMissing);
+
+        viewModel.PlinkPath = @"C:\Tool\plink.exe";
+        Assert.True(viewModel.IsPlinkPathMissing);
+        Assert.Contains(nameof(SettingsViewModel.IsPlinkPathMissing), raised);
+
+        folders.Add(@"C:\Tools\Sysinternals");
+        viewModel.SysinternalsPath = @"C:\Tools\Sysinternals ";
+        Assert.False(viewModel.IsSysinternalsPathMissing);
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

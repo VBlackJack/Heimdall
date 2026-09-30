@@ -2768,6 +2768,7 @@
                                                 </StackPanel>
                                             </Button>
                                         </Grid>
+                                        <TextBlock x:Name="Mw_SettingsPlinkPathMissing" Text="{loc:Translate SettingsFileNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsPlinkPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <TextBlock x:Name="Mw_SettingsPlinkPathHint" Text="{loc:Translate SettingsPlinkPathHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         <TextBlock x:Name="Mw_SettingsPuttyPathLabel" Text="{loc:Translate SettingsLabelPuttyPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,12,0,4"/>
                                         <Grid>
@@ -2788,6 +2789,7 @@
                                                 </StackPanel>
                                             </Button>
                                         </Grid>
+                                        <TextBlock x:Name="Mw_SettingsPuttyPathMissing" Text="{loc:Translate SettingsFileNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsPuttyPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <TextBlock x:Name="Mw_SettingsPuttyPathHint" Text="{loc:Translate SettingsPuttyPathHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         <StackPanel Margin="0,12,0,0">
                                             <TextBlock x:Name="Mw_SettingsSshModeLabel" Text="{loc:Translate SettingsLabelSshMode}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
@@ -4106,6 +4108,7 @@
                                                 </StackPanel>
                                             </Button>
                                         </Grid>
+                                        <TextBlock x:Name="Mw_SettingsEditorPathMissing" Text="{loc:Translate SettingsFileNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsExternalEditorPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
                                 </Border>
 
@@ -4125,6 +4128,9 @@
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
                                             </Grid.RowDefinitions>
                                             <TextBlock x:Name="Mw_SettingsLblSysintPath" Grid.Row="0" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsLblSysinternalsPath}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
                                             <TextBox x:Name="Mw_SettingsTxtSysintPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblSysintPath}" Grid.Row="0" Grid.Column="1" Text="{Binding Settings.SysinternalsPath, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}"/>
@@ -4134,22 +4140,25 @@
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
-                                            <TextBlock x:Name="Mw_SettingsLblNirSoftPath" Grid.Row="1" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsLblNirSoftPath}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <TextBox x:Name="Mw_SettingsTxtNirSoftPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblNirSoftPath}" Grid.Row="1" Grid.Column="1" Text="{Binding Settings.NirSoftPath, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}"/>
-                                            <Button x:Name="Mw_SettingsBtnNirSoftBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNirSoftPath}" Grid.Row="1" Grid.Column="2" Padding="6,2" Margin="4,0,0,8" Click="OnNirSoftPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
+                                            <TextBlock x:Name="Mw_SettingsSysintPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Grid.Row="1" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="{Binding Settings.IsSysinternalsPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <TextBlock x:Name="Mw_SettingsLblNirSoftPath" Grid.Row="2" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsLblNirSoftPath}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
+                                            <TextBox x:Name="Mw_SettingsTxtNirSoftPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblNirSoftPath}" Grid.Row="2" Grid.Column="1" Text="{Binding Settings.NirSoftPath, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}"/>
+                                            <Button x:Name="Mw_SettingsBtnNirSoftBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNirSoftPath}" Grid.Row="2" Grid.Column="2" Padding="6,2" Margin="4,0,0,8" Click="OnNirSoftPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
-                                            <TextBlock x:Name="Mw_SettingsLblNanaRunPath" Grid.Row="2" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsLblNanaRunPath}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <TextBox x:Name="Mw_SettingsTxtNanaRunPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblNanaRunPath}" Grid.Row="2" Grid.Column="1" Text="{Binding Settings.NanaRunPath, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,0" FontSize="{StaticResource FontSizeBody}"/>
-                                            <Button x:Name="Mw_SettingsBtnNanaRunBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNanaRunPath}" Grid.Row="2" Grid.Column="2" Padding="6,2" Margin="4,0,0,0" Click="OnNanaRunPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
+                                            <TextBlock x:Name="Mw_SettingsNirSoftPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Grid.Row="3" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="{Binding Settings.IsNirSoftPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <TextBlock x:Name="Mw_SettingsLblNanaRunPath" Grid.Row="4" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsLblNanaRunPath}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
+                                            <TextBox x:Name="Mw_SettingsTxtNanaRunPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblNanaRunPath}" Grid.Row="4" Grid.Column="1" Text="{Binding Settings.NanaRunPath, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,0" FontSize="{StaticResource FontSizeBody}"/>
+                                            <Button x:Name="Mw_SettingsBtnNanaRunBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNanaRunPath}" Grid.Row="4" Grid.Column="2" Padding="6,2" Margin="4,0,0,0" Click="OnNanaRunPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
+                                            <TextBlock x:Name="Mw_SettingsNanaRunPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Grid.Row="5" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsNanaRunPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </Grid>
                                         <DockPanel Margin="0,8,0,0">
                                             <Button x:Name="Mw_SettingsBtnRescan" DockPanel.Dock="Right" Content="{loc:Translate ExtToolBtnRescan}" Click="OnRescanExternalToolsClick" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}"/>

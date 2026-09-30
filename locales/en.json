@@ -3580,6 +3580,8 @@
   "SettingsSshAgentPreferencePageantOnly": "Pageant only",
   "SettingsSshAgentPreferenceHint": "Controls which loaded SSH agent keys Heimdall tries first. Changes apply to the next connection.",
   "SettingsPlinkPathHint": "Required for Plink fallback, Pageant-based PuTTY flows, and keyboard-interactive servers. Not needed if using key files only.",
+  "SettingsFileNotFound": "No file at this path.",
+  "SettingsFolderNotFound": "No folder at this path.",
   "SettingsPuttyPathHint": "Required when SSH mode is set to External. Auto-detected next to plink.exe if left blank.",
   "SettingsSshModeHint": "Embedded: terminal runs inside Heimdall (SSH.NET / Plink). External: opens PuTTY in a separate window.",
   "SettingsRdpModeHint": "Embedded: RDP client runs inside Heimdall. External: opens mstsc.exe in a separate window.",

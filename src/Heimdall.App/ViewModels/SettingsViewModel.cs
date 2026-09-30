@@ -420,6 +420,52 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private string _nanaRunPath = "";
 
+    /// <summary>Checks a file path; replaceable so the "not found" hints can be exercised without a disk.</summary>
+    internal Func<string, bool> FileExists { get; set; } = File.Exists;
+
+    /// <summary>Checks a folder path; replaceable for the same reason as <see cref="FileExists"/>.</summary>
+    internal Func<string, bool> DirectoryExists { get; set; } = Directory.Exists;
+
+    /// <summary>True when a Plink path is typed and no file is there.</summary>
+    /// <remarks>
+    /// The six tool paths were accepted as typed and failed only at use: a mistyped Plink path
+    /// surfaced as a connection that fell back or failed, far from the field that caused it.
+    /// </remarks>
+    public bool IsPlinkPathMissing => IsFileMissing(PlinkPath);
+
+    /// <summary>True when a PuTTY path is typed and no file is there.</summary>
+    public bool IsPuttyPathMissing => IsFileMissing(PuttyPath);
+
+    /// <summary>True when an external editor path is typed and no file is there.</summary>
+    public bool IsExternalEditorPathMissing => IsFileMissing(ExternalEditorPath);
+
+    /// <summary>True when a Sysinternals folder is typed and does not exist.</summary>
+    public bool IsSysinternalsPathMissing => IsFolderMissing(SysinternalsPath);
+
+    /// <summary>True when a NirSoft folder is typed and does not exist.</summary>
+    public bool IsNirSoftPathMissing => IsFolderMissing(NirSoftPath);
+
+    /// <summary>True when a NanaRun folder is typed and does not exist.</summary>
+    public bool IsNanaRunPathMissing => IsFolderMissing(NanaRunPath);
+
+    private bool IsFileMissing(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && !FileExists(Environment.ExpandEnvironmentVariables(path.Trim()));
+
+    private bool IsFolderMissing(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && !DirectoryExists(Environment.ExpandEnvironmentVariables(path.Trim()));
+
+    partial void OnPlinkPathChanged(string value) => OnPropertyChanged(nameof(IsPlinkPathMissing));
+
+    partial void OnPuttyPathChanged(string value) => OnPropertyChanged(nameof(IsPuttyPathMissing));
+
+    partial void OnExternalEditorPathChanged(string value) => OnPropertyChanged(nameof(IsExternalEditorPathMissing));
+
+    partial void OnSysinternalsPathChanged(string value) => OnPropertyChanged(nameof(IsSysinternalsPathMissing));
+
+    partial void OnNirSoftPathChanged(string value) => OnPropertyChanged(nameof(IsNirSoftPathMissing));
+
+    partial void OnNanaRunPathChanged(string value) => OnPropertyChanged(nameof(IsNanaRunPathMissing));
+
     // --- Command Library Git Sync ---
 
     [ObservableProperty]

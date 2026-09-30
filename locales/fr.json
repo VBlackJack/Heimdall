@@ -3577,6 +3577,8 @@
   "SettingsSshAgentPreferencePageantOnly": "Pageant uniquement",
   "SettingsSshAgentPreferenceHint": "Contr\u00f4le quelles cl\u00e9s d'agent SSH Heimdall essaie en premier. Les changements s'appliquent \u00e0 la prochaine connexion.",
   "SettingsPlinkPathHint": "N\u00e9cessaire pour le repli Plink, les flux PuTTY bas\u00e9s sur Pageant et les serveurs keyboard-interactive. Inutile si vous utilisez uniquement des cl\u00e9s.",
+  "SettingsFileNotFound": "Aucun fichier \u00e0 cet emplacement.",
+  "SettingsFolderNotFound": "Aucun dossier \u00e0 cet emplacement.",
   "SettingsPuttyPathHint": "N\u00e9cessaire quand le mode SSH est d\u00e9fini sur Externe. D\u00e9tect\u00e9 automatiquement \u00e0 c\u00f4t\u00e9 de plink.exe si laiss\u00e9 vide.",
   "SettingsSshModeHint": "Int\u00e9gr\u00e9 : terminal dans Heimdall (SSH.NET / Plink). Externe : ouvre PuTTY dans une fen\u00eatre s\u00e9par\u00e9e.",
   "SettingsRdpModeHint": "Int\u00e9gr\u00e9 : client RDP dans Heimdall. Externe : ouvre mstsc.exe dans une fen\u00eatre s\u00e9par\u00e9e.",
