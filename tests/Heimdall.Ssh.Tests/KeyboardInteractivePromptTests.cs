@@ -257,4 +257,105 @@ public sealed class KeyboardInteractivePromptTests
         Assert.Equal("s3cret", afterReset.Response);
         Assert.Null(observation.UnansweredPrompt);
     }
+    /// <summary>
+    /// A one-time code prompt never receives the stored password, even alone in its round.
+    /// </summary>
+    /// <remarks>
+    /// Audit 2026-09-30 S-02. pam_oath asks "One-time password (OATH) for `user':", which carries
+    /// the word "password". On a keyboard-interactive-only server that single prompt got the
+    /// account password: the secret went to the OTP backend and burned a factor attempt.
+    /// </remarks>
+    [Theory]
+    [InlineData("One-time password (OATH) for `audit': ")]
+    [InlineData("One-time password: ")]
+    [InlineData("OTP: ")]
+    [InlineData("Passcode: ")]
+    [InlineData("Mot de passe à usage unique : ")]
+    [InlineData("Einmalpasswort: ")]
+    [InlineData("Contraseña de un solo uso: ")]
+    public void AOneTimeCodePrompt_AloneInItsRound_IsNeverAnsweredWithTheStoredPassword(string wording)
+    {
+        KeyboardInteractiveObservation observation = new();
+        AuthenticationPrompt prompt = new(0, false, wording);
+
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([prompt], "s3cret", observation);
+
+        Assert.NotEqual("s3cret", prompt.Response);
+        Assert.Equal(string.Empty, prompt.Response);
+        Assert.Equal(wording.Trim(), observation.UnansweredPrompt);
+    }
+
+    /// <summary>
+    /// With a responder, a one-time code prompt is asked of the user, not answered from storage.
+    /// </summary>
+    [Fact]
+    public void AOneTimeCodePrompt_WithAResponder_IsAskedOfTheUser()
+    {
+        KeyboardInteractiveObservation observation = new();
+        AuthenticationPrompt prompt = new(0, false, "One-time password (OATH) for `audit': ");
+        string? asked = null;
+
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([prompt], "s3cret", observation,
+            request => { asked = request; return "424242"; });
+
+        Assert.Equal("One-time password (OATH) for `audit': ", asked);
+        Assert.Equal("424242", prompt.Response);
+        Assert.True(observation.HasInteractiveAnswer);
+    }
+
+    /// <summary>
+    /// Once the password method has been accepted as a factor, the keyboard-interactive round
+    /// that follows does not send the password again, whatever its wording.
+    /// </summary>
+    /// <remarks>
+    /// S-02 part one. With <c>AuthenticationMethods password,keyboard-interactive</c> the password
+    /// method succeeds partially, then the server asks its second factor through
+    /// keyboard-interactive. The one-password-per-attempt guard only counted keyboard-interactive
+    /// answers, so the password went out a second time.
+    /// </remarks>
+    [Fact]
+    public void AfterThePasswordMethodSucceededPartially_APasswordWordedPromptIsNotAnsweredFromStorage()
+    {
+        KeyboardInteractiveObservation observation = new();
+        SshConnectionFactory.RecordPasswordMethodOutcome(AuthenticationResult.PartialSuccess, observation);
+        AuthenticationPrompt prompt = new(0, false, "Password: ");
+
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([prompt], "s3cret", observation);
+
+        Assert.Equal(string.Empty, prompt.Response);
+        Assert.Equal("Password:", observation.UnansweredPrompt);
+    }
+
+    /// <summary>
+    /// The control: a password method that was refused outright leaves the keyboard-interactive
+    /// fallback free to try the same password, as servers with PasswordAuthentication disabled
+    /// and a PAM password prompt require.
+    /// </summary>
+    [Fact]
+    public void AfterThePasswordMethodFailed_TheKeyboardInteractiveFallbackStillGetsThePassword()
+    {
+        KeyboardInteractiveObservation observation = new();
+        SshConnectionFactory.RecordPasswordMethodOutcome(AuthenticationResult.Failure, observation);
+        AuthenticationPrompt prompt = new(0, false, "Password: ");
+
+        SshConnectionFactory.AnswerKeyboardInteractivePrompts([prompt], "s3cret", observation);
+
+        Assert.Equal("s3cret", prompt.Response);
+    }
+
+    /// <summary>
+    /// The password method the factory builds is the one that reports its outcome.
+    /// </summary>
+    /// <remarks>
+    /// Without this, <see cref="SshConnectionFactory.RecordPasswordMethodOutcome"/> could be
+    /// correct and never called: a plain SSH.NET password method tells nobody it was accepted.
+    /// </remarks>
+    [Fact]
+    public void TheFactory_BuildsAPasswordMethodThatReportsItsOutcome()
+    {
+        ConnectionInfo info = SshConnectionFactory.Create(Parameters(), new Heimdall.Ssh.Agents.SshAgentRegistry([]));
+
+        AuthenticationMethod password = Assert.Single(info.AuthenticationMethods, m => m.Name == "password");
+        Assert.IsType<SshConnectionFactory.ObservedPasswordAuthenticationMethod>(password);
+    }
 }
