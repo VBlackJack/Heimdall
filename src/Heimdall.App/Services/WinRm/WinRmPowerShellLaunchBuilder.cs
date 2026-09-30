@@ -15,6 +15,7 @@
  */
 
 using System.Globalization;
+using System.IO;
 using System.Net;
 using System.Text;
 using Heimdall.Core.Configuration;
@@ -26,7 +27,15 @@ namespace Heimdall.App.Services.WinRm;
 /// <summary>
 /// Local PowerShell process launch shape expected by Heimdall terminal sessions.
 /// </summary>
-internal sealed record WinRmPowerShellLaunchSpec(string Executable, string Arguments);
+/// <param name="Executable">The PowerShell host to start.</param>
+/// <param name="Arguments">The host's command line arguments.</param>
+/// <param name="EnvironmentVariables">
+/// Variables that override the inherited environment of the host, or null to inherit it unchanged.
+/// </param>
+internal sealed record WinRmPowerShellLaunchSpec(
+    string Executable,
+    string Arguments,
+    IReadOnlyDictionary<string, string>? EnvironmentVariables = null);
 
 /// <summary>
 /// Builds local PowerShell command lines that enter a remote WinRM session.
@@ -74,10 +83,20 @@ internal sealed class WinRmPowerShellLaunchBuilder
         RemoteSessionNotEnteredExitCode);
 
     private readonly Func<string, string?> _findExecutable;
+    private readonly Func<string, string?> _getEnvironmentVariable;
+    private readonly Func<string, bool> _fileExists;
+    private readonly PowerShellModuleRoots _moduleRoots;
 
-    public WinRmPowerShellLaunchBuilder(Func<string, string?>? findExecutable = null)
+    public WinRmPowerShellLaunchBuilder(
+        Func<string, string?>? findExecutable = null,
+        Func<string, string?>? getEnvironmentVariable = null,
+        Func<string, bool>? fileExists = null,
+        PowerShellModuleRoots? moduleRoots = null)
     {
         _findExecutable = findExecutable ?? ConnectionHelpers.FindInPath;
+        _getEnvironmentVariable = getEnvironmentVariable ?? Environment.GetEnvironmentVariable;
+        _fileExists = fileExists ?? File.Exists;
+        _moduleRoots = moduleRoots ?? PowerShellModuleRoots.ForCurrentUser();
     }
 
     public WinRmPowerShellLaunchSpec Build(
@@ -102,6 +121,7 @@ internal sealed class WinRmPowerShellLaunchBuilder
         ValidateWinRmEndpoint(computerName, port);
 
         string executable = ResolvePowerShellExecutable();
+        IReadOnlyDictionary<string, string>? environment = BuildEnvironment(executable);
         if (server.WinRmIdentityMode == WinRmIdentityMode.Credential)
         {
             if (string.IsNullOrWhiteSpace(bootstrapScriptPath))
@@ -121,7 +141,8 @@ internal sealed class WinRmPowerShellLaunchBuilder
             return new WinRmPowerShellLaunchSpec(
                 executable,
                 "-NoLogo -NoExit -NoProfile -ExecutionPolicy Bypass -Command "
-                + QuoteCommandLineArgument(bootstrapCommand));
+                + QuoteCommandLineArgument(bootstrapCommand),
+                environment);
         }
 
         string command = LocalPromptExitGuard
@@ -136,7 +157,8 @@ internal sealed class WinRmPowerShellLaunchBuilder
         return new WinRmPowerShellLaunchSpec(
             executable,
             "-NoLogo -NoExit -NoProfile -Command "
-            + QuoteCommandLineArgument(command));
+            + QuoteCommandLineArgument(command),
+            environment);
     }
 
     internal static string BuildEnterPSSessionCommand(
@@ -245,6 +267,25 @@ internal sealed class WinRmPowerShellLaunchBuilder
     internal static void ValidateProfile(ServerProfileDto server)
     {
         ValidateWinRmProfile(server);
+    }
+
+    private IReadOnlyDictionary<string, string>? BuildEnvironment(string executable)
+    {
+        if (!WindowsPowerShellModulePath.IsWindowsPowerShell(executable))
+        {
+            return null;
+        }
+
+        string? modulePath = WindowsPowerShellModulePath.FromInherited(
+            _getEnvironmentVariable(WindowsPowerShellModulePath.VariableName),
+            _moduleRoots,
+            _fileExists);
+        return modulePath is null
+            ? null
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [WindowsPowerShellModulePath.VariableName] = modulePath
+            };
     }
 
     private string ResolvePowerShellExecutable()

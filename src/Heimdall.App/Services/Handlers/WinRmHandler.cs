@@ -162,6 +162,12 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
                 _launchBuilder.Build(server, targetHost, targetPort, bootstrapScriptPath);
 
             session = _terminalSessionFactory();
+            if (spec.EnvironmentVariables is not null)
+            {
+                session.EnvironmentVariables = new Dictionary<string, string>(
+                    spec.EnvironmentVariables,
+                    StringComparer.OrdinalIgnoreCase);
+            }
 
             Core.Logging.FileLogger.Info($"Launching WinRM session for host '{server.RemoteServer}'");
             _connectionSm.TryTransition(server.Id, ConnectionState.LaunchingWinRm);

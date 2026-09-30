@@ -73,6 +73,53 @@ public sealed class WinRmPowerShellLaunchBuilderTests
     }
 
     [Fact]
+    public void Build_WithWindowsPowerShell_PassesTheInheritedModulePathWithoutPowerShell7Entries()
+    {
+        WinRmPowerShellLaunchBuilder builder = new WinRmPowerShellLaunchBuilder(
+            FindWindowsPowerShellPathOnly,
+            InheritedPowerShell7ModulePath,
+            path => string.Equals(path, @"C:\Program Files\PowerShell\7\pwsh.exe", StringComparison.OrdinalIgnoreCase),
+            TestModuleRoots);
+
+        WinRmPowerShellLaunchSpec spec = builder.Build(CreateServer());
+
+        Assert.NotNull(spec.EnvironmentVariables);
+        KeyValuePair<string, string> variable = Assert.Single(spec.EnvironmentVariables);
+        Assert.Equal("PSModulePath", variable.Key);
+        Assert.Equal(
+            @"C:\Program Files\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules;D:\Corp\Modules",
+            variable.Value);
+    }
+
+    [Fact]
+    public void Build_WithPwsh_LeavesTheInheritedEnvironmentUnchanged()
+    {
+        WinRmPowerShellLaunchBuilder builder = new WinRmPowerShellLaunchBuilder(
+            FindPwshAndWindowsPowerShell,
+            InheritedPowerShell7ModulePath,
+            _ => true,
+            TestModuleRoots);
+
+        WinRmPowerShellLaunchSpec spec = builder.Build(CreateServer());
+
+        Assert.Null(spec.EnvironmentVariables);
+    }
+
+    [Fact]
+    public void Build_WithWindowsPowerShellAndNoInheritedModulePath_LeavesTheInheritedEnvironmentUnchanged()
+    {
+        WinRmPowerShellLaunchBuilder builder = new WinRmPowerShellLaunchBuilder(
+            FindWindowsPowerShellPathOnly,
+            _ => null,
+            _ => true,
+            TestModuleRoots);
+
+        WinRmPowerShellLaunchSpec spec = builder.Build(CreateServer());
+
+        Assert.Null(spec.EnvironmentVariables);
+    }
+
+    [Fact]
     public void Build_WhenPwshFound_UsesPwshExecutable()
     {
         WinRmPowerShellLaunchBuilder builder = new WinRmPowerShellLaunchBuilder(FindPwshAndWindowsPowerShell);
@@ -329,6 +376,19 @@ public sealed class WinRmPowerShellLaunchBuilderTests
             WinRmUseSsl = true,
             WinRmIdentityMode = WinRmIdentityMode.CurrentUser
         };
+
+    private static readonly PowerShellModuleRoots TestModuleRoots = new(
+        [@"C:\Users\u\Documents\PowerShell\Modules", @"C:\Program Files\PowerShell\Modules"],
+        [@"C:\Program Files\WindowsPowerShell\Modules"]);
+
+    private static string? InheritedPowerShell7ModulePath(string variableName)
+    {
+        return string.Equals(variableName, "PSModulePath", StringComparison.OrdinalIgnoreCase)
+            ? @"C:\Users\u\Documents\PowerShell\Modules;C:\Program Files\PowerShell\Modules;"
+                + @"c:\program files\powershell\7\Modules;C:\Program Files\WindowsPowerShell\Modules;"
+                + @"C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules;D:\Corp\Modules"
+            : null;
+    }
 
     private static string? FindPwshAndWindowsPowerShell(string executableName)
     {
