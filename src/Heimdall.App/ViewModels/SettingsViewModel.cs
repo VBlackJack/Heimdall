@@ -415,13 +415,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _cmdLibGitSyncUrl = "";
 
     [ObservableProperty]
-    private string _cmdLibGitSyncBranch = "main";
+    private string _cmdLibGitSyncBranch = AppSettings.DefaultCmdLibGitSyncBranch;
 
     [ObservableProperty]
-    private string _cmdLibGitSyncAuthorName = "Heimdall User";
+    private string _cmdLibGitSyncAuthorName = AppSettings.DefaultCmdLibGitSyncAuthorName;
 
     [ObservableProperty]
-    private string _cmdLibGitSyncAuthorEmail = "heimdall@local";
+    private string _cmdLibGitSyncAuthorEmail = AppSettings.DefaultCmdLibGitSyncAuthorEmail;
 
     [ObservableProperty]
     private bool _cmdLibGitSyncOnStartup;

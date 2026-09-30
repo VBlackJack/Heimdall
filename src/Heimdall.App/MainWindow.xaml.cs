@@ -1146,6 +1146,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private DispatcherTimer? _settingsSearchHighlightTimer;
 
+    /// <summary>How long a settings search match stays highlighted after a jump.</summary>
+    private static readonly TimeSpan SettingsSearchHighlightDuration = TimeSpan.FromMilliseconds(1500);
+
+    /// <summary>The highlight opacity when the theme token cannot be found.</summary>
+    private const double SettingsSearchHighlightFallbackOpacity = 0.55;
+
     private void OnSettingsSearchTextChanged(object sender, TextChangedEventArgs e)
     {
         string query = Mw_SettingsSearchBox.Text?.Trim() ?? string.Empty;
@@ -1431,7 +1437,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         FrameworkElement highlightElement = GetSettingsSearchHighlightElement(target);
         Brush highlightBrush = accentBrush.CloneCurrentValue();
-        highlightBrush.Opacity = 0.55;
+        highlightBrush.Opacity = TryFindResource("OpacitySearchHighlight") is double opacity
+            ? opacity
+            : SettingsSearchHighlightFallbackOpacity;
 
         _settingsSearchHighlightElement = highlightElement;
         _settingsSearchHighlightOriginalBackground = GetSettingsSearchBackground(highlightElement);
@@ -1439,7 +1447,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         DispatcherTimer timer = new()
         {
-            Interval = TimeSpan.FromMilliseconds(1500),
+            Interval = SettingsSearchHighlightDuration,
         };
         timer.Tick += OnSettingsSearchHighlightTimerTick;
         _settingsSearchHighlightTimer = timer;
@@ -2647,7 +2655,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (DataContext is not MainViewModel vm) return;
         using var dlg = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "Sysinternals",
+            Description = vm.Localize("BrowseSysinternalsPathTitle"),
             ShowNewFolderButton = false
         };
         if (!string.IsNullOrEmpty(vm.Settings.SysinternalsPath)
@@ -2665,7 +2673,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (DataContext is not MainViewModel vm) return;
         using var dlg = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "NirSoft",
+            Description = vm.Localize("BrowseNirSoftPathTitle"),
             ShowNewFolderButton = false
         };
         if (!string.IsNullOrEmpty(vm.Settings.NirSoftPath)
@@ -2683,7 +2691,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (DataContext is not MainViewModel vm) return;
         using var dlg = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "NanaRun",
+            Description = vm.Localize("BrowseNanaRunPathTitle"),
             ShowNewFolderButton = false
         };
         if (!string.IsNullOrEmpty(vm.Settings.NanaRunPath)

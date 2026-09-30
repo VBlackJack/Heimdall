@@ -481,9 +481,12 @@ public sealed class AppSettings
     public bool CmdLibGitSyncEnabled { get; set; }
     public string? CmdLibGitSyncUrl { get; set; }
     public string? CmdLibGitSyncToken { get; set; }
-    public string CmdLibGitSyncBranch { get; set; } = "main";
-    public string CmdLibGitSyncAuthorName { get; set; } = "Heimdall User";
-    public string CmdLibGitSyncAuthorEmail { get; set; } = "heimdall@local";
+    public const string DefaultCmdLibGitSyncBranch = "main";
+    public const string DefaultCmdLibGitSyncAuthorName = "Heimdall User";
+    public const string DefaultCmdLibGitSyncAuthorEmail = "heimdall@local";
+    public string CmdLibGitSyncBranch { get; set; } = DefaultCmdLibGitSyncBranch;
+    public string CmdLibGitSyncAuthorName { get; set; } = DefaultCmdLibGitSyncAuthorName;
+    public string CmdLibGitSyncAuthorEmail { get; set; } = DefaultCmdLibGitSyncAuthorEmail;
     public bool CmdLibGitSyncOnStartup { get; set; }
     public bool CmdLibGitSyncAutoPush { get; set; } = true;
 

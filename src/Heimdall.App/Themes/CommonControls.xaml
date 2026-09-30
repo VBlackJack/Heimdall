@@ -6,6 +6,7 @@
     <!-- ========================================================= -->
     <!-- Design Tokens: Typography                                 -->
     <!-- ========================================================= -->
+    <sys:Double x:Key="FontSizeBadge">10</sys:Double>
     <sys:Double x:Key="FontSizeSmallCaption">11</sys:Double>
     <sys:Double x:Key="FontSizeCaption">12</sys:Double>
     <sys:Double x:Key="FontSizeBody">13</sys:Double>
@@ -125,6 +126,10 @@
     <sys:Double x:Key="OpacityReadOnly">0.75</sys:Double>
     <sys:Double x:Key="OpacityOverlay">0.20</sys:Double>
     <sys:Double x:Key="OpacityAccentOverlay">0.20</sys:Double>
+    <sys:Double x:Key="OpacitySearchHighlight">0.55</sys:Double>
+
+    <!-- Height, and minimum width, of a round count badge (the Settings tab error badges). -->
+    <sys:Double x:Key="BadgeHeight">18</sys:Double>
 
     <!-- Design Tokens: Icon Sizes                                 -->
     <sys:Double x:Key="IconSizeSmall">12</sys:Double>

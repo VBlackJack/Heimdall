@@ -2269,6 +2269,22 @@
                   Visibility="{Binding IsSettingsTabSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.Resources>
                     <converters:SettingsFieldErrorConverter x:Key="SettingsFieldErrorConverter"/>
+                    <!-- The error-count badge of a settings tab, once for all six tabs. -->
+                    <Style x:Key="SettingsTabErrorBadgeStyle" TargetType="{x:Type Border}">
+                        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMd}"/>
+                        <Setter Property="Background" Value="{DynamicResource ErrorTextBrush}"/>
+                        <Setter Property="MinWidth" Value="{StaticResource BadgeHeight}"/>
+                        <Setter Property="Height" Value="{StaticResource BadgeHeight}"/>
+                        <Setter Property="Padding" Value="5,0"/>
+                        <Setter Property="Margin" Value="6,0,0,0"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                    </Style>
+                    <Style x:Key="SettingsTabErrorBadgeTextStyle" TargetType="{x:Type TextBlock}">
+                        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
+                        <Setter Property="FontSize" Value="{StaticResource FontSizeBadge}"/>
+                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                    </Style>
                     <!-- A settings box in error says why, to the eye and to a screen reader. A red
                          border alone told neither which rule the value broke nor, when the error
                          came from a range, what range. -->
@@ -2410,15 +2426,9 @@
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{loc:Translate SettingsTabGeneral}"/>
-                                <Border CornerRadius="8"
-                                        Background="{DynamicResource ErrorTextBrush}"
-                                        MinWidth="18" Height="18"
-                                        Padding="5,0" Margin="6,0,0,0"
-                                        VerticalAlignment="Center"
+                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
                                         Visibility="{Binding Settings.HasGeneralTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.GeneralTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Settings.GeneralTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
@@ -2646,15 +2656,9 @@
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{loc:Translate SettingsTabTerminal}"/>
-                                <Border CornerRadius="8"
-                                        Background="{DynamicResource ErrorTextBrush}"
-                                        MinWidth="18" Height="18"
-                                        Padding="5,0" Margin="6,0,0,0"
-                                        VerticalAlignment="Center"
+                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
                                         Visibility="{Binding Settings.HasTerminalTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.TerminalTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Settings.TerminalTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
@@ -2726,15 +2730,9 @@
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{loc:Translate SettingsTabSshSftp}"/>
-                                <Border CornerRadius="8"
-                                        Background="{DynamicResource ErrorTextBrush}"
-                                        MinWidth="18" Height="18"
-                                        Padding="5,0" Margin="6,0,0,0"
-                                        VerticalAlignment="Center"
+                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
                                         Visibility="{Binding Settings.HasSshTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.SshTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Settings.SshTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
@@ -3145,15 +3143,9 @@
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{loc:Translate SettingsTabRdp}"/>
-                                <Border CornerRadius="8"
-                                        Background="{DynamicResource ErrorTextBrush}"
-                                        MinWidth="18" Height="18"
-                                        Padding="5,0" Margin="6,0,0,0"
-                                        VerticalAlignment="Center"
+                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
                                         Visibility="{Binding Settings.HasRdpTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.RdpTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Settings.RdpTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
@@ -3527,7 +3519,7 @@
                                                                             Visibility="{Binding IsProfileMissing, Converter={StaticResource BoolToVisibilityConverter}}">
                                                                         <TextBlock Text="{loc:Translate LblTrustedRdpCertificateProfileMissing}"
                                                                                    Foreground="{DynamicResource BadgeTextBrush}"
-                                                                                   FontSize="10"
+                                                                                   FontSize="{StaticResource FontSizeBadge}"
                                                                                    VerticalAlignment="Center"/>
                                                                     </Border>
                                                                     <!-- A destination typed by hand: no profile owns this decision, so it is
@@ -3542,7 +3534,7 @@
                                                                             Visibility="{Binding IsTypedDestination, Converter={StaticResource BoolToVisibilityConverter}}">
                                                                         <TextBlock Text="{loc:Translate LblTrustedRdpCertificateTypedDestination}"
                                                                                    Foreground="{DynamicResource BadgeTextBrush}"
-                                                                                   FontSize="10"
+                                                                                   FontSize="{StaticResource FontSizeBadge}"
                                                                                    VerticalAlignment="Center"/>
                                                                     </Border>
                                                                 </StackPanel>
@@ -3645,15 +3637,9 @@
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{loc:Translate SettingsTabSecurity}"/>
-                                <Border CornerRadius="8"
-                                        Background="{DynamicResource ErrorTextBrush}"
-                                        MinWidth="18" Height="18"
-                                        Padding="5,0" Margin="6,0,0,0"
-                                        VerticalAlignment="Center"
+                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
                                         Visibility="{Binding Settings.HasSecurityTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.SecurityTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Settings.SecurityTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
@@ -3884,15 +3870,9 @@
                         <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{loc:Translate SettingsTabAdvanced}"/>
-                                <Border CornerRadius="8"
-                                        Background="{DynamicResource ErrorTextBrush}"
-                                        MinWidth="18" Height="18"
-                                        Padding="5,0" Margin="6,0,0,0"
-                                        VerticalAlignment="Center"
+                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
                                         Visibility="{Binding Settings.HasAdvancedTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.AdvancedTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Settings.AdvancedTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
