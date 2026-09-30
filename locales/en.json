@@ -926,6 +926,7 @@
   "TreeCtxNewProject": "New project",
   "TreeCtxNewGroup": "New folder",
   "StatusGroupCreated": "Folder \"{0}\" created.",
+  "TreeStatusDeleteFolderHint": "The Delete key does not delete a folder: use \"{0}\" in the folder menu (Shift+F10).",
   "NewGroupDialogTitle": "New Folder",
   "NewGroupFieldName": "Folder name:",
   "TreeCtxExpandAll": "Expand all",

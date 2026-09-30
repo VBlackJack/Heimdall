@@ -926,6 +926,7 @@
   "TreeCtxNewProject": "Nouveau projet",
   "TreeCtxNewGroup": "Nouveau dossier",
   "StatusGroupCreated": "Dossier \"{0}\" cr\u00e9\u00e9.",
+  "TreeStatusDeleteFolderHint": "La touche Suppr ne supprime pas un dossier : utilisez \"{0}\" dans le menu du dossier (Maj+F10).",
   "NewGroupDialogTitle": "Nouveau dossier",
   "NewGroupFieldName": "Nom du dossier :",
   "TreeCtxExpandAll": "Tout d\u00e9plier",

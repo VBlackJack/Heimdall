@@ -391,9 +391,7 @@ public partial class MainWindow
         (bool toggle, bool extend, bool additive) = ResolveTreePointerSelection(modifiers);
         if (additive)
         {
-            _treeState.SuppressSelectedItemSync = true;
-            vm.ServerList.AddSelectionRangeTo(server);
-            treeViewItem.Focus();
+            ApplyTreeRangePress(_treeState, treeViewItem, () => vm.ServerList.AddSelectionRangeTo(server));
             ShowTreeSelection(vm, vm.ServerList.SelectedServer);
             e.Handled = true;
             return;
@@ -412,9 +410,7 @@ public partial class MainWindow
 
         if (extend)
         {
-            _treeState.SuppressSelectedItemSync = true;
-            vm.ServerList.ExtendSelectionTo(server);
-            treeViewItem.Focus();
+            ApplyTreeRangePress(_treeState, treeViewItem, () => vm.ServerList.ExtendSelectionTo(server));
             ShowTreeSelection(vm, vm.ServerList.SelectedServer);
             e.Handled = true;
             return;
@@ -433,6 +429,87 @@ public partial class MainWindow
             SynchronizeNativeTreeSelection(_treeState, treeViewItem);
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// Applies a Shift or Ctrl+Shift range press, then puts focus on the pressed row without
+    /// letting that focus rewrite the selection the range has just made.
+    /// </summary>
+    /// <param name="treeState">The transient TreeView interaction state.</param>
+    /// <param name="pressedContainer">The row under the pointer.</param>
+    /// <param name="applyRange">Extends or adds the range in the view model.</param>
+    internal static void ApplyTreeRangePress(
+        TreeInteractionState treeState,
+        TreeViewItem pressedContainer,
+        Action applyRange)
+    {
+        ArgumentNullException.ThrowIfNull(treeState);
+        ArgumentNullException.ThrowIfNull(pressedContainer);
+        ArgumentNullException.ThrowIfNull(applyRange);
+
+        // The flag used to be set and left for the selection-changed handler to clear. Focusing
+        // the row that already has focus raises no selection change, so nothing cleared it, and
+        // the next genuine click was taken for a modifier gesture and swallowed.
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            applyRange();
+            pressedContainer.Focus();
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
+        }
+    }
+
+    /// <summary>
+    /// Focuses the row a right-click lands on before its context menu opens.
+    /// </summary>
+    /// <param name="treeState">The transient TreeView interaction state.</param>
+    /// <param name="container">The row under the pointer.</param>
+    /// <param name="opensBulkMenu">Whether the row belongs to a multi-selection the menu will act on.</param>
+    internal static void FocusRowForContextMenu(
+        TreeInteractionState treeState,
+        TreeViewItem container,
+        bool opensBulkMenu)
+    {
+        ArgumentNullException.ThrowIfNull(treeState);
+        ArgumentNullException.ThrowIfNull(container);
+
+        if (!opensBulkMenu)
+        {
+            // Outside a multi-selection a right-click selects the row, which is what WPF's own
+            // focus-then-select does through the selection sync.
+            container.Focus();
+            return;
+        }
+
+        // A row of the multi-selection that lacks keyboard focus is not WPF's selected row:
+        // focusing it selects it, and an unsuppressed sync collapses the selection onto it
+        // before the bulk menu the right-click asked for can open.
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            container.Focus();
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
+        }
+    }
+
+    /// <summary>
+    /// The status line a Delete press on a folder shows, or <see langword="null"/> when the press
+    /// is not one the tree refuses.
+    /// </summary>
+    /// <param name="focusedNode">The data context of the container owning keyboard focus.</param>
+    /// <param name="localize">Resolves a locale key.</param>
+    internal static string? DescribeRefusedTreeDeletion(object? focusedNode, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+        return focusedNode is FolderViewModel
+            ? string.Format(localize("TreeStatusDeleteFolderHint"), localize("TreeCtxDeleteGroup"))
+            : null;
     }
 
     /// <summary>
@@ -575,11 +652,17 @@ public partial class MainWindow
 
         if (treeViewItem is not null)
         {
-            treeViewItem.Focus();
+            // Asked before the focus moves: focusing a row WPF has not selected selects it, and
+            // the selection sync that follows would collapse the very multi-selection the menu
+            // is about to act on.
+            bool opensBulkMenu = treeViewItem.DataContext is ServerItemViewModel pressed
+                && DataContext is MainViewModel bulkViewModel
+                && bulkViewModel.ServerList.ShouldOpenBulkContextMenu(pressed);
+            FocusRowForContextMenu(_treeState, treeViewItem, opensBulkMenu);
 
             if (treeViewItem.DataContext is ServerItemViewModel server && DataContext is MainViewModel vm)
             {
-                if (vm.ServerList.ShouldOpenBulkContextMenu(server))
+                if (opensBulkMenu)
                 {
                     _treeState.ContextTarget = vm.ServerList.CreateBulkSelectionContext() ?? (object)server;
                     ShowTreeSelection(vm, vm.ServerList.SelectedServer);
@@ -783,6 +866,15 @@ public partial class MainWindow
 
         if (!deleteSelection)
         {
+            // A folder refuses the key rather than deleting the session selected elsewhere, and
+            // says so: a key that does nothing, silently, reads as a key that is broken.
+            if (DescribeRefusedTreeDeletion(
+                    FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext,
+                    vm.Localize) is { } refusal)
+            {
+                vm.StatusText = refusal;
+            }
+
             return;
         }
 

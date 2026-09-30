@@ -926,6 +926,7 @@
   "TreeCtxNewProject": "Nuevo proyecto",
   "TreeCtxNewGroup": "Nueva carpeta",
   "StatusGroupCreated": "Carpeta \"{0}\" creada.",
+  "TreeStatusDeleteFolderHint": "La tecla Supr no elimina una carpeta: usa \"{0}\" en el menú de la carpeta (Mayús+F10).",
   "NewGroupDialogTitle": "Nueva carpeta",
   "NewGroupFieldName": "Nombre de la carpeta:",
   "TreeCtxExpandAll": "Expandir todo",
