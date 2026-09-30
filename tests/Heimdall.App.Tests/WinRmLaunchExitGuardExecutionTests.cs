@@ -188,7 +188,25 @@ public sealed class WinRmLaunchExitGuardExecutionTests
         string executable,
         string arguments)
     {
-        using ConPtySession session = new();
+        using ConPtySession session = new()
+        {
+            // A test run started from a PowerShell 7 step inherits PowerShell 7's module path,
+            // and Windows PowerShell then loads PowerShell 7's PSReadLine. Under AllSigned that
+            // module's format file raises the untrusted-publisher question, which waits for an
+            // answer before the guard is ever defined (CI run 36765683841). The child gets the
+            // module path a Windows PowerShell started from Explorer has, so the run measures
+            // the guard rather than the step that launched the tests.
+            EnvironmentVariables = new Dictionary<string, string>
+            {
+                ["PSModulePath"] = string.Join(
+                    Path.PathSeparator,
+                    Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                        "WindowsPowerShell",
+                        "Modules"),
+                    Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "Modules"))
+            }
+        };
         StringBuilder output = new();
         object outputLock = new();
         TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
