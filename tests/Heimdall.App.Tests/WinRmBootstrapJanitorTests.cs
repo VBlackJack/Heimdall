@@ -185,6 +185,40 @@ public sealed class WinRmBootstrapJanitorTests
         Assert.Empty(deleted);
     }
 
+    // The default enumeration, against a real directory: a stale DPAPI blob left beside a
+    // bootstrap script is swept with it, and an unrelated file is not.
+    [Fact]
+    public void SweepStale_DefaultEnumeration_SweepsStaleScriptsAndBlobs()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"heimdall_janitor_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string scriptPath = Path.Combine(directory, "heimdall_winrm_stale.ps1");
+            string blobPath = Path.Combine(directory, "heimdall_winrm_stale.blob");
+            string unrelatedPath = Path.Combine(directory, "heimdall_other.blob");
+            File.WriteAllText(scriptPath, "script");
+            File.WriteAllText(blobPath, "blob");
+            File.WriteAllText(unrelatedPath, "other");
+            WinRmBootstrapJanitor janitor = new WinRmBootstrapJanitor(
+                tempDirectory: () => directory,
+                getLastWriteTimeUtc: _ => FixedUtcNow.AddHours(-2),
+                utcNow: () => FixedUtcNow,
+                maxAge: TimeSpan.FromHours(1));
+
+            SensitiveFileJanitorSweepResult result = janitor.SweepStale();
+
+            Assert.Equal(2, result.Removed);
+            Assert.False(File.Exists(scriptPath));
+            Assert.False(File.Exists(blobPath));
+            Assert.True(File.Exists(unrelatedPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static WinRmBootstrapJanitor CreateJanitor(
         IEnumerable<string> candidates,
         IReadOnlyDictionary<string, DateTime> lastWriteTimes,

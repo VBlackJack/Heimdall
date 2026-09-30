@@ -108,16 +108,19 @@ public sealed class WinRmHandlerGatewayTests
                 CancellationToken.None);
             TerminalSessionResult terminalResult = Assert.IsType<TerminalSessionResult>(result.Session);
             Assert.True(File.Exists(scriptPath));
+            Assert.True(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
 
             if (killFirst)
             {
                 terminalResult.Session.Kill();
                 Assert.False(File.Exists(scriptPath));
+                Assert.False(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
             }
 
             terminalResult.Session.Dispose();
 
             Assert.False(File.Exists(scriptPath));
+            Assert.False(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
             Assert.True(terminalSession.IsDisposed);
         }
         finally
@@ -164,10 +167,12 @@ public sealed class WinRmHandlerGatewayTests
             int exitEventCount = 0;
             terminalResult.Session.ProcessExited += _ => exitEventCount++;
             Assert.True(File.Exists(scriptPath));
+            Assert.True(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
 
             terminalSession.RaiseProcessExited(0);
 
             Assert.False(File.Exists(scriptPath));
+            Assert.False(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
             Assert.Equal(1, exitEventCount);
             terminalResult.Session.Dispose();
         }

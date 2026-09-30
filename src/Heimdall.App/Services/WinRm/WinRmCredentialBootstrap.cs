@@ -36,6 +36,13 @@ internal sealed class WinRmCredentialBootstrap
     internal const string ScriptFilePrefix = "heimdall_winrm_";
     internal const string ScriptSearchPattern = "heimdall_winrm_*.ps1";
 
+    /// <summary>
+    /// Extension of the file that carries the DPAPI blob beside its script: same name, other
+    /// extension, so the script finds it from its own path and the janitor sweeps it.
+    /// </summary>
+    internal const string BlobFileExtension = ".blob";
+    internal const string BlobSearchPattern = "heimdall_winrm_*" + BlobFileExtension;
+
     private readonly Func<string> _createScriptPath;
     private readonly Action<string, string> _writeAndProtect;
     private readonly Func<string?, byte[]?> _unprotectStoredPasswordBytes;
@@ -71,20 +78,38 @@ internal sealed class WinRmCredentialBootstrap
 
         byte[] plaintextBytes = UnprotectStoredPassword(server.WinRmPasswordEncrypted);
 
+        string dpapiPasswordBlob;
         try
         {
-            string dpapiPasswordBlob = ProtectBootstrapPassword(plaintextBytes);
-            string script = BuildScript(server, dpapiPasswordBlob, computerName, port);
-            string scriptPath = _createScriptPath();
-
-            _writeAndProtect(scriptPath, script);
-            return new WinRmCredentialBootstrapResult(scriptPath);
+            dpapiPasswordBlob = ProtectBootstrapPassword(plaintextBytes);
         }
         finally
         {
             CryptographicOperations.ZeroMemory(plaintextBytes);
         }
+
+        // The blob goes in its own file, never in the script text: script-block logging writes
+        // the text of every script it runs to the event log.
+        string script = BuildScript(server, computerName, port);
+        string scriptPath = _createScriptPath();
+        string blobPath = BlobPathFor(scriptPath);
+        _writeAndProtect(blobPath, dpapiPasswordBlob);
+        try
+        {
+            _writeAndProtect(scriptPath, script);
+        }
+        catch
+        {
+            DeleteFile(blobPath);
+            throw;
+        }
+
+        return new WinRmCredentialBootstrapResult(scriptPath);
     }
+
+    /// <summary>The DPAPI blob file that belongs to a bootstrap script.</summary>
+    internal static string BlobPathFor(string scriptPath)
+        => Path.ChangeExtension(scriptPath, BlobFileExtension);
 
     /// <summary>
     /// Reads the stored password, turning each way it can be unreadable into the message that
@@ -134,49 +159,57 @@ internal sealed class WinRmCredentialBootstrap
 
     public void Delete(string scriptPath)
     {
-        if (string.IsNullOrWhiteSpace(scriptPath) || !File.Exists(scriptPath))
+        if (string.IsNullOrWhiteSpace(scriptPath))
+        {
+            return;
+        }
+
+        DeleteFile(scriptPath);
+        DeleteFile(BlobPathFor(scriptPath));
+    }
+
+    private static void DeleteFile(string path)
+    {
+        if (!File.Exists(path))
         {
             return;
         }
 
         try
         {
-            File.Delete(scriptPath);
+            File.Delete(path);
         }
         catch (IOException ex)
         {
-            FileLogger.Warn($"[WinRmCredentialBootstrap] Delete bootstrap script failed: {ex.Message}");
+            FileLogger.Warn($"[WinRmCredentialBootstrap] Delete bootstrap file failed: {ex.Message}");
         }
         catch (UnauthorizedAccessException ex)
         {
-            FileLogger.Warn($"[WinRmCredentialBootstrap] Delete bootstrap script unauthorized: {ex.Message}");
+            FileLogger.Warn($"[WinRmCredentialBootstrap] Delete bootstrap file unauthorized: {ex.Message}");
         }
     }
 
     internal static string CreateDefaultScriptPath()
         => Path.Combine(Path.GetTempPath(), $"{ScriptFilePrefix}{Guid.NewGuid():N}.ps1");
 
-    internal static string BuildScript(ServerProfileDto server, string dpapiPasswordBlob)
+    internal static string BuildScript(ServerProfileDto server)
     {
         ArgumentNullException.ThrowIfNull(server);
         return BuildScript(
             server,
-            dpapiPasswordBlob,
             server.RemoteServer,
             WinRmPowerShellLaunchBuilder.ResolvePort(server));
     }
 
     internal static string BuildScript(
         ServerProfileDto server,
-        string dpapiPasswordBlob,
         string computerName,
         int port)
     {
         ValidateCredentialProfile(server);
-        ArgumentException.ThrowIfNullOrEmpty(dpapiPasswordBlob);
 
         string usernameLiteral = WinRmPowerShellLaunchBuilder.QuotePowerShellLiteral(server.WinRmUsername!);
-        string blobLiteral = WinRmPowerShellLaunchBuilder.QuotePowerShellLiteral(dpapiPasswordBlob);
+        string blobExtensionLiteral = WinRmPowerShellLaunchBuilder.QuotePowerShellLiteral(BlobFileExtension);
         string enterCommand = WinRmPowerShellLaunchBuilder.BuildEnterPSSessionCommand(
             server,
             computerName,
@@ -187,11 +220,13 @@ internal sealed class WinRmCredentialBootstrap
         [
             "$ErrorActionPreference = 'Stop'",
             "$scriptPath = $PSCommandPath",
+            "$blobPath = [System.IO.Path]::ChangeExtension($PSCommandPath, " + blobExtensionLiteral + ")",
             "Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue",
+            "try { $blob = [System.IO.File]::ReadAllText($blobPath) }",
+            "finally { Remove-Item -LiteralPath $blobPath -Force -ErrorAction SilentlyContinue }",
             // ProtectedData lives in System.Security on .NET Framework / PS 5.1 and in System.Security.Cryptography.ProtectedData on .NET / PS 7; load whichever the host has, ignore the other.
             "try { Add-Type -AssemblyName System.Security -ErrorAction Stop } catch { }",
             "try { Add-Type -AssemblyName System.Security.Cryptography.ProtectedData -ErrorAction Stop } catch { }",
-            "$blob = " + blobLiteral,
             "try {",
             "    $encryptedBytes = [Convert]::FromBase64String($blob)",
             "    $plainBytes = [System.Security.Cryptography.ProtectedData]::Unprotect($encryptedBytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)",

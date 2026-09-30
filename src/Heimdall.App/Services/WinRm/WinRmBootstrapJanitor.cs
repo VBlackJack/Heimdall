@@ -118,8 +118,11 @@ internal sealed class WinRmBootstrapJanitor
         return new SensitiveFileJanitorSweepResult(removed, nextEligibleUtc);
     }
 
+    // Scripts and the DPAPI blob files written beside them: a crash between the two writes, or
+    // before the script's own cleanup ran, can leave either one behind.
     private static IEnumerable<string> DefaultEnumerate(string directory)
         => Directory.Exists(directory)
             ? Directory.EnumerateFiles(directory, WinRmCredentialBootstrap.ScriptSearchPattern)
+                .Concat(Directory.EnumerateFiles(directory, WinRmCredentialBootstrap.BlobSearchPattern))
             : Array.Empty<string>();
 }

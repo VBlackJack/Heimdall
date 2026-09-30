@@ -111,19 +111,27 @@ public sealed class WinRmLaunchExitGuardExecutionTests
         server.WinRmIdentityMode = WinRmIdentityMode.Credential;
         server.WinRmUsername = @"CONTOSO\operator";
         server.WinRmPasswordEncrypted = "stored";
-        string blob = blobDecrypts
-            ? DpapiProvider.ProtectBytes(Encoding.UTF8.GetBytes("test-only-password"))
-            : Convert.ToBase64String(Encoding.UTF8.GetBytes("not a dpapi blob"));
+        Func<byte[], string> protect = blobDecrypts
+            ? DpapiProvider.ProtectBytes
+            : _ => Convert.ToBase64String(Encoding.UTF8.GetBytes("not a dpapi blob"));
         string shadow = enterReturns ? ReturningEnterPSSession : FailingEnterPSSession;
         string scriptPath = Path.Combine(
             Path.GetTempPath(),
             $"{WinRmCredentialBootstrap.ScriptFilePrefix}exit_guard_test_{Guid.NewGuid():N}.ps1");
 
+        string blobPath = WinRmCredentialBootstrap.BlobPathFor(scriptPath);
+        WinRmCredentialBootstrap bootstrap = new WinRmCredentialBootstrap(
+            createScriptPath: () => scriptPath,
+            writeAndProtect: (path, content) => File.WriteAllText(
+                path,
+                path == scriptPath ? shadow + "\r\n" + content : content),
+            unprotectStoredPasswordBytes: _ => Encoding.UTF8.GetBytes("test-only-password"),
+            protectBootstrapPasswordBytes: protect);
+
         try
         {
-            File.WriteAllText(
-                scriptPath,
-                shadow + "\r\n" + WinRmCredentialBootstrap.BuildScript(server, blob));
+            Assert.Equal(scriptPath, bootstrap.Write(server).ScriptPath);
+            Assert.True(File.Exists(blobPath));
             WinRmPowerShellLaunchSpec spec = CreateBuilder().Build(server, scriptPath);
             string arguments = spec.Arguments;
             if (scriptRefusedByPolicy)
@@ -142,10 +150,14 @@ public sealed class WinRmLaunchExitGuardExecutionTests
             {
                 Assert.Contains(EnteredMarker, output, StringComparison.Ordinal);
             }
+
+            // A script that ran removed its blob itself; a refused one leaves it to the
+            // handler's cleanup, which the finally below stands in for.
+            Assert.Equal(scriptRefusedByPolicy, File.Exists(blobPath));
         }
         finally
         {
-            File.Delete(scriptPath);
+            bootstrap.Delete(scriptPath);
         }
     }
 

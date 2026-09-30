@@ -25,18 +25,19 @@ namespace Heimdall.App.Tests;
 [Collection(CredentialProtectorAppCollection.Name)]
 public sealed class WinRmCredentialBootstrapTests
 {
+    private const string TestScriptPath = @"C:\Temp\heimdall_winrm_test.ps1";
+    private const string TestBlobPath = @"C:\Temp\heimdall_winrm_test.blob";
+
+    // Script-block logging writes the text of every script it runs to the event log. The DPAPI
+    // blob is ciphertext bound to this user, but it has no business in a log that other readers
+    // and forwarders see, so it lives in its own file beside the script and never in its text.
     [Fact]
     public void Write_CreatesProtectedBootstrapScriptWithoutPlaintextPassword()
     {
-        string? writtenPath = null;
-        string? writtenContent = null;
+        Dictionary<string, string> written = new(StringComparer.Ordinal);
         WinRmCredentialBootstrap bootstrap = new WinRmCredentialBootstrap(
-            createScriptPath: () => @"C:\Temp\heimdall_winrm_test.ps1",
-            writeAndProtect: (path, content) =>
-            {
-                writtenPath = path;
-                writtenContent = content;
-            },
+            createScriptPath: () => TestScriptPath,
+            writeAndProtect: (path, content) => written.Add(path, content),
             unprotectStoredPasswordBytes: encrypted =>
                 encrypted == "stored-password" ? Encoding.UTF8.GetBytes("p@ss'word!") : null,
             protectBootstrapPasswordBytes: bytes =>
@@ -44,10 +45,16 @@ public sealed class WinRmCredentialBootstrapTests
 
         WinRmCredentialBootstrapResult result = bootstrap.Write(CreateCredentialServer());
 
-        Assert.Equal(@"C:\Temp\heimdall_winrm_test.ps1", result.ScriptPath);
-        Assert.Equal(result.ScriptPath, writtenPath);
-        Assert.NotNull(writtenContent);
-        Assert.Contains("$blob = 'dpapi-bootstrap-blob'", writtenContent, StringComparison.Ordinal);
+        Assert.Equal(TestScriptPath, result.ScriptPath);
+        Assert.Equal([TestBlobPath, TestScriptPath], written.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal("dpapi-bootstrap-blob", written[TestBlobPath]);
+        string writtenContent = written[TestScriptPath];
+        Assert.DoesNotContain("dpapi-bootstrap-blob", writtenContent, StringComparison.Ordinal);
+        Assert.Contains(
+            "$blobPath = [System.IO.Path]::ChangeExtension($PSCommandPath, '.blob')",
+            writtenContent,
+            StringComparison.Ordinal);
+        Assert.Contains("$blob = [System.IO.File]::ReadAllText($blobPath)", writtenContent, StringComparison.Ordinal);
         Assert.Contains("System.Security.Cryptography.ProtectedData", writtenContent, StringComparison.Ordinal);
         Assert.Contains("[System.Security.Cryptography.ProtectedData]::Unprotect", writtenContent, StringComparison.Ordinal);
         Assert.Contains("[System.Management.Automation.PSCredential]::new('CONTOSO\\operator'", writtenContent, StringComparison.Ordinal);
@@ -65,14 +72,21 @@ public sealed class WinRmCredentialBootstrapTests
     }
 
     [Fact]
-    public void BuildScript_QuotesDpapiBlobForPowerShell()
+    public void BuildScript_ReadsTheBlobFromItsOwnFileAndRemovesIt()
     {
         ServerProfileDto server = CreateCredentialServer();
 
-        string script = WinRmCredentialBootstrap.BuildScript(server, "blob'value");
+        string script = WinRmCredentialBootstrap.BuildScript(server);
 
-        Assert.Contains("$blob = 'blob''value'", script, StringComparison.Ordinal);
-        Assert.Contains("[System.Management.Automation.PSCredential]::new('CONTOSO\\operator'", script, StringComparison.Ordinal);
+        int read = script.IndexOf("try { $blob = [System.IO.File]::ReadAllText($blobPath) }", StringComparison.Ordinal);
+        int removed = script.IndexOf(
+            "finally { Remove-Item -LiteralPath $blobPath -Force -ErrorAction SilentlyContinue }",
+            StringComparison.Ordinal);
+        int decrypted = script.IndexOf("[Convert]::FromBase64String($blob)", StringComparison.Ordinal);
+        Assert.True(read >= 0);
+        Assert.True(removed > read);
+        Assert.True(decrypted > removed);
+        Assert.Contains(@"[System.Management.Automation.PSCredential]::new('CONTOSO\operator'", script, StringComparison.Ordinal);
         Assert.Contains("-ComputerName 'server01.contoso.local'", script, StringComparison.Ordinal);
         Assert.Contains("-Authentication Negotiate", script, StringComparison.Ordinal);
     }
@@ -82,7 +96,7 @@ public sealed class WinRmCredentialBootstrapTests
     {
         ServerProfileDto server = CreateCredentialServer();
 
-        string script = WinRmCredentialBootstrap.BuildScript(server, "dpapi-bootstrap-blob");
+        string script = WinRmCredentialBootstrap.BuildScript(server);
         string[] lines = script.Split("\r\n");
 
         // The local prompt guard is defined by the launch command, before this script loads.
@@ -101,7 +115,7 @@ public sealed class WinRmCredentialBootstrapTests
     {
         ServerProfileDto server = CreateCredentialServer();
 
-        string script = WinRmCredentialBootstrap.BuildScript(server, "dpapi-bootstrap-blob");
+        string script = WinRmCredentialBootstrap.BuildScript(server);
 
         int finallyStart = script.IndexOf("finally {\r\n", StringComparison.Ordinal);
         int blobClearIndex = script.IndexOf("    $blob = $null", StringComparison.Ordinal);
@@ -181,6 +195,65 @@ public sealed class WinRmCredentialBootstrapTests
         bootstrap.Delete(scriptPath);
 
         Assert.False(File.Exists(scriptPath));
+    }
+
+    [Fact]
+    public void Delete_RemovesTheBlobBesideTheScript()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"heimdall_winrm_blob_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string scriptPath = Path.Combine(directory, "heimdall_winrm_x.ps1");
+            string blobPath = Path.Combine(directory, "heimdall_winrm_x.blob");
+            File.WriteAllText(scriptPath, "bootstrap");
+            File.WriteAllText(blobPath, "blob");
+
+            new WinRmCredentialBootstrap().Delete(scriptPath);
+
+            Assert.False(File.Exists(scriptPath));
+            Assert.False(File.Exists(blobPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Write_WhenTheScriptCannotBeWritten_RemovesTheBlobItWrote()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"heimdall_winrm_blob_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string scriptPath = Path.Combine(directory, "heimdall_winrm_x.ps1");
+            List<string> writtenPaths = [];
+            WinRmCredentialBootstrap bootstrap = new WinRmCredentialBootstrap(
+                createScriptPath: () => scriptPath,
+                writeAndProtect: (path, content) =>
+                {
+                    writtenPaths.Add(path);
+                    if (path.EndsWith(".ps1", StringComparison.Ordinal))
+                    {
+                        throw new IOException("disk full");
+                    }
+
+                    File.WriteAllText(path, content);
+                },
+                unprotectStoredPasswordBytes: _ => Encoding.UTF8.GetBytes("secret"),
+                protectBootstrapPasswordBytes: _ => "dpapi-blob");
+
+            Assert.Throws<IOException>(() => bootstrap.Write(CreateCredentialServer()));
+
+            string blobPath = Path.Combine(directory, "heimdall_winrm_x.blob");
+            Assert.Contains(blobPath, writtenPaths);
+            Assert.False(File.Exists(blobPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]
