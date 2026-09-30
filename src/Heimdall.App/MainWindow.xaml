@@ -2684,8 +2684,13 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                                 <TextBlock x:Name="Mw_SettingsTerminalFontLabel" Text="{loc:Translate SettingsLabelTerminalFont}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                                <TextBox Text="{Binding Settings.TerminalFontFamily}" Width="200" HorizontalAlignment="Left"
-                                                         AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTerminalFontLabel}"/>
+                                                <ComboBox x:Name="Mw_SettingsTerminalFontFamily"
+                                                          IsEditable="True"
+                                                          IsTextSearchEnabled="True"
+                                                          ItemsSource="{Binding Settings.InstalledFontFamilies}"
+                                                          Text="{Binding Settings.TerminalFontFamily, UpdateSourceTrigger=LostFocus}"
+                                                          Width="200" HorizontalAlignment="Left"
+                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTerminalFontLabel}"/>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock x:Name="Mw_SettingsTerminalFontSizeLabel" Text="{loc:Translate SettingsLabelTerminalFontSize}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>

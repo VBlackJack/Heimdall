@@ -2170,6 +2170,28 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal(string.Empty, viewModel.SaveStatusText);
     }
 
+    // The terminal font box offers the installed families, read once, and a name it does not list
+    // is still accepted: the box stays editable.
+    [Fact]
+    public void TerminalFont_OffersInstalledFamiliesAndAcceptsAnyName()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        int reads = 0;
+        viewModel.InstalledFontFamiliesProvider = () =>
+        {
+            reads++;
+            return ["Cascadia Mono", "Consolas"];
+        };
+
+        Assert.Equal(["Cascadia Mono", "Consolas"], viewModel.InstalledFontFamilies);
+        Assert.Same(viewModel.InstalledFontFamilies, viewModel.InstalledFontFamilies);
+        Assert.Equal(1, reads);
+
+        viewModel.TerminalFontFamily = "Iosevka Term";
+        Assert.Equal("Iosevka Term", viewModel.TerminalFontFamily);
+        Assert.True(viewModel.IsDirty);
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

@@ -297,6 +297,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private string _terminalFontFamily = "Consolas";
 
+    private IReadOnlyList<string>? _installedFontFamilies;
+
+    /// <summary>Lists the font families installed on this machine; replaceable for tests.</summary>
+    internal Func<IReadOnlyList<string>> InstalledFontFamiliesProvider { get; set; } = ReadInstalledFontFamilies;
+
+    /// <summary>
+    /// The installed font families the terminal font box offers, read once, on first use.
+    /// </summary>
+    /// <remarks>
+    /// The font was a free text box, so a misspelt family silently fell back to the terminal's
+    /// default. The box offers what is installed and stays editable, so a font it does not list -
+    /// one installed later, or a CSS fallback list - can still be typed.
+    /// </remarks>
+    public IReadOnlyList<string> InstalledFontFamilies => _installedFontFamilies ??= InstalledFontFamiliesProvider();
+
+    private static IReadOnlyList<string> ReadInstalledFontFamilies() =>
+        System.Windows.Media.Fonts.SystemFontFamilies
+            .Select(family => family.Source)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [SettingRangeOf(nameof(AppSettings.TerminalFontSize))]
