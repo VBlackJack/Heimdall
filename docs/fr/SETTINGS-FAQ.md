@@ -54,6 +54,9 @@ ou un autre compte. Il sauve un PIN oublié, pas un ordinateur perdu.
 une session de bureau. Laissez-la activée. Ne la désactivez que pour des cibles qui ne savent
 pas faire, comme la plupart des serveurs `xrdp` Linux, qui n'implémentent pas CredSSP du tout.
 Sans NLA vous arrivez sur l'écran de connexion distant au lieu d'être connecté directement.
+En mode externe sans NLA, Heimdall ne transmet pas votre mot de passe enregistré à
+`mstsc.exe` : rien ne vérifie l'identité du serveur sur ce chemin, l'invite Bureau à distance
+vous le demande donc, et un avis explique pourquoi.
 
 **Authentification stricte du serveur** - refuse de se connecter si l'identité du serveur ne
 peut pas être vérifiée. Désactivée par défaut, parce que beaucoup de serveurs RDP internes
@@ -182,7 +185,8 @@ serveurs et que le bruit dans leurs journaux compte plus que les pastilles d'ét
 ## Modes
 
 **Mode RDP par défaut** - `Embedded` rend la session dans un onglet Heimdall. `External` lance
-`mstsc.exe` dans sa propre fenêtre, identifiants remplis pour vous. Le mode externe consomme
+`mstsc.exe` dans sa propre fenêtre, identifiants remplis pour vous (sauf sans NLA, voir Sécurité
+plus haut). Le mode externe consomme
 plus de mémoire par session mais isole chaque session dans son processus.
 
 **Mode SSH par défaut** - `Embedded` utilise le terminal intégré. `External` utilise PuTTY, ce

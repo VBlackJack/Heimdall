@@ -19,7 +19,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 
 ### Remote Desktop (RDP)
 - Embedded sessions via ActiveX MsTscAx in a tabbed interface
-- External sessions via mstsc.exe with credential autofill - the generated `.rdp` honors the per-server resolution profile, and Auto mode now matches embedded Auto with Smart Sizing, windowed launch, single-monitor mode, and primary working-area dimensions (`ae0dd70`)
+- External sessions via mstsc.exe with credential autofill (withheld when NLA is off: mstsc then checks no server, so it asks for the password itself and a notice says why) - the generated `.rdp` honors the per-server resolution profile, and Auto mode now matches embedded Auto with Smart Sizing, windowed launch, single-monitor mode, and primary working-area dimensions (`ae0dd70`)
 - **One-shot mode override**: right-click any RDP profile -> *Connect with...* to launch in embedded or external mode for a single session, leaving the saved profile untouched. Forced sessions show a discreet `(forced embedded/external)` tab-title suffix
 - Dynamic resolution resize with stabilization guard
 - Per-server resolution profiles: Fit Window, Fixed, Smart Sizing, and Multimon, with a per-profile **Selected monitors** picker in Multimon mode (empty selection = use all monitors, backward-compatible with existing profiles) and connect-time topology validation that falls back to single-monitor mode when the host cannot honor the saved selection (`2e9b938`)
@@ -50,15 +50,17 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Fail-closed host-key enforcement for SSH.NET and Plink fallback paths, including `HostKeyUnavailable` when a pinned gateway key cannot be resolved without falling back to PuTTY/Plink's cache
 - Gateway-aware tunnel reuse includes endpoints, accounts, stored credentials and agent preference. Connection-affecting edits open a fresh tunnel; display-name changes preserve sharing.
 - Multi-gateway tunnel chaining with circular dependency detection
-- **Test gateway route** from the gateway add/edit dialog: preview every ancestor, test SSH authentication at each hop, optionally confirm a destination TCP port, and copy an anonymized report with durations and next actions. Tests use existing trusted host keys, can be cancelled, and do not save the form or disturb existing tunnels
+- **Test gateway route** from the gateway add/edit dialog: preview every ancestor, test SSH authentication at each hop, optionally confirm a destination TCP port, and copy an anonymized report with durations and next actions. Each step gets the per-hop connect timeout a real tunnel gives (15 s), and a destination the gateway's SOCKS reply refuses, or a reply it cannot read, is a failure. Tests use existing trusted host keys, can be cancelled, and do not save the form or disturb existing tunnels
 - Dynamic tunnel port allocation with bounded retry on bind-race (`AddressAlreadyInUse`)
-- Tunnel ref-counting (shared tunnels survive individual session close)
+- Tunnel ref-counting (shared tunnels survive individual session close, and a failed reconnect of one split pane)
 - Terminal resize via SSH window-change request (public `ShellStream.ChangeWindowSize` API, no reflection)
 - X11 forwarding with automatic X server detection and auto-start; when no X server is available the session says so in its status text and launches without forwarding. The managed VcXsrv keeps host access control on
 - Clipboard pastes into the terminal go through xterm's own paste path (bracketed paste when the shell enabled it, CR+LF folded), and Shift+Insert reaches the same paste guard as Ctrl+V
 - The PTY opens at the size the terminal already reported, on both the SSH.NET and the plink transport, instead of 80x24 until the first resize
 - The Plink fallback refuses, with a localized message, a profile that needs a SOCKS proxy or a reverse forward it cannot provide, instead of opening a plain local forward and reporting success
 - A keyboard-interactive server that asks for a second factor after the password gets an honest failure naming the unanswered question, not a rejected password
+- The stored password never answers a question that names a one-time code, and is not offered again once the server has accepted it as a first factor; in the embedded terminal such a question is asked of the user, in a dialog that quotes the server's sanitised text as the server's own
+- An unresponsive host fails after the 15-second connect timeout; the two minutes left for answering a question start once the server has answered
 - Structured failure codes, one per cause, each with a localized error message
 - Typed mid-session security events distinguish host-key attacks from ordinary disconnects and suppress SSH auto-reconnect on MITM signals
 - Auto-reconnect overlay on unexpected disconnect (SSH and RDP)
@@ -79,15 +81,15 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Embedded file browser panel with directory tree and file list
 - **Auto-open companion**: opens automatically alongside an SSH session as a vertical split (gated by a setting). Reconnecting the SFTP pane is pane-scoped, so the sibling SSH terminal and its scrollback are preserved; an SSH keepalive keeps idle SFTP sessions alive
 - **Follow the SSH directory** (opt-in): the companion can track the SSH terminal's current working directory via the OSC 7 escape sequence, with a per-pane toggle (best-effort; inert on shells that do not emit OSC 7)
-- Dual edit modes: integrated AvalonEdit editor OR external editor with auto-upload on save (transient upload failures are retried). The external editor set in Settings is used for remote files too, and a shell interpreter is refused as an editor. Closing a pane while a file is open in an external editor asks first, and the staged copy is kept as long as that editor runs
+- Dual edit modes: integrated AvalonEdit editor OR external editor with auto-upload on save (transient upload failures are retried; a refusal no retry can change is reported once and tried again at the next save). The external editor set in Settings is used for remote files too, and a shell interpreter is refused as an editor. Closing a pane while a file is open in an external editor asks first, and the staged copy is kept as long as that editor runs
 - The inline editor opens a file that is not valid UTF-8 as Latin-1 and says so; Ctrl+S saves, Ctrl+W closes; the local editor pane asks before closing on unsaved text
-- **"Browse as root" sudo mode**: toggle in toolbar lists directories through GNU find with NUL-delimited records over SSH. Literal arrow names are preserved; unsafe names are excluded
-- **Full sudo fallback** on all operations: upload (private staging and atomic publication), download (`sudo cat`), edit, chmod, rename, delete, mkdir - triggered only on typed permission-denied exceptions
-- Transfers replace files only after an explicit replacement choice. New and automatically renamed destinations refuse late collisions. Safe remote creation requires SFTP with a working SSH command channel; FTP creation uploads are refused
+- **"Browse as root" sudo mode**: toggle in toolbar lists directories through GNU find with NUL-delimited records over SSH, follows a symbolic link given as the directory to list, and shows owners by name. Literal arrow names are preserved; unsafe names are excluded
+- **Full sudo fallback** on all operations: upload (private staging and atomic publication), download (`sudo cat`), edit, chmod, rename, delete, mkdir - triggered only on typed permission-denied exceptions. The privileged connection can be cancelled, and every privileged command is bounded (ten minutes, plus time in proportion to the data it carries)
+- Transfers replace files only after an explicit replacement choice. New and automatically renamed destinations refuse late collisions. A new file is committed by the transport itself: over SFTP by the protocol's own rename, which refuses an existing name and needs no SSH command channel (so `internal-sftp` accounts, Windows OpenSSH and SFTP gateways work); over FTP by a check of the name just before the final move, which leaves a residual race FTP cannot close
 - SFTP replacements preserve POSIX ownership (GID) and permission bits; an unreproducible GID refuses the replacement. Closing the pane also cancels external-editor opens still downloading
 - Sudo edit sessions cache the pinned host-key verifier, detect mid-edit host-key rotation, track upload tasks, and clean temporary files even when the privileged write fails
 - Drag-and-drop upload and download
-- **Cut / Copy / Paste / Duplicate** with non-destructive collision handling on SFTP; the server-side copy (host-key-pinned) reserves the destination exclusively and is journaled as a single operation. Copying on the server is refused whenever no such reservation is possible: always over FTP, and over SFTP when the server-side command cannot be used
+- **Cut / Copy / Paste / Duplicate** with non-destructive collision handling on SFTP; the server-side copy (host-key-pinned) reserves the destination exclusively, stages under `umask 077`, only ever cleans up what it created itself, never links into a directory, and is journaled as a single operation. Copying on the server is refused whenever no such reservation is possible: always over FTP, and over SFTP when the server-side command cannot be used
 - **Recursive folder upload** and drop-into-folder targeting
 - **Cross-pane paste** between two file browsers, same server or across servers
 - **Paste from Explorer**: upload files/folders from the Windows clipboard (CF_HDROP) into the current directory
@@ -116,8 +118,10 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - HTTP (5985) and HTTPS (5986) transports with a `Use SSL` toggle and a dynamic default port; full TLS certificate validation by default
 - Two identity modes: an explicit stored credential (DPAPI-encrypted) or the current Windows identity (Kerberos SSO, no stored secret)
 - `Negotiate` authentication (Kerberos with NTLM fallback)
-- Credential mode injects the password via a self-deleting, ACL-restricted bootstrap script - no plaintext on disk or in PowerShell history
-- Transport pre-flight check (TCP reachability + TLS handshake) surfaces clear, localized errors before the session launches
+- Credential mode injects the password via a self-deleting, ACL-restricted bootstrap script - no plaintext on disk or in PowerShell history. The DPAPI-protected password travels in a separate file the script reads and deletes first, so script-block logging never records it
+- A failed sign-in, an `exit` in the remote session or a dropped connection ends the local PowerShell host instead of leaving a local prompt in the remote tab; an execution policy that refuses the sign-in script, a locked vault, an unavailable credential and a terminal that cannot start each get their own localized message
+- Transport pre-flight check (TCP reachability + TLS handshake) surfaces clear, localized errors before the session launches, on direct connections (through a gateway it would only reach the local end of the tunnel, so it is skipped)
+- Imported profiles never carry the skip of TLS certificate validation; the profile dialog checks the WinRM username at save
 - Optional SSH gateway routing: a WinRM session can be tunneled through an SSH bastion, like RDP and SSH. Over the tunnel the WinRM transport is HTTP only (NTLM authentication); direct WinRM connections are unaffected.
 - Known gateway limitation: some environments accept the tunnel at TCP level but the target (or an intermediate device) closes the WinRM HTTP exchange - diagnosed as environmental, not a Heimdall fault. See [docs/winrm-gateway-12152-diagnostic.md](winrm-gateway-12152-diagnostic.md).
 
@@ -255,7 +259,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Deferred state machine cleanup**: reconnect releases old tunnel/state only after new connection succeeds or definitively fails
 - **Merge feedback**: status bar message when a busy tool blocks a merge operation
 - Command Palette renders as a WPF `Popup` (own HWND) above RDP/VNC ActiveX surfaces
-- **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) → right-click → bulk connect, duplicate, delete, move to project/folder, edit port, edit username, edit password (DPAPI-encrypted, with confirmation dialog), and **bulk edit SSH gateway** (credential-free, four explicit outcomes - preserve / force direct / inherit / specific - skipping protocols that do not support gateways)
+- **Bulk operations**: multi-select (Ctrl+Click, Shift+Click) → right-click → bulk connect, duplicate, delete, move to project/folder, edit port, edit username (a WinRM profile keeps its identity mode), edit password (DPAPI-encrypted, with confirmation dialog), and **bulk edit SSH gateway** (credential-free, four explicit outcomes - preserve / force direct / inherit / specific - skipping protocols that do not support gateways)
 - **Inline rename**: F2 or Ctrl+E renames sessions and folders directly in the tree, without opening a dialog, and stays correct under virtualization
 - **Tree search and selection**: removable filter chips, reset and no-results recovery actions, folder/host context in search results, and visible actions for multiple selection.
 - **Guided tree organization**: destination hints, hover expansion and edge scrolling during drag and drop; one-step undo for the latest move, inline rename or session reorder, with conflict checks.
@@ -334,7 +338,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Plink fallback sessions enforce pinned `-hostkey` fingerprints from the shared trust store and refuse to launch when Heimdall cannot resolve a pinned/probed fingerprint safely
 - Credential broker autofill requires an RDP host-title match before injecting a password into an external client's prompt; inside Heimdall, the prompt of an embedded session is matched by the window that owns it, so two sessions prompting at once each fill their own
 - Known security limitations and threat model notes are tracked in [docs/SECURITY.md](SECURITY.md)
-- Session-scoped CredMan entries with deterministic cleanup: released after the cleanup delay, flushed when Heimdall exits, and swept at startup and before every external launch when an earlier process left one behind
+- Session-scoped CredMan entries with deterministic cleanup: released after the cleanup delay, flushed when Heimdall exits, and swept at startup and before every external launch when an earlier process left one behind. A second external launch to the same host with another account is refused while the first one's entry is live
 
 ### Import and Migration
 - Migration from Heimdall v1 (DPAPI-encrypted credentials preserved)
