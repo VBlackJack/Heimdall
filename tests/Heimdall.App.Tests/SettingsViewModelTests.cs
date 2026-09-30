@@ -1897,6 +1897,31 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.False(viewModel.IsDirty);
     }
 
+    // The unlock secret lives in a PasswordBox, which cannot be bound, so the window refills it on
+    // this signal. Every path that reseeds the panel has to raise it: the startup load, a revert
+    // and a factory reset each left the box showing a secret that was not the pending one.
+    [Fact]
+    public async Task EveryReloadOfThePanel_SignalsTheViewToRefillUnboundFields()
+    {
+        FakeConfigManager config = new();
+        config.Settings.CredentialProviderUnlockSecretEncrypted = null;
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        int loads = 0;
+        viewModel.SettingsLoaded += () => loads++;
+
+        viewModel.LoadFromSettings(config.Settings);
+        Assert.Equal(1, loads);
+
+        viewModel.CredentialProviderUnlockSecret = "typed";
+        await viewModel.RevertChangesCommand.ExecuteAsync(null);
+        Assert.Equal(2, loads);
+        Assert.Equal(string.Empty, viewModel.CredentialProviderUnlockSecret);
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+        Assert.Equal(3, loads);
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

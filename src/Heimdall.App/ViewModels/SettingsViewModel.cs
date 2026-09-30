@@ -1033,6 +1033,18 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     public event Action<string>? AccentTintChanged;
 
     /// <summary>
+    /// Raised at the end of every <see cref="LoadFromSettings"/>, so fields the view fills by hand
+    /// rather than through a binding can follow.
+    /// </summary>
+    /// <remarks>
+    /// A PasswordBox cannot be bound. The credential provider unlock secret was pushed into its box
+    /// only when the window was built and when the language changed - before the first load, so the
+    /// box was empty after startup, and never after a revert or a reset, so it then showed a secret
+    /// that was no longer the pending one.
+    /// </remarks>
+    public event Action? SettingsLoaded;
+
+    /// <summary>
     /// Raised when the user asks to see the welcome tour again.
     /// </summary>
     /// <remarks>
@@ -1577,6 +1589,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // command owns the failure, and the panel is not on screen when settings load.
         TrustedRdpCertificates.RefreshCommand.Execute(null);
         IsDirty = false;
+        SettingsLoaded?.Invoke();
     }
 
     /// <summary>

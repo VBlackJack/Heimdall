@@ -127,6 +127,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private System.ComponentModel.PropertyChangedEventHandler? _serverListPropertyChangedHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _settingsPropertyChangedHandler;
     private Action<bool>? _fileShareTftpSavedHandler;
+    private Action? _settingsLoadedHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _selectedExternalToolPropertyChangedHandler;
     private Action? _externalToolsChangedHandler;
     private Action<string>? _localeChangedHandler;
@@ -237,6 +238,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             }
         };
         viewModel.Settings.FileShareTftpSaved += _fileShareTftpSavedHandler;
+
+        _settingsLoadedHandler = () => Dispatcher.BeginInvoke(() => PopulateCredentialProviderUnlockSecret(viewModel));
+        viewModel.Settings.SettingsLoaded += _settingsLoadedHandler;
         AttachSelectedExternalToolPreviewTracking(viewModel.Settings.SelectedExternalTool);
 
         // Refresh Tools tab and Settings status when background scan discovers external tools
@@ -3897,6 +3901,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 vm.Settings.PropertyChanged -= _settingsPropertyChangedHandler;
             if (_fileShareTftpSavedHandler is not null)
                 vm.Settings.FileShareTftpSaved -= _fileShareTftpSavedHandler;
+            if (_settingsLoadedHandler is not null)
+                vm.Settings.SettingsLoaded -= _settingsLoadedHandler;
             if (_trackedExternalToolForPreview is not null
                 && _selectedExternalToolPropertyChangedHandler is not null)
             {
