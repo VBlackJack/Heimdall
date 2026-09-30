@@ -4553,7 +4553,10 @@
                             </StackPanel>
                         </Button.Content>
                     </Button>
+                    <!-- Centred like its siblings: without it the text stretched to the height the
+                         buttons give the panel and sat at its top, above the status line's baseline. -->
                     <TextBlock FontSize="{StaticResource FontSizeCaption}"
+                               VerticalAlignment="Center"
                                Foreground="{DynamicResource TextSecondaryBrush}">
                         <Run Text="{Binding ServerCount, Mode=OneWay}"/>
                         <Run Text=" "/>
