@@ -46,7 +46,7 @@ public sealed class RdpTrustPromptWiringTests
 {
     private const string Constructor = "public EmbeddedRdpView()";
     private const string InitializeSession = "public void InitializeSession(";
-    private const string DisposeMember = "private void Dispose(DisconnectReason reason)";
+    private const string DisposeMember = "private void SettleCertificatePromptForTeardown()";
     private const string RegisterMember = "private void RegisterTrustPromptSurface()";
     private const string VerifyCertificate =
         "private async Task<RdpCertificateCheckResult> VerifyServerCertificateAsync()";

@@ -52,4 +52,52 @@ internal static class DisposeSequence
             teardown();
         }
     }
+
+    /// <summary>
+    /// Runs every one of <paramref name="releases"/> in order, each contained on its own so a
+    /// release that throws starves none after it, reports each failure, and runs
+    /// <paramref name="teardown"/> in every case.
+    /// </summary>
+    /// <remarks>
+    /// A report that throws is swallowed rather than propagated: the report is a log line, and
+    /// letting it escape would skip the releases still to run, which is the failure this
+    /// overload exists to remove.
+    /// </remarks>
+    public static void Run(IReadOnlyList<Action> releases, Action teardown, Action<Exception> onReleaseFailure)
+    {
+        ArgumentNullException.ThrowIfNull(releases);
+        ArgumentNullException.ThrowIfNull(teardown);
+        ArgumentNullException.ThrowIfNull(onReleaseFailure);
+
+        try
+        {
+            foreach (Action release in releases)
+            {
+                try
+                {
+                    release();
+                }
+                catch (Exception ex)
+                {
+                    ReportContained(onReleaseFailure, ex);
+                }
+            }
+        }
+        finally
+        {
+            teardown();
+        }
+    }
+
+    private static void ReportContained(Action<Exception> onReleaseFailure, Exception failure)
+    {
+        try
+        {
+            onReleaseFailure(failure);
+        }
+        catch (Exception)
+        {
+            // The report is best effort; the remaining releases are not.
+        }
+    }
 }
