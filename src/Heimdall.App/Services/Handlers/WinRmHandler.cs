@@ -138,8 +138,19 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
                     $"WinRM TLS certificate validation is being skipped for host '{server.RemoteServer}' protocol=WINRM");
             }
 
-            await _preflight.EnsureReachableAsync(server, targetHost, targetPort, ct)
-                .ConfigureAwait(false);
+            if (usesTunnel)
+            {
+                // The probe would reach only the local forwarder, which accepts whether or not
+                // the target answers, so a pass would claim a reachability nobody measured.
+                Core.Logging.FileLogger.Info(
+                    $"WinRM reachability preflight skipped for host '{server.RemoteServer}': "
+                    + "through a gateway it would only reach the local forwarder");
+            }
+            else
+            {
+                await _preflight.EnsureReachableAsync(server, targetHost, targetPort, ct)
+                    .ConfigureAwait(false);
+            }
 
             if (server.WinRmIdentityMode == WinRmIdentityMode.Credential)
             {

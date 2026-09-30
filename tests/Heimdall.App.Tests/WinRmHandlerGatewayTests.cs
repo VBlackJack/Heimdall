@@ -202,14 +202,15 @@ public sealed class WinRmHandlerGatewayTests
         Assert.NotNull(terminalSession.Arguments);
         Assert.Contains("-ComputerName '127.0.0.1'", terminalSession.Arguments, StringComparison.Ordinal);
         Assert.Contains("-Port 55985", terminalSession.Arguments, StringComparison.Ordinal);
-        Assert.Equal(1, preflight.TcpProbeCount);
-        Assert.Equal("127.0.0.1", preflight.LastTcpHost);
-        Assert.Equal(55985, preflight.LastTcpPort);
+        Assert.Equal(0, preflight.TcpProbeCount);
         Assert.Equal("WarnWinRmGatewayKerberos", result.Warning);
     }
 
+    // Through a gateway the TCP probe could only reach the local forwarder, which accepts
+    // whether or not the target answers, so a pass proved nothing. The probe is skipped there;
+    // an unreachable target surfaces as the Enter-PSSession error, which now ends the tab.
     [Fact]
-    public async Task ConnectAsync_TunneledCredentialProfile_PreflightFailureStopsBeforeBootstrap()
+    public async Task ConnectAsync_TunneledCredentialProfile_SkipsPreflightAndLaunches()
     {
         FakeTunnelService tunnelService = new FakeTunnelService
         {
@@ -242,14 +243,11 @@ public sealed class WinRmHandlerGatewayTests
             new AppSettings(),
             CancellationToken.None);
 
-        Assert.False(result.Success);
-        Assert.Equal(1, preflight.TcpProbeCount);
-        Assert.Equal("127.0.0.1", preflight.LastTcpHost);
-        Assert.Equal(55985, preflight.LastTcpPort);
-        Assert.Equal(0, bootstrapFactoryCallCount);
-        Assert.Null(terminalSession.Arguments);
-        Assert.Equal(1, tunnelService.ReleaseCount);
-        Assert.Equal(55985, tunnelService.ReleasedLocalPort);
+        Assert.True(result.Success);
+        Assert.Equal(0, preflight.TcpProbeCount);
+        Assert.Equal(1, bootstrapFactoryCallCount);
+        Assert.NotNull(terminalSession.Arguments);
+        Assert.Equal(0, tunnelService.ReleaseCount);
     }
 
     [Fact]
