@@ -1769,8 +1769,9 @@ public partial class ServerListViewModel
                 return true;
 
             case "WINRM":
+                // The identity mode is left alone: a username without a password is not a
+                // credential, and forcing Credential mode broke working CurrentUser profiles.
                 dto.WinRmUsername = username;
-                dto.WinRmIdentityMode = Core.Configuration.WinRmIdentityMode.Credential;
                 return true;
 
             case "RDP":

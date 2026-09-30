@@ -1653,7 +1653,9 @@ public sealed class ServerListBulkActionTests : IDisposable
                 break;
             case "WINRM":
                 Assert.Equal(newUsername, stored.WinRmUsername);
-                Assert.Equal(WinRmIdentityMode.Credential, stored.WinRmIdentityMode);
+                // A username alone is not a credential: switching to Credential mode without a
+                // password broke a working CurrentUser (Kerberos) profile. The mode is left alone.
+                Assert.Equal(WinRmIdentityMode.CurrentUser, stored.WinRmIdentityMode);
                 Assert.True(string.IsNullOrEmpty(stored.SshUsername));
                 Assert.True(string.IsNullOrEmpty(stored.RdpUsername));
                 Assert.True(string.IsNullOrEmpty(stored.FtpUsername));
