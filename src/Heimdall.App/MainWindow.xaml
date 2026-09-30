@@ -2630,6 +2630,38 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- Settings file: preferences out and in, never secrets. -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsFileTitle"
+                                                   Text="{loc:Translate SettingsSectionSettingsFile}"
+                                                   FontSize="{StaticResource FontSizeSubtitle}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   Margin="0,0,0,8"/>
+                                        <TextBlock Text="{loc:Translate SettingsSettingsFileHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,12"/>
+                                        <WrapPanel Orientation="Horizontal">
+                                            <Button x:Name="Mw_SettingsExportSettingsBtn"
+                                                    Content="{loc:Translate SettingsBtnExportSettings}"
+                                                    Command="{Binding Settings.ExportSettingsCommand}"
+                                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                                    Margin="0,0,8,0"
+                                                    AutomationProperties.Name="{loc:Translate SettingsBtnExportSettings}"
+                                                    AutomationProperties.HelpText="{loc:Translate SettingsSettingsFileHint}"/>
+                                            <Button x:Name="Mw_SettingsImportSettingsBtn"
+                                                    Content="{loc:Translate SettingsBtnImportSettings}"
+                                                    Command="{Binding Settings.ImportSettingsCommand}"
+                                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                                    AutomationProperties.Name="{loc:Translate SettingsBtnImportSettings}"
+                                                    AutomationProperties.HelpText="{loc:Translate SettingsSettingsFileHint}"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Replaying the tour is the only way back into it. One reflex
                                      Escape used to end it permanently: Skip and Escape both call
                                      CompleteAsync, which persists OnboardingCompleted, and that

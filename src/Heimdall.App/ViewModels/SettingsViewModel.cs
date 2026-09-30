@@ -2013,7 +2013,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
     }
 
-    private async Task PersistValidatedSettingsAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Writes every value this panel edits into <paramref name="settings"/>, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Save runs it inside the merge; the settings import runs it to build what the panel holds
+    /// before an imported file is laid over it.
+    /// </remarks>
+    private void WritePanelInto(AppSettings settings)
     {
         SshAgentPreferenceEnum parsedSshAgentPreference = Enum.TryParse<SshAgentPreferenceEnum>(
                 SshAgentPreference,
@@ -2030,6 +2037,132 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             RunAsAdministrator = tool.RunAsAdministrator,
             RunHidden = tool.RunHidden
         }).ToList();
+
+        // General
+        settings.DefaultLocale = DefaultLocale;
+        settings.DefaultTheme = DefaultTheme;
+        settings.AccentTint = AccentTint;
+        settings.MaxEmbeddedSessions = MaxEmbeddedSessions;
+        settings.PreventSleepDuringSession = PreventSleepDuringSession;
+        settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
+        settings.ExternalEditorPath = ExternalEditorPath;
+        settings.UpdateCheckEnabled = UpdateCheckEnabled;
+        settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
+
+        // Terminal
+        settings.TerminalFontFamily = TerminalFontFamily;
+        settings.TerminalFontSize = TerminalFontSize;
+        settings.TerminalColorScheme = TerminalColorScheme;
+        settings.PowerShellExecutionPolicy = PowerShellExecutionPolicy;
+
+        // SSH & SFTP
+        settings.PlinkPath = PlinkPath;
+        settings.PuttyPath = string.IsNullOrWhiteSpace(PuttyPath) ? null : PuttyPath;
+        settings.SshDefaultMode = SshDefaultMode;
+        settings.SshAgentPreference = parsedSshAgentPreference;
+        settings.AntiIdleIntervalSeconds = AntiIdleInterval;
+        settings.SshTmoutResetIntervalSeconds = SshTmoutResetInterval;
+        settings.SshKeepAliveIntervalSeconds = SshKeepAliveIntervalSeconds;
+        settings.SyncKnownHostsAtStartup = SyncKnownHostsAtStartup;
+        settings.SshAutoReconnect = SshAutoReconnect;
+        settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
+        settings.SftpBrowserEnabled = SftpBrowserEnabled;
+        settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
+        settings.SftpFollowSshDirectory = SftpFollowSshDirectory;
+        settings.X11ServerPath = string.IsNullOrWhiteSpace(X11ServerPath) ? null : X11ServerPath;
+        settings.X11AutoStart = X11AutoStart;
+        settings.SysinternalsPath = string.IsNullOrWhiteSpace(SysinternalsPath) ? null : SysinternalsPath;
+        settings.NirSoftPath = string.IsNullOrWhiteSpace(NirSoftPath) ? null : NirSoftPath;
+        settings.NanaRunPath = string.IsNullOrWhiteSpace(NanaRunPath) ? null : NanaRunPath;
+
+        // Command Library Git Sync
+        settings.CmdLibGitSyncEnabled = CmdLibGitSyncEnabled;
+        settings.CmdLibGitSyncUrl = string.IsNullOrWhiteSpace(CmdLibGitSyncUrl) ? null : CmdLibGitSyncUrl;
+        settings.CmdLibGitSyncBranch = CmdLibGitSyncBranch;
+        settings.CmdLibGitSyncAuthorName = CmdLibGitSyncAuthorName;
+        settings.CmdLibGitSyncAuthorEmail = CmdLibGitSyncAuthorEmail;
+        settings.CmdLibGitSyncOnStartup = CmdLibGitSyncOnStartup;
+        settings.CmdLibGitSyncAutoPush = CmdLibGitSyncAutoPush;
+
+        // Session Health Monitor
+        settings.SessionHealthMonitorEnabled = SessionHealthMonitorEnabled;
+        settings.SessionHealthCheckIntervalSeconds = SessionHealthCheckIntervalSeconds;
+        settings.SessionHealthProbeTimeoutMs = SessionHealthProbeTimeoutMs;
+        settings.SessionHealthMaxConcurrent = SessionHealthMaxConcurrent;
+
+        // RDP defaults
+        settings.DefaultResolutionWidth = DefaultResolutionWidth;
+        settings.DefaultResolutionHeight = DefaultResolutionHeight;
+        settings.RdpDefaultMode = RdpDefaultMode;
+        settings.RdpDefaultNla = RdpDefaultNla;
+        settings.RdpDefaultStrictServerAuthentication = RdpDefaultStrictServerAuthentication;
+        settings.RdpDefaultColorDepth = RdpDefaultColorDepth;
+        settings.RdpDefaultDynamicResolution = RdpDefaultDynamicResolution;
+        settings.RdpDefaultMultiMonitor = RdpDefaultMultiMonitor;
+        settings.RdpDefaultRedirectClipboard = RdpDefaultRedirectClipboard;
+        settings.RdpDefaultRedirectDrives = RdpDefaultRedirectDrives;
+        settings.RdpDefaultRedirectPrinters = RdpDefaultRedirectPrinters;
+        settings.RdpDefaultRedirectComPorts = RdpDefaultRedirectComPorts;
+        settings.RdpDefaultRedirectSmartCards = RdpDefaultRedirectSmartCards;
+        settings.RdpDefaultRedirectWebcam = RdpDefaultRedirectWebcam;
+        settings.RdpDefaultRedirectUsb = RdpDefaultRedirectUsb;
+        settings.RdpDefaultAudioCapture = RdpDefaultAudioCapture;
+        settings.RdpDefaultAutoReconnect = RdpDefaultAutoReconnect;
+        settings.RdpDefaultBitmapCaching = RdpDefaultBitmapCaching;
+        settings.RdpDefaultCompression = RdpDefaultCompression;
+        settings.RdpDefaultHardwareAcceleration = RdpDefaultHardwareAcceleration;
+        settings.RdpDefaultAudioMode = RdpDefaultAudioMode;
+        settings.RdpResolutionPresets = RdpResolutionPresets;
+        settings.RdpDialogAdvancedDefault = RdpDialogAdvancedDefault;
+
+        // Security
+        settings.UseExternalCredentialProvider = UseExternalCredentialProvider;
+        settings.CredentialProviderType = CredentialProviderType;
+        settings.CredentialProviderCommand = CredentialProviderCommand;
+        settings.CredentialProviderDatabase = CredentialProviderDatabase;
+        settings.CredentialProviderKeyFile =
+            string.IsNullOrWhiteSpace(CredentialProviderKeyFile)
+                ? null
+                : CredentialProviderKeyFile.Trim();
+        settings.CredentialProviderUsernameCommand = CredentialProviderUsernameCommand;
+        settings.CredentialProviderFirstLineOnly = CredentialProviderFirstLineOnly;
+        settings.CredentialProviderUnlockSecretEncrypted =
+            string.IsNullOrEmpty(CredentialProviderUnlockSecret)
+                ? null
+                : CredentialProtector.Protect(CredentialProviderUnlockSecret);
+        settings.CredentialProviderTimeoutMs = CredentialProviderTimeoutMs;
+        settings.VaultHelloMaxDaysBeforeMasterPassword = VaultHelloMaxDaysBeforeMasterPassword;
+        settings.RequireCredentialGuard = RequireCredentialGuard;
+        settings.RequireWindowsHelloOnConnect = RequireWindowsHelloOnConnect;
+        settings.WindowsHelloGraceMinutes = WindowsHelloGraceMinutes;
+        settings.AutoLockIdleMinutes = AutoLockIdleMinutes;
+        settings.DisconnectOnLock = DisconnectOnLock;
+
+        // Advanced / Logging
+        settings.EnableLogging = EnableLogging;
+        settings.SessionLoggingEnabled = SessionLoggingEnabled;
+        settings.SessionLogDirectory = SessionLogDirectory;
+        settings.TunnelEstablishmentDelayMs = TunnelEstablishmentDelayMs;
+        settings.RdpConnectWatchdogTimeoutMs = RdpConnectWatchdogTimeoutMs;
+        settings.ExternalToolTimeoutMs = ExternalToolTimeoutMs;
+        settings.RdpResizeEnableDelayMs = RdpResizeEnableDelayMs;
+        settings.RdpArtifactCleanupDelayMs = RdpArtifactCleanupDelayMs;
+        settings.RdpCredentialAutofillTimeoutMs = RdpCredentialAutofillTimeoutMs;
+        settings.RdpAutoReconnectMaxAttempts = RdpAutoReconnectMaxAttempts;
+        settings.RdpKeepAliveIntervalMs = RdpKeepAliveIntervalMs;
+        settings.RdpHostPoolCapacity = RdpHostPoolCapacity;
+        settings.RdpHostPoolIdleExpiryMinutes = RdpHostPoolIdleExpiryMinutes;
+
+        // UI state
+        settings.ShowToolsPanel = ShowToolsPanel;
+
+        // Advanced / File sharing
+        settings.FileShareEnableTftp = FileShareEnableTftp;
+        settings.ExternalTools = externalTools;
+    }
+
+    private async Task PersistValidatedSettingsAsync(CancellationToken cancellationToken)
+    {
         List<SshGatewayDto> sshGateways = _pendingGateways.Select(CloneGateway).ToList();
         HashSet<string> deletedGatewayIds = new(_deletedGatewayIds, StringComparer.OrdinalIgnoreCase);
 
@@ -2067,127 +2200,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 }
             }
 
-            // General
-            settings.DefaultLocale = DefaultLocale;
-            settings.DefaultTheme = DefaultTheme;
-            settings.AccentTint = AccentTint;
-            settings.MaxEmbeddedSessions = MaxEmbeddedSessions;
-            settings.PreventSleepDuringSession = PreventSleepDuringSession;
-            settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
-            settings.ExternalEditorPath = ExternalEditorPath;
-            settings.UpdateCheckEnabled = UpdateCheckEnabled;
-            settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
-
-            // Terminal
-            settings.TerminalFontFamily = TerminalFontFamily;
-            settings.TerminalFontSize = TerminalFontSize;
-            settings.TerminalColorScheme = TerminalColorScheme;
-            settings.PowerShellExecutionPolicy = PowerShellExecutionPolicy;
-
-            // SSH & SFTP
-            settings.PlinkPath = PlinkPath;
-            settings.PuttyPath = string.IsNullOrWhiteSpace(PuttyPath) ? null : PuttyPath;
-            settings.SshDefaultMode = SshDefaultMode;
-            settings.SshAgentPreference = parsedSshAgentPreference;
-            settings.AntiIdleIntervalSeconds = AntiIdleInterval;
-            settings.SshTmoutResetIntervalSeconds = SshTmoutResetInterval;
-            settings.SshKeepAliveIntervalSeconds = SshKeepAliveIntervalSeconds;
-            settings.SyncKnownHostsAtStartup = SyncKnownHostsAtStartup;
-            settings.SshAutoReconnect = SshAutoReconnect;
-            settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
-            settings.SftpBrowserEnabled = SftpBrowserEnabled;
-            settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
-            settings.SftpFollowSshDirectory = SftpFollowSshDirectory;
-            settings.X11ServerPath = string.IsNullOrWhiteSpace(X11ServerPath) ? null : X11ServerPath;
-            settings.X11AutoStart = X11AutoStart;
-            settings.SysinternalsPath = string.IsNullOrWhiteSpace(SysinternalsPath) ? null : SysinternalsPath;
-            settings.NirSoftPath = string.IsNullOrWhiteSpace(NirSoftPath) ? null : NirSoftPath;
-            settings.NanaRunPath = string.IsNullOrWhiteSpace(NanaRunPath) ? null : NanaRunPath;
-
-            // Command Library Git Sync
-            settings.CmdLibGitSyncEnabled = CmdLibGitSyncEnabled;
-            settings.CmdLibGitSyncUrl = string.IsNullOrWhiteSpace(CmdLibGitSyncUrl) ? null : CmdLibGitSyncUrl;
-            settings.CmdLibGitSyncBranch = CmdLibGitSyncBranch;
-            settings.CmdLibGitSyncAuthorName = CmdLibGitSyncAuthorName;
-            settings.CmdLibGitSyncAuthorEmail = CmdLibGitSyncAuthorEmail;
-            settings.CmdLibGitSyncOnStartup = CmdLibGitSyncOnStartup;
-            settings.CmdLibGitSyncAutoPush = CmdLibGitSyncAutoPush;
-
-            // Session Health Monitor
-            settings.SessionHealthMonitorEnabled = SessionHealthMonitorEnabled;
-            settings.SessionHealthCheckIntervalSeconds = SessionHealthCheckIntervalSeconds;
-            settings.SessionHealthProbeTimeoutMs = SessionHealthProbeTimeoutMs;
-            settings.SessionHealthMaxConcurrent = SessionHealthMaxConcurrent;
-
-            // RDP defaults
-            settings.DefaultResolutionWidth = DefaultResolutionWidth;
-            settings.DefaultResolutionHeight = DefaultResolutionHeight;
-            settings.RdpDefaultMode = RdpDefaultMode;
-            settings.RdpDefaultNla = RdpDefaultNla;
-            settings.RdpDefaultStrictServerAuthentication = RdpDefaultStrictServerAuthentication;
-            settings.RdpDefaultColorDepth = RdpDefaultColorDepth;
-            settings.RdpDefaultDynamicResolution = RdpDefaultDynamicResolution;
-            settings.RdpDefaultMultiMonitor = RdpDefaultMultiMonitor;
-            settings.RdpDefaultRedirectClipboard = RdpDefaultRedirectClipboard;
-            settings.RdpDefaultRedirectDrives = RdpDefaultRedirectDrives;
-            settings.RdpDefaultRedirectPrinters = RdpDefaultRedirectPrinters;
-            settings.RdpDefaultRedirectComPorts = RdpDefaultRedirectComPorts;
-            settings.RdpDefaultRedirectSmartCards = RdpDefaultRedirectSmartCards;
-            settings.RdpDefaultRedirectWebcam = RdpDefaultRedirectWebcam;
-            settings.RdpDefaultRedirectUsb = RdpDefaultRedirectUsb;
-            settings.RdpDefaultAudioCapture = RdpDefaultAudioCapture;
-            settings.RdpDefaultAutoReconnect = RdpDefaultAutoReconnect;
-            settings.RdpDefaultBitmapCaching = RdpDefaultBitmapCaching;
-            settings.RdpDefaultCompression = RdpDefaultCompression;
-            settings.RdpDefaultHardwareAcceleration = RdpDefaultHardwareAcceleration;
-            settings.RdpDefaultAudioMode = RdpDefaultAudioMode;
-            settings.RdpResolutionPresets = RdpResolutionPresets;
-            settings.RdpDialogAdvancedDefault = RdpDialogAdvancedDefault;
-
-            // Security
-            settings.UseExternalCredentialProvider = UseExternalCredentialProvider;
-            settings.CredentialProviderType = CredentialProviderType;
-            settings.CredentialProviderCommand = CredentialProviderCommand;
-            settings.CredentialProviderDatabase = CredentialProviderDatabase;
-            settings.CredentialProviderKeyFile =
-                string.IsNullOrWhiteSpace(CredentialProviderKeyFile)
-                    ? null
-                    : CredentialProviderKeyFile.Trim();
-            settings.CredentialProviderUsernameCommand = CredentialProviderUsernameCommand;
-            settings.CredentialProviderFirstLineOnly = CredentialProviderFirstLineOnly;
-            settings.CredentialProviderUnlockSecretEncrypted =
-                string.IsNullOrEmpty(CredentialProviderUnlockSecret)
-                    ? null
-                    : CredentialProtector.Protect(CredentialProviderUnlockSecret);
-            settings.CredentialProviderTimeoutMs = CredentialProviderTimeoutMs;
-            settings.VaultHelloMaxDaysBeforeMasterPassword = VaultHelloMaxDaysBeforeMasterPassword;
-            settings.RequireCredentialGuard = RequireCredentialGuard;
-            settings.RequireWindowsHelloOnConnect = RequireWindowsHelloOnConnect;
-            settings.WindowsHelloGraceMinutes = WindowsHelloGraceMinutes;
-            settings.AutoLockIdleMinutes = AutoLockIdleMinutes;
-            settings.DisconnectOnLock = DisconnectOnLock;
-
-            // Advanced / Logging
-            settings.EnableLogging = EnableLogging;
-            settings.SessionLoggingEnabled = SessionLoggingEnabled;
-            settings.SessionLogDirectory = SessionLogDirectory;
-            settings.TunnelEstablishmentDelayMs = TunnelEstablishmentDelayMs;
-            settings.RdpConnectWatchdogTimeoutMs = RdpConnectWatchdogTimeoutMs;
-            settings.ExternalToolTimeoutMs = ExternalToolTimeoutMs;
-            settings.RdpResizeEnableDelayMs = RdpResizeEnableDelayMs;
-            settings.RdpArtifactCleanupDelayMs = RdpArtifactCleanupDelayMs;
-            settings.RdpCredentialAutofillTimeoutMs = RdpCredentialAutofillTimeoutMs;
-            settings.RdpAutoReconnectMaxAttempts = RdpAutoReconnectMaxAttempts;
-            settings.RdpKeepAliveIntervalMs = RdpKeepAliveIntervalMs;
-            settings.RdpHostPoolCapacity = RdpHostPoolCapacity;
-            settings.RdpHostPoolIdleExpiryMinutes = RdpHostPoolIdleExpiryMinutes;
-
-            // UI state
-            settings.ShowToolsPanel = ShowToolsPanel;
-
-            // Advanced / File sharing
-            settings.FileShareEnableTftp = FileShareEnableTftp;
-            settings.ExternalTools = externalTools;
+            WritePanelInto(settings);
 
             // Flush buffered gateways. They RECONCILE against what was just read from disk
             // instead of replacing it: the buffer is a snapshot taken at LoadFromSettings,
@@ -2355,6 +2368,158 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         ApplyRdpDefaults(defaults);
         IsDirty = true;
+    }
+
+    /// <summary>Picks where a settings file is written; replaceable for tests.</summary>
+    internal Func<string?>? SettingsExportPathProvider { get; set; }
+
+    /// <summary>Picks the settings file to read; replaceable for tests.</summary>
+    internal Func<string?>? SettingsImportPathProvider { get; set; }
+
+    /// <summary>The user's profile folder, whose paths stay behind unless the user asks.</summary>
+    internal string UserProfileFolder { get; set; } =
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+    /// <summary>
+    /// Writes the saved preferences to a JSON file another Heimdall can import.
+    /// </summary>
+    /// <remarks>
+    /// The saved values, not the pending ones: an export is a copy of the configuration, and
+    /// exporting an edit the user may still discard would hand on a state that never existed.
+    /// Secrets and machine-specific values are left out; see <see cref="SettingsTransfer"/>.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ExportSettingsAsync(CancellationToken cancellationToken)
+    {
+        string? path = SettingsExportPathProvider is not null
+            ? SettingsExportPathProvider()
+            : PickSettingsFile(save: true);
+        if (path is null)
+        {
+            return;
+        }
+
+        try
+        {
+            AppSettings saved = await _configManager.LoadSettingsAsync();
+            System.Text.Json.Nodes.JsonObject probe = SettingsTransfer.Export(saved, includeUserPaths: false, UserProfileFolder, out int heldBack);
+            bool includeUserPaths = heldBack > 0
+                && await _dialogService.ShowConfirmAsync(
+                    _localizer["SettingsExportTitle"],
+                    _localizer.Format("SettingsExportIncludeUserPaths", heldBack));
+            System.Text.Json.Nodes.JsonObject document = includeUserPaths
+                ? SettingsTransfer.Export(saved, includeUserPaths: true, UserProfileFolder, out _)
+                : probe;
+
+            await File.WriteAllTextAsync(
+                path,
+                document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
+                new System.Text.UTF8Encoding(false),
+                cancellationToken);
+            FileLogger.Info("Settings exported.");
+            _dialogService.ShowInfo(_localizer["SettingsExportTitle"], _localizer["SettingsExportDone"]);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FileLogger.Error("Settings export failed", ex);
+            _dialogService.ShowError(_localizer["SettingsExportTitle"], _localizer.Format("SettingsExportFailed", ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Reads a settings file into the panel as pending edits, after showing what it changes.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is written: the imported values go through the panel's own validation and are
+    /// kept only when the user saves, so a file with an out-of-range number is reported like a
+    /// typed one, and Discard undoes the whole import. The PIN, the vault and Windows Hello
+    /// enrolment, the gateways and the restore points of the language and theme are held across
+    /// the reload the way a factory reset holds them.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ImportSettingsAsync(CancellationToken cancellationToken)
+    {
+        string? path = SettingsImportPathProvider is not null
+            ? SettingsImportPathProvider()
+            : PickSettingsFile(save: false);
+        if (path is null)
+        {
+            return;
+        }
+
+        AppSettings merged;
+        IReadOnlyList<string> changed;
+        try
+        {
+            string json = await File.ReadAllTextAsync(path, cancellationToken);
+            AppSettings current = await _configManager.LoadSettingsAsync();
+            WritePanelInto(current);
+            (merged, changed) = SettingsTransfer.Import(current, System.Text.Json.Nodes.JsonNode.Parse(json));
+        }
+        catch (Exception ex) when (ex is JsonException or FormatException or IOException or UnauthorizedAccessException)
+        {
+            FileLogger.Warn($"Settings import refused: {ex.Message}");
+            _dialogService.ShowError(_localizer["SettingsImportTitle"], _localizer["SettingsImportInvalid"]);
+            return;
+        }
+
+        if (changed.Count == 0)
+        {
+            _dialogService.ShowInfo(_localizer["SettingsImportTitle"], _localizer["SettingsImportNothingToChange"]);
+            return;
+        }
+
+        bool confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer["SettingsImportTitle"],
+            _localizer.Format(
+                "SettingsImportPreview",
+                changed.Count,
+                string.Join(Environment.NewLine, changed.Take(ImportPreviewMaxLines)))
+                + (changed.Count > ImportPreviewMaxLines
+                    ? Environment.NewLine + _localizer.Format("SettingsImportPreviewMore", changed.Count - ImportPreviewMaxLines)
+                    : string.Empty));
+        if (!confirmed)
+        {
+            return;
+        }
+
+        List<SshGatewayDto> keptGateways = _pendingGateways.Select(CloneGateway).ToList();
+        List<string> keptDeletedGatewayIds = _deletedGatewayIds.ToList();
+        string localeToReturnTo = _originalLocale;
+        string themeToReturnTo = _originalTheme;
+        string accentToReturnTo = _originalAccentTint;
+        bool savedTftp = _savedFileShareEnableTftp;
+        bool savedTranscripts = _savedSessionLoggingEnabled;
+        merged.SshGateways = keptGateways;
+
+        LoadFromSettings(merged);
+        _originalLocale = localeToReturnTo;
+        _originalTheme = themeToReturnTo;
+        _originalAccentTint = accentToReturnTo;
+        _savedFileShareEnableTftp = savedTftp;
+        _savedSessionLoggingEnabled = savedTranscripts;
+        foreach (string gatewayId in keptDeletedGatewayIds)
+        {
+            _deletedGatewayIds.Add(gatewayId);
+        }
+
+        await RefreshVaultStatusAsync();
+        IsDirty = true;
+        ValidateAllProperties();
+        RefreshValidationSummary();
+    }
+
+    /// <summary>How many changed settings the import preview names before summing up the rest.</summary>
+    private const int ImportPreviewMaxLines = 20;
+
+    private string? PickSettingsFile(bool save)
+    {
+        Microsoft.Win32.FileDialog dialog = save
+            ? new Microsoft.Win32.SaveFileDialog { FileName = "heimdall-settings.json", DefaultExt = ".json" }
+            : new Microsoft.Win32.OpenFileDialog();
+        dialog.Title = _localizer[save ? "SettingsExportTitle" : "SettingsImportTitle"];
+        dialog.Filter = _localizer["SettingsFileDialogFilter"];
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
     private static async Task<AppSettings> LoadFactoryDefaultsAsync(CancellationToken cancellationToken)
@@ -3663,6 +3828,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(SshTmoutResetInterval)] = nameof(AppSettings.SshTmoutResetIntervalSeconds),
         [nameof(CredentialProviderUnlockSecret)] = nameof(AppSettings.CredentialProviderUnlockSecretEncrypted),
     };
+
+    /// <summary>The <see cref="AppSettings"/> property a panel property is saved to.</summary>
+    internal static string SettingNameOf(string panelPropertyName) =>
+        PersistedPropertyAliases.TryGetValue(panelPropertyName, out string? alias) ? alias : panelPropertyName;
 
     /// <summary>
     /// Panel properties named like a setting that are nevertheless written the moment they

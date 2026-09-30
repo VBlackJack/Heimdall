@@ -2192,6 +2192,50 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.True(viewModel.IsDirty);
     }
 
+    // I-01: export the saved preferences, import them on another machine as pending edits that go
+    // through the panel's own validation, and write nothing until Save.
+    [Fact]
+    public async Task SettingsFile_ExportsSavedValues_ImportsThemAsPendingEdits()
+    {
+        string file = Path.Combine(Path.GetTempPath(), "heimdall-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            FakeConfigManager source = new();
+            source.Settings.TerminalFontSize = 18;
+            source.Settings.PinHash = "pin-hash";
+            FakeDialogService sourceDialog = new() { ConfirmResult = false };
+            SettingsViewModel exporter = CreateViewModel(source, sourceDialog);
+            exporter.SettingsExportPathProvider = () => file;
+            exporter.UserProfileFolder = @"C:\Users\nobody-here";
+            await exporter.ExportSettingsCommand.ExecuteAsync(null);
+            Assert.DoesNotContain("pin-hash", File.ReadAllText(file), StringComparison.Ordinal);
+
+            // A value the panel refuses travels like any other and is reported, not saved.
+            System.Text.Json.Nodes.JsonNode document = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file))!;
+            document["settings"]![nameof(AppSettings.MaxEmbeddedSessions)] = 0;
+            File.WriteAllText(file, document.ToJsonString());
+
+            FakeConfigManager target = new();
+            FakeDialogService targetDialog = new() { ConfirmResult = true };
+            SettingsViewModel importer = CreateViewModel(target, targetDialog, localizer: await CreateLocalizerAsync());
+            importer.LoadFromSettings(target.Settings);
+            importer.SettingsImportPathProvider = () => file;
+
+            await importer.ImportSettingsCommand.ExecuteAsync(null);
+
+            Assert.Equal(18, importer.TerminalFontSize);
+            Assert.Equal("18", importer.TerminalFontSizeText);
+            Assert.True(importer.IsDirty);
+            Assert.True(importer.HasValidationErrors);
+            Assert.Equal(0, target.MergeSettingCallCount);
+            Assert.Contains(nameof(AppSettings.TerminalFontSize), Assert.Single(targetDialog.ConfirmCalls).Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {
