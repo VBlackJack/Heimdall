@@ -448,6 +448,24 @@ public sealed partial class ServerListSelectionTests
         AssertVisibleServerIds(fixture.ViewModel);
     }
 
+    [Theory]
+    [InlineData("ops", "alpha.example.com", "ops \u00B7 alpha.example.com")]
+    [InlineData("", "alpha.example.com", "alpha.example.com")]
+    [InlineData("ops", "", "ops")]
+    public async Task SearchContext_LeavesOutAnEmptyHalf_WithoutLeadingSpaces(
+        string group,
+        string host,
+        string expected)
+    {
+        LocalizationManager localizer = await LoadEnglishLocalizerAsync();
+        ServerProfileDto dto = CreateServer("alpha", "Alpha", group);
+        dto.RemoteServer = host;
+
+        ServerItemViewModel server = ServerItemViewModel.FromDto(dto, localizer: localizer);
+
+        Assert.Equal(expected, server.SearchContextText);
+    }
+
     private static async Task<LocalizationManager> LoadEnglishLocalizerAsync()
     {
         var localizer = new LocalizationManager();

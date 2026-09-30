@@ -49,6 +49,8 @@ public sealed class HeimdallThemeBridgeTests
         "ScrollBarThumbBrush",
         "ScrollBarTrackBrush",
         "TreeViewIndentGuideBrush",
+        "TreeRowSelectedBrush",
+        "TreeRowDropTargetBrush",
         "DragDropOverlayBackground",
         "OverlayBackground",
         "ProtocolRdpBrush",
@@ -114,7 +116,7 @@ public sealed class HeimdallThemeBridgeTests
             .ToList();
 
         Assert.Empty(duplicateKeys);
-        Assert.Equal(62, brushKeys.Count);
+        Assert.Equal(64, brushKeys.Count);
         Assert.Equal(
             ExpectedBrushKeys.OrderBy(key => key, StringComparer.Ordinal),
             brushKeys.OrderBy(key => key, StringComparer.Ordinal));

@@ -282,6 +282,23 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     public string SidebarDisplayName => SidebarDisplayNameFormatter.Format(DisplayName) ?? "";
 
     /// <summary>
+    /// The second line a row shows under a search: where the session is filed and where it goes.
+    /// </summary>
+    /// <remarks>
+    /// It was a StringFormat of "{0}  {1}" in the markup, which printed two leading spaces before
+    /// the host of every session outside a folder, and hardcoded its separator. Either half is
+    /// now left out when empty, and the separator comes from the locale.
+    /// </remarks>
+    public string SearchContextText =>
+        (string.IsNullOrWhiteSpace(Group), string.IsNullOrWhiteSpace(RemoteServer)) switch
+        {
+            (false, false) => Format("SessionTreeSearchContext", Group, RemoteServer),
+            (false, true) => Group,
+            (true, false) => RemoteServer,
+            _ => "",
+        };
+
+    /// <summary>
     /// Spoken description of the row. Its status half follows the SAME priority as the sidebar
     /// dot - connection state first, health only where the dot itself falls back to health.
     /// </summary>
@@ -519,10 +536,15 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     partial void OnRemoteServerChanged(string value)
     {
         Endpoint = string.IsNullOrEmpty(value) ? "" : (RemotePort > 0 ? $"{value}:{RemotePort}" : value);
+        OnPropertyChanged(nameof(SearchContextText));
         InvalidateSearchTextCache();
     }
 
-    partial void OnGroupChanged(string value) => InvalidateSearchTextCache();
+    partial void OnGroupChanged(string value)
+    {
+        OnPropertyChanged(nameof(SearchContextText));
+        InvalidateSearchTextCache();
+    }
 
     partial void OnEnvironmentChanged(string value) => InvalidateSearchTextCache();
 
@@ -745,6 +767,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionStatusDisconnecting" => "Disconnecting...",
         "SessionStatusError" => "Error",
         "SessionTreeProtocolTool" => "Tool",
+        "SessionTreeSearchContext" => "{0} \u00B7 {1}",
         "StatusLaunchedExternalClient" => "External client launched",
         "StatusLaunchedExternalClientTooltip" => "The external client was launched.",
         "StatusRemoteSessionHandedOff" => "Session started",

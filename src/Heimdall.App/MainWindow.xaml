@@ -697,7 +697,8 @@
                                   PreviewMouseRightButtonDown="OnTreeViewPreviewMouseRightButtonDown"
                                   PreviewKeyDown="OnSessionTreeViewPreviewKeyDown"
                                   ContextMenuOpening="OnTreeViewContextMenuOpening"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  AutomationProperties.Name="{loc:Translate SessionTreeAccessibleName}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   ScrollViewer.CanContentScroll="True"
                                   VirtualizingPanel.IsVirtualizing="True"
                                   VirtualizingPanel.VirtualizationMode="Recycling">
@@ -778,7 +779,7 @@
                                             BorderBrush="Transparent"
                                             Background="Transparent"
                                             ToolTip="{Binding RowTooltipText}"
-                                            ToolTipService.InitialShowDelay="150">
+                                            ToolTipService.InitialShowDelay="{StaticResource SessionTreeRowToolTipDelay}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -799,28 +800,55 @@
                                                     </MultiBinding>
                                                 </Path.Fill>
                                             </Path>
-                                            <!-- Status dot: shows session state when active, otherwise health reachability -->
+                                            <!-- Status mark: a filled dot for a session state (open, opening, failed), a ring
+                                                 for a reachability verdict. An open session and a reachable host are both
+                                                 green, so colour alone told them apart for nobody who cannot see it (WCAG
+                                                 1.4.1); the shape does, and the spoken name says the state in words. -->
                                             <Ellipse Grid.Column="1"
-                                                     Width="7" Height="7" Margin="2,0,8,0"
+                                                     Width="{StaticResource SessionTreeStatusDotSize}"
+                                                     Height="{StaticResource SessionTreeStatusDotSize}"
+                                                     Margin="2,0,8,0"
                                                      VerticalAlignment="Center"
+                                                     StrokeThickness="{StaticResource SessionTreeStatusRingThickness}"
                                                      ToolTip="{Binding StatusTooltipText}"
-                                                     ToolTipService.InitialShowDelay="200">
-                                                <Ellipse.Fill>
+                                                     ToolTipService.InitialShowDelay="{StaticResource SessionTreeStatusToolTipDelay}">
+                                                <Ellipse.Stroke>
                                                     <MultiBinding Converter="{StaticResource ServerStatusToColorConverter}">
                                                         <Binding Path="ConnectionType"/>
                                                         <Binding Path="ConnectionState"/>
                                                         <Binding Path="HealthState"/>
                                                         <Binding Path="DataContext.ThemeRevision" ElementName="MainWindowRoot"/>
                                                     </MultiBinding>
-                                                </Ellipse.Fill>
+                                                </Ellipse.Stroke>
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill" Value="Transparent"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding StatusShowsConnectionState}" Value="True">
+                                                                <Setter Property="Fill">
+                                                                    <Setter.Value>
+                                                                        <MultiBinding Converter="{StaticResource ServerStatusToColorConverter}">
+                                                                            <Binding Path="ConnectionType"/>
+                                                                            <Binding Path="ConnectionState"/>
+                                                                            <Binding Path="HealthState"/>
+                                                                            <Binding Path="DataContext.ThemeRevision" ElementName="MainWindowRoot"/>
+                                                                        </MultiBinding>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
                                             </Ellipse>
                                             <!-- Server name -->
                                             <Grid Grid.Column="2">
                                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                                <!-- A long name ends in an ellipsis; the row's tooltip opens with the full name. -->
                                                 <TextBlock Text="{Binding DisplayName}"
                                                            FontSize="{StaticResource FontSizeBody}"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                                            VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
                                                            Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
                                                 <TextBox Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                          MinWidth="80"
@@ -834,10 +862,9 @@
                                                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                 <TextBlock Grid.Row="1" FontSize="{StaticResource FontSizeSmallCaption}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"
-                                                           Visibility="{Binding DataContext.ServerList.ShowSearchContext, RelativeSource={RelativeSource AncestorType={x:Type TreeView}}, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                    <TextBlock.Text><MultiBinding StringFormat="{}{0}  {1}"><Binding Path="Group"/><Binding Path="RemoteServer"/></MultiBinding></TextBlock.Text>
-                                                    <TextBlock.ToolTip><MultiBinding StringFormat="{}{0}  {1}"><Binding Path="Group"/><Binding Path="RemoteServer"/></MultiBinding></TextBlock.ToolTip>
-                                                </TextBlock>
+                                                           Text="{Binding SearchContextText}"
+                                                           ToolTip="{Binding SearchContextText}"
+                                                           Visibility="{Binding DataContext.ServerList.ShowSearchContext, RelativeSource={RelativeSource AncestorType={x:Type TreeView}}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </Grid>
                                             <StackPanel Grid.Column="3"
                                                         Orientation="Horizontal"
@@ -854,7 +881,7 @@
                                                            AutomationProperties.Name="{loc:Translate SessionTreeFavoriteMark}"
                                                            Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                 <Border BorderThickness="1"
-                                                        CornerRadius="3"
+                                                        CornerRadius="{StaticResource SessionTreeBadgeCornerRadius}"
                                                         Padding="4,0"
                                                         Margin="6,0,0,0"
                                                         VerticalAlignment="Center"
@@ -875,7 +902,7 @@
                                                     <TextBlock Text="{Binding GatewayBadgeText}"
                                                                FontSize="{StaticResource FontSizeSmallCaption}"
                                                                FontWeight="SemiBold"
-                                                               MaxWidth="140"
+                                                               MaxWidth="{StaticResource SessionTreeGatewayBadgeMaxWidth}"
                                                                TextTrimming="CharacterEllipsis"
                                                                VerticalAlignment="Center">
                                                         <TextBlock.Style>
@@ -893,7 +920,7 @@
                                                 <Border Background="{DynamicResource CardBrush}"
                                                         BorderBrush="{DynamicResource BorderBrush}"
                                                         BorderThickness="1"
-                                                        CornerRadius="3"
+                                                        CornerRadius="{StaticResource SessionTreeBadgeCornerRadius}"
                                                         Padding="4,0"
                                                         Margin="6,0,0,0"
                                                         VerticalAlignment="Center"
@@ -913,7 +940,7 @@
                                              single selection happens to rest on: without it a selected row and a
                                              hovered row were painted alike. -->
                                         <DataTrigger Binding="{Binding IsSelected, FallbackValue=False}" Value="True">
-                                            <Setter TargetName="ServerSelectionChrome" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                                            <Setter TargetName="ServerSelectionChrome" Property="Background" Value="{DynamicResource TreeRowSelectedBrush}"/>
                                             <Setter TargetName="ServerSelectionChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                         </DataTrigger>
                                     </DataTemplate.Triggers>
@@ -929,7 +956,10 @@
                                     <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
                                     <Setter Property="Padding" Value="1,1"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                    <!-- Stretch, not Left: a row only as wide as its label sent a drop
+                                         beside a short name to the root and a right-click there to the
+                                         empty-area menu. -->
+                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
                                     <Setter Property="ItemsPanel">
                                         <Setter.Value>
                                             <ItemsPanelTemplate>
@@ -953,6 +983,7 @@
                                                                   Grid.Row="0"
                                                                   Grid.Column="0"
                                                                   Margin="0,2,2,0"
+                                                                  Panel.ZIndex="1"
                                                                   Style="{StaticResource TreeViewExpanderToggleButtonStyle}"
                                                                   IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
                                                                   ClickMode="Press"/>
@@ -963,7 +994,7 @@
                                                             Padding="{TemplateBinding Padding}"
                                                             Background="Transparent"
                                                             BorderBrush="Transparent"
-                                                            BorderThickness="3,0,0,0"
+                                                            BorderThickness="{StaticResource SessionTreeRowOutlineThickness}"
                                                             CornerRadius="0">
                                                         <ContentPresenter x:Name="HeaderHost"
                                                                           ContentSource="Header"
@@ -1001,24 +1032,27 @@
                                                     <Trigger Property="IsMouseOver" Value="True">
                                                         <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                                                     </Trigger>
+                                                    <!-- The selection itself is drawn by the row template from the view model, which
+                                                         knows the whole multi-selection; painting WPF's single selected row here as well
+                                                         drew a second accent bar beside the first. -->
                                                     <Trigger Property="IsSelected" Value="True">
                                                         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource CardBrush}"/>
-                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                     </Trigger>
+                                                    <!-- Keyboard focus is an outline of its own, never the selection's bar: a focused row
+                                                         that is not selected must not look selected, and one that is must show both. -->
                                                     <Trigger Property="IsKeyboardFocused" Value="True">
-                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="theming:DropTargetVisualState.Insertion" Value="Before">
-                                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="3,2,0,0"/>
+                                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="{StaticResource SessionTreeInsertBeforeThickness}"/>
                                                         <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="theming:DropTargetVisualState.Insertion" Value="After">
-                                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="3,0,0,2"/>
+                                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="{StaticResource SessionTreeInsertAfterThickness}"/>
                                                         <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
-                                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource TreeRowDropTargetBrush}"/>
                                                         <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="IsEnabled" Value="False">
@@ -1048,6 +1082,7 @@
                                                                           Grid.Row="0"
                                                                           Grid.Column="0"
                                                                           Margin="0,2,2,0"
+                                                                          Panel.ZIndex="1"
                                                                           Style="{StaticResource TreeViewExpanderToggleButtonStyle}"
                                                                           IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
                                                                           ClickMode="Press"/>
@@ -1058,7 +1093,7 @@
                                                                     Padding="{TemplateBinding Padding}"
                                                                     Background="Transparent"
                                                                     BorderBrush="Transparent"
-                                                                    BorderThickness="3,0,0,0"
+                                                                    BorderThickness="{StaticResource SessionTreeRowOutlineThickness}"
                                                                     CornerRadius="0">
                                                                 <ContentPresenter x:Name="HeaderHost"
                                                                                   ContentSource="Header"
@@ -1080,24 +1115,27 @@
                                                             <Trigger Property="IsMouseOver" Value="True">
                                                                 <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                                                             </Trigger>
+                                                            <!-- The selection itself is drawn by the row template from the view model, which
+                                                                 knows the whole multi-selection; painting WPF's single selected row here as well
+                                                                 drew a second accent bar beside the first. -->
                                                             <Trigger Property="IsSelected" Value="True">
                                                                 <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource CardBrush}"/>
-                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                             </Trigger>
+                                                            <!-- Keyboard focus is an outline of its own, never the selection's bar: a focused row
+                                                                 that is not selected must not look selected, and one that is must show both. -->
                                                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
                                                             </Trigger>
                                                             <Trigger Property="theming:DropTargetVisualState.Insertion" Value="Before">
-                                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="3,2,0,0"/>
+                                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="{StaticResource SessionTreeInsertBeforeThickness}"/>
                                                                 <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                             </Trigger>
                                                             <Trigger Property="theming:DropTargetVisualState.Insertion" Value="After">
-                                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="3,0,0,2"/>
+                                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="{StaticResource SessionTreeInsertAfterThickness}"/>
                                                                 <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                             </Trigger>
                                                             <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
-                                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource TreeRowDropTargetBrush}"/>
                                                                 <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                             </Trigger>
                                                             <Trigger Property="IsEnabled" Value="False">

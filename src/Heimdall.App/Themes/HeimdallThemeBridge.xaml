@@ -44,6 +44,10 @@
     <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="{DynamicResource TextSecondaryColor}" />
     <SolidColorBrush x:Key="ScrollBarTrackBrush" Color="{DynamicResource BackgroundColor}" />
     <SolidColorBrush x:Key="TreeViewIndentGuideBrush" Color="{DynamicResource BorderColor}" Opacity="0.35" />
+    <!-- Session tree row states. Hover keeps HighlightBrush; a selected row and a drop target each
+         get their own tint, so the three never read as one state. -->
+    <SolidColorBrush x:Key="TreeRowSelectedBrush" Color="{DynamicResource AccentColor}" Opacity="0.18" />
+    <SolidColorBrush x:Key="TreeRowDropTargetBrush" Color="{DynamicResource InfoColor}" Opacity="0.30" />
     <SolidColorBrush x:Key="DragDropOverlayBackground" Color="{DynamicResource BackgroundColor}" Opacity="0.40" />
     <SolidColorBrush x:Key="OverlayBackground" Color="#B3000000" />
 
