@@ -82,7 +82,7 @@ public sealed class KeyboardInteractivePromptTests
         AuthenticationPrompt second = new(1, false, "Recovery code: ");
         int questions = 0;
 
-        Assert.Throws<OperationCanceledException>(() =>
+        Assert.Throws<KeyboardInteractiveCancelledException>(() =>
             SshConnectionFactory.AnswerKeyboardInteractivePrompts([first, second], "stored", observation,
                 _ => { questions++; return null; }));
 

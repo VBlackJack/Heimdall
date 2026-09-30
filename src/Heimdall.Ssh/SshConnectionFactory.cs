@@ -814,7 +814,7 @@ public static class SshConnectionFactory
                 string? response = responder(prompt.Request);
                 if (response is null)
                 {
-                    throw new OperationCanceledException("SSH authentication input was cancelled.");
+                    throw new KeyboardInteractiveCancelledException();
                 }
 
                 observation.RecordInteractiveAnswer();
