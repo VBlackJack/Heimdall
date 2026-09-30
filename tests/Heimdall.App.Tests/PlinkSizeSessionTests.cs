@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
@@ -237,6 +238,104 @@ public sealed class PlinkSizeSessionTests
             "HeimdallPtySize",
             "xHeimdallPtySize-embedded");
     }
+
+    /// <summary>
+    /// A size session this process created survives the sweep.
+    /// </summary>
+    /// <remarks>
+    /// Audit 2026-09-30 S-04. A portable and an installed Heimdall share HKCU's PuTTY sessions,
+    /// and the janitor swept every prefixed key when an SSH handler was built, including the key
+    /// another running instance had just created for a Plink that had not read it yet. The same
+    /// sweep run by a second handler in one process did the same to the first handler's key. The
+    /// key names its owner now, and only a key whose owner has gone is removed.
+    /// </remarks>
+    [Fact]
+    public void Janitor_KeepsASessionWhoseOwnerIsStillRunning()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        string? live = PlinkSizeSession.TryCreate(registry, Columns, Rows, _ => { });
+        live.Should().NotBeNull();
+
+        int removed = new PlinkSizeSessionJanitor(registry, _ => { }).SweepLeftovers();
+
+        removed.Should().Be(0);
+        registry.GetSessionNames().Should().Contain(live);
+    }
+
+    /// <summary>
+    /// The same owner check, with the owner written out as another running instance would.
+    /// </summary>
+    [Fact]
+    public void Janitor_KeepsASessionNamedAfterARunningProcess()
+    {
+        using Process current = Process.GetCurrentProcess();
+        string name = OwnedName(current.Id, current.StartTime.ToUniversalTime().Ticks);
+        InMemoryPuttySessionRegistry registry = new();
+        registry.Seed(name);
+
+        new PlinkSizeSessionJanitor(registry, _ => { }).SweepLeftovers();
+
+        registry.GetSessionNames().Should().Contain(name);
+    }
+
+    /// <summary>
+    /// A reused process id is not a live owner: the start time must match too.
+    /// </summary>
+    [Fact]
+    public void Janitor_RemovesASessionWhoseProcessIdWasReused()
+    {
+        using Process current = Process.GetCurrentProcess();
+        long earlierStart = current.StartTime.ToUniversalTime().AddDays(-1).Ticks;
+        string name = OwnedName(current.Id, earlierStart);
+        InMemoryPuttySessionRegistry registry = new();
+        registry.Seed(name);
+
+        int removed = new PlinkSizeSessionJanitor(registry, _ => { }).SweepLeftovers();
+
+        removed.Should().Be(1);
+        registry.GetSessionNames().Should().NotContain(name);
+    }
+
+    /// <summary>
+    /// A name in the format of the previous release carries no owner and is swept as before.
+    /// </summary>
+    [Fact]
+    public void Janitor_RemovesALegacySessionWithoutAnOwner()
+    {
+        string legacy = $"{PlinkSizeSessionNaming.Prefix}{Guid.NewGuid():N}";
+        InMemoryPuttySessionRegistry registry = new();
+        registry.Seed(legacy);
+
+        int removed = new PlinkSizeSessionJanitor(registry, _ => { }).SweepLeftovers();
+
+        removed.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("HeimdallPtySize-p12-t0-00000000000000000000000000000000x")]
+    [InlineData("HeimdallPtySize-p-12-t1f-00000000000000000000000000000000")]
+    [InlineData("HeimdallPtySize-p12-tZZ-00000000000000000000000000000000")]
+    [InlineData("HeimdallPtySize-p99999999999-t1f-00000000000000000000000000000000")]
+    [InlineData("heimdallptysize-p12-t1f-00000000000000000000000000000000")]
+    public void OwnerParsing_RefusesAnythingButTheExactFormat(string name)
+    {
+        PlinkSizeSessionNaming.TryParseOwner(name, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreatedNames_StayInTheUnescapedAlphabet_AndNameTheirOwner()
+    {
+        string name = PlinkSizeSessionNaming.CreateName();
+
+        Regex.IsMatch(name, "^[A-Za-z0-9-]+$").Should().BeTrue();
+        PlinkSizeSessionNaming.TryParseOwner(name, out PlinkSizeSessionOwner owner).Should().BeTrue();
+        owner.ProcessId.Should().Be(Environment.ProcessId);
+    }
+
+    private static string OwnedName(int processId, long startTicks) =>
+        string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{PlinkSizeSessionNaming.Prefix}p{processId}-t{startTicks:x}-{Guid.NewGuid():N}");
 
     [Fact]
     public void Janitor_EnumerationFailure_WarnsAndRemovesNothing()
