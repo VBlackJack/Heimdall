@@ -466,6 +466,95 @@ public sealed class WinRmHandlerGatewayTests
         Assert.Equal(55985, tunnelService.ReleasedLocalPort);
     }
 
+    // Each failure names its own cause. Every InvalidOperationException used to read as an
+    // unavailable credential, including a terminal that failed to start, while a locked vault
+    // and a DPAPI failure fell through to the generic launch failure.
+    public static TheoryData<string, Exception> TerminalStartFailures => new()
+    {
+        { "ErrorWinRmLaunchFailed", new InvalidOperationException("Failed to start process") },
+        { "ErrorWinRmLaunchFailed", new InvalidOperationException("Session already started") },
+    };
+
+    [Theory]
+    [MemberData(nameof(TerminalStartFailures))]
+    public async Task ConnectAsync_TerminalStartFailure_ReportsLaunchFailure(
+        string expectedKey,
+        Exception startException)
+    {
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession
+        {
+            StartException = startException
+        };
+        using WinRmHandler handler = CreateHandler(
+            new FakeTunnelService(),
+            new CountingWinRmPreflight(),
+            terminalSession);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateDirectServer(),
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(expectedKey, result.ErrorMessage);
+    }
+
+    public static TheoryData<string, Func<string?, byte[]?>, Func<byte[], string>> CredentialFailures => new()
+    {
+        {
+            "ErrorWinRmVaultLocked",
+            _ => throw new Heimdall.Core.Security.Vault.VaultLockedException(),
+            _ => "dpapi-bootstrap-blob"
+        },
+        {
+            "ErrorWinRmCredentialUnavailable",
+            _ => throw new System.Security.Cryptography.CryptographicException("tampered"),
+            _ => "dpapi-bootstrap-blob"
+        },
+        {
+            "ErrorWinRmCredentialUnavailable",
+            _ => Encoding.UTF8.GetBytes("secret"),
+            _ => throw new System.Security.Cryptography.CryptographicException("dpapi refused")
+        },
+        {
+            "ErrorWinRmCredentialUnavailable",
+            _ => null,
+            _ => "dpapi-bootstrap-blob"
+        },
+    };
+
+    [Theory]
+    [MemberData(nameof(CredentialFailures))]
+    public async Task ConnectAsync_CredentialFailure_ReportsItsOwnCause(
+        string expectedKey,
+        Func<string?, byte[]?> unprotect,
+        Func<byte[], string> protect)
+    {
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+        using WinRmHandler handler = CreateHandler(
+            new FakeTunnelService(),
+            new CountingWinRmPreflight(),
+            terminalSession,
+            () => new WinRmCredentialBootstrap(
+                createScriptPath: () => @"C:\Temp\heimdall_winrm_test.ps1",
+                writeAndProtect: (string path, string content) => { },
+                unprotectStoredPasswordBytes: unprotect,
+                protectBootstrapPasswordBytes: protect));
+        ServerProfileDto server = CreateDirectServer();
+        server.WinRmIdentityMode = WinRmIdentityMode.Credential;
+        server.WinRmUsername = @"CONTOSO\operator";
+        server.WinRmPasswordEncrypted = "encrypted";
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(expectedKey, result.ErrorMessage);
+        Assert.Null(terminalSession.Arguments);
+    }
+
     private static WinRmHandler CreateHandler(
         FakeTunnelService tunnelService,
         CountingWinRmPreflight preflight,

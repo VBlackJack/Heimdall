@@ -2251,6 +2251,7 @@
   "ErrorWinRmProfileInvalid": "El perfil del servidor no es un perfil WinRM válido.",
   "ErrorWinRmBootstrapPathMissing": "Se requiere una ruta interna de arranque de WinRM para sesiones con credenciales almacenadas.",
   "ErrorWinRmCredentialUnavailable": "La credencial almacenada de WinRM no está disponible.",
+  "ErrorWinRmVaultLocked": "Desbloquea el almacén antes de iniciar esta sesión WinRM.",
   "ErrorWinRmLaunchFailed": "No se pudo iniciar la terminal WinRM.",
   "ErrorWinRmNoPowerShellHost": "No se encontró ningún ejecutable de host de PowerShell. Instala PowerShell 7 (pwsh.exe) o Windows PowerShell (powershell.exe), o añade uno al PATH.",
   "ErrorWinRmSslGatewayUnsupported": "WinRM a través de una pasarela SSH no admite HTTPS. Usa HTTP, o conecta directamente.",

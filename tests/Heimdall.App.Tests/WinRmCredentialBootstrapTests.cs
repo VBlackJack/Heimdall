@@ -121,7 +121,10 @@ public sealed class WinRmCredentialBootstrapTests
             unprotectStoredPasswordBytes: _ => null,
             protectBootstrapPasswordBytes: bytes => Encoding.UTF8.GetString(bytes));
 
-        Assert.Throws<InvalidOperationException>(() => bootstrap.Write(CreateCredentialServer()));
+        WinRmConfigurationException ex = Assert.Throws<WinRmConfigurationException>(
+            () => bootstrap.Write(CreateCredentialServer()));
+
+        Assert.Equal("ErrorWinRmCredentialUnavailable", ex.LocalizationKey);
     }
 
     [Fact]

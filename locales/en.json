@@ -2251,6 +2251,7 @@
   "ErrorWinRmProfileInvalid": "The server profile is not a valid WinRM profile.",
   "ErrorWinRmBootstrapPathMissing": "An internal WinRM bootstrap path is required for stored-credential sessions.",
   "ErrorWinRmCredentialUnavailable": "WinRM stored credential is unavailable.",
+  "ErrorWinRmVaultLocked": "Unlock the vault before starting this WinRM session.",
   "ErrorWinRmLaunchFailed": "Failed to launch the WinRM terminal.",
   "ErrorWinRmNoPowerShellHost": "No PowerShell host executable was found. Install PowerShell 7 (pwsh.exe) or Windows PowerShell (powershell.exe), or add one to PATH.",
   "ErrorWinRmSslGatewayUnsupported": "WinRM over an SSH gateway does not support HTTPS. Use HTTP, or connect directly.",

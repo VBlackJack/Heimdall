@@ -246,18 +246,6 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
                 "ErrorWinRmInvalidConfiguration",
                 ex);
         }
-        catch (InvalidOperationException ex)
-        {
-            return BuildFailureResult(
-                server,
-                session,
-                bootstrap,
-                bootstrapScriptPath,
-                usesTunnel,
-                tunnelLocalPort,
-                "ErrorWinRmCredentialUnavailable",
-                ex);
-        }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Error(

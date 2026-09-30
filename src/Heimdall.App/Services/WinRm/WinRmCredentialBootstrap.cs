@@ -19,6 +19,7 @@ using System.Security.Cryptography;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 
 namespace Heimdall.App.Services.WinRm;
 
@@ -68,15 +69,11 @@ internal sealed class WinRmCredentialBootstrap
     {
         ValidateCredentialProfile(server);
 
-        byte[]? plaintextBytes = _unprotectStoredPasswordBytes(server.WinRmPasswordEncrypted);
-        if (plaintextBytes is null)
-        {
-            throw new InvalidOperationException("WinRM stored credential could not be decrypted.");
-        }
+        byte[] plaintextBytes = UnprotectStoredPassword(server.WinRmPasswordEncrypted);
 
         try
         {
-            string dpapiPasswordBlob = _protectBootstrapPasswordBytes(plaintextBytes);
+            string dpapiPasswordBlob = ProtectBootstrapPassword(plaintextBytes);
             string script = BuildScript(server, dpapiPasswordBlob, computerName, port);
             string scriptPath = _createScriptPath();
 
@@ -88,6 +85,52 @@ internal sealed class WinRmCredentialBootstrap
             CryptographicOperations.ZeroMemory(plaintextBytes);
         }
     }
+
+    /// <summary>
+    /// Reads the stored password, turning each way it can be unreadable into the message that
+    /// names its cause: a locked vault asks for an unlock, anything else is an unavailable
+    /// credential. Neither may read as a failure to launch the terminal.
+    /// </summary>
+    private byte[] UnprotectStoredPassword(string? protectedPassword)
+    {
+        byte[]? plaintextBytes;
+        try
+        {
+            plaintextBytes = _unprotectStoredPasswordBytes(protectedPassword);
+        }
+        catch (VaultLockedException ex)
+        {
+            throw new WinRmConfigurationException(
+                "ErrorWinRmVaultLocked",
+                [],
+                "The vault is locked, so the WinRM stored credential cannot be read.",
+                ex);
+        }
+        catch (CryptographicException ex)
+        {
+            throw CredentialUnavailable("WinRM stored credential could not be decrypted.", ex);
+        }
+
+        return plaintextBytes
+            ?? throw CredentialUnavailable("WinRM stored credential could not be decrypted.");
+    }
+
+    private string ProtectBootstrapPassword(byte[] plaintextBytes)
+    {
+        try
+        {
+            return _protectBootstrapPasswordBytes(plaintextBytes);
+        }
+        catch (CryptographicException ex)
+        {
+            throw CredentialUnavailable("WinRM bootstrap credential could not be protected.", ex);
+        }
+    }
+
+    private static WinRmConfigurationException CredentialUnavailable(
+        string technicalDetail,
+        Exception? innerException = null)
+        => new("ErrorWinRmCredentialUnavailable", [], technicalDetail, innerException);
 
     public void Delete(string scriptPath)
     {

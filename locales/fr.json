@@ -2251,6 +2251,7 @@
   "ErrorWinRmProfileInvalid": "Le profil de serveur n'est pas un profil WinRM valide.",
   "ErrorWinRmBootstrapPathMissing": "Un chemin d'amor\u00e7age interne WinRM est requis pour les sessions \u00e0 identifiant stock\u00e9.",
   "ErrorWinRmCredentialUnavailable": "L'identifiant WinRM stock\u00e9 est indisponible.",
+  "ErrorWinRmVaultLocked": "D\u00e9verrouillez le coffre avant de d\u00e9marrer cette session WinRM.",
   "ErrorWinRmLaunchFailed": "\u00c9chec du lancement du terminal WinRM.",
   "ErrorWinRmNoPowerShellHost": "Aucun ex\u00e9cutable h\u00f4te PowerShell n'a \u00e9t\u00e9 trouv\u00e9. Installez PowerShell 7 (pwsh.exe) ou Windows PowerShell (powershell.exe), ou ajoutez-en un au PATH.",
   "ErrorWinRmSslGatewayUnsupported": "WinRM via une passerelle SSH ne prend pas en charge HTTPS. Utilisez HTTP ou une connexion directe.",
