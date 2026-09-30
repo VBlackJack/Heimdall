@@ -16,7 +16,7 @@
   "TreeUxDropAfter": "Mover {0} sesión(es) después de {1} en {2}",
   "TreeUxDropMoveFolder": "Mover carpeta {0} a {1}",
   "SshInteractivePromptTitle": "Autenticación SSH",
-  "SshInteractivePromptMessage": "El servidor {0} pide a la cuenta {1} que responda al texto citado abajo. Ese texto lo escribió el servidor, no Heimdall: Heimdall nunca pide aquí su contraseña maestra.\n\nTexto enviado por el servidor:\n\"{2}\"\n\nEsta respuesta se usa solo para esta conexión y no se guarda.",
+  "SshInteractivePromptMessage": "Servidor: {0}\nCuenta: {1}\n\nEl servidor solicita:\n{2}\n\nEsta respuesta se usa solo para esta conexión y no se guarda.",
   "RdpCopyAnonymous": "Copiar informe anonimizado",
   "RdpCopyAnonymousHeader": "Informe de diagnóstico RDP (anonimizado)",
   "RdpCopyAnonymousHint": "Incluye la hora, la versión de la aplicación y los códigos RDP disponibles. Excluye direcciones de servidor, nombres de cuenta y texto de mensajes de error.",
@@ -2227,6 +2227,9 @@
   "WarnFtpCleartext": "La sesión FTP a {0}:{1} está usando un canal en texto claro. Las credenciales y el contenido de los archivos se transmiten sin cifrar. Usa SFTP o FTPS cuando estén disponibles.",
   "WarnFtpCleartextBadge": "Enviado en texto claro (sin TLS)",
   "RdpExistingWindowsCredentialNotice": "Se está usando una credencial de Windows existente; no se inyectó la credencial almacenada de Heimdall.",
+  "RdpErrorLaunchInFlightForAnotherAccount": "Todavía hay un inicio en curso hacia este host con otra cuenta. Vuelva a intentarlo en unos segundos.",
+  "RdpExternalNoServerAuthenticationNotice": "La autenticación a nivel de red está desactivada para esta conexión, por lo que no se verifica la identidad del servidor: Heimdall no entregó la contraseña almacenada. Introdúzcala en el aviso de Escritorio remoto.",
+  "RdpErrorEventSinkAttachFailed": "Heimdall no pudo suscribirse a los eventos del control de Escritorio remoto.",
   "WarnFtpsDataChannelIdentityBadge": "No se verificó la identidad del canal de datos FTPS",
   "WarnRemoteEntriesSkippedUnsupported": "Se omitieron {0} entradas que no son ni archivos ni directorios. Consulta el registro para más detalles.",
   "WarnUploadTargetsSkippedUnsupported": "Se omitieron {0} subida(s): el destino ya existe y no es un archivo normal. Consulta el registro para más detalles.",
@@ -6644,7 +6647,5 @@
   "GatewayDiagnosticRouteSeparator": " → ",
   "GatewayDiagnosticStepLine": "{0}: {1} ({2} ms)",
   "ErrorGatewayRouteEmpty": "Una ruta de pasarela no puede estar vacía.",
-  "ErrorToolGatewayServicesUnavailable": "Los servicios de pasarela no están disponibles: la conexión se rechaza en lugar de abrirse sin verificación.",
-  "RdpErrorLaunchInFlightForAnotherAccount": "Todavía hay un inicio en curso hacia este host con otra cuenta. Vuelva a intentarlo en unos segundos.",
-  "RdpExternalNoServerAuthenticationNotice": "La autenticación a nivel de red está desactivada para esta conexión, por lo que no se verifica la identidad del servidor: Heimdall no entregó la contraseña almacenada. Introdúzcala en el aviso de Escritorio remoto."
+  "ErrorToolGatewayServicesUnavailable": "Los servicios de pasarela no están disponibles: la conexión se rechaza en lugar de abrirse sin verificación."
 }

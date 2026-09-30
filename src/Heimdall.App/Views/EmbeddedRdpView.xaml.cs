@@ -389,6 +389,7 @@ public partial class EmbeddedRdpView
         internal const string ErrorCancelReconnectFailed = "RdpErrorCancelReconnectFailed";
         internal const string ErrorCancelConnectFailed = "RdpErrorCancelConnectFailed";
         internal const string ErrorStartEmbeddedSessionFailed = "RdpErrorStartEmbeddedSessionFailed";
+        internal const string ErrorEventSinkAttachFailed = "RdpErrorEventSinkAttachFailed";
         internal const string CertificateNotVerifiableToast = "RdpCertificateNotVerifiableToast";
         internal const string ResolutionHeaderFormat = "RdpResolutionHeaderFormat";
         internal const string ResolutionHeaderWithSizeFormat = "RdpResolutionHeaderWithSizeFormat";
@@ -1867,7 +1868,7 @@ public partial class EmbeddedRdpView
                 if (!_rdpHost.AttachEventSink())
                 {
                     throw new InvalidOperationException(
-                        _rdpHost.LastError ?? "Failed to attach the Remote Desktop event sink.");
+                        EventSinkAttachFailureMessage(_rdpHost.LastError, L));
                 }
             }
 
@@ -4180,6 +4181,16 @@ public partial class EmbeddedRdpView
 
     /// <summary>Resolves a locale key, falling back to the key name if no localizer is set.</summary>
     private string L(string key) => _localizer?[key] ?? key;
+
+    /// <summary>
+    /// The detail shown on the status line when the control's events could not be attached:
+    /// the control's own error when it gave one, the localized sentence otherwise.
+    /// </summary>
+    internal static string EventSinkAttachFailureMessage(string? lastError, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+        return lastError ?? localize(LocaleKeys.ErrorEventSinkAttachFailed);
+    }
 
     /// <summary>
     /// Writes the session status line and tells UI Automation the live region changed.
