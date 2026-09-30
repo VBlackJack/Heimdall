@@ -65,6 +65,138 @@ public sealed partial class ServerListSelectionTests
         AssertVisibleServerIds(fixture.ViewModel, "fw");
     }
 
+    [Fact]
+    public async Task SearchHidingTheSelection_ClearingTheSearchRestoresIt()
+    {
+        var timeProvider = new FakeTimeProvider();
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("beta"));
+
+        fixture.ViewModel.SearchText = "Alpha";
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+        Assert.Null(fixture.ViewModel.SelectedServer);
+        List<ServerItemViewModel> scrolledTo = [];
+        fixture.ViewModel.HiddenSelectionRestored += scrolledTo.Add;
+
+        fixture.ViewModel.SearchText = "";
+
+        Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
+        AssertSelection(fixture.ViewModel, "beta");
+        Assert.Equal("beta", Assert.Single(scrolledTo).Id);
+    }
+
+    [Fact]
+    public async Task CollapsingPartOfAMultiSelection_ReExpandingRestoresAllOfIt()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops", "lab"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "lab"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+
+        fixture.CollapseGroup("lab");
+        AssertSelection(fixture.ViewModel, "alpha");
+
+        fixture.FolderByPath("lab").IsExpanded = true;
+
+        AssertSelection(fixture.ViewModel, "alpha", "beta");
+        Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
+    }
+
+    [Fact]
+    public async Task SearchHidingTheSelection_ASelectionMadeMeanwhileWins()
+    {
+        var timeProvider = new FakeTimeProvider();
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("beta"));
+        fixture.ViewModel.SearchText = "Alpha";
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.SearchText = "";
+
+        AssertSelection(fixture.ViewModel, "alpha");
+    }
+
+    [Fact]
+    public async Task SearchHidingTheSelection_IsNotPersistedAsADeselection()
+    {
+        var timeProvider = new FakeTimeProvider();
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
+        AppSettings settings = fixture.ExpandGroups("ops");
+        settings.LastSelectedServerId = "beta";
+        await fixture.LoadServersAsync(
+            settings,
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"));
+        Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
+
+        fixture.ViewModel.SearchText = "Alpha";
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+        Assert.Null(fixture.ViewModel.SelectedServer);
+        await fixture.ViewModel.FlushExpandStateForCloseAsync();
+
+        AppSettings saved = await fixture.ConfigManager.LoadSettingsAsync();
+        Assert.Equal("beta", saved.LastSelectedServerId);
+    }
+
+    [Fact]
+    public async Task CollapsingTheFolderOfTheSelection_ReExpandingRestoresIt()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops", "lab"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "lab"));
+        fixture.ViewModel.SelectSingle(fixture.ServerById("beta"));
+
+        fixture.CollapseGroup("lab");
+        Assert.Null(fixture.ViewModel.SelectedServer);
+
+        fixture.FolderByPath("lab").IsExpanded = true;
+
+        Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
+        AssertSelection(fixture.ViewModel, "beta");
+    }
+
+    [Fact]
+    public async Task SelectAllVisible_NotifiesTheCountOnce()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        ServerProfileDto[] servers = Enumerable
+            .Range(0, 40)
+            .Select(index => CreateServer($"s{index:D2}", $"Server {index:D2}", "ops"))
+            .ToArray();
+        fixture.LoadServers(fixture.ExpandGroups("ops"), servers);
+        fixture.ViewModel.SelectSingle(fixture.ServerById("s00"));
+        int countNotifications = 0;
+        int collectionNotifications = 0;
+        fixture.ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ServerListViewModel.SelectionCountText))
+            {
+                countNotifications++;
+            }
+        };
+        fixture.ViewModel.SelectedItems.CollectionChanged += (_, _) => collectionNotifications++;
+
+        fixture.ViewModel.SelectAllVisible();
+
+        Assert.Equal(40, fixture.ViewModel.SelectionCount);
+        Assert.Equal(1, countNotifications);
+        Assert.Equal(1, collectionNotifications);
+    }
+
     private static async Task<LocalizationManager> LoadEnglishLocalizerAsync()
     {
         var localizer = new LocalizationManager();

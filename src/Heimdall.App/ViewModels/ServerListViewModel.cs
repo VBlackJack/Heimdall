@@ -471,7 +471,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         // Nothing selected yet is a fresh start: open on the session the previous run left
         // selected. A reload after a folder operation keeps whatever is selected now.
-        var selectedServerId = SelectedServer?.Id ?? settings.LastSelectedServerId;
+        var selectedServerId = EffectiveSelectedServerId ?? settings.LastSelectedServerId;
         _persistedSelectionId = settings.LastSelectedServerId;
         var projectMap = BuildProjectMap(settings);
 
@@ -1962,8 +1962,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         var key = folder.ExpansionKey;
-        if (!folder.IsExpanded)
+        if (!folder.IsExpanded || _hiddenSelection is not null)
         {
+            // A collapse may hide the selection; an expand may show one a collapse hid.
             SynchronizeSelection(null);
         }
 
@@ -2004,7 +2005,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     private void ScheduleExpandStateSave()
     {
         ImmutableArray<string> expandedNodes = [.. _expandedNodes];
-        string? selectedId = SelectedServer?.Id;
+        string? selectedId = EffectiveSelectedServerId;
         lock (_expandSaveSync)
         {
             long version = ++_expandSaveVersion;
@@ -2081,7 +2082,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// </remarks>
     internal async Task FlushExpandStateForCloseAsync()
     {
-        string? selectedId = SelectedServer?.Id;
+        string? selectedId = EffectiveSelectedServerId;
         bool selectionChanged = !string.Equals(selectedId, _persistedSelectionId, StringComparison.Ordinal);
 
         lock (_expandSaveSync)
@@ -2230,44 +2231,6 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             dialogVm.SelectedGatewayId = settings.LastUsedGatewayId;
         }
-    }
-
-    private void SynchronizeSelection(string? preferredSelectedServerId)
-    {
-        List<ServerItemViewModel> visibleLeaves = SelectionHelpers
-            .EnumerateVisibleLeaves(GroupedServers)
-            .ToList();
-
-        if (!string.IsNullOrWhiteSpace(preferredSelectedServerId))
-        {
-            ServerItemViewModel? preferred = visibleLeaves.FirstOrDefault(
-                server => string.Equals(server.Id, preferredSelectedServerId, StringComparison.Ordinal));
-
-            if (preferred is not null)
-            {
-                SelectSingle(preferred);
-                return;
-            }
-        }
-
-        var visibleSelection = SelectedItems
-            .Where(visibleLeaves.Contains)
-            .ToList();
-
-        if (visibleSelection.Count == 0)
-        {
-            ClearSelection();
-            return;
-        }
-
-        var primary = SelectedServer is not null && visibleSelection.Contains(SelectedServer)
-            ? SelectedServer
-            : visibleSelection.LastOrDefault();
-        var anchor = _selectionAnchor is not null && visibleSelection.Contains(_selectionAnchor)
-            ? _selectionAnchor
-            : primary;
-
-        ApplySelection(visibleSelection, primary, anchor, updateSelectedServer: true);
     }
 
     private static Dictionary<string, ProjectDto> BuildProjectMap(AppSettings settings)

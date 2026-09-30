@@ -1268,7 +1268,19 @@ public partial class MainWindow
                     return;
                 }
 
-                SelectRowProgrammatically(_treeState, container, server, vm.ServerList.SelectSingle);
+                // A restored multi-selection already holds this row: selecting it alone would
+                // throw the rest of the restored selection away.
+                SelectRowProgrammatically(
+                    _treeState,
+                    container,
+                    server,
+                    row =>
+                    {
+                        if (!vm.ServerList.SelectedItems.Contains(row))
+                        {
+                            vm.ServerList.SelectSingle(row);
+                        }
+                    });
                 container.BringIntoView();
             }));
     }
