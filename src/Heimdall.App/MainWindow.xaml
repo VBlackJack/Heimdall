@@ -2549,8 +2549,11 @@
                                         <CheckBox x:Name="Mw_SettingsUpdateCheckEnabled" Content="{loc:Translate SettingsLabelUpdateCheckEnabled}" IsChecked="{Binding Settings.UpdateCheckEnabled}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UpdateCheckEnabled}">
                                             <TextBlock x:Name="Mw_SettingsUpdateIntervalLabel" Text="{loc:Translate SettingsLabelUpdateInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                            <TextBox Text="{Binding Settings.UpdateCheckIntervalHoursText, UpdateSourceTrigger=PropertyChanged}" Width="100" HorizontalAlignment="Left"
-                                                     AutomationProperties.LabeledBy="{x:Reference Mw_SettingsUpdateIntervalLabel}"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.UpdateCheckIntervalHoursText, UpdateSourceTrigger=PropertyChanged}" Width="100" HorizontalAlignment="Left"
+                                                         AutomationProperties.LabeledBy="{x:Reference Mw_SettingsUpdateIntervalLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitHours}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
                                         </StackPanel>
                                         <StackPanel Margin="0,12,0,0">
                                             <TextBlock x:Name="Mw_SettingsCurrentVersionLabel" Text="{loc:Translate SettingsLabelCurrentVersion}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
@@ -2675,7 +2678,7 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.TerminalFontSizeText, UpdateSourceTrigger=PropertyChanged}" Width="80"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTerminalFontSizeLabel}"/>
-                                                    <TextBlock Text="px" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitPixels}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
@@ -2831,14 +2834,14 @@
                                                 <TextBlock x:Name="Mw_SettingsAntiIdleLabel" Text="{loc:Translate SettingsLabelAntiIdleInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.AntiIdleIntervalText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsAntiIdleLabel}"/>
-                                                    <TextBlock Text="s" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock x:Name="Mw_SettingsSshTmoutLabel" Text="{loc:Translate SettingsLabelSshTmoutReset}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.SshTmoutResetIntervalText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshTmoutLabel}"/>
-                                                    <TextBlock Text="s" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
@@ -3200,14 +3203,14 @@
                                                 <TextBlock x:Name="Mw_SettingsRdpWidthLabel" Text="{loc:Translate SettingsLabelRdpWidth}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.DefaultResolutionWidthText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpWidthLabel}"/>
-                                                    <TextBlock Text="px" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitPixels}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock x:Name="Mw_SettingsRdpHeightLabel" Text="{loc:Translate SettingsLabelRdpHeight}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.DefaultResolutionHeightText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpHeightLabel}"/>
-                                                    <TextBlock Text="px" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitPixels}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
@@ -3306,7 +3309,7 @@
                                                       Width="120"
                                                       ToolTip="{loc:Translate RdpHostPoolIdleExpiryHint}"
                                                       AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpHostPoolIdleExpiryLabel}"/>
-                                             <TextBlock Text="min" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                             <TextBlock Text="{loc:Translate SettingsUnitMinutes}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                          </StackPanel>
                                      </StackPanel>
                                 </Border>
@@ -3334,7 +3337,7 @@
                                                 <TextBox Text="{Binding Settings.RdpResizeEnableDelayMsText, UpdateSourceTrigger=PropertyChanged}"
                                                          Width="120"
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpResizeEnableDelayLabel}"/>
-                                                <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
 
                                             <TextBlock x:Name="Mw_SettingsRdpArtifactCleanupDelayLabel"
@@ -3346,7 +3349,7 @@
                                                 <TextBox Text="{Binding Settings.RdpArtifactCleanupDelayMsText, UpdateSourceTrigger=PropertyChanged}"
                                                          Width="120"
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpArtifactCleanupDelayLabel}"/>
-                                                <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
 
                                             <TextBlock x:Name="Mw_SettingsRdpCredentialAutofillTimeoutLabel"
@@ -3358,7 +3361,7 @@
                                                 <TextBox Text="{Binding Settings.RdpCredentialAutofillTimeoutMsText, UpdateSourceTrigger=PropertyChanged}"
                                                          Width="120"
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpCredentialAutofillTimeoutLabel}"/>
-                                                <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
 
                                             <TextBlock x:Name="Mw_SettingsRdpAutoReconnectMaxAttemptsLabel"
@@ -3380,7 +3383,7 @@
                                                 <TextBox Text="{Binding Settings.RdpKeepAliveIntervalMsText, UpdateSourceTrigger=PropertyChanged}"
                                                          Width="120"
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpKeepAliveIntervalLabel}"/>
-                                                <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </Expander>
@@ -3737,7 +3740,10 @@
                                         <StackPanel Margin="0,16,0,0"
                                                     Visibility="{Binding Settings.VaultEnabledActionsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <TextBlock x:Name="Mw_SettingsAutoLockLabel" Text="{loc:Translate SettingsAutoLockLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                            <TextBox x:Name="Mw_SettingsAutoLockMinutes" Text="{Binding Settings.AutoLockIdleMinutesText, UpdateSourceTrigger=PropertyChanged}" Width="80" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsAutoLockLabel}"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox x:Name="Mw_SettingsAutoLockMinutes" Text="{Binding Settings.AutoLockIdleMinutesText, UpdateSourceTrigger=PropertyChanged}" Width="80" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsAutoLockLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMinutes}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
                                             <TextBlock Text="{loc:Translate SettingsAutoLockHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                             <CheckBox x:Name="Mw_SettingsDisconnectOnLock" Content="{loc:Translate SettingsDisconnectOnLock}" IsChecked="{Binding Settings.DisconnectOnLock}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"
                                                       AutomationProperties.HelpText="{loc:Translate SettingsDisconnectOnLockHint}"/>
@@ -3942,7 +3948,7 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.TunnelEstablishmentDelayMsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTunnelDelayLabel}"/>
-                                                    <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,0">
@@ -3950,7 +3956,7 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.RdpConnectWatchdogTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpTimeoutLabel}"/>
-                                                    <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                             <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,0,0">
@@ -3958,7 +3964,7 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.ExternalToolTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsExtToolTimeoutLabel}"/>
-                                                    <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
@@ -3989,7 +3995,7 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.SessionHealthCheckIntervalSecondsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsHealthIntervalLabel}"/>
-                                                    <TextBlock Text="s" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,0">
@@ -3997,7 +4003,7 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBox Text="{Binding Settings.SessionHealthProbeTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsHealthTimeoutLabel}"/>
-                                                    <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                             </StackPanel>
                                             <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,8,0">
