@@ -87,6 +87,33 @@ public sealed class SettingsLayoutOrderGuardTests
         Assert.Equal("{Binding Settings.IsVaultEnabled}", autoLock.Attribute("IsEnabled")?.Value);
     }
 
+    /// <summary>
+    /// The sections that do not wait for Save say when they apply.
+    /// </summary>
+    /// <remarks>
+    /// I-03. The PIN, the vault and the two trust lists are written the moment they change, so
+    /// Discard cannot undo them and Save has nothing to do with them. Nothing on screen said so.
+    /// </remarks>
+    [Theory]
+    [InlineData("Mw_SettingsPinTitle", "SettingsSavedImmediately")]
+    [InlineData("Mw_SettingsVaultTitle", "SettingsSavedImmediately")]
+    [InlineData("Mw_SettingsTrustedHostKeysTitle", "SettingsSavedImmediately")]
+    [InlineData("Mw_SettingsTrustedRdpCertificatesTitle", "SettingsSavedImmediately")]
+    [InlineData("Mw_SettingsAppearanceTitle", "SettingsAppliesImmediately")]
+    [InlineData("Mw_SettingsRdpDefaultsTitle", "SettingsAppliesToNewConnections")]
+    public void ASectionThatDoesNotWaitForSaveSaysWhenItApplies(string title, string key)
+    {
+        XDocument markup = XDocument.Load(
+            Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
+        XElement heading = markup.Descendants().Single(element => element.Attribute(Xaml + "Name")?.Value == title);
+
+        XElement? badge = heading.ElementsAfterSelf().FirstOrDefault();
+
+        Assert.NotNull(badge);
+        Assert.Equal("{StaticResource SettingsApplyBadgeStyle}", badge!.Attribute("Style")?.Value);
+        Assert.Equal("{loc:Translate " + key + "}", badge.Elements().Single().Attribute("Text")?.Value);
+    }
+
     [Fact]
     public void TheCheckRefusesEachShape()
     {

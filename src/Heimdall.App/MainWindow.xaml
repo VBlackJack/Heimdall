@@ -2279,6 +2279,20 @@
                         <Setter Property="Margin" Value="6,0,0,0"/>
                         <Setter Property="VerticalAlignment" Value="Center"/>
                     </Style>
+                    <!-- When a card's settings take effect, where it is not simply "on Save". -->
+                    <Style x:Key="SettingsApplyBadgeStyle" TargetType="{x:Type Border}">
+                        <Setter Property="HorizontalAlignment" Value="Left"/>
+                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusSm}"/>
+                        <Setter Property="Padding" Value="6,1"/>
+                        <Setter Property="Margin" Value="0,0,0,10"/>
+                    </Style>
+                    <Style x:Key="SettingsApplyBadgeTextStyle" TargetType="{x:Type TextBlock}">
+                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                        <Setter Property="FontSize" Value="{StaticResource FontSizeSmallCaption}"/>
+                    </Style>
                     <Style x:Key="SettingsTabErrorBadgeTextStyle" TargetType="{x:Type TextBlock}">
                         <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
                         <Setter Property="FontSize" Value="{StaticResource FontSizeBadge}"/>
@@ -2445,6 +2459,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsAppearanceTitle" Text="{loc:Translate SettingsSectionAppearance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsAppearanceTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -2677,6 +2694,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsTerminalTitle" Text="{loc:Translate SettingsSectionTerminal}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsTerminalTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewSessions}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -2762,6 +2782,9 @@
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsSshTitle" Text="{loc:Translate SettingsSectionSshDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsSshTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <TextBlock x:Name="Mw_SettingsPlinkPathLabel" Text="{loc:Translate SettingsLabelPlinkPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -2948,6 +2971,9 @@
                                         <DockPanel Margin="0,0,0,12">
                                             <StackPanel>
                                                 <TextBlock x:Name="Mw_SettingsTrustedHostKeysTitle" Text="{loc:Translate SettingsSshTrustedHostKeysSectionTitle}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsTrustedHostKeysTitleApplies">
+                                                    <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                                </Border>
                                                 <TextBlock Text="{loc:Translate SettingsSshTrustedHostKeysSectionHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                             </StackPanel>
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -3208,6 +3234,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRdpDefaultsTitle" Text="{loc:Translate SettingsSectionRdpDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpDefaultsTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <StackPanel Margin="0,0,0,8">
                                             <TextBlock x:Name="Mw_SettingsRdpModeLabel" Text="{loc:Translate SettingsLabelRdpMode}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
@@ -3261,6 +3290,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRdpDisplayTitle" Text="{loc:Translate SettingsSectionRdpDisplay}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpDisplayTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <CheckBox x:Name="Mw_SettingsRdpDynRes" Content="{loc:Translate SettingsLabelRdpDynamicRes}" IsChecked="{Binding Settings.RdpDefaultDynamicResolution}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpDynamicResolutionHint}" AutomationProperties.HelpText="{loc:Translate RdpDynamicResolutionHint}"/>
                                         <CheckBox x:Name="Mw_SettingsRdpMultiMon" Content="{loc:Translate SettingsLabelRdpMultiMonitor}" IsChecked="{Binding Settings.RdpDefaultMultiMonitor}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpMultiMonitorHint}" AutomationProperties.HelpText="{loc:Translate RdpMultiMonitorHint}"/>
                                     </StackPanel>
@@ -3269,6 +3301,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRdpAudioTitle" Text="{loc:Translate SettingsSectionRdpAudio}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpAudioTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <StackPanel>
                                             <TextBlock x:Name="Mw_SettingsRdpAudioLabel" Text="{loc:Translate SettingsLabelRdpAudio}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox SelectedValue="{Binding Settings.RdpDefaultAudioMode}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpAudioLabel}">
@@ -3292,6 +3327,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRdpDevicesTitle" Text="{loc:Translate SettingsSectionRdpDevices}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpDevicesTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <CheckBox x:Name="Mw_SettingsRdpClipboard" Content="{loc:Translate ServerDialogRedirectClipboard}" IsChecked="{Binding Settings.RdpDefaultRedirectClipboard}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpRedirectClipboardHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectClipboardHint}"/>
                                         <CheckBox x:Name="Mw_SettingsRdpDrives" Content="{loc:Translate ServerDialogRedirectDrives}" IsChecked="{Binding Settings.RdpDefaultRedirectDrives}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpRedirectDrivesHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectDrivesHint}"/>
                                         <CheckBox x:Name="Mw_SettingsRdpPrinters" Content="{loc:Translate ServerDialogRedirectPrinters}" IsChecked="{Binding Settings.RdpDefaultRedirectPrinters}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpRedirectPrintersHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectPrintersHint}"/>
@@ -3314,6 +3352,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRdpPerformanceTitle" Text="{loc:Translate SettingsSectionRdpPerformance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpPerformanceTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <CheckBox x:Name="Mw_SettingsRdpBitmapCache" Content="{loc:Translate SettingsLabelRdpBitmapCache}" IsChecked="{Binding Settings.RdpDefaultBitmapCaching}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpBitmapCachingHint}" AutomationProperties.HelpText="{loc:Translate RdpBitmapCachingHint}"/>
                                          <CheckBox x:Name="Mw_SettingsRdpCompression" Content="{loc:Translate SettingsLabelRdpCompression}" IsChecked="{Binding Settings.RdpDefaultCompression}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpCompressionHint}" AutomationProperties.HelpText="{loc:Translate RdpCompressionHint}"/>
                                          <CheckBox x:Name="Mw_SettingsRdpHardwareAcceleration" Content="{loc:Translate SettingsLabelRdpHardwareAcceleration}" IsChecked="{Binding Settings.RdpDefaultHardwareAcceleration}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpHardwareAccelerationHint}" AutomationProperties.HelpText="{loc:Translate RdpHardwareAccelerationHint}"/>
@@ -3473,6 +3514,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRdpSecurityTitle" Text="{loc:Translate SettingsSectionRdpSecurity}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpSecurityTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <CheckBox x:Name="Mw_SettingsRdpNla" Content="{loc:Translate SettingsLabelRdpNla}" IsChecked="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpDefaultNlaHint}" AutomationProperties.HelpText="{loc:Translate RdpDefaultNlaHint}"/>
                                         <CheckBox x:Name="Mw_SettingsRdpStrictServerAuth" Content="{loc:Translate SettingsLabelRdpStrictServerAuth}" IsChecked="{Binding Settings.RdpDefaultStrictServerAuthentication}" IsEnabled="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpStrictServerAuthHint}" AutomationProperties.HelpText="{loc:Translate RdpStrictServerAuthHint}"/>
                                     </StackPanel>
@@ -3486,6 +3530,9 @@
                                                            FontSize="{StaticResource FontSizeSubtitle}"
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsTrustedRdpCertificatesTitleApplies">
+                                                    <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                                </Border>
                                                 <TextBlock Text="{loc:Translate SettingsRdpTrustedCertificatesSectionHint}"
                                                            Foreground="{DynamicResource TextTertiaryBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"
@@ -3696,6 +3743,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsPinTitle" Text="{loc:Translate SettingsSectionPin}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsPinTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <DockPanel>
                                             <Button x:Name="Mw_SettingsPinConfigureBtn"
                                                     DockPanel.Dock="Right"
@@ -3715,6 +3765,9 @@
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsVaultTitle" Text="{loc:Translate SettingsSectionVault}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsVaultTitleApplies">
+                                            <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
+                                        </Border>
                                         <TextBlock x:Name="Mw_SettingsVaultExplanation" Text="{loc:Translate SettingsVaultExplanation}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,12"/>
                                         <DockPanel>
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -4224,6 +4277,12 @@
                                                 <TextBox Grid.Column="1" Text="{Binding Settings.CmdLibGitSyncAuthorEmail, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="{loc:Translate A11ySettingsCmdLibSyncAuthorEmail}" FontSize="{StaticResource FontSizeBody}"/>
                                             </Grid>
                                         </Grid>
+                                        <TextBlock x:Name="Mw_SettingsCmdLibSyncTokenSavedImmediately"
+                                                   Text="{loc:Translate SettingsCmdLibSyncTokenSavedImmediately}"
+                                                   Foreground="{DynamicResource TextTertiaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,8"/>
                                         <CheckBox x:Name="Mw_SettingsCmdLibSyncOnStartup" Content="{loc:Translate SettingsCmdLibSyncOnStartup}" IsChecked="{Binding Settings.CmdLibGitSyncOnStartup}" Margin="0,4,0,4" FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <CheckBox x:Name="Mw_SettingsCmdLibSyncAutoPush" Content="{loc:Translate SettingsCmdLibSyncAutoPush}" IsChecked="{Binding Settings.CmdLibGitSyncAutoPush}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <Button x:Name="Mw_SettingsCmdLibSyncTestBtn" Content="{loc:Translate SettingsCmdLibSyncTestConnection}" Command="{Binding Settings.TestGitSyncConnectionCommand}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" HorizontalAlignment="Left"
