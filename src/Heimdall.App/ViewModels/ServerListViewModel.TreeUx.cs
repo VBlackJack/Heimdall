@@ -29,13 +29,104 @@ public partial class ServerListViewModel
     public bool ShowSearchContext => !string.IsNullOrWhiteSpace(SearchText);
     public bool HasNoInventory => _allServers.Count == 0;
 
+    /// <summary>
+    /// How long the undo bar offers the last organization change before it withdraws.
+    /// </summary>
+    /// <remarks>
+    /// The bar used to stay until the next change, so a user coming back to it minutes later saw
+    /// "Undo" beside nothing they remembered doing, and one delete-folder later it offered to
+    /// undo a move that was no longer the last thing done.
+    /// </remarks>
+    internal static readonly TimeSpan OrganizationUndoLifetime = TimeSpan.FromSeconds(30);
+
     private bool _resettingTreeFilters;
     private TreeOrganizationHistory? _treeOrganizationHistory;
     private TreeOrganizationHistory OrganizationHistory => _treeOrganizationHistory ??= new(_configManager);
+    private TreeOrganizationChange _lastOrganizationChange;
+    private ITimer? _organizationUndoExpiry;
     public bool CanUndoTreeOrganization => _treeOrganizationHistory?.CanUndo == true;
+
+    /// <summary>What the undo bar says it would undo: the last recorded change, by name.</summary>
+    public string UndoTreeOrganizationText => _localizer[_lastOrganizationChange switch
+    {
+        TreeOrganizationChange.Rename => "TreeUxChangedRename",
+        TreeOrganizationChange.FolderRename => "TreeUxChangedFolderRename",
+        TreeOrganizationChange.FolderMove => "TreeUxChangedFolderMove",
+        TreeOrganizationChange.Reorder => "TreeUxChangedReorder",
+        _ => "TreeUxChangedMove",
+    }];
+
+    /// <summary>
+    /// Withdraws the undo offer, for an organization change the history cannot reverse: left in
+    /// place, the bar would offer to undo an older change as if it were the last one.
+    /// </summary>
+    public void ClearOrganizationUndo()
+    {
+        _organizationUndoExpiry?.Dispose();
+        _organizationUndoExpiry = null;
+        _treeOrganizationHistory?.Clear();
+        OnPropertyChanged(nameof(CanUndoTreeOrganization));
+        UndoTreeOrganizationCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OfferOrganizationUndo(TreeOrganizationChange change)
+    {
+        _lastOrganizationChange = change;
+        OnPropertyChanged(nameof(UndoTreeOrganizationText));
+        _organizationUndoExpiry?.Dispose();
+        _organizationUndoExpiry = _timeProvider.CreateTimer(
+            _ => _ = _uiDispatcher.InvokeAsync(ClearOrganizationUndo),
+            null,
+            OrganizationUndoLifetime,
+            Timeout.InfiniteTimeSpan);
+    }
 
     [RelayCommand]
     private void ClearTreeSearch() => SearchText = "";
+
+    /// <summary>
+    /// Adds sessions to, or removes them from, the favorites from the tree, through the same
+    /// persisted <see cref="ServerProfileDto.IsFavorite"/> flag the server dialog writes.
+    /// </summary>
+    /// <param name="request">The sessions and the state to give them.</param>
+    [RelayCommand]
+    private async Task SetFavoriteAsync(FavoriteChangeRequest? request)
+    {
+        if (request is null || request.Servers.Count == 0)
+        {
+            return;
+        }
+
+        HashSet<string> ids = new(request.Servers.Select(server => server.Id), StringComparer.Ordinal);
+        try
+        {
+            await _configManager.MutateServersAsync(inventory =>
+            {
+                foreach (ServerProfileDto dto in inventory.Where(dto => ids.Contains(dto.Id)))
+                {
+                    dto.IsFavorite = request.IsFavorite;
+                }
+
+                return true;
+            });
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Saving the favorite flag from the tree failed", ex);
+            StatusMessageRequested?.Invoke(_localizer["StatusFavoriteSaveFailed"]);
+            return;
+        }
+
+        foreach (ServerItemViewModel server in _allServers.Where(server => ids.Contains(server.Id)))
+        {
+            server.ApplyFavorite(request.IsFavorite);
+        }
+
+        if (FavoriteFilterEnabled)
+        {
+            ApplyFilter();
+        }
+    }
 
     [RelayCommand]
     private void ResetTreeFilters()
@@ -81,16 +172,28 @@ public partial class ServerListViewModel
     }
 
     /// <summary>Records the latest successful organization change for explicit undo.</summary>
-    public async Task<T> WithOrganizationUndoAsync<T>(Func<Task<T>> operation,
+    /// <param name="change">What the change is, so the undo bar can name it.</param>
+    /// <param name="operation">The change itself.</param>
+    /// <param name="reverseFolder">How to reverse a folder path change, when it is one.</param>
+    /// <param name="serverIds">The sessions whose organization fields the change may touch.</param>
+    public async Task<T> WithOrganizationUndoAsync<T>(
+        TreeOrganizationChange change,
+        Func<Task<T>> operation,
         Func<T, FolderRenamePlan?>? reverseFolder = null,
         IReadOnlyCollection<string>? serverIds = null)
     {
+        int recordedBefore = OrganizationHistory.RecordedCount;
         try
         {
             return await OrganizationHistory.ExecuteAsync(operation, reverseFolder, serverIds);
         }
         finally
         {
+            if (OrganizationHistory.RecordedCount != recordedBefore && OrganizationHistory.CanUndo)
+            {
+                OfferOrganizationUndo(change);
+            }
+
             OnPropertyChanged(nameof(CanUndoTreeOrganization));
             UndoTreeOrganizationCommand.NotifyCanExecuteChanged();
         }
@@ -116,6 +219,8 @@ public partial class ServerListViewModel
         }
         finally
         {
+            _organizationUndoExpiry?.Dispose();
+            _organizationUndoExpiry = null;
             OnPropertyChanged(nameof(CanUndoTreeOrganization));
             UndoTreeOrganizationCommand.NotifyCanExecuteChanged();
         }
@@ -124,3 +229,25 @@ public partial class ServerListViewModel
 
 /// <summary>A removable, accessible active filter.</summary>
 public sealed record TreeFilterChip(string Label, string RemoveAccessibilityName, IRelayCommand RemoveCommand);
+
+/// <summary>Sessions to add to or remove from the favorites.</summary>
+public sealed record FavoriteChangeRequest(IReadOnlyList<ServerItemViewModel> Servers, bool IsFavorite);
+
+/// <summary>The kinds of organization change the undo bar can name.</summary>
+public enum TreeOrganizationChange
+{
+    /// <summary>Sessions moved into another folder.</summary>
+    Move,
+
+    /// <summary>Sessions reordered within their folder.</summary>
+    Reorder,
+
+    /// <summary>A session renamed.</summary>
+    Rename,
+
+    /// <summary>A folder renamed.</summary>
+    FolderRename,
+
+    /// <summary>A folder moved under another parent.</summary>
+    FolderMove,
+}

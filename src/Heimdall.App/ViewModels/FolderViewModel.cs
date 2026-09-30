@@ -186,6 +186,7 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
         _serverCountCache = null;
         SynchronizeChildrenProjection();
         OnPropertyChanged(nameof(ServerCount));
+        OnPropertyChanged(nameof(CountBadgeText));
     }
 
     /// <summary>
@@ -212,6 +213,36 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     public int ServerCount =>
         _serverCountCache ??= Servers.Count + SubFolders.Sum(f => f.ServerCount);
 
+    private int? _filteredTotal;
+
+    /// <summary>
+    /// The count badge the folder row shows: the sessions on screen, followed under a filter by
+    /// how many the folder holds in all.
+    /// </summary>
+    /// <remarks>
+    /// Under a filter the badge used to show the visible count alone, so a folder of forty read
+    /// "2" and looked nearly empty rather than filtered.
+    /// </remarks>
+    public string CountBadgeText => _filteredTotal is int total
+        ? Format("SessionTreeFolderCountFiltered", ServerCount, total)
+        : ServerCount.ToString(System.Globalization.CultureInfo.CurrentCulture);
+
+    /// <summary>
+    /// Records how many sessions the folder holds in all while a filter is on screen, or clears
+    /// it when no filter is.
+    /// </summary>
+    /// <param name="total">The unfiltered descendant count, or <see langword="null"/> with no filter.</param>
+    public void SetFilteredTotal(int? total)
+    {
+        if (_filteredTotal == total)
+        {
+            return;
+        }
+
+        _filteredTotal = total;
+        OnPropertyChanged(nameof(CountBadgeText));
+    }
+
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
 
     partial void OnFullPathChanged(string value) => OnPropertyChanged(nameof(TooltipText));
@@ -222,6 +253,7 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     {
         OnPropertyChanged(nameof(AccessibleName));
         OnPropertyChanged(nameof(AccessibleHelpText));
+        OnPropertyChanged(nameof(CountBadgeText));
     }
 
     private static void SynchronizeCollection<T>(
@@ -304,6 +336,7 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     private static string Fallback(string key) => key switch
     {
         "SessionTreeFolderAccessibleName" => "{0}, folder",
+        "SessionTreeFolderCountFiltered" => "{0}/{1}",
         "SessionTreeFolderAccessibleHelp" =>
             "Folder. Use Left and Right Arrow or Enter to collapse or expand. Press Shift+F10 for actions.",
         _ => key

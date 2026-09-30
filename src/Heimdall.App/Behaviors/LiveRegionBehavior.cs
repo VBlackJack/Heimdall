@@ -55,6 +55,20 @@ public static class LiveRegionBehavior
     public static bool GetAnnounceOnTargetUpdated(DependencyObject element) =>
         (bool)element.GetValue(AnnounceOnTargetUpdatedProperty);
 
+    /// <summary>
+    /// Announces an element whose text code has just set, for a live region with no binding to
+    /// raise TargetUpdated: the drag hint, for one, is written from the drag handlers.
+    /// </summary>
+    /// <param name="element">An element with <c>AnnounceOnTargetUpdated</c> set.</param>
+    public static void Announce(FrameworkElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        if (GetAnnounceOnTargetUpdated(element))
+        {
+            QueueAnnouncement(element);
+        }
+    }
+
     private static void OnAnnounceOnTargetUpdatedChanged(
         DependencyObject dependencyObject,
         DependencyPropertyChangedEventArgs e)

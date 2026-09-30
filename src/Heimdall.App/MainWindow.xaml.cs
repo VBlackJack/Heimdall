@@ -211,6 +211,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             }
         };
         viewModel.ServerList.PropertyChanged += _serverListPropertyChangedHandler;
+
+        // A selection a search or a collapsed folder had hidden comes back on the view model;
+        // WPF's own row selection has to follow, and the row has to scroll into view.
+        viewModel.ServerList.HiddenSelectionRestored += RestoreTreeSelectionRow;
         _toolContext.SetSelectedServer(viewModel.ServerList.SelectedServer);
 
         _selectedExternalToolPropertyChangedHandler = (_, _) =>
@@ -315,6 +319,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         PreviewMouseDown += OnWindowPreviewMouseDown;
         CommandPalettePopup.Closed += OnCommandPaletteClosed;
         Mw_FilterBox.TextChanged += OnFilterBoxTextChanged;
+        WireSessionFilterKeys();
     }
 
     /// <summary>
@@ -3912,6 +3917,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             if (_localeChangedHandler is not null)
                 vm.GetLocalizer().LocaleChanged -= _localeChangedHandler;
             vm.ToolsTab.SectionsInvalidated -= OnToolsTabSectionsInvalidated;
+            vm.ServerList.HiddenSelectionRestored -= RestoreTreeSelectionRow;
         }
 
         _fileShareService.SharingStarted -= OnFileShareSharingStarted;
