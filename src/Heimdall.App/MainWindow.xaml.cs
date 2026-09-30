@@ -128,6 +128,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private System.ComponentModel.PropertyChangedEventHandler? _settingsPropertyChangedHandler;
     private Action<bool>? _fileShareTftpSavedHandler;
     private Action? _settingsLoadedHandler;
+    private Action<string>? _invalidFieldFocusHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _selectedExternalToolPropertyChangedHandler;
     private Action? _externalToolsChangedHandler;
     private Action<string>? _localeChangedHandler;
@@ -241,6 +242,13 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         _settingsLoadedHandler = () => Dispatcher.BeginInvoke(() => PopulateCredentialProviderUnlockSecret(viewModel));
         viewModel.Settings.SettingsLoaded += _settingsLoadedHandler;
+
+        // A refused save takes the user to the first field in error rather than leaving them to
+        // hunt for it across six tabs from a banner that names it.
+        _invalidFieldFocusHandler = property => Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() => FocusSettingsField(property)));
+        viewModel.Settings.InvalidFieldFocusRequested += _invalidFieldFocusHandler;
         AttachSelectedExternalToolPreviewTracking(viewModel.Settings.SelectedExternalTool);
 
         // Refresh Tools tab and Settings status when background scan discovers external tools
@@ -1528,6 +1536,78 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (element is System.Windows.Controls.Control control)
         {
             control.Background = background;
+        }
+    }
+
+    /// <summary>Takes keyboard focus to the settings box bound to <paramref name="property"/>.</summary>
+    private void FocusSettingsField(string property)
+    {
+        if (FindSettingsField(Mw_SettingsSubTabControl, property) is not { } box)
+        {
+            return;
+        }
+
+        RevealSettingsElement(box);
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                box.BringIntoView();
+                box.Focus();
+                Keyboard.Focus(box);
+            }));
+    }
+
+    /// <summary>
+    /// Finds the settings text box whose Text is bound to <c>Settings.</c><paramref name="property"/>.
+    /// </summary>
+    /// <remarks>
+    /// Walks the logical tree, which holds the content of tabs that have never been shown; the
+    /// visual tree of an unselected tab does not exist yet.
+    /// </remarks>
+    internal static System.Windows.Controls.TextBox? FindSettingsField(DependencyObject root, string property)
+    {
+        string path = Converters.SettingsFieldErrorConverter.SettingsPathPrefix + property;
+        if (root is System.Windows.Controls.TextBox box
+            && string.Equals(
+                System.Windows.Data.BindingOperations
+                    .GetBindingExpression(box, System.Windows.Controls.TextBox.TextProperty)?
+                    .ParentBinding.Path?.Path,
+                path,
+                StringComparison.Ordinal))
+        {
+            return box;
+        }
+
+        foreach (object child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is DependencyObject node && FindSettingsField(node, property) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Makes a settings element reachable: selects every tab that holds it and opens every
+    /// expander it sits in.
+    /// </summary>
+    internal static void RevealSettingsElement(DependencyObject element)
+    {
+        for (DependencyObject? node = LogicalTreeHelper.GetParent(element);
+            node is not null;
+            node = LogicalTreeHelper.GetParent(node))
+        {
+            if (node is TabItem tab)
+            {
+                tab.IsSelected = true;
+            }
+            else if (node is Expander expander)
+            {
+                expander.IsExpanded = true;
+            }
         }
     }
 
@@ -3903,6 +3983,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 vm.Settings.FileShareTftpSaved -= _fileShareTftpSavedHandler;
             if (_settingsLoadedHandler is not null)
                 vm.Settings.SettingsLoaded -= _settingsLoadedHandler;
+            if (_invalidFieldFocusHandler is not null)
+                vm.Settings.InvalidFieldFocusRequested -= _invalidFieldFocusHandler;
             if (_trackedExternalToolForPreview is not null
                 && _selectedExternalToolPropertyChangedHandler is not null)
             {

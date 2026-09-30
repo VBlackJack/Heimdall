@@ -2258,7 +2258,38 @@
             <!-- ============================================================ -->
             <!-- SETTINGS TAB: top sub-tabs with search                        -->
             <!-- ============================================================ -->
-            <Grid Visibility="{Binding IsSettingsTabSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Grid x:Name="Mw_SettingsRoot"
+                  Visibility="{Binding IsSettingsTabSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.Resources>
+                    <converters:SettingsFieldErrorConverter x:Key="SettingsFieldErrorConverter"/>
+                    <!-- A settings box in error says why, to the eye and to a screen reader. A red
+                         border alone told neither which rule the value broke nor, when the error
+                         came from a range, what range. -->
+                    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+                        <Style.Triggers>
+                            <Trigger Property="Validation.HasError" Value="True">
+                                <Setter Property="ToolTip">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource SettingsFieldErrorConverter}">
+                                            <Binding RelativeSource="{RelativeSource Self}" Path="(Validation.Errors)[0].ErrorContent"/>
+                                            <Binding RelativeSource="{RelativeSource AncestorType=Window}" Path="DataContext.Settings"/>
+                                            <Binding RelativeSource="{RelativeSource Self}"/>
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="AutomationProperties.HelpText">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource SettingsFieldErrorConverter}">
+                                            <Binding RelativeSource="{RelativeSource Self}" Path="(Validation.Errors)[0].ErrorContent"/>
+                                            <Binding RelativeSource="{RelativeSource AncestorType=Window}" Path="DataContext.Settings"/>
+                                            <Binding RelativeSource="{RelativeSource Self}"/>
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Resources>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -2325,13 +2356,21 @@
                                                Foreground="{DynamicResource ErrorTextBrush}"
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding Settings.ValidationSummary}"
+                                    <!-- Assertive, and raised through the live-region helper: a save
+                                         refused by validation has to be heard at once, and the
+                                         LiveSetting property alone raises nothing when the text
+                                         changes while the banner is collapsed. -->
+                                    <TextBlock x:Name="Mw_SettingsValidationBannerText"
+                                               Grid.Column="1"
+                                               Text="{Binding Settings.ValidationSummary, NotifyOnTargetUpdated=True}"
                                                Foreground="{DynamicResource ErrorTextBrush}"
                                                FontSize="{StaticResource FontSizeCaption}"
                                                FontWeight="SemiBold"
                                                TextWrapping="Wrap"
-                                               VerticalAlignment="Center"/>
+                                               VerticalAlignment="Center"
+                                               AutomationProperties.Name="{Binding Settings.ValidationSummary}"
+                                               AutomationProperties.LiveSetting="Assertive"
+                                               behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                                 </Grid>
                             </Border>
                         </WrapPanel>

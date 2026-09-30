@@ -1957,6 +1957,65 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.True(await viewModel.TrySaveAsync());
     }
 
+    /// <summary>
+    /// A refused save names the field, marks the box, counts the errors and says where to go.
+    /// </summary>
+    /// <remarks>
+    /// "This setting must be a whole number." named no setting; an out-of-range entry left the box
+    /// itself looking valid because the range was checked on the number and the box is bound to
+    /// the text; and the banner showed the first error alone, so fixing it led to a second refusal
+    /// over a field nobody had pointed at.
+    /// </remarks>
+    [Fact]
+    public async Task RefusedSave_NamesTheFieldMarksTheBoxAndCountsTheErrors()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.MaxEmbeddedSessionsText = "many";
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.Contains(localizer["SettingsLabelMaxEmbeddedSessions"], viewModel.ValidationSummary, StringComparison.Ordinal);
+
+        viewModel.MaxEmbeddedSessionsText = "0";
+        Assert.NotEmpty(viewModel.GetErrors(nameof(SettingsViewModel.MaxEmbeddedSessionsText)).Cast<object>());
+
+        viewModel.TerminalFontSizeText = "big";
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.Contains("2", viewModel.ValidationSummary, StringComparison.Ordinal);
+        Assert.Equal(
+            localizer.Format(
+                "SettingsValidationSummaryCount",
+                2,
+                localizer.Format(
+                    "ValidationSettingsMaxSessions",
+                    SettingRanges.Of(nameof(AppSettings.MaxEmbeddedSessions)).Min,
+                    SettingRanges.Of(nameof(AppSettings.MaxEmbeddedSessions)).Max)),
+            viewModel.ValidationSummary);
+        Assert.Equal(0, config.MergeSettingCallCount);
+    }
+
+    // The window moves focus on this signal; the property is the one the box is bound to, the
+    // text of a number field, so the view can find the box by its binding.
+    [Fact]
+    public async Task RefusedSave_AsksTheViewToFocusTheFirstInvalidBox()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        List<string> requests = [];
+        viewModel.InvalidFieldFocusRequested += requests.Add;
+
+        viewModel.AutoLockIdleMinutesText = "soon";
+        viewModel.TerminalFontSize = int.MaxValue;
+        Assert.False(await viewModel.TrySaveAsync());
+
+        // The error sits on the number; the box the user has to reach is bound to its text.
+        Assert.Equal([nameof(SettingsViewModel.TerminalFontSizeText)], requests);
+        Assert.NotNull(viewModel.DescribeFieldError(nameof(SettingsViewModel.AutoLockIdleMinutesText)));
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

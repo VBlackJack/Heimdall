@@ -1750,6 +1750,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (HasErrors)
         {
+            if (FirstInvalidFieldProperty() is { } firstInvalid)
+            {
+                InvalidFieldFocusRequested?.Invoke(firstInvalid);
+            }
+
             return false;
         }
 
@@ -3633,30 +3638,68 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnSecurityTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasSecurityTabErrors));
 
     /// <summary>
-    /// Validates the text of a settings field that edits a whole number.
+    /// Validates the text of a settings field that edits a whole number: it has to parse, and the
+    /// number it parses to has to sit in the range the edited setting declares.
     /// </summary>
     /// <param name="value">The text currently in the field.</param>
     /// <param name="context">The validation context supplied by the data annotations pipeline.</param>
-    /// <returns>A validation error when the text is not a whole number.</returns>
+    /// <returns>A validation error when the text is not a whole number, or is out of range.</returns>
     /// <remarks>
-    /// The bounds are deliberately not checked here. The number the text commits to keeps its own
-    /// range attribute and its own translated message, so a value that is merely out of range still
-    /// names the bound it missed instead of being reported as not a number at all.
+    /// The box on screen is bound to the text, so only an error on the text reaches it. The range
+    /// used to be checked on the number alone, and an out-of-range entry then left the box looking
+    /// valid while the banner and the badge reported it. The range error raised here is the same
+    /// token the number's own attribute raises, so it is localized by the same map and names the
+    /// same bounds; <see cref="GetLocalizedFieldError"/> holds the number's copy back so the field
+    /// still counts once.
     /// </remarks>
     public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateWholeNumberText(
         string? value,
         ValidationContext context)
     {
-        _ = context;
+        string? memberName = context?.MemberName;
+        string[] members = memberName is null ? [] : [memberName];
 
-        if (TryParseWholeNumber(value, out _))
+        if (!TryParseWholeNumber(value, out int number))
         {
-            return System.ComponentModel.DataAnnotations.ValidationResult.Success;
+            return new System.ComponentModel.DataAnnotations.ValidationResult(
+                "This setting must be a whole number.",
+                members);
         }
 
-        return new System.ComponentModel.DataAnnotations.ValidationResult(
-            "This setting must be a whole number.");
+        if (memberName is not null
+            && RangeOfNumberEditedBy(memberName) is { } range
+            && !range.Range.Accepts(number))
+        {
+            return new System.ComponentModel.DataAnnotations.ValidationResult(range.SettingsPropertyName, members);
+        }
+
+        return System.ComponentModel.DataAnnotations.ValidationResult.Success;
     }
+
+    private const string NumberTextSuffix = "Text";
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SettingRangeOfAttribute?> RangeByTextProperty = new(StringComparer.Ordinal);
+
+    /// <summary>The range declared on the number a text property edits, or null when it declares none.</summary>
+    private static SettingRangeOfAttribute? RangeOfNumberEditedBy(string textPropertyName)
+        => RangeByTextProperty.GetOrAdd(textPropertyName, static name =>
+        {
+            if (!name.EndsWith(NumberTextSuffix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            string numberName = name[..^NumberTextSuffix.Length];
+
+            // The attribute is written on the backing field the generator turns into the property.
+            string fieldName = "_" + char.ToLowerInvariant(numberName[0]) + numberName[1..];
+            System.Reflection.FieldInfo? field = typeof(SettingsViewModel).GetField(
+                fieldName,
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return field is null
+                ? null
+                : (SettingRangeOfAttribute?)Attribute.GetCustomAttribute(field, typeof(SettingRangeOfAttribute));
+        });
 
     /// <summary>Parses the text of a settings field that edits a whole number.</summary>
     /// <remarks>
@@ -3688,7 +3731,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     private static readonly Dictionary<string, string> SettingsValidationKeyMap = new(StringComparer.Ordinal)
     {
-        // Not per-field: every number field raises this one when its text is not a number at all.
+        // Every number field raises this one when its text is not a number at all; the field's
+        // label is formatted into it, see FieldLabelKeyByNumber.
         ["This setting must be a whole number."] = "ValidationSettingsWholeNumber",
     };
 
@@ -3727,6 +3771,37 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.SessionHealthCheckIntervalSeconds)] = "ValidationSettingsHealthCheckInterval",
         [nameof(AppSettings.SessionHealthProbeTimeoutMs)] = "ValidationSettingsHealthProbeTimeout",
         [nameof(AppSettings.SessionHealthMaxConcurrent)] = "ValidationSettingsHealthMaxConcurrent",
+    };
+
+    /// <summary>
+    /// The label key of every number field, so the "not a whole number" message says which field
+    /// it is about. The range messages name their setting already.
+    /// </summary>
+    private static readonly Dictionary<string, string> FieldLabelKeyByNumber = new(StringComparer.Ordinal)
+    {
+        [nameof(MaxEmbeddedSessions)] = "SettingsLabelMaxEmbeddedSessions",
+        [nameof(UpdateCheckIntervalHours)] = "SettingsLabelUpdateInterval",
+        [nameof(TerminalFontSize)] = "SettingsLabelTerminalFontSize",
+        [nameof(AntiIdleInterval)] = "SettingsLabelAntiIdleInterval",
+        [nameof(SshTmoutResetInterval)] = "SettingsLabelSshTmoutReset",
+        [nameof(SshAutoReconnectAttempts)] = "SettingsSshAutoReconnectMaxAttempts",
+        [nameof(TunnelEstablishmentDelayMs)] = "SettingsLabelTunnelDelay",
+        [nameof(RdpConnectWatchdogTimeoutMs)] = "SettingsLabelRdpTimeout",
+        [nameof(ExternalToolTimeoutMs)] = "SettingsLabelExtToolTimeout",
+        [nameof(RdpResizeEnableDelayMs)] = "SettingsLabelRdpResizeEnableDelay",
+        [nameof(RdpArtifactCleanupDelayMs)] = "SettingsLabelRdpArtifactCleanupDelay",
+        [nameof(RdpCredentialAutofillTimeoutMs)] = "SettingsLabelRdpCredentialAutofillTimeout",
+        [nameof(RdpAutoReconnectMaxAttempts)] = "SettingsLabelRdpAutoReconnectMaxAttempts",
+        [nameof(RdpKeepAliveIntervalMs)] = "SettingsLabelRdpKeepAliveInterval",
+        [nameof(RdpHostPoolCapacity)] = "SettingsLabelRdpHostPoolCapacity",
+        [nameof(RdpHostPoolIdleExpiryMinutes)] = "SettingsLabelRdpHostPoolIdleExpiry",
+        [nameof(SessionHealthCheckIntervalSeconds)] = "SettingsLabelSessionHealthCheckInterval",
+        [nameof(SessionHealthProbeTimeoutMs)] = "SettingsLabelSessionHealthProbeTimeout",
+        [nameof(SessionHealthMaxConcurrent)] = "SettingsLabelSessionHealthMaxConcurrent",
+        [nameof(DefaultResolutionWidth)] = "SettingsLabelRdpWidth",
+        [nameof(DefaultResolutionHeight)] = "SettingsLabelRdpHeight",
+        [nameof(WindowsHelloGraceMinutes)] = "SettingsLabelWindowsHelloGrace",
+        [nameof(AutoLockIdleMinutes)] = "SettingsAutoLockLabel",
     };
 
     private static readonly string[] GeneralValidatedSettingPropertyNames =
@@ -3884,7 +3959,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (SettingsValidationKeyMap.TryGetValue(message, out var key))
         {
-            return _localizer[key];
+            string number = propertyName.EndsWith(NumberTextSuffix, StringComparison.Ordinal)
+                ? propertyName[..^NumberTextSuffix.Length]
+                : propertyName;
+            string label = FieldLabelKeyByNumber.TryGetValue(number, out string? labelKey)
+                ? _localizer[labelKey]
+                : _localizer["SettingsValidationUnnamedField"];
+            return _localizer.Format(key, label);
         }
 
         if (message.StartsWith(ResolutionPresetsErrorPrefix, StringComparison.Ordinal))
@@ -3917,17 +3998,62 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpTabErrorCount = CountValidationErrors(RdpValidatedSettingPropertyNames);
         SecurityTabErrorCount = CountValidationErrors(SecurityValidatedSettingPropertyNames);
 
-        string? firstError = GetFirstLocalizedFieldError(GeneralValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(TerminalValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(SshValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(RdpValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(SecurityValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(AdvancedValidatedSettingPropertyNames);
+        string? firstInvalid = FirstInvalidProperty();
+        string? firstError = firstInvalid is null ? null : GetLocalizedFieldError(firstInvalid);
+        int errorCount = GeneralTabErrorCount + TerminalTabErrorCount + SshTabErrorCount
+            + AdvancedTabErrorCount + RdpTabErrorCount + SecurityTabErrorCount;
 
         // Field errors keep precedence: a save never reaches the external tools while one stands.
-        ValidationSummary = firstError ?? _externalToolsValidationError;
+        // With several, the banner says how many: showing only the first read as "fix this one
+        // and you are done", and the next Save then refused again over a field nobody had named.
+        ValidationSummary = firstError is null
+            ? _externalToolsValidationError
+            : errorCount > 1
+                ? _localizer.Format("SettingsValidationSummaryCount", errorCount, firstError)
+                : firstError;
         HasValidationErrors = ValidationSummary is not null;
     }
+
+    /// <summary>The first property in error, in tab order, or null when there is none.</summary>
+    private string? FirstInvalidProperty()
+    {
+        foreach (string[] tab in AllValidatedSettingPropertyNames)
+        {
+            foreach (string propertyName in tab)
+            {
+                if (GetLocalizedFieldError(propertyName) is not null)
+                {
+                    return propertyName;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The property of the first field in error, in tab order, named as the box on screen binds it:
+    /// the text of a number field rather than the number.
+    /// </summary>
+    internal string? FirstInvalidFieldProperty()
+    {
+        string? propertyName = FirstInvalidProperty();
+        return propertyName is not null && NumbersEditedThroughText.Contains(propertyName)
+            ? propertyName + NumberTextSuffix
+            : propertyName;
+    }
+
+    /// <summary>
+    /// The localized message for the error a settings box shows, for its tooltip and its
+    /// accessible help text. Null when the property holds no error.
+    /// </summary>
+    public string? DescribeFieldError(string propertyName) => GetLocalizedFieldError(propertyName);
+
+    /// <summary>
+    /// Raised when a save is refused over a field error, with the property the first field in
+    /// error is bound to, so the view can take the user there.
+    /// </summary>
+    public event Action<string>? InvalidFieldFocusRequested;
 
     private int CountValidationErrors(string[] propertyNames)
     {
@@ -3941,20 +4067,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
 
         return count;
-    }
-
-    private string? GetFirstLocalizedFieldError(string[] propertyNames)
-    {
-        foreach (string propertyName in propertyNames)
-        {
-            string? error = GetLocalizedFieldError(propertyName);
-            if (error is not null)
-            {
-                return error;
-            }
-        }
-
-        return null;
     }
 
     /// <summary>
