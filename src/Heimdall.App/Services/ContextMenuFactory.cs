@@ -92,7 +92,7 @@ public sealed class ContextMenuFactory
         var renameItem = new MenuItem
         {
             Header = vm.Localize("TreeCtxRename"),
-            InputGestureText = "F2"
+            InputGestureText = vm.Localize("TreeCtxGestureRename")
         };
         renameItem.Click += (_, _) => callbacks.BeginInlineRename(server);
         menu.Items.Add(renameItem);
@@ -100,7 +100,7 @@ public sealed class ContextMenuFactory
             vm.Localize("TreeCtxEdit"),
             vm.ServerList.EditServerCommand,
             server,
-            inputGestureText: "Ctrl+E"));
+            inputGestureText: vm.Localize("TreeCtxGestureEdit")));
         menu.Items.Add(CreateMenuItem(
             vm.Localize("TreeCtxDuplicate"),
             vm.ServerList.DuplicateServerCommand,
@@ -112,11 +112,18 @@ public sealed class ContextMenuFactory
             vm.Localize("TreeCtxCopyHostname"),
             vm.ServerList.CopyHostnameCommand,
             server));
-        menu.Items.Add(CreateMenuItem(
+        bool hasUsername = !string.IsNullOrWhiteSpace(server.Username);
+        MenuItem copyUsername = CreateMenuItem(
             vm.Localize("TreeCtxCopyUsername"),
             vm.ServerList.CopyUsernameCommand,
             server,
-            !string.IsNullOrWhiteSpace(server.Username)));
+            hasUsername);
+        if (!hasUsername)
+        {
+            ExplainDisabled(copyUsername, vm.Localize("TreeCtxCopyUsernameDisabledReason"));
+        }
+
+        menu.Items.Add(copyUsername);
         menu.Items.Add(CreateMenuItem(
             vm.Localize("TreeCtxCopyAddress"),
             vm.ServerList.CopyAddressCommand,
@@ -172,7 +179,7 @@ public sealed class ContextMenuFactory
             vm.Localize("TreeCtxDelete"),
             vm.ServerList.DeleteServerCommand,
             server,
-            inputGestureText: "Ctrl+Del");
+            inputGestureText: vm.Localize("TreeCtxGestureDelete"));
         ApplyDestructiveForeground(deleteItem);
         menu.Items.Add(deleteItem);
 
@@ -214,7 +221,7 @@ public sealed class ContextMenuFactory
         var deleteItem = CreateMenuItem(
             string.Format(vm.Localize("TreeCtxDeleteSelected"), selectionCount),
             vm.ServerList.DeleteSelectedCommand,
-            inputGestureText: "Del");
+            inputGestureText: vm.Localize("TreeCtxGestureDelete"));
         ApplyDestructiveForeground(deleteItem);
         menu.Items.Add(deleteItem);
 
@@ -326,6 +333,10 @@ public sealed class ContextMenuFactory
             Header = vm.Localize("TreeCtxOpenInSplit"),
             IsEnabled = hasActiveSession
         };
+        if (!hasActiveSession)
+        {
+            ExplainDisabled(submenu, vm.Localize("TreeCtxOpenInSplitDisabledReason"));
+        }
 
         submenu.Items.Add(CreateOpenInSplitItem(
             vm, server, "OrientationHorizontal", Core.Models.SplitOrientation.Horizontal, hasActiveSession));
@@ -400,7 +411,7 @@ public sealed class ContextMenuFactory
         var renameItem = new MenuItem
         {
             Header = vm.Localize("TreeCtxRename"),
-            InputGestureText = "F2"
+            InputGestureText = vm.Localize("TreeCtxGestureRename")
         };
         renameItem.Click += (_, _) => callbacks.BeginInlineRename(tool);
         menu.Items.Add(renameItem);
@@ -561,7 +572,7 @@ public sealed class ContextMenuFactory
             var renameItem = new MenuItem
             {
                 Header = vm.Localize("TreeCtxRename"),
-                InputGestureText = "F2"
+                InputGestureText = vm.Localize("TreeCtxGestureRename")
             };
             renameItem.Click += (_, _) => callbacks.BeginInlineRename(folder);
             menu.Items.Add(renameItem);
@@ -574,30 +585,69 @@ public sealed class ContextMenuFactory
                 Header = vm.Localize("TreeCtxDeleteGroup")
             };
             ApplyDestructiveForeground(deleteItem);
-            deleteItem.Click += async (_, _) =>
-            {
-                int affectedEntryCount =
-                    vm.ServerList.GetCanonicalFolderEntryCount(folder.FullPath);
-                bool confirmed = await vm.DialogService.ShowConfirmAsync(
-                    vm.Localize("TreeCtxDeleteGroup"),
-                    string.Format(
-                        vm.Localize("TreeCtxDeleteGroupConfirm"),
-                        folder.Name,
-                        affectedEntryCount),
-                    "warning");
-
-                if (!confirmed) return;
-
-                FolderDeletionService deletionService = new(vm.ConfigManager);
-                FolderDeletionResult result = await deletionService.DeleteAsync(
-                    folder.FullPath,
-                    vm.ServerList.FlushExpandStateForCloseAsync);
-                vm.ServerList.LoadServers(result.Servers, result.Settings);
-            };
+            deleteItem.Click += async (_, _) => await DeleteFolderFromMenuAsync(
+                vm,
+                folder,
+                path => new FolderDeletionService(vm.ConfigManager).DeleteAsync(
+                    path,
+                    vm.ServerList.FlushExpandStateForCloseAsync));
             menu.Items.Add(deleteItem);
         }
 
         return menu;
+    }
+
+    /// <summary>
+    /// Confirms and deletes a folder from its context menu, reporting a failure on the status
+    /// line instead of letting it escape the click handler.
+    /// </summary>
+    /// <param name="vm">The shell view model.</param>
+    /// <param name="folder">The folder to delete.</param>
+    /// <param name="delete">Deletes the folder at a path and returns the reloaded inventory.</param>
+    /// <remarks>
+    /// The handler was an async lambda with nothing around it, so a failure - a locked settings
+    /// file, a dialog that threw - left an unobserved exception on an async void and said nothing.
+    /// A deletion is also not something the organization undo can reverse: it would put the
+    /// sessions back but not the folder's own entry, colour and defaults, an undo that looks
+    /// complete and is not. Rather than offer that, a completed deletion withdraws the undo bar,
+    /// which would otherwise go on offering to undo the change made before it as if it were the
+    /// last one.
+    /// </remarks>
+    internal static async Task DeleteFolderFromMenuAsync(
+        MainViewModel vm,
+        FolderViewModel folder,
+        Func<string, Task<FolderDeletionResult>> delete)
+    {
+        ArgumentNullException.ThrowIfNull(vm);
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(delete);
+
+        try
+        {
+            int affectedEntryCount =
+                vm.ServerList.GetCanonicalFolderEntryCount(folder.FullPath);
+            bool confirmed = await vm.DialogService.ShowConfirmAsync(
+                vm.Localize("TreeCtxDeleteGroup"),
+                string.Format(
+                    vm.Localize("TreeCtxDeleteGroupConfirm"),
+                    folder.Name,
+                    affectedEntryCount),
+                "warning");
+
+            if (!confirmed)
+            {
+                return;
+            }
+
+            FolderDeletionResult result = await delete(folder.FullPath);
+            vm.ServerList.ClearOrganizationUndo();
+            vm.ServerList.LoadServers(result.Servers, result.Settings);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Folder deletion from the tree menu failed", ex);
+            vm.StatusText = string.Format(vm.Localize("StatusFolderDeleteFailed"), folder.Name);
+        }
     }
 
     /// <summary>
@@ -621,23 +671,141 @@ public sealed class ContextMenuFactory
         topLevel.Click += async (_, _) => await callbacks.MoveFolderAsync(folder, null);
         item.Items.Add(topLevel);
 
-        foreach (GroupTarget group in vm.ServerList.GetGroupTargets(includeNoGroup: false))
-        {
-            if (FolderPath.IsSelfOrDescendant(group.GroupName, folder.FullPath))
+        AddFolderTargets(
+            item.Items,
+            vm,
+            vm.ServerList.GetGroupTargets(includeNoGroup: false).Select(group => group.GroupName),
+            path => !FolderPath.IsSelfOrDescendant(path, folder.FullPath),
+            (path, header) =>
             {
-                continue;
-            }
-
-            MenuItem child = new()
-            {
-                Header = group.DisplayName,
-                IsEnabled = !string.Equals(group.GroupName, currentParent, StringComparison.OrdinalIgnoreCase)
-            };
-            child.Click += async (_, _) => await callbacks.MoveFolderAsync(folder, group.GroupName);
-            item.Items.Add(child);
-        }
+                MenuItem child = new()
+                {
+                    Header = header,
+                    IsEnabled = !string.Equals(path, currentParent, StringComparison.OrdinalIgnoreCase)
+                };
+                child.Click += async (_, _) => await callbacks.MoveFolderAsync(folder, path);
+                return child;
+            });
 
         return item;
+    }
+
+    /// <summary>
+    /// Adds a folder picker to a menu as nested submenus that mirror the folder tree, rather than
+    /// one flat list of full paths.
+    /// </summary>
+    /// <param name="items">The menu level to fill.</param>
+    /// <param name="vm">The shell view model, for the "into this folder" wording.</param>
+    /// <param name="paths">Every folder path a target may name.</param>
+    /// <param name="include">Whether a folder is offered at all; an excluded folder takes its descendants with it.</param>
+    /// <param name="createTarget">Builds the entry that performs the move into a path, given its header.</param>
+    /// <remarks>
+    /// A flat list of two hundred folders is a menu nobody can use, and it spelled every path out
+    /// in full. Each folder is now one entry under its parent. A folder with children opens a
+    /// submenu whose first entry moves into the folder itself: WPF gives a submenu header no click
+    /// of its own, and the entry keeps the target reachable from the keyboard, Right to open and
+    /// Enter to choose.
+    /// </remarks>
+    internal static void AddFolderTargets(
+        ItemCollection items,
+        MainViewModel vm,
+        IEnumerable<string> paths,
+        Func<string, bool> include,
+        Func<string, string, MenuItem> createTarget)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(vm);
+        ArgumentNullException.ThrowIfNull(paths);
+        ArgumentNullException.ThrowIfNull(include);
+        ArgumentNullException.ThrowIfNull(createTarget);
+
+        foreach (FolderTargetNode node in FolderTargetNode.BuildForest(paths))
+        {
+            AddFolderTarget(items, vm, node, include, createTarget);
+        }
+    }
+
+    private static void AddFolderTarget(
+        ItemCollection items,
+        MainViewModel vm,
+        FolderTargetNode node,
+        Func<string, bool> include,
+        Func<string, string, MenuItem> createTarget)
+    {
+        if (!include(node.FullPath))
+        {
+            return;
+        }
+
+        List<FolderTargetNode> children = node.Children.Where(child => include(child.FullPath)).ToList();
+        if (children.Count == 0)
+        {
+            items.Add(createTarget(node.FullPath, node.Name));
+            return;
+        }
+
+        MenuItem branch = new() { Header = node.Name };
+        MenuItem here = createTarget(
+            node.FullPath,
+            string.Format(vm.Localize("TreeCtxMoveIntoFolder"), node.Name));
+        branch.Items.Add(here);
+        branch.Items.Add(new Separator());
+        foreach (FolderTargetNode child in children)
+        {
+            AddFolderTarget(branch.Items, vm, child, include, createTarget);
+        }
+
+        branch.IsEnabled = branch.Items.OfType<MenuItem>().Any(entry => entry.IsEnabled);
+        items.Add(branch);
+    }
+
+    /// <summary>One folder of the picker, with the folders directly under it.</summary>
+    internal sealed class FolderTargetNode(string name, string fullPath)
+    {
+        public string Name { get; } = name;
+
+        public string FullPath { get; } = fullPath;
+
+        public List<FolderTargetNode> Children { get; } = [];
+
+        /// <summary>
+        /// Builds the folder forest from full paths, creating the intermediate folders a path
+        /// implies and sorting every level the way the tree does.
+        /// </summary>
+        public static List<FolderTargetNode> BuildForest(IEnumerable<string> paths)
+        {
+            List<FolderTargetNode> roots = [];
+            Dictionary<string, FolderTargetNode> byPath = new(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in paths.Where(path => !string.IsNullOrWhiteSpace(path)))
+            {
+                string current = "";
+                List<FolderTargetNode> level = roots;
+                foreach (string segment in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    current = current.Length == 0 ? segment : $"{current}/{segment}";
+                    if (!byPath.TryGetValue(current, out FolderTargetNode? node))
+                    {
+                        node = new FolderTargetNode(segment, current);
+                        byPath.Add(current, node);
+                        level.Add(node);
+                    }
+
+                    level = node.Children;
+                }
+            }
+
+            Sort(roots);
+            return roots;
+        }
+
+        private static void Sort(List<FolderTargetNode> level)
+        {
+            level.Sort((left, right) => DisplayNameOrdering.Comparer.Compare(left.Name, right.Name));
+            foreach (FolderTargetNode node in level)
+            {
+                Sort(node.Children);
+            }
+        }
     }
 
     /// <summary>Side of the colour swatch drawn beside a palette entry.</summary>
@@ -715,7 +883,7 @@ public sealed class ContextMenuFactory
         menu.Items.Add(CreateMenuItem(
             vm.Localize("DialogTitleAddServer"),
             vm.ServerList.AddServerCommand,
-            inputGestureText: "Ctrl+N"));
+            inputGestureText: vm.Localize("TreeCtxGestureAddServer")));
         menu.Items.Add(CreateMenuItem(
             vm.Localize("BtnAddGateway"),
             vm.Settings.AddGatewayOutsidePanelCommand));
@@ -732,64 +900,81 @@ public sealed class ContextMenuFactory
     }
 
     /// <summary>
-    /// Creates the "Add Tool" menu item that invokes
-    /// <see cref="IContextMenuCallbacks.AddToolFromMenu"/> with the supplied
-    /// folder path as the target group.
-    /// </summary>
-    /// <summary>
     /// Creates a folder from a context menu, asking the same question and giving the same answers
     /// as the Add menu.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Both call sites used to inline their own rule: an EmptyGroups membership test with no else
     /// branch, so a name that already existed produced a closed dialog and nothing else - and the
     /// test was narrow enough to miss a folder that exists only because sessions carry its path.
     /// The rule now lives once, in MainWindow.ResolveFolderCreation, and all three entry points
     /// share it. Three copies of one decision is how they came to disagree.
+    /// </para>
+    /// <para>
+    /// A failure - a settings file that cannot be read or written - is caught and reported on the
+    /// status line. The click handler that awaits this is async void, and an exception escaping it
+    /// was reported nowhere.
+    /// </para>
     /// </remarks>
-    private static async Task CreateFolderFromMenuAsync(MainViewModel vm, string? parentPath)
+    internal static async Task CreateFolderFromMenuAsync(MainViewModel vm, string? parentPath)
     {
-        string? name = await vm.DialogService.ShowInputAsync(
-            vm.Localize("NewGroupDialogTitle"),
-            vm.Localize("NewGroupFieldName"));
+        ArgumentNullException.ThrowIfNull(vm);
 
-        string? requested = string.IsNullOrWhiteSpace(name)
-            ? name
-            : string.IsNullOrEmpty(parentPath)
-                ? name.Trim()
-                : $"{parentPath}/{name.Trim()}";
-
-        AppSettings settings = await vm.ConfigManager.LoadSettingsAsync();
-        List<ServerProfileDto> servers = await vm.ConfigManager.LoadServersAsync();
-        List<string?> existingPaths =
-            [.. settings.EmptyGroups, .. servers.Select(server => server.Group)];
-
-        (MainWindow.FolderCreationOutcome outcome, string path) =
-            MainWindow.ResolveFolderCreation(requested, existingPaths);
-
-        switch (outcome)
+        try
         {
-            case MainWindow.FolderCreationOutcome.Created:
-                settings = await MainWindow.CommitEmptyFolderAsync(vm.ConfigManager, path);
-                vm.ServerList.LoadServers(servers, settings);
-                vm.StatusText = string.Format(vm.Localize("StatusGroupCreated"), path);
-                break;
+            string? name = await vm.DialogService.ShowInputAsync(
+                vm.Localize("NewGroupDialogTitle"),
+                vm.Localize("NewGroupFieldName"));
 
-            case MainWindow.FolderCreationOutcome.Duplicate:
-                vm.DialogService.ShowWarning(
-                    vm.Localize("NewGroupDialogTitle"),
-                    vm.Localize("RenameGroupErrorSiblingCollision"));
-                break;
+            string? requested = string.IsNullOrWhiteSpace(name)
+                ? name
+                : string.IsNullOrEmpty(parentPath)
+                    ? name.Trim()
+                    : $"{parentPath}/{name.Trim()}";
 
-            case MainWindow.FolderCreationOutcome.Cancelled:
-                break;
+            AppSettings settings = await vm.ConfigManager.LoadSettingsAsync();
+            List<ServerProfileDto> servers = await vm.ConfigManager.LoadServersAsync();
+            List<string?> existingPaths =
+                [.. settings.EmptyGroups, .. servers.Select(server => server.Group)];
 
-            default:
-                throw new InvalidOperationException(
-                    $"Unexpected folder creation outcome: {outcome}.");
+            (MainWindow.FolderCreationOutcome outcome, string path) =
+                MainWindow.ResolveFolderCreation(requested, existingPaths);
+
+            switch (outcome)
+            {
+                case MainWindow.FolderCreationOutcome.Created:
+                    settings = await MainWindow.CommitEmptyFolderAsync(vm.ConfigManager, path);
+                    vm.ServerList.LoadServers(servers, settings);
+                    vm.StatusText = string.Format(vm.Localize("StatusGroupCreated"), path);
+                    break;
+
+                case MainWindow.FolderCreationOutcome.Duplicate:
+                    vm.DialogService.ShowWarning(
+                        vm.Localize("NewGroupDialogTitle"),
+                        vm.Localize("RenameGroupErrorSiblingCollision"));
+                    break;
+
+                case MainWindow.FolderCreationOutcome.Cancelled:
+                    break;
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unexpected folder creation outcome: {outcome}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Folder creation from the tree menu failed", ex);
+            vm.StatusText = vm.Localize("StatusFolderCreateFailed");
         }
     }
 
+    /// <summary>
+    /// Creates the "Add Tool" menu item that invokes
+    /// <see cref="IContextMenuCallbacks.AddToolFromMenu"/> with the supplied
+    /// folder path as the target group.
+    /// </summary>
     private static MenuItem CreateAddToolMenuItem(
         MainViewModel vm,
         IContextMenuCallbacks callbacks,
@@ -811,17 +996,26 @@ public sealed class ContextMenuFactory
             Header = vm.Localize("TreeCtxMoveToGroup")
         };
 
-        foreach (var group in vm.ServerList.GetGroupTargets(includeNoGroup: true))
+        IReadOnlyList<GroupTarget> targets = vm.ServerList.GetGroupTargets(includeNoGroup: true);
+        foreach (GroupTarget group in targets.Where(target => target.IsVirtualGroup))
         {
-            var targetGroupName = string.IsNullOrWhiteSpace(group.GroupName) ? null : group.GroupName;
-            var child = CreateMenuItem(
+            item.Items.Add(CreateMenuItem(
                 group.DisplayName,
                 vm.ServerList.MoveToGroupCommand,
-                new ServerMoveToGroupRequest(server, targetGroupName),
-                !string.Equals(server.Group, group.GroupName, StringComparison.OrdinalIgnoreCase));
-
-            item.Items.Add(child);
+                new ServerMoveToGroupRequest(server, null),
+                !string.IsNullOrWhiteSpace(server.Group)));
         }
+
+        AddFolderTargets(
+            item.Items,
+            vm,
+            targets.Where(target => !target.IsVirtualGroup).Select(target => target.GroupName),
+            static _ => true,
+            (path, header) => CreateMenuItem(
+                header,
+                vm.ServerList.MoveToGroupCommand,
+                new ServerMoveToGroupRequest(server, path),
+                !string.Equals(server.Group, path, StringComparison.OrdinalIgnoreCase)));
 
         return item;
     }
@@ -839,27 +1033,58 @@ public sealed class ContextMenuFactory
             Header = vm.Localize("TreeCtxMoveToGroup")
         };
 
-        var enabledChildren = 0;
-        foreach (var group in vm.ServerList.GetBulkGroupTargets(bulkContext.Items, includeNoGroup: true))
-        {
-            var targetGroupName = string.IsNullOrWhiteSpace(group.GroupName) ? null : group.GroupName;
-            var isEnabled = vm.ServerList.IsBulkMoveTargetEnabled(bulkContext.Items, targetGroupName);
-            if (isEnabled)
-            {
-                enabledChildren++;
-            }
+        AddBulkMoveTargets(item.Items, vm, bulkContext.Items);
+        item.IsEnabled = item.Items.OfType<MenuItem>().Any(child => child.IsEnabled);
+        return item;
+    }
 
-            var child = CreateMenuItem(
+    /// <summary>
+    /// Fills a menu level with every folder a multi-selection can move into, nested like the
+    /// tree: the context menu's submenu and the bulk bar's Move button share it.
+    /// </summary>
+    /// <param name="items">The menu level to fill.</param>
+    /// <param name="vm">The shell view model.</param>
+    /// <param name="selection">The sessions to move.</param>
+    internal static void AddBulkMoveTargets(
+        ItemCollection items,
+        MainViewModel vm,
+        IReadOnlyList<ServerItemViewModel> selection)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(vm);
+        ArgumentNullException.ThrowIfNull(selection);
+
+        IReadOnlyList<GroupTarget> targets = vm.ServerList.GetBulkGroupTargets(selection, includeNoGroup: true);
+        foreach (GroupTarget group in targets.Where(target => target.IsVirtualGroup))
+        {
+            items.Add(CreateMenuItem(
                 group.DisplayName,
                 vm.ServerList.MoveSelectedToGroupCommand,
-                new BulkMoveToGroupRequest(targetGroupName),
-                isEnabled);
-
-            item.Items.Add(child);
+                new BulkMoveToGroupRequest(null),
+                vm.ServerList.IsBulkMoveTargetEnabled(selection, null)));
         }
 
-        item.IsEnabled = enabledChildren > 0;
-        return item;
+        AddFolderTargets(
+            items,
+            vm,
+            targets.Where(target => !target.IsVirtualGroup).Select(target => target.GroupName),
+            static _ => true,
+            (path, header) => CreateMenuItem(
+                header,
+                vm.ServerList.MoveSelectedToGroupCommand,
+                new BulkMoveToGroupRequest(path),
+                vm.ServerList.IsBulkMoveTargetEnabled(selection, path)));
+    }
+
+    /// <summary>
+    /// Says why an entry is disabled, on hover and to assistive technology, instead of leaving a
+    /// greyed item to be puzzled over.
+    /// </summary>
+    private static void ExplainDisabled(MenuItem item, string reason)
+    {
+        item.ToolTip = reason;
+        ToolTipService.SetShowOnDisabled(item, true);
+        System.Windows.Automation.AutomationProperties.SetHelpText(item, reason);
     }
 
     private static MenuItem CreateBulkEditMenu(

@@ -45,16 +45,7 @@ public partial class MainWindow
         if (DataContext is not MainViewModel vm || vm.ServerList.CreateBulkSelectionContext() is not BulkSelectionContext context)
             return;
         ContextMenu menu = new();
-        foreach (GroupTarget group in vm.ServerList.GetBulkGroupTargets(context.Items, includeNoGroup: true))
-        {
-            menu.Items.Add(new MenuItem
-            {
-                Header = group.DisplayName,
-                Command = vm.ServerList.MoveSelectedToGroupCommand,
-                CommandParameter = new BulkMoveToGroupRequest(group.GroupName),
-                IsEnabled = vm.ServerList.IsBulkMoveTargetEnabled(context.Items, group.GroupName),
-            });
-        }
+        ContextMenuFactory.AddBulkMoveTargets(menu.Items, vm, context.Items);
         OpenTreeActionMenu(sender, menu);
     }
 

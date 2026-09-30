@@ -782,9 +782,12 @@ public sealed partial class SessionCoordinatorPreMountTests
             return Task.FromResult<bool?>(false);
         }
 
+        /// <summary>Answers an input prompt instead of echoing its default, when set.</summary>
+        public Func<string?>? InputAnswer { get; set; }
+
         public Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null)
         {
-            return Task.FromResult(defaultValue);
+            return Task.FromResult(InputAnswer is null ? defaultValue : InputAnswer());
         }
 
         public Task<string?> ShowPasswordInputAsync(
