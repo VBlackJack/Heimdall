@@ -78,6 +78,25 @@ public sealed class WinRmCredentialBootstrapTests
     }
 
     [Fact]
+    public void BuildScript_EndsTheHostAtItsFirstLocalPrompt()
+    {
+        ServerProfileDto server = CreateCredentialServer();
+
+        string script = WinRmCredentialBootstrap.BuildScript(server, "dpapi-bootstrap-blob");
+        string[] lines = script.Split("\r\n");
+
+        // The guard is the second statement, so a failed decryption ends the host too; the
+        // entered flag is set only on the line after Enter-PSSession, inside the try.
+        // WinRmLaunchExitGuardExecutionTests runs this script in a real host.
+        Assert.Equal("$ErrorActionPreference = 'Stop'", lines[0]);
+        Assert.Equal(WinRmPowerShellLaunchBuilder.LocalPromptExitGuard, lines[1]);
+        int enterLine = Array.FindIndex(lines, line => line.TrimStart().StartsWith("Enter-PSSession ", StringComparison.Ordinal));
+        Assert.True(enterLine > 1);
+        Assert.Equal("    $global:HeimdallWinRmEntered = $true", lines[enterLine + 1]);
+        Assert.Equal("}", lines[enterLine + 2]);
+    }
+
+    [Fact]
     public void BuildScript_ClearsDpapiBlobInFinallyBlock()
     {
         ServerProfileDto server = CreateCredentialServer();

@@ -33,6 +33,46 @@ internal sealed record WinRmPowerShellLaunchSpec(string Executable, string Argum
 /// </summary>
 internal sealed class WinRmPowerShellLaunchBuilder
 {
+    /// <summary>
+    /// Exit code of the local PowerShell host when the remote session was entered and has ended.
+    /// </summary>
+    internal const int RemoteSessionEndedExitCode = 0;
+
+    /// <summary>
+    /// Exit code of the local PowerShell host when the remote session was never entered.
+    /// </summary>
+    internal const int RemoteSessionNotEnteredExitCode = 1;
+
+    /// <summary>
+    /// Global PowerShell variable set once Enter-PSSession has returned without error.
+    /// </summary>
+    internal const string RemoteSessionEnteredVariable = "$global:HeimdallWinRmEntered";
+
+    /// <summary>Marks the remote session as entered; runs right after Enter-PSSession.</summary>
+    internal const string RemoteSessionEnteredAssignment = RemoteSessionEnteredVariable + " = $true";
+
+    /// <summary>
+    /// Ends the local PowerShell host the first time it would show a LOCAL prompt.
+    /// </summary>
+    /// <remarks>
+    /// The tab is a remote session, so a local prompt is never something to hand the user:
+    /// broadcast, the Command Library and macros would run on this machine under a tab titled
+    /// with the remote host. Enter-PSSession pushes the remote runspace and returns; the rest of
+    /// the command still runs locally, and the host evaluates the prompt in the pushed runspace
+    /// once the command completes. So this local prompt function runs only when no remote
+    /// runspace is pushed: Enter-PSSession failed (exit 1), or the remote session ended through
+    /// a remote <c>exit</c> or a dropped connection (exit 0). A plain <c>; exit</c> after
+    /// Enter-PSSession would end the process before the user ever reached the remote prompt,
+    /// and <c>exit</c> inside the prompt function is not honoured by the host (PSReadLine
+    /// reports an ExitException and the local prompt stays), hence Environment.Exit.
+    /// </remarks>
+    internal static readonly string LocalPromptExitGuard = string.Format(
+        CultureInfo.InvariantCulture,
+        "{0} = $false; function global:prompt {{ if ({0}) {{ [Environment]::Exit({1}) }} [Environment]::Exit({2}) }}",
+        RemoteSessionEnteredVariable,
+        RemoteSessionEndedExitCode,
+        RemoteSessionNotEnteredExitCode);
+
     private readonly Func<string, string?> _findExecutable;
 
     public WinRmPowerShellLaunchBuilder(Func<string, string?>? findExecutable = null)
@@ -78,11 +118,15 @@ internal sealed class WinRmPowerShellLaunchBuilder
                 + QuoteCommandLineArgument(bootstrapScriptPath));
         }
 
-        string command = BuildEnterPSSessionCommand(
-            server,
-            computerName,
-            port,
-            credentialExpression: null);
+        string command = LocalPromptExitGuard
+            + "; "
+            + BuildEnterPSSessionCommand(
+                server,
+                computerName,
+                port,
+                credentialExpression: null)
+            + " -ErrorAction Stop; "
+            + RemoteSessionEnteredAssignment;
         return new WinRmPowerShellLaunchSpec(
             executable,
             "-NoLogo -NoExit -NoProfile -Command "

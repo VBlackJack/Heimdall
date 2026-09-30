@@ -42,6 +42,27 @@ public sealed class WinRmPowerShellLaunchBuilderTests
     }
 
     [Fact]
+    public void Build_CurrentUser_EndsTheHostAtItsFirstLocalPrompt()
+    {
+        WinRmPowerShellLaunchBuilder builder = new WinRmPowerShellLaunchBuilder(FindWindowsPowerShellNameOnly);
+
+        WinRmPowerShellLaunchSpec spec = builder.Build(CreateServer());
+
+        // The guard is defined before Enter-PSSession, a failure of Enter-PSSession ends the
+        // command before the entered flag is set, and the flag is the command's last statement.
+        // WinRmLaunchExitGuardExecutionTests runs this text in a real host.
+        string expectedCommand =
+            WinRmPowerShellLaunchBuilder.LocalPromptExitGuard
+            + "; Enter-PSSession -ComputerName 'server01.contoso.local' -Port 5986 -Authentication Negotiate -UseSSL"
+            + " -ErrorAction Stop; $global:HeimdallWinRmEntered = $true";
+        Assert.Equal("-NoLogo -NoExit -NoProfile -Command \"" + expectedCommand + "\"", spec.Arguments);
+        Assert.Equal(
+            "$global:HeimdallWinRmEntered = $false; function global:prompt { if ($global:HeimdallWinRmEntered) "
+            + "{ [Environment]::Exit(0) } [Environment]::Exit(1) }",
+            WinRmPowerShellLaunchBuilder.LocalPromptExitGuard);
+    }
+
+    [Fact]
     public void Build_WhenPwshMissing_FallsBackToWindowsPowerShellName()
     {
         WinRmPowerShellLaunchBuilder builder = new WinRmPowerShellLaunchBuilder(FindWindowsPowerShellNameOnly);
