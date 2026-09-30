@@ -369,6 +369,40 @@ public sealed class RdpHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task ConnectAsync_EarlierLaunchInFlightForAnotherAccount_RefusesWithoutLaunching()
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            Outcome = Heimdall.Rdp.DomainCredentialWriteOutcome.LaunchInFlightForAnotherAccount
+        };
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        RdpHandler handler = CreateHandler(launcher, credentialManager, localizer);
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateCredentialedServer(),
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.False(result.Success);
+        Assert.Equal(localizer["RdpErrorLaunchInFlightForAnotherAccount"], result.ErrorMessage);
+        Assert.NotEqual("RdpErrorLaunchInFlightForAnotherAccount", result.ErrorMessage);
+        Assert.Equal(1, credentialManager.WriteCalls);
+        Assert.Equal(0, credentialManager.DeleteCalls);
+        Assert.Equal(0, launcher.LaunchCalls);
+    }
+
+    [Fact]
     public async Task ConnectAsync_OwnCredential_InvokesTheAutofillDelegate()
     {
         TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
@@ -1429,6 +1463,9 @@ public sealed class RdpHandlerTests : IDisposable
     {
         public bool CredentialWritten { get; init; }
 
+        /// <summary>When set, the write outcome reported instead of the one CredentialWritten implies.</summary>
+        public Heimdall.Rdp.DomainCredentialWriteOutcome? Outcome { get; init; }
+
         public Exception? DeleteException { get; init; }
 
         public int WriteCalls { get; private set; }
@@ -1452,12 +1489,14 @@ public sealed class RdpHandlerTests : IDisposable
             string username,
             string password,
             string ownershipMarker,
-            out bool credentialWritten,
+            out Heimdall.Rdp.DomainCredentialWriteOutcome outcome,
             out string? error)
         {
             WriteCalls++;
             LastWriteMarker = ownershipMarker;
-            credentialWritten = CredentialWritten;
+            outcome = Outcome ?? (CredentialWritten
+                ? Heimdall.Rdp.DomainCredentialWriteOutcome.Written
+                : Heimdall.Rdp.DomainCredentialWriteOutcome.ExistingEntryKept);
             error = null;
             return true;
         }

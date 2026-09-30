@@ -6644,5 +6644,6 @@
   "GatewayDiagnosticRouteSeparator": " → ",
   "GatewayDiagnosticStepLine": "{0}: {1} ({2} ms)",
   "ErrorGatewayRouteEmpty": "Una ruta de pasarela no puede estar vacía.",
-  "ErrorToolGatewayServicesUnavailable": "Los servicios de pasarela no están disponibles: la conexión se rechaza en lugar de abrirse sin verificación."
+  "ErrorToolGatewayServicesUnavailable": "Los servicios de pasarela no están disponibles: la conexión se rechaza en lugar de abrirse sin verificación.",
+  "RdpErrorLaunchInFlightForAnotherAccount": "Todavía hay un inicio en curso hacia este host con otra cuenta. Vuelva a intentarlo en unos segundos."
 }

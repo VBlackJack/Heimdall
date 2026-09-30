@@ -6643,5 +6643,6 @@
   "GatewayDiagnosticRouteSeparator": " → ",
   "GatewayDiagnosticStepLine": "{0} : {1} ({2} ms)",
   "ErrorGatewayRouteEmpty": "Un itinéraire de passerelle ne peut pas être vide.",
-  "ErrorToolGatewayServicesUnavailable": "Les services de passerelle sont indisponibles : la connexion est refusée plutôt qu'ouverte sans vérification."
+  "ErrorToolGatewayServicesUnavailable": "Les services de passerelle sont indisponibles : la connexion est refusée plutôt qu'ouverte sans vérification.",
+  "RdpErrorLaunchInFlightForAnotherAccount": "Un lancement vers cet h\u00f4te avec un autre compte est encore en cours. R\u00e9essayez dans quelques secondes."
 }
