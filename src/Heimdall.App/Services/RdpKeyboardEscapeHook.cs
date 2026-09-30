@@ -43,12 +43,8 @@ internal static class RdpKeyboardEscapeHook
     private static IntPtr _hookHandle;
     private static uint _hookThreadId;
     private static bool _probeInstalled;
-    private static bool _duplicateShortcutWarningLogged;
-    private static RdpShortcut _escapeShortcut = RdpShortcutParser.DefaultShortcut;
-    private static RdpShortcut _fullscreenShortcut = RdpShortcutParser.DefaultFullscreenShortcut;
 
     internal static Action<bool>? InstallProbe { get; set; }
-    internal static Action<string>? WarningProbe { get; set; }
 
     internal static int RegisteredViewCount
     {
@@ -74,13 +70,10 @@ internal static class RdpKeyboardEscapeHook
         return FindFocusedRdpView() is not null;
     }
 
-    public static bool Register(EmbeddedRdpView view, string? shortcut = null)
-        => Register(view, new RdpHookShortcuts(shortcut, null));
-
-    public static bool Register(EmbeddedRdpView view, RdpHookShortcuts shortcuts)
+    public static bool Register(EmbeddedRdpView view)
     {
         ArgumentNullException.ThrowIfNull(view);
-        return RegisterCore(view, view, shortcuts);
+        return RegisterCore(view, view);
     }
 
     public static void Unregister(EmbeddedRdpView view)
@@ -89,13 +82,10 @@ internal static class RdpKeyboardEscapeHook
         UnregisterCore(view);
     }
 
-    internal static bool RegisterForTests(object viewKey, string? shortcut = null)
-        => RegisterForTests(viewKey, new RdpHookShortcuts(shortcut, null));
-
-    internal static bool RegisterForTests(object viewKey, RdpHookShortcuts shortcuts)
+    internal static bool RegisterForTests(object viewKey)
     {
         ArgumentNullException.ThrowIfNull(viewKey);
-        return RegisterCore(viewKey, null, shortcuts);
+        return RegisterCore(viewKey, null);
     }
 
     internal static void UnregisterForTests(object viewKey)
@@ -112,15 +102,11 @@ internal static class RdpKeyboardEscapeHook
             _hookHandle = IntPtr.Zero;
             _hookThreadId = 0;
             _probeInstalled = false;
-            _duplicateShortcutWarningLogged = false;
-            _escapeShortcut = RdpShortcutParser.DefaultShortcut;
-            _fullscreenShortcut = RdpShortcutParser.DefaultFullscreenShortcut;
             InstallProbe = null;
-            WarningProbe = null;
         }
     }
 
-    private static bool RegisterCore(object viewKey, EmbeddedRdpView? view, RdpHookShortcuts shortcuts)
+    private static bool RegisterCore(object viewKey, EmbeddedRdpView? view)
     {
         lock (SyncRoot)
         {
@@ -128,10 +114,6 @@ internal static class RdpKeyboardEscapeHook
             {
                 return true;
             }
-
-            _escapeShortcut = RdpShortcutParser.ParseOrDefault(shortcuts.EscapeShortcut);
-            _fullscreenShortcut = RdpShortcutParser.ParseFullscreenOrDefault(shortcuts.FullscreenShortcut);
-            WarnOnceIfShortcutsOverlap();
 
             if (RegisteredViews.Count == 0 && !InstallHook())
             {
@@ -223,8 +205,8 @@ internal static class RdpKeyboardEscapeHook
                 var action = RdpKeyboardHookShortcutRouter.Resolve(
                     key,
                     modifiers,
-                    _escapeShortcut,
-                    _fullscreenShortcut);
+                    RdpDefaultShortcuts.ReleaseFocus,
+                    RdpDefaultShortcuts.Fullscreen);
 
                 if (action != RdpKeyboardHookAction.None)
                 {
@@ -264,25 +246,6 @@ internal static class RdpKeyboardEscapeHook
     private static bool IsKeyDown(IntPtr lParam)
     {
         return ((lParam.ToInt64() >> 31) & 1) == 0;
-    }
-
-    private static void WarnOnceIfShortcutsOverlap()
-    {
-        if (_duplicateShortcutWarningLogged || _escapeShortcut != _fullscreenShortcut)
-        {
-            return;
-        }
-
-        LogWarning(
-            "RDP release-focus and fullscreen shortcuts resolve to the same key combination. "
-            + "The release-focus behavior will take precedence.");
-        _duplicateShortcutWarningLogged = true;
-    }
-
-    private static void LogWarning(string message)
-    {
-        WarningProbe?.Invoke(message);
-        FileLogger.Warn(message);
     }
 
     private static ModifierKeys ReadCurrentModifiers()
@@ -457,8 +420,6 @@ internal static class RdpKeyboardEscapeHook
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 }
 
-internal sealed record RdpHookShortcuts(string? EscapeShortcut, string? FullscreenShortcut);
-
 internal enum RdpKeyboardHookAction
 {
     None,
@@ -498,97 +459,15 @@ internal static class RdpKeyboardHookShortcutRouter
     }
 }
 
-internal static class RdpShortcutParser
+/// <summary>
+/// The two shortcuts the hook answers while the embedded RDP surface owns the keyboard. Fixed:
+/// no setting ever reached the configurable path that once parsed replacements for them.
+/// </summary>
+internal static class RdpDefaultShortcuts
 {
-    private static readonly KeyConverter KeyConverter = new();
-    private static readonly ModifierKeysConverter ModifierKeysConverter = new();
+    /// <summary>Ctrl+Alt+Home: hands keyboard focus back to the RDP toolbar.</summary>
+    public static RdpShortcut ReleaseFocus { get; } = new(ModifierKeys.Control | ModifierKeys.Alt, Key.Home);
 
-    public static RdpShortcut DefaultShortcut { get; } = new(ModifierKeys.Control | ModifierKeys.Alt, Key.Home);
-    public static RdpShortcut DefaultFullscreenShortcut { get; } = new(ModifierKeys.None, Key.F11);
-
-    public static RdpShortcut ParseOrDefault(string? shortcut)
-        => ParseOrDefault(
-            shortcut,
-            DefaultShortcut,
-            allowUnmodifiedKey: false,
-            shortcutDescription: "release focus",
-            fallbackDescription: "Ctrl+Alt+Home");
-
-    public static RdpShortcut ParseFullscreenOrDefault(string? shortcut)
-        => ParseOrDefault(
-            shortcut,
-            DefaultFullscreenShortcut,
-            allowUnmodifiedKey: true,
-            shortcutDescription: "fullscreen toggle",
-            fallbackDescription: "F11");
-
-    private static RdpShortcut ParseOrDefault(
-        string? shortcut,
-        RdpShortcut defaultShortcut,
-        bool allowUnmodifiedKey,
-        string shortcutDescription,
-        string fallbackDescription)
-    {
-        if (string.IsNullOrWhiteSpace(shortcut))
-        {
-            return defaultShortcut;
-        }
-
-        try
-        {
-            var parts = shortcut.Split(
-                    '+',
-                    StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                .ToArray();
-            if (parts.Length == 0
-                || (parts.Length < 2 && (shortcut.Contains('+') || !allowUnmodifiedKey)))
-            {
-                return Fallback(shortcut, defaultShortcut, shortcutDescription, fallbackDescription);
-            }
-
-            var modifiers = ModifierKeys.None;
-            for (var index = 0; index < parts.Length - 1; index++)
-            {
-                modifiers |= ParseModifier(parts[index]);
-            }
-
-            if (modifiers == ModifierKeys.None && !allowUnmodifiedKey)
-            {
-                return Fallback(shortcut, defaultShortcut, shortcutDescription, fallbackDescription);
-            }
-
-            if (KeyConverter.ConvertFromInvariantString(parts[^1]) is not Key key || key == Key.None)
-            {
-                return Fallback(shortcut, defaultShortcut, shortcutDescription, fallbackDescription);
-            }
-
-            return new RdpShortcut(modifiers, key);
-        }
-        catch (Exception ex) when (ex is ArgumentException or FormatException or NotSupportedException)
-        {
-            return Fallback(shortcut, defaultShortcut, shortcutDescription, fallbackDescription);
-        }
-    }
-
-    private static ModifierKeys ParseModifier(string value)
-    {
-        var normalized = value.Equals("Ctrl", StringComparison.OrdinalIgnoreCase)
-            ? "Control"
-            : value;
-
-        return ModifierKeysConverter.ConvertFromInvariantString(normalized) is ModifierKeys modifier
-            ? modifier
-            : ModifierKeys.None;
-    }
-
-    private static RdpShortcut Fallback(
-        string shortcut,
-        RdpShortcut defaultShortcut,
-        string shortcutDescription,
-        string fallbackDescription)
-    {
-        FileLogger.Warn(
-            $"Invalid RDP {shortcutDescription} shortcut '{shortcut}'. Falling back to {fallbackDescription}.");
-        return defaultShortcut;
-    }
+    /// <summary>F11: toggles fullscreen.</summary>
+    public static RdpShortcut Fullscreen { get; } = new(ModifierKeys.None, Key.F11);
 }

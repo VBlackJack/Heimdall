@@ -82,23 +82,22 @@ public sealed class RdpKeyboardEscapeHookTests : IDisposable
     }
 
     [Fact]
-    public void Register_DuplicateShortcuts_LogsSingleWarningAndKeepsRegistration()
+    public void DefaultShortcuts_AreCtrlAltHomeAndF11()
     {
-        var installEvents = new List<bool>();
-        var warnings = new List<string>();
-        RdpKeyboardEscapeHook.InstallProbe = installEvents.Add;
-        RdpKeyboardEscapeHook.WarningProbe = warnings.Add;
+        Assert.Equal(new RdpShortcut(ModifierKeys.Control | ModifierKeys.Alt, Key.Home), RdpDefaultShortcuts.ReleaseFocus);
+        Assert.Equal(new RdpShortcut(ModifierKeys.None, Key.F11), RdpDefaultShortcuts.Fullscreen);
+    }
 
-        var shortcuts = new RdpHookShortcuts("Ctrl+Alt+Home", "Ctrl+Alt+Home");
+    [Fact]
+    public void ShortcutRouter_CtrlAltHome_ReleasesFocus()
+    {
+        var action = RdpKeyboardHookShortcutRouter.Resolve(
+            Key.Home,
+            ModifierKeys.Control | ModifierKeys.Alt,
+            RdpDefaultShortcuts.ReleaseFocus,
+            RdpDefaultShortcuts.Fullscreen);
 
-        Assert.True(RdpKeyboardEscapeHook.RegisterForTests(new object(), shortcuts));
-        Assert.True(RdpKeyboardEscapeHook.RegisterForTests(new object(), shortcuts));
-
-        Assert.Equal(2, RdpKeyboardEscapeHook.RegisteredViewCount);
-        Assert.Equal([true], installEvents);
-        Assert.Single(warnings);
-        Assert.Contains("release-focus", warnings[0], StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("precedence", warnings[0], StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(RdpKeyboardHookAction.ReleaseFocus, action);
     }
 
     [Fact]
@@ -107,8 +106,8 @@ public sealed class RdpKeyboardEscapeHookTests : IDisposable
         var action = RdpKeyboardHookShortcutRouter.Resolve(
             Key.K,
             ModifierKeys.Control,
-            RdpShortcutParser.DefaultShortcut,
-            RdpShortcutParser.DefaultFullscreenShortcut);
+            RdpDefaultShortcuts.ReleaseFocus,
+            RdpDefaultShortcuts.Fullscreen);
 
         Assert.Equal(RdpKeyboardHookAction.None, action);
     }
@@ -120,7 +119,7 @@ public sealed class RdpKeyboardEscapeHookTests : IDisposable
             Key.K,
             ModifierKeys.Control,
             new RdpShortcut(ModifierKeys.Control, Key.K),
-            RdpShortcutParser.DefaultFullscreenShortcut);
+            RdpDefaultShortcuts.Fullscreen);
 
         Assert.Equal(RdpKeyboardHookAction.ReleaseFocus, action);
     }
@@ -131,8 +130,8 @@ public sealed class RdpKeyboardEscapeHookTests : IDisposable
         var action = RdpKeyboardHookShortcutRouter.Resolve(
             Key.K,
             ModifierKeys.Control | ModifierKeys.Shift,
-            RdpShortcutParser.DefaultShortcut,
-            RdpShortcutParser.DefaultFullscreenShortcut);
+            RdpDefaultShortcuts.ReleaseFocus,
+            RdpDefaultShortcuts.Fullscreen);
 
         Assert.Equal(RdpKeyboardHookAction.None, action);
     }
@@ -143,8 +142,8 @@ public sealed class RdpKeyboardEscapeHookTests : IDisposable
         var action = RdpKeyboardHookShortcutRouter.Resolve(
             Key.F11,
             ModifierKeys.None,
-            RdpShortcutParser.DefaultShortcut,
-            RdpShortcutParser.DefaultFullscreenShortcut);
+            RdpDefaultShortcuts.ReleaseFocus,
+            RdpDefaultShortcuts.Fullscreen);
 
         Assert.Equal(RdpKeyboardHookAction.ToggleFullscreen, action);
     }

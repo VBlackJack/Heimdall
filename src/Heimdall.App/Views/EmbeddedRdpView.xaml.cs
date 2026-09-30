@@ -1187,8 +1187,8 @@ public partial class EmbeddedRdpView
 
         var body = BuildShortcutsHelpContent(
             localizer,
-            FormatShortcutForDisplay(RdpShortcutParser.DefaultShortcut),
-            FormatShortcutForDisplay(RdpShortcutParser.DefaultFullscreenShortcut));
+            FormatShortcutForDisplay(RdpDefaultShortcuts.ReleaseFocus),
+            FormatShortcutForDisplay(RdpDefaultShortcuts.Fullscreen));
         var title = localizer["RdpShortcutsHelpTitle"];
 
         var dialogService = (Application.Current as App)?.Services
