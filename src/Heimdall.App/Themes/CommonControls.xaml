@@ -121,6 +121,29 @@
     <CornerRadius x:Key="CornerRadiusLg">10</CornerRadius>
     <CornerRadius x:Key="CornerRadiusXl">12</CornerRadius>
 
+    <!-- Design Tokens: Session tree                               -->
+    <!-- Gateway and origin badges on a session row. -->
+    <CornerRadius x:Key="SessionTreeBadgeCornerRadius">3</CornerRadius>
+    <!-- Diameter of the status dot beside a session name. -->
+    <sys:Double x:Key="SessionTreeStatusDotSize">7</sys:Double>
+    <!-- Ring width of a status dot that shows a reachability verdict rather than an open session. -->
+    <sys:Double x:Key="SessionTreeStatusRingThickness">1.5</sys:Double>
+    <sys:Double x:Key="SessionTreeGatewayBadgeMaxWidth">140</sys:Double>
+    <sys:Double x:Key="SessionTreeFilterChipMaxWidth">160</sys:Double>
+    <sys:Double x:Key="SessionTreeDropHintMaxWidth">380</sys:Double>
+    <!-- Hover delays, in milliseconds: the row's summary, then the status dot's own verdict. -->
+    <sys:Int32 x:Key="SessionTreeRowToolTipDelay">150</sys:Int32>
+    <sys:Int32 x:Key="SessionTreeStatusToolTipDelay">200</sys:Int32>
+    <!-- Row outline: transparent at rest, the focus ring when focused, a thick edge for an insertion. -->
+    <Thickness x:Key="SessionTreeRowOutlineThickness">1</Thickness>
+    <Thickness x:Key="SessionTreeInsertBeforeThickness">1,3,1,1</Thickness>
+    <Thickness x:Key="SessionTreeInsertAfterThickness">1,1,1,3</Thickness>
+    <!-- Expander: a 12 px glyph box whose click target reaches 24 px (WCAG 2.5.8) without widening
+         the indent; the overhang is the difference split on each side. -->
+    <sys:Double x:Key="TreeExpanderGlyphBoxSize">12</sys:Double>
+    <sys:Double x:Key="TreeExpanderHitSize">24</sys:Double>
+    <Thickness x:Key="TreeExpanderHitOverhang">-6</Thickness>
+
     <!-- Design Tokens: Opacity                                    -->
     <sys:Double x:Key="OpacityDisabled">0.60</sys:Double>
     <sys:Double x:Key="OpacityReadOnly">0.75</sys:Double>
@@ -1223,30 +1246,41 @@
 
     <Style x:Key="TreeViewExpanderToggleButtonStyle" TargetType="{x:Type ToggleButton}">
         <Setter Property="Focusable" Value="False"/>
-        <Setter Property="Width" Value="12"/>
-        <Setter Property="Height" Value="12"/>
+        <Setter Property="Width" Value="{StaticResource TreeExpanderGlyphBoxSize}"/>
+        <Setter Property="Height" Value="{StaticResource TreeExpanderGlyphBoxSize}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
-                    <Border x:Name="ExpanderBorder"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="{StaticResource CornerRadiusSm}">
-                        <Path x:Name="Arrow"
-                              Width="7"
-                              Height="12"
-                              Data="M 0 0 L 6 6 L 0 12"
-                              Stroke="{DynamicResource TextSecondaryBrush}"
-                              StrokeThickness="1.5"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Center"
-                              RenderTransformOrigin="0.5,0.5">
-                            <Path.RenderTransform>
-                                <RotateTransform Angle="0"/>
-                            </Path.RenderTransform>
-                        </Path>
-                    </Border>
+                    <!-- The transparent grid is the click target: 24 x 24 around a 12 x 12 box.
+                         Its negative margin keeps the layout at 12, so the indent is unchanged;
+                         WPF hit-tests it outside the button's own bounds because nothing clips. -->
+                    <Grid x:Name="ExpanderHitArea"
+                          Width="{StaticResource TreeExpanderHitSize}"
+                          Height="{StaticResource TreeExpanderHitSize}"
+                          Margin="{StaticResource TreeExpanderHitOverhang}"
+                          Background="Transparent">
+                        <Border x:Name="ExpanderBorder"
+                                Width="{StaticResource TreeExpanderGlyphBoxSize}"
+                                Height="{StaticResource TreeExpanderGlyphBoxSize}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{StaticResource CornerRadiusSm}">
+                            <Path x:Name="Arrow"
+                                  Width="7"
+                                  Height="12"
+                                  Data="M 0 0 L 6 6 L 0 12"
+                                  Stroke="{DynamicResource TextSecondaryBrush}"
+                                  StrokeThickness="1.5"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ExpanderBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
@@ -1266,7 +1300,10 @@
     </Style>
 
     <Style x:Key="ThemedTreeViewItemStyle" TargetType="{x:Type TreeViewItem}">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+        <!-- No focus adorner: WPF draws it around the whole item, which for an expanded folder is
+             the folder and its entire subtree. The template's IsKeyboardFocused trigger marks the
+             focused row itself. -->
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
         <Setter Property="Padding" Value="2,1"/>
@@ -1286,6 +1323,7 @@
                                       Grid.Row="0"
                                       Grid.Column="0"
                                       Margin="0,2,2,0"
+                                      Panel.ZIndex="1"
                                       Style="{StaticResource TreeViewExpanderToggleButtonStyle}"
                                       IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
                                       ClickMode="Press"/>
@@ -1324,7 +1362,7 @@
                             <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
                         </Trigger>
                         <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
                             <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>

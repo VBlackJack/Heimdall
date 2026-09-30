@@ -15,6 +15,7 @@
  */
 
 using System.Collections.Frozen;
+using System.Collections.Immutable;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Heimdall.Core.StateMachine;
 
@@ -32,6 +33,17 @@ public sealed record ServerFilterSpec
     public static ServerFilterSpec Empty { get; } = new();
 
     public string NormalizedText { get; init; } = "";
+
+    /// <summary>
+    /// The whitespace-separated words of <see cref="NormalizedText"/>; a session matches only when
+    /// every one of them occurs somewhere in its searchable fields.
+    /// </summary>
+    /// <remarks>
+    /// The query used to be matched as one substring, so "web prod" found nothing for a session
+    /// named web01 filed in the Prod folder: the two words live in different fields and never sit
+    /// side by side. Each word now has to match on its own, anywhere in the joined fields.
+    /// </remarks>
+    public ImmutableArray<string> Tokens { get; init; } = [];
 
     public FrozenSet<string> Protocols { get; init; } = EmptyProtocols;
 
@@ -63,9 +75,11 @@ public sealed record ServerFilterSpec
         string? projectName = null,
         bool gatewayOnly = false)
     {
+        string normalizedText = ServerItemViewModel.NormalizeSearchTerm(text);
         return new ServerFilterSpec
         {
-            NormalizedText = ServerItemViewModel.NormalizeSearchTerm(text),
+            NormalizedText = normalizedText,
+            Tokens = [.. normalizedText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)],
             Protocols = (protocols ?? [])
                 .Where(protocol => !string.IsNullOrWhiteSpace(protocol))
                 .ToFrozenSet(StringComparer.OrdinalIgnoreCase),
@@ -80,10 +94,7 @@ public sealed record ServerFilterSpec
     {
         ArgumentNullException.ThrowIfNull(server);
 
-        return (NormalizedText.Length == 0
-                || server.NormalizedSearchText.Contains(
-                    NormalizedText,
-                    StringComparison.Ordinal))
+        return MatchesEveryToken(server.NormalizedSearchText)
             && (Protocols.Count == 0
                 || Protocols.Contains(server.ConnectionType))
             && (!FavoritesOnly || server.IsFavorite)
@@ -95,6 +106,19 @@ public sealed record ServerFilterSpec
                     server.ProjectName,
                     ProjectName,
                     StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool MatchesEveryToken(string searchable)
+    {
+        foreach (string token in Tokens)
+        {
+            if (!searchable.Contains(token, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 

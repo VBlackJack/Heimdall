@@ -230,17 +230,44 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
 
     public bool IsActiveSession => ConnectionStateSets.IsConnected(ConnectionState);
 
+    /// <summary>
+    /// The session state as the product names it: the tooltip and the spoken row name read this.
+    /// </summary>
+    /// <remarks>
+    /// Only three states used to be translated; every other one reached the tooltip and the screen
+    /// reader as the enum member itself, "LaunchingSsh" or "EstablishingTunnel". The steps a
+    /// connection walks through on its way up are one thing to a user, so they share the
+    /// "connecting" wording.
+    /// </remarks>
     public string ConnectionStateDisplayName =>
-        ConnectionState switch
-        {
-            { } state when string.Equals(state, "Connected", StringComparison.OrdinalIgnoreCase)
-                => T("SessionStatusConnected"),
-            { } state when string.Equals(state, "LaunchedExternalClient", StringComparison.OrdinalIgnoreCase)
-                => T("StatusLaunchedExternalClient"),
-            { } state when string.Equals(state, "RemoteSessionHandedOff", StringComparison.OrdinalIgnoreCase)
-                => T("StatusRemoteSessionHandedOff"),
-            _ => ConnectionState
-        };
+        Enum.TryParse(ConnectionState, ignoreCase: true, out Core.Models.ConnectionState state)
+            ? state switch
+            {
+                Core.Models.ConnectionState.Connected => T("SessionStatusConnected"),
+                Core.Models.ConnectionState.LaunchedExternalClient => T("StatusLaunchedExternalClient"),
+                Core.Models.ConnectionState.RemoteSessionHandedOff => T("StatusRemoteSessionHandedOff"),
+                Core.Models.ConnectionState.Disconnected => T("SessionStatusDisconnected"),
+                Core.Models.ConnectionState.Disconnecting => T("SessionStatusDisconnecting"),
+                Core.Models.ConnectionState.Error => T("SessionStatusError"),
+                _ => T("SessionStatusConnecting"),
+            }
+            : ConnectionState;
+
+    /// <summary>
+    /// The protocol as the product names it - the same name the sidebar's protocol filter shows -
+    /// rather than the persisted token.
+    /// </summary>
+    /// <remarks>
+    /// The spoken name and the tooltip read out "WINRM", "LOCAL" or "TOOL:PING", tokens that
+    /// appear nowhere on screen. The filter checklist was fixed the same way earlier; both now
+    /// resolve through <see cref="ConnectionTypeCatalog.GetDisplayNameKey"/>.
+    /// </remarks>
+    public string ProtocolDisplayName =>
+        ConnectionTypeCatalog.GetDisplayNameKey(ConnectionType) is { } key && _localizer?.HasKey(key) == true
+            ? _localizer[key]
+            : ConnectionTypeCatalog.IsToolConnectionType(ConnectionType)
+                ? T("SessionTreeProtocolTool")
+                : ConnectionType.ToUpperInvariant();
 
     public string ConnectionStateTooltip =>
         ConnectionState switch
@@ -255,6 +282,23 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     public string SidebarDisplayName => SidebarDisplayNameFormatter.Format(DisplayName) ?? "";
 
     /// <summary>
+    /// The second line a row shows under a search: where the session is filed and where it goes.
+    /// </summary>
+    /// <remarks>
+    /// It was a StringFormat of "{0}  {1}" in the markup, which printed two leading spaces before
+    /// the host of every session outside a folder, and hardcoded its separator. Either half is
+    /// now left out when empty, and the separator comes from the locale.
+    /// </remarks>
+    public string SearchContextText =>
+        (string.IsNullOrWhiteSpace(Group), string.IsNullOrWhiteSpace(RemoteServer)) switch
+        {
+            (false, false) => Format("SessionTreeSearchContext", Group, RemoteServer),
+            (false, true) => Group,
+            (true, false) => RemoteServer,
+            _ => "",
+        };
+
+    /// <summary>
     /// Spoken description of the row. Its status half follows the SAME priority as the sidebar
     /// dot - connection state first, health only where the dot itself falls back to health.
     /// </summary>
@@ -265,11 +309,15 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// a user most needs the status. <c>ServerStatusToColorConverter</c> is deliberately left
     /// untouched; its own priority is the correct behaviour, and a coherence test pins the two
     /// together so neither can drift alone.
+    /// <para>
+    /// A favorite says so, right after its name: the row marks it with a star glyph, which a
+    /// screen reader does not read.
+    /// </para>
     /// </remarks>
     public string AccessibleName => Format(
-        "SessionTreeServerAccessibleName",
+        IsFavorite ? "SessionTreeServerAccessibleNameFavorite" : "SessionTreeServerAccessibleName",
         DisplayName,
-        ConnectionType.ToUpperInvariant(),
+        ProtocolDisplayName,
         StatusShowsConnectionState
             ? ConnectionStateDisplayName
             : HealthTooltipText);
@@ -285,14 +333,14 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     public string? AccessibleHelpText => T("SessionTreeServerAccessibleHelp");
 
     /// <summary>
-    /// Hover text for the row, or <see langword="null"/> when the row already shows everything
-    /// there is to say.
+    /// Hover text for the row: its full name, then what the row does not print.
     /// </summary>
     /// <remarks>
-    /// It used to be bound straight to <see cref="DisplayName"/>, which is the one thing the row
-    /// is already printing, so hovering answered a question nobody had. What the row does not
-    /// print is where the session actually goes: the host and port, who it signs in as, and which
-    /// protocol the coloured icon stands for.
+    /// It used to be bound straight to <see cref="DisplayName"/> alone, and then to leave the name
+    /// out altogether. Neither holds once the row trims a long name with an ellipsis to fit the
+    /// sidebar: the hover is then the only place the whole name is read, so it leads, once. The
+    /// lines after it are where the session actually goes: the host and port, who it signs in as,
+    /// and which protocol the coloured icon stands for.
     ///
     /// <para>
     /// The health verdict is deliberately left out. The status dot carries its own tooltip and is
@@ -307,6 +355,11 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         get
         {
             List<string> lines = [];
+
+            if (!string.IsNullOrWhiteSpace(DisplayName))
+            {
+                lines.Add(DisplayName);
+            }
 
             if (!string.IsNullOrWhiteSpace(Endpoint))
             {
@@ -323,7 +376,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
             {
                 lines.Add(Format(
                     "SessionTreeRowTooltipProtocol",
-                    ConnectionType.ToUpperInvariant()));
+                    ProtocolDisplayName));
             }
 
             // With the badge hidden the row no longer says where it routes; the hover does, so
@@ -427,6 +480,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     partial void OnConnectionTypeChanged(string value)
     {
         OnPropertyChanged(nameof(ConnectionTypeBadge));
+        OnPropertyChanged(nameof(ProtocolDisplayName));
         OnPropertyChanged(nameof(AccessibleName));
         OnPropertyChanged(nameof(RowTooltipText));
         InvalidateSearchTextCache();
@@ -434,10 +488,27 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
 
     partial void OnEndpointChanged(string value) => OnPropertyChanged(nameof(RowTooltipText));
 
+    partial void OnIsFavoriteChanged(bool value) => OnPropertyChanged(nameof(AccessibleName));
+
+    /// <summary>
+    /// Takes a favorite flag the inventory has just persisted, keeping the retained DTO in step
+    /// so a later reader of the profile sees the same answer as the row.
+    /// </summary>
+    internal void ApplyFavorite(bool isFavorite)
+    {
+        if (_sourceDto is not null)
+        {
+            _sourceDto.IsFavorite = isFavorite;
+        }
+
+        IsFavorite = isFavorite;
+    }
+
     partial void OnDisplayNameChanged(string value)
     {
         OnPropertyChanged(nameof(SidebarDisplayName));
         OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(RowTooltipText));
         InvalidateSearchTextCache();
     }
 
@@ -465,10 +536,15 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     partial void OnRemoteServerChanged(string value)
     {
         Endpoint = string.IsNullOrEmpty(value) ? "" : (RemotePort > 0 ? $"{value}:{RemotePort}" : value);
+        OnPropertyChanged(nameof(SearchContextText));
         InvalidateSearchTextCache();
     }
 
-    partial void OnGroupChanged(string value) => InvalidateSearchTextCache();
+    partial void OnGroupChanged(string value)
+    {
+        OnPropertyChanged(nameof(SearchContextText));
+        InvalidateSearchTextCache();
+    }
 
     partial void OnEnvironmentChanged(string value) => InvalidateSearchTextCache();
 
@@ -553,8 +629,39 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         return port > 0 ? $"{host}:{port}" : host;
     }
 
-    internal static string NormalizeSearchTerm(string? value) =>
-        value?.Trim().ToUpperInvariant() ?? "";
+    /// <summary>
+    /// Folds a search term or a searchable field to the form both sides are compared in: trimmed,
+    /// upper-cased with the invariant culture, and stripped of its diacritics.
+    /// </summary>
+    /// <remarks>
+    /// Without the fold a folder named with an accent could only be found by typing the accent,
+    /// which a French keyboard makes awkward on capitals and an English one makes impossible. The
+    /// fold decomposes each character (FormD) and drops the combining marks, so the accented and
+    /// the plain spelling meet on the plain one, whichever side carries the accent.
+    /// </remarks>
+    internal static string NormalizeSearchTerm(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        string decomposed = value.Trim().Normalize(System.Text.NormalizationForm.FormD);
+        var folded = new System.Text.StringBuilder(decomposed.Length);
+        foreach (char character in decomposed)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character)
+                != System.Globalization.UnicodeCategory.NonSpacingMark)
+            {
+                folded.Append(character);
+            }
+        }
+
+        return folded
+            .ToString()
+            .Normalize(System.Text.NormalizationForm.FormC)
+            .ToUpperInvariant();
+    }
 
     private void InvalidateSearchTextCache() => _searchTextCacheInvalid = true;
 
@@ -647,6 +754,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionAuthNoneSaved" => "No saved credentials",
         "SessionAuthCurrentUser" => "Current user",
         "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
+        "SessionTreeServerAccessibleNameFavorite" => "{0}, favorite, protocol {1}, state {2}",
         "SessionTreeServerAccessibleHelp" =>
             "Session. Enter opens it, F2 renames it, Ctrl+Space adds it to or removes it from the selection, Shift+Up and Shift+Down extend the selection, Ctrl+A selects every visible session, Alt+Up and Alt+Down move it within its folder, Shift+F10 lists the actions.",
         "SessionTreeRowTooltipHost" => "Host: {0}",
@@ -654,6 +762,12 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionTreeRowTooltipProtocol" => "Protocol: {0}",
         "SessionTreeRowTooltipGateway" => "Gateway: {0}",
         "SessionStatusConnected" => "Connected",
+        "SessionStatusConnecting" => "Connecting...",
+        "SessionStatusDisconnected" => "Disconnected",
+        "SessionStatusDisconnecting" => "Disconnecting...",
+        "SessionStatusError" => "Error",
+        "SessionTreeProtocolTool" => "Tool",
+        "SessionTreeSearchContext" => "{0} \u00B7 {1}",
         "StatusLaunchedExternalClient" => "External client launched",
         "StatusLaunchedExternalClientTooltip" => "The external client was launched.",
         "StatusRemoteSessionHandedOff" => "Session started",

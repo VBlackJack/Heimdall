@@ -26,7 +26,36 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
     private bool _suppressSelectedServerSync;
     private ServerItemViewModel? _selectionAnchor;
 
-    public ObservableCollection<ServerItemViewModel> SelectedItems { get; } = [];
+    /// <summary>
+    /// The selection a filter or a collapsed folder took off the screen, kept by id so it
+    /// survives a reload, until the view shows it again or the user selects something else.
+    /// </summary>
+    private HiddenSelection? _hiddenSelection;
+
+    /// <summary>
+    /// Set while the view, rather than the user, changes the selection, so that change does not
+    /// read as the user moving on from the remembered one.
+    /// </summary>
+    private bool _synchronizingSelection;
+
+    public SessionSelectionCollection SelectedItems { get; } = [];
+
+    /// <summary>
+    /// Raised when a selection a view change had hidden is put back in full, so the tree can
+    /// scroll the restored primary row into view.
+    /// </summary>
+    public event Action<ServerItemViewModel>? HiddenSelectionRestored;
+
+    /// <summary>
+    /// The session the user last chose: the selected one, or the one a filter or a collapsed
+    /// folder is hiding for now.
+    /// </summary>
+    /// <remarks>
+    /// This is what is persisted and what a reload restores. Writing the on-screen selection
+    /// instead recorded a search that happened to hide the session as the user deselecting it,
+    /// and the next start opened on nothing.
+    /// </remarks>
+    internal string? EffectiveSelectedServerId => SelectedServer?.Id ?? _hiddenSelection?.PrimaryId;
 
     public int SelectionCount => SelectedItems.Count;
 
@@ -62,6 +91,18 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
         HasMultiSelection ? _localizer.Format("SessionTreeSelectionCount", SelectionCount) : "";
 
     /// <summary>
+    /// The bulk bar's Connect label, counting what it would open exactly as the context menu's
+    /// "Connect selected (N)" does.
+    /// </summary>
+    /// <remarks>
+    /// The bar said a bare "Connect" beside a selection that may hold tools and folders it will
+    /// skip, so the click's reach was only learnt afterwards. It now carries the same number the
+    /// menu has always shown.
+    /// </remarks>
+    public string BulkConnectText =>
+        _localizer.Format("TreeCtxConnectSelected", GetBulkConnectTargetCount(SelectedItems));
+
+    /// <summary>
     /// Selects every session on screen, in tree order, keeping the current primary when it is
     /// among them.
     /// </summary>
@@ -86,6 +127,7 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(HasMultiSelection));
         OnPropertyChanged(nameof(SelectionCountText));
+        OnPropertyChanged(nameof(BulkConnectText));
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
         MoveSelectedToProjectCommand.NotifyCanExecuteChanged();
@@ -245,20 +287,21 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
         ServerItemViewModel? preferredAnchor,
         bool updateSelectedServer)
     {
+        if (!_synchronizingSelection)
+        {
+            // The user chose something: the selection a view change was holding back is no
+            // longer the one to bring back.
+            _hiddenSelection = null;
+        }
+
         var normalized = NormalizeSelection(requestedItems);
-        var selectedSet = normalized.Count == 0
-            ? new HashSet<ServerItemViewModel>()
-            : normalized.ToHashSet();
+        var selectedSet = new HashSet<ServerItemViewModel>(normalized, ReferenceEqualityComparer.Instance);
 
         List<ServerItemViewModel> previousSelection = SelectedItems.ToList();
 
         // Publish membership before row notifications: automation peers query the host
-        // synchronously when IsSelected changes.
-        SelectedItems.Clear();
-        foreach (ServerItemViewModel item in normalized)
-        {
-            SelectedItems.Add(item);
-        }
+        // synchronously when IsSelected changes. One replacement, one notification.
+        SelectedItems.ReplaceAll(normalized);
 
         foreach (ServerItemViewModel previouslySelected in previousSelection)
         {
@@ -275,13 +318,13 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
 
         var primary = normalized.Count == 0
             ? null
-            : preferredPrimary is not null && normalized.Contains(preferredPrimary)
+            : preferredPrimary is not null && selectedSet.Contains(preferredPrimary)
                 ? preferredPrimary
                 : normalized[^1];
 
         _selectionAnchor = normalized.Count == 0
             ? null
-            : preferredAnchor is not null && normalized.Contains(preferredAnchor)
+            : preferredAnchor is not null && selectedSet.Contains(preferredAnchor)
                 ? preferredAnchor
                 : primary;
 
@@ -304,11 +347,12 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
     private List<ServerItemViewModel> NormalizeSelection(IReadOnlyList<ServerItemViewModel> requestedItems)
     {
         var normalized = new List<ServerItemViewModel>(requestedItems.Count);
-        var seen = new HashSet<ServerItemViewModel>();
+        var seen = new HashSet<ServerItemViewModel>(ReferenceEqualityComparer.Instance);
+        var listed = new HashSet<ServerItemViewModel>(Servers, ReferenceEqualityComparer.Instance);
 
         foreach (var item in requestedItems)
         {
-            if (!Servers.Contains(item) || !seen.Add(item))
+            if (!listed.Contains(item) || !seen.Add(item))
             {
                 continue;
             }
@@ -318,4 +362,134 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
 
         return normalized;
     }
+
+    /// <summary>
+    /// Brings the selection in line with what the tree shows after a filter pass, a collapse or
+    /// an expand, remembering what the view hid and putting it back once it is shown again.
+    /// </summary>
+    /// <param name="preferredSelectedServerId">A session to select when it is visible, used by a reload.</param>
+    /// <remarks>
+    /// A search that hid the selected session used to clear the selection for good: clearing the
+    /// search brought the row back unselected, the detail pane stayed blank, and the close flush
+    /// saved the empty selection over the one the user had made. Collapsing the folder holding the
+    /// selection did the same. A view change now only hides the selection; the user's own choice
+    /// is what replaces it.
+    /// </remarks>
+    private void SynchronizeSelection(string? preferredSelectedServerId)
+    {
+        List<ServerItemViewModel> visibleLeaves = SelectionHelpers
+            .EnumerateVisibleLeaves(GroupedServers)
+            .ToList();
+        var visible = new HashSet<ServerItemViewModel>(visibleLeaves, ReferenceEqualityComparer.Instance);
+
+        ServerItemViewModel? restored;
+        _synchronizingSelection = true;
+        try
+        {
+            restored = SynchronizeSelectionCore(visibleLeaves, visible, preferredSelectedServerId);
+        }
+        finally
+        {
+            _synchronizingSelection = false;
+        }
+
+        if (restored is not null)
+        {
+            HiddenSelectionRestored?.Invoke(restored);
+        }
+    }
+
+    private ServerItemViewModel? SynchronizeSelectionCore(
+        List<ServerItemViewModel> visibleLeaves,
+        HashSet<ServerItemViewModel> visible,
+        string? preferredSelectedServerId)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredSelectedServerId))
+        {
+            ServerItemViewModel? preferred = visibleLeaves.FirstOrDefault(
+                server => string.Equals(server.Id, preferredSelectedServerId, StringComparison.Ordinal));
+
+            if (preferred is not null)
+            {
+                _hiddenSelection = null;
+                SelectSingle(preferred);
+                return null;
+            }
+
+            // Asked for a session the view is hiding - a reload under a filter, or a start with
+            // its folder closed: hold it back rather than forget it.
+            if (_hiddenSelection is null
+                && _allServers.Any(server => string.Equals(server.Id, preferredSelectedServerId, StringComparison.Ordinal)))
+            {
+                _hiddenSelection = new HiddenSelection(
+                    [preferredSelectedServerId],
+                    preferredSelectedServerId,
+                    preferredSelectedServerId);
+            }
+        }
+
+        if (_hiddenSelection is { } hidden)
+        {
+            Dictionary<string, ServerItemViewModel> byId = new(StringComparer.Ordinal);
+            foreach (ServerItemViewModel server in _allServers)
+            {
+                byId.TryAdd(server.Id, server);
+            }
+
+            List<ServerItemViewModel> remembered = hidden.Ids
+                .Select(id => byId.GetValueOrDefault(id))
+                .OfType<ServerItemViewModel>()
+                .ToList();
+            if (remembered.Count > 0)
+            {
+                List<ServerItemViewModel> shown = remembered.Where(visible.Contains).ToList();
+                ServerItemViewModel? primary = shown.FirstOrDefault(server =>
+                    string.Equals(server.Id, hidden.PrimaryId, StringComparison.Ordinal));
+                ServerItemViewModel? anchor = shown.FirstOrDefault(server =>
+                    string.Equals(server.Id, hidden.AnchorId, StringComparison.Ordinal));
+                bool complete = shown.Count == remembered.Count;
+                if (complete)
+                {
+                    _hiddenSelection = null;
+                }
+
+                ApplySelection(shown, primary, anchor, updateSelectedServer: true);
+                return complete ? SelectedServer : null;
+            }
+
+            // Every remembered session is gone from the inventory: nothing is left to restore.
+            _hiddenSelection = null;
+        }
+
+        var visibleSelection = SelectedItems
+            .Where(visible.Contains)
+            .ToList();
+
+        if (visibleSelection.Count < SelectedItems.Count)
+        {
+            _hiddenSelection = new HiddenSelection(
+                SelectedItems.Select(server => server.Id).ToList(),
+                SelectedServer?.Id,
+                _selectionAnchor?.Id);
+        }
+
+        if (visibleSelection.Count == 0)
+        {
+            ClearSelection();
+            return null;
+        }
+
+        var primaryVisible = SelectedServer is not null && visible.Contains(SelectedServer)
+            ? SelectedServer
+            : visibleSelection.LastOrDefault();
+        var anchorVisible = _selectionAnchor is not null && visible.Contains(_selectionAnchor)
+            ? _selectionAnchor
+            : primaryVisible;
+
+        ApplySelection(visibleSelection, primaryVisible, anchorVisible, updateSelectedServer: true);
+        return null;
+    }
+
+    /// <summary>A selection a view change took off the screen, by id.</summary>
+    private sealed record HiddenSelection(IReadOnlyList<string> Ids, string? PrimaryId, string? AnchorId);
 }

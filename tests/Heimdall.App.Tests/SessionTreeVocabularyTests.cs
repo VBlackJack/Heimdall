@@ -79,7 +79,6 @@ public sealed class SessionTreeVocabularyTests
         "TreeCtxDeleteGroupConfirm",
         "TreeCtxMoveToGroup",
         "TreeCtxNewGroup",
-        "TreeCtxRenameGroup",
         "TreeNodeNoGroup",
         "TreeNoGroupDropZoneHint",
         "TreeTooltipGroupCount",
