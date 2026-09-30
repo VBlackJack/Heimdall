@@ -2146,6 +2146,30 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.False(viewModel.IsSysinternalsPathMissing);
     }
 
+    // Save answered with nothing but a button going grey. It now says so, once, and the line goes
+    // with the next edit so it never describes a panel that has changed since.
+    [Fact]
+    public async Task Save_SaysSettingsSaved_UntilTheNextEdit()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer["SettingsSavedAnnouncement"], viewModel.SaveStatusText);
+        Assert.False(viewModel.IsDirty);
+
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+        Assert.Equal(string.Empty, viewModel.SaveStatusText);
+
+        config.FailOnMergeSetting = true;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(string.Empty, viewModel.SaveStatusText);
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

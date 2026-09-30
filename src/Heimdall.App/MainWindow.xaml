@@ -2357,6 +2357,14 @@
                             <Button x:Name="Mw_SettingsResetBtn" Content="{loc:Translate SettingsBtnResetDefaults}" Command="{Binding Settings.ResetToDefaultsCommand}"
                                     Style="{DynamicResource SecondaryButtonStyle}" MinWidth="130" Margin="0,0,8,4"
                                     AutomationProperties.Name="{loc:Translate AccessSettingsReset}"/>
+                            <TextBlock x:Name="Mw_SettingsSavedStatus"
+                                       Text="{Binding Settings.SaveStatusText, NotifyOnTargetUpdated=True}"
+                                       Foreground="{DynamicResource SuccessTextBrush}"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,16,4"
+                                       AutomationProperties.LiveSetting="Polite"
+                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                             <Border x:Name="Mw_SettingsValidationBanner"
                                     MaxWidth="520"
                                     MinHeight="32"

@@ -1764,6 +1764,7 @@
   "SettingsCloseSaveFailedTitle": "Ajustes no guardados",
   "SettingsCloseSaveFailedMessage": "Heimdall no pudo guardar los ajustes. Revisa los errores de validación y vuelve a intentarlo. Si no se muestra ninguno, los detalles están en el registro.",
   "SettingsUnsavedChanges": "Tienes cambios sin guardar",
+  "SettingsSavedAnnouncement": "Ajustes guardados",
   "ProjectColorBlue": "Azul",
   "ProjectColorGreen": "Verde",
   "ProjectColorRed": "Rojo",

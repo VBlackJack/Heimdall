@@ -1862,6 +1862,25 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     }
 
     /// <summary>
+    /// A short confirmation after a successful Save, announced through a live region; empty
+    /// otherwise, and cleared by the next edit.
+    /// </summary>
+    /// <remarks>
+    /// Save used to answer with nothing but a button going grey, which a screen reader does not
+    /// report and a sighted user can miss.
+    /// </remarks>
+    [ObservableProperty]
+    private string _saveStatusText = string.Empty;
+
+    partial void OnIsDirtyChanged(bool value)
+    {
+        if (value)
+        {
+            SaveStatusText = string.Empty;
+        }
+    }
+
+    /// <summary>
     /// Save is offered only when there is something to save. It was always enabled, so pressing it
     /// on a clean panel looked like it did something, and nothing distinguished a panel with edits
     /// pending from one without. Ctrl+S goes through the same gate.
@@ -1894,7 +1913,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             return;
         }
 
-        if (await TrySaveAsync(cancellationToken) || cancellationToken.IsCancellationRequested)
+        if (await TrySaveAsync(cancellationToken))
+        {
+            SaveStatusText = _localizer["SettingsSavedAnnouncement"];
+            return;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
         {
             return;
         }

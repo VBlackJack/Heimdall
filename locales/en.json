@@ -1764,6 +1764,7 @@
   "SettingsCloseSaveFailedTitle": "Settings Not Saved",
   "SettingsCloseSaveFailedMessage": "Heimdall could not save the settings. Review the validation errors, then try again. If none are shown, the details are in the log.",
   "SettingsUnsavedChanges": "You have unsaved changes",
+  "SettingsSavedAnnouncement": "Settings saved",
   "ProjectColorBlue": "Blue",
   "ProjectColorGreen": "Green",
   "ProjectColorRed": "Red",
