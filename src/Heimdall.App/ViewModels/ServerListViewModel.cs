@@ -486,6 +486,19 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         var gatewayMap = BuildGatewayMap(settings);
+
+        // Every row is rebuilt, and a new row starts on the grey "not probed yet" dot while the
+        // next probe may be minutes away, so a move, an undo or a new folder used to grey out
+        // every dot in the tree. The verdicts are carried over by server id instead.
+        Dictionary<string, HealthState> healthById = new(StringComparer.Ordinal);
+        foreach (ServerItemViewModel previous in _allServers)
+        {
+            if (!string.IsNullOrEmpty(previous.Id))
+            {
+                healthById[previous.Id] = previous.HealthState;
+            }
+        }
+
         _allServers = serverDtos
             .Select(dto => ServerItemViewModel.FromDto(
                 dto,
@@ -494,6 +507,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 gatewayMap,
                 _localizer))
             .ToList();
+        foreach (ServerItemViewModel server in _allServers)
+        {
+            if (healthById.TryGetValue(server.Id, out HealthState? health))
+            {
+                server.HealthState = health;
+            }
+        }
+
         RebuildHealthServerIndex();
 
         RefreshLookupCollections(settings);

@@ -197,6 +197,22 @@ public sealed partial class ServerListSelectionTests
         Assert.Equal(1, collectionNotifications);
     }
 
+    [Fact]
+    public async Task Reload_CarriesTheHealthVerdictOverByServerId()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        ServerProfileDto alpha = CreateServer("alpha", "Alpha", "ops");
+        fixture.LoadServers(fixture.ExpandGroups("ops"), alpha);
+        var verdict = new Heimdall.Core.SessionHealth.HealthState(
+            Heimdall.Core.SessionHealth.HealthStatus.Up, DateTime.UtcNow, 12, null);
+        Assert.True(fixture.ViewModel.ApplyServerHealthChange(
+            new Heimdall.App.Services.HealthStateChange("alpha", verdict, 1)));
+
+        fixture.LoadServers(fixture.ExpandGroups("ops"), alpha);
+
+        Assert.Same(verdict, fixture.ServerById("alpha").HealthState);
+    }
+
     private static async Task<LocalizationManager> LoadEnglishLocalizerAsync()
     {
         var localizer = new LocalizationManager();
