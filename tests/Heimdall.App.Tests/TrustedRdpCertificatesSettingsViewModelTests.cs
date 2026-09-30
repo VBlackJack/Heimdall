@@ -666,7 +666,16 @@ public sealed class TrustedRdpCertificatesSettingsViewModelTests
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var rebuilt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.ProfileLoadGate = gate.Task;
-        fixture.ViewModel.Rows.CollectionChanged += (_, _) => rebuilt.TrySetResult();
+        // The rebuild clears the rows before it adds them back, and the clear raises its own
+        // Reset: signalling on that first event let the assertion read the empty list the
+        // rebuild was about to fill. Only the Add of the surviving row marks it rebuilt.
+        fixture.ViewModel.Rows.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
+            {
+                rebuilt.TrySetResult();
+            }
+        };
 
         await fixture.ViewModel.ForgetCommand.ExecuteAsync(
             fixture.ViewModel.Rows.Single(r => r.Thumbprint == "SHA256:AA:BB:01"));
