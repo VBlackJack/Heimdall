@@ -133,6 +133,23 @@ public sealed class WinRmEarlyOutputDiagnosticTests
         Assert.Equal("ErrorWinRmNtlmLoopback", result);
     }
 
+    // The refusal names its help topic, untranslated, in every language (measured on a French
+    // Windows PowerShell 5.1: "voir la rubrique about_Execution_Policies").
+    [Theory]
+    [InlineData("File C:\\Temp\\heimdall_winrm_x.ps1 cannot be loaded. The file is not digitally signed. "
+        + "For more information, see about_Execution_Policies at https://go.microsoft.com/fwlink/?LinkID=135170.")]
+    [InlineData("Impossible de charger le fichier C:\\Temp\\heimdall_winrm_x.ps1. Pour plus d'informations, "
+        + "voir la rubrique about_Execution_Policies.\r\n    + FullyQualifiedErrorId : UnauthorizedAccess")]
+    public void Observe_ExecutionPolicyRefusal_ReturnsKey(string output)
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes(output));
+
+        Assert.Equal("ErrorWinRmExecutionPolicyBlocked", result);
+        Assert.False(diagnostic.IsActive);
+    }
+
     [Fact]
     public void Observe_CleanBannerWithoutPrompt_StaysActive()
     {

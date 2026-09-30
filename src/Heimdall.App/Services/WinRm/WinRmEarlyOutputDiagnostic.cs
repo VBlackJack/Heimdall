@@ -29,6 +29,11 @@ internal sealed class WinRmEarlyOutputDiagnostic
     private const string WsManInvalidResponseCode = "12152";
 
     /// <summary>
+    /// Help topic every execution-policy refusal names, untranslated in every host language.
+    /// </summary>
+    private const string ExecutionPolicyHelpTopic = "about_Execution_Policies";
+
+    /// <summary>
     /// The prompt of an entered remote session, "[host]: PS path>". The colon may be preceded
     /// by a space, as localized hosts write it (measured on a French host: "[Processus :id] : PS").
     /// A bare local "PS path>" is deliberately not a match: it is what the host shows after
@@ -94,6 +99,13 @@ internal sealed class WinRmEarlyOutputDiagnostic
 
     private static string? FindDiagnosticKey(string output)
     {
+        // The credential launch runs a local script; a Group Policy that requires signed
+        // scripts overrides -ExecutionPolicy Bypass and refuses it before it runs.
+        if (output.Contains(ExecutionPolicyHelpTopic, StringComparison.OrdinalIgnoreCase))
+        {
+            return "ErrorWinRmExecutionPolicyBlocked";
+        }
+
         int ntlmCodeIndex = output.IndexOf(NtlmLoopbackCode, StringComparison.OrdinalIgnoreCase);
         if (ntlmCodeIndex >= 0 && ContainsWinRmContextNear(output, ntlmCodeIndex))
         {

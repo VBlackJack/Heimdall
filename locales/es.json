@@ -2260,6 +2260,7 @@
   "ErrorWinRmPreflightTlsFailed": "Falló la conexión TLS de WinRM a \"{0}\" en el puerto {1} (certificado no confiable o error de negociación).",
   "ErrorWinRmNtlmLoopback": "Falló la autenticación WinRM para la identidad de Windows actual. Usa credenciales almacenadas para localhost o hosts fuera del dominio.",
   "ErrorWinRmWsmanInvalidResponse": "WinRM recibió una respuesta WSMan no válida. Si esta sesión usa una pasarela, verifica que WinRM use HTTP a través del túnel.",
+  "ErrorWinRmExecutionPolicyBlocked": "La directiva de ejecución de PowerShell rechazó el script de inicio de sesión de WinRM. Es posible que una directiva de grupo exija scripts firmados: usa la identidad actual de Windows para este host o consulta a tu administrador.",
   "WarnWinRmGatewayKerberos": "WinRM a través de una pasarela: Kerberos no está disponible, la autenticación recurre a NTLM.",
   "WarnWinRmSkipCertificateCheck": "Se omitió la validación del certificado TLS de WinRM para esta sesión.",
 
