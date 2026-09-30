@@ -70,8 +70,11 @@ public sealed class ImportedProfileSanitizerTests
         Assert.Null(exception);
     }
 
+    // Skipping TLS certificate validation is a trust decision about this machine's view of
+    // the host, like ExecutionConfirmed: an imported file must not carry it in, with or without
+    // SSL. The user re-enables it on the profile if the host really needs it.
     [Fact]
-    public void Sanitize_WinRmWithoutSsl_ClearsLatentCertificateSkip()
+    public void Sanitize_WinRm_ClearsCertificateSkipWithAndWithoutSsl()
     {
         var profiles = new List<ServerProfileDto>
         {
@@ -92,7 +95,8 @@ public sealed class ImportedProfileSanitizerTests
         ImportedProfileSanitizer.Sanitize(profiles);
 
         Assert.False(profiles[0].WinRmSkipCertificateCheck);
-        Assert.True(profiles[1].WinRmSkipCertificateCheck);
+        Assert.False(profiles[1].WinRmSkipCertificateCheck);
+        Assert.True(profiles[1].WinRmUseSsl);
     }
 
     [Fact]
