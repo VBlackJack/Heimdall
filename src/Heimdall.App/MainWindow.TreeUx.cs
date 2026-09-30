@@ -202,8 +202,16 @@ public partial class MainWindow
 
     private void SetTreeDropFeedback(string text)
     {
+        bool changed = !string.Equals(TreeDropFeedback.Text, text, StringComparison.Ordinal);
         TreeDropFeedback.Text = text;
         TreeDropHint.IsOpen = !string.IsNullOrEmpty(text);
+
+        // A LiveSetting alone announces nothing: WPF raises no live-region event for a text set
+        // from code. The hint changes as the pointer crosses targets, so each new target is said.
+        if (changed && !string.IsNullOrEmpty(text))
+        {
+            Behaviors.LiveRegionBehavior.Announce(TreeDropFeedback);
+        }
     }
 
     private void UpdateTreeDragNavigation(System.Windows.DragEventArgs e, FolderViewModel? folder)

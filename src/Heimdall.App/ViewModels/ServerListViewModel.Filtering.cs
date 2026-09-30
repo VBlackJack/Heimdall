@@ -92,10 +92,24 @@ public partial class ServerListViewModel
         || GatewayFilterEnabled
         || ProtocolFilters.Any(option => option.IsSelected);
 
+    /// <summary>
+    /// Whether a drag started in the tree is in progress; set by the view around its drag loop.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNoGroupDropZone))]
+    private bool _isTreeDragInProgress;
+
+    /// <summary>Whether the "take it out of its folder" drop target is on screen.</summary>
+    /// <remarks>
+    /// It used to stand above the tree permanently, a second "(No Folder)" that read like a node
+    /// of the tree and did nothing until something was dragged onto it. It now appears only
+    /// while a drag is under way, when it is the thing the user is looking for.
+    /// </remarks>
     public bool ShowNoGroupDropZone =>
-        !AppliedFilterSpec.IsActive
-        || _stableTreeRoot.Children.Any(node =>
-            node.IsNoGroup && node.ViewModel!.Servers.Count > 0);
+        IsTreeDragInProgress
+        && (!AppliedFilterSpec.IsActive
+            || _stableTreeRoot.Children.Any(node =>
+                node.IsNoGroup && node.ViewModel!.Servers.Count > 0));
 
     internal int StableTreeBuildCount { get; private set; }
 

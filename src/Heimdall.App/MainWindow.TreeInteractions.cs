@@ -1493,6 +1493,8 @@ public partial class MainWindow
 
         try
         {
+            // DoDragDrop runs its own loop until the drop: the drop zone shows for exactly that long.
+            vm.ServerList.IsTreeDragInProgress = true;
             switch (sourceItem)
             {
                 case ServerItemViewModel sourceServer:
@@ -1523,6 +1525,7 @@ public partial class MainWindow
         }
         finally
         {
+            vm.ServerList.IsTreeDragInProgress = false;
             StopTreeDragNavigation();
             ClearDropHighlight();
         }

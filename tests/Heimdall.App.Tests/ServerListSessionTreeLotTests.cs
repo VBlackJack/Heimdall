@@ -448,6 +448,24 @@ public sealed partial class ServerListSelectionTests
         AssertVisibleServerIds(fixture.ViewModel);
     }
 
+    [Fact]
+    public async Task NoFolderDropZone_ShowsOnlyWhileADragIsUnderWay()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(fixture.ExpandGroups("ops"), CreateServer("a", "A", "ops"));
+        List<string?> changed = [];
+        fixture.ViewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        Assert.False(fixture.ViewModel.ShowNoGroupDropZone);
+
+        fixture.ViewModel.IsTreeDragInProgress = true;
+        Assert.True(fixture.ViewModel.ShowNoGroupDropZone);
+        Assert.Contains(nameof(ServerListViewModel.ShowNoGroupDropZone), changed);
+
+        fixture.ViewModel.IsTreeDragInProgress = false;
+        Assert.False(fixture.ViewModel.ShowNoGroupDropZone);
+    }
+
     [Theory]
     [InlineData("ops", "alpha.example.com", "ops \u00B7 alpha.example.com")]
     [InlineData("", "alpha.example.com", "alpha.example.com")]
