@@ -99,6 +99,9 @@ public partial class App : System.Windows.Application
     /// <summary>Ceiling on the trusted host key flush at exit.</summary>
     private static readonly TimeSpan ExitHostKeyFlushBudget = TimeSpan.FromSeconds(5);
 
+    /// <summary>Ceiling on the RDP certificate trust flush at exit.</summary>
+    private static readonly TimeSpan ExitRdpTrustFlushBudget = TimeSpan.FromSeconds(5);
+
     /// <summary>
     /// Exit code of a launch that failed before the main window. Nothing in the
     /// application consumes it - the relauncher waits on the process id, by design - but
@@ -1433,6 +1436,10 @@ public partial class App : System.Windows.Application
         Task hostKeyPersistenceFlush = _serviceProvider?.GetService<HostKeyPersistenceCoalescer>()?.FlushAsync()
             ?? Task.CompletedTask;
 
+        // Resolved here, while the container is whole; its queue is awaited below, after the
+        // sessions are closed and before the container that owns the settings writer goes.
+        RdpCertificatePersistence? rdpTrustPersistence = _serviceProvider?.GetService<RdpCertificatePersistence>();
+
         // Everything that releases a resource outside this process runs here, BEFORE the
         // first await: WPF clears Application.Current the moment an asynchronous OnExit
         // returns to DoShutdown, which is its first incomplete await, and the continuation
@@ -1450,6 +1457,7 @@ public partial class App : System.Windows.Application
         Core.Logging.FileLogger.Flush();
 
         await SaveSnapshotAndCloseSessionsAsync();
+        await FlushRdpTrustAsync(rdpTrustPersistence, ExitRdpTrustFlushBudget, Core.Logging.FileLogger.Warn);
         await DisposeContainerBoundedAsync();
         await ExitStep.RunBoundedAsync(
             "trusted host key flush",
@@ -1556,6 +1564,23 @@ public partial class App : System.Windows.Application
             snapshotService,
             ExitSnapshotSaveBudget,
             Core.Logging.FileLogger.Warn);
+    }
+
+    /// <summary>
+    /// Waits, bounded, for the RDP certificate trust writes already queued. An approval made
+    /// just before exit is written by a task nobody awaits; without this it dies with the
+    /// process and the certificate is asked about again at the next start. Never throws.
+    /// </summary>
+    internal static Task<bool> FlushRdpTrustAsync(
+        RdpCertificatePersistence? persistence,
+        TimeSpan budget,
+        Action<string> logWarn)
+    {
+        return ExitStep.RunBoundedAsync(
+            "RDP trust flush",
+            () => persistence?.PendingWrites ?? Task.CompletedTask,
+            budget,
+            logWarn);
     }
 
     /// <summary>
