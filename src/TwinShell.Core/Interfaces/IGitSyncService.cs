@@ -61,6 +61,9 @@ public enum GitSyncErrorCode
     /// <summary>Data conflict detected (local changes would be overwritten)</summary>
     DataConflict = 12,
 
+    /// <summary>The remote answered but has no branch of the requested name</summary>
+    BranchNotFound = 13,
+
     /// <summary>Unknown or unclassified error</summary>
     Unknown = 99
 }
@@ -122,6 +125,19 @@ public interface IGitSyncService
     /// </summary>
     /// <returns>True if connection is successful</returns>
     Task<GitOperationResult> TestConnectionAsync();
+
+    /// <summary>
+    /// Tests a remote the user has typed but not saved: the URL is reached with the saved access
+    /// token, and the branch, when given, has to exist on it.
+    /// </summary>
+    /// <remarks>
+    /// The settings panel tested the saved configuration while its button sat under the fields
+    /// being edited, so a corrected URL still failed until Save, and a mistyped one passed if the
+    /// saved one was good. The default body keeps implementations that only know the saved
+    /// configuration compiling; <c>GitSyncService</c> overrides it.
+    /// </remarks>
+    Task<GitOperationResult> TestConnectionAsync(string remoteUrl, string? branch)
+        => TestConnectionAsync();
 
     /// <summary>
     /// Gets the current local repository status (branch, ahead/behind, etc.)

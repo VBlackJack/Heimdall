@@ -969,24 +969,36 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
 
     public Task<GitOperationResult> TestConnectionAsync()
     {
-        return ExecuteWithLockAsync(TestConnectionInternalAsync, "test-connection");
+        return ExecuteWithLockAsync(
+            cancellationToken => TestConnectionInternalAsync(Settings?.GitRemoteUrl, branch: null, cancellationToken),
+            "test-connection");
     }
 
-    private async Task<GitOperationResult> TestConnectionInternalAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public Task<GitOperationResult> TestConnectionAsync(string remoteUrl, string? branch)
+    {
+        return ExecuteWithLockAsync(
+            cancellationToken => TestConnectionInternalAsync(remoteUrl, branch, cancellationToken),
+            "test-connection");
+    }
+
+    private async Task<GitOperationResult> TestConnectionInternalAsync(
+        string? candidateUrl,
+        string? branch,
+        CancellationToken cancellationToken)
     {
         var startedAt = DateTime.UtcNow;
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(Settings?.GitRemoteUrl))
+        if (string.IsNullOrWhiteSpace(candidateUrl))
         {
             var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncNotConfigured), GitSyncErrorCode.InvalidConfiguration);
             await LogSyncOperationAsync(failResult, SyncOperationType.TestConnection, startedAt);
             return failResult;
         }
 
-        UserSettings settings = Settings!;
-        string remoteUrl = settings.GitRemoteUrl!;
-        bool hasToken = !string.IsNullOrWhiteSpace(settings.GitAccessToken);
+        string remoteUrl = candidateUrl.Trim();
+        bool hasToken = !string.IsNullOrWhiteSpace(Settings?.GitAccessToken);
         if (!GitUrlValidator.IsAllowed(remoteUrl, hasToken, out string remoteUrlReason))
         {
             GitOperationResult failResult = GitOperationResult.Fail(
@@ -1005,18 +1017,29 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 "Testing connection to {RemoteUrl}",
                 GitUrlSanitizer.SanitizeForLogging(remoteUrl));
 
-            // Test connection with retry logic
-            await ExecuteWithRetryAsync(async () =>
+            // Test connection with retry logic. Listing the remote references proves the URL and
+            // the credentials; the branch is then looked for among them.
+            List<string> referenceNames = await ExecuteWithRetryAsync(async () =>
             {
-                await Task.Run(() =>
-                {
-                    // Try to list remote references to test connection
-                    IEnumerable<Reference> refs = Repository.ListRemoteReferences(remoteUrl, GetCredentialsHandler());
-                    int count = refs.Count();
-                }, cancellationToken);
+                List<string> names = await Task.Run(
+                    () => Repository.ListRemoteReferences(remoteUrl, GetCredentialsHandler())
+                        .Select(reference => reference.CanonicalName)
+                        .ToList(),
+                    cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                return true;
+                return names;
             }, "connection test", cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(branch)
+                && !referenceNames.Contains(BranchReferencePrefix + branch.Trim(), StringComparer.Ordinal))
+            {
+                GitOperationResult branchResult = GitOperationResult.Fail(
+                    "Branch not found on the remote repository",
+                    GitSyncErrorCode.BranchNotFound,
+                    branch.Trim());
+                await LogSyncOperationAsync(branchResult, SyncOperationType.TestConnection, startedAt);
+                return branchResult;
+            }
 
             RaiseStatusChanged(L(MessageKeys.GitSyncConnectionSuccess), SyncPhase.Completed, 100);
             _logger.LogInformation(
@@ -1115,6 +1138,9 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
 
         return status;
     }
+
+    /// <summary>The prefix of a branch in a remote's reference list.</summary>
+    private const string BranchReferencePrefix = "refs/heads/";
 
     private CredentialsHandler GetCredentialsHandler()
     {

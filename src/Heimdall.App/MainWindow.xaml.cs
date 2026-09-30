@@ -249,6 +249,15 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             DispatcherPriority.Background,
             new Action(() => FocusSettingsField(property)));
         viewModel.Settings.InvalidFieldFocusRequested += _invalidFieldFocusHandler;
+
+        // The sync service lives in the TwinShell container; the panel tests typed values through it.
+        viewModel.Settings.GitConnectionTester = (remoteUrl, branch) =>
+            (System.Windows.Application.Current as App)?.Services?
+                .GetService(typeof(TwinShell.Core.Interfaces.IGitSyncService)) is TwinShell.Core.Interfaces.IGitSyncService gitSync
+                ? gitSync.TestConnectionAsync(remoteUrl, branch)
+                : Task.FromResult(TwinShell.Core.Interfaces.GitOperationResult.Fail(
+                    string.Empty,
+                    TwinShell.Core.Interfaces.GitSyncErrorCode.InvalidConfiguration));
         AttachSelectedExternalToolPreviewTracking(viewModel.Settings.SelectedExternalTool);
 
         // Refresh Tools tab and Settings status when background scan discovers external tools
@@ -2577,37 +2586,6 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         else
         {
             ApplyCommandLibraryTokenSaveError();
-        }
-    }
-
-    private async void OnCmdLibSyncTestClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm) return;
-
-        var app = System.Windows.Application.Current as App;
-        var gitSync = app?.Services?
-            .GetService(typeof(TwinShell.Core.Interfaces.IGitSyncService))
-                as TwinShell.Core.Interfaces.IGitSyncService;
-        if (gitSync is null) return;
-
-        Mw_SettingsCmdLibSyncTestBtn.IsEnabled = false;
-        Mw_SettingsCmdLibSyncTestBtn.Content = "...";
-
-        try
-        {
-            var result = await gitSync.TestConnectionAsync();
-            Mw_SettingsCmdLibSyncTestBtn.Content = result.Success
-                ? vm.Localize("SettingsCmdLibSyncTestSuccess")
-                : vm.Localize("SettingsCmdLibSyncTestFailed");
-        }
-        catch (Exception ex)
-        {
-            Mw_SettingsCmdLibSyncTestBtn.Content = vm.Localize("SettingsCmdLibSyncTestFailed");
-            Core.Logging.FileLogger.Warn($"[GitSync] Test connection failed: {ex.Message}");
-        }
-        finally
-        {
-            Mw_SettingsCmdLibSyncTestBtn.IsEnabled = true;
         }
     }
 

@@ -429,6 +429,84 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private bool _cmdLibGitSyncAutoPush = true;
 
+    /// <summary>
+    /// Tests a typed repository URL and branch; supplied by the window, which owns the sync service.
+    /// </summary>
+    internal Func<string, string?, Task<TwinShell.Core.Interfaces.GitOperationResult>>? GitConnectionTester { get; set; }
+
+    /// <summary>The outcome of the last connection test, with its reason, or empty.</summary>
+    [ObservableProperty]
+    private string _gitSyncTestStatusText = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(TestGitSyncConnectionCommand))]
+    private bool _isTestingGitSyncConnection;
+
+    private bool CanTestGitSyncConnection() => !IsTestingGitSyncConnection;
+
+    /// <summary>
+    /// Tests the repository URL and branch as typed, and reports the outcome and its reason in a
+    /// status line.
+    /// </summary>
+    /// <remarks>
+    /// The button used to test the saved configuration - so a corrected URL failed until Save and
+    /// a mistyped one passed when the saved one was good - and it replaced its own label with
+    /// "Connection OK" or "Connection failed" for the rest of the session, without saying why.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanTestGitSyncConnection))]
+    private async Task TestGitSyncConnectionAsync()
+    {
+        if (GitConnectionTester is null)
+        {
+            return;
+        }
+
+        IsTestingGitSyncConnection = true;
+        GitSyncTestStatusText = _localizer["SettingsCmdLibSyncTestRunning"];
+        try
+        {
+            TwinShell.Core.Interfaces.GitOperationResult result = await GitConnectionTester(
+                CmdLibGitSyncUrl.Trim(),
+                string.IsNullOrWhiteSpace(CmdLibGitSyncBranch) ? null : CmdLibGitSyncBranch.Trim());
+            GitSyncTestStatusText = DescribeGitTest(result);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[GitSync] Test connection failed: {ex.Message}");
+            GitSyncTestStatusText = _localizer.Format(
+                "SettingsCmdLibSyncTestFailedReason",
+                _localizer["SettingsCmdLibSyncTestReasonOther"]);
+        }
+        finally
+        {
+            IsTestingGitSyncConnection = false;
+        }
+    }
+
+    private string DescribeGitTest(TwinShell.Core.Interfaces.GitOperationResult result)
+    {
+        if (result.Success)
+        {
+            return _localizer["SettingsCmdLibSyncTestSuccess"];
+        }
+
+        string reasonKey = result.ErrorCode switch
+        {
+            TwinShell.Core.Interfaces.GitSyncErrorCode.NetworkError => "SettingsCmdLibSyncTestReasonNetwork",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.AuthenticationFailed => "SettingsCmdLibSyncTestReasonAuth",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.RepositoryNotFound => "SettingsCmdLibSyncTestReasonNotFound",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.BranchNotFound => "SettingsCmdLibSyncTestReasonBranch",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.InvalidConfiguration => "SettingsCmdLibSyncTestReasonConfig",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.Timeout => "SettingsCmdLibSyncTestReasonTimeout",
+            _ => "SettingsCmdLibSyncTestReasonOther",
+        };
+
+        string reason = result.ErrorCode == TwinShell.Core.Interfaces.GitSyncErrorCode.BranchNotFound
+            ? _localizer.Format(reasonKey, result.ErrorDetails ?? CmdLibGitSyncBranch)
+            : _localizer[reasonKey];
+        return _localizer.Format("SettingsCmdLibSyncTestFailedReason", reason);
+    }
+
     // --- RDP defaults ---
 
     // The bounds are the ones SchemaValidator already enforces on these two settings. A width this

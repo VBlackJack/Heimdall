@@ -2016,6 +2016,44 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.NotNull(viewModel.DescribeFieldError(nameof(SettingsViewModel.AutoLockIdleMinutesText)));
     }
 
+    /// <summary>
+    /// Test connection tries what is typed, and says why it failed in a status line.
+    /// </summary>
+    /// <remarks>
+    /// The button tested the saved configuration, so a corrected URL failed until Save, and it
+    /// replaced its own label with a bare "Connection failed" for the rest of the session.
+    /// </remarks>
+    [Fact]
+    public async Task GitSyncTest_UsesTheTypedValuesAndReportsTheReason()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        config.Settings.CmdLibGitSyncUrl = "https://saved.example.test/repo.git";
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        List<(string Url, string? Branch)> probes = [];
+        viewModel.GitConnectionTester = (url, branch) =>
+        {
+            probes.Add((url, branch));
+            return Task.FromResult(TwinShell.Core.Interfaces.GitOperationResult.Fail(
+                "Branch not found on the remote repository",
+                TwinShell.Core.Interfaces.GitSyncErrorCode.BranchNotFound,
+                "release"));
+        };
+
+        viewModel.CmdLibGitSyncUrl = "https://typed.example.test/repo.git";
+        viewModel.CmdLibGitSyncBranch = "release";
+        await viewModel.TestGitSyncConnectionCommand.ExecuteAsync(null);
+
+        Assert.Equal([("https://typed.example.test/repo.git", (string?)"release")], probes);
+        Assert.Equal(
+            localizer.Format(
+                "SettingsCmdLibSyncTestFailedReason",
+                localizer.Format("SettingsCmdLibSyncTestReasonBranch", "release")),
+            viewModel.GitSyncTestStatusText);
+        Assert.Equal(0, config.MergeSettingCallCount);
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {
