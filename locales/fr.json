@@ -755,6 +755,7 @@
   "SettingsAdvancedSubTabTools": "Outils et int\u00e9grations",
   "SettingsSearchPlaceholder": "Rechercher dans les param\u00e8tres...",
   "SettingsSearchResultCount": "R\u00e9sultats : {0} - Entr\u00e9e pour y aller",
+  "SettingsSearchResultPosition": "R\u00e9sultat {0} sur {1} - Entr\u00e9e pour le suivant, Maj+Entr\u00e9e pour le pr\u00e9c\u00e9dent",
   "SettingsSearchNoResults": "Aucun r\u00e9glage correspondant",
   "A11ySettingsSearch": "Rechercher dans les param\u00e8tres",
   "A11ySettingsSections": "Sections des param\u00e8tres",

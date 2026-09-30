@@ -755,6 +755,7 @@
   "SettingsAdvancedSubTabTools": "Tools & integrations",
   "SettingsSearchPlaceholder": "Search settings...",
   "SettingsSearchResultCount": "Results: {0} - press Enter to jump",
+  "SettingsSearchResultPosition": "Result {0} of {1} - Enter for the next, Shift+Enter for the previous",
   "SettingsSearchNoResults": "No matching settings",
   "A11ySettingsSearch": "Search settings",
   "A11ySettingsSections": "Settings sections",

@@ -1177,7 +1177,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         _settingsSearchMatches = GetSettingsSearchIndex()
             .Where((SettingsSearchEntry entry) =>
-                GetSettingsSearchEntryText(entry).IndexOf(query, StringComparison.InvariantCultureIgnoreCase) >= 0)
+                SettingsSearchMatches(GetSettingsSearchEntryText(entry), query)
+                && IsSettingsSearchEntryReachable(entry.Target))
             .ToList();
 
         if (DataContext is MainViewModel vm)
@@ -1284,14 +1285,22 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             gesture == SettingsSearchGesture.StepBack);
         SettingsSearchEntry entry = _settingsSearchMatches[_settingsSearchMatchIndex];
         FrameworkElement jumpTarget = ResolveSettingsSearchJumpTarget(entry.Target);
+
+        // Selecting the tabs is not enough: a match inside a collapsed expander was jumped to with
+        // nothing on screen and nothing highlighted. Every tab and expander on the way is opened.
         Mw_SettingsSubTabControl.SelectedItem = entry.TopTab;
-        if (entry.SubTab is not null)
+        RevealSettingsElement(jumpTarget);
+        if (DataContext is MainViewModel searchVm)
         {
-            entry.SubTab.IsSelected = true;
+            Mw_SettingsSearchHintText.Text = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                searchVm.Localize("SettingsSearchResultPosition"),
+                _settingsSearchMatchIndex + 1,
+                _settingsSearchMatches.Count);
         }
 
         Dispatcher.BeginInvoke(
-            DispatcherPriority.Background,
+            DispatcherPriority.Loaded,
             new Action(() =>
             {
                 entry.TopTab.UpdateLayout();
@@ -1364,6 +1373,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
+        // A hint that exists only as a tooltip - most of the RDP check boxes, the host pool
+        // fields - is text the user can read on hover and could not search for.
+        if (node is FrameworkElement { ToolTip: string } withTooltip
+            && node is not ContentControl { Content: string })
+        {
+            entries.Add(new SettingsSearchEntry(withTooltip, topTab, subTab));
+        }
+
         // A control whose Content is a plain string puts no TextBlock in the logical tree,
         // so the walk below can never reach its label and the search answers "no matching
         // settings" for words the user is reading. Only string Content is taken here: a
@@ -1391,17 +1408,52 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (entry.Target is TextBlock textBlock)
+        string own = entry.Target switch
         {
-            return textBlock.Text ?? string.Empty;
+            TextBlock textBlock => textBlock.Text ?? string.Empty,
+            ContentControl { Content: string text } => text,
+            _ => string.Empty,
+        };
+
+        return entry.Target.ToolTip is string tooltip && tooltip.Length > 0
+            ? own.Length == 0 ? tooltip : own + " " + tooltip
+            : own;
+    }
+
+    /// <summary>
+    /// Whether a settings search query matches a text, ignoring case and accents.
+    /// </summary>
+    /// <remarks>
+    /// "delai" has to find "Délai": French labels are full of accents a search box is often typed
+    /// without, and an ordinal-ignore-case comparison missed every one of them.
+    /// </remarks>
+    internal static bool SettingsSearchMatches(string text, string query)
+        => !string.IsNullOrEmpty(query)
+            && System.Globalization.CultureInfo.InvariantCulture.CompareInfo.IndexOf(
+                text ?? string.Empty,
+                query,
+                System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace) >= 0;
+
+    /// <summary>
+    /// Whether a jump could show the element: nothing on its logical path is hidden.
+    /// </summary>
+    /// <remarks>
+    /// An unselected tab and a collapsed expander hide content without collapsing it, and the
+    /// jump opens both. Anything collapsed for another reason - the vault controls with the vault
+    /// off, a provider's fields with another provider selected - was counted and then jumped to
+    /// with nothing on screen.
+    /// </remarks>
+    internal static bool IsSettingsSearchEntryReachable(FrameworkElement target)
+    {
+        for (DependencyObject? node = target; node is not null; node = LogicalTreeHelper.GetParent(node))
+        {
+            if (node is UIElement { Visibility: not Visibility.Visible })
+            {
+                return false;
+            }
         }
 
-        if (entry.Target is ContentControl { Content: string text })
-        {
-            return text;
-        }
-
-        return string.Empty;
+        return true;
     }
 
     /// <summary>
@@ -1702,6 +1754,18 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             Mw_FilterBox.SelectAll();
         }, canExecute: () => CanFocusServerFilter(IsTerminalFocusedContext(), Mw_FilterBox.IsVisible));
 
+        // Ctrl+F on the Settings tab: focus the settings search. Registered after the sessions
+        // filter, whose own gate needs the filter box on screen, so the two never compete.
+        RegisterSettingsSearchShortcut(
+            _keyboardShortcutService,
+            IsTerminalFocusedContext,
+            () => GetMainVm()?.IsSettingsTabSelected == true,
+            () =>
+            {
+                Mw_SettingsSearchBox.Focus();
+                Mw_SettingsSearchBox.SelectAll();
+            });
+
         // Ctrl+B: toggle sidebar
         _keyboardShortcutService.Register(Key.B, ModifierKeys.Control,
             ToggleSidebar,
@@ -1878,6 +1942,32 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             Key.S,
             ModifierKeys.Control,
             save,
+            canExecute: () => !isTerminalFocused() && isSettingsTabSelected());
+    }
+
+    /// <summary>
+    /// Registers Ctrl+F on the settings search box while the Settings tab is shown.
+    /// </summary>
+    /// <remarks>
+    /// The sessions filter owns Ctrl+F elsewhere, and its gate already refuses the key when its box
+    /// is off screen, which it is on the Settings tab; this binding sits behind it and takes the
+    /// key only there. Parameters, not window state, so the gates can be exercised without one.
+    /// </remarks>
+    internal static void RegisterSettingsSearchShortcut(
+        KeyboardShortcutService service,
+        Func<bool> isTerminalFocused,
+        Func<bool> isSettingsTabSelected,
+        Action focusSearch)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(isTerminalFocused);
+        ArgumentNullException.ThrowIfNull(isSettingsTabSelected);
+        ArgumentNullException.ThrowIfNull(focusSearch);
+
+        service.Register(
+            Key.F,
+            ModifierKeys.Control,
+            focusSearch,
             canExecute: () => !isTerminalFocused() && isSettingsTabSelected());
     }
 

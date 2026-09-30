@@ -755,6 +755,7 @@
   "SettingsAdvancedSubTabTools": "Herramientas e integraciones",
   "SettingsSearchPlaceholder": "Buscar en ajustes...",
   "SettingsSearchResultCount": "Resultados: {0} - pulsa Intro para saltar",
+  "SettingsSearchResultPosition": "Resultado {0} de {1} - Intro para el siguiente, Mayús+Intro para el anterior",
   "SettingsSearchNoResults": "No hay ajustes coincidentes",
   "A11ySettingsSearch": "Buscar en ajustes",
   "A11ySettingsSections": "Secciones de ajustes",
