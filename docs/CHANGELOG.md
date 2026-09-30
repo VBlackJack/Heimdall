@@ -14,6 +14,183 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### SSH: a second factor no longer receives your password
+
+- **Cancelling the verification-code dialog now says the connection was cancelled.** Pressing
+  Cancel was reported as "SSH authentication timed out after 20 seconds", with advice about
+  Pageant that had nothing to do with it. It now reads as a cancellation, and no second attempt
+  through Plink is started behind it.
+- **The stored password is never sent to a question that asks for a one-time code.** A prompt
+  that names one (one-time, OTP, verification code, token, passcode, and their French, German
+  and Spanish forms) is asked of you in the SSH terminal, and left unanswered where nobody can be
+  asked: the file browser, gateways and the route test. It used to receive the password when it
+  was the server's only question, or whenever its wording contained the word "password", as
+  pam_oath's "One-time password (OATH)" does. Each such answer spent one of the code's attempts.
+- **Once the server has accepted the password as a first factor, it is not sent again.** On a
+  server that asks for the password and then a code, the next question that mentioned a password
+  was answered with it a second time, and the refusal that followed started a Plink retry that
+  sent it once more. A server that refuses the password method outright still receives the
+  password at its keyboard-interactive password prompt, as before.
+- **The question a server asks is presented as the server's.** The dialog names the server that
+  sent the text, quotes it, and says that Heimdall never asks for its master password there.
+  Line breaks, invisible characters and text-direction overrides are removed from the text
+  first, and it is cut at 256 characters, so a server can no longer lay out a question that reads
+  as if Heimdall had written it.
+
+### SSH: an unresponsive host fails in 15 seconds again
+
+- **An embedded SSH session to a host that does not answer now gives up after 15 seconds, like
+  every other connection.** The two minutes meant for typing a verification code also bounded
+  reaching the host, so a machine that was switched off took two minutes to report it. The two
+  minutes now start only once the server has answered, when a question can reach you.
+- **One copy of Heimdall no longer resets another's terminal size.** A Plink session carries its
+  initial size in a temporary PuTTY saved session, and every Heimdall that started deleted all
+  of them, including the one another running copy (a portable one beside an installed one, for
+  example) had just created, which then opened at 80x24. Each temporary session now records the
+  process that made it, and only those whose process has gone are removed. The ones left by
+  earlier versions record no owner and are still removed.
+
+### SSH gateways: the route test judges each hop as the tunnel does
+
+- **Each step of Test route now gets 15 seconds, the time a real tunnel gives each hop.** It used
+  to get the host-key probe timeout (8 seconds by default), which is meant for a banner and a key
+  exchange alone, so a hop the tunnel reaches in ten seconds was reported as timed out.
+- **A destination the gateway cannot reach is now reported as a failure.** Only one SOCKS failure
+  code was recognised: "host unreachable" and the others passed as a success, and so did any
+  reply the test could not read. The test now waits for the proxy's own answer and treats
+  anything other than success as a failure.
+- **The route preview and each step line follow your language**, and two refusals that the
+  network tools can show (an empty gateway route, gateway services unavailable) are no longer in
+  English only.
+
+### RDP: the external client is handed a password only when it checks the server
+
+- **A second external launch to the same host with another account is refused while the first
+  is still starting.** Heimdall stages the password for mstsc under the host's name for a short
+  while. A second launch to that host inside that window, with a different account, found the
+  first one's entry, kept it, and opened the session as the first account, with only a generic
+  notice to show for it. It is now refused with a message asking you to retry in a few seconds.
+  Launching the same account twice is unaffected.
+- **With Network Level Authentication off, the external client is no longer given the stored
+  password.** In External or Force-External mode with NLA off, mstsc does not check the server's
+  identity, and Heimdall has no certificate check of its own on that path, so supplying the
+  password meant signing in to whatever answered at that name or tunnel endpoint. Heimdall now
+  neither stages nor fills in the password there: mstsc asks you for it, and a notice says why.
+  With NLA on nothing changes.
+- **An approved certificate is written before Heimdall exits.** Approving a server certificate
+  and closing Heimdall within the moment the settings write takes could lose the approval: the
+  next connection asked again, or warned of a mismatch on a pinned server. Exit now waits up to
+  five seconds for approvals still being written.
+- **Creating a folder or saving a scheduled task can no longer bring back a certificate you
+  revoked.** Both wrote back the whole settings file from a copy read a moment earlier, so a
+  revocation that landed in between was undone without a word. They now write only their own
+  entry.
+- **Closing an embedded RDP tab releases each of its resources on its own.** One release that
+  failed used to skip every one after it, among them the request that keeps the computer awake,
+  which then stayed active for the rest of the run.
+- **The reconnect overlay's buttons are reached by Tab in the order they appear.** Copy
+  anonymized report came after Close; it now sits between Copy report and Edit profile, as it
+  does on screen.
+- **A failure to subscribe to the Remote Desktop control's events is reported in your language**
+  on the status line, instead of an English sentence.
+- An unused path that let the RDP keyboard hook take configurable shortcuts was removed. No
+  setting ever fed it; Ctrl+Alt+Home and F11 behave exactly as before.
+
+### File transfers: a new file uploads again over FTP and restricted SFTP accounts
+
+- **Uploading a new file over FTP or FTPS works again.** Since v2026.090801 every upload of a file
+  that did not exist yet was refused with "The upload could not be confirmed without replacing a
+  file". FTP now uploads it, checks just before moving it into place that the name is still
+  free, and refuses rather than replace a file that appeared in the meantime. A file created in
+  the instant between that check and the move can still be overwritten: FTP has no command that
+  would prevent it.
+- **On SFTP, a new file no longer needs a shell on the server.** Each new file was published by a
+  command run over an extra SSH connection, which failed on accounts restricted to SFTP
+  (`internal-sftp` in a chroot), on Windows OpenSSH and behind SFTP gateways, and cost one more
+  connection per file everywhere else. It is now published by the SFTP protocol's own rename,
+  which refuses a name that exists, so a file that appeared since the listing is reported as a
+  collision and never replaced. Pasting between two servers keeps the server-side command, whose
+  promise never to overwrite is strict.
+- **A copy made on the server stays private while it is written.** The temporary copy was created
+  readable by every user of that server until the copy finished, whatever the source's
+  permissions. It is now readable by your account only, until the source's permissions are
+  applied at the end.
+- **A failed folder copy never deletes a folder it did not create.** When another client created
+  the destination folder at the same moment, the cleanup removed that folder and its content. It
+  now removes only a folder the copy made itself.
+- **A copy can no longer land inside a folder by accident.** If the destination name had become a
+  folder, the file was linked inside it and the copy reported success. It now fails. A server
+  whose `ln` lacks the `-T` option (an old BusyBox) refuses the copy instead.
+- **Browse as root lists a linked folder, and shows owners by name.** Opening a symbolic link to
+  a folder in sudo mode showed it empty; it now lists what the link points at. Owners and groups
+  are shown as names again instead of numbers, as they were before the privileged listing was
+  rebuilt; an ID with no name still shows as its number.
+- **Connecting in sudo mode can be cancelled, and privileged commands no longer wait forever.**
+  The privileged connection ignored Cancel once it had started. Every privileged command is now
+  bounded: ten minutes, plus time in proportion to the data it carries, so a large upload is not
+  cut short.
+- **An auto-upload the server refuses is reported once, not retried every two seconds.** Saving
+  in the external editor a file the server will not accept (permission denied, a file ownership it
+  cannot restore, a target it does not support) retried every two seconds for as long as the file stayed
+  open, each time with the same generic failure. It now says once why the upload was refused, and
+  tries again at your next save. A remote permission refusal also gets its own message instead of
+  "Transfer failed".
+- **Opening a link while another folder is loading says the pane is busy**, instead of claiming
+  that the link does not point at a folder.
+- **The editor refuses to open a file in a working folder it cannot protect.** When the local
+  working folder could not be restricted to your account, the file, a root-owned one read through
+  sudo included, was staged there anyway, readable by other users of the computer. The file is
+  now not opened, and a message says why.
+
+### WinRM: a failed session no longer leaves a PowerShell prompt on your own machine
+
+- **When the sign-in fails, the remote session ends or the connection drops, the session now ends
+  too.** PowerShell used to fall back to a prompt on this computer, inside a tab named after the
+  remote host, where broadcast, the Command Library and macros then ran their commands locally.
+  PowerShell now exits at its first local prompt: the error stays on screen and the tab shows the
+  session as ended (exit code 1 when the session was never entered, 0 after you type `exit` in
+  it). Under Constrained Language Mode this cannot apply and PowerShell behaves as before.
+- **The explanation of a known sign-in error now appears.** The message that explains the NTLM
+  loopback and WSMan 12152 errors switched itself off when the error and the prompt arrived
+  together, which was the usual case.
+- **A sign-in script refused by the execution policy is explained.** An execution policy your
+  organization enforces (AllSigned, for example) overrides the one Heimdall asks for and refuses
+  the stored-credential sign-in script. Instead of PowerShell's raw error, a message now says so
+  and offers two ways out: the current Windows identity for that host, or your administrator.
+- **Each launch failure has its own message.** A locked vault asks you to unlock it, an unreadable
+  stored password says the credential is unavailable, and a terminal that cannot start says the
+  launch failed. The first two could read as a generic launch failure, and the third blamed a
+  credential that was fine.
+- **No reachability check through a gateway.** Through an SSH gateway the check connected to the
+  local end of the tunnel, which accepts every connection, so it proved nothing. It is skipped
+  there, and an unreachable target shows as the error of `Enter-PSSession`. Direct connections
+  still run it.
+- **Imported profiles no longer skip the certificate check.** "Skip certificate validation" came
+  through an import whenever the profile used SSL, so a file written by someone else could decide
+  that this host's TLS certificate need not be validated. It is now cleared on every imported
+  profile; turn it back on in the profile if you need it.
+- **Editing the username of several sessions at once no longer switches WinRM profiles to a stored
+  credential.** A profile that used the current Windows identity was switched to a stored
+  credential it did not have, and its next connection failed with "The WinRM stored credential is
+  missing". A bulk password edit still switches, since both halves of the credential are then
+  there.
+- **The session dialog checks the WinRM username when you save**, with the rule the sign-in script
+  applies, instead of the connection failing later. Switching a profile to the current Windows
+  identity now drops its stored WinRM password when you save, since the field that shows and
+  clears it is hidden in that mode.
+- **The encrypted password is kept out of the PowerShell event log.** With script-block logging on,
+  a common hardening policy, Windows records the text of every script in the
+  Microsoft-Windows-PowerShell/Operational log, and the sign-in script carried the password,
+  DPAPI-encrypted, in its text. The encrypted value now travels in a separate file beside the
+  script, with the same restricted permissions, read and deleted before anything else runs; the
+  script text holds only its path.
+
+### Split view: a failed reconnect no longer closes another pane's tunnel
+
+- **Two panes sharing one gateway tunnel no longer lose it when one of them fails to reconnect.**
+  The failed attempt's share of the tunnel was released twice, the second time when that pane
+  was closed, which closed the tunnel under the other pane. It is now released once.
+
 ### The Command Library ran nothing on a local shell
 
 - **Sending a command to a Local Shell or a WinRM session now runs it.** The command arrived
