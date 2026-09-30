@@ -1501,6 +1501,83 @@ public sealed class SplitServiceTests : IDisposable
         Assert.Equal(ConnectionState.Disconnected, _connectionSm.GetState("server-1"));
     }
 
+    // A failed reconnect must not leave the handler's already-released tunnel port recorded
+    // under the pane key. Two panes share one tunnel (two references). Pane A reconnects: the
+    // pre-connect cleanup releases A's reference, the handler acquires one, records the port,
+    // fails and releases it. When the port stayed recorded, closing pane A released it a second
+    // time and closed the tunnel pane B still uses.
+    [Theory]
+    [InlineData(WinRmConnectionOutcome.FailureAfterTransportCleanup)]
+    [InlineData(WinRmConnectionOutcome.CancellationAfterTransportCleanup)]
+    [InlineData(WinRmConnectionOutcome.ExceptionAfterTransportCleanup)]
+    public async Task ReconnectPaneAsync_FailedDispatch_ThenClose_LeavesSharedTunnelToOtherPane(
+        WinRmConnectionOutcome outcome)
+    {
+        const string inventoryServerId = "winrm-shared-server";
+        const string paneASessionId = "pane-a-session";
+        const string paneBSessionId = "pane-b-session";
+        const int localPort = 45131;
+        TunnelInfo tunnelInfo = new(
+            "gateway-1",
+            localPort,
+            "winrm.example.test",
+            5985,
+            DateTime.UtcNow,
+            true);
+        Assert.True(_tunnelManager.TryRegisterExternalTunnel(tunnelInfo, new DisposableHost(), () => true));
+        _tunnelManager.AddReference(localPort);
+        RegisterConnectedState(paneASessionId, ConnectionState.LaunchingWinRm, localPort);
+        RegisterConnectedState(paneBSessionId, ConnectionState.LaunchingWinRm, localPort);
+
+        SharedTunnelWinRmConnectionService connectionService = new(
+            _connectionSm,
+            _tunnelManager,
+            tunnelInfo,
+            outcome,
+            tunnelPreRegistered: true);
+        SplitService sut = CreateSplitService(connectionService);
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = inventoryServerId,
+                DisplayName = "Shared WinRM server",
+                ConnectionType = "WINRM",
+                RemoteServer = tunnelInfo.RemoteHost,
+                RemotePort = tunnelInfo.RemotePort
+            }
+        });
+
+        SessionPaneModel paneA = MakePane(paneId: "pane-a", serverId: paneASessionId, connectionType: "WINRM");
+        paneA.OriginalServerId = inventoryServerId;
+        paneA.HostControl = new DisposableHost();
+        SessionPaneModel paneB = MakePane(paneId: "pane-b", serverId: paneBSessionId, connectionType: "WINRM");
+        paneB.OriginalServerId = inventoryServerId;
+        paneB.HostControl = new DisposableHost();
+        SessionTabViewModel session = new SessionTabViewModel
+        {
+            RootContent = new SplitContainerModel
+            {
+                First = paneA,
+                Second = paneB,
+                Orientation = SplitOrientation.Vertical
+            }
+        };
+        ObservableCollection<SessionTabViewModel> activeSessions = new() { session };
+        sut.ActiveSessionsProvider = () => activeSessions;
+
+        Exception? reconnectException = await Record.ExceptionAsync(
+            () => sut.ReconnectPaneAsync(session, paneA.PaneId));
+        Assert.Null(reconnectException);
+        Assert.Equal(paneASessionId, Assert.Single(connectionService.ServerIds));
+
+        sut.ClosePane(session, paneA.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
+
+        Assert.Same(paneB, session.RootContent);
+        Assert.Equal(localPort, _connectionSm.GetStateData(paneBSessionId)?.TunnelLocalPort);
+        AssertSingleTunnelReferenceReleased(localPort);
+    }
+
     // ── Category E: ToggleSplitOrientation ──────────────────────────────
 
     [Fact]
@@ -2170,18 +2247,25 @@ public sealed class SplitServiceTests : IDisposable
         private readonly TunnelManager _tunnelManager;
         private readonly TunnelInfo _tunnelInfo;
         private readonly WinRmConnectionOutcome _outcome;
+        private readonly bool _tunnelPreRegistered;
         private readonly List<string> _serverIds = [];
 
+        /// <param name="tunnelPreRegistered">
+        /// True when the test registered the shared tunnel and its holders itself: the double
+        /// then only takes and gives back its own reference, as a real handler does.
+        /// </param>
         public SharedTunnelWinRmConnectionService(
             ConnectionStateMachine connectionSm,
             TunnelManager tunnelManager,
             TunnelInfo tunnelInfo,
-            WinRmConnectionOutcome outcome = WinRmConnectionOutcome.Success)
+            WinRmConnectionOutcome outcome = WinRmConnectionOutcome.Success,
+            bool tunnelPreRegistered = false)
         {
             _connectionSm = connectionSm;
             _tunnelManager = tunnelManager;
             _tunnelInfo = tunnelInfo;
             _outcome = outcome;
+            _tunnelPreRegistered = tunnelPreRegistered;
         }
 
         public IReadOnlyList<string> ServerIds => _serverIds;
@@ -2248,7 +2332,9 @@ public sealed class SplitServiceTests : IDisposable
             ct.ThrowIfCancellationRequested();
             _serverIds.Add(server.Id);
 
-            if (_serverIds.Count == 1)
+            // With a pre-registered tunnel the test owns every holder, and only the failure
+            // branch below takes and releases this attempt's own reference.
+            if (!_tunnelPreRegistered && _serverIds.Count == 1)
             {
                 bool registered = _tunnelManager.TryRegisterExternalTunnel(
                     _tunnelInfo,
@@ -2259,7 +2345,7 @@ public sealed class SplitServiceTests : IDisposable
                     throw new InvalidOperationException("Shared test tunnel registration failed.");
                 }
             }
-            else
+            else if (!_tunnelPreRegistered)
             {
                 _tunnelManager.AddReference(_tunnelInfo.LocalPort);
             }

@@ -634,6 +634,11 @@ public sealed class SplitService : ISplitService
         var oldServerId = pane.ServerId;
         var oldConnectionStateReleased = false;
 
+        // The state key the new attempt runs under, once dispatched and until it succeeds. A
+        // handler that fails has already released its own tunnel reference, but the port it
+        // recorded stays under this key; the next reconnect or close would release it again.
+        string? pendingDispatchKey = null;
+
         void ReleaseOldConnectionStateOnce(string context)
         {
             if (oldConnectionStateReleased)
@@ -685,6 +690,7 @@ public sealed class SplitService : ISplitService
                 NotifyForcedEmbeddedMode(paneScopedServerDto);
             }
 
+            pendingDispatchKey = paneScopedServerDto.Id;
             var result = await ConnectByProtocolAsync(
                 paneScopedServerDto,
                 settings,
@@ -693,6 +699,9 @@ public sealed class SplitService : ISplitService
 
             if (!result.Success || result.Session is null)
             {
+                // Protocol handlers own transport rollback before returning failure.
+                // Remove only the pane state key to avoid releasing a shared tunnel twice.
+                TryTeardownFailedDispatchState(ref pendingDispatchKey, "ReconnectPane failure");
                 pane.Status = SessionStatusTokens.Error;
                 pane.FailureDetails = result.Failure;
                 SetStatusText?.Invoke(result.ErrorMessage ?? _localizer["ErrorSplitSessionFailed"]);
@@ -700,6 +709,9 @@ public sealed class SplitService : ISplitService
                     $"ReconnectPane failed for '{paneScopedServerDto.DisplayName}': {result.ErrorMessage}");
                 return;
             }
+
+            // The attempt succeeded: its tunnel reference is live and owned by the new session.
+            pendingDispatchKey = null;
 
             // Post-await guard
             var activeSessions = ActiveSessionsProvider?.Invoke();
@@ -761,6 +773,7 @@ public sealed class SplitService : ISplitService
         }
         catch (OperationCanceledException)
         {
+            TryTeardownFailedDispatchState(ref pendingDispatchKey, "ReconnectPane cancellation");
             ReleaseOldConnectionStateOnce("ReconnectPane cancellation");
             Core.Logging.FileLogger.Info(
                 $"ReconnectPane cancelled for session '{session.Title}' - tab closed during reconnection.");
@@ -768,6 +781,7 @@ public sealed class SplitService : ISplitService
         catch (Exception ex)
         {
             pane.Status = SessionStatusTokens.Error;
+            TryTeardownFailedDispatchState(ref pendingDispatchKey, "ReconnectPane exception");
             ReleaseOldConnectionStateOnce("ReconnectPane exception");
             Core.Logging.FileLogger.Error($"ReconnectPane error: {ex.Message}", ex);
             SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
@@ -926,6 +940,25 @@ public sealed class SplitService : ISplitService
         if (!string.IsNullOrWhiteSpace(serverId))
         {
             _connectionSm.Teardown(serverId);
+        }
+    }
+
+    /// <summary>
+    /// Forgets the state a failed reconnect attempt left under its key, without releasing the
+    /// tunnel port recorded there: the handler already released that reference itself.
+    /// </summary>
+    private void TryTeardownFailedDispatchState(ref string? pendingDispatchKey, string context)
+    {
+        string? key = pendingDispatchKey;
+        pendingDispatchKey = null;
+        try
+        {
+            TeardownFailedConnectionState(key);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"{context}: failed to tear down the failed attempt state for '{key}': {ex.Message}");
         }
     }
 
