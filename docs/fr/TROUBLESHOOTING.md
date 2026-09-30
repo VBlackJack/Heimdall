@@ -65,6 +65,14 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 48. [Fournisseur d'identifiants KeePassXC - pièges courants](#keepassxc-credential-provider)
 49. [RDP embarqué - session coupée peu après la connexion](#rdp-slow-server-cutoff)
 50. [Tâche planifiée - exécutée mais rien de connecté](#scheduled-task-connected-nothing)
+51. [SSH - le serveur pose une question interactive à laquelle ce client ne peut pas répondre](#ssh-keyboard-interactive-unsupported-prompt)
+52. [Tunnel - repli Plink refusé pour un proxy SOCKS ou une redirection distante](#tunnel-plink-fallback-forwarding-unsupported)
+53. [Mise à jour - la bannière dit que la mise à jour ne s'est pas appliquée](#update-did-not-apply)
+54. [Terminal SSH (Plink) - les lignes longues reviennent à la ligne en colonne 80 ou écrasent l'invite](#ssh-plink-terminal-width)
+55. [WinRM - la session se termine dès son ouverture](#winrm-session-ends-at-sign-in)
+56. [WinRM - la stratégie d'exécution a refusé le script de connexion](#winrm-execution-policy-refused)
+57. [SSH - un hôte qui ne répond pas échoue au bout de 15 secondes](#ssh-unresponsive-host-timeout)
+58. [FTP/SFTP - le téléversement d'un nouveau fichier est refusé](#upload-new-file-refused)
 
 ---
 
@@ -936,12 +944,13 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 
 **Symptôme** : une connexion par mot de passe échoue avec un message disant que le serveur a posé une question interactive à laquelle ce client ne peut pas répondre, en nommant la question (par exemple `Verification code:`).
 
-**Cause racine** : le serveur authentifie par keyboard-interactive et demande un second facteur après le mot de passe. Heimdall répond avec le mot de passe stocké à un tour qui ne pose qu'une seule question, quelle que soit cette question, et dans un tour qui en pose plusieurs il ne répond qu'aux demandes qui se lisent comme une demande de mot de passe, laissant les autres vides et enregistrées ; le refus qui suit une demande sans réponse est signalé comme cette question sans réponse (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un mot de passe rejeté. Un serveur dont la seule question est le second facteur reçoit donc le mot de passe stocké en réponse. Avant cette classification, le même refus était imputé au mot de passe.
+**Cause racine** : le serveur authentifie par keyboard-interactive et demande un second facteur, sur une connexion qui ne peut pas vous le demander : l'explorateur de fichiers, les passerelles et le test de parcours n'ont pas de boîte de dialogue pour cela (le terminal SSH intégré en a une, et vous pose la question). Sur ces chemins, Heimdall répond avec le mot de passe stocké à un tour qui ne pose qu'une seule question, sauf si cette question nomme un code à usage unique (one-time, OTP, code de vérification, token, passcode, et leurs formes française, allemande et espagnole), et dans un tour qui en pose plusieurs il ne répond qu'aux demandes qui se lisent comme une demande de mot de passe. Dès que le serveur a accepté la méthode `password` comme premier facteur, le mot de passe n'est plus proposé. Tout le reste est laissé vide et enregistré ; le refus qui suit une demande sans réponse est signalé comme cette question sans réponse (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) plutôt que comme un mot de passe rejeté. Avant l'audit du 2026-09-30, un serveur dont la seule question était le second facteur recevait le mot de passe stocké en réponse, ce qui consommait une des tentatives du code ; avant cette classification, le même refus était imputé au mot de passe.
 
 **Solution** :
 
-1. Utiliser pour cet hôte un client qui prend en charge le second facteur du serveur, ou s'authentifier avec une clé que le serveur accepte sans défi.
-2. Si le serveur vous appartient, exempter la source ou le compte du client du second facteur, ou activer l'authentification par clé publique.
+1. Ouvrir la session dans le terminal SSH, qui vous pose la question dans une boîte de dialogue.
+2. Pour l'explorateur de fichiers ou une passerelle, s'authentifier avec une clé que le serveur accepte sans défi.
+3. Si le serveur vous appartient, exempter la source ou le compte du client du second facteur, ou activer l'authentification par clé publique.
 
 **Leçon clé** : un refus de mot de passe signalé après un tour keyboard-interactive doit se lire avec ce que le tour a demandé ; le classifieur le fait à partir de `SshConnectionParams.KeyboardInteractive`.
 
@@ -984,7 +993,7 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 
 **Symptôme** : sur une session qui passe par le repli Plink (transfert d'agent activé sur le profil avec Pageant en cours d'exécution, ou nouvel essai après une connexion refusée), bash revient à la ligne en colonne 80 alors que le terminal est plus large, et une longue ligne de commande écrase son propre début.
 
-**Cause racine** : plink sous Windows prend la taille du PTY distant uniquement dans sa configuration (`TermWidth`/`TermHeight`), jamais dans une console, et n'envoie jamais de changement de taille de fenêtre. Heimdall transporte la taille initiale dans une session PuTTY enregistrée temporaire (`HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-<aléatoire>`) passée avec `-load`. Quand le registre refuse cette session, le lancement retombe en 80x24 et un avertissement `[PlinkSizeSession] Could not create the Plink size session` est écrit dans le journal. Le lancement attend aussi la première taille rapportée par la page du terminal, au plus `PlinkInitialSizeWaitMs` (3000 ms par défaut) ; quand la page est plus lente, il retombe en 80x24 et journalise `SSH opening the PTY for <profil> at the default 80x24: <raison>`.
+**Cause racine** : plink sous Windows prend la taille du PTY distant uniquement dans sa configuration (`TermWidth`/`TermHeight`), jamais dans une console, et n'envoie jamais de changement de taille de fenêtre. Heimdall transporte la taille initiale dans une session PuTTY enregistrée temporaire (`HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-p<pid>-t<heure de démarrage>-<guid>`) passée avec `-load`. Le nom enregistre le processus qui l'a créée : au démarrage, Heimdall ne supprime que les sessions de taille dont le processus a disparu (même identifiant et même heure de démarrage), ainsi que celles laissées par les versions antérieures à l'audit du 2026-09-30, qui n'enregistrent aucun propriétaire. Avant ce changement, démarrer une autre copie de Heimdall (une copie portable à côté d'une copie installée, par exemple) supprimait une session que la première venait de créer, avant que son plink l'ait lue, et ce lancement s'ouvrait en 80x24. Quand le registre refuse cette session, le lancement retombe en 80x24 et un avertissement `[PlinkSizeSession] Could not create the Plink size session` est écrit dans le journal. Le lancement attend aussi la première taille rapportée par la page du terminal, au plus `PlinkInitialSizeWaitMs` (3000 ms par défaut) ; quand la page est plus lente, il retombe en 80x24 et journalise `SSH opening the PTY for <profil> at the default 80x24: <raison>`.
 
 **Solution** :
 
@@ -992,4 +1001,67 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 2. Redimensionner avant de se connecter, pas après : la taille est prise une seule fois, au lancement. Redimensionner la fenêtre après le démarrage ne peut pas atteindre le PTY distant sur ce chemin ; se reconnecter pour appliquer une nouvelle taille.
 3. Dans le shell distant, `stty cols <n> rows <m>` fixe la taille à la main pour la session en cours.
 
-**Fichiers** : `Services/Handlers/PlinkSizeSession.cs`, `Services/PlinkSizeSessionJanitor.cs`, `Services/Handlers/SshHandler.cs` (`ConnectSshViaPlinkAsync`, `BuildPipeModeArguments`), `Heimdall.Terminal/PipeModeSession.cs`
+**Fichiers** : `Services/Handlers/PlinkSizeSession.cs`, `Services/PlinkSizeSessionJanitor.cs`, `Heimdall.Ssh/Plink/PlinkSizeSessionNaming.cs`, `Services/Handlers/SshHandler.cs` (`ConnectSshViaPlinkAsync`, `BuildPipeModeArguments`), `Heimdall.Terminal/PipeModeSession.cs`
+
+---
+
+## 55. WinRM - la session se termine dès son ouverture {#winrm-session-ends-at-sign-in}
+
+**Symptôme** : un onglet WinRM affiche une erreur PowerShell (accès refusé, erreur Kerberos ou TrustedHosts, WinHTTP `12152`, hôte injoignable), puis `Le processus s'est terminé avec le code 1`, et propose de se reconnecter. Après un `exit` tapé dans une session qui fonctionne, ou quand sa connexion tombe, l'onglet se termine de la même façon avec le code 0.
+
+**Cause racine** : voulu depuis l'audit du 2026-09-30. Les deux lancements WinRM exécutent PowerShell avec `-NoExit`. Quand `Enter-PSSession` échouait, ou que la session distante se terminait, PowerShell retombait sur une invite de la machine locale, dans un onglet qui porte le nom de l'hôte distant, où la diffusion, la Command Library et les macros exécutaient alors leurs commandes en local. Une fonction globale `prompt` définie avant `Enter-PSSession` met désormais fin à l'hôte à la première invite locale : code de sortie 1 quand la session distante n'a jamais été ouverte, 0 une fois qu'elle l'a été. WinRM ne se reconnecte jamais seul après la fin du processus, une connexion refusée ne peut donc pas boucler.
+
+**Solution** :
+
+1. Lire l'erreur affichée au-dessus du marqueur de fin. C'est celle de PowerShell, et elle nomme la cause ; pour WinHTTP `12152` à travers une passerelle, voir [47](#winrm-gateway-12152). Quand Heimdall reconnaît l'erreur, il ajoute une explication localisée en dessous.
+2. À travers une passerelle SSH, aucun test d'accessibilité ne précède le lancement (il n'atteindrait que l'extrémité locale du tunnel) : une cible injoignable apparaît donc ici, comme l'erreur de `Enter-PSSession`.
+3. En Constrained Language Mode, la garde ne peut pas mettre fin à l'hôte, et une invite locale suit encore un échec. Fermer l'onglet plutôt que d'y taper.
+
+**Fichiers** : `Services/WinRm/WinRmPowerShellLaunchBuilder.cs`, `Services/WinRm/WinRmCredentialBootstrap.cs`, `Services/WinRm/WinRmEarlyOutputDiagnostic.cs`, `Services/Handlers/WinRmHandler.cs`
+
+---
+
+## 56. WinRM - la stratégie d'exécution a refusé le script de connexion {#winrm-execution-policy-refused}
+
+**Symptôme** : un profil WinRM qui utilise un identifiant stocké se termine aussitôt avec "La stratégie d'exécution PowerShell a refusé le script de connexion WinRM. Votre organisation exige peut-être des scripts signés : utilisez l'identité Windows actuelle pour cet hôte, ou contactez votre administrateur."
+
+**Cause racine** : le mode identifiant stocké exécute un script de connexion local avec `-ExecutionPolicy Bypass`. Une stratégie d'exécution imposée au niveau machine ou utilisateur (`AllSigned`, ou `RemoteSigned` appliquée de cette façon) l'emporte sur la valeur de la ligne de commande, et le script, qui n'est pas signé, est refusé avant de s'exécuter. Heimdall reconnaît ce refus dans la première sortie de PowerShell, qui nomme la rubrique d'aide `about_Execution_Policies` sans la traduire, quelle que soit la langue de l'hôte. Le mode identité Windows courante n'exécute aucun script et n'est pas concerné.
+
+**Solution** :
+
+1. Passer le profil sur l'identité Windows courante (Kerberos) si l'hôte l'accepte.
+2. Sinon, s'adresser à l'administrateur qui fixe la stratégie d'exécution ; Heimdall ne la contourne pas.
+3. `Get-ExecutionPolicy -List` dans un PowerShell local indique quelle portée fixe la stratégie.
+
+**Fichiers** : `Services/WinRm/WinRmEarlyOutputDiagnostic.cs`, `Services/WinRm/WinRmCredentialBootstrap.cs`, `Services/WinRm/WinRmPowerShellLaunchBuilder.cs`
+
+---
+
+## 57. SSH - un hôte qui ne répond pas échoue au bout de 15 secondes {#ssh-unresponsive-host-timeout}
+
+**Symptôme** : une session SSH intégrée vers un hôte éteint ou filtré signale une expiration réseau au bout d'environ 15 secondes. Avant l'audit du 2026-09-30, le même échec prenait deux minutes.
+
+**Cause racine** : le chemin SSH intégré utilisait comme délai de connexion la borne de deux minutes prévue pour répondre à une question de code de vérification, et SSH.NET applique un seul délai à toutes les phases : la connexion TCP, la bannière, l'échange de clés et chaque attente de l'authentification. La connexion garde désormais la borne normale de 15 secondes jusqu'à la réception de la clé d'hôte du serveur ; les deux minutes ne s'appliquent qu'aux attentes de l'authentification après ce point, quand une question peut vous parvenir.
+
+**Solution** :
+
+1. Une expiration à 15 secondes signifie que l'hôte n'a pas terminé l'échange de clés : vérifier l'adresse, le port et le pare-feu.
+2. Une question longue à traiter, comme un code lu sur un autre appareil, dispose toujours de deux minutes.
+
+**Fichiers** : `Heimdall.Ssh/SshConnectionFactory.cs` (`ConnectWithTransportBoundAsync`), `Heimdall.Ssh/SshConnectionParams.cs` (`AuthenticationTimeout`), `Heimdall.Ssh/SshShellSession.cs`, `Services/Handlers/SshHandler.cs`
+
+---
+
+## 58. FTP/SFTP - le téléversement d'un nouveau fichier est refusé {#upload-new-file-refused}
+
+**Symptôme** : le téléversement d'un fichier qui n'existe pas encore sur le serveur échoue avec "Le téléversement sans remplacement n'a pas pu être confirmé. Actualisez la destination avant de réessayer. Une création sûre exige SFTP avec un canal de commandes SSH fonctionnel ; FTP ne peut pas la garantir." En FTP et FTPS, cela touchait chaque nouveau fichier depuis v2026.090801 ; en SFTP, les comptes restreints à `internal-sftp`, Windows OpenSSH et les passerelles SFTP.
+
+**Cause racine** : depuis v2026.090801, un nouveau fichier est téléversé sans remplacement consenti, et la seule validation qui respectait cela était une commande `ln` exécutée sur un canal exec SSH supplémentaire. FTP n'a pas ce canal, et les serveurs SFTP restreints refusent exec. Corrigé par l'audit du 2026-09-30 : chaque transport valide désormais lui-même un nouveau fichier. SFTP utilise le renommage de la version 3 du protocole, qui échoue sur un nom existant et n'exige aucun canal exec ; FTP vérifie de nouveau le nom juste avant le déplacement final et refuse un nom occupé.
+
+**Solution** :
+
+1. Passer à une version qui contient la correction.
+2. Si le message est désormais "La destination est maintenant occupée et n'a pas été remplacée", un autre client a créé ce nom pendant le téléversement : actualiser le dossier et réessayer avec un autre nom ou un choix explicite de remplacement.
+3. En FTP, un fichier créé entre cette dernière vérification et le déplacement peut encore être écrasé, car FTP n'a aucune commande qui l'empêche. Utiliser SFTP là où cela compte.
+
+**Fichiers** : `Heimdall.Sftp/SftpAtomicUpload.cs` (`CommitCreate`), `Heimdall.Sftp/FtpAtomicUpload.cs` (`CommitCreateAsync`), `Heimdall.Sftp/SftpBrowser.cs`, `Heimdall.Sftp/FtpBrowser.cs`

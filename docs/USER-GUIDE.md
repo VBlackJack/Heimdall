@@ -144,7 +144,8 @@ remote machine on the other.
 - **Right-click** a row to act on it: the row under the pointer is selected before the menu opens.
 - **Edit in external editor** uses the editor chosen in Settings, for remote files too. Heimdall
   keeps a local copy while that editor is open and uploads each save; closing the pane while a
-  file is still open there asks you first.
+  file is still open there asks you first. If the server refuses an upload (permission denied,
+  for example), the pane says why once and tries again the next time you save.
 - In the built-in editor, **Ctrl+S** saves and **Ctrl+W** closes. A file that is not UTF-8 opens
   as Latin-1 and says so in the editor's status bar.
 
@@ -159,10 +160,11 @@ Heimdall shows the reason in plain language wherever it can. The common ones:
 
 | What you see | What it usually means |
 |---|---|
-| The password is refused | Wrong password, or the account is locked on the remote machine. If the server's only question is a verification code, Heimdall answers it with your password and the refusal arrives here. |
-| The connection times out | The machine is off, or a firewall is in the way. Check the address. |
+| The password is refused | Wrong password, or the account is locked on the remote machine. |
+| The connection times out | The machine is off, or a firewall is in the way. Check the address. An SSH host that does not answer is reported after 15 seconds. |
 | The host key changed | See the warning above. Do not accept it without asking. |
-| The server asks a question this client cannot answer | The server wants a verification code or another second factor. Heimdall only answers password prompts; use another client for that server. |
+| The server asks a question this client cannot answer | The server wants a verification code or another second factor, and this connection cannot ask you: the file browser, gateways and the route test only answer password prompts, and never with your password when the question names a one-time code. The SSH terminal asks you instead. |
+| A WinRM session ends as soon as it opens | The sign-in failed, and the error above the end marker says why (access denied, Kerberos, TrustedHosts, a host unreachable behind a gateway). Heimdall ends PowerShell rather than leave you at a prompt on your own machine in that tab. If the message says the execution policy refused the sign-in script, use the current Windows identity for that host, or ask your administrator. |
 | A message about WebView2 | The machine has no Microsoft Edge. See [Installing](#installing). |
 | "SSH gateway not found" | The session points at a gateway that no longer exists. Edit the session and choose one, or recreate it in Settings. |
 
@@ -186,7 +188,7 @@ Each step shows its duration and an action to take if it fails; later steps stop
 Use **Stop test** or close the dialog to cancel. Changing the form clears the previous report.
 
 The diagnostic uses existing SSH trusted host keys and never accepts a new or changed key for you.
-Its per-step deadline uses the host-key probe timeout in Settings. **Copy diagnostic report**
+Each step gets 15 seconds, the time a real tunnel gives each hop. **Copy diagnostic report**
 omits hostnames, accounts, key paths and raw errors. A successful destination step proves TCP
 access only, not that an RDP, database or other application login will work.
 

@@ -51,7 +51,9 @@ PIN, not a lost computer.
 **Network Level Authentication (NLA)** - the remote machine authenticates you *before* opening
 a desktop session. Leave it on. Turn it off only for targets that cannot do it, such as most
 Linux `xrdp` servers, which do not implement CredSSP at all. With NLA off you will land on the
-remote login screen instead of being logged in directly.
+remote login screen instead of being logged in directly. In External mode with NLA off,
+Heimdall does not hand your stored password to `mstsc.exe`: nothing checks the server's
+identity on that path, so the Remote Desktop prompt asks you for it, and a notice says why.
 
 **Strict server authentication** - refuses to connect if the server's identity cannot be
 verified. It is off by default because many internal RDP servers use self-signed certificates,
@@ -168,7 +170,8 @@ their logs matters more to you than the status dots.
 ## Modes
 
 **Default RDP mode** - `Embedded` renders the session inside a Heimdall tab. `External` launches
-`mstsc.exe` in its own window, with credentials filled in for you. External uses more memory per
+`mstsc.exe` in its own window, with credentials filled in for you (except with NLA off, see
+Security above). External uses more memory per
 session but isolates each session in its own process.
 
 **Default SSH mode** - `Embedded` uses the built-in terminal. `External` uses PuTTY, which needs
