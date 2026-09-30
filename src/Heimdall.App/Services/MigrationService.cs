@@ -270,7 +270,6 @@ public sealed class MigrationService
         MapNullableString(legacy, "HmacKey", v => target.HmacKey = v);
         MapNullableString(legacy, "LastDpapiUser", v => target.LastDpapiUser = v);
         MapBool(legacy, "RequireCredentialGuard", v => target.RequireCredentialGuard = v);
-        MapBool(legacy, "EnableEventLog", v => target.EnableEventLog = v);
 
         if (legacy.TryGetProperty("HmacKeyCreatedAt", out var hmacDate)
             && hmacDate.ValueKind == JsonValueKind.String)
@@ -309,7 +308,6 @@ public sealed class MigrationService
         // Session
         MapInt(legacy, "MaxEmbeddedSessions", v => target.MaxEmbeddedSessions = v);
         MapInt(legacy, "EmbeddedRdpTimeoutMs", v => target.RdpConnectWatchdogTimeoutMs = v);
-        MapInt(legacy, "EmbeddedIdleTimeoutMs", v => target.EmbeddedIdleTimeoutMs = v);
         MapBool(legacy, "SftpBrowserEnabled", v => target.SftpBrowserEnabled = v);
         MapBool(legacy, "SftpAutoOpenOnSsh", v => target.SftpAutoOpenOnSsh = v);
         MapBool(legacy, "SftpFollowSshDirectory", v => target.SftpFollowSshDirectory = v);

@@ -17,7 +17,7 @@
 #    claim of those tests goes through the predicate; the anchors that only order it do not yet.
 #  - a uniqueness count used to build a mutant, Regex.Matches(source, Regex.Escape(X)).Count. It
 #    asserts that a mutant can be built, not that behaviour is present.
-tests/Heimdall.App.Tests/C2DeadSettingsRegressionTests.cs|RdpResolutionPresetEditor_BindsToExistingTextProjection|assert-presence|"Text=\"{Binding Settings.RdpResolutionPresetsText, UpdateSourceTrigger=PropertyChanged}\""
+tests/Heimdall.App.Tests/C2DeadSettingsRegressionTests.cs|RdpResolutionPresetEditor_BindsToExistingTextProjection|assert-presence|"Text=\"{Binding Settings.RdpResolutionPresetsText, UpdateSourceTrigger=LostFocus}\""
 tests/Heimdall.App.Tests/C2DeadSettingsRegressionTests.cs|RdpAutoReconnectMaximum_HasCompleteSettingsToRuntimeChain|assert-presence|"settings.RdpAutoReconnectMaxAttempts"
 tests/Heimdall.App.Tests/C2DeadSettingsRegressionTests.cs|ApplyRdpDefaults_CoversEveryRdpSettingExposedBySettings|assert-presence|$"{property} = defaults.{property};"
 tests/Heimdall.App.Tests/C2DeadSettingsRegressionTests.cs|RdpDialogAdvancedDefault_ReachesTheServerDialogAdvancedExpander|assert-presence|"IsExpanded=\"{Binding IsAdvancedMode, Mode=OneWay}\""

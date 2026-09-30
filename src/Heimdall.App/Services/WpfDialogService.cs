@@ -285,24 +285,6 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
-    public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null)
-    {
-        var vm = editVm ?? new ProjectDialogViewModel();
-        vm.Localizer ??= _localizer;
-        var dialog = new ProjectDialog
-        {
-            DataContext = vm,
-            Owner = GetOwnerWindow()
-        };
-
-        ProjectDialogResult? result = dialog.ShowDialog() == true
-            ? new ProjectDialogResult(vm.ToDto(), true)
-            : null;
-
-        return Task.FromResult(result);
-    }
-
-    /// <inheritdoc/>
     public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(ScheduledTaskDialogViewModel? editVm = null)
     {
         var vm = editVm ?? new ScheduledTaskDialogViewModel();

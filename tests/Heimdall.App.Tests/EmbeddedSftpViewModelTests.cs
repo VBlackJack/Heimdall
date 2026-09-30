@@ -2469,9 +2469,6 @@ public sealed class EmbeddedSftpViewModelTests
         public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null)
             => throw new NotSupportedException();
 
-        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null)
-            => throw new NotSupportedException();
-
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(ScheduledTaskDialogViewModel? editVm = null)
             => throw new NotSupportedException();
 

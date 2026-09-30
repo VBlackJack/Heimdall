@@ -1413,11 +1413,6 @@ public sealed class SshHandlerConnectTests : IDisposable
             throw new NotImplementedException();
         }
 
-        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null)
-        {
-            throw new NotImplementedException();
-        }
-
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(ScheduledTaskDialogViewModel? editVm = null)
         {
             throw new NotImplementedException();

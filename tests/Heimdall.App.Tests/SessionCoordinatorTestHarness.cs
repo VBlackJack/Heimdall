@@ -808,11 +808,6 @@ public sealed partial class SessionCoordinatorPreMountTests
             return Task.FromResult<GatewayDialogResult?>(null);
         }
 
-        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null)
-        {
-            return Task.FromResult<ProjectDialogResult?>(null);
-        }
-
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(
             ScheduledTaskDialogViewModel? editVm = null)
         {
