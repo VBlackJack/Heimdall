@@ -292,9 +292,13 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// a user most needs the status. <c>ServerStatusToColorConverter</c> is deliberately left
     /// untouched; its own priority is the correct behaviour, and a coherence test pins the two
     /// together so neither can drift alone.
+    /// <para>
+    /// A favorite says so, right after its name: the row marks it with a star glyph, which a
+    /// screen reader does not read.
+    /// </para>
     /// </remarks>
     public string AccessibleName => Format(
-        "SessionTreeServerAccessibleName",
+        IsFavorite ? "SessionTreeServerAccessibleNameFavorite" : "SessionTreeServerAccessibleName",
         DisplayName,
         ProtocolDisplayName,
         StatusShowsConnectionState
@@ -466,6 +470,22 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     }
 
     partial void OnEndpointChanged(string value) => OnPropertyChanged(nameof(RowTooltipText));
+
+    partial void OnIsFavoriteChanged(bool value) => OnPropertyChanged(nameof(AccessibleName));
+
+    /// <summary>
+    /// Takes a favorite flag the inventory has just persisted, keeping the retained DTO in step
+    /// so a later reader of the profile sees the same answer as the row.
+    /// </summary>
+    internal void ApplyFavorite(bool isFavorite)
+    {
+        if (_sourceDto is not null)
+        {
+            _sourceDto.IsFavorite = isFavorite;
+        }
+
+        IsFavorite = isFavorite;
+    }
 
     partial void OnDisplayNameChanged(string value)
     {
@@ -712,6 +732,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionAuthNoneSaved" => "No saved credentials",
         "SessionAuthCurrentUser" => "Current user",
         "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
+        "SessionTreeServerAccessibleNameFavorite" => "{0}, favorite, protocol {1}, state {2}",
         "SessionTreeServerAccessibleHelp" =>
             "Session. Enter opens it, F2 renames it, Ctrl+Space adds it to or removes it from the selection, Shift+Up and Shift+Down extend the selection, Ctrl+A selects every visible session, Alt+Up and Alt+Down move it within its folder, Shift+F10 lists the actions.",
         "SessionTreeRowTooltipHost" => "Host: {0}",

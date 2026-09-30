@@ -368,6 +368,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                     harness.Main.Localize("TreeCtxRename"),
                     harness.Main.Localize("TreeCtxEdit"),
                     harness.Main.Localize("TreeCtxDuplicate"),
+                    harness.Main.Localize("TreeCtxFavoriteAdd"),
                     "<separator>",
                     harness.Main.Localize("TreeCtxMoveToGroup"),
                     "<separator>",

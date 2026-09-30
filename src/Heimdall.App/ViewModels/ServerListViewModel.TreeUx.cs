@@ -84,6 +84,50 @@ public partial class ServerListViewModel
     [RelayCommand]
     private void ClearTreeSearch() => SearchText = "";
 
+    /// <summary>
+    /// Adds sessions to, or removes them from, the favorites from the tree, through the same
+    /// persisted <see cref="ServerProfileDto.IsFavorite"/> flag the server dialog writes.
+    /// </summary>
+    /// <param name="request">The sessions and the state to give them.</param>
+    [RelayCommand]
+    private async Task SetFavoriteAsync(FavoriteChangeRequest? request)
+    {
+        if (request is null || request.Servers.Count == 0)
+        {
+            return;
+        }
+
+        HashSet<string> ids = new(request.Servers.Select(server => server.Id), StringComparer.Ordinal);
+        try
+        {
+            await _configManager.MutateServersAsync(inventory =>
+            {
+                foreach (ServerProfileDto dto in inventory.Where(dto => ids.Contains(dto.Id)))
+                {
+                    dto.IsFavorite = request.IsFavorite;
+                }
+
+                return true;
+            });
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Saving the favorite flag from the tree failed", ex);
+            StatusMessageRequested?.Invoke(_localizer["StatusFavoriteSaveFailed"]);
+            return;
+        }
+
+        foreach (ServerItemViewModel server in _allServers.Where(server => ids.Contains(server.Id)))
+        {
+            server.ApplyFavorite(request.IsFavorite);
+        }
+
+        if (FavoriteFilterEnabled)
+        {
+            ApplyFilter();
+        }
+    }
+
     [RelayCommand]
     private void ResetTreeFilters()
     {
@@ -185,6 +229,9 @@ public partial class ServerListViewModel
 
 /// <summary>A removable, accessible active filter.</summary>
 public sealed record TreeFilterChip(string Label, string RemoveAccessibilityName, IRelayCommand RemoveCommand);
+
+/// <summary>Sessions to add to or remove from the favorites.</summary>
+public sealed record FavoriteChangeRequest(IReadOnlyList<ServerItemViewModel> Servers, bool IsFavorite);
 
 /// <summary>The kinds of organization change the undo bar can name.</summary>
 public enum TreeOrganizationChange

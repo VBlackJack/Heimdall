@@ -75,6 +75,31 @@ public sealed partial class SessionCoordinatorPreMountTests
     }
 
     [Fact]
+    public void ServerMenu_OffersTheFavoriteToggleBoundToThePersistingCommand()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            ServerItemViewModel server = PersistSession(harness, "alpha", "Ops");
+
+            MenuItem add = AssertMenuItem(
+                CreateServerMenu(harness.Main, server),
+                harness.Main.Localize("TreeCtxFavoriteAdd"));
+
+            Assert.Same(harness.Main.ServerList.SetFavoriteCommand, add.Command);
+            FavoriteChangeRequest request = Assert.IsType<FavoriteChangeRequest>(add.CommandParameter);
+            Assert.True(request.IsFavorite);
+            Assert.Same(server, Assert.Single(request.Servers));
+
+            server.IsFavorite = true;
+            MenuItem remove = AssertMenuItem(
+                CreateServerMenu(harness.Main, server),
+                harness.Main.Localize("TreeCtxFavoriteRemove"));
+            Assert.False(Assert.IsType<FavoriteChangeRequest>(remove.CommandParameter).IsFavorite);
+        });
+    }
+
+    [Fact]
     public void ServerMenu_MoveToFolder_NestsFoldersLikeTheTree()
     {
         RunOnStaThread(() =>

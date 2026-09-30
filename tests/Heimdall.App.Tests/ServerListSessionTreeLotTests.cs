@@ -409,6 +409,45 @@ public sealed partial class ServerListSelectionTests
         Assert.False(fixture.ViewModel.UndoTreeOrganizationCommand.CanExecute(null));
     }
 
+    [Fact]
+    public async Task SetFavorite_PersistsTheFlag_AndTheRowSaysSo()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"),
+            CreateServer("a", "A", "ops"), CreateServer("b", "B", "ops"));
+        ServerItemViewModel a = fixture.ServerById("a");
+
+        await fixture.ViewModel.SetFavoriteCommand.ExecuteAsync(new FavoriteChangeRequest([a], true));
+
+        Assert.True(a.IsFavorite);
+        Assert.Contains("favorite", a.AccessibleName, StringComparison.Ordinal);
+        List<ServerProfileDto> saved = await fixture.ConfigManager.LoadServersAsync();
+        Assert.True(saved.Single(row => row.Id == "a").IsFavorite);
+        Assert.False(saved.Single(row => row.Id == "b").IsFavorite);
+
+        await fixture.ViewModel.SetFavoriteCommand.ExecuteAsync(new FavoriteChangeRequest([a], false));
+
+        Assert.False(a.IsFavorite);
+        Assert.DoesNotContain("favorite", a.AccessibleName, StringComparison.Ordinal);
+        Assert.False((await fixture.ConfigManager.LoadServersAsync()).Single(row => row.Id == "a").IsFavorite);
+    }
+
+    [Fact]
+    public async Task SetFavorite_UnderTheFavoritesFilter_TakesTheRowOutOfTheList()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        ServerProfileDto a = CreateServer("a", "A", "ops");
+        a.IsFavorite = true;
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"), a, CreateServer("b", "B", "ops"));
+        fixture.ViewModel.FavoriteFilterEnabled = true;
+        AssertVisibleServerIds(fixture.ViewModel, "a");
+
+        await fixture.ViewModel.SetFavoriteCommand.ExecuteAsync(
+            new FavoriteChangeRequest([fixture.ServerById("a")], false));
+
+        AssertVisibleServerIds(fixture.ViewModel);
+    }
+
     private static async Task<LocalizationManager> LoadEnglishLocalizerAsync()
     {
         var localizer = new LocalizationManager();

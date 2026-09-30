@@ -842,6 +842,17 @@
                                             <StackPanel Grid.Column="3"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center">
+                                                <!-- Favorite mark. The spoken row name carries "favorite" itself;
+                                                     the glyph is for the eye. -->
+                                                <TextBlock Text="&#xE735;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                                           Foreground="{DynamicResource WarningBrush}"
+                                                           Margin="6,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           ToolTip="{loc:Translate SessionTreeFavoriteMark}"
+                                                           AutomationProperties.Name="{loc:Translate SessionTreeFavoriteMark}"
+                                                           Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                 <Border BorderThickness="1"
                                                         CornerRadius="3"
                                                         Padding="4,0"

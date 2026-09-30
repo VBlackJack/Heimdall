@@ -105,6 +105,7 @@ public sealed class ContextMenuFactory
             vm.Localize("TreeCtxDuplicate"),
             vm.ServerList.DuplicateServerCommand,
             server));
+        menu.Items.Add(CreateFavoriteMenuItem(vm, [server]));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMoveToGroupMenu(vm, server));
         menu.Items.Add(new Separator());
@@ -214,6 +215,7 @@ public sealed class ContextMenuFactory
             vm.Localize("TreeCtxBulkDuplicate"),
             vm.ServerList.DuplicateSelectedCommand));
         menu.Items.Add(CreateBulkEditMenu(vm, bulkContext));
+        menu.Items.Add(CreateFavoriteMenuItem(vm, bulkContext.Items));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateBulkMoveToGroupMenu(vm, bulkContext));
         menu.Items.Add(new Separator());
@@ -1074,6 +1076,25 @@ public sealed class ContextMenuFactory
                 vm.ServerList.MoveSelectedToGroupCommand,
                 new BulkMoveToGroupRequest(path),
                 vm.ServerList.IsBulkMoveTargetEnabled(selection, path)));
+    }
+
+    /// <summary>
+    /// Adds or removes sessions from the favorites, the same flag the server dialog sets and
+    /// the Favorites filter reads.
+    /// </summary>
+    /// <remarks>
+    /// The flag could only be set by opening the server dialog, one session at a time. The entry
+    /// adds when any of the targets is not yet a favorite, and removes once they all are.
+    /// </remarks>
+    private static MenuItem CreateFavoriteMenuItem(
+        MainViewModel vm,
+        IReadOnlyList<ServerItemViewModel> servers)
+    {
+        bool allFavorite = servers.Count > 0 && servers.All(server => server.IsFavorite);
+        return CreateMenuItem(
+            vm.Localize(allFavorite ? "TreeCtxFavoriteRemove" : "TreeCtxFavoriteAdd"),
+            vm.ServerList.SetFavoriteCommand,
+            new FavoriteChangeRequest(servers, !allFavorite));
     }
 
     /// <summary>
