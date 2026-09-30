@@ -6637,5 +6637,11 @@
   "ToolPwdGenFloorSetLength": "Longueur port\u00e9e \u00e0 {0} pour garantir {1} bits.",
   "ToolPwdGenFloorSetSyllable": "R\u00e9gl\u00e9 sur {0} caract\u00e8res, {1} chiffres et {2} caract\u00e8res sp\u00e9ciaux, pour garantir {3} bits.",
   "ToolPwdGenFloorSetPassphrase": "R\u00e9gl\u00e9 sur {0} mots, {1} chiffres et {2} caract\u00e8res sp\u00e9ciaux, pour garantir {3} bits.",
-  "ToolPwdGenFloorSetLeet": "R\u00e9gl\u00e9 sur {0} chiffres et {1} caract\u00e8res sp\u00e9ciaux, pour garantir {2} bits."
+  "ToolPwdGenFloorSetLeet": "R\u00e9gl\u00e9 sur {0} chiffres et {1} caract\u00e8res sp\u00e9ciaux, pour garantir {2} bits.",
+  "GatewayDiagnosticRouteHop": "{0} ({1}:{2})",
+  "GatewayDiagnosticRouteEndpoint": "{0}:{1}",
+  "GatewayDiagnosticRouteSeparator": " → ",
+  "GatewayDiagnosticStepLine": "{0} : {1} ({2} ms)",
+  "ErrorGatewayRouteEmpty": "Un itinéraire de passerelle ne peut pas être vide.",
+  "ErrorToolGatewayServicesUnavailable": "Les services de passerelle sont indisponibles : la connexion est refusée plutôt qu'ouverte sans vérification."
 }

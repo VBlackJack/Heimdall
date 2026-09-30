@@ -6638,5 +6638,11 @@
   "ToolPwdGenFloorSetLength": "Length set to {0} to guarantee {1} bits.",
   "ToolPwdGenFloorSetSyllable": "Set to {0} characters with {1} digits and {2} specials, to guarantee {3} bits.",
   "ToolPwdGenFloorSetPassphrase": "Set to {0} words with {1} digits and {2} specials, to guarantee {3} bits.",
-  "ToolPwdGenFloorSetLeet": "Set to {0} digits and {1} specials, to guarantee {2} bits."
+  "ToolPwdGenFloorSetLeet": "Set to {0} digits and {1} specials, to guarantee {2} bits.",
+  "GatewayDiagnosticRouteHop": "{0} ({1}:{2})",
+  "GatewayDiagnosticRouteEndpoint": "{0}:{1}",
+  "GatewayDiagnosticRouteSeparator": " → ",
+  "GatewayDiagnosticStepLine": "{0}: {1} ({2} ms)",
+  "ErrorGatewayRouteEmpty": "A gateway route cannot be empty.",
+  "ErrorToolGatewayServicesUnavailable": "The gateway services are unavailable, so the connection was refused rather than opened unverified."
 }

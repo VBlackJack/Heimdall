@@ -18,6 +18,7 @@ using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Tests;
@@ -26,9 +27,11 @@ namespace Heimdall.App.Tests;
 public sealed class GatewayDiagnosticViewModelTests
 {
     [Fact]
-    public void Preview_ContainsAllAncestorsAndUnsavedDraft()
+    public async Task Preview_ContainsAllAncestorsAndUnsavedDraft()
     {
+        // The preview is assembled from locale templates, so it needs the shipped catalogue.
         GatewayDialogViewModel vm = Create();
+        vm.Localizer = await ShippedEnglishAsync();
         vm.ConfigureDiagnostics(Inventory(), (_, _, _, _, _) => Task.FromResult<IReadOnlyList<GatewayDiagnosticStep>>([]));
         vm.SelectedParentGatewayId = "child";
         vm.Name = "edited";
@@ -52,13 +55,15 @@ public sealed class GatewayDiagnosticViewModelTests
     public async Task Run_CopiesOnlyTypedResultsAndClearsAfterEditing()
     {
         GatewayDialogViewModel vm = Create();
+        LocalizationManager localizer = await ShippedEnglishAsync();
+        vm.Localizer = localizer;
         vm.Host = "private-host-secret.invalid";
         vm.User = "private-account-secret";
         vm.KeyPath = "private-key-path-secret";
         vm.ConfigureDiagnostics([], (_, _, _, _, _) =>
             Task.FromResult<IReadOnlyList<GatewayDiagnosticStep>>([new(1, false, false, SshFailureCode.AuthRejected, 12)]));
         await vm.TestGatewayRouteCommand.ExecuteAsync(null);
-        Assert.Contains("GatewayDiagnosticAuth", vm.DiagnosticReport);
+        Assert.Contains(localizer["GatewayDiagnosticAuth"], vm.DiagnosticReport);
         Assert.DoesNotContain("private-", vm.DiagnosticReport);
         RecordingClipboard clipboard = new();
         vm.CopyDiagnosticReport(clipboard);
@@ -152,6 +157,13 @@ public sealed class GatewayDiagnosticViewModelTests
         vm.CloseDiagnostics();
         vm.ConfigureDiagnostics([], (_, _, _, _, _) => Task.FromResult<IReadOnlyList<GatewayDiagnosticStep>>([]));
         Assert.False(vm.DiagnosticsReady);
+    }
+
+    private static async Task<LocalizationManager> ShippedEnglishAsync()
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        return localizer;
     }
 
     private static GatewayDialogViewModel Create() => new() { Name = "draft", Host = "draft.invalid", User = "audit" };

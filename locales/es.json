@@ -6638,5 +6638,11 @@
   "ToolPwdGenFloorSetLength": "Longitud ajustada a {0} para garantizar {1} bits.",
   "ToolPwdGenFloorSetSyllable": "Ajustado a {0} caracteres, {1} dígitos y {2} caracteres especiales, para garantizar {3} bits.",
   "ToolPwdGenFloorSetPassphrase": "Ajustado a {0} palabras, {1} dígitos y {2} caracteres especiales, para garantizar {3} bits.",
-  "ToolPwdGenFloorSetLeet": "Ajustado a {0} dígitos y {1} caracteres especiales, para garantizar {2} bits."
+  "ToolPwdGenFloorSetLeet": "Ajustado a {0} dígitos y {1} caracteres especiales, para garantizar {2} bits.",
+  "GatewayDiagnosticRouteHop": "{0} ({1}:{2})",
+  "GatewayDiagnosticRouteEndpoint": "{0}:{1}",
+  "GatewayDiagnosticRouteSeparator": " → ",
+  "GatewayDiagnosticStepLine": "{0}: {1} ({2} ms)",
+  "ErrorGatewayRouteEmpty": "Una ruta de pasarela no puede estar vacía.",
+  "ErrorToolGatewayServicesUnavailable": "Los servicios de pasarela no están disponibles: la conexión se rechaza en lugar de abrirse sin verificación."
 }

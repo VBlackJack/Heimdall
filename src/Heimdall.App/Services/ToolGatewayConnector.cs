@@ -30,6 +30,9 @@ namespace Heimdall.App.Services;
 /// <summary>Opens the complete configured gateway route for a network tool.</summary>
 internal static class ToolGatewayConnector
 {
+    /// <summary>Locale key of the refusal raised when the application's services are absent.</summary>
+    internal const string ToolGatewayServicesUnavailableKey = "ErrorToolGatewayServicesUnavailable";
+
     /// <summary>
     /// Connects without blocking the tool UI. The returned client owns the complete
     /// parent route; disposing it releases the forwarding ports, sessions and keys.
@@ -39,8 +42,10 @@ internal static class ToolGatewayConnector
     {
         ArgumentNullException.ThrowIfNull(gateway);
         ct.ThrowIfCancellationRequested();
+        // Without the application's services there is no localizer either, so the refusal carries
+        // its locale key, the same stand-in LocalizationManager returns for a missing entry.
         IServiceProvider services = (Application.Current as App)?.Services
-            ?? throw new InvalidOperationException("Tool gateway services are unavailable; refusing an unverified connection.");
+            ?? throw new InvalidOperationException(ToolGatewayServicesUnavailableKey);
         IConfigManager config = services.GetRequiredService<IConfigManager>();
         IHostKeyTrustService trust = services.GetRequiredService<IHostKeyTrustService>();
         LocalizationManager localizer = services.GetRequiredService<LocalizationManager>();
@@ -71,7 +76,7 @@ internal static class ToolGatewayConnector
         Func<SshClient, CancellationToken, Task>? connectClient = null)
     {
         ct.ThrowIfCancellationRequested();
-        if (chain.Count == 0) throw new ArgumentException("A gateway route cannot be empty.", nameof(chain));
+        if (chain.Count == 0) throw new ArgumentException(localizer["ErrorGatewayRouteEmpty"], nameof(chain));
         Dictionary<(string Host, int Port), string> fingerprints = [];
         foreach (SshConnectionParams hop in chain)
         {
