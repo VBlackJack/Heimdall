@@ -22,14 +22,20 @@ namespace Heimdall.Sftp;
 public static class SudoDirectoryListing
 {
     private const int FieldCount = 7;
-    private const string RecordFormat = "%y\\0%m\\0%U\\0%G\\0%s\\0%T@\\0%f\\0";
+    // Owner and group by name (%u, %g), as the privileged listing showed them before it moved to
+    // NUL-delimited records; find prints the number for an ID that has no name.
+    private const string RecordFormat = "%y\\0%m\\0%u\\0%g\\0%s\\0%T@\\0%f\\0";
 
-    /// <summary>Lists immediate children without following symbolic links.</summary>
+    /// <summary>
+    /// Lists immediate children. A symbolic link given as the path is followed (<c>-H</c>), so a
+    /// link to a directory lists that directory; links among the children are never followed and
+    /// are reported as links.
+    /// </summary>
     public static string Build(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         string operand = path.StartsWith('/') ? path : "./" + path;
-        return $"LC_ALL=C find {PathEscaper.EscapeForShell(operand)} -mindepth 1 -maxdepth 1 -printf '{RecordFormat}'";
+        return $"LC_ALL=C find -H {PathEscaper.EscapeForShell(operand)} -mindepth 1 -maxdepth 1 -printf '{RecordFormat}'";
     }
 
     /// <summary>Rejects malformed records and excludes names unsupported by remote operations.</summary>

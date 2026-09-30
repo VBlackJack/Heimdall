@@ -16,6 +16,7 @@
 
 using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.App.ViewModels;
+using Heimdall.Sftp;
 
 namespace Heimdall.App.Tests;
 
@@ -145,5 +146,34 @@ public sealed class EmbeddedSftpSudoCommandTimeoutTests
             ViewSource.IsStatementOfTheMethodBody(Folded, BoundStatement),
             "The statement predicate accepted a bound that only runs inside a false branch, so "
                 + "nothing these tests read means anything.");
+    }
+
+    /// <summary>
+    /// The pane's control commands and the privileged transfer share one decision about the
+    /// control bound, instead of two copies of the same number that can drift apart.
+    /// </summary>
+    [Fact]
+    public void ThePaneSharesTheControlBoundOfThePrivilegedTransfer()
+    {
+        Assert.Equal(PrivilegedFileTransfer.ControlCommandTimeout, EmbeddedSftpViewModel.SudoCommandTimeout);
+    }
+
+    /// <summary>
+    /// The privileged transfer's command, which every privileged read and write of the remote
+    /// editor and the pane's sudo upload run through, carries a bound of its own too.
+    /// </summary>
+    /// <remarks>
+    /// It was left unbounded on purpose when the control commands were bounded, because a fixed
+    /// deadline would abort a large legitimate transfer. The bound it now carries grows with the
+    /// payload for a write; that arithmetic is pinned beside the helper in Heimdall.Sftp.Tests.
+    /// </remarks>
+    [Fact]
+    public void ThePrivilegedTransferBoundsItsCommand()
+    {
+        string logic = SourceStatements.Method(
+            SourceStatements.Logic("src", "Heimdall.Sftp", "PrivilegedFileTransfer.cs"),
+            "private static async Task<PrivilegedCommandResult> ExecuteWithInputAsync(");
+
+        SourceStatements.AssertStatementChain(logic, "command.CommandTimeout = commandTimeout;");
     }
 }

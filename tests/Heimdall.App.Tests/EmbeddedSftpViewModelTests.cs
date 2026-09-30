@@ -1024,6 +1024,38 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
     }
 
+    /// <remarks>
+    /// The external editor's auto-upload reports a permission refusal through this description,
+    /// once, instead of retrying it. "Transfer failed" gave no hint that no retry would help.
+    /// </remarks>
+    [Fact]
+    public async Task DescribeTransferError_RemotePermissionDenied_SaysSo()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+
+        string message = viewModel.DescribeTransferError(new SftpPermissionDeniedException("Permission denied"));
+
+        Assert.Equal(localizer["SftpErrorRemotePermissionDenied"], message);
+    }
+
+    [Fact]
+    public async Task DescribeTransferError_UnprotectedEditorFolder_ExplainsTheRefusal()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+
+        string message = viewModel.DescribeTransferError(
+            new Heimdall.Core.Utilities.EditorWorkingDirectoryUnprotectedException(new UnauthorizedAccessException()));
+
+        Assert.Equal(localizer[Heimdall.Core.Utilities.EditorWorkingDirectoryUnprotectedException.LocaleKey], message);
+        Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
+    }
+
     [Fact]
     public async Task DescribeTransferError_InventoryFailure_NamesTheDirectory()
     {
@@ -1171,6 +1203,32 @@ public sealed class EmbeddedSftpViewModelTests
 
         Assert.Equal("/srv", viewModel.CurrentPath);
         Assert.Equal(localizer.Format("SftpStatusLinkNotADirectory", "link"), viewModel.StatusText);
+    }
+
+    /// <remarks>
+    /// The link was never listed: another load held the gate. It used to be reported as "does not
+    /// point at a directory", which is a statement about the server this pane never asked.
+    /// </remarks>
+    [Fact]
+    public async Task HandleFileDoubleClick_LinkWhileAnotherLoadRuns_SaysBusyNotNotADirectory()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/srv", IsConnected = true };
+        SetLocalizer(viewModel, localizer);
+        TaskCompletionSource<IReadOnlyList<SftpFileInfo>> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser browser = new() { ListDirectoryHandler = (_, _) => release.Task };
+        SetBrowser(viewModel, browser);
+        Task blocked = viewModel.LoadDirectoryAsync("/srv/elsewhere");
+        SftpFileInfo link = new("link", "/srv/link", RemoteEntryKind.SymbolicLink, 0, DateTime.UnixEpoch, "rwxrwxrwx", "1000", "1000");
+
+        Assert.True(viewModel.HandleFileDoubleClick(link));
+        await viewModel.PendingNavigation.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(localizer.Format("SftpStatusLinkNavigationBusy", "link"), viewModel.StatusText);
+        Assert.NotEqual(localizer.Format("SftpStatusLinkNotADirectory", "link"), viewModel.StatusText);
+        release.SetResult([]);
+        await blocked.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     /// <remarks>

@@ -76,12 +76,25 @@ public interface IRemoteBrowser : IDisposable
     /// <summary>Uploads a local file to a remote path.</summary>
     Task UploadFileAsync(string localPath, string remotePath, CancellationToken ct = default);
 
-    /// <summary>Uploads with explicit permission to replace a remote destination.</summary>
+    /// <summary>Uploads, stating whether the caller consented to replacing the remote destination.</summary>
+    /// <remarks>
+    /// <paramref name="overwrite"/> false means the caller established, from a listing, that the
+    /// destination was absent, and did not consent to replacing anything. A transport whose own
+    /// commit can refuse an existing name overrides this and raises
+    /// <see cref="RemoteDestinationExistsException"/> for a destination that appeared since the
+    /// listing. A transport with no such commit falls back here to its ordinary upload: the listing
+    /// is then the only proof of absence, and a destination created between the listing and the
+    /// commit is a residual race this default does not close.
+    /// <para>
+    /// Deliberately not routed through <see cref="IRemoteNoClobberCapability"/>. That publisher
+    /// needs an SSH exec channel and a new connection per file, which chrooted
+    /// <c>internal-sftp</c> accounts, Windows OpenSSH and SFTP gateways refuse; an upload of a new
+    /// file must not depend on it. And refusing outright, as this default once did, made every new
+    /// file on a transport that did not override it fail.
+    /// </para>
+    /// </remarks>
     Task UploadFileAsync(string localPath, string remotePath, bool overwrite, CancellationToken ct = default)
-        => overwrite ? UploadFileAsync(localPath, remotePath, ct)
-            : (this as IRemoteNoClobberCapability)?.NoClobberPublisher is { } publisher
-                ? publisher.PublishFileIfAbsentAsync(localPath, remotePath, ct)
-                : throw new RemoteNoClobberPublishUnavailableException(remotePath, "exclusive publication is unavailable");
+        => UploadFileAsync(localPath, remotePath, ct);
 
     /// <summary>Creates a directory on the remote host.</summary>
     Task CreateDirectoryAsync(string path, CancellationToken ct = default);

@@ -85,12 +85,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// channel and then never answers wedges the operation with nothing left to end it. The
     /// caller's token does not cover that gap on its own: several sudo call sites pass no token at
     /// all, and a token cannot interrupt a delegate that has already started running.</para>
-    /// <para>Ten minutes, matching the server-side copy bound in the SFTP browser: long enough for
-    /// a recursive delete over a large tree, short enough that an unproductive channel gives up by
-    /// itself rather than holding the operation open forever. Reaching it surfaces the failure to
-    /// the user as a failure, which is what an unproductive exec channel is.</para>
+    /// <para>The privileged transfer's control bound, shared rather than copied: ten minutes,
+    /// matching the server-side copy bound in the SFTP browser, long enough for a recursive delete
+    /// over a large tree, short enough that an unproductive channel gives up by itself rather than
+    /// holding the operation open forever. Reaching it surfaces the failure to the user as a
+    /// failure, which is what an unproductive exec channel is.</para>
     /// </remarks>
-    internal static readonly TimeSpan SudoCommandTimeout = TimeSpan.FromMinutes(10);
+    internal static readonly TimeSpan SudoCommandTimeout = PrivilegedFileTransfer.ControlCommandTimeout;
 
     private readonly Stack<string> _navigationHistory = new();
     private readonly IUiDispatcher _uiDispatcher;
@@ -589,8 +590,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return;
         }
 
-        bool listed = await LoadDirectoryCoreAsync(previousPath, pushToHistory: false).ConfigureAwait(false);
-        if (!listed)
+        LoadDirectoryOutcome outcome = await LoadDirectoryCoreAsync(previousPath, pushToHistory: false)
+            .ConfigureAwait(false);
+        if (outcome != LoadDirectoryOutcome.Listed)
         {
             return;
         }
@@ -717,13 +719,23 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     private async Task NavigateIntoLinkAsync(SftpFileInfo link)
     {
-        bool listed = await LoadDirectoryCoreAsync(link.FullPath, pushToHistory: true, suppressErrorStatus: true)
+        LoadDirectoryOutcome outcome = await LoadDirectoryCoreAsync(
+                link.FullPath,
+                pushToHistory: true,
+                suppressErrorStatus: true)
             .ConfigureAwait(false);
-        if (!listed)
+
+        // Only a listing the server refused says anything about the link. A load that never ran,
+        // because another one held the gate, used to be reported as "not a directory" too.
+        string? statusKey = outcome switch
         {
-            await RunOnUiAsync(() => UpdateStatus(
-                _localizer?.Format("SftpStatusLinkNotADirectory", link.Name)
-                    ?? $"{link.Name} does not point at a directory.")).ConfigureAwait(false);
+            LoadDirectoryOutcome.Failed => "SftpStatusLinkNotADirectory",
+            LoadDirectoryOutcome.Busy => "SftpStatusLinkNavigationBusy",
+            _ => null,
+        };
+        if (statusKey is not null && _localizer is { } localizer)
+        {
+            await RunOnUiAsync(() => UpdateStatus(localizer.Format(statusKey, link.Name))).ConfigureAwait(false);
         }
     }
 
@@ -963,6 +975,18 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         if (ex is RemoteUploadTargetUnsupportedException)
         {
             return L10n("SftpErrorRemoteUploadTargetNotRegularFile");
+        }
+
+        if (ex is EditorWorkingDirectoryUnprotectedException unprotected)
+        {
+            return L10n(unprotected.MessageKey);
+        }
+
+        // Reached only where no privileged fallback took the refusal over, such as the external
+        // editor's auto-upload. "Transfer failed" gave no hint that nothing would change on retry.
+        if (ex is SftpPermissionDeniedException)
+        {
+            return L10n("SftpErrorRemotePermissionDenied");
         }
 
         // Eight localized refusals, each naming the metadata at stake and a remedy, were
@@ -2038,11 +2062,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         try
         {
-            await Task.Run(() =>
-            {
-                ct.ThrowIfCancellationRequested();
-                ssh.Connect();
-            }, ct).ConfigureAwait(false);
+            // Not Task.Run around Connect(): its token is checked once, before the handshake, and
+            // never again. This one reaches the handshake.
+            await PrivilegedFileTransfer.ConnectAsync(ssh, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -2565,7 +2587,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 Core.Logging.FileLogger.Info("EmbeddedSFTP mkdir permission denied, falling back to sudo");
                 await _sudoEmitter.RunMkdirAsync(
                     remotePath,
-                    () => RunSudoCommandAsync($"mkdir -p {PathEscaper.EscapeForShell(remotePath)}"),
+                    () => RunSudoCommandAsync(
+                        $"mkdir -p {PathEscaper.EscapeForShell(remotePath)}",
+                        LifecycleTokenOrNone()),
                     privileged: true);
             }
 
@@ -3132,7 +3156,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
             await _sudoEmitter.RunChmodAsync(
                 entry.FullPath,
-                () => RunSudoCommandAsync($"chmod {octalText} {PathEscaper.EscapeForShell(entry.FullPath)}"),
+                () => RunSudoCommandAsync(
+                    $"chmod {octalText} {PathEscaper.EscapeForShell(entry.FullPath)}",
+                    LifecycleTokenOrNone()),
                 privileged: true).ConfigureAwait(false);
         }
     }
@@ -3322,8 +3348,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     public static string ResolveDropTargetDirectory(SftpFileInfo? hoveredEntry, string currentDirectory)
         => hoveredEntry is { IsDirectory: true } ? hoveredEntry.FullPath : currentDirectory;
 
-    /// <returns>True when the directory was listed and applied; false when nothing changed.</returns>
-    private async Task<bool> LoadDirectoryCoreAsync(
+    /// <summary>What became of a request to list a directory.</summary>
+    private enum LoadDirectoryOutcome
+    {
+        /// <summary>The directory was listed and applied.</summary>
+        Listed,
+
+        /// <summary>No load could start: no live session, or the pane is closing.</summary>
+        NotStarted,
+
+        /// <summary>Another load held the gate, so this one never asked the server.</summary>
+        Busy,
+
+        /// <summary>The load was cancelled.</summary>
+        Cancelled,
+
+        /// <summary>The server was asked and the listing failed.</summary>
+        Failed,
+    }
+
+    /// <returns>What happened; only <see cref="LoadDirectoryOutcome.Listed"/> changed anything.</returns>
+    private async Task<LoadDirectoryOutcome> LoadDirectoryCoreAsync(
         string path,
         bool pushToHistory,
         bool suppressErrorStatus = false,
@@ -3333,17 +3378,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             || _browser is null
             || !_browser.IsConnected)
         {
-            return false;
+            return LoadDirectoryOutcome.NotStarted;
         }
 
         // One atomic gate. IsLoading was read here and set through a second dispatch, and two
         // loads started in that gap both listed and both applied.
         if (Interlocked.CompareExchange(ref _loadGate, 1, 0) != 0)
         {
-            return false;
+            return LoadDirectoryOutcome.Busy;
         }
 
-        bool listed = false;
+        LoadDirectoryOutcome outcome = LoadDirectoryOutcome.Failed;
         await RunOnUiAsync(() => IsLoading = true);
 
         try
@@ -3384,10 +3429,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 CanGoBack = _navigationHistory.Count > 0;
                 UpdateStatus(_localizer?["SftpStatusReady"] ?? "Ready");
             });
-            listed = true;
+            outcome = LoadDirectoryOutcome.Listed;
         }
         catch (OperationCanceledException)
         {
+            outcome = LoadDirectoryOutcome.Cancelled;
             Core.Logging.FileLogger.Debug("SFTP listing cancelled");
             await RunOnUiAsync(() => UpdateStatus(_localizer?["SftpStatusReady"] ?? "Ready"));
         }
@@ -3412,7 +3458,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             await RunOnUiAsync(() => IsLoading = false);
         }
 
-        return listed;
+        return outcome;
     }
 
     private async Task<IReadOnlyList<SftpFileInfo>> ListDirectoryViaSudoAsync(

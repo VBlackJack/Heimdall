@@ -20,13 +20,66 @@ namespace Heimdall.Sftp.Tests;
 
 public sealed class SftpAuditHardeningTests
 {
+    // A new file carries no consent to replace. That used to be refused outright on FTP, which has no
+    // exclusive publish, and routed through the exec-based publisher on SFTP, which needs an exec
+    // channel chrooted accounts refuse. The browser contract is now that a new file goes through the
+    // transport's own upload with a commit that refuses a destination it can see: the refusal for a
+    // missing publisher must not come back. A disconnected browser proves the call got past the
+    // publication choice to the transport, because the only thing left to refuse it is the missing
+    // connection.
     [Fact]
-    public async Task Ftp_ExclusiveUploadIsRefusedBeforeTransportWork()
+    public async Task Ftp_NewFileUploadReachesTheTransportInsteadOfBeingRefused()
     {
+        using TempFile source = new();
         using IRemoteBrowser browser = new FtpBrowser();
-        await Assert.ThrowsAsync<RemoteNoClobberPublishUnavailableException>(
-            async () => await browser.UploadFileAsync("synthetic-source", "/target", overwrite: false));
-        Assert.False(browser.IsConnected);
+
+        InvalidOperationException notConnected = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => browser.UploadFileAsync(source.Path, "/target", overwrite: false));
+
+        Assert.Contains("not connected", notConnected.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sftp_NewFileUploadNeedsNoExecChannel()
+    {
+        using TempFile source = new();
+        using IRemoteBrowser browser = new SftpBrowser();
+
+        // No pinned connection context exists, so anything that still wanted an exec channel would
+        // refuse with the unavailable-publisher exception before reaching the connection check.
+        InvalidOperationException notConnected = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => browser.UploadFileAsync(source.Path, "/target", overwrite: false));
+
+        Assert.Contains("not connected", notConnected.Message, StringComparison.Ordinal);
+    }
+
+    // The interface's default for a new file is the transport's ordinary upload, which replaces a
+    // destination that appeared after the listing. Each transport with a commit able to refuse that
+    // must therefore declare its own overload: dropping it compiles and passes every other test here.
+    [Theory]
+    [InlineData(typeof(SftpBrowser))]
+    [InlineData(typeof(FtpBrowser))]
+    public void Transports_DeclareTheirOwnCommitForANewFile(Type browserType)
+    {
+        System.Reflection.MethodInfo? overload = browserType.GetMethod(
+            nameof(IRemoteBrowser.UploadFileAsync),
+            [typeof(string), typeof(string), typeof(bool), typeof(CancellationToken)]);
+
+        Assert.NotNull(overload);
+        Assert.Equal(browserType, overload!.DeclaringType);
+    }
+
+    private sealed class TempFile : IDisposable
+    {
+        internal TempFile()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"Heimdall-NewFile-{Guid.NewGuid():N}.txt");
+            File.WriteAllText(Path, "payload");
+        }
+
+        internal string Path { get; }
+
+        public void Dispose() => File.Delete(Path);
     }
 
     [Theory]
@@ -136,6 +189,47 @@ public sealed class SftpAuditHardeningTests
     [InlineData("plain ls output")]
     public void SudoListing_RejectsIncompleteResponse(string output)
         => Assert.Throws<InvalidDataException>(() => SudoDirectoryListing.Parse(output, "/"));
+
+    // find does not follow a symbolic link given as its starting point unless told to, so a
+    // privileged listing of a link to a directory printed nothing and the pane showed an empty
+    // directory with status Ready. Measured on the docker bench: plain find lists 0 entries under the
+    // link, `find -H` lists the 2 the target holds, with GNU find and BusyBox 1.37 alike. -H follows
+    // the starting point only; the children are still reported as the links they are.
+    [Fact]
+    public void SudoListing_FollowsALinkGivenAsTheStartingPoint_AndOnlyThat()
+    {
+        string command = SudoDirectoryListing.Build("/srv/link");
+
+        Assert.StartsWith("LC_ALL=C find -H '/srv/link' -mindepth 1 -maxdepth 1 ", command, StringComparison.Ordinal);
+        Assert.DoesNotContain(" -L ", command, StringComparison.Ordinal);
+    }
+
+    // The unprivileged listing used to be `ls -la`, which named owners; the NUL-delimited records
+    // switched to numeric IDs, and a privileged pane showed "0 0" where an administrator reads
+    // "root root". %u and %g print the names, and the number for an ID with no name.
+    [Fact]
+    public void SudoListing_RequestsOwnerAndGroupNames()
+    {
+        string command = SudoDirectoryListing.Build("/srv");
+
+        Assert.Contains("%y\\0%m\\0%u\\0%g\\0%s", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("%U", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("%G", command, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("root", "root")]
+    [InlineData("www-data", "adm")]
+    [InlineData("1001", "1001")]
+    public void SudoListing_CarriesOwnerAndGroupAsReported(string owner, string group)
+    {
+        string record = string.Join('\0', "f", "640", owner, group, "7", "1234.5", "entry", "");
+
+        SftpFileInfo entry = Assert.Single(SudoDirectoryListing.Parse(record, "/srv"));
+
+        Assert.Equal(owner, entry.Owner);
+        Assert.Equal(group, entry.Group);
+    }
 
     [Fact]
     public void SudoListing_EmptyDirectoryAndInvariantNumbers()

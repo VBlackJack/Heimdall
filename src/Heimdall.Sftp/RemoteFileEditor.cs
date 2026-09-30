@@ -73,6 +73,14 @@ public sealed class RemoteFileEditor : IDisposable
     public event Action<RemoteEditorSudoSaveCompleted>? SudoSaveCompleted;
 
     /// <summary>
+    /// Raised once per attempt when the server refused an auto-upload for a reason that another
+    /// attempt cannot change, carrying the refusal so the application can explain it. Such an
+    /// attempt is not retried by the debounce timer, and <see cref="FileUploaded"/> is not raised
+    /// for it; the next save of the file tries again.
+    /// </summary>
+    public event Action<string, Exception>? FileUploadRefused;
+
+    /// <summary>
     /// Creates a new <see cref="RemoteFileEditor"/> backed by the given SFTP browser.
     /// </summary>
     /// <param name="browser">Connected SFTP browser used for file transfers.</param>
@@ -515,6 +523,7 @@ public sealed class RemoteFileEditor : IDisposable
     private async Task OnFileChangedAsync(EditSession session, CancellationToken ct)
     {
         var enteredSemaphore = false;
+        session.IsRetryArmed = false;
 
         if (!session.ShouldUpload)
         {
@@ -523,6 +532,7 @@ public sealed class RemoteFileEditor : IDisposable
         }
 
         bool success;
+        Exception? refusal = null;
         try
         {
             // Serialize uploads per file - prevents concurrent saves from overlapping
@@ -586,6 +596,17 @@ public sealed class RemoteFileEditor : IDisposable
             FileUploaded?.Invoke(session.RemotePath, false);
             return;
         }
+        catch (Exception ex) when (IsDeterministicRefusal(ex))
+        {
+            // Retrying cannot change this answer: re-arming used to re-attempt it every debounce
+            // interval for as long as the file stayed open, each time with the same generic
+            // failure. It is reported once, with its reason, and the next save tries again.
+            success = false;
+            refusal = ex;
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"RemoteFileEditor auto-upload refused for {session.RemotePath} ({ex.GetType().Name}); "
+                + "not retrying until the next save.");
+        }
         catch (Exception ex)
         {
             success = false;
@@ -609,11 +630,34 @@ public sealed class RemoteFileEditor : IDisposable
             }
         }
 
+        if (refusal is not null)
+        {
+            FileUploadRefused?.Invoke(session.RemotePath, refusal);
+            return;
+        }
+
         FileUploaded?.Invoke(session.RemotePath, success);
     }
 
+    /// <summary>
+    /// Whether an auto-upload failure is a refusal that a later attempt of the same content
+    /// cannot change.
+    /// </summary>
+    /// <remarks>
+    /// The replacement's metadata cannot be reproduced (a capability, an ACL, another owner), the
+    /// destination is not a regular file, or the server denied permission, which is also how it
+    /// refuses to hand the replacement to a group the account is not a member of. Each one holds
+    /// until somebody changes the server, so retrying on a timer only repeats it. A transport
+    /// failure is not in this list: that one may well succeed on the next attempt.
+    /// </remarks>
+    internal static bool IsDeterministicRefusal(Exception ex)
+        => ex is SftpMetadataPreservationException
+            or RemoteUploadTargetUnsupportedException
+            or Renci.SshNet.Common.SftpPermissionDeniedException;
+
     private static void ArmDebounceTimer(EditSession session)
     {
+        session.IsRetryArmed = true;
         try
         {
             session.DebounceTimer?.Change(
@@ -909,6 +953,12 @@ internal sealed class EditSession : IDisposable
 
     /// <summary>File system watcher for auto-upload on save.</summary>
     public FileSystemWatcher? Watcher { get; set; }
+
+    /// <summary>
+    /// Whether the debounce timer was last armed to re-attempt the upload, rather than left idle
+    /// until the next save.
+    /// </summary>
+    internal bool IsRetryArmed { get; set; }
 
     /// <summary>The external editor started on the staged copy, when one was.</summary>
     public Process? EditorProcess { get; set; }

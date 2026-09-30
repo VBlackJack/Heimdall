@@ -76,6 +76,77 @@ public static class SftpAtomicUpload
     // has no consumer and is removed rather than left as a route back to that behaviour.
 
     /// <summary>
+    /// Publishes the uploaded temp path at a destination the caller established was absent, with the
+    /// SFTP version 3 rename, and turns a refusal caused by a destination that appeared since into
+    /// <see cref="RemoteDestinationExistsException"/>.
+    /// </summary>
+    /// <remarks>
+    /// The version 3 rename (<c>SSH_FXP_RENAME</c>, not the <c>posix-rename@openssh.com</c>
+    /// extension) is specified to fail when the new name exists, and OpenSSH implements it with
+    /// <c>link()</c>, which the kernel refuses on an existing name. It needs no exec channel and no
+    /// extra connection, so it works where the exec-based publisher does not: chrooted
+    /// <c>internal-sftp</c> accounts, Windows OpenSSH and SFTP gateways.
+    /// <para>
+    /// This is not the strict no-clobber the remote copy requires, and the copy does not use it: a
+    /// server that departs from the specification and overwrites on this rename would replace a file
+    /// created after the caller's listing. For an upload whose destination a listing just proved
+    /// absent, that is the same residual race every transport without an exclusive commit carries,
+    /// and it is never wider than an ordinary upload's.
+    /// </para>
+    /// <para>
+    /// The existence probe runs only after the rename failed, and only to say why. A probe failure
+    /// leaves the reason unknown, so the rename's own failure is what propagates.
+    /// </para>
+    /// </remarks>
+    /// <param name="tempRemotePath">Uploaded temporary path to publish.</param>
+    /// <param name="finalRemotePath">Final remote destination path, absent at the caller's listing.</param>
+    /// <param name="plainRename">SFTP version 3 rename, which refuses an existing destination.</param>
+    /// <param name="remoteExists">Existence probe, consulted only after the rename failed.</param>
+    /// <exception cref="RemoteDestinationExistsException">The destination exists at commit time.</exception>
+    public static void CommitCreate(
+        string tempRemotePath,
+        string finalRemotePath,
+        Action<string, string> plainRename,
+        Func<string, bool> remoteExists)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tempRemotePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(finalRemotePath);
+        ArgumentNullException.ThrowIfNull(plainRename);
+        ArgumentNullException.ThrowIfNull(remoteExists);
+
+        try
+        {
+            plainRename(tempRemotePath, finalRemotePath);
+        }
+        catch (Exception renameFailure) when (renameFailure is not OperationCanceledException)
+        {
+            if (DestinationExistsAfterFailedCommit(finalRemotePath, remoteExists))
+            {
+                throw new RemoteDestinationExistsException(finalRemotePath, renameFailure);
+            }
+
+            throw;
+        }
+    }
+
+    private static bool DestinationExistsAfterFailedCommit(
+        string finalRemotePath,
+        Func<string, bool> remoteExists)
+    {
+        try
+        {
+            return remoteExists(finalRemotePath);
+        }
+        catch (Exception probeFailure) when (probeFailure is not OperationCanceledException)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                "SFTP create commit failed and the destination could not be examined "
+                + $"({probeFailure.GetType().Name}); reporting the commit failure.");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Replaces the final remote path with the uploaded temp path.
     /// </summary>
     /// <remarks>
