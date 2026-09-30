@@ -254,11 +254,20 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
     /// Persists the current <see cref="Tasks"/> collection back to
     /// <see cref="AppSettings.ScheduledTasks"/>.
     /// </summary>
-    private async Task SaveAsync()
+    private Task SaveAsync() => PersistTasksAsync(_configManager, [.. Tasks]);
+
+    /// <summary>
+    /// Writes the task list and nothing else. A whole-object save of a snapshot loaded a moment
+    /// earlier would put back whatever another writer removed in between, such as a revoked
+    /// RDP certificate.
+    /// </summary>
+    internal static Task PersistTasksAsync(IConfigManager configManager, IReadOnlyList<ScheduledTaskDto> tasks)
     {
-        var settings = await _configManager.LoadSettingsAsync();
-        settings.ScheduledTasks = [.. Tasks];
-        await _configManager.SaveSettingsAsync(settings);
+        ArgumentNullException.ThrowIfNull(configManager);
+        ArgumentNullException.ThrowIfNull(tasks);
+
+        List<ScheduledTaskDto> snapshot = [.. tasks];
+        return configManager.MergeSettingAsync(settings => settings.ScheduledTasks = snapshot);
     }
 
     /// <summary>

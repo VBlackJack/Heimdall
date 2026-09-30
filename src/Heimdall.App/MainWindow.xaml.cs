@@ -752,6 +752,26 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         return (FolderCreationOutcome.Created, path);
     }
 
+    /// <summary>
+    /// Records a new empty folder by writing that one entry, then returns the settings as
+    /// persisted. The snapshot the caller loaded to decide on the name is not written back: a
+    /// whole-object save of it would put back whatever another writer removed while the name
+    /// was being checked, such as a revoked RDP certificate.
+    /// </summary>
+    internal static async Task<AppSettings> CommitEmptyFolderAsync(IConfigManager configManager, string path)
+    {
+        ArgumentNullException.ThrowIfNull(configManager);
+
+        await configManager.MergeSettingAsync(settings =>
+        {
+            if (!settings.EmptyGroups.Contains(path, StringComparer.OrdinalIgnoreCase))
+            {
+                settings.EmptyGroups.Add(path);
+            }
+        });
+        return await configManager.LoadSettingsAsync();
+    }
+
     private async void OnAddFolderFromMenu(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
@@ -769,8 +789,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         switch (outcome)
         {
             case FolderCreationOutcome.Created:
-                settings.EmptyGroups.Add(path);
-                await vm.ConfigManager.SaveSettingsAsync(settings);
+                settings = await CommitEmptyFolderAsync(vm.ConfigManager, path);
                 vm.ServerList.LoadServers(servers, settings);
                 vm.StatusText = string.Format(vm.Localize("StatusGroupCreated"), path);
                 break;
