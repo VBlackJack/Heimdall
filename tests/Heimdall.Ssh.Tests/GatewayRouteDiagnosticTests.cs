@@ -123,17 +123,53 @@ public sealed class GatewayRouteDiagnosticTests
     public async Task TruncatedSocksReply_DoesNotPass()
     {
         using ScriptStream stream = new([5, 0, 5, 0, 0, 1]);
-        await Assert.ThrowsAsync<EndOfStreamException>(() =>
+        await Assert.ThrowsAsync<ProxyException>(() =>
             SshGatewayDiagnosticSession.ConfirmSocksTargetAsync(stream, "internal.invalid", 443, default));
     }
 
     [Fact]
     public async Task DestinationBannerBeforeProxyReply_ProvesRemoteTcpAccess()
     {
-        // SSH.NET can forward server-first protocol data before its own SOCKS reply.
-        using ScriptStream stream = new([5, 0, (byte)'S', (byte)'S', (byte)'H', (byte)'-']);
+        // SSH.NET 2026.0.0 can forward server-first protocol data before its own SOCKS reply:
+        // ChannelDirectTcpip.OnData writes to the socket from the message loop as soon as the
+        // channel is open, while HandleSocks5 sends the reply only after Open returns.
+        byte[] banner = System.Text.Encoding.ASCII.GetBytes("SSH-2.0-OpenSSH_9.6");
+        using ScriptStream stream = new([5, 0, .. banner, 13, 10, .. SocksReply(0)]);
         await SshGatewayDiagnosticSession.ConfirmSocksTargetAsync(stream, "internal.invalid", 22, default);
     }
+
+    /// <summary>
+    /// Audit 2026-09-30 S-09: bytes that are not the proxy's reply never count as success.
+    /// </summary>
+    /// <remarks>
+    /// The parser returned success for any four-byte prefix it did not recognise, on the theory
+    /// that it was destination data. The proxy always sends its reply after that data, so a
+    /// stream that ends without one is a proxy the parser does not understand, not a success.
+    /// </remarks>
+    [Fact]
+    public async Task UnrecognisedBytesWithoutAProxyReply_AreNotASuccess()
+    {
+        using ScriptStream stream = new([5, 0, (byte)'S', (byte)'S', (byte)'H', (byte)'-']);
+        await Assert.ThrowsAsync<ProxyException>(() =>
+            SshGatewayDiagnosticSession.ConfirmSocksTargetAsync(stream, "internal.invalid", 22, default));
+    }
+
+    /// <summary>
+    /// Any SOCKS failure code is a failure, not only the one the proxy uses today.
+    /// </summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(5)]
+    public async Task ASocksFailureCode_IsAFailure(byte status)
+    {
+        using ScriptStream stream = new([5, 0, .. SocksReply(status)]);
+        await Assert.ThrowsAsync<ProxyException>(() =>
+            SshGatewayDiagnosticSession.ConfirmSocksTargetAsync(stream, "internal.invalid", 443, default));
+    }
+
+    /// <summary>SSH.NET 2026.0.0 ForwardedPortDynamic.CreateSocks5Reply: ten bytes.</summary>
+    private static byte[] SocksReply(byte status) => [5, status, 0, 1, 0, 0, 0, 0, 0, 0];
 
     private static Task<IReadOnlyList<GatewayDiagnosticStep>> Run(FakeSession session, string? target = null) =>
         GatewayRouteDiagnostic.RunAsync(Chain, _ => "pin", TestTimeout, target, 443, null, default, () => session);

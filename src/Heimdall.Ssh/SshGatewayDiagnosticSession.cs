@@ -81,9 +81,30 @@ internal sealed class SshGatewayDiagnosticSession : IGatewayDiagnosticSession
         await ConfirmSocksTargetAsync(socket.GetStream(), host, port, ct).ConfigureAwait(false);
     }
 
-    // This parser is private to our owned SSH.NET 2025.1.0 loopback proxy, not a general SOCKS client.
-    // That proxy emits a fixed 10-byte success/failure reply after channel.Open. Channel data can
-    // arrive before the reply (for example an SSH banner); such data itself proves TCP access.
+    /// <summary>Length of the proxy's SOCKS5 reply: version, status, reserved, IPv4 type, address, port.</summary>
+    private const int SocksReplyLength = 10;
+
+    /// <summary>Position of the status byte in the reply; zero is success.</summary>
+    private const int SocksReplyStatusIndex = 1;
+
+    /// <summary>
+    /// Destination bytes tolerated ahead of the reply. A server-first protocol sends a banner of
+    /// tens of bytes; a proxy that sends this much without its reply is not the one we parse.
+    /// </summary>
+    private const int MaxBytesBeforeSocksReply = 64 * 1024;
+
+    private const int SocksReadChunkBytes = 4096;
+
+    // This parser is private to our owned SSH.NET loopback proxy, not a general SOCKS client.
+    // Verified against the SSH.NET 2026.0.0 source the projects reference
+    // (ForwardedPortDynamic.HandleSocks5 and CreateSocks5Reply, ChannelDirectTcpip.OnData):
+    // after channel.Open returns, the proxy sends exactly 05 SS 00 01 00 00 00 00 00 00, with
+    // SS = 00 when the channel opened and 01 otherwise. Destination data can arrive BEFORE that
+    // reply, because OnData writes to the socket from the message loop as soon as the channel
+    // is open while the reply is sent afterwards by the accepting thread; the reply itself
+    // always follows. So the stream is scanned for the reply, and only the reply decides: a
+    // zero status is success, any other status is a failure, and a stream that ends or runs
+    // past MaxBytesBeforeSocksReply without a reply is an unrecognised proxy, never a success.
     internal static async Task ConfirmSocksTargetAsync(Stream stream, string host, int port, CancellationToken ct)
     {
         await stream.WriteAsync(new byte[] { 5, 1, 0 }, ct).ConfigureAwait(false);
@@ -107,14 +128,47 @@ internal sealed class SshGatewayDiagnosticSession : IGatewayDiagnosticSession
         }
         byte[] request = [5, 1, 0, addressType, .. address, (byte)(port >> 8), (byte)port];
         await stream.WriteAsync(request, ct).ConfigureAwait(false);
-        byte[] reply = new byte[4];
-        await stream.ReadExactlyAsync(reply, ct).ConfigureAwait(false);
-        // The owned proxy only emits 05 00 00 01 or 05 01 00 01 here. Any other
-        // prefix is destination data forwarded after a successful direct-tcpip channel open.
-        if (reply[0] != 5 || reply[1] > 1 || reply[2] != 0 || reply[3] != 1) return;
-        if (reply[1] == 1) throw new ProxyException("The gateway did not confirm destination access.");
-        byte[] remainder = new byte[6];
-        await stream.ReadExactlyAsync(remainder, ct).ConfigureAwait(false);
+
+        byte status = await ReadSocksReplyStatusAsync(stream, ct).ConfigureAwait(false);
+        if (status != 0) throw new ProxyException("The gateway did not confirm destination access.");
+    }
+
+    /// <summary>
+    /// Reads until the proxy's reply is found and returns its status byte.
+    /// </summary>
+    private static async Task<byte> ReadSocksReplyStatusAsync(Stream stream, CancellationToken ct)
+    {
+        byte[] received = new byte[MaxBytesBeforeSocksReply + SocksReplyLength];
+        int length = 0;
+        while (length < received.Length)
+        {
+            int read = await stream
+                .ReadAsync(received.AsMemory(length, Math.Min(SocksReadChunkBytes, received.Length - length)), ct)
+                .ConfigureAwait(false);
+            if (read == 0) break;
+
+            int searchFrom = Math.Max(0, length - (SocksReplyLength - 1));
+            length += read;
+            int found = FindSocksReply(received.AsSpan(0, length), searchFrom);
+            if (found >= 0) return received[found + SocksReplyStatusIndex];
+        }
+
+        throw new ProxyException("The diagnostic proxy did not send a recognised reply.");
+    }
+
+    private static int FindSocksReply(ReadOnlySpan<byte> data, int searchFrom)
+    {
+        for (int start = searchFrom; start + SocksReplyLength <= data.Length; start++)
+        {
+            ReadOnlySpan<byte> candidate = data.Slice(start, SocksReplyLength);
+            if (candidate[0] == 5 && candidate[2] == 0 && candidate[3] == 1
+                && candidate[4..].IndexOfAnyExcept((byte)0) < 0)
+            {
+                return start;
+            }
+        }
+
+        return -1;
     }
 
     public void Dispose()
