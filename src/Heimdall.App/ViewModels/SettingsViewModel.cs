@@ -3366,36 +3366,82 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         base.OnPropertyChanged(e);
 
-        // Mark dirty when any settings property changes, excluding non-settings properties.
-        // LegacyMigrationReofferAvailable belongs in that exclusion: the command that clears it
-        // has already written the decision to disk through the config manager, outside the
-        // pending-edit buffer, so raising the dirty flag would prompt the user about a change
-        // that neither Save nor Discard can act on.
-        if (e.PropertyName is not (nameof(IsDirty) or nameof(IsBusy)
-            or nameof(IsCheckingUpdate) or nameof(UpdateStatusText)
-            or nameof(UpdateSkippedVersion) or nameof(HasSkippedVersion) or nameof(SkippedVersionText)
-            or nameof(CredentialGuardStatusText)
-            or nameof(IsInstallingUpdate) or nameof(DownloadProgress) or nameof(IsUpdateAvailable)
-            or nameof(IsUpdateReleaseAvailable)
-            or nameof(LegacyMigrationReofferAvailable)
-            or nameof(SelectedGateway) or nameof(SelectedProject)
-            or nameof(SelectedExternalTool) or nameof(HasValidationErrors)
-            or nameof(IsPinConfigured) or nameof(PinStatusText)
-            or nameof(IsVaultHelloAvailable) or nameof(IsVaultHelloEnrolled)
-            or nameof(IsVaultHelloBusy) or nameof(VaultHelloStatusText)
-            or nameof(VaultHelloSectionVisible) or nameof(VaultHelloEnrollVisible)
-            or nameof(VaultHelloDisableVisible) or nameof(VaultHelloUnavailableVisible)
-            or nameof(CanEnableVaultHello) or nameof(CanDisableVaultHello)
-            or nameof(ValidationSummary)
-            or nameof(GeneralTabErrorCount) or nameof(HasGeneralTabErrors)
-            or nameof(TerminalTabErrorCount) or nameof(HasTerminalTabErrors)
-            or nameof(SshTabErrorCount) or nameof(HasSshTabErrors)
-            or nameof(AdvancedTabErrorCount) or nameof(HasAdvancedTabErrors)
-            or nameof(RdpTabErrorCount) or nameof(HasRdpTabErrors)
-            or nameof(SecurityTabErrorCount) or nameof(HasSecurityTabErrors)))
+        // Only a property Save writes can make the panel dirty. This used to be the other way
+        // round - every property, minus a list of exclusions - and every status line, visibility
+        // flag or test result added without its exclusion line armed the unsaved-changes prompt:
+        // enabling the vault, which writes to disk at once, then asked the user whether to save
+        // or discard a change neither button could act on.
+        if (e.PropertyName is not null && PersistedPropertyNames.Contains(e.PropertyName))
         {
             IsDirty = true;
         }
+    }
+
+    /// <summary>
+    /// The panel properties whose name differs from the <see cref="AppSettings"/> property Save
+    /// writes them to.
+    /// </summary>
+    private static readonly Dictionary<string, string> PersistedPropertyAliases = new(StringComparer.Ordinal)
+    {
+        [nameof(AntiIdleInterval)] = nameof(AppSettings.AntiIdleIntervalSeconds),
+        [nameof(SshTmoutResetInterval)] = nameof(AppSettings.SshTmoutResetIntervalSeconds),
+        [nameof(CredentialProviderUnlockSecret)] = nameof(AppSettings.CredentialProviderUnlockSecretEncrypted),
+    };
+
+    /// <summary>
+    /// Panel properties named like a setting that are nevertheless written the moment they
+    /// change, outside the pending-edit buffer, so neither Save nor Discard can act on them.
+    /// </summary>
+    private static readonly HashSet<string> WrittenImmediatelyPropertyNames = new(StringComparer.Ordinal)
+    {
+        nameof(UpdateSkippedVersion),
+    };
+
+    /// <summary>
+    /// Every panel property whose change is a pending edit: the ones Save writes into
+    /// <see cref="AppSettings"/>, and the text of every field that edits one of them.
+    /// </summary>
+    /// <remarks>
+    /// Derived from the settings type rather than listed, so a new setting is tracked the day it
+    /// is added to both, and a new status line is not tracked at all.
+    /// </remarks>
+    internal static readonly IReadOnlySet<string> PersistedPropertyNames = BuildPersistedPropertyNames();
+
+    private static HashSet<string> BuildPersistedPropertyNames()
+    {
+        const System.Reflection.BindingFlags Public =
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
+        const string textSuffix = "Text";
+
+        HashSet<string> settingNames = typeof(AppSettings)
+            .GetProperties(Public)
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        HashSet<string> panelNames = typeof(SettingsViewModel)
+            .GetProperties(Public)
+            .Where(property => property.CanWrite)
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        HashSet<string> persisted = new(StringComparer.Ordinal);
+        foreach (string name in panelNames)
+        {
+            string target = PersistedPropertyAliases.TryGetValue(name, out string? alias) ? alias : name;
+            if (settingNames.Contains(target) && !WrittenImmediatelyPropertyNames.Contains(name))
+            {
+                persisted.Add(name);
+            }
+        }
+
+        foreach (string name in persisted.ToList())
+        {
+            if (panelNames.Contains(name + textSuffix))
+            {
+                persisted.Add(name + textSuffix);
+            }
+        }
+
+        return persisted;
     }
 
     [ObservableProperty]

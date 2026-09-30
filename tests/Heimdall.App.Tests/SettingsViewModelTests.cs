@@ -2385,6 +2385,156 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal("danger", confirm.Severity);
     }
 
+    /// <summary>
+    /// State the panel shows but Save does not write never arms the unsaved-changes prompt.
+    /// </summary>
+    /// <remarks>
+    /// Enabling the vault writes to disk at once and then flipped the vault status, the action
+    /// visibility flags and the status text - each of which marked the panel dirty, so leaving the
+    /// tab asked the user to save or discard a change neither button could reach. The sweep walks
+    /// every writable property the settings type does not carry, so the next status line is caught
+    /// without anyone remembering to list it.
+    /// </remarks>
+    [Fact]
+    public void NonPersistedState_NeverMarksTheSettingsDirty()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        viewModel.LoadFromSettings(new AppSettings());
+        HashSet<string> settingNames = typeof(AppSettings).GetProperties()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        List<string> dirtied = [];
+        List<string> probedNames = [];
+        int probed = 0;
+
+        foreach (PropertyInfo property in typeof(SettingsViewModel).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!property.CanWrite
+                || property.Name == nameof(SettingsViewModel.IsDirty)
+                || settingNames.Contains(property.Name)
+                || settingNames.Contains(StripTextSuffix(property.Name))
+                || PersistedUnderAnotherName.Contains(StripTextSuffix(property.Name))
+                || property.Name is nameof(SettingsViewModel.IsCommandProvider)
+                    or nameof(SettingsViewModel.IsWindowsCredentialManagerProvider))
+            {
+                continue;
+            }
+
+            object? changed = DifferentValue(property.PropertyType, property.GetValue(viewModel));
+            if (changed is null)
+            {
+                continue;
+            }
+
+            viewModel.IsDirty = false;
+            property.SetValue(viewModel, changed);
+            probed++;
+            probedNames.Add(property.Name);
+            if (viewModel.IsDirty)
+            {
+                dirtied.Add(property.Name);
+            }
+        }
+
+        Assert.True(probed >= 10, $"only {probed} non-persisted properties were probed; the sweep is not reading the view model");
+        Assert.Contains(nameof(SettingsViewModel.IsVaultEnabled), probedNames);
+        Assert.Empty(dirtied);
+    }
+
+    /// <summary>Every property Save writes marks the panel dirty when it changes.</summary>
+    [Fact]
+    public void EveryPersistedSetting_MarksTheSettingsDirty()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        viewModel.LoadFromSettings(new AppSettings());
+        HashSet<string> settingNames = typeof(AppSettings).GetProperties()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        List<string> silent = [];
+        int probed = 0;
+
+        foreach (PropertyInfo property in typeof(SettingsViewModel).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            bool persisted = settingNames.Contains(property.Name) || PersistedUnderAnotherName.Contains(property.Name);
+            if (!property.CanWrite
+                || !persisted
+                || property.Name == nameof(SettingsViewModel.UpdateSkippedVersion)
+                || property.Name == nameof(SettingsViewModel.DefaultLocale))
+            {
+                continue;
+            }
+
+            object? changed = DifferentValue(property.PropertyType, property.GetValue(viewModel));
+            if (changed is null)
+            {
+                continue;
+            }
+
+            viewModel.IsDirty = false;
+            property.SetValue(viewModel, changed);
+            probed++;
+            if (!viewModel.IsDirty)
+            {
+                silent.Add(property.Name);
+            }
+        }
+
+        Assert.True(probed >= 60, $"only {probed} persisted properties were probed");
+        Assert.Empty(silent);
+    }
+
+    private static readonly HashSet<string> PersistedUnderAnotherName = new(StringComparer.Ordinal)
+    {
+        nameof(SettingsViewModel.AntiIdleInterval),
+        nameof(SettingsViewModel.SshTmoutResetInterval),
+        nameof(SettingsViewModel.CredentialProviderUnlockSecret),
+    };
+
+    private static string StripTextSuffix(string name) =>
+        name.EndsWith("Text", StringComparison.Ordinal) ? name[..^"Text".Length] : name;
+
+    private static object? DifferentValue(Type type, object? current)
+    {
+        if (type == typeof(bool))
+        {
+            return !(bool)current!;
+        }
+
+        if (type == typeof(int))
+        {
+            return (int)current! + 1;
+        }
+
+        if (type == typeof(double))
+        {
+            return (double)current! + 0.5;
+        }
+
+        if (type == typeof(string))
+        {
+            return (current as string) + "1";
+        }
+
+        if (type == typeof(string[]))
+        {
+            return ((string[]?)current ?? []).Append("800x600").ToArray();
+        }
+
+        if (type.IsEnum)
+        {
+            Array values = Enum.GetValues(type);
+            foreach (object value in values)
+            {
+                if (!value.Equals(current))
+                {
+                    return value;
+                }
+            }
+        }
+
+        return null;
+    }
+
     // The confirmation is consent to a rewrite, so the number in it is the size of the rewrite:
     // the sessions that will change, not every session of the type. Reading "3" before a change
     // that touches 2 teaches the user that the number on a destructive prompt is decoration.
