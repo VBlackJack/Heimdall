@@ -22,8 +22,8 @@ using Heimdall.App.Tests.Views.EmbeddedRdp;
 namespace Heimdall.App.Tests;
 
 /// <summary>
-/// No blocking <c>Connect()</c> survives in Heimdall.Sftp: every connect goes through the
-/// SSH side's cancellable connect, whose token reaches the handshake.
+/// No blocking <c>Connect()</c> survives in Heimdall.Sftp or in the SFTP pane's view model: every
+/// connect goes through the SSH side's cancellable connect, whose token reaches the handshake.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -48,6 +48,18 @@ namespace Heimdall.App.Tests;
 /// by someone who copied an older file.
 /// </para>
 /// <para>
+/// The census first covered Heimdall.Sftp alone, and a fifth site was indeed waiting outside it:
+/// the pane's privileged (sudo) connect, in the application's view model, still ran
+/// <c>Task.Run(() =&gt; ssh.Connect())</c>. The view model's partial files are now read too. It
+/// reaches the cancellable connect through <c>PrivilegedFileTransfer.ConnectAsync</c>, because the
+/// SSH assembly grants its internals to Heimdall.Sftp and not to the application.
+/// </para>
+/// <para>
+/// The same pane's sudo mkdir and chmod passed no token to the privileged command at all, so a
+/// closing pane could not reach them. <see cref="EverySudoCommandCarriesAToken"/> counts the
+/// arguments of every call instead of reading the two known sites.
+/// </para>
+/// <para>
 /// What none of this establishes: that a cancel now interrupts a transfer already in
 /// flight. It does not, deliberately. The study behind this lot found that abandoning an
 /// in-flight SFTP request would release the client lock with the request still on the wire,
@@ -60,6 +72,9 @@ public sealed class SftpConnectCancellationWiringTests
     private const string BrowserFile = "SftpBrowser.cs";
     private const string ExecRunnerFile = "SftpExecCommandRunner.cs";
     private const string EditorFile = "RemoteFileEditor.cs";
+    private const string ViewModelFile = "EmbeddedSftpViewModel.cs";
+    private const string SudoCommandCall = "RunSudoCommandAsync(";
+    private const int SudoCommandArgumentsWithAToken = 2;
 
     private const int MinimumSourceFiles = 10;
 
@@ -108,7 +123,89 @@ public sealed class SftpConnectCancellationWiringTests
         Assert.Contains(files, path => Path.GetFileName(path) == BrowserFile);
         Assert.Contains(files, path => Path.GetFileName(path) == ExecRunnerFile);
         Assert.Contains(files, path => Path.GetFileName(path) == EditorFile);
+        Assert.Contains(files, path => Path.GetFileName(path) == ViewModelFile);
     }
+
+    [Fact]
+    public void EverySudoCommandCarriesAToken()
+    {
+        string logic = ViewSource.WithoutCommentsAndLiterals(File.ReadAllText(ViewModelPath()));
+        IReadOnlyList<int> arities = SudoCommandCallArities(logic);
+
+        // Without a floor this is green on a file that no longer calls the method at all.
+        Assert.True(arities.Count >= 3, $"only {arities.Count} sudo command call(s) were found");
+        Assert.All(arities, arity => Assert.Equal(SudoCommandArgumentsWithAToken, arity));
+    }
+
+    [Fact]
+    public void TheSudoTokenCensusCountsWhatItIsShown()
+    {
+        // The positive control: the shape the census exists for, and the one it must accept. The
+        // literal is blanked first, as it is in the real reading, so a comma inside it cannot count.
+        string withoutToken = ViewSource.WithoutCommentsAndLiterals(
+            "() => RunSudoCommandAsync($\"chmod {octal} {PathEscaper.EscapeForShell(path)}\"),");
+        string withToken = ViewSource.WithoutCommentsAndLiterals(
+            "() => RunSudoCommandAsync($\"mkdir -p {Escape(path, ',')}\", LifecycleTokenOrNone()),");
+
+        Assert.Equal(1, Assert.Single(SudoCommandCallArities(withoutToken)));
+        Assert.Equal(2, Assert.Single(SudoCommandCallArities(withToken)));
+    }
+
+    /// <summary>The number of top-level arguments of every call to the sudo command runner.</summary>
+    /// <remarks>The declaration is skipped: its parameter list is not a call.</remarks>
+    private static List<int> SudoCommandCallArities(string logic)
+    {
+        List<int> arities = [];
+        int index = 0;
+        while ((index = logic.IndexOf(SudoCommandCall, index, StringComparison.Ordinal)) >= 0)
+        {
+            int open = index + SudoCommandCall.Length - 1;
+            index = open + 1;
+            if (IsDeclaration(logic, open - SudoCommandCall.Length + 1))
+            {
+                continue;
+            }
+
+            // The runner takes at least the privileged body, so a call has one argument plus one
+            // per top-level comma. Emptiness cannot be read here: a literal argument is blanked.
+            int depth = 0;
+            int commas = 0;
+            for (int cursor = open; cursor < logic.Length; cursor++)
+            {
+                char current = logic[cursor];
+                if (current is '(' or '[' or '{')
+                {
+                    depth++;
+                }
+                else if (current is ')' or ']' or '}')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        break;
+                    }
+                }
+                else if (current == ',' && depth == 1)
+                {
+                    commas++;
+                }
+            }
+
+            arities.Add(commas + 1);
+        }
+
+        return arities;
+    }
+
+    private static bool IsDeclaration(string logic, int nameStart)
+    {
+        int lineStart = logic.LastIndexOf('\n', Math.Max(0, nameStart - 1)) + 1;
+        string prefix = logic[lineStart..nameStart];
+        return prefix.TrimEnd().EndsWith("Task", StringComparison.Ordinal);
+    }
+
+    private static string ViewModelPath()
+        => Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App", "ViewModels", ViewModelFile);
 
     [Fact]
     public void TheCensusReportsAConnectItIsShownOnPurpose()
@@ -153,10 +250,13 @@ public sealed class SftpConnectCancellationWiringTests
     {
         string root = Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.Sftp");
         Assert.True(Directory.Exists(root), $"Source directory not found: {root}");
+        string viewModels = Path.GetDirectoryName(ViewModelPath())!;
+        Assert.True(Directory.Exists(viewModels), $"Source directory not found: {viewModels}");
 
         return Directory
             .EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
             .Where(path => !IsBuildOutput(path, root))
+            .Concat(Directory.EnumerateFiles(viewModels, "EmbeddedSftpViewModel*.cs", SearchOption.TopDirectoryOnly))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
     }

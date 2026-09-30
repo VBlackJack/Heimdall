@@ -85,12 +85,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// channel and then never answers wedges the operation with nothing left to end it. The
     /// caller's token does not cover that gap on its own: several sudo call sites pass no token at
     /// all, and a token cannot interrupt a delegate that has already started running.</para>
-    /// <para>Ten minutes, matching the server-side copy bound in the SFTP browser: long enough for
-    /// a recursive delete over a large tree, short enough that an unproductive channel gives up by
-    /// itself rather than holding the operation open forever. Reaching it surfaces the failure to
-    /// the user as a failure, which is what an unproductive exec channel is.</para>
+    /// <para>The privileged transfer's control bound, shared rather than copied: ten minutes,
+    /// matching the server-side copy bound in the SFTP browser, long enough for a recursive delete
+    /// over a large tree, short enough that an unproductive channel gives up by itself rather than
+    /// holding the operation open forever. Reaching it surfaces the failure to the user as a
+    /// failure, which is what an unproductive exec channel is.</para>
     /// </remarks>
-    internal static readonly TimeSpan SudoCommandTimeout = TimeSpan.FromMinutes(10);
+    internal static readonly TimeSpan SudoCommandTimeout = PrivilegedFileTransfer.ControlCommandTimeout;
 
     private readonly Stack<string> _navigationHistory = new();
     private readonly IUiDispatcher _uiDispatcher;
@@ -2038,11 +2039,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         try
         {
-            await Task.Run(() =>
-            {
-                ct.ThrowIfCancellationRequested();
-                ssh.Connect();
-            }, ct).ConfigureAwait(false);
+            // Not Task.Run around Connect(): its token is checked once, before the handshake, and
+            // never again. This one reaches the handshake.
+            await PrivilegedFileTransfer.ConnectAsync(ssh, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -2565,7 +2564,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 Core.Logging.FileLogger.Info("EmbeddedSFTP mkdir permission denied, falling back to sudo");
                 await _sudoEmitter.RunMkdirAsync(
                     remotePath,
-                    () => RunSudoCommandAsync($"mkdir -p {PathEscaper.EscapeForShell(remotePath)}"),
+                    () => RunSudoCommandAsync(
+                        $"mkdir -p {PathEscaper.EscapeForShell(remotePath)}",
+                        LifecycleTokenOrNone()),
                     privileged: true);
             }
 
@@ -3132,7 +3133,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
             await _sudoEmitter.RunChmodAsync(
                 entry.FullPath,
-                () => RunSudoCommandAsync($"chmod {octalText} {PathEscaper.EscapeForShell(entry.FullPath)}"),
+                () => RunSudoCommandAsync(
+                    $"chmod {octalText} {PathEscaper.EscapeForShell(entry.FullPath)}",
+                    LifecycleTokenOrNone()),
                 privileged: true).ConfigureAwait(false);
         }
     }

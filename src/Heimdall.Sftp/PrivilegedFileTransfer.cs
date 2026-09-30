@@ -211,6 +211,58 @@ public readonly record struct PrivilegedCommandResult(
 public static class PrivilegedFileTransfer
 {
     /// <summary>
+    /// The bound of a privileged exec command whose duration is not set by a payload.
+    /// </summary>
+    /// <remarks>
+    /// SSH.NET leaves <c>SshCommand.CommandTimeout</c> infinite, so a server that accepts the exec
+    /// channel and then never answers holds the operation open with nothing left to end it. Ten
+    /// minutes, matching the server-side copy bound: long enough for a recursive privileged
+    /// operation over a large tree, short enough that an unproductive channel gives up by itself.
+    /// The SFTP pane's sudo control commands use this same value, so the two cannot drift apart.
+    /// </remarks>
+    public static readonly TimeSpan ControlCommandTimeout = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// The slowest sustained rate a privileged write is still expected to complete at.
+    /// </summary>
+    /// <remarks>
+    /// SSH.NET's command bound is wall-clock over the whole command, not an inactivity timer, so a
+    /// fixed bound on a write would abort a large legitimate one. The write's bound grows by the
+    /// time its payload takes at this rate: 32 KiB/s, well below any usable link, so it never
+    /// aborts a transfer that is making progress, while a wedged server is still given up on.
+    /// </remarks>
+    internal const long MinimumTransferBytesPerSecond = 32 * 1024;
+
+    /// <summary>
+    /// Returns the bound for a privileged command carrying <paramref name="payloadBytes"/>, or the
+    /// control bound when the payload is unknown.
+    /// </summary>
+    internal static TimeSpan TransferCommandTimeout(long? payloadBytes)
+    {
+        if (payloadBytes is not { } bytes)
+        {
+            return ControlCommandTimeout;
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(bytes, nameof(payloadBytes));
+        return ControlCommandTimeout + TimeSpan.FromSeconds((double)bytes / MinimumTransferBytesPerSecond);
+    }
+
+    /// <summary>
+    /// Connects a client for a privileged command with a cancellation that reaches the handshake.
+    /// </summary>
+    /// <remarks>
+    /// The application's privileged SFTP connect used <c>Task.Run(() =&gt; client.Connect())</c>,
+    /// whose token is checked once before the call and never again. The SSH assembly grants its
+    /// cancellable connect to this one, not to the application, so the application reaches it here.
+    /// </remarks>
+    public static Task ConnectAsync(SshClient client, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        return Heimdall.Ssh.SshConnectionFactory.ConnectWithCancellationAsync(client, ct);
+    }
+
+    /// <summary>
     /// Executes a privileged command whose body does not consume standard input.
     /// </summary>
     public static async Task<PrivilegedCommandResult> ExecuteCommandAsync(
@@ -230,6 +282,7 @@ public static class PrivilegedFileTransfer
                     PrivilegedFileCommands.BuildNonInteractiveSudoInvocation(privilegedBody),
                     emptyInput,
                     ReadOnlyMemory<byte>.Empty,
+                    ControlCommandTimeout,
                     ct)
                 .ConfigureAwait(false);
         }
@@ -261,6 +314,11 @@ public static class PrivilegedFileTransfer
             throw new ArgumentException("The content stream must be readable.", nameof(content));
         }
 
+        // The payload sets how long a legitimate write takes, so it sets the bound too. A stream
+        // whose length cannot be read gets the control bound: no caller passes one today.
+        TimeSpan commandTimeout = TransferCommandTimeout(
+            content.CanSeek ? Math.Max(0, content.Length - content.Position) : null);
+
         string commandText;
         if (string.IsNullOrEmpty(sudoPassword))
         {
@@ -270,6 +328,7 @@ public static class PrivilegedFileTransfer
                     commandText,
                     content,
                     ReadOnlyMemory<byte>.Empty,
+                    commandTimeout,
                     ct)
                 .ConfigureAwait(false);
         }
@@ -278,7 +337,7 @@ public static class PrivilegedFileTransfer
         byte[] passwordBytes = Encoding.UTF8.GetBytes(sudoPassword + "\n");
         try
         {
-            return await ExecuteWithInputAsync(client, commandText, content, passwordBytes, ct)
+            return await ExecuteWithInputAsync(client, commandText, content, passwordBytes, commandTimeout, ct)
                 .ConfigureAwait(false);
         }
         finally
@@ -297,7 +356,13 @@ public static class PrivilegedFileTransfer
         try
         {
             using var emptyInput = new MemoryStream();
-            return await ExecuteWithInputAsync(client, commandText, emptyInput, passwordBytes, ct)
+            return await ExecuteWithInputAsync(
+                    client,
+                    commandText,
+                    emptyInput,
+                    passwordBytes,
+                    ControlCommandTimeout,
+                    ct)
                 .ConfigureAwait(false);
         }
         finally
@@ -311,9 +376,11 @@ public static class PrivilegedFileTransfer
         string commandText,
         Stream input,
         ReadOnlyMemory<byte> prefix,
+        TimeSpan commandTimeout,
         CancellationToken ct)
     {
         using SshCommand command = client.CreateCommand(commandText);
+        command.CommandTimeout = commandTimeout;
         Task? executeTask = null;
         try
         {
