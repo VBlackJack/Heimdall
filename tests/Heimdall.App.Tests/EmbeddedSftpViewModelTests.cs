@@ -1024,6 +1024,23 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.NotEqual(localizer["SftpStatusTransferFailed"], message);
     }
 
+    /// <remarks>
+    /// The external editor's auto-upload reports a permission refusal through this description,
+    /// once, instead of retrying it. "Transfer failed" gave no hint that no retry would help.
+    /// </remarks>
+    [Fact]
+    public async Task DescribeTransferError_RemotePermissionDenied_SaysSo()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        SetLocalizer(viewModel, localizer);
+
+        string message = viewModel.DescribeTransferError(new SftpPermissionDeniedException("Permission denied"));
+
+        Assert.Equal(localizer["SftpErrorRemotePermissionDenied"], message);
+    }
+
     [Fact]
     public async Task DescribeTransferError_InventoryFailure_NamesTheDirectory()
     {

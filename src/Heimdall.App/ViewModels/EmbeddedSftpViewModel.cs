@@ -966,6 +966,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return L10n("SftpErrorRemoteUploadTargetNotRegularFile");
         }
 
+        // Reached only where no privileged fallback took the refusal over, such as the external
+        // editor's auto-upload. "Transfer failed" gave no hint that nothing would change on retry.
+        if (ex is SftpPermissionDeniedException)
+        {
+            return L10n("SftpErrorRemotePermissionDenied");
+        }
+
         // Eight localized refusals, each naming the metadata at stake and a remedy, were
         // carried by this exception and read by nothing: every one showed "Transfer failed".
         if (ex is SftpMetadataPreservationException preservationRefusal)

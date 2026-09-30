@@ -398,6 +398,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         _externalEditorRejectionKey = editorRejectionKey;
         _editor = new RemoteFileEditor(operationsBrowser, hostKeyStore: hostKeyStore, hostKeyVerifier: _hostKeyVerifier, editorPath: editorPath);
         _editor.FileUploaded += OnEditorFileUploaded;
+        _editor.FileUploadRefused += OnEditorFileUploadRefused;
         _editor.HostKeyRotatedDuringUpload += OnHostKeyRotatedDuringUpload;
         _editor.SudoSaveCompleted += OnEditorSudoSaveCompleted;
 
@@ -489,6 +490,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         if (_editor is not null)
         {
             _editor.FileUploaded -= OnEditorFileUploaded;
+            _editor.FileUploadRefused -= OnEditorFileUploadRefused;
             _editor.HostKeyRotatedDuringUpload -= OnHostKeyRotatedDuringUpload;
             _editor.SudoSaveCompleted -= OnEditorSudoSaveCompleted;
             _editor.Dispose();
@@ -1954,6 +1956,27 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 // available here: this callback is told that the upload failed, not why.
                 ShowError(LF("SftpStatusAutoUploadFailed", fileName));
             }
+        });
+    }
+
+    /// <summary>
+    /// Shows, once, why the server refused an auto-upload that retrying cannot change. The editor
+    /// no longer re-attempts it on a timer, so this is the only report until the next save.
+    /// </summary>
+    private void OnEditorFileUploadRefused(string remotePath, Exception refusal)
+    {
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            if (_disposed
+                || _editor?.GetActiveEdits().Contains(remotePath, StringComparer.Ordinal) != true)
+            {
+                return;
+            }
+
+            ShowError(LF(
+                "SftpStatusAutoUploadRefused",
+                Path.GetFileName(remotePath),
+                _viewModel.DescribeTransferError(refusal)));
         });
     }
 

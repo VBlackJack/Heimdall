@@ -201,6 +201,66 @@ public sealed class RemoteFileEditorTaskTrackingTests
         }
     }
 
+    /// <summary>
+    /// Refusals another attempt cannot change: the replacement's metadata cannot be reproduced
+    /// (including a group the account is not a member of, which the server refuses as permission
+    /// denied), or the destination is not a regular file.
+    /// </summary>
+    public static TheoryData<Exception> DeterministicRefusals => new()
+    {
+        new SftpMetadataPreservationException(SftpMetadataPreflightVerdict.AclPresent, "/remote/file.txt"),
+        new RemoteUploadTargetUnsupportedException("/remote/file.txt", RemoteEntryKind.SymbolicLink),
+        new Renci.SshNet.Common.SftpPermissionDeniedException("Permission denied"),
+    };
+
+    /// <remarks>
+    /// Every failure used to re-arm the debounce timer, so a refusal that no retry can change was
+    /// re-attempted every two seconds for as long as the file stayed open, each attempt opening a
+    /// metadata probe channel and each one reporting the same generic failure again. The flag is
+    /// read after the attempt has completed, so the verdict is not a matter of timing.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(DeterministicRefusals))]
+    public async Task OnFileChangedAsync_DeterministicRefusal_IsReportedOnceAndNotRetried(Exception refusal)
+    {
+        var browser = new FakeRemoteBrowser((_, _, _) => Task.FromException(refusal));
+        using var editor = CreateEditor(browser);
+        using var session = CreateSession();
+        var refusals = new List<(string RemotePath, Exception Refusal)>();
+        var uploadEvents = new List<(string RemotePath, bool Success)>();
+        editor.FileUploadRefused += (path, ex) => refusals.Add((path, ex));
+        editor.FileUploaded += (path, success) => uploadEvents.Add((path, success));
+
+        editor.TriggerOnFileChangedForTesting(session);
+        await WaitUntilAsync(() => session.CurrentUpload is not null);
+        await WaitForTaskAsync(session.CurrentUpload!);
+
+        Assert.False(session.IsRetryArmed, "a refusal no retry can change must not re-arm the timer");
+        var reported = Assert.Single(refusals);
+        Assert.Equal(session.RemotePath, reported.RemotePath);
+        Assert.Same(refusal, reported.Refusal);
+        Assert.Empty(uploadEvents);
+    }
+
+    // The positive control: a transient failure still re-arms, so the flag above is not simply
+    // never set.
+    [Fact]
+    public async Task OnFileChangedAsync_TransientFailure_ArmsTheRetry()
+    {
+        var browser = new FakeRemoteBrowser((_, _, _) => Task.FromException(new IOException("Connection reset.")));
+        using var editor = CreateEditor(browser);
+        using var session = CreateSession();
+        var refusals = new List<Exception>();
+        editor.FileUploadRefused += (_, ex) => refusals.Add(ex);
+
+        editor.TriggerOnFileChangedForTesting(session);
+        await WaitUntilAsync(() => session.CurrentUpload is not null);
+        await WaitForTaskAsync(session.CurrentUpload!);
+
+        Assert.True(session.IsRetryArmed);
+        Assert.Empty(refusals);
+    }
+
     [Fact]
     public async Task OnFileChangedAsync_SuccessfulUpload_AdvancesLastUploadTime()
     {
