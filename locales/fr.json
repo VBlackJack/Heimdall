@@ -1884,6 +1884,7 @@
   "SftpHostKeyMismatchMidSession": "Avertissement de s\u00e9curit\u00e9 : la cl\u00e9 d'h\u00f4te de {0}:{1} a chang\u00e9 en cours de session. Possible MITM. Empreinte pr\u00e9sent\u00e9e : {2}. Empreinte de confiance : {3}. D\u00e9connectez-vous et reconnectez-vous pour r\u00e9tablir la confiance.",
   "SftpStatusEditFileTooLarge": "Impossible d'\u00e9diter {0} : les fichiers de plus de 16 Mio doivent \u00eatre t\u00e9l\u00e9charg\u00e9s \u00e0 la place.",
   "SftpStatusLinkNotADirectory": "{0} ne pointe pas vers un r\u00e9pertoire.",
+  "SftpStatusLinkNavigationBusy": "{0} n'a pas été ouvert : un autre dossier est encore en cours de chargement. Réessayez une fois le chargement terminé.",
   "SftpErrorExternalEditorLaunchFailed": "L'\u00e9diteur externe n'a pas pu \u00eatre lanc\u00e9 : {0}. V\u00e9rifiez le chemin de l'\u00e9diteur dans les param\u00e8tres.",
   "SftpStatusEditOpenFailed": "Impossible d'ouvrir l'\u00e9diteur : {0}",
   "SftpStatusEditUnsupportedEntry": "Impossible d'\u00e9diter {0} : cette entr\u00e9e n'est pas un fichier r\u00e9gulier.",

@@ -1191,6 +1191,32 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     /// <remarks>
+    /// The link was never listed: another load held the gate. It used to be reported as "does not
+    /// point at a directory", which is a statement about the server this pane never asked.
+    /// </remarks>
+    [Fact]
+    public async Task HandleFileDoubleClick_LinkWhileAnotherLoadRuns_SaysBusyNotNotADirectory()
+    {
+        FakeUiDispatcher dispatcher = new();
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        EmbeddedSftpViewModel viewModel = new(dispatcher) { CurrentPath = "/srv", IsConnected = true };
+        SetLocalizer(viewModel, localizer);
+        TaskCompletionSource<IReadOnlyList<SftpFileInfo>> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeRemoteBrowser browser = new() { ListDirectoryHandler = (_, _) => release.Task };
+        SetBrowser(viewModel, browser);
+        Task blocked = viewModel.LoadDirectoryAsync("/srv/elsewhere");
+        SftpFileInfo link = new("link", "/srv/link", RemoteEntryKind.SymbolicLink, 0, DateTime.UnixEpoch, "rwxrwxrwx", "1000", "1000");
+
+        Assert.True(viewModel.HandleFileDoubleClick(link));
+        await viewModel.PendingNavigation.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(localizer.Format("SftpStatusLinkNavigationBusy", "link"), viewModel.StatusText);
+        Assert.NotEqual(localizer.Format("SftpStatusLinkNotADirectory", "link"), viewModel.StatusText);
+        release.SetResult([]);
+        await blocked.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    /// <remarks>
     /// The privileged script's tooling refusal used to surface as "sudo atomic write failed
     /// (exit 75)": a raw exit status where a sentence about the missing tool belongs.
     /// </remarks>

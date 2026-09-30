@@ -1884,6 +1884,7 @@
   "SftpHostKeyMismatchMidSession": "Security warning: host key for {0}:{1} changed during the session. Possible MITM. Presented fingerprint: {2}. Trusted fingerprint: {3}. Disconnect and reconnect to re-establish trust.",
   "SftpStatusEditFileTooLarge": "Cannot edit {0}: files larger than 16 MiB must be downloaded instead.",
   "SftpStatusLinkNotADirectory": "{0} does not point at a directory.",
+  "SftpStatusLinkNavigationBusy": "{0} was not opened: another folder is still loading. Try again once it finishes.",
   "SftpErrorExternalEditorLaunchFailed": "The external editor could not be started: {0}. Check the editor path in Settings.",
   "SftpStatusEditOpenFailed": "Could not open editor: {0}",
   "SftpStatusEditUnsupportedEntry": "Cannot edit {0}: this entry is not a regular file.",

@@ -1884,6 +1884,7 @@
   "SftpHostKeyMismatchMidSession": "Aviso de seguridad: la clave de host de {0}:{1} cambió durante la sesión. Posible MITM. Huella presentada: {2}. Huella de confianza: {3}. Desconecta y vuelve a conectar para restablecer la confianza.",
   "SftpStatusEditFileTooLarge": "No se puede editar {0}: los archivos de más de 16 MiB deben descargarse en su lugar.",
   "SftpStatusLinkNotADirectory": "{0} no apunta a un directorio.",
+  "SftpStatusLinkNavigationBusy": "{0} no se abrió: otra carpeta aún se está cargando. Vuelve a intentarlo cuando termine.",
   "SftpErrorExternalEditorLaunchFailed": "No se pudo iniciar el editor externo: {0}. Comprueba la ruta del editor en Ajustes.",
   "SftpStatusEditOpenFailed": "No se pudo abrir el editor: {0}",
   "SftpStatusEditUnsupportedEntry": "No se puede editar {0}: esta entrada no es un archivo normal.",
