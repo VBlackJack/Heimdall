@@ -51,7 +51,8 @@ public sealed class CredentialManagerHelperTests
         {
             string marker = CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(Environment.ProcessId, now);
             return CredentialManagerHelper.WriteDomainCredential("TERMSRV/audit.invalid", "user", "synthetic", marker,
-                Probe, Write, Environment.ProcessId, now, out bool written, out _) && written;
+                Probe, Write, Environment.ProcessId, now, out DomainCredentialWriteOutcome outcome, out _)
+                && outcome == DomainCredentialWriteOutcome.Written;
         }
         Task<bool> first = Task.Run(Launch);
         Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
@@ -135,11 +136,11 @@ public sealed class CredentialManagerHelperTests
                 writeError = null;
                 return true;
             },
-            out bool credentialWritten,
+            out DomainCredentialWriteOutcome outcome,
             out string? error);
 
         Assert.True(result);
-        Assert.True(credentialWritten);
+        Assert.Equal(DomainCredentialWriteOutcome.Written, outcome);
         Assert.Null(error);
         Assert.Equal(marker, writtenComment);
     }
@@ -168,11 +169,11 @@ public sealed class CredentialManagerHelperTests
                 writeError = null;
                 return true;
             },
-            out bool credentialWritten,
+            out DomainCredentialWriteOutcome outcome,
             out string? error);
 
         Assert.True(result);
-        Assert.False(credentialWritten);
+        Assert.Equal(DomainCredentialWriteOutcome.ExistingEntryKept, outcome);
         Assert.False(writeCalled);
         Assert.Null(error);
     }
@@ -202,11 +203,11 @@ public sealed class CredentialManagerHelperTests
                 writeError = null;
                 return true;
             },
-            out bool credentialWritten,
+            out DomainCredentialWriteOutcome outcome,
             out string? error);
 
         Assert.True(result);
-        Assert.True(credentialWritten);
+        Assert.Equal(DomainCredentialWriteOutcome.Written, outcome);
         Assert.Null(error);
         Assert.Equal(marker, writtenComment);
     }

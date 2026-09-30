@@ -30,14 +30,22 @@ public sealed class CredentialManagerLaunchMarkerTests
         new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
 
     [Fact]
-    public void WriteDomainCredential_EntryOwnedByALiveLaunch_KeepsTheFirstLaunchsCredential()
+    public void WriteDomainCredential_TwoLaunchesToTheSameHostWithTwoAccounts_RefusesTheSecond()
     {
-        string firstMarker = CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(
-            OwningProcessId,
-            WriteInstant);
-        FakeCredentialStore store = new FakeCredentialStore(firstMarker, "admin", "pw-a");
+        FakeCredentialStore store = new FakeCredentialStore(null, null, null);
 
-        bool result = CredentialManagerHelper.WriteDomainCredential(
+        bool first = CredentialManagerHelper.WriteDomainCredential(
+            "TERMSRV/srv01",
+            "admin",
+            "pw-a",
+            CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(OwningProcessId, WriteInstant),
+            store.Probe,
+            store.Write,
+            OwningProcessId,
+            WriteInstant,
+            out DomainCredentialWriteOutcome firstOutcome,
+            out _);
+        bool second = CredentialManagerHelper.WriteDomainCredential(
             "TERMSRV/srv01",
             "svc",
             "pw-b",
@@ -48,14 +56,73 @@ public sealed class CredentialManagerLaunchMarkerTests
             store.Write,
             OwningProcessId,
             WriteInstant.AddSeconds(3),
-            out bool credentialWritten,
+            out DomainCredentialWriteOutcome secondOutcome,
+            out string? error);
+
+        Assert.True(first);
+        Assert.Equal(DomainCredentialWriteOutcome.Written, firstOutcome);
+        Assert.True(second);
+        Assert.Null(error);
+        Assert.Equal(DomainCredentialWriteOutcome.LaunchInFlightForAnotherAccount, secondOutcome);
+        Assert.Equal("admin", store.UserName);
+        Assert.Equal("pw-a", store.Secret);
+    }
+
+    [Fact]
+    public void WriteDomainCredential_EntryOwnedByALiveLaunchForTheSameAccount_KeepsItAndLaunches()
+    {
+        string firstMarker = CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(
+            OwningProcessId,
+            WriteInstant);
+        FakeCredentialStore store = new FakeCredentialStore(firstMarker, "admin", "pw-a");
+
+        bool result = CredentialManagerHelper.WriteDomainCredential(
+            "TERMSRV/srv01",
+            "ADMIN",
+            "pw-a2",
+            CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(
+                OwningProcessId,
+                WriteInstant.AddSeconds(3)),
+            store.Probe,
+            store.Write,
+            OwningProcessId,
+            WriteInstant.AddSeconds(3),
+            out DomainCredentialWriteOutcome outcome,
             out string? error);
 
         Assert.True(result);
-        Assert.False(credentialWritten);
+        Assert.Equal(DomainCredentialWriteOutcome.ExistingEntryKept, outcome);
         Assert.Null(error);
         Assert.Equal(firstMarker, store.Comment);
         Assert.Equal("admin", store.UserName);
+        Assert.Equal("pw-a", store.Secret);
+    }
+
+    [Fact]
+    public void WriteDomainCredential_EntryOwnedByALiveLaunchWithAnUnreadableAccount_IsRefused()
+    {
+        string firstMarker = CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(
+            OwningProcessId,
+            WriteInstant);
+        FakeCredentialStore store = new FakeCredentialStore(firstMarker, null, "pw-a");
+
+        bool result = CredentialManagerHelper.WriteDomainCredential(
+            "TERMSRV/srv01",
+            "admin",
+            "pw-b",
+            CredentialManagerHelper.CreateDomainCredentialOwnershipMarker(
+                OwningProcessId,
+                WriteInstant.AddSeconds(3)),
+            store.Probe,
+            store.Write,
+            OwningProcessId,
+            WriteInstant.AddSeconds(3),
+            out DomainCredentialWriteOutcome outcome,
+            out _);
+
+        Assert.True(result);
+        Assert.Equal(DomainCredentialWriteOutcome.LaunchInFlightForAnotherAccount, outcome);
+        Assert.Equal(firstMarker, store.Comment);
         Assert.Equal("pw-a", store.Secret);
     }
 
@@ -82,11 +149,11 @@ public sealed class CredentialManagerLaunchMarkerTests
             store.Write,
             OwningProcessId,
             now,
-            out bool credentialWritten,
+            out DomainCredentialWriteOutcome outcome,
             out string? error);
 
         Assert.True(result);
-        Assert.True(credentialWritten);
+        Assert.Equal(DomainCredentialWriteOutcome.Written, outcome);
         Assert.Null(error);
         Assert.Equal(currentMarker, store.Comment);
         Assert.Equal("svc", store.UserName);
@@ -113,11 +180,11 @@ public sealed class CredentialManagerLaunchMarkerTests
             store.Write,
             OwningProcessId,
             WriteInstant.AddSeconds(3),
-            out bool credentialWritten,
+            out DomainCredentialWriteOutcome outcome,
             out string? error);
 
         Assert.True(result);
-        Assert.True(credentialWritten);
+        Assert.Equal(DomainCredentialWriteOutcome.Written, outcome);
         Assert.Equal(currentMarker, store.Comment);
         Assert.Equal("svc", store.UserName);
     }
@@ -191,7 +258,8 @@ public sealed class CredentialManagerLaunchMarkerTests
                 true,
                 Comment.StartsWith(marker, StringComparison.Ordinal),
                 null,
-                Comment);
+                Comment,
+                UserName);
         }
 
         public bool Write(

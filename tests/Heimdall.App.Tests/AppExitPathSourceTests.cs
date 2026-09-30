@@ -49,6 +49,8 @@ public sealed class AppExitPathSourceTests
     private const string FlushStatement = "Core.Logging.FileLogger.Flush();";
     private const string SnapshotStatement = "await SaveSnapshotAndCloseSessionsAsync();";
     private const string ContainerDisposeStatement = "await DisposeContainerBoundedAsync();";
+    private const string RdpTrustFlushStatement =
+        "await FlushRdpTrustAsync(rdpTrustPersistence, ExitRdpTrustFlushBudget, Core.Logging.FileLogger.Warn);";
     private const string BoundedStepStatement = "await ExitStep.RunBoundedAsync(";
     private const string SingleInstanceStatement = "switch (SingleInstanceGuard.TryAcquire(";
     private const string SplashStatement = "var splash = CreateSplashWindow();";
@@ -117,6 +119,17 @@ public sealed class AppExitPathSourceTests
 
         // Absence: the unbounded form, the only unbounded await the exit path had.
         Assert.DoesNotContain("await asyncProvider.DisposeAsync();", ReadAppSource("App.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OnExit_FlushesTheRdpTrustWritesBeforeTheContainerGoes()
+    {
+        string exit = Logic("App.xaml.cs", OnExitMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, RdpTrustFlushStatement), "the RDP trust flush is not a step of OnExit");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, ContainerDisposeStatement), "the container disposal is not a step of OnExit");
+        Assert.True(
+            exit.IndexOf(RdpTrustFlushStatement, StringComparison.Ordinal) < exit.IndexOf(ContainerDisposeStatement, StringComparison.Ordinal),
+            "the RDP trust flush waits on a settings writer the container has already disposed");
     }
 
     [Fact]

@@ -48,13 +48,6 @@ public sealed class SettingsWholeObjectWriteGuardTests
         ["App.xaml.cs"] =
             "startup HMAC key seeding: the settings object is the one just loaded by the caller "
             + "and nothing is awaited between the mutation and the write",
-        ["MainWindow.xaml.cs"] =
-            "new root folder: the name prompt happens BEFORE the load, so load and write are adjacent",
-        ["ContextMenuFactory.cs"] =
-            "new folder from the tree, twice: the name prompt happens BEFORE the load, so load "
-            + "and write are adjacent",
-        ["ScheduledTasksViewModel.cs"] =
-            "scheduled task list: load, assign, write, three consecutive statements"
     };
 
     [Fact]
@@ -113,6 +106,8 @@ public sealed class SettingsWholeObjectWriteGuardTests
     [InlineData("Services/Import/ProfileImportService.cs")]
     [InlineData("Services/Import/OpenSshConfigImporter.cs")]
     [InlineData("Views/Dialogs/ServerDialog.xaml.cs")]
+    [InlineData("MainWindow.xaml.cs")]
+    [InlineData("ViewModels/Scheduled/ScheduledTasksViewModel.cs")]
     public void ConvertedSites_StillUseTheLockedWrite(string relativePath)
     {
         string path = Path.Combine(AppSourceRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar));

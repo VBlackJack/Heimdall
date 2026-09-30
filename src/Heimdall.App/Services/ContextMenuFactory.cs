@@ -770,8 +770,7 @@ public sealed class ContextMenuFactory
         switch (outcome)
         {
             case MainWindow.FolderCreationOutcome.Created:
-                settings.EmptyGroups.Add(path);
-                await vm.ConfigManager.SaveSettingsAsync(settings);
+                settings = await MainWindow.CommitEmptyFolderAsync(vm.ConfigManager, path);
                 vm.ServerList.LoadServers(servers, settings);
                 vm.StatusText = string.Format(vm.Localize("StatusGroupCreated"), path);
                 break;

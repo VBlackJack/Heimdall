@@ -85,17 +85,12 @@ internal sealed class RdpConnectAttemptArbiter
     /// <summary>The attempt a retry must present to be allowed to continue.</summary>
     public int CurrentAttempt => _gate.CurrentAttempt;
 
-    /// <summary>
-    /// Opens a fresh attempt because the user asked for a connect, and runs it.
-    /// </summary>
+    /// <summary>Opens the attempt before its asynchronous certificate check starts.</summary>
     /// <remarks>
     /// Opening is what clears any prior abandonment, and it is the only thing that does: a new
     /// attempt is a new decision by the user, while a retry is the same attempt finishing what it
     /// started.
     /// </remarks>
-    public void UserRequestedConnect() => _runner.RunAttempt(_gate.OpenAttempt());
-
-    /// <summary>Opens the attempt before its asynchronous certificate check starts.</summary>
     public int PrepareAttempt() => _gate.OpenAttempt();
 
     /// <summary>Revalidates an attempt after dispatch or a nested layout message pump.</summary>

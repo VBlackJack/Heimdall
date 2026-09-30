@@ -402,13 +402,15 @@ public static class CredentialManagerHelper
     /// Target must follow the TERMSRV/host format for RDP auto-login.
     /// Persist is set to Session - credential lives only until logoff and is cleaned
     /// up by the caller after the RDP session launches (defense-in-depth).
+    /// Returns false only on a store failure; <paramref name="outcome"/> then says whether the
+    /// entry was written, left in place, or held by a launch in flight for another account.
     /// </summary>
     public static bool WriteDomainCredential(
         string targetName,
         string username,
         string password,
         string ownershipMarker,
-        out bool credentialWritten,
+        out DomainCredentialWriteOutcome outcome,
         out string? error)
     {
         return WriteDomainCredential(
@@ -418,7 +420,7 @@ public static class CredentialManagerHelper
             ownershipMarker,
             (target, marker) => ProbeCredential(target, CredTypeDomainPassword, marker, exactMarker: false),
             WriteCredential,
-            out credentialWritten,
+            out outcome,
             out error);
     }
 
@@ -453,7 +455,7 @@ public static class CredentialManagerHelper
         string ownershipMarker,
         Func<string, string, CredentialProbeResult> probeCredential,
         CredentialWriteOperation writeCredential,
-        out bool credentialWritten,
+        out DomainCredentialWriteOutcome outcome,
         out string? error)
     {
         return WriteDomainCredential(
@@ -465,7 +467,7 @@ public static class CredentialManagerHelper
             writeCredential,
             Environment.ProcessId,
             DateTime.UtcNow,
-            out credentialWritten,
+            out outcome,
             out error);
     }
 
@@ -478,12 +480,12 @@ public static class CredentialManagerHelper
         CredentialWriteOperation writeCredential,
         int currentProcessId,
         DateTime utcNow,
-        out bool credentialWritten,
+        out DomainCredentialWriteOutcome outcome,
         out string? error)
     {
         lock (CredentialGate)
         {
-            credentialWritten = false;
+            outcome = DomainCredentialWriteOutcome.ExistingEntryKept;
             error = null;
 
             if (string.IsNullOrWhiteSpace(targetName))
@@ -518,7 +520,15 @@ public static class CredentialManagerHelper
             {
                 // The entry belongs to a launch of this process that may not have read it yet.
                 // Overwriting it would hand that session this profile's account instead of its
-                // own, so treat it exactly like a foreign entry and leave it in place.
+                // own, so it stays in place. For the same account the client can sign in with it;
+                // for another account, or one that cannot be read, launching now would open the
+                // session as the first launch's account, so this launch is refused instead.
+                if (probe.UserName is null ||
+                    !string.Equals(probe.UserName, username, StringComparison.OrdinalIgnoreCase))
+                {
+                    outcome = DomainCredentialWriteOutcome.LaunchInFlightForAnotherAccount;
+                }
+
                 return true;
             }
 
@@ -530,7 +540,11 @@ public static class CredentialManagerHelper
                 CredPersistSession,
                 ownershipMarker,
                 out error);
-            credentialWritten = written;
+            if (written)
+            {
+                outcome = DomainCredentialWriteOutcome.Written;
+            }
+
             return written;
         }
     }
@@ -607,7 +621,8 @@ public static class CredentialManagerHelper
         bool Exists,
         bool MarkerMatches,
         string? Error,
-        string? Comment = null);
+        string? Comment = null,
+        string? UserName = null);
 
     internal readonly record struct CredentialDeleteResult(bool Success, int ErrorCode);
 
@@ -618,7 +633,8 @@ public static class CredentialManagerHelper
         bool exactMarker,
         CredentialReadOperation readCredential,
         Action<IntPtr> freeCredential,
-        Func<IntPtr, string?> readComment)
+        Func<IntPtr, string?> readComment,
+        Func<IntPtr, string?>? readUserName = null)
     {
         ArgumentNullException.ThrowIfNull(readCredential);
         ArgumentNullException.ThrowIfNull(freeCredential);
@@ -645,10 +661,11 @@ public static class CredentialManagerHelper
             }
 
             string? comment = readComment(credentialPointer);
+            string? userName = readUserName?.Invoke(credentialPointer);
             bool markerMatches = exactMarker
                 ? string.Equals(comment, marker, StringComparison.Ordinal)
                 : comment?.StartsWith(marker, StringComparison.Ordinal) == true;
-            return new CredentialProbeResult(true, true, markerMatches, null, comment);
+            return new CredentialProbeResult(true, true, markerMatches, null, comment, userName);
         }
         finally
         {
@@ -677,7 +694,15 @@ public static class CredentialManagerHelper
                 return read;
             },
             CredFree,
-            ReadCredentialComment);
+            ReadCredentialComment,
+            ReadCredentialUserName);
+    }
+
+    private static string? ReadCredentialUserName(IntPtr credentialPointer)
+    {
+        int userNameOffset = Marshal.OffsetOf<NativeCredentialPointers>(
+            nameof(NativeCredentialPointers.UserName)).ToInt32();
+        return Marshal.PtrToStringUni(Marshal.ReadIntPtr(credentialPointer, userNameOffset));
     }
 
     private static string? ReadCredentialComment(IntPtr credentialPointer)

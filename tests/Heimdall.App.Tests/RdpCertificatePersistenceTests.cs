@@ -75,6 +75,61 @@ public sealed class RdpCertificatePersistenceTests
     }
 
     [Fact]
+    public async Task ExitFlush_WaitsForAnApprovalStillBeingWritten()
+    {
+        RdpCertificateTrustStore store = new();
+        RdpTrustKey key = RdpTrustKey.ForProfile("profile");
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool written = false;
+        using RdpCertificatePersistence persistence = new(store, async (_, _) =>
+        {
+            entered.SetResult();
+            await release.Task.WaitAsync(Budget);
+            written = true;
+        });
+        store.Trust(key, "SHA256:AA");
+        await entered.Task.WaitAsync(Budget);
+
+        Task<bool> flush = App.FlushRdpTrustAsync(persistence, Budget, _ => { });
+
+        Assert.False(flush.IsCompleted, "the exit flush returned while the approval was still being written");
+        release.SetResult();
+        Assert.True(await flush.WaitAsync(Budget));
+        Assert.True(written);
+    }
+
+    [Fact]
+    public async Task ExitFlush_AWriteThatNeverEnds_IsAbandonedWithinTheBudget()
+    {
+        RdpCertificateTrustStore store = new();
+        RdpTrustKey key = RdpTrustKey.ForProfile("profile");
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource never = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        List<string> warnings = [];
+        using RdpCertificatePersistence persistence = new(store, async (_, _) =>
+        {
+            entered.SetResult();
+            await never.Task;
+        });
+        store.Trust(key, "SHA256:AA");
+        await entered.Task.WaitAsync(Budget);
+
+        bool completed = await App.FlushRdpTrustAsync(persistence, TimeSpan.FromMilliseconds(50), warnings.Add)
+            .WaitAsync(Budget);
+
+        Assert.False(completed);
+        Assert.Single(warnings);
+        never.SetResult();
+    }
+
+    [Fact]
+    public async Task ExitFlush_NoPersistence_CompletesAtOnce()
+    {
+        Assert.True(await App.FlushRdpTrustAsync(null, Budget, _ => { }).WaitAsync(Budget));
+    }
+
+    [Fact]
     public async Task ProductionWriterRevocationSurvivesReload()
     {
         string root = Path.Combine(Path.GetTempPath(), nameof(RdpCertificatePersistenceTests), Guid.NewGuid().ToString("N"));

@@ -22,6 +22,16 @@ internal enum RdpOverlayPrimaryAction
     EditProfile
 }
 
+/// <summary>The action buttons of the reconnect overlay, in their visual order.</summary>
+internal enum RdpOverlayButton
+{
+    Reconnect,
+    CopyError,
+    CopyAnonymous,
+    EditProfile,
+    Close
+}
+
 /// <summary>
 /// Determines which reconnect-overlay actions are useful for a disconnect code.
 /// </summary>
@@ -64,6 +74,30 @@ internal static class RdpDisconnectActionPolicy
     /// was never in this list, so the same disconnect offered a different first action depending
     /// on which of its two codes arrived.</para>
     /// </remarks>
+    /// <summary>
+    /// The keyboard order of the overlay's buttons: the visual order, with the primary action
+    /// first. Every button appears exactly once, so none is skipped by Tab and reached last
+    /// (WCAG 2.4.3).
+    /// </summary>
+    public static IReadOnlyList<RdpOverlayButton> ResolveTabOrder(RdpOverlayPrimaryAction primaryAction)
+        => primaryAction == RdpOverlayPrimaryAction.EditProfile
+            ?
+            [
+                RdpOverlayButton.EditProfile,
+                RdpOverlayButton.Reconnect,
+                RdpOverlayButton.CopyError,
+                RdpOverlayButton.CopyAnonymous,
+                RdpOverlayButton.Close,
+            ]
+            :
+            [
+                RdpOverlayButton.Reconnect,
+                RdpOverlayButton.CopyError,
+                RdpOverlayButton.CopyAnonymous,
+                RdpOverlayButton.EditProfile,
+                RdpOverlayButton.Close,
+            ];
+
     private static bool IsProfileRemediationCode(int? disconnectCode) => disconnectCode switch
     {
         2055 or 2308 or 2311 or 2825 or 3080 or 3848 => true,

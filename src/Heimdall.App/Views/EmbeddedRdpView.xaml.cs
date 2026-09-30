@@ -53,6 +53,7 @@ public partial class EmbeddedRdpView
     : UserControl,
         IDisposable,
         IRdpDisconnectTeardownTarget,
+        IRdpViewDisposeTarget,
         IRdpConnectWatchdogTimer,
         IRdpConnectAttemptRunner,
         IRdpTrustPromptSurface
@@ -388,6 +389,7 @@ public partial class EmbeddedRdpView
         internal const string ErrorCancelReconnectFailed = "RdpErrorCancelReconnectFailed";
         internal const string ErrorCancelConnectFailed = "RdpErrorCancelConnectFailed";
         internal const string ErrorStartEmbeddedSessionFailed = "RdpErrorStartEmbeddedSessionFailed";
+        internal const string ErrorEventSinkAttachFailed = "RdpErrorEventSinkAttachFailed";
         internal const string CertificateNotVerifiableToast = "RdpCertificateNotVerifiableToast";
         internal const string ResolutionHeaderFormat = "RdpResolutionHeaderFormat";
         internal const string ResolutionHeaderWithSizeFormat = "RdpResolutionHeaderWithSizeFormat";
@@ -592,43 +594,16 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        // Backstop: a user-initiated tab close/disconnect tears down here. The COM OnRdpDisconnected
-        // handler short-circuits once _disposed is set below (and the event sink is detached during
-        // teardown), so emit the teardown Disconnected now, before _disposed flips. Idempotent via the
-        // latch, so a real disconnect or reconnect bounce that already logged one is not double-counted.
-        // The teardown reason picks the trigger: a toolbar/menu Disconnect (UserAction) tags "user",
-        // every other teardown (tab close, failed session, app shutdown) tags "teardown".
-        EmitTeardownDisconnectEvent(reason);
-
-        _disposed = true;
-        Core.Logging.FileLogger.Info($"EmbeddedRDP Dispose started reason={reason}");
-
-        // The verification token is cancelled BEFORE the question is closed, and the pane is
-        // unregistered before it refuses what it was holding. Closing the pane is not an
-        // answer - it is something the user did to the pane, not something they said about
-        // the certificate - so the session settles it as NotAsked. NotAsked does not stop a
-        // connection on its own; a pane sharing its question is handed the answer given
-        // elsewhere. This path stops for a reason of its own, and it is this ordering: the
-        // coalescer takes no shared answer for a pane whose own connection was given up.
-        // Moving the cancellation below the close would put a session behind a pane that no
-        // longer exists. Both stay steps of this body, where the wiring guard reads them.
-        _certificateVerificationCts?.Cancel();
-        _certificateVerificationCts?.Dispose();
-        _certificateVerificationCts = null;
-        _trustPromptRegistration?.Dispose();
-        _trustPromptRegistration = null;
-        _trustPrompt.Close();
-        _trustPrompt.QuestionChanged -= OnTrustPromptQuestionChanged;
-
-        // Every other release is contained, and the COM teardown runs whatever they do.
-        // Roughly forty statements ran ahead of it with no try at all, so any one of them
-        // throwing skipped the whole teardown: the ActiveX control was never disconnected,
-        // its sink never detached, and it never went back to the pool - and _disposed was
-        // already set, so nothing would retry.
+        // Every release is contained on its own, and the COM teardown runs whatever they do.
+        // Roughly forty statements once ran ahead of it with no try at all, so any one of them
+        // throwing skipped the whole teardown: the ActiveX control was never disconnected, its
+        // sink never detached, and it never went back to the pool. A single try around them
+        // then still let the first failing release skip every later one, the sleep prevention
+        // release and the connect watchdog stop among them.
         DisposeSequence.Run(
-            DisposePrologue,
+            RdpViewDisposeSteps.Releases(this, reason),
             () => CompleteDispose(reason),
-            ex => Core.Logging.FileLogger.WarnDetailed($"EmbeddedRDP Dispose prologue failed reason={reason}", ex));
+            ex => Core.Logging.FileLogger.WarnDetailed($"EmbeddedRDP Dispose release failed reason={reason}", ex));
     }
 
     /// <summary>The teardown that must run: the COM host, then the last handles.</summary>
@@ -659,23 +634,71 @@ public partial class EmbeddedRdpView
         RdpDisconnectTeardownSequence.Execute(this, reason);
     }
 
-    /// <summary>Every release that precedes the COM teardown, none of which may prevent it.</summary>
-    private void DisposePrologue()
+    void IRdpViewDisposeTarget.EmitTeardownDisconnectEvent(DisconnectReason reason)
     {
-        UnregisterEscapeHook();
-        UnregisterDpiChangedHandler();
+        // Backstop: a user-initiated tab close/disconnect tears down here. The COM OnRdpDisconnected
+        // handler short-circuits once _disposed is set by the next step (and the event sink is
+        // detached during teardown), so emit the teardown Disconnected now, before _disposed flips.
+        // Idempotent via the latch, so a real disconnect or reconnect bounce that already logged one
+        // is not double-counted. The teardown reason picks the trigger: a toolbar/menu Disconnect
+        // (UserAction) tags "user", every other teardown (tab close, failed session, app shutdown)
+        // tags "teardown".
+        EmitTeardownDisconnectEvent(reason);
+    }
 
+    void IRdpViewDisposeTarget.MarkDisposed(DisconnectReason reason)
+    {
+        _disposed = true;
+        Core.Logging.FileLogger.Info($"EmbeddedRDP Dispose started reason={reason}");
+    }
+
+    void IRdpViewDisposeTarget.SettleCertificatePrompt() => SettleCertificatePromptForTeardown();
+
+    /// <summary>Settles the certificate question this pane holds, for a pane being torn down.</summary>
+    private void SettleCertificatePromptForTeardown()
+    {
+        // The verification token is cancelled BEFORE the question is closed, and the pane is
+        // unregistered before it refuses what it was holding. Closing the pane is not an
+        // answer - it is something the user did to the pane, not something they said about
+        // the certificate - so the session settles it as NotAsked. NotAsked does not stop a
+        // connection on its own; a pane sharing its question is handed the answer given
+        // elsewhere. This path stops for a reason of its own, and it is this ordering: the
+        // coalescer takes no shared answer for a pane whose own connection was given up.
+        // Moving the cancellation below the close would put a session behind a pane that no
+        // longer exists. All stay steps of this body, where the wiring guard reads them.
+        _certificateVerificationCts?.Cancel();
+        _certificateVerificationCts?.Dispose();
+        _certificateVerificationCts = null;
+        _trustPromptRegistration?.Dispose();
+        _trustPromptRegistration = null;
+        _trustPrompt.Close();
+        _trustPrompt.QuestionChanged -= OnTrustPromptQuestionChanged;
+    }
+
+    void IRdpViewDisposeTarget.UnregisterEscapeHook() => UnregisterEscapeHook();
+
+    void IRdpViewDisposeTarget.UnregisterDpiChangedHandler() => UnregisterDpiChangedHandler();
+
+    void IRdpViewDisposeTarget.DetachConnectionStateMachine()
+    {
         if (_connectionStateMachine is not null)
         {
             _connectionStateMachine.StateChanged -= OnConnectionStateChanged;
             _connectionStateMachine = null;
         }
+    }
 
+    void IRdpViewDisposeTarget.DetachLayoutHandlers()
+    {
         Loaded -= OnLoaded;
         Unloaded -= OnUnloaded;
         SurfaceContainer.SizeChanged -= OnSurfaceContainerSizeChanged;
         _resizeTimer.Stop();
         _resizeTimer.Tick -= OnResizeTimerTick;
+    }
+
+    void IRdpViewDisposeTarget.StopAutofillFilledTimer()
+    {
         if (_autofillFilledTimer is not null)
         {
             _autofillFilledTimer.Stop();
@@ -684,18 +707,32 @@ public partial class EmbeddedRdpView
         }
 
         _autofillRetryContext = null;
-        StopTransientToastTimer();
-        HideLetterboxHint();
+    }
+
+    void IRdpViewDisposeTarget.StopTransientToastTimer() => StopTransientToastTimer();
+
+    void IRdpViewDisposeTarget.HideLetterboxHint() => HideLetterboxHint();
+
+    void IRdpViewDisposeTarget.StopStabilization()
+    {
         StopStabilizationCountdown();
         _stabilizationCts?.Cancel();
         _stabilizationCts?.Dispose();
         _stabilizationCts = null;
+    }
 
-        StopReconnectElapsedTracking();
-        StopAntiIdleTimer();
-        StopConnectWatchdog();
-        ReleaseSleepPrevention();
-        CancelAutofill();
+    void IRdpViewDisposeTarget.StopReconnectElapsedTracking() => StopReconnectElapsedTracking();
+
+    void IRdpViewDisposeTarget.StopAntiIdleTimer() => StopAntiIdleTimer();
+
+    void IRdpViewDisposeTarget.StopConnectWatchdog() => StopConnectWatchdog();
+
+    void IRdpViewDisposeTarget.ReleaseSleepPrevention() => ReleaseSleepPrevention();
+
+    void IRdpViewDisposeTarget.CancelAutofill() => CancelAutofill();
+
+    void IRdpViewDisposeTarget.ResetSessionIndicators()
+    {
         TransitionPhase(RdpConnectionPhase.None);
         HideRedirectionIndicators();
         _allowResolutionUpdates = false;
@@ -1150,8 +1187,8 @@ public partial class EmbeddedRdpView
 
         var body = BuildShortcutsHelpContent(
             localizer,
-            FormatShortcutForDisplay(RdpShortcutParser.DefaultShortcut),
-            FormatShortcutForDisplay(RdpShortcutParser.DefaultFullscreenShortcut));
+            FormatShortcutForDisplay(RdpDefaultShortcuts.ReleaseFocus),
+            FormatShortcutForDisplay(RdpDefaultShortcuts.Fullscreen));
         var title = localizer["RdpShortcutsHelpTitle"];
 
         var dialogService = (Application.Current as App)?.Services
@@ -1831,7 +1868,7 @@ public partial class EmbeddedRdpView
                 if (!_rdpHost.AttachEventSink())
                 {
                     throw new InvalidOperationException(
-                        _rdpHost.LastError ?? "Failed to attach the Remote Desktop event sink.");
+                        EventSinkAttachFailureMessage(_rdpHost.LastError, L));
                 }
             }
 
@@ -4146,6 +4183,16 @@ public partial class EmbeddedRdpView
     private string L(string key) => _localizer?[key] ?? key;
 
     /// <summary>
+    /// The detail shown on the status line when the control's events could not be attached:
+    /// the control's own error when it gave one, the localized sentence otherwise.
+    /// </summary>
+    internal static string EventSinkAttachFailureMessage(string? lastError, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+        return lastError ?? localize(LocaleKeys.ErrorEventSinkAttachFailed);
+    }
+
+    /// <summary>
     /// Writes the session status line and tells UI Automation the live region changed.
     /// </summary>
     /// <remarks>
@@ -4487,20 +4534,29 @@ public partial class EmbeddedRdpView
         {
             ApplyOverlayButtonStyle(OverlayEditProfileButton, "PrimaryButtonStyle");
             ApplyOverlayButtonStyle(OverlayReconnectButton, "SecondaryButtonStyle");
-            OverlayEditProfileButton.TabIndex = 0;
-            OverlayReconnectButton.TabIndex = 1;
-            OverlayCopyErrorButton.TabIndex = 2;
-            OverlayCloseButton.TabIndex = 3;
-            return;
+        }
+        else
+        {
+            ApplyOverlayButtonStyle(OverlayReconnectButton, "PrimaryButtonStyle");
+            ApplyOverlayButtonStyle(OverlayEditProfileButton, "SecondaryButtonStyle");
         }
 
-        ApplyOverlayButtonStyle(OverlayReconnectButton, "PrimaryButtonStyle");
-        ApplyOverlayButtonStyle(OverlayEditProfileButton, "SecondaryButtonStyle");
-        OverlayReconnectButton.TabIndex = 0;
-        OverlayCopyErrorButton.TabIndex = 1;
-        OverlayEditProfileButton.TabIndex = 2;
-        OverlayCloseButton.TabIndex = 3;
+        IReadOnlyList<RdpOverlayButton> tabOrder = RdpDisconnectActionPolicy.ResolveTabOrder(primaryAction);
+        for (int tabIndex = 0; tabIndex < tabOrder.Count; tabIndex++)
+        {
+            OverlayButton(tabOrder[tabIndex]).TabIndex = tabIndex;
+        }
     }
+
+    private Button OverlayButton(RdpOverlayButton button) => button switch
+    {
+        RdpOverlayButton.Reconnect => OverlayReconnectButton,
+        RdpOverlayButton.CopyError => OverlayCopyErrorButton,
+        RdpOverlayButton.CopyAnonymous => OverlayCopyAnonymousButton,
+        RdpOverlayButton.EditProfile => OverlayEditProfileButton,
+        RdpOverlayButton.Close => OverlayCloseButton,
+        _ => throw new ArgumentOutOfRangeException(nameof(button), button, null),
+    };
 
     private void ApplyOverlayButtonStyle(Button button, string resourceKey)
     {

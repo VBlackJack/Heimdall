@@ -282,7 +282,27 @@ internal sealed class RdpHandler : IProtocolHandler
             string rdpHost = targetHost;
             int rdpPort = targetPort;
 
-            if (!string.IsNullOrEmpty(server.RdpUsername) &&
+            // Resolved before the credential is staged: the same options decide both the
+            // server-authentication level the .rdp file carries and whether a password may
+            // be handed to that client at all.
+            var redirections = RdpProfileResolver.BuildRedirections(server, settings);
+            bool clientAuthenticatesServer = Heimdall.Rdp.RdpAuthenticationResolver
+                .Resolve(redirections.Nla, redirections.StrictServerAuthentication)
+                .AuthenticatesServer;
+
+            bool hasStoredSecret = !string.IsNullOrEmpty(server.RdpUsername) &&
+                !string.IsNullOrEmpty(server.RdpPasswordEncrypted);
+            if (hasStoredSecret && !clientAuthenticatesServer)
+            {
+                // With NLA off the .rdp file says "authentication level:i:0": mstsc connects
+                // to whoever answers without checking the server, and this path has no
+                // certificate gate of its own. Neither staging the entry nor filling the
+                // prompt: the user types the password into the client, knowingly.
+                Core.Logging.FileLogger.Warn(
+                    $"RDP external launch to {rdpHost}: server authentication is off, sign-in left to the client");
+                warning = _localizer["RdpExternalNoServerAuthenticationNotice"];
+            }
+            else if (!string.IsNullOrEmpty(server.RdpUsername) &&
                 !string.IsNullOrEmpty(server.RdpPasswordEncrypted))
             {
                 rdpPassword = _decryptPassword(server.RdpPasswordEncrypted);
@@ -298,7 +318,7 @@ internal sealed class RdpHandler : IProtocolHandler
                     server.RdpUsername,
                     rdpPassword,
                     ownershipMarker,
-                    out bool credentialWritten,
+                    out Heimdall.Rdp.DomainCredentialWriteOutcome credentialOutcome,
                     out string? credentialError))
                 {
                     Core.Logging.FileLogger.Warn(
@@ -310,7 +330,20 @@ internal sealed class RdpHandler : IProtocolHandler
                         RdpSessionDiagnosticFactory.FromCredentialWriteFailure(credentialError));
                 }
 
-                if (credentialWritten)
+                if (credentialOutcome == Heimdall.Rdp.DomainCredentialWriteOutcome.LaunchInFlightForAnotherAccount)
+                {
+                    // The entry an earlier launch of this process staged for another account is
+                    // still waiting to be read. Launching now would open this session as that
+                    // account, so the user retries once the earlier launch has consumed it.
+                    Core.Logging.FileLogger.Warn(
+                        $"RDP launch to {rdpHost} refused: an earlier launch for another account is still in flight");
+                    return new ConnectionResult(
+                        false,
+                        _localizer["RdpErrorLaunchInFlightForAnotherAccount"],
+                        null);
+                }
+
+                if (credentialOutcome == Heimdall.Rdp.DomainCredentialWriteOutcome.Written)
                 {
                     credentialCleanupTarget = credentialTarget;
                     credentialOwnershipMarker = ownershipMarker;
@@ -334,7 +367,6 @@ internal sealed class RdpHandler : IProtocolHandler
             // return below deletes it synchronously before ConnectAsync hands back.
             rdpArtifactPath = rdpFile;
             var resolution = RdpProfileResolver.ResolveResolution(server, settings);
-            var redirections = RdpProfileResolver.BuildRedirections(server, settings);
             if (resolution.EmitDisabledMultiMonitor)
             {
                 redirections.MultiMonitor = false;
@@ -815,7 +847,7 @@ internal interface IRdpCredentialManager
         string username,
         string password,
         string ownershipMarker,
-        out bool credentialWritten,
+        out Heimdall.Rdp.DomainCredentialWriteOutcome outcome,
         out string? error);
 
     bool DeleteCredential(
@@ -849,7 +881,7 @@ internal sealed class RdpCredentialManager : IRdpCredentialManager
         string username,
         string password,
         string ownershipMarker,
-        out bool credentialWritten,
+        out Heimdall.Rdp.DomainCredentialWriteOutcome outcome,
         out string? error)
     {
         return Heimdall.Rdp.CredentialManagerHelper.WriteDomainCredential(
@@ -857,7 +889,7 @@ internal sealed class RdpCredentialManager : IRdpCredentialManager
             username,
             password,
             ownershipMarker,
-            out credentialWritten,
+            out outcome,
             out error);
     }
 

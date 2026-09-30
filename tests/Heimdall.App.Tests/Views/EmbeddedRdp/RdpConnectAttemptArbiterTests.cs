@@ -86,7 +86,7 @@ public sealed class RdpConnectAttemptArbiterTests
         var runner = new RecordingRunner();
         var arbiter = new RdpConnectAttemptArbiter(runner);
 
-        arbiter.UserRequestedConnect();
+        StartVerifiedConnect(arbiter);
         int scheduled = Assert.Single(runner.RunAttempts);
 
         arbiter.UserCancelled();
@@ -113,7 +113,7 @@ public sealed class RdpConnectAttemptArbiterTests
         var runner = new RecordingRunner();
         var arbiter = new RdpConnectAttemptArbiter(runner);
 
-        arbiter.UserRequestedConnect();
+        StartVerifiedConnect(arbiter);
         int scheduled = Assert.Single(runner.RunAttempts);
 
         Assert.Equal(
@@ -138,7 +138,7 @@ public sealed class RdpConnectAttemptArbiterTests
         var runner = new RecordingRunner();
         var arbiter = new RdpConnectAttemptArbiter(runner);
 
-        arbiter.UserRequestedConnect();
+        StartVerifiedConnect(arbiter);
         int scheduled = Assert.Single(runner.RunAttempts);
 
         arbiter.WatchdogAborted();
@@ -168,11 +168,11 @@ public sealed class RdpConnectAttemptArbiterTests
         var runner = new RecordingRunner();
         var arbiter = new RdpConnectAttemptArbiter(runner);
 
-        arbiter.UserRequestedConnect();
+        StartVerifiedConnect(arbiter);
         int cancelled = Assert.Single(runner.RunAttempts);
         arbiter.UserCancelled();
 
-        arbiter.UserRequestedConnect();
+        StartVerifiedConnect(arbiter);
         Assert.Equal(2, runner.RunAttempts.Count);
         int current = runner.RunAttempts[1];
 
@@ -204,7 +204,7 @@ public sealed class RdpConnectAttemptArbiterTests
         var runner = new RecordingRunner();
         var arbiter = new RdpConnectAttemptArbiter(runner);
 
-        arbiter.UserRequestedConnect();
+        StartVerifiedConnect(arbiter);
         int scheduled = Assert.Single(runner.RunAttempts);
 
         Assert.Equal(
@@ -230,7 +230,7 @@ public sealed class RdpConnectAttemptArbiterTests
             RdpConnectRetryAdmission.Refuse,
             arbiter.RetryArrived(RdpConnectAttemptGate.NoAttempt, viewDisposed: false));
 
-        arbiter.UserRequestedConnect();
+        StartVerifiedConnect(arbiter);
 
         Assert.Equal(
             RdpConnectRetryAdmission.Refuse,
@@ -278,7 +278,7 @@ public sealed class RdpConnectAttemptArbiterTests
 
         // And the defect itself, shown rather than described: this is what starting the connect
         // does to the state every later refusal reads.
-        arbiter.UserRequestedConnect();
+        StartVerifiedConnect(arbiter);
         Assert.False(arbiter.AbandonedByUser);
         Assert.Equal(RdpLateConnectDecision.Promote, arbiter.ConnectArrived());
     }
@@ -328,6 +328,17 @@ public sealed class RdpConnectAttemptArbiterTests
     }
 
     /// <summary>Records what the arbiter asked the control to do, in order.</summary>
+    /// <summary>
+    /// The connect the user asks for, as the view drives it: the attempt is opened before the
+    /// certificate check and run when the connect the check stood in front of is dispatched.
+    /// </summary>
+    private static void StartVerifiedConnect(RdpConnectAttemptArbiter arbiter)
+    {
+        int attempt = arbiter.PrepareAttempt();
+        Assert.Equal(RdpVerifiedConnectAdmission.Proceed, arbiter.CertificateCheckSettled(viewDisposed: false));
+        Assert.Equal(RdpConnectRetryAdmission.Admit, arbiter.RetryArrived(attempt, viewDisposed: false));
+    }
+
     private sealed class RecordingRunner : IRdpConnectAttemptRunner
     {
         internal List<int> RunAttempts { get; } = new();
