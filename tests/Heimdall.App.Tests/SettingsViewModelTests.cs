@@ -2073,6 +2073,33 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.True(changes > 0);
     }
 
+    // A transcript keeps typed input as well as output, secrets echoed to the terminal included.
+    // Turning it on was one silent tick.
+    [Fact]
+    public async Task Save_TurningSessionTranscriptsOn_AsksFirstAndWritesNothingWhenDeclined()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SessionLoggingEnabled = true;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal("SettingsSessionLoggingEnableConfirmTitle", Assert.Single(dialog.ConfirmCalls).Title);
+        Assert.False(config.Settings.SessionLoggingEnabled);
+        Assert.True(viewModel.IsDirty);
+
+        dialog.ConfirmResult = true;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.True(config.Settings.SessionLoggingEnabled);
+
+        // Already on: saving an unrelated edit asks nothing more.
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(2, dialog.ConfirmCalls.Count);
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

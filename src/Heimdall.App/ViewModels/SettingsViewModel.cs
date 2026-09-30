@@ -940,6 +940,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private bool _sessionLoggingEnabled;
 
+    /// <summary>The session transcript choice as it stands on disk, so Save knows whether it is being turned on.</summary>
+    private bool _savedSessionLoggingEnabled;
+
     [ObservableProperty]
     private string _sessionLogDirectory = @"logs\sessions";
 
@@ -1669,6 +1672,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Advanced / Logging
         EnableLogging = settings.EnableLogging;
         SessionLoggingEnabled = settings.SessionLoggingEnabled;
+        _savedSessionLoggingEnabled = settings.SessionLoggingEnabled;
         SessionLogDirectory = settings.SessionLogDirectory;
         TunnelEstablishmentDelayMs = settings.TunnelEstablishmentDelayMs;
         RdpConnectWatchdogTimeoutMs = settings.RdpConnectWatchdogTimeoutMs;
@@ -1782,20 +1786,27 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync(CancellationToken cancellationToken)
     {
-        // Turning on a share that answers anyone on the network without a password is asked
-        // about once, here. Only the explicit Save asks: the leave-tab and close paths have just
-        // put a Save / Discard / Cancel question in front of the user, and the close path runs
-        // inside a Closing handler, where a second modal is a shape this repository avoids.
-        if (FileShareEnableTftp && !_savedFileShareEnableTftp)
-        {
-            bool confirmed = await _dialogService.ShowConfirmAsync(
+        // Turning on a share that answers anyone on the network without a password, or a
+        // transcript that keeps what is typed into every session, is asked about once, here. Only
+        // the explicit Save asks: the leave-tab and close paths have just put a Save / Discard /
+        // Cancel question in front of the user, and the close path runs inside a Closing handler,
+        // where a second modal is a shape this repository avoids.
+        if (FileShareEnableTftp && !_savedFileShareEnableTftp
+            && !await _dialogService.ShowConfirmAsync(
                 _localizer["SettingsTftpEnableConfirmTitle"],
                 _localizer["SettingsTftpEnableConfirmBody"],
-                "warning");
-            if (!confirmed)
-            {
-                return;
-            }
+                "warning"))
+        {
+            return;
+        }
+
+        if (SessionLoggingEnabled && !_savedSessionLoggingEnabled
+            && !await _dialogService.ShowConfirmAsync(
+                _localizer["SettingsSessionLoggingEnableConfirmTitle"],
+                _localizer["SettingsSessionLoggingEnableConfirmBody"],
+                "warning"))
+        {
+            return;
         }
 
         if (await TrySaveAsync(cancellationToken) || cancellationToken.IsCancellationRequested)
@@ -2069,6 +2080,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _originalAccentTint = AccentTint;
         bool tftpChanged = FileShareEnableTftp != _savedFileShareEnableTftp;
         _savedFileShareEnableTftp = FileShareEnableTftp;
+        _savedSessionLoggingEnabled = SessionLoggingEnabled;
 
         // The saved language is already on screen - it was applied when it was picked. What
         // saving adds is that it becomes the language a later discard has to come back to.

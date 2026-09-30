@@ -3907,7 +3907,16 @@
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsSessionLoggingTitle" Text="{loc:Translate SettingsSectionSessionLogging}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
                                         <CheckBox x:Name="Mw_SettingsEnableLogging" Content="{loc:Translate SettingsLabelEnableLogging}" IsChecked="{Binding Settings.EnableLogging}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        <CheckBox x:Name="Mw_SettingsSessionLoggingEnabled" Content="{loc:Translate SettingsLabelSessionLoggingEnabled}" IsChecked="{Binding Settings.SessionLoggingEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                        <CheckBox x:Name="Mw_SettingsSessionLoggingEnabled" Content="{loc:Translate SettingsLabelSessionLoggingEnabled}" IsChecked="{Binding Settings.SessionLoggingEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"
+                                                  AutomationProperties.HelpText="{loc:Translate SettingsSessionLoggingWarning}"/>
+                                        <!-- A transcript keeps what was typed as well as what was shown, secrets
+                                             echoed to the terminal included; said here, like the TFTP warning. -->
+                                        <TextBlock x:Name="Mw_SettingsSessionLoggingWarning"
+                                                   Text="{loc:Translate SettingsSessionLoggingWarning}"
+                                                   Margin="20,4,0,0"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   Foreground="{DynamicResource WarningTextBrush}"
+                                                   TextWrapping="Wrap"/>
                                         <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.SessionLoggingEnabled}">
                                             <TextBlock x:Name="Mw_SettingsSessionLogDirLabel" Text="{loc:Translate SettingsLabelSessionLogDirectory}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <Grid>

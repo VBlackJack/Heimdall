@@ -2524,7 +2524,7 @@
   "SettingsLabelPuttyPath": "Ruta de PuTTY (para el modo SSH externo)",
   "SettingsLabelEditorPath": "Ruta del editor externo",
   "SettingsSectionSessionBehavior": "Comportamiento de la sesión",
-  "SettingsLabelEnableLogging": "Activar registro",
+  "SettingsLabelEnableLogging": "Escribir el registro de diagnóstico de la aplicación (eventos y errores de Heimdall)",
   "SettingsLabelSftpBrowserEnabled": "Activar el explorador SFTP integrado",
   "SettingsLabelAutoOpenSftp": "Abrir automáticamente el panel SFTP al conectar por SSH",
   "SettingsLabelSftpFollowSshDirectory": "SFTP sigue el directorio de trabajo de SSH",
@@ -3501,8 +3501,11 @@
   "SettingsLabelRdpWidth": "Ancho",
   "SettingsLabelRdpHeight": "Alto",
 
-  "SettingsSectionSessionLogging": "Registro de sesión",
-  "SettingsLabelSessionLoggingEnabled": "Activar registro de sesión",
+  "SettingsSectionSessionLogging": "Registro",
+  "SettingsLabelSessionLoggingEnabled": "Grabar transcripciones de sesión (lo que muestra cada terminal, incluida la entrada escrita)",
+  "SettingsSessionLoggingWarning": "Las transcripciones guardan lo que escribes y lo que se muestra, incluidas contraseñas o tokens que el terminal repita. Mantén privada la carpeta de registros.",
+  "SettingsSessionLoggingEnableConfirmTitle": "¿Grabar transcripciones de sesión?",
+  "SettingsSessionLoggingEnableConfirmBody": "Cada sesión de terminal se escribirá en un archivo: lo que escribes y lo que se muestra, incluidas contraseñas o tokens que el terminal repita. ¿Guardar y activarlo?",
   "SettingsLabelSessionLogDirectory": "Directorio de registro de sesión",
 
   "SettingsSectionCredentialProvider": "Proveedor de credenciales externo",

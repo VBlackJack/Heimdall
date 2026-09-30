@@ -2524,7 +2524,7 @@
   "SettingsLabelPuttyPath": "Chemin PuTTY (pour le mode SSH externe)",
   "SettingsLabelEditorPath": "Chemin de l'\u00e9diteur externe",
   "SettingsSectionSessionBehavior": "Comportement des sessions",
-  "SettingsLabelEnableLogging": "Activer les logs",
+  "SettingsLabelEnableLogging": "\u00c9crire le journal de diagnostic de l'application (\u00e9v\u00e9nements et erreurs de Heimdall)",
   "SettingsLabelSftpBrowserEnabled": "Activer le navigateur SFTP int\u00e9gr\u00e9",
   "SettingsLabelAutoOpenSftp": "Ouvrir le panneau SFTP automatiquement lors d'une connexion SSH",
   "SettingsLabelSftpFollowSshDirectory": "Le SFTP suit le r\u00e9pertoire courant SSH",
@@ -3498,8 +3498,11 @@
   "SettingsLabelRdpWidth": "Largeur",
   "SettingsLabelRdpHeight": "Hauteur",
 
-  "SettingsSectionSessionLogging": "Journalisation des sessions",
-  "SettingsLabelSessionLoggingEnabled": "Activer la journalisation des sessions",
+  "SettingsSectionSessionLogging": "Journalisation",
+  "SettingsLabelSessionLoggingEnabled": "Enregistrer la transcription des sessions (ce qu'affiche chaque terminal, saisie comprise)",
+  "SettingsSessionLoggingWarning": "Les transcriptions gardent ce que vous tapez comme ce qui s'affiche, y compris les mots de passe ou jetons renvoy\u00e9s par le terminal. Gardez le dossier des journaux priv\u00e9.",
+  "SettingsSessionLoggingEnableConfirmTitle": "Enregistrer la transcription des sessions ?",
+  "SettingsSessionLoggingEnableConfirmBody": "Chaque session de terminal sera \u00e9crite dans un fichier : ce que vous tapez comme ce qui s'affiche, y compris les mots de passe ou jetons renvoy\u00e9s par le terminal. Enregistrer et l'activer ?",
   "SettingsLabelSessionLogDirectory": "R\u00e9pertoire des journaux de session",
 
   "SettingsSectionCredentialProvider": "Fournisseur de credentials externe",

@@ -2524,7 +2524,7 @@
   "SettingsLabelPuttyPath": "PuTTY path (for External SSH mode)",
   "SettingsLabelEditorPath": "External editor path",
   "SettingsSectionSessionBehavior": "Session behavior",
-  "SettingsLabelEnableLogging": "Enable logging",
+  "SettingsLabelEnableLogging": "Write the application diagnostics log (Heimdall's own events and errors)",
   "SettingsLabelSftpBrowserEnabled": "Enable integrated SFTP browser",
   "SettingsLabelAutoOpenSftp": "Auto-open SFTP panel on SSH connection",
   "SettingsLabelSftpFollowSshDirectory": "SFTP follows SSH working directory",
@@ -3501,8 +3501,11 @@
   "SettingsLabelRdpWidth": "Width",
   "SettingsLabelRdpHeight": "Height",
 
-  "SettingsSectionSessionLogging": "Session Logging",
-  "SettingsLabelSessionLoggingEnabled": "Enable session logging",
+  "SettingsSectionSessionLogging": "Logging",
+  "SettingsLabelSessionLoggingEnabled": "Record session transcripts (what each terminal shows, typed input included)",
+  "SettingsSessionLoggingWarning": "Transcripts keep what you type as well as what is shown, including passwords or tokens echoed to the terminal. Keep the log folder private.",
+  "SettingsSessionLoggingEnableConfirmTitle": "Record session transcripts?",
+  "SettingsSessionLoggingEnableConfirmBody": "Every terminal session will be written to a file: what you type as well as what is shown, including passwords or tokens echoed to the terminal. Save and turn it on?",
   "SettingsLabelSessionLogDirectory": "Session log directory",
 
   "SettingsSectionCredentialProvider": "External Credential Provider",
