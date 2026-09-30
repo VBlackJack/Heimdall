@@ -76,6 +76,11 @@ internal static class ServerSideCopyCommand
     internal const int PublishedASymlinkStatus = 99;
 
     /// <summary>
+    /// Makes everything the chain creates owner-only until the copy restores the source's modes.
+    /// </summary>
+    private const string PrivateCreationUmask = "umask 077;";
+
+    /// <summary>
     /// Returns a sibling-temp and hard-link chain for a file copy, or an exclusive root reservation
     /// followed by an archive copy when <paramref name="recursive"/> is true.
     /// </summary>
@@ -94,9 +99,14 @@ internal static class ServerSideCopyCommand
         {
             // The reserved root and whatever cp managed to copy are removed when cp fails
             // part way: the caller reports that the copy was not performed, and a partial
-            // tree left on the server made that statement false.
-            return $"mkdir -- {destination} && cp -a -- {source}/. {destination}; "
-                + $"status=$?; if [ $status -ne 0 ]; then rm -rf -- {destination}; fi; exit $status";
+            // tree left on the server made that statement false. The removal is reachable
+            // only from cp's failure: a mkdir refused because somebody else created the
+            // name in the meantime ends the chain with its own status, and the tree it
+            // found there is not this command's to delete.
+            // The umask keeps every node owner-only while it is written; cp -a restores the
+            // source's modes, the root's included, once each node is complete.
+            return $"{PrivateCreationUmask} mkdir -- {destination} || exit $?; "
+                + $"cp -a -- {source}/. {destination} || {{ status=$?; rm -rf -- {destination}; exit $status; }}";
         }
 
         // The staging name is drawn client-side, by the same generator the upload path
@@ -115,8 +125,15 @@ internal static class ServerSideCopyCommand
         // The staging cleanup sits after the reservation on purpose. A refused reservation
         // means the name was already taken by something this command did not create, and
         // deleting that is not its business.
-        return $"set -C; : > {tempDestination} || exit $?; set +C; "
-            + $"cp -p -- {source} {tempDestination} && ln -- {tempDestination} {destination}; "
+        // The umask comes first: the reservation used to create the staging file with the
+        // exec session's umask, 0644 on a default server, and cp -p writes the content
+        // before it applies the source's mode, so a 0600 source was world-readable for the
+        // whole copy. Under 077 it is created 0600, and cp -p still ends with the source's
+        // mode (measured with GNU coreutils and BusyBox 1.37). -T makes ln treat the
+        // destination as a name: a destination that became a directory would otherwise
+        // receive the link inside it, with exit 0.
+        return $"{PrivateCreationUmask} set -C; : > {tempDestination} || exit $?; set +C; "
+            + $"cp -p -- {source} {tempDestination} && ln -T -- {tempDestination} {destination}; "
             + $"status=$?; if [ $status -eq 0 ] && [ -L {destination} ]; then "
             + $"rm -f -- {destination}; status={PublishedASymlinkStatus}; fi; "
             + $"rm -f -- {tempDestination}; exit $status";

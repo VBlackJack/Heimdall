@@ -33,8 +33,8 @@ public sealed class ServerSideCopyCommandTests
 
         string temp = StagingToken(command);
         Assert.Equal(
-            $"set -C; : > {temp} || exit $?; set +C; "
-            + $"cp -p -- '/srv/a.txt' {temp} && ln -- {temp} '/srv/b.txt'; "
+            $"umask 077; set -C; : > {temp} || exit $?; set +C; "
+            + $"cp -p -- '/srv/a.txt' {temp} && ln -T -- {temp} '/srv/b.txt'; "
             + "status=$?; if [ $status -eq 0 ] && [ -L '/srv/b.txt' ]; then "
             + "rm -f -- '/srv/b.txt'; status=99; fi; "
             + $"rm -f -- {temp}; exit $status",
@@ -47,8 +47,8 @@ public sealed class ServerSideCopyCommandTests
         string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive: true);
 
         Assert.Equal(
-            "mkdir -- '/srv/copy' && cp -a -- '/srv/data'/. '/srv/copy'; "
-            + "status=$?; if [ $status -ne 0 ]; then rm -rf -- '/srv/copy'; fi; exit $status",
+            "umask 077; mkdir -- '/srv/copy' || exit $?; "
+            + "cp -a -- '/srv/data'/. '/srv/copy' || { status=$?; rm -rf -- '/srv/copy'; exit $status; }",
             command);
     }
 
@@ -70,8 +70,75 @@ public sealed class ServerSideCopyCommandTests
 
         Assert.True(copyIndex > 0 && statusIndex > copyIndex, "the status is captured after cp");
         Assert.True(cleanupIndex > statusIndex, "the reserved root is removed on failure");
-        Assert.Contains("if [ $status -ne 0 ]", command, StringComparison.Ordinal);
         Assert.True(exitIndex > cleanupIndex, "cp's own status is what the command returns");
+    }
+
+    /// <remarks>
+    /// The chain used to be `mkdir -- d && cp -a ...; status=$?; if [ $status -ne 0 ]; then
+    /// rm -rf -- d; fi`. When mkdir failed because the name had been taken in the meantime,
+    /// by another client creating that directory, the status was mkdir's, and the cleanup
+    /// removed a tree this command never created. Measured on the docker bench: with the
+    /// cleanup reachable only from a failed cp, a pre-existing directory and its content
+    /// survive a refused reservation, and a failed copy still removes its own root.
+    /// </remarks>
+    [Fact]
+    public void Build_Directory_CleanupIsReachableOnlyOnceTheReservationSucceeded()
+    {
+        string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive: true);
+
+        int reservation = command.IndexOf("mkdir -- '/srv/copy' || exit $?;", StringComparison.Ordinal);
+        int cleanup = command.IndexOf("rm -rf -- '/srv/copy'", StringComparison.Ordinal);
+
+        Assert.True(reservation >= 0, "a refused reservation must end the chain with its own status");
+        Assert.True(cleanup > reservation, command);
+
+        // The cleanup belongs to the copy's failure branch and to nothing else.
+        Assert.Contains(
+            "cp -a -- '/srv/data'/. '/srv/copy' || { status=$?; rm -rf -- '/srv/copy'; exit $status; }",
+            command,
+            StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(command, Regex.Escape("rm -rf")));
+    }
+
+    /// <remarks>
+    /// The staging reservation `: > temp` used to create the file with the exec session's
+    /// umask, 0644 on a default server, and `cp -p` writes the content first and applies
+    /// the source's mode only at the end: a 0600 source was world-readable for the whole
+    /// copy. Measured on the docker bench (GNU coreutils and BusyBox 1.37 cp): under
+    /// `umask 077` the reservation is 0600, and `cp -p` still ends with the source's mode,
+    /// 0600 for a 0600 source and 0644 for a 0644 one; `cp -a` restores every mode of a
+    /// tree, the root included, so the directory branch gets the same tightening.
+    /// </remarks>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Build_TightensTheUmaskBeforeCreatingAnything(bool recursive)
+    {
+        string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive);
+
+        Assert.StartsWith("umask 077; ", command, StringComparison.Ordinal);
+
+        int umask = command.IndexOf("umask 077;", StringComparison.Ordinal);
+        int firstCreation = recursive
+            ? command.IndexOf("mkdir -- ", StringComparison.Ordinal)
+            : command.IndexOf(": > ", StringComparison.Ordinal);
+        Assert.True(firstCreation > umask, command);
+    }
+
+    /// <remarks>
+    /// Without -T, `ln -- temp dest` given a dest that became a directory in the meantime
+    /// creates the link INSIDE it and exits 0, and the copy is reported as done at a path
+    /// that does not hold it. Measured: GNU ln -T and BusyBox 1.37 ln -T both refuse with
+    /// exit 1; plain GNU ln linked into the directory and exited 0. An older BusyBox
+    /// without -T rejects the option, which the caller reports as a refused copy.
+    /// </remarks>
+    [Fact]
+    public void Build_File_LinksOntoTheNameNeverIntoADirectory()
+    {
+        string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
+
+        Assert.Contains($"ln -T -- {StagingToken(command)} '/srv/b.txt'", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("ln -- ", command, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -88,9 +155,9 @@ public sealed class ServerSideCopyCommandTests
         // matters more than before since the token embeds the destination's own quote.
         string escapedTemp = StagingToken(command);
         Assert.Equal(
-            $"set -C; : > {escapedTemp} || exit $?; set +C; "
+            $"umask 077; set -C; : > {escapedTemp} || exit $?; set +C; "
             + $"cp -p -- '/srv/my dir/it'\\''s a file.txt' {escapedTemp} "
-            + $"&& ln -- {escapedTemp} '/dst/o'\\''brien'; "
+            + $"&& ln -T -- {escapedTemp} '/dst/o'\\''brien'; "
             + "status=$?; if [ $status -eq 0 ] && [ -L '/dst/o'\\''brien' ]; then "
             + "rm -f -- '/dst/o'\\''brien'; status=99; fi; "
             + $"rm -f -- {escapedTemp}; exit $status",
@@ -102,7 +169,10 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/my data", "/srv/my copy", recursive: true);
 
-        Assert.StartsWith("mkdir -- '/srv/my copy' && cp -a -- '/srv/my data'/. '/srv/my copy'; ", command, StringComparison.Ordinal);
+        Assert.StartsWith(
+            "umask 077; mkdir -- '/srv/my copy' || exit $?; cp -a -- '/srv/my data'/. '/srv/my copy' || ",
+            command,
+            StringComparison.Ordinal);
         Assert.Contains("rm -rf -- '/srv/my copy'", command, StringComparison.Ordinal);
     }
 
@@ -120,7 +190,7 @@ public sealed class ServerSideCopyCommandTests
             "cp -p -- '/srv/source.txt' '/srv/destination.txt' ",
             command,
             StringComparison.Ordinal);
-        Assert.Contains($"ln -- {tempPath} '/srv/destination.txt'", command, StringComparison.Ordinal);
+        Assert.Contains($"ln -T -- {tempPath} '/srv/destination.txt'", command, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -131,7 +201,7 @@ public sealed class ServerSideCopyCommandTests
             "/srv/destination.txt",
             recursive: false);
         string tempPath = StagingToken(command);
-        int linkIndex = command.IndexOf($"ln -- {tempPath}", StringComparison.Ordinal);
+        int linkIndex = command.IndexOf($"ln -T -- {tempPath}", StringComparison.Ordinal);
         int statusIndex = command.IndexOf("; status=$?;", StringComparison.Ordinal);
         int cleanupIndex = command.IndexOf($"rm -f -- {tempPath}", StringComparison.Ordinal);
         int exitIndex = command.IndexOf("exit $status", StringComparison.Ordinal);
@@ -184,7 +254,7 @@ public sealed class ServerSideCopyCommandTests
             "cp -a -- '/srv/source'/. '/srv/destination'",
             StringComparison.Ordinal);
 
-        Assert.Equal(0, reserveIndex);
+        Assert.True(reserveIndex > 0, command);
         Assert.True(copyIndex > reserveIndex);
     }
 
@@ -220,8 +290,8 @@ public sealed class ServerSideCopyCommandTests
         // cp writing one path, ln linking a path that does not exist, and rm deleting
         // nothing.
         Assert.Matches(
-            @"^set -C; : > '(/srv/b\.txt\.[0-9a-f]{32}\.part)' \|\| exit \$\?; set \+C; "
-                + @"cp -p -- '/srv/a\.txt' '\1' && ln -- '\1' '/srv/b\.txt'; "
+            @"^umask 077; set -C; : > '(/srv/b\.txt\.[0-9a-f]{32}\.part)' \|\| exit \$\?; set \+C; "
+                + @"cp -p -- '/srv/a\.txt' '\1' && ln -T -- '\1' '/srv/b\.txt'; "
                 + @"status=\$\?; if \[ \$status -eq 0 \] && \[ -L '/srv/b\.txt' \]; then "
                 + @"rm -f -- '/srv/b\.txt'; status=99; fi; "
                 + @"rm -f -- '\1'; exit \$status$",
@@ -244,7 +314,7 @@ public sealed class ServerSideCopyCommandTests
         int reservation = command.IndexOf("set -C; : > ", StringComparison.Ordinal);
         int copy = command.IndexOf("cp -p -- ", StringComparison.Ordinal);
 
-        Assert.Equal(0, reservation);
+        Assert.True(reservation > 0, command);
         Assert.True(copy > reservation, command);
         // Without the guard the reservation is a comment: cp would create the file anyway.
         Assert.Contains("|| exit $?", command, StringComparison.Ordinal);

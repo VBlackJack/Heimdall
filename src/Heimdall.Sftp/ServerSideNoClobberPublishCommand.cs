@@ -69,7 +69,9 @@ internal static class ServerSideNoClobberPublishCommand
         string staging = PathEscaper.EscapeForShell(stagingPath);
         string destination = PathEscaper.EscapeForShell(destinationPath);
 
-        return $"ln -- {staging} {destination}; status=$?; rm -f -- {staging}; exit $status";
+        // -T: a destination that became a directory after the listing must refuse the link,
+        // not receive it inside and report a publication at a path that does not hold the file.
+        return $"ln -T -- {staging} {destination}; status=$?; rm -f -- {staging}; exit $status";
     }
 
     /// <summary>

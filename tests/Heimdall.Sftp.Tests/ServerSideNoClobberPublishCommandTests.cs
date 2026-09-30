@@ -40,7 +40,7 @@ public sealed class ServerSideNoClobberPublishCommandTests
             "/srv/data/file.txt.abc.part",
             "/srv/data/file.txt");
 
-        Assert.Contains("ln -- '/srv/data/file.txt.abc.part' '/srv/data/file.txt'", command, StringComparison.Ordinal);
+        Assert.Contains("ln -T -- '/srv/data/file.txt.abc.part' '/srv/data/file.txt'", command, StringComparison.Ordinal);
 
         // A rename replaces the destination silently on many servers. It is the one primitive that
         // must never appear here, in any form.
@@ -50,6 +50,17 @@ public sealed class ServerSideNoClobberPublishCommandTests
         Assert.DoesNotContain("ln -s", command, StringComparison.Ordinal);
     }
 
+    // Without -T a destination that became a directory after the listing receives the link INSIDE
+    // it, and the publish exits 0 for a file that is not at the path the caller asked for. Measured:
+    // GNU ln -T and BusyBox 1.37 ln -T refuse a directory destination with exit 1.
+    [Fact]
+    public void BuildFilePublish_TreatsTheDestinationAsANameNeverAsADirectory()
+    {
+        string command = ServerSideNoClobberPublishCommand.BuildFilePublish("/s/t.part", "/s/t");
+
+        Assert.StartsWith("ln -T -- '/s/t.part' '/s/t';", command, StringComparison.Ordinal);
+    }
+
     // The exit status must be the link's, sampled before cleanup: a failed cleanup must not report a
     // failed publish, and a successful publish must not be masked by it.
     [Fact]
@@ -57,7 +68,7 @@ public sealed class ServerSideNoClobberPublishCommandTests
     {
         string command = ServerSideNoClobberPublishCommand.BuildFilePublish("/s/t.part", "/s/t");
 
-        int linkIndex = command.IndexOf("ln -- ", StringComparison.Ordinal);
+        int linkIndex = command.IndexOf("ln -T -- ", StringComparison.Ordinal);
         int statusIndex = command.IndexOf("status=$?", StringComparison.Ordinal);
         int cleanupIndex = command.IndexOf("rm -f -- ", StringComparison.Ordinal);
         int exitIndex = command.IndexOf("exit $status", StringComparison.Ordinal);
@@ -113,7 +124,7 @@ public sealed class ServerSideNoClobberPublishCommandTests
         string command = ServerSideNoClobberPublishCommand.BuildFilePublish(staging, destination);
 
         Assert.Equal(
-            $"ln -- {escapedStaging} {escapedDestination}; status=$?; rm -f -- {escapedStaging}; exit $status",
+            $"ln -T -- {escapedStaging} {escapedDestination}; status=$?; rm -f -- {escapedStaging}; exit $status",
             command);
     }
 
