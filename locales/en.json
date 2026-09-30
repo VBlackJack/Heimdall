@@ -1906,6 +1906,7 @@
   "ValidationInlineTimeFormat": "Time must be in HH:MM format (00:00 - 23:59)",
   "ValidationInlineServerRequired": "A session must be selected",
   "ValidationInlineSshUserRequired": "SSH username is required",
+  "ValidationInlineWinRmUserInvalid": "Enter a WinRM user name such as operator, CONTOSO\\operator or operator@contoso.com.",
   "ValidationInlineSshUserFormat": "Invalid SSH username format",
 
   "SftpErrorDestinationChanged": "The destination is now occupied and was not replaced. Refresh the folder and retry with a new name or an explicit replacement choice.",
@@ -2251,6 +2252,7 @@
   "ErrorWinRmProfileInvalid": "The server profile is not a valid WinRM profile.",
   "ErrorWinRmBootstrapPathMissing": "An internal WinRM bootstrap path is required for stored-credential sessions.",
   "ErrorWinRmCredentialUnavailable": "WinRM stored credential is unavailable.",
+  "ErrorWinRmVaultLocked": "Unlock the vault before starting this WinRM session.",
   "ErrorWinRmLaunchFailed": "Failed to launch the WinRM terminal.",
   "ErrorWinRmNoPowerShellHost": "No PowerShell host executable was found. Install PowerShell 7 (pwsh.exe) or Windows PowerShell (powershell.exe), or add one to PATH.",
   "ErrorWinRmSslGatewayUnsupported": "WinRM over an SSH gateway does not support HTTPS. Use HTTP, or connect directly.",
@@ -2259,6 +2261,7 @@
   "ErrorWinRmPreflightTlsFailed": "The WinRM TLS connection to '{0}' on port {1} failed (untrusted certificate or handshake error).",
   "ErrorWinRmNtlmLoopback": "WinRM authentication failed for the current Windows identity. Use stored credentials for localhost or off-domain hosts.",
   "ErrorWinRmWsmanInvalidResponse": "WinRM received an invalid WSMan response. If this session uses a gateway, verify that WinRM uses HTTP through the tunnel.",
+  "ErrorWinRmExecutionPolicyBlocked": "The PowerShell execution policy refused the WinRM sign-in script. Your organization may require signed scripts: use the current Windows identity for this host, or ask your administrator.",
   "WarnWinRmGatewayKerberos": "WinRM over a gateway: Kerberos is unavailable, authentication falls back to NTLM.",
   "WarnWinRmSkipCertificateCheck": "WinRM TLS certificate validation was skipped for this session.",
 

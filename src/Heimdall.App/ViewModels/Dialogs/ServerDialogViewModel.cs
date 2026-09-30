@@ -20,6 +20,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
+using Heimdall.App.Services.WinRm;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
@@ -527,7 +528,37 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
         _ = value;
         OnPropertyChanged(nameof(IsWinRmCredentialIdentity));
+        RefreshWinRmUsernameErrorIfShown(WinRmUsername);
     }
+
+    partial void OnWinRmUsernameChanged(string value)
+    {
+        RefreshWinRmUsernameErrorIfShown(value);
+    }
+
+    /// <summary>
+    /// Clears the WinRM username error as the user fixes the field or leaves Credential mode,
+    /// the way the SSH username error does; it is only raised by Save.
+    /// </summary>
+    private void RefreshWinRmUsernameErrorIfShown(string username)
+    {
+        if (WinRmUsernameError is not null)
+        {
+            WinRmUsernameError = GetWinRmUsernameError(username);
+            RefreshValidationSummary();
+        }
+    }
+
+    /// <summary>
+    /// The WinRM username the stored-credential bootstrap would refuse at connect time, judged by
+    /// the bootstrap's own predicate so the two can never disagree.
+    /// </summary>
+    private string? GetWinRmUsernameError(string? username)
+        => IsWinRmConnection
+            && IsWinRmCredentialIdentity
+            && !WinRmCredentialBootstrap.IsValidUsername(username)
+            ? L("ValidationInlineWinRmUserInvalid")
+            : null;
 
     partial void OnWinRmUseSslChanged(bool value)
     {
@@ -1247,6 +1278,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(DisplayNameError),
         nameof(RemoteServerError),
         nameof(SshUsernameError),
+        nameof(WinRmUsernameError),
         nameof(EndpointPortError),
         nameof(LocalPortError),
         nameof(AudioModeError),
@@ -1338,6 +1370,9 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     private string? _sshUsernameError;
+
+    [ObservableProperty]
+    private string? _winRmUsernameError;
 
     [ObservableProperty]
     private string? _endpointPortError;
@@ -1656,6 +1691,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         DisplayNameError = null;
         RemoteServerError = null;
         SshUsernameError = null;
+        WinRmUsernameError = null;
         EndpointPortError = null;
         LocalPortError = null;
         AudioModeError = null;
@@ -1673,12 +1709,13 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     private void RefreshValidationSummary()
     {
-        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? EndpointPortError
+        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
             ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
+            + (WinRmUsernameError is not null ? 1 : 0)
             + (EndpointPortError is not null ? 1 : 0);
         NetworkTabErrorCount = (LocalPortError is not null ? 1 : 0)
             + (RdpGatewayError is not null ? 1 : 0);
@@ -1733,6 +1770,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         SshUsernameError = RequiresSshUsername && string.IsNullOrWhiteSpace(SshUsername)
             ? L("ValidationInlineSshUserRequired")
             : null;
+        WinRmUsernameError = GetWinRmUsernameError(WinRmUsername);
         EndpointPortError = RequiresNetworkEndpoint ? GetEndpointPortError() : null;
         LocalPortError = UsesGateway ? GetLocalizedFieldError(nameof(LocalPort)) : null;
 
@@ -1762,6 +1800,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
+            + (WinRmUsernameError is not null ? 1 : 0)
             + (EndpointPortError is not null ? 1 : 0);
         NetworkTabErrorCount = (LocalPortError is not null ? 1 : 0)
             + (RdpGatewayError is not null ? 1 : 0);
@@ -1778,6 +1817,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         FirstInvalidField = DisplayNameError is not null ? nameof(DisplayName)
             : RemoteServerError is not null ? nameof(RemoteServer)
             : SshUsernameError is not null ? nameof(SshUsername)
+            : WinRmUsernameError is not null ? nameof(WinRmUsername)
             : EndpointPortError is not null ? "EndpointPort"
             : LocalPortError is not null ? nameof(LocalPort)
             : RdpGatewayError is not null ? nameof(RdpGateway)
@@ -1789,7 +1829,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             : null;
 
         // Aggregate summary
-        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? EndpointPortError
+        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
             ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
     }
@@ -2138,9 +2178,13 @@ public partial class ServerDialogViewModel : ObservableValidator
             VaultEntryName = string.IsNullOrWhiteSpace(VaultEntryName) ? null : VaultEntryName,
             WinRmPort = WinRmPort,
             WinRmUsername = string.IsNullOrWhiteSpace(WinRmUsername) ? null : WinRmUsername,
-            WinRmPasswordEncrypted = string.IsNullOrEmpty(WinRmPassword)
-                ? ExistingWinRmPasswordEncrypted
-                : Heimdall.Core.Security.CredentialProtector.Protect(WinRmPassword),
+            // The current Windows identity uses no stored password, and the card that shows and
+            // clears one is hidden in that mode, so a kept secret would be invisible to the user.
+            WinRmPasswordEncrypted = WinRmIdentityMode != WinRmIdentityMode.Credential
+                ? null
+                : string.IsNullOrEmpty(WinRmPassword)
+                    ? ExistingWinRmPasswordEncrypted
+                    : Heimdall.Core.Security.CredentialProtector.Protect(WinRmPassword),
             WinRmUseSsl = WinRmUseSsl,
             WinRmSkipCertificateCheck = WinRmUseSsl && WinRmSkipCertificateCheck,
             WinRmIdentityMode = WinRmIdentityMode,

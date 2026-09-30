@@ -267,6 +267,10 @@ public partial class ServerDialog : Window
                 MainTabControl.SelectedItem = DlgSrv_TabGeneral;
                 target = DlgSrv_BasicSshUsernameBox;
                 break;
+            case nameof(ServerDialogViewModel.WinRmUsername):
+                MainTabControl.SelectedItem = DlgSrv_TabGeneral;
+                target = DlgSrv_WinRmUsernameBox;
+                break;
             case "EndpointPort":
                 MainTabControl.SelectedItem = DlgSrv_TabGeneral;
                 target = DlgSrv_EndpointPortBox;

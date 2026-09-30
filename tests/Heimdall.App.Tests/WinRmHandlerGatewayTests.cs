@@ -108,16 +108,19 @@ public sealed class WinRmHandlerGatewayTests
                 CancellationToken.None);
             TerminalSessionResult terminalResult = Assert.IsType<TerminalSessionResult>(result.Session);
             Assert.True(File.Exists(scriptPath));
+            Assert.True(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
 
             if (killFirst)
             {
                 terminalResult.Session.Kill();
                 Assert.False(File.Exists(scriptPath));
+                Assert.False(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
             }
 
             terminalResult.Session.Dispose();
 
             Assert.False(File.Exists(scriptPath));
+            Assert.False(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
             Assert.True(terminalSession.IsDisposed);
         }
         finally
@@ -164,10 +167,12 @@ public sealed class WinRmHandlerGatewayTests
             int exitEventCount = 0;
             terminalResult.Session.ProcessExited += _ => exitEventCount++;
             Assert.True(File.Exists(scriptPath));
+            Assert.True(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
 
             terminalSession.RaiseProcessExited(0);
 
             Assert.False(File.Exists(scriptPath));
+            Assert.False(File.Exists(WinRmCredentialBootstrap.BlobPathFor(scriptPath)));
             Assert.Equal(1, exitEventCount);
             terminalResult.Session.Dispose();
         }
@@ -202,14 +207,15 @@ public sealed class WinRmHandlerGatewayTests
         Assert.NotNull(terminalSession.Arguments);
         Assert.Contains("-ComputerName '127.0.0.1'", terminalSession.Arguments, StringComparison.Ordinal);
         Assert.Contains("-Port 55985", terminalSession.Arguments, StringComparison.Ordinal);
-        Assert.Equal(1, preflight.TcpProbeCount);
-        Assert.Equal("127.0.0.1", preflight.LastTcpHost);
-        Assert.Equal(55985, preflight.LastTcpPort);
+        Assert.Equal(0, preflight.TcpProbeCount);
         Assert.Equal("WarnWinRmGatewayKerberos", result.Warning);
     }
 
+    // Through a gateway the TCP probe could only reach the local forwarder, which accepts
+    // whether or not the target answers, so a pass proved nothing. The probe is skipped there;
+    // an unreachable target surfaces as the Enter-PSSession error, which now ends the tab.
     [Fact]
-    public async Task ConnectAsync_TunneledCredentialProfile_PreflightFailureStopsBeforeBootstrap()
+    public async Task ConnectAsync_TunneledCredentialProfile_SkipsPreflightAndLaunches()
     {
         FakeTunnelService tunnelService = new FakeTunnelService
         {
@@ -242,14 +248,11 @@ public sealed class WinRmHandlerGatewayTests
             new AppSettings(),
             CancellationToken.None);
 
-        Assert.False(result.Success);
-        Assert.Equal(1, preflight.TcpProbeCount);
-        Assert.Equal("127.0.0.1", preflight.LastTcpHost);
-        Assert.Equal(55985, preflight.LastTcpPort);
-        Assert.Equal(0, bootstrapFactoryCallCount);
-        Assert.Null(terminalSession.Arguments);
-        Assert.Equal(1, tunnelService.ReleaseCount);
-        Assert.Equal(55985, tunnelService.ReleasedLocalPort);
+        Assert.True(result.Success);
+        Assert.Equal(0, preflight.TcpProbeCount);
+        Assert.Equal(1, bootstrapFactoryCallCount);
+        Assert.NotNull(terminalSession.Arguments);
+        Assert.Equal(0, tunnelService.ReleaseCount);
     }
 
     [Fact]
@@ -437,7 +440,7 @@ public sealed class WinRmHandlerGatewayTests
         Assert.True(result.Success);
         Assert.Equal("WarnWinRmGatewayKerberos", result.Warning);
         Assert.NotNull(terminalSession.Arguments);
-        Assert.Contains("-File", terminalSession.Arguments, StringComparison.Ordinal);
+        Assert.Contains("; & 'C:\\Temp\\heimdall_winrm_test.ps1'", terminalSession.Arguments, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -466,6 +469,95 @@ public sealed class WinRmHandlerGatewayTests
         Assert.False(result.Success);
         Assert.Equal(1, tunnelService.ReleaseCount);
         Assert.Equal(55985, tunnelService.ReleasedLocalPort);
+    }
+
+    // Each failure names its own cause. Every InvalidOperationException used to read as an
+    // unavailable credential, including a terminal that failed to start, while a locked vault
+    // and a DPAPI failure fell through to the generic launch failure.
+    public static TheoryData<string, Exception> TerminalStartFailures => new()
+    {
+        { "ErrorWinRmLaunchFailed", new InvalidOperationException("Failed to start process") },
+        { "ErrorWinRmLaunchFailed", new InvalidOperationException("Session already started") },
+    };
+
+    [Theory]
+    [MemberData(nameof(TerminalStartFailures))]
+    public async Task ConnectAsync_TerminalStartFailure_ReportsLaunchFailure(
+        string expectedKey,
+        Exception startException)
+    {
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession
+        {
+            StartException = startException
+        };
+        using WinRmHandler handler = CreateHandler(
+            new FakeTunnelService(),
+            new CountingWinRmPreflight(),
+            terminalSession);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateDirectServer(),
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(expectedKey, result.ErrorMessage);
+    }
+
+    public static TheoryData<string, Func<string?, byte[]?>, Func<byte[], string>> CredentialFailures => new()
+    {
+        {
+            "ErrorWinRmVaultLocked",
+            _ => throw new Heimdall.Core.Security.Vault.VaultLockedException(),
+            _ => "dpapi-bootstrap-blob"
+        },
+        {
+            "ErrorWinRmCredentialUnavailable",
+            _ => throw new System.Security.Cryptography.CryptographicException("tampered"),
+            _ => "dpapi-bootstrap-blob"
+        },
+        {
+            "ErrorWinRmCredentialUnavailable",
+            _ => Encoding.UTF8.GetBytes("secret"),
+            _ => throw new System.Security.Cryptography.CryptographicException("dpapi refused")
+        },
+        {
+            "ErrorWinRmCredentialUnavailable",
+            _ => null,
+            _ => "dpapi-bootstrap-blob"
+        },
+    };
+
+    [Theory]
+    [MemberData(nameof(CredentialFailures))]
+    public async Task ConnectAsync_CredentialFailure_ReportsItsOwnCause(
+        string expectedKey,
+        Func<string?, byte[]?> unprotect,
+        Func<byte[], string> protect)
+    {
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+        using WinRmHandler handler = CreateHandler(
+            new FakeTunnelService(),
+            new CountingWinRmPreflight(),
+            terminalSession,
+            () => new WinRmCredentialBootstrap(
+                createScriptPath: () => @"C:\Temp\heimdall_winrm_test.ps1",
+                writeAndProtect: (string path, string content) => { },
+                unprotectStoredPasswordBytes: unprotect,
+                protectBootstrapPasswordBytes: protect));
+        ServerProfileDto server = CreateDirectServer();
+        server.WinRmIdentityMode = WinRmIdentityMode.Credential;
+        server.WinRmUsername = @"CONTOSO\operator";
+        server.WinRmPasswordEncrypted = "encrypted";
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(expectedKey, result.ErrorMessage);
+        Assert.Null(terminalSession.Arguments);
     }
 
     private static WinRmHandler CreateHandler(

@@ -1906,6 +1906,7 @@
   "ValidationInlineTimeFormat": "La hora debe tener el formato HH:MM (00:00 - 23:59)",
   "ValidationInlineServerRequired": "Debe seleccionarse una sesión",
   "ValidationInlineSshUserRequired": "El usuario SSH es obligatorio",
+  "ValidationInlineWinRmUserInvalid": "Introduce un nombre de usuario WinRM como operator, CONTOSO\\operator u operator@contoso.com.",
   "ValidationInlineSshUserFormat": "Formato de usuario SSH no válido",
 
   "SftpErrorDestinationChanged": "El destino ahora está ocupado y no se reemplazó. Actualiza la carpeta y vuelve a intentarlo con un nombre nuevo o una elección explícita de reemplazo.",
@@ -2251,6 +2252,7 @@
   "ErrorWinRmProfileInvalid": "El perfil del servidor no es un perfil WinRM válido.",
   "ErrorWinRmBootstrapPathMissing": "Se requiere una ruta interna de arranque de WinRM para sesiones con credenciales almacenadas.",
   "ErrorWinRmCredentialUnavailable": "La credencial almacenada de WinRM no está disponible.",
+  "ErrorWinRmVaultLocked": "Desbloquea el almacén antes de iniciar esta sesión WinRM.",
   "ErrorWinRmLaunchFailed": "No se pudo iniciar la terminal WinRM.",
   "ErrorWinRmNoPowerShellHost": "No se encontró ningún ejecutable de host de PowerShell. Instala PowerShell 7 (pwsh.exe) o Windows PowerShell (powershell.exe), o añade uno al PATH.",
   "ErrorWinRmSslGatewayUnsupported": "WinRM a través de una pasarela SSH no admite HTTPS. Usa HTTP, o conecta directamente.",
@@ -2259,6 +2261,7 @@
   "ErrorWinRmPreflightTlsFailed": "Falló la conexión TLS de WinRM a \"{0}\" en el puerto {1} (certificado no confiable o error de negociación).",
   "ErrorWinRmNtlmLoopback": "Falló la autenticación WinRM para la identidad de Windows actual. Usa credenciales almacenadas para localhost o hosts fuera del dominio.",
   "ErrorWinRmWsmanInvalidResponse": "WinRM recibió una respuesta WSMan no válida. Si esta sesión usa una pasarela, verifica que WinRM use HTTP a través del túnel.",
+  "ErrorWinRmExecutionPolicyBlocked": "La directiva de ejecución de PowerShell rechazó el script de inicio de sesión de WinRM. Es posible que tu organización exija scripts firmados: usa la identidad actual de Windows para este host o consulta a tu administrador.",
   "WarnWinRmGatewayKerberos": "WinRM a través de una pasarela: Kerberos no está disponible, la autenticación recurre a NTLM.",
   "WarnWinRmSkipCertificateCheck": "Se omitió la validación del certificado TLS de WinRM para esta sesión.",
 

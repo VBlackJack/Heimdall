@@ -26,7 +26,7 @@ public static class ImportedProfileSanitizer
     /// <summary>
     /// Clears fields that are intended to be produced only by trusted local
     /// scanners and must not cross the trust boundary of an external import,
-    /// and clears any imported local-execution trust assertion.
+    /// and clears any imported local-execution or certificate-skip trust assertion.
     /// New rules can be added here as additional trust-boundary fields are identified.
     /// </summary>
     public static void Sanitize(IList<ServerProfileDto> profiles)
@@ -42,8 +42,9 @@ public static class ImportedProfileSanitizer
 
             profile.CitrixLaunchCommandLine = null;
             profile.ExecutionConfirmed = false;
-            profile.WinRmSkipCertificateCheck =
-                profile.WinRmUseSsl && profile.WinRmSkipCertificateCheck;
+
+            // A trust decision about the remote certificate, made on the exporting machine.
+            profile.WinRmSkipCertificateCheck = false;
         }
     }
 }

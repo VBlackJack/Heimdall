@@ -79,10 +79,12 @@ public sealed class WinRmEarlyOutputDiagnosticTests
         Assert.True(diagnostic.IsActive);
     }
 
+    // A remote prompt is the only proof the session was entered. The local "PS C:\>" used to
+    // count too, and it is exactly what the host printed after a failed Enter-PSSession.
     [Theory]
-    [InlineData("PowerShell 7.5.0\r\nPS C:\\> ")]
     [InlineData("[server.example]: PS C:\\Users\\operator> ")]
-    public void Observe_ConfirmedPowerShellPrompt_DisablesDiagnostic(string output)
+    [InlineData("[server.example] : PS C:\\Users\\operator> ")]
+    public void Observe_RemotePowerShellPrompt_DisablesDiagnostic(string output)
     {
         WinRmEarlyOutputDiagnostic diagnostic = new();
 
@@ -91,6 +93,61 @@ public sealed class WinRmEarlyOutputDiagnosticTests
         Assert.Null(result);
         Assert.False(diagnostic.IsActive);
         Assert.Null(diagnostic.Observe(Bytes("WinRM 0x8009030e")));
+    }
+
+    [Fact]
+    public void Observe_LocalPowerShellPrompt_StaysActive()
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes("PowerShell 7.5.0\r\nPS C:\\> "));
+
+        Assert.Null(result);
+        Assert.True(diagnostic.IsActive);
+    }
+
+    [Theory]
+    [InlineData("PS C:\\Users\\operator> ")]
+    [InlineData("[server.example]: PS C:\\Users\\operator> ")]
+    public void Observe_ErrorAndPromptInOneChunk_ReturnsKey(string prompt)
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes(
+            "Enter-PSSession : Connecting to remote server failed: WinRM cannot process the request. "
+            + "Error code 0x8009030e occurred while using Negotiate authentication.\r\n"
+            + prompt));
+
+        Assert.Equal("ErrorWinRmNtlmLoopback", result);
+        Assert.False(diagnostic.IsActive);
+    }
+
+    [Fact]
+    public void Observe_ErrorAfterLocalPromptChunk_ReturnsKey()
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        Assert.Null(diagnostic.Observe(Bytes("PS C:\\Users\\operator> ")));
+        string? result = diagnostic.Observe(Bytes("Enter-PSSession : WinRM 0x8009030e"));
+
+        Assert.Equal("ErrorWinRmNtlmLoopback", result);
+    }
+
+    // The refusal names its help topic, untranslated, in every language (measured on a French
+    // Windows PowerShell 5.1: "voir la rubrique about_Execution_Policies").
+    [Theory]
+    [InlineData("File C:\\Temp\\heimdall_winrm_x.ps1 cannot be loaded. The file is not digitally signed. "
+        + "For more information, see about_Execution_Policies at https://go.microsoft.com/fwlink/?LinkID=135170.")]
+    [InlineData("Impossible de charger le fichier C:\\Temp\\heimdall_winrm_x.ps1. Pour plus d'informations, "
+        + "voir la rubrique about_Execution_Policies.\r\n    + FullyQualifiedErrorId : UnauthorizedAccess")]
+    public void Observe_ExecutionPolicyRefusal_ReturnsKey(string output)
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes(output));
+
+        Assert.Equal("ErrorWinRmExecutionPolicyBlocked", result);
+        Assert.False(diagnostic.IsActive);
     }
 
     [Fact]

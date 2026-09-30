@@ -1906,6 +1906,7 @@
   "ValidationInlineTimeFormat": "L'heure doit \u00eatre au format HH:MM (00:00 - 23:59)",
   "ValidationInlineServerRequired": "Une session doit \u00eatre s\u00e9lectionn\u00e9e",
   "ValidationInlineSshUserRequired": "Le nom d'utilisateur SSH est obligatoire",
+  "ValidationInlineWinRmUserInvalid": "Saisissez un nom d'utilisateur WinRM comme operator, CONTOSO\\operator ou operator@contoso.com.",
   "ValidationInlineSshUserFormat": "Format de nom d'utilisateur SSH invalide",
 
   "SftpErrorDestinationChanged": "La destination est maintenant occupée et n'a pas été remplacée. Actualisez le dossier et réessayez avec un autre nom ou un choix explicite de remplacement.",
@@ -2251,6 +2252,7 @@
   "ErrorWinRmProfileInvalid": "Le profil de serveur n'est pas un profil WinRM valide.",
   "ErrorWinRmBootstrapPathMissing": "Un chemin d'amor\u00e7age interne WinRM est requis pour les sessions \u00e0 identifiant stock\u00e9.",
   "ErrorWinRmCredentialUnavailable": "L'identifiant WinRM stock\u00e9 est indisponible.",
+  "ErrorWinRmVaultLocked": "D\u00e9verrouillez le coffre avant de d\u00e9marrer cette session WinRM.",
   "ErrorWinRmLaunchFailed": "\u00c9chec du lancement du terminal WinRM.",
   "ErrorWinRmNoPowerShellHost": "Aucun ex\u00e9cutable h\u00f4te PowerShell n'a \u00e9t\u00e9 trouv\u00e9. Installez PowerShell 7 (pwsh.exe) ou Windows PowerShell (powershell.exe), ou ajoutez-en un au PATH.",
   "ErrorWinRmSslGatewayUnsupported": "WinRM via une passerelle SSH ne prend pas en charge HTTPS. Utilisez HTTP ou une connexion directe.",
@@ -2259,6 +2261,7 @@
   "ErrorWinRmPreflightTlsFailed": "La connexion TLS WinRM vers '{0}' sur le port {1} a \u00e9chou\u00e9 (certificat non approuv\u00e9 ou erreur de n\u00e9gociation).",
   "ErrorWinRmNtlmLoopback": "\u00c9chec de l'authentification WinRM pour l'identit\u00e9 Windows courante. Utilisez des identifiants stock\u00e9s pour localhost ou les h\u00f4tes hors domaine.",
   "ErrorWinRmWsmanInvalidResponse": "WinRM a re\u00e7u une r\u00e9ponse WSMan invalide. Si cette session utilise une passerelle, v\u00e9rifiez que WinRM utilise HTTP dans le tunnel.",
+  "ErrorWinRmExecutionPolicyBlocked": "La strat\u00e9gie d'ex\u00e9cution PowerShell a refus\u00e9 le script de connexion WinRM. Votre organisation exige peut-\u00eatre des scripts sign\u00e9s : utilisez l'identit\u00e9 Windows actuelle pour cet h\u00f4te, ou contactez votre administrateur.",
   "WarnWinRmGatewayKerberos": "WinRM via une passerelle : Kerberos indisponible, l'authentification bascule sur NTLM.",
   "WarnWinRmSkipCertificateCheck": "La validation du certificat TLS WinRM a \u00e9t\u00e9 ignor\u00e9e pour cette session.",
 

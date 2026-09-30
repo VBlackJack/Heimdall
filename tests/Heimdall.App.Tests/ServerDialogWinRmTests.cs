@@ -369,6 +369,115 @@ public sealed class ServerDialogWinRmTests
         Assert.Equal(DefaultPorts.WinRmHttps, vm.WinRmPort);
     }
 
+    // The dialog refuses the username the credential bootstrap would refuse at connect time,
+    // by the same predicate, so the user learns it at Save rather than from a failed session.
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("bad user")]
+    [InlineData("user;Remove-Item")]
+    [InlineData("CONTOSO\\user\\extra")]
+    public void Validate_CredentialModeWithUsernameTheBootstrapRefuses_NamesTheField(string username)
+    {
+        ServerDialogViewModel vm = CredentialProfile(username);
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.NotNull(vm.ValidationError);
+        Assert.Equal("WinRmUsername", vm.FirstInvalidField);
+    }
+
+    [Theory]
+    [InlineData("operator")]
+    [InlineData("CONTOSO\\operator")]
+    [InlineData("operator@contoso.com")]
+    public void Validate_CredentialModeWithUsernameTheBootstrapAccepts_PassesTheField(string username)
+    {
+        ServerDialogViewModel vm = CredentialProfile(username);
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.Null(vm.ValidationError);
+    }
+
+    [Fact]
+    public void Validate_CurrentUserMode_IgnoresTheUsernameField()
+    {
+        ServerDialogViewModel vm = CredentialProfile("bad user");
+        vm.WinRmIdentityMode = WinRmIdentityMode.CurrentUser;
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.Null(vm.ValidationError);
+    }
+
+    [Fact]
+    public async Task Validate_InvalidUsername_ShowsTheLocalizedMessageAndClearsWhenFixed()
+    {
+        ServerDialogViewModel vm = CredentialProfile("bad user");
+        vm.Localizer = await CreateLocalizerAsync("en");
+
+        vm.ValidateCommand.Execute(null);
+        Assert.Equal(vm.Localizer["ValidationInlineWinRmUserInvalid"], vm.ValidationError);
+        Assert.NotEqual("ValidationInlineWinRmUserInvalid", vm.ValidationError);
+
+        vm.WinRmUsername = "operator";
+
+        Assert.Null(vm.ValidationError);
+    }
+
+    // Switching back to the current Windows identity must not keep a stored password nobody
+    // can see or clear any more: the credential card, and its Clear button, are hidden then.
+    [Fact]
+    public void ToDto_CurrentUserMode_DropsTheStoredWinRmPassword()
+    {
+        ServerDialogViewModel vm = ServerDialogViewModel.FromDto(new ServerProfileDto
+        {
+            DisplayName = "WinRM",
+            RemoteServer = "server01.contoso.test",
+            ConnectionType = "WINRM",
+            WinRmIdentityMode = WinRmIdentityMode.Credential,
+            WinRmUsername = "operator",
+            WinRmPasswordEncrypted = "encrypted-password"
+        });
+
+        vm.WinRmIdentityMode = WinRmIdentityMode.CurrentUser;
+        ServerProfileDto dto = vm.ToDto();
+
+        Assert.Equal(WinRmIdentityMode.CurrentUser, dto.WinRmIdentityMode);
+        Assert.Null(dto.WinRmPasswordEncrypted);
+    }
+
+    [Fact]
+    public void ToDto_BackToCredentialModeBeforeSaving_KeepsTheStoredWinRmPassword()
+    {
+        ServerDialogViewModel vm = ServerDialogViewModel.FromDto(new ServerProfileDto
+        {
+            DisplayName = "WinRM",
+            RemoteServer = "server01.contoso.test",
+            ConnectionType = "WINRM",
+            WinRmIdentityMode = WinRmIdentityMode.Credential,
+            WinRmUsername = "operator",
+            WinRmPasswordEncrypted = "encrypted-password"
+        });
+
+        vm.WinRmIdentityMode = WinRmIdentityMode.CurrentUser;
+        vm.WinRmIdentityMode = WinRmIdentityMode.Credential;
+        ServerProfileDto dto = vm.ToDto();
+
+        Assert.Equal("encrypted-password", dto.WinRmPasswordEncrypted);
+    }
+
+    private static ServerDialogViewModel CredentialProfile(string username) =>
+        new()
+        {
+            DisplayName = "WinRM",
+            RemoteServer = "server01.contoso.test",
+            ConnectionType = "WINRM",
+            WinRmIdentityMode = WinRmIdentityMode.Credential,
+            WinRmUsername = username
+        };
+
     private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)
     {
         LocalizationManager manager = new LocalizationManager();

@@ -218,6 +218,10 @@ public sealed class ServerDialogStoredPasswordTests
                 dto.RdpPasswordEncrypted = StoredCipher;
                 break;
             case "WinRm":
+                // Only a stored-credential profile keeps a WinRM password: the current Windows
+                // identity uses none, and saving in that mode drops one.
+                dto.WinRmIdentityMode = WinRmIdentityMode.Credential;
+                dto.WinRmUsername = "operator";
                 dto.WinRmPasswordEncrypted = StoredCipher;
                 break;
             case "Ssh":
