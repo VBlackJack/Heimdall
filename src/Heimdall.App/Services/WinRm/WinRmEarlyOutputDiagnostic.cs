@@ -15,6 +15,7 @@
  */
 
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Heimdall.App.Services.WinRm;
 
@@ -26,6 +27,16 @@ internal sealed class WinRmEarlyOutputDiagnostic
 
     private const string NtlmLoopbackCode = "0x8009030e";
     private const string WsManInvalidResponseCode = "12152";
+
+    /// <summary>
+    /// The prompt of an entered remote session, "[host]: PS path>". The colon may be preceded
+    /// by a space, as localized hosts write it (measured on a French host: "[Processus :id] : PS").
+    /// A bare local "PS path>" is deliberately not a match: it is what the host shows after
+    /// Enter-PSSession failed, right below the error this diagnostic exists to explain.
+    /// </summary>
+    private static readonly Regex RemotePromptPattern = new(
+        @"\[[^\]\r\n]+\] ?: ?PS [^\r\n]*>",
+        RegexOptions.CultureInvariant);
 
     private readonly int _maxBufferedBytes;
     private readonly StringBuilder _buffer = new();
@@ -69,14 +80,11 @@ internal sealed class WinRmEarlyOutputDiagnostic
         _bufferedBytes += observedBytes.Length;
 
         string output = _buffer.ToString();
-        if (ContainsConfirmedPowerShellPrompt(output))
-        {
-            IsActive = false;
-            return null;
-        }
 
+        // The error is looked for first: a chunk can carry both the error and the prompt the
+        // host prints after it, and the prompt must not silence the error it follows.
         string? localizationKey = FindDiagnosticKey(output);
-        if (localizationKey is not null || exceedsCap)
+        if (localizationKey is not null || exceedsCap || ContainsRemotePowerShellPrompt(output))
         {
             IsActive = false;
         }
@@ -112,21 +120,8 @@ internal sealed class WinRmEarlyOutputDiagnostic
             || context.Contains("New-PSSession", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool ContainsConfirmedPowerShellPrompt(string output)
-    {
-        foreach (string line in output.Split('\n'))
-        {
-            string candidate = line.Trim();
-            bool hasPowerShellPrefix = candidate.StartsWith("PS ", StringComparison.OrdinalIgnoreCase)
-                || candidate.Contains("]: PS ", StringComparison.OrdinalIgnoreCase);
-            if (hasPowerShellPrefix && candidate.EndsWith('>'))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    private static bool ContainsRemotePowerShellPrompt(string output)
+        => RemotePromptPattern.IsMatch(output);
 
     private static bool ContainsWsManContext(string output)
     {
