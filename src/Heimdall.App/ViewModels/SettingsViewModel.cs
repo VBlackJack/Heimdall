@@ -2069,7 +2069,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpHostPoolIdleExpiryMinutes = defaults.RdpHostPoolIdleExpiryMinutes;
         RdpDialogAdvancedDefault = defaults.RdpDialogAdvancedDefault;
         RdpResolutionPresets = defaults.RdpResolutionPresets;
-        RdpConnectWatchdogTimeoutMs = defaults.RdpConnectWatchdogTimeoutMs;
+
+        // RdpConnectWatchdogTimeoutMs is deliberately not here: it is edited on Advanced >
+        // Diagnostics, and this button promises to leave everything outside the RDP tab alone.
 
         // The factory reset routes through LoadFromSettings, which reseeds every box. This one does
         // not, and the boxes are bound to the text: without the line below they would go on showing
@@ -2090,7 +2092,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpKeepAliveIntervalMsText = RdpKeepAliveIntervalMs.ToString(CultureInfo.InvariantCulture);
         RdpHostPoolCapacityText = RdpHostPoolCapacity.ToString(CultureInfo.InvariantCulture);
         RdpHostPoolIdleExpiryMinutesText = RdpHostPoolIdleExpiryMinutes.ToString(CultureInfo.InvariantCulture);
-        RdpConnectWatchdogTimeoutMsText = RdpConnectWatchdogTimeoutMs.ToString(CultureInfo.InvariantCulture);
     }
 
     [RelayCommand]

@@ -2375,6 +2375,21 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal(22, viewModel.TerminalFontSize);
     }
 
+    // The RDP connect watchdog is edited on Advanced > Diagnostics, and the button's tooltip
+    // promises that settings outside the RDP defaults are untouched.
+    [Fact]
+    public async Task ResetRdpDefaultsCommand_LeavesTheWatchdogOnTheDiagnosticsTabAlone()
+    {
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(new FakeConfigManager(), dialog);
+        viewModel.RdpConnectWatchdogTimeoutMsText = "0";
+
+        await viewModel.ResetRdpDefaultsCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, viewModel.RdpConnectWatchdogTimeoutMs);
+        Assert.Equal("0", viewModel.RdpConnectWatchdogTimeoutMsText);
+    }
+
     [Fact]
     public async Task ResetRdpDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {
