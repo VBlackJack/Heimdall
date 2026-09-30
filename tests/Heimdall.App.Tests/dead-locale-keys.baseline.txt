@@ -188,7 +188,6 @@ BtnExitFullscreen
 BtnExportRdp
 BtnFullExport
 BtnFullImport
-BtnGenerateRecoveryFile
 BtnManageCreds
 BtnReleasePorts
 BtnRestart
@@ -981,7 +980,6 @@ SettingsResolution
 SettingsSectionData
 SettingsSectionGateways
 SettingsSectionLogging
-SettingsSectionPinRecovery
 SettingsSectionPlink
 SettingsSectionProjects
 SettingsSectionSessionBehavior

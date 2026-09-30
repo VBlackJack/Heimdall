@@ -486,8 +486,6 @@
   "ServerGatewayUnavailableHint": "Aucune passerelle SSH n'est configur\u00e9e. Activez la connexion directe ou ajoutez-en une dans les param\u00e8tres.",
   "StatusDirectConnection": "Connexion RDP directe vers : {0}...",
   "StatusDirectConnectionReady": "Connexion directe vers {0}...",
-  "SettingsSectionPinRecovery": "R\u00e9cup\u00e9ration du PIN",
-  "BtnGenerateRecoveryFile": "G\u00e9n\u00e9rer fichier de r\u00e9cup\u00e9ration",
   "BtnEmergencyReset": "R\u00e9initialisation d'urgence",
   "RecoveryFileGenerated": "Fichier de r\u00e9cup\u00e9ration enregistr\u00e9 : {0}",
   "RecoveryFileHint": "Conservez ce fichier en lieu s\u00fbr. Il permet de r\u00e9initialiser le PIN.",

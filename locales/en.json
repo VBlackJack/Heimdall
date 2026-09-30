@@ -486,8 +486,6 @@
   "ServerGatewayUnavailableHint": "No SSH gateway is configured. Enable Direct Connection or add one in Settings.",
   "StatusDirectConnection": "Direct RDP connection to: {0}...",
   "StatusDirectConnectionReady": "Connecting directly to {0}...",
-  "SettingsSectionPinRecovery": "PIN Recovery",
-  "BtnGenerateRecoveryFile": "Generate Recovery File",
   "BtnEmergencyReset": "Emergency Reset",
   "RecoveryFileGenerated": "Recovery file saved to: {0}",
   "RecoveryFileHint": "Store this file in a safe location. It allows PIN reset.",

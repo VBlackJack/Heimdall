@@ -43,12 +43,15 @@ surveillance, le PIN suffit. Si elle porte sur le fichier d'identifiants lui-mê
 de passe maître y répond. Les deux se cumulent, et poser un PIN en pensant obtenir le second
 protège beaucoup moins qu'il n'y paraît.
 
-**Générer un fichier de récupération** écrit un fichier `.heimdall-recovery` capable de
-réinitialiser un PIN oublié. Une réserve que la boîte de dialogue n'énonce pas : ce fichier est
-chiffré pour votre compte Windows sur cette machine, donc inutilisable depuis une autre machine
-ou un autre compte. Il sauve un PIN oublié, pas un ordinateur perdu.
+**Verrouillage auto après inactivité** et **Déconnecter les sessions au verrouillage** demandent le mot de passe
+maître : sans lui, il n'y a rien derrière quoi verrouiller l'espace de travail, et les deux restent
+grisés, avec une ligne qui dit pourquoi, tant que le mot de passe maître n'est pas activé. 0
+désactive le verrouillage automatique.
 
 ## Sécurité
+
+**Network Level Authentication (NLA)** et **Authentification stricte du serveur** se trouvent dans
+l'onglet RDP, sous Certificats, dans la carte Sécurité de la connexion.
 
 **Network Level Authentication (NLA)** - la machine distante vous authentifie *avant* d'ouvrir
 une session de bureau. Laissez-la activée. Ne la désactivez que pour des cibles qui ne savent
@@ -87,9 +90,9 @@ seconde commande.
 qui doivent d'abord être déverrouillés. Bitwarden et 1Password exigent en plus une session
 établie hors de Heimdall (`BW_SESSION`, `op signin`) ; Heimdall ne l'établit pas pour vous.
 
-**N'utiliser que la première ligne de la sortie** - certains CLI impriment le secret suivi
-d'autres champs. Laissez actif, sauf si votre mot de passe contient légitimement un saut de
-ligne.
+**N'utiliser que la première ligne de la sortie** - désactivé par défaut. Certains CLI
+(KeePass2 KPScript, `pass`) impriment le secret suivi d'autres champs : activez-le pour ceux-là.
+Laissez-le désactivé si votre mot de passe contient légitimement un saut de ligne.
 
 L'entrée du coffre est cherchée par le **Nom d'entrée du coffre** du profil si vous en
 renseignez un, et par le nom affiché du profil sinon. Renseignez-le quand l'entrée de votre
@@ -119,9 +122,9 @@ Bureau à distance et le format `.rdp` connaissent, et une profondeur plus basse
 importé (un profil mRemoteNG en 256 couleurs ou 15 bits, un `session bpp` sous 16) est ramenée
 à 16, ce que la session recevait déjà avant que la borne ne le dise.
 
-**Mode de résolution, Largeur, Hauteur** - les autres réglages dont l'effet sur la mémoire a été
-mesuré. Une session plus petite coûte environ 86 Mo de moins qu'en 1920x1080. `Auto` suit la
-fenêtre de Heimdall, `Fixed` fige la taille choisie.
+**Largeur, Hauteur** - la taille du bureau d'une nouvelle session, et les autres réglages dont
+l'effet sur la mémoire a été mesuré : une session plus petite coûte environ 86 Mo de moins qu'en
+1920x1080. Avec la **Résolution dynamique** active, la session suit plutôt la fenêtre de Heimdall.
 
 Les mesures complètes sont dans [Mémoire RDP et réglage des sessions](RDP-PERFORMANCE.md).
 
@@ -141,11 +144,12 @@ Les délais avancés existent parce que des pannes différentes demandent des pa
 différentes. Vous n'avez presque jamais besoin d'y toucher.
 
 **Délai de surveillance de connexion RDP** - combien de temps attendre avant de déclarer la
-connexion en échec. Augmentez-le pour des serveurs lents ou lointains.
+connexion en échec. Augmentez-le pour des serveurs lents ou lointains. 0 désactive la
+surveillance.
 
 **Délai de stabilisation de la résolution après connexion** - une pause avant d'autoriser le
 redimensionnement, pour qu'une session encore en train de négocier sa géométrie ne soit pas
-redimensionnée aussitôt.
+redimensionnée aussitôt. 0 supprime la pause.
 
 **Délai de surveillance de l'autofill d'identifiants** - combien de temps Heimdall guette
 l'invite d'identifiants d'une session mstsc *externe* pour la remplir. Sans effet sur les
@@ -168,7 +172,7 @@ sans redémarrage. Voir [RDP-PERFORMANCE.md](RDP-PERFORMANCE.md).
 **Intervalle de maintien de session** et **Intervalle anti-inactivité** sont deux choses
 différentes. Le maintien est du trafic protocolaire qui empêche le *serveur* de couper une
 session inactive. L'anti-inactivité simule une activité pour que le *bureau* distant ne se
-verrouille pas.
+verrouille pas ; 0 la désactive.
 
 ## Sondes en arrière-plan
 
@@ -194,10 +198,11 @@ qui exige de renseigner **Chemin de PuTTY**.
 
 ## Journalisation
 
-**Activer la journalisation** écrit le journal de l'application. **Activer la journalisation de
-session** enregistre en plus le contenu des sessions terminal dans **Répertoire des journaux de
-session**. La seconde enregistre ce que vous tapez et ce qui revient : réfléchissez à
-l'emplacement de ce répertoire.
+**Écrire le journal de diagnostic de l'application** écrit le journal propre à Heimdall : ses
+événements et ses erreurs. **Enregistrer la transcription des sessions** enregistre en plus le
+contenu des sessions terminal dans **Répertoire des journaux de session**. La seconde enregistre
+ce que vous tapez et ce qui revient, mots de passe ou jetons renvoyés par le terminal compris :
+réfléchissez à l'emplacement de ce répertoire ; Heimdall demande confirmation avant de l'activer.
 
 ## Migration depuis l'ancienne version
 
@@ -249,11 +254,6 @@ vide, il est cherché à côté de plink.exe.
 **Répertoires Sysinternals, NirSoft et NanaRun** - Heimdall n'embarque pas ces suites. Indiquez
 un dossier où vous en avez déjà installé une, et les outils qui s'y trouvent apparaissent dans
 la boîte à outils. Laissez vide et Heimdall propose simplement ses outils intégrés.
-
-## Projets
-
-Une étiquette pour regrouper les sessions par client, site ou environnement, et filtrer l'arbre
-dessus. Purement organisationnel : cela ne change rien à la façon dont une connexion est faite.
 
 ## Éditeur externe
 

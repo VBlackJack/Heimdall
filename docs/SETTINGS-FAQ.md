@@ -41,12 +41,14 @@ unlock with a fingerprint instead of typing it.
 PIN is enough. If the worry is the credential file itself, only the master password answers it.
 The two stack, and setting a PIN when you meant the second gives you much less than it appears.
 
-**Generate Recovery File** writes a `.heimdall-recovery` file that can reset a forgotten PIN.
-One caveat the dialog does not spell out: the file is encrypted for your Windows account on this
-machine, so it cannot be used from another machine or another account. It rescues a forgotten
-PIN, not a lost computer.
+**Auto-lock after idle** and **Disconnect sessions when locking** need the master password: without it there is
+nothing to lock the workspace behind, so both stay greyed out, with a line saying why, until the
+master password is on. 0 turns auto-lock off.
 
 ## Security
+
+**Network Level Authentication (NLA)** and **Strict server authentication** are on the RDP tab,
+under Certificates, in the Connection security card.
 
 **Network Level Authentication (NLA)** - the remote machine authenticates you *before* opening
 a desktop session. Leave it on. Turn it off only for targets that cannot do it, such as most
@@ -82,8 +84,9 @@ profile says. Fill it in and the username is fetched too, by a second command.
 first. Bitwarden and 1Password additionally need a session established outside Heimdall
 (`BW_SESSION`, `op signin`); Heimdall does not establish those for you.
 
-**Use only the first line of output** - some CLIs print the secret followed by other fields.
-Leave this on unless your password legitimately contains a newline.
+**Use only the first line of output** - off by default. Some CLIs (KeePass2 KPScript, `pass`)
+print the secret followed by other fields: turn it on for those. Leave it off if your password
+legitimately contains a newline.
 
 The vault entry is looked up by the profile's **Vault entry name** if you set one, and by the
 profile's display name otherwise. Set it when the entry in your vault is not named exactly like
@@ -111,9 +114,9 @@ know, and a lower depth in an imported file (a 256-colour or 15-bit mRemoteNG pr
 `session bpp` below 16) is brought to 16, which is what the session was given before the bound
 said so.
 
-**Resolution mode, Width, Height** - the other settings measured to change memory use. A smaller
-session costs about 86 MB less than 1920x1080. `Auto` follows the Heimdall window, `Fixed` pins
-the size you choose.
+**Width, Height** - the default desktop size of a new session, and the other settings measured
+to change memory use: a smaller session costs about 86 MB less than 1920x1080. With **Dynamic
+resolution** on, the session follows the Heimdall window instead.
 
 Full measurements are in [RDP memory and session tuning](RDP-PERFORMANCE.md).
 
@@ -132,10 +135,11 @@ The advanced timeouts exist because different failures need different patience. 
 to touch them.
 
 **RDP connection watchdog timeout** - how long to wait for a connection before declaring it
-failed. Raise it for slow or distant servers.
+failed. Raise it for slow or distant servers. 0 turns the watchdog off.
 
 **Resolution stabilization delay after connect** - a pause before resizing is allowed, so a
-session that is still negotiating its geometry is not immediately resized again.
+session that is still negotiating its geometry is not immediately resized again. 0 turns the
+pause off.
 
 **Credential autofill watcher timeout** - how long Heimdall watches for the credential prompt
 of an *external* mstsc session in order to fill it. It does not affect embedded sessions.
@@ -154,7 +158,7 @@ without a restart. See [RDP-PERFORMANCE.md](RDP-PERFORMANCE.md).
 
 **Session keep-alive interval** and **Anti-idle interval** are different things. Keep-alive is
 protocol traffic that stops the *server* dropping an idle session. Anti-idle simulates activity
-so the remote *desktop* does not lock.
+so the remote *desktop* does not lock; 0 turns it off.
 
 ## Background probes
 
@@ -179,9 +183,11 @@ session but isolates each session in its own process.
 
 ## Logging
 
-**Enable logging** writes the application log. **Enable session logging** additionally records
-the content of terminal sessions to **Session log directory**. The second one records what you
-typed and what came back, so consider where that directory lives.
+**Write the application diagnostics log** writes Heimdall's own log: its events and errors.
+**Record session transcripts** additionally records the content of terminal sessions to **Session
+log directory**. The second one records what you typed and what came back, passwords or tokens
+echoed to the terminal included, so consider where that directory lives; Heimdall asks before it
+turns it on.
 
 ## Legacy migration
 
@@ -230,11 +236,6 @@ to plink.exe.
 **Sysinternals, NirSoft and NanaRun directories** - Heimdall does not ship these suites. Point it
 at a folder where you have already installed one, and the tools it finds there appear in the
 toolbox. Leave them empty and Heimdall simply offers its own built-in tools.
-
-## Projects
-
-A label for grouping sessions by client, site or environment, and filtering the tree by it.
-Purely organisational: it changes nothing about how a connection is made.
 
 ## External editor
 
