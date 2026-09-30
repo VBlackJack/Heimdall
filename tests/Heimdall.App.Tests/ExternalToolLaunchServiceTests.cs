@@ -189,9 +189,6 @@ public sealed class ExternalToolLaunchServiceTests : IDisposable
         public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null) =>
             Task.FromResult<GatewayDialogResult?>(null);
 
-        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null) =>
-            Task.FromResult<ProjectDialogResult?>(null);
-
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(
             ScheduledTaskDialogViewModel? editVm = null) =>
             Task.FromResult<ScheduledTaskDialogResult?>(null);

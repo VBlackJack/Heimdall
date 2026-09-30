@@ -1036,45 +1036,27 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal("Buffy", saved.DefaultTheme);
     }
 
+    // The panel no longer edits projects (their UI was removed on purpose), so its Save must not
+    // write the project list either: it used to write back the snapshot taken at load, which erased
+    // any project another surface had persisted while the panel was open.
     [Fact]
-    public async Task ProjectDeletion_ClearsInventoryProjectIds_RecoverableIfInterrupted()
+    public async Task Save_LeavesProjectsAsTheyAreOnDisk()
     {
         var config = new FakeConfigManager
         {
             Settings = new AppSettings
             {
-                Projects =
-                [
-                    new ProjectDto
-                    {
-                        Id = "project-a",
-                        Name = "Project A"
-                    }
-                ]
-            },
-            Servers =
-            [
-                new ServerProfileDto
-                {
-                    Id = "alpha",
-                    DisplayName = "Alpha",
-                    RemoteServer = "alpha.example.test",
-                    ProjectId = "project-a"
-                }
-            ]
+                Projects = [new ProjectDto { Id = "project-a", Name = "Project A" }]
+            }
         };
-        var dialog = new FakeDialogService { ConfirmResult = true };
-        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        SettingsViewModel viewModel = CreateViewModel(config);
         viewModel.LoadFromSettings(config.Settings);
-        viewModel.SelectedProject = Assert.Single(viewModel.Projects);
-        await viewModel.DeleteProjectCommand.ExecuteAsync(null);
-        config.FailOnMergeSetting = true;
+        config.Settings.Projects.Add(new ProjectDto { Id = "project-b", Name = "Project B" });
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
 
-        bool saved = await viewModel.TrySaveAsync();
+        Assert.True(await viewModel.TrySaveAsync());
 
-        Assert.False(saved);
-        Assert.Null(Assert.Single(config.Servers).ProjectId);
-        Assert.Contains(config.Settings.Projects, project => project.Id == "project-a");
+        Assert.Equal(["project-a", "project-b"], config.Settings.Projects.Select(project => project.Id));
     }
 
     [Fact]
@@ -1792,7 +1774,7 @@ public sealed class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task ResetToDefaultsCommand_RestoresPreferencesButKeepsGatewaysAndProjects()
+    public async Task ResetToDefaultsCommand_RestoresPreferencesButKeepsGateways()
     {
         var dialog = new FakeDialogService { ConfirmResult = true };
         var viewModel = CreateViewModel(new FakeConfigManager(), dialog);
@@ -1807,7 +1789,6 @@ public sealed class SettingsViewModelTests : IDisposable
             User = "ops",
             SshPasswordEncrypted = "encrypted-secret"
         });
-        seeded.Projects.Add(new ProjectDto { Id = "prj-1", Name = "Production" });
         viewModel.LoadFromSettings(seeded);
         viewModel.DefaultTheme = "Buffy";
 
@@ -1825,9 +1806,6 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal("10.0.0.1", gateway.Host);
         Assert.Equal(2222, gateway.Port);
         Assert.True(gateway.HasPassword);
-
-        var project = Assert.Single(viewModel.Projects);
-        Assert.Equal("Production", project.Name);
     }
 
     /// <summary>
@@ -4083,9 +4061,6 @@ public sealed class SettingsViewModelTests : IDisposable
             LastGatewayOverviewViewModel = viewModel;
             return Task.CompletedTask;
         }
-
-        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null)
-            => Task.FromResult<ProjectDialogResult?>(null);
 
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(ScheduledTaskDialogViewModel? editVm = null)
             => Task.FromResult<ScheduledTaskDialogResult?>(null);

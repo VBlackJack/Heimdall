@@ -173,10 +173,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// this panel, and one copy of that sequence is the point.
     /// </summary>
     private IGatewayCreationService? _gatewayCreation;
-    private List<ProjectDto> _pendingProjects = new();
-
-    // Projects removed before Save - servers are unassigned on flush
-    private readonly List<string> _deletedProjectIds = new();
 
     // Gateways removed before Save - all reverse references are cleared on flush
     private readonly HashSet<string> _deletedGatewayIds = new(StringComparer.OrdinalIgnoreCase);
@@ -1166,14 +1162,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [NotifyCanExecuteChangedFor(nameof(DeleteGatewayCommand))]
     private GatewayItemViewModel? _selectedGateway;
 
-    [ObservableProperty]
-    private ObservableCollection<ProjectItemViewModel> _projects = new();
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(EditProjectCommand))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteProjectCommand))]
-    private ProjectItemViewModel? _selectedProject;
-
     /// <summary>
     /// Raised after a server import completes so the main shell can reload
     /// the server list and related UI state.
@@ -1722,19 +1710,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 ParentGatewayId = g.ParentGatewayId
             }));
 
-        Projects = new ObservableCollection<ProjectItemViewModel>(
-            settings.Projects.Select(p => new ProjectItemViewModel
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Color = p.Color ?? "#3B82F6",
-                Description = p.Description ?? ""
-            }));
-
         // Seed working buffers from loaded settings
         _pendingGateways = settings.SshGateways.Select(CloneGateway).ToList();
-        _pendingProjects = settings.Projects.Select(CloneProject).ToList();
-        _deletedProjectIds.Clear();
         _deletedGatewayIds.Clear();
 
         SyncNumericTexts();
@@ -1907,26 +1884,17 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             RunHidden = tool.RunHidden
         }).ToList();
         List<SshGatewayDto> sshGateways = _pendingGateways.Select(CloneGateway).ToList();
-        List<ProjectDto> projects = _pendingProjects.Select(CloneProject).ToList();
-        HashSet<string> deletedProjectIds = _deletedProjectIds.ToHashSet(StringComparer.Ordinal);
         HashSet<string> deletedGatewayIds = new(_deletedGatewayIds, StringComparer.OrdinalIgnoreCase);
 
         // Clear inventory references first. If the following settings commit is interrupted,
-        // the project or gateway still exists and can be reassigned; the inverse order leaves
-        // dangling IDs.
-        if (deletedProjectIds.Count > 0 || deletedGatewayIds.Count > 0)
+        // the gateway still exists and can be reassigned; the inverse order leaves dangling IDs.
+        if (deletedGatewayIds.Count > 0)
         {
             await _configManager.MutateServersAsync(servers =>
             {
                 int changedCount = 0;
                 foreach (ServerProfileDto server in servers)
                 {
-                    if (server.ProjectId is not null && deletedProjectIds.Contains(server.ProjectId))
-                    {
-                        server.ProjectId = null;
-                        changedCount++;
-                    }
-
                     if (server.SshGatewayId is not null && deletedGatewayIds.Contains(server.SshGatewayId))
                     {
                         server.SshGatewayId = null;
@@ -2071,18 +2039,17 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.FileShareEnableTftp = FileShareEnableTftp;
             settings.ExternalTools = externalTools;
 
-            // Flush buffered gateways and projects. Gateways RECONCILE against what was
-            // just read from disk instead of replacing it: the buffer is a snapshot taken
-            // at LoadFromSettings, nothing reseeds it afterwards, and assigning it wholesale
-            // erased every gateway another surface had persisted meanwhile.
+            // Flush buffered gateways. They RECONCILE against what was just read from disk
+            // instead of replacing it: the buffer is a snapshot taken at LoadFromSettings,
+            // nothing reseeds it afterwards, and assigning it wholesale erased every gateway
+            // another surface had persisted meanwhile. Projects are not edited here any more
+            // and are left as they are on disk.
             settings.SshGateways = ReconcileGateways(
                 settings.SshGateways,
                 sshGateways,
                 deletedGatewayIds);
-            settings.Projects = projects;
         });
 
-        _deletedProjectIds.Clear();
         _deletedGatewayIds.Clear();
 
         _originalTheme = DefaultTheme;
@@ -2147,16 +2114,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (!confirmed) return;
 
-        // Gateways and projects are inventory, not preferences. A gateway carries a
-        // stored password and passphrase that the interface only ever reports as
-        // booleans, so wiping one destroys a secret no user can read back, and the
-        // servers this reset leaves alone hold references to both. Carry them across
-        // the reload, together with the deletions still pending: LoadFromSettings
-        // clears those sets, and losing them would orphan the references that the
-        // save path cleans up.
+        // Gateways are inventory, not preferences. A gateway carries a stored password and
+        // passphrase that the interface only ever reports as booleans, so wiping one destroys
+        // a secret no user can read back, and the servers this reset leaves alone hold
+        // references to it. Carry them across the reload, together with the deletions still
+        // pending: LoadFromSettings clears that set, and losing it would orphan the references
+        // that the save path cleans up. Projects are not written by Save, so the reset leaves
+        // them on disk as they are.
         List<SshGatewayDto> keptGateways = _pendingGateways.Select(CloneGateway).ToList();
-        List<ProjectDto> keptProjects = _pendingProjects.Select(CloneProject).ToList();
-        List<string> keptDeletedProjectIds = _deletedProjectIds.ToList();
         List<string> keptDeletedGatewayIds = _deletedGatewayIds.ToList();
 
         // The language the user can still get back to. LoadFromSettings reseeds the restore
@@ -2170,7 +2135,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         defaults.SshGateways = keptGateways;
-        defaults.Projects = keptProjects;
 
         // The language and the theme are kept. A reset that switches the interface into English
         // under a user who reads French leaves them in front of a panel they cannot read, the one
@@ -2195,7 +2159,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _originalAccentTint = accentToReturnTo;
         await RefreshVaultStatusAsync();
 
-        _deletedProjectIds.AddRange(keptDeletedProjectIds);
         foreach (string gatewayId in keptDeletedGatewayIds)
         {
             _deletedGatewayIds.Add(gatewayId);
@@ -3106,92 +3069,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         string name = string.IsNullOrWhiteSpace(gateway.Name) ? gateway.Id : gateway.Name;
         string endpoint = gateway.Port > 0 ? $"{gateway.Host}:{gateway.Port}" : gateway.Host;
         return string.IsNullOrWhiteSpace(endpoint) ? name : $"{name} ({endpoint})";
-    }
-
-    [RelayCommand]
-    private async Task AddProjectAsync(CancellationToken cancellationToken)
-    {
-        var vm = new ProjectDialogViewModel
-        {
-            DialogTitle = _localizer["ProjectDialogTitleAdd"]
-        };
-
-        var result = await _dialogService.ShowProjectDialogAsync(vm);
-        if (result is not { Saved: true }) return;
-
-        result.Project.Id = Guid.NewGuid().ToString();
-        _pendingProjects.Add(result.Project);
-
-        Projects.Add(new ProjectItemViewModel
-        {
-            Id = result.Project.Id,
-            Name = result.Project.Name,
-            Color = result.Project.Color ?? "#3B82F6",
-            Description = result.Project.Description ?? ""
-        });
-
-        IsDirty = true;
-    }
-
-    private bool CanEditProject() => SelectedProject is not null;
-
-    [RelayCommand(CanExecute = nameof(CanEditProject))]
-    private async Task EditProjectAsync(CancellationToken cancellationToken)
-    {
-        var project = SelectedProject!;
-        var projectDto = _pendingProjects.FirstOrDefault(p => p.Id == project.Id);
-        if (projectDto is null) return;
-
-        var vm = ProjectDialogViewModel.FromDto(projectDto);
-        vm.DialogTitle = _localizer["ProjectDialogTitleEdit"];
-
-        var result = await _dialogService.ShowProjectDialogAsync(vm);
-        if (result is not { Saved: true }) return;
-
-        var idx = _pendingProjects.FindIndex(p => p.Id == projectDto.Id);
-        if (idx >= 0)
-        {
-            result.Project.Id = projectDto.Id;
-            _pendingProjects[idx] = result.Project;
-
-            project.Name = result.Project.Name;
-            project.Color = result.Project.Color ?? "#3B82F6";
-            project.Description = result.Project.Description ?? "";
-        }
-
-        IsDirty = true;
-    }
-
-    private bool CanDeleteProject() => SelectedProject is not null;
-
-    [RelayCommand(CanExecute = nameof(CanDeleteProject))]
-    private async Task DeleteProjectAsync(CancellationToken cancellationToken)
-    {
-        var project = SelectedProject!;
-
-        // Check server usage for the confirmation message
-        var servers = await _configManager.LoadServersAsync();
-        var usageCount = servers.Count(s =>
-            string.Equals(s.ProjectId, project.Id, StringComparison.Ordinal));
-
-        var message = usageCount > 0
-            ? _localizer.Format("ConfirmDeleteProjectInUse", usageCount)
-                + "\n" + _localizer.Format("ConfirmDeleteProjectMessage", project.Name)
-            : _localizer.Format("ConfirmDeleteProjectMessage", project.Name);
-
-        var confirmed = await _dialogService.ShowConfirmAsync(
-            _localizer["ConfirmDeleteProjectTitle"],
-            message,
-            "danger");
-
-        if (!confirmed) return;
-
-        _pendingProjects.RemoveAll(p => p.Id == project.Id);
-        _deletedProjectIds.Add(project.Id);
-
-        Projects.Remove(project);
-        SelectedProject = null;
-        IsDirty = true;
     }
 
     [RelayCommand]
@@ -4232,15 +4109,4 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     // Field-by-field this raised the passphrase presence flag on every copy, which flips
     // UsesLegacySshCredentialMapping and changes how the gateway authenticates.
     private static SshGatewayDto CloneGateway(SshGatewayDto g) => g.CloneFaithfully();
-
-    private static ProjectDto CloneProject(ProjectDto p) => new()
-    {
-        Id = p.Id,
-        Name = p.Name,
-        Description = p.Description,
-        Color = p.Color,
-        DefaultSshUsername = p.DefaultSshUsername,
-        DefaultSshKeyPath = p.DefaultSshKeyPath,
-        DefaultGatewayId = p.DefaultGatewayId
-    };
 }
