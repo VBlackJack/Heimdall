@@ -198,7 +198,6 @@ public sealed class AppSettings
     public DateTime? HmacKeyCreatedAt { get; set; }
     public string? LastDpapiUser { get; set; }
     public bool RequireCredentialGuard { get; set; }
-    public bool EnableEventLog { get; set; }
 
     // Terminal appearance
     public string TerminalFontFamily { get; set; } = "Consolas";
@@ -293,11 +292,9 @@ public sealed class AppSettings
     ];
 
     // Session
-    public bool EnableSessionPersistence { get; set; }
     public const int DefaultMaxEmbeddedSessions = 10;
     [SettingRange(1, 20)]
     public int MaxEmbeddedSessions { get; set; } = DefaultMaxEmbeddedSessions;
-    public int EmbeddedIdleTimeoutMs { get; set; }
     public bool SftpBrowserEnabled { get; set; } = true;
     public bool SftpAutoOpenOnSsh { get; set; } = true;
     public bool SftpFollowSshDirectory { get; set; }

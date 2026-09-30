@@ -2852,6 +2852,14 @@
                                             </StackPanel>
                                         </Grid>
                                         <StackPanel Margin="0,12,0,0">
+                                            <TextBlock x:Name="Mw_SettingsSshKeepAliveLabel" Text="{loc:Translate SettingsLabelSshKeepAliveInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.SshKeepAliveIntervalSecondsText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshKeepAliveLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
+                                            <TextBlock x:Name="Mw_SettingsSshKeepAliveHint" Text="{loc:Translate SettingsSshKeepAliveIntervalHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,12,0,0">
                                             <TextBlock x:Name="Mw_SettingsSshAutoReconnectTitle" Text="{loc:Translate SettingsSshAutoReconnect}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <TextBlock Text="{loc:Translate SettingsSshAutoReconnectDesc}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,6" TextWrapping="Wrap"/>
                                             <CheckBox x:Name="Mw_SettingsSshAutoReconnect"
@@ -2963,6 +2971,12 @@
                                             </StackPanel>
                                         </DockPanel>
 
+                                        <CheckBox x:Name="Mw_SettingsSyncKnownHostsAtStartup"
+                                                  Content="{loc:Translate SettingsLabelSyncKnownHostsAtStartup}"
+                                                  IsChecked="{Binding Settings.SyncKnownHostsAtStartup}"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  AutomationProperties.HelpText="{loc:Translate SettingsSyncKnownHostsAtStartupHint}"/>
+                                        <TextBlock Text="{loc:Translate SettingsSyncKnownHostsAtStartupHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="20,4,0,12" TextWrapping="Wrap"/>
                                         <TextBox Text="{Binding Settings.TrustedHostKeys.SearchText, UpdateSourceTrigger=PropertyChanged}"
                                                  ToolTip="{loc:Translate HintTrustedHostKeysSearch}"
                                                  AutomationProperties.Name="{loc:Translate HintTrustedHostKeysSearch}"
@@ -3739,6 +3753,12 @@
                                                         Style="{DynamicResource SecondaryButtonStyle}"
                                                         AutomationProperties.Name="{loc:Translate SettingsVaultHelloBtnDisable}"/>
                                             </StackPanel>
+                                            <TextBlock x:Name="Mw_SettingsVaultHelloMaxDaysLabel" Text="{loc:Translate SettingsLabelVaultHelloMaxDays}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,12,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.VaultHelloMaxDaysBeforeMasterPasswordText, UpdateSourceTrigger=PropertyChanged}" Width="80" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsVaultHelloMaxDaysLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitDays}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{loc:Translate SettingsVaultHelloMaxDaysHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
 
                                         <!-- Auto-lock + D3 policy. Only meaningful with the vault on, but shown disabled
@@ -3836,6 +3856,14 @@
                                                 </Button>
                                             </Grid>
                                             <TextBlock x:Name="Mw_SettingsCredProvKeyFileHint" Text="{loc:Translate SettingsCredProviderKeyFileHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}">
+                                            <TextBlock x:Name="Mw_SettingsCredProvTimeoutLabel" Text="{loc:Translate SettingsLabelCredProviderTimeout}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.CredentialProviderTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvTimeoutLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{loc:Translate SettingsCredProviderTimeoutHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
                                         <DockPanel Margin="0,16,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <Button x:Name="Mw_SettingsCredProvTestBtn" DockPanel.Dock="Right" Content="{loc:Translate CredProvBtnTest}" Command="{Binding Settings.TestCredentialProviderCommand}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,4" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate CredProvBtnTest}"/>

@@ -2078,6 +2078,41 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal(2, dialog.ConfirmCalls.Count);
     }
 
+    // Four settings were read by the product and editable only in settings.json. They now have
+    // fields; the panel has to carry each from the file and back.
+    [Fact]
+    public async Task FormerlyHiddenSettings_LoadAndSaveThroughThePanel()
+    {
+        FakeConfigManager config = new();
+        config.Settings.SyncKnownHostsAtStartup = true;
+        config.Settings.SshKeepAliveIntervalSeconds = 45;
+        config.Settings.CredentialProviderTimeoutMs = 20000;
+        config.Settings.VaultHelloMaxDaysBeforeMasterPassword = 30;
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+
+        Assert.True(viewModel.SyncKnownHostsAtStartup);
+        Assert.Equal("45", viewModel.SshKeepAliveIntervalSecondsText);
+        Assert.Equal("20000", viewModel.CredentialProviderTimeoutMsText);
+        Assert.Equal("30", viewModel.VaultHelloMaxDaysBeforeMasterPasswordText);
+
+        viewModel.SyncKnownHostsAtStartup = false;
+        viewModel.SshKeepAliveIntervalSecondsText = "60";
+        viewModel.CredentialProviderTimeoutMsText = "30000";
+        viewModel.VaultHelloMaxDaysBeforeMasterPasswordText = "0";
+        Assert.True(viewModel.IsDirty);
+        Assert.True(await viewModel.TrySaveAsync());
+
+        Assert.False(config.Settings.SyncKnownHostsAtStartup);
+        Assert.Equal(60, config.Settings.SshKeepAliveIntervalSeconds);
+        Assert.Equal(30000, config.Settings.CredentialProviderTimeoutMs);
+        Assert.Equal(0, config.Settings.VaultHelloMaxDaysBeforeMasterPassword);
+
+        viewModel.SshKeepAliveIntervalSecondsText = "1";
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.True(viewModel.SshTabErrorCount > 0);
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

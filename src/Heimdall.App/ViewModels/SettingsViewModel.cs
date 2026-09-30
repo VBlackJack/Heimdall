@@ -360,6 +360,24 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         => CommitNumericText(value, parsed => SshTmoutResetInterval = parsed);
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.SshKeepAliveIntervalSeconds))]
+    private int _sshKeepAliveIntervalSeconds = AppSettings.DefaultSshKeepAliveIntervalSeconds;
+
+    /// <summary>Text of the field that edits <see cref="SshKeepAliveIntervalSeconds"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sshKeepAliveIntervalSecondsText = string.Empty;
+
+    partial void OnSshKeepAliveIntervalSecondsTextChanged(string value)
+        => CommitNumericText(value, parsed => SshKeepAliveIntervalSeconds = parsed);
+
+    /// <summary>Whether Heimdall imports the OpenSSH known_hosts file each time it starts.</summary>
+    [ObservableProperty]
+    private bool _syncKnownHostsAtStartup;
+
+    [ObservableProperty]
     private bool _sshAutoReconnect;
 
     [ObservableProperty]
@@ -770,7 +788,36 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _credentialProviderUnlockSecret = "";
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.CredentialProviderTimeoutMs))]
     private int _credentialProviderTimeoutMs = 10000;
+
+    /// <summary>Text of the field that edits <see cref="CredentialProviderTimeoutMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _credentialProviderTimeoutMsText = string.Empty;
+
+    partial void OnCredentialProviderTimeoutMsTextChanged(string value)
+        => CommitNumericText(value, parsed => CredentialProviderTimeoutMs = parsed);
+
+    /// <summary>
+    /// Days a Windows Hello unlock stays accepted before the master password is asked again; 0
+    /// never asks.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.VaultHelloMaxDaysBeforeMasterPassword))]
+    private int _vaultHelloMaxDaysBeforeMasterPassword;
+
+    /// <summary>Text of the field that edits <see cref="VaultHelloMaxDaysBeforeMasterPassword"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _vaultHelloMaxDaysBeforeMasterPasswordText = string.Empty;
+
+    partial void OnVaultHelloMaxDaysBeforeMasterPasswordTextChanged(string value)
+        => CommitNumericText(value, parsed => VaultHelloMaxDaysBeforeMasterPassword = parsed);
 
     [ObservableProperty]
     private bool _requireCredentialGuard;
@@ -1593,6 +1640,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SshAgentPreference = settings.SshAgentPreference.ToString();
         AntiIdleInterval = settings.AntiIdleIntervalSeconds;
         SshTmoutResetInterval = settings.SshTmoutResetIntervalSeconds;
+        SshKeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds;
+        SyncKnownHostsAtStartup = settings.SyncKnownHostsAtStartup;
         SshAutoReconnect = settings.SshAutoReconnect;
         SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
         SftpBrowserEnabled = settings.SftpBrowserEnabled;
@@ -1655,6 +1704,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         CredentialProviderUnlockSecret =
             CredentialProtector.Unprotect(settings.CredentialProviderUnlockSecretEncrypted) ?? "";
         CredentialProviderTimeoutMs = settings.CredentialProviderTimeoutMs;
+        VaultHelloMaxDaysBeforeMasterPassword = settings.VaultHelloMaxDaysBeforeMasterPassword;
         RequireCredentialGuard = settings.RequireCredentialGuard;
         RequireWindowsHelloOnConnect = settings.RequireWindowsHelloOnConnect;
         WindowsHelloGraceMinutes = settings.WindowsHelloGraceMinutes;
@@ -1743,6 +1793,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         AntiIdleIntervalText = AntiIdleInterval.ToString(CultureInfo.InvariantCulture);
         SshTmoutResetIntervalText = SshTmoutResetInterval.ToString(CultureInfo.InvariantCulture);
         SshAutoReconnectAttemptsText = SshAutoReconnectAttempts.ToString(CultureInfo.InvariantCulture);
+        SshKeepAliveIntervalSecondsText = SshKeepAliveIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+        CredentialProviderTimeoutMsText = CredentialProviderTimeoutMs.ToString(CultureInfo.InvariantCulture);
+        VaultHelloMaxDaysBeforeMasterPasswordText = VaultHelloMaxDaysBeforeMasterPassword.ToString(CultureInfo.InvariantCulture);
         TunnelEstablishmentDelayMsText = TunnelEstablishmentDelayMs.ToString(CultureInfo.InvariantCulture);
         RdpConnectWatchdogTimeoutMsText = RdpConnectWatchdogTimeoutMs.ToString(CultureInfo.InvariantCulture);
         ExternalToolTimeoutMsText = ExternalToolTimeoutMs.ToString(CultureInfo.InvariantCulture);
@@ -1944,6 +1997,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.SshAgentPreference = parsedSshAgentPreference;
             settings.AntiIdleIntervalSeconds = AntiIdleInterval;
             settings.SshTmoutResetIntervalSeconds = SshTmoutResetInterval;
+            settings.SshKeepAliveIntervalSeconds = SshKeepAliveIntervalSeconds;
+            settings.SyncKnownHostsAtStartup = SyncKnownHostsAtStartup;
             settings.SshAutoReconnect = SshAutoReconnect;
             settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
             settings.SftpBrowserEnabled = SftpBrowserEnabled;
@@ -2011,6 +2066,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                     ? null
                     : CredentialProtector.Protect(CredentialProviderUnlockSecret);
             settings.CredentialProviderTimeoutMs = CredentialProviderTimeoutMs;
+            settings.VaultHelloMaxDaysBeforeMasterPassword = VaultHelloMaxDaysBeforeMasterPassword;
             settings.RequireCredentialGuard = RequireCredentialGuard;
             settings.RequireWindowsHelloOnConnect = RequireWindowsHelloOnConnect;
             settings.WindowsHelloGraceMinutes = WindowsHelloGraceMinutes;
@@ -3755,6 +3811,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.SessionHealthCheckIntervalSeconds)] = "ValidationSettingsHealthCheckInterval",
         [nameof(AppSettings.SessionHealthProbeTimeoutMs)] = "ValidationSettingsHealthProbeTimeout",
         [nameof(AppSettings.SessionHealthMaxConcurrent)] = "ValidationSettingsHealthMaxConcurrent",
+        [nameof(AppSettings.SshKeepAliveIntervalSeconds)] = "ValidationSettingsSshKeepAlive",
+        [nameof(AppSettings.CredentialProviderTimeoutMs)] = "ValidationSettingsCredProviderTimeout",
+        [nameof(AppSettings.VaultHelloMaxDaysBeforeMasterPassword)] = "ValidationSettingsVaultHelloMaxDays",
     };
 
     /// <summary>
@@ -3786,6 +3845,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(DefaultResolutionHeight)] = "SettingsLabelRdpHeight",
         [nameof(WindowsHelloGraceMinutes)] = "SettingsLabelWindowsHelloGrace",
         [nameof(AutoLockIdleMinutes)] = "SettingsAutoLockLabel",
+        [nameof(SshKeepAliveIntervalSeconds)] = "SettingsLabelSshKeepAliveInterval",
+        [nameof(CredentialProviderTimeoutMs)] = "SettingsLabelCredProviderTimeout",
+        [nameof(VaultHelloMaxDaysBeforeMasterPassword)] = "SettingsLabelVaultHelloMaxDays",
     };
 
     private static readonly string[] GeneralValidatedSettingPropertyNames =
@@ -3810,6 +3872,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(SshTmoutResetIntervalText),
         nameof(SshAutoReconnectAttempts),
         nameof(SshAutoReconnectAttemptsText),
+        nameof(SshKeepAliveIntervalSeconds),
+        nameof(SshKeepAliveIntervalSecondsText),
     ];
 
     private static readonly string[] AdvancedValidatedSettingPropertyNames =
@@ -3875,6 +3939,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(WindowsHelloGraceMinutesText),
         nameof(AutoLockIdleMinutes),
         nameof(AutoLockIdleMinutesText),
+        nameof(CredentialProviderTimeoutMs),
+        nameof(CredentialProviderTimeoutMsText),
+        nameof(VaultHelloMaxDaysBeforeMasterPassword),
+        nameof(VaultHelloMaxDaysBeforeMasterPasswordText),
     ];
 
     private static readonly string[][] AllValidatedSettingPropertyNames =
