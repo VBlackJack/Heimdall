@@ -34,6 +34,11 @@ namespace Heimdall.App.Services.Handlers;
 /// </summary>
 internal sealed class SshHandler : IProtocolHandler, IDisposable
 {
+    /// <summary>
+    /// Bound on each authentication wait of the embedded client, long enough for a person to
+    /// answer a keyboard-interactive question. Reaching the server keeps the normal connect
+    /// timeout (see <see cref="SshConnectionParams.AuthenticationTimeout"/>).
+    /// </summary>
     private static readonly TimeSpan InteractiveAuthenticationTimeout = TimeSpan.FromMinutes(2);
     /// <summary>
     /// Opens the embedded shell session. Replaced in tests so the refusal
@@ -224,19 +229,23 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             AgentForwarding = server.SshAgentForwarding,
             Compression = server.SshCompression,
             X11Forwarding = server.SshX11Forwarding,
-            ConnectTimeout = InteractiveAuthenticationTimeout,
+            AuthenticationTimeout = InteractiveAuthenticationTimeout,
             KeyboardInteractiveResponder = request =>
             {
                 // SSH.NET invokes this synchronous event on its own authentication worker.
                 // WPF marshals the dialog to the dispatcher; the UI thread never waits here.
                 promptLifetime.Token.ThrowIfCancellationRequested();
+
+                // The request is server text inside a Heimdall dialog: sanitised so it cannot
+                // lay itself out as Heimdall's own words, and framed by the message as sent by
+                // the named host.
                 return _dialogService.ShowPasswordInputAsync(
                     _localizer[SshLocalizationKeys.InteractivePromptTitle],
                     string.Format(
                         _localizer[SshLocalizationKeys.InteractivePromptMessage],
                         server.RemoteServer,
                         server.SshUsername,
-                        request),
+                        ServerPromptText.Sanitize(request)),
                     promptLifetime.Token).GetAwaiter().GetResult();
             }
         };

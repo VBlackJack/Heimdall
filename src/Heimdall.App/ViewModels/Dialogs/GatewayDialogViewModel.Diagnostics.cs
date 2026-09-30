@@ -49,9 +49,15 @@ public partial class GatewayDialogViewModel
         {
             try
             {
-                string route = string.Join(" → ", BuildDiagnosticRoute(false).Select(g => $"{g.Name} ({g.Host}:{g.Port})"));
-                return $"{Text("GatewayDiagnosticWorkstation")} → {route}"
-                    + (string.IsNullOrWhiteSpace(DiagnosticTargetHost) ? "" : $" → {DiagnosticTargetHost}:{DiagnosticTargetPort}");
+                List<string> parts = [Text("GatewayDiagnosticWorkstation")];
+                parts.AddRange(BuildDiagnosticRoute(false)
+                    .Select(g => Format("GatewayDiagnosticRouteHop", g.Name, g.Host, g.Port)));
+                if (!string.IsNullOrWhiteSpace(DiagnosticTargetHost))
+                {
+                    parts.Add(Format("GatewayDiagnosticRouteEndpoint", DiagnosticTargetHost, DiagnosticTargetPort));
+                }
+
+                return string.Join(Text("GatewayDiagnosticRouteSeparator"), parts);
             }
             catch (Exception ex) when (ex is ArgumentException or GatewayChainException)
             {
@@ -187,10 +193,10 @@ public partial class GatewayDialogViewModel
     private string FormatStep(GatewayDiagnosticStep step)
     {
         string label = step.IsTarget ? Text("GatewayDiagnosticTargetStep")
-            : Localizer?.Format("GatewayDiagnosticHopStep", step.Hop) ?? $"GatewayDiagnosticHopStep {step.Hop}";
+            : Format("GatewayDiagnosticHopStep", step.Hop);
         string outcome = Text(step.IsRunning ? "GatewayDiagnosticRunning"
             : step.Success ? "GatewayDiagnosticSuccess" : FailureKey(step.Failure));
-        return $"{label}: {outcome} ({step.ElapsedMilliseconds} ms)";
+        return Format("GatewayDiagnosticStepLine", label, outcome, step.ElapsedMilliseconds);
     }
 
     private static string FailureKey(SshFailureCode? code) => code switch
@@ -211,6 +217,9 @@ public partial class GatewayDialogViewModel
     };
 
     private string Text(string key) => Localizer?[key] ?? key;
+
+    // Same fallback as Text: without a localizer the key stands in, never text written here.
+    private string Format(string key, params object[] args) => Localizer?.Format(key, args) ?? key;
 
     internal void InvalidateDiagnosticResult()
     {

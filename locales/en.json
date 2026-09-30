@@ -16,7 +16,7 @@
   "TreeUxDropAfter": "Move {0} session(s) after {1} in {2}",
   "TreeUxDropMoveFolder": "Move folder {0} into {1}",
   "SshInteractivePromptTitle": "SSH authentication",
-  "SshInteractivePromptMessage": "Server: {0}\nAccount: {1}\n\nThe server requests:\n{2}\n\nThis response is used for this connection only and is not saved.",
+  "SshInteractivePromptMessage": "The server {0} asks account {1} to answer the text quoted below. That text was written by the server, not by Heimdall: Heimdall never asks for its master password here.\n\nText sent by the server:\n\"{2}\"\n\nThis response is used for this connection only and is not saved.",
   "RdpCopyAnonymous": "Copy anonymized report",
   "RdpCopyAnonymousHeader": "RDP diagnostic report (anonymized)",
   "RdpCopyAnonymousHint": "Includes time, application version and available RDP codes. Excludes server addresses, account names and error message text.",
@@ -6638,5 +6638,11 @@
   "ToolPwdGenFloorSetLength": "Length set to {0} to guarantee {1} bits.",
   "ToolPwdGenFloorSetSyllable": "Set to {0} characters with {1} digits and {2} specials, to guarantee {3} bits.",
   "ToolPwdGenFloorSetPassphrase": "Set to {0} words with {1} digits and {2} specials, to guarantee {3} bits.",
-  "ToolPwdGenFloorSetLeet": "Set to {0} digits and {1} specials, to guarantee {2} bits."
+  "ToolPwdGenFloorSetLeet": "Set to {0} digits and {1} specials, to guarantee {2} bits.",
+  "GatewayDiagnosticRouteHop": "{0} ({1}:{2})",
+  "GatewayDiagnosticRouteEndpoint": "{0}:{1}",
+  "GatewayDiagnosticRouteSeparator": " → ",
+  "GatewayDiagnosticStepLine": "{0}: {1} ({2} ms)",
+  "ErrorGatewayRouteEmpty": "A gateway route cannot be empty.",
+  "ErrorToolGatewayServicesUnavailable": "The gateway services are unavailable, so the connection was refused rather than opened unverified."
 }

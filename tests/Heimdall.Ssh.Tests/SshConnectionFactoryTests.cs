@@ -55,8 +55,12 @@ public sealed class SshConnectionFactoryTests
         return (List<AuthenticationMethod>)result;
     }
 
+    // The factory's password method is SSH.NET's, subclassed to report its outcome; these
+    // tests are about which SSH.NET method is offered, so it is named by the SSH.NET type.
     private static IEnumerable<string> MethodTypeNames(IEnumerable<AuthenticationMethod> methods)
-        => methods.Select(m => m.GetType().Name);
+        => methods.Select(m => m is PasswordAuthenticationMethod
+            ? nameof(PasswordAuthenticationMethod)
+            : m.GetType().Name);
 
     private static PrivateKeyFile GetSinglePrivateKeyFile(BaseClient client)
     {

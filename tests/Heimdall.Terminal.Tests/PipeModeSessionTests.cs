@@ -233,4 +233,34 @@ public sealed class PipeModeSessionTests
             session.Dispose();
         }
     }
+
+    /// <summary>
+    /// Disposing a running session tells the ProcessExited subscribers that the process ended.
+    /// </summary>
+    /// <remarks>
+    /// Pins the refutation of audit 2026-09-30 S-05, which held that Dispose killed the process
+    /// and unsubscribed its Exited handler before the notification ran, leaking the temporary
+    /// PuTTY size session of an unattested Plink until the next start. It does not: Dispose waits
+    /// with <c>Process.WaitForExit(int)</c>, which raises <c>Exited</c> synchronously once the
+    /// process is gone and events are enabled, so every ProcessExited subscriber (the size
+    /// session and password file release handles among them) has run before the unsubscribe.
+    /// The Plink launch relies on this and on nothing else when the launcher is unattested, so it
+    /// is pinned: dropping the wait from KillProcess turns this test red.
+    /// </remarks>
+    [Fact]
+    public async Task Dispose_OfARunningProcess_RaisesProcessExitedBeforeReturning()
+    {
+        PipeModeSession session = new();
+        int notifications = 0;
+        session.ProcessExited += _ => Interlocked.Increment(ref notifications);
+
+        await session.StartAsync(
+            TerminalTestHelpers.ResolveExitCodeChildExecutable(),
+            TerminalTestHelpers.BuildStdinEchoChildArguments("pipe-dispose:"));
+        Assert.True(session.IsRunning);
+
+        session.Dispose();
+
+        Assert.Equal(1, Volatile.Read(ref notifications));
+    }
 }

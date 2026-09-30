@@ -84,6 +84,21 @@ public sealed class SshConnectionParams
     /// <summary>TCP connection timeout. Defaults to 15 seconds.</summary>
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// Bound on each wait of the authentication exchange when it can include a human answer,
+    /// or null to use <see cref="ConnectTimeout"/> throughout.
+    /// </summary>
+    /// <remarks>
+    /// SSH.NET applies one timeout, <c>ConnectionInfo.Timeout</c>, to every wait of the connect:
+    /// the banner, the key exchange and each authentication round alike. A keyboard-interactive
+    /// question held open by a person needs minutes; reaching the server does not. When this is
+    /// set, the client's timeout is this value and the phase before the server's host key
+    /// arrives is bounded separately by <see cref="ConnectTimeout"/>
+    /// (<see cref="SshConnectionFactory.ConnectWithTransportBoundAsync"/>). The host key probe
+    /// never waits for a person and always uses <see cref="ConnectTimeout"/>.
+    /// </remarks>
+    public TimeSpan? AuthenticationTimeout { get; init; }
+
     /// <summary>SSH transport keepalive interval in seconds.</summary>
     public int? KeepAliveIntervalSeconds { get; init; } = AppSettings.DefaultSshKeepAliveIntervalSeconds;
 

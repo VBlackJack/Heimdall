@@ -56,6 +56,12 @@ public sealed class KeyboardInteractiveObservation
     public bool TryTakePasswordAnswer() =>
         Interlocked.CompareExchange(ref _passwordAnswered, 1, 0) == 0;
 
+    /// <summary>
+    /// Records that the stored password was already given, by the "password" method, and
+    /// accepted as one factor: no keyboard-interactive round of this attempt may send it again.
+    /// </summary>
+    public void MarkPasswordSpent() => Volatile.Write(ref _passwordAnswered, 1);
+
     /// <summary>Clears the record before a new attempt.</summary>
     public void Reset()
     {

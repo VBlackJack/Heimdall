@@ -16,6 +16,7 @@
 
 using System.Buffers.Binary;
 using System.Text;
+using System.Text.RegularExpressions;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh.Agents;
 using Renci.SshNet;
@@ -136,7 +137,7 @@ public static class SshConnectionFactory
             connectionParams.Username,
             [.. authMethods])
         {
-            Timeout = connectionParams.ConnectTimeout
+            Timeout = ClientTimeout(connectionParams)
         };
 
         return info;
@@ -240,7 +241,7 @@ public static class SshConnectionFactory
                 connectionParams.Username,
                 [.. authMethods])
             {
-                Timeout = connectionParams.ConnectTimeout
+                Timeout = ClientTimeout(connectionParams)
             };
 
             return new OwnedConnectionInfo(info, ownedResources);
@@ -490,6 +491,93 @@ public static class SshConnectionFactory
             throw new OperationCanceledException(ConnectCancelledMessage, ex, cancellationToken);
         }
     }
+
+    /// <summary>
+    /// The timeout SSH.NET applies to every wait of an authenticating client.
+    /// </summary>
+    private static TimeSpan ClientTimeout(SshConnectionParams connectionParams) =>
+        connectionParams.AuthenticationTimeout ?? connectionParams.ConnectTimeout;
+
+    /// <summary>
+    /// Runs <paramref name="connect"/> for <paramref name="client"/> so that the phase before the
+    /// server's host key arrives is bounded by <see cref="SshConnectionParams.ConnectTimeout"/>,
+    /// even when the client's own timeout is the much longer
+    /// <see cref="SshConnectionParams.AuthenticationTimeout"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>SSH.NET has a single timeout for the TCP connect, the banner, the key exchange and
+    /// every authentication wait, so the two phases cannot be separated through its settings.
+    /// This bound is a cancellation of its own, armed before the connect and disarmed on
+    /// <see cref="BaseClient.HostKeyReceived"/>: the host key arrives inside the key exchange,
+    /// after the transport has proved the server answers, and before any question can be put
+    /// to the user. What remains after it (new keys, the service request) runs under the
+    /// client's timeout.</para>
+    /// <para>When the bound fires, the failure is an <see cref="SshOperationTimeoutException"/>,
+    /// classified as a network timeout, never an <see cref="OperationCanceledException"/>: the
+    /// caller's own token was not cancelled, and a cancellation would read as an authentication
+    /// timeout. With no <see cref="SshConnectionParams.AuthenticationTimeout"/>, or one no longer
+    /// than the connect timeout, the client's timeout already bounds the transport and
+    /// <paramref name="connect"/> runs unchanged.</para>
+    /// </remarks>
+    internal static async Task ConnectWithTransportBoundAsync(
+        BaseClient client,
+        SshConnectionParams connectionParams,
+        Func<CancellationToken, Task> connect,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(connectionParams);
+        ArgumentNullException.ThrowIfNull(connect);
+
+        if (connectionParams.AuthenticationTimeout is not { } authenticationTimeout
+            || authenticationTimeout <= connectionParams.ConnectTimeout)
+        {
+            await connect(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        using CancellationTokenSource transportBound =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        EventHandler<HostKeyEventArgs> disarm = (_, _) =>
+        {
+            try
+            {
+                transportBound.CancelAfter(Timeout.InfiniteTimeSpan);
+            }
+            catch (ObjectDisposedException)
+            {
+                // The connect already returned; nothing is left to bound.
+            }
+        };
+        client.HostKeyReceived += disarm;
+        try
+        {
+            transportBound.CancelAfter(connectionParams.ConnectTimeout);
+            await connect(transportBound.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested
+            && transportBound.IsCancellationRequested
+            && !HostKeyRejectionFinder.TryFind(ex, out _))
+        {
+            throw new SshOperationTimeoutException(
+                string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    TransportTimeoutMessage,
+                    (int)connectionParams.ConnectTimeout.TotalMilliseconds),
+                ex);
+        }
+        finally
+        {
+            client.HostKeyReceived -= disarm;
+        }
+    }
+
+    /// <summary>
+    /// Diagnostic message of the timeout raised by <see cref="ConnectWithTransportBoundAsync"/>;
+    /// the user sees the localized network-timeout sentence, not this.
+    /// </summary>
+    private const string TransportTimeoutMessage =
+        "The server did not present its host key within {0} ms.";
 
     internal static async Task<PinnedFingerprintVerifier> ResolvePresentedHostKeyAsync(
         string verificationHost,
@@ -765,7 +853,8 @@ public static class SshConnectionFactory
     {
         string username = connectionParams.Username;
         string password = connectionParams.Password!;
-        methods.Add(new PasswordAuthenticationMethod(username, password));
+        methods.Add(new ObservedPasswordAuthenticationMethod(
+            username, password, connectionParams.KeyboardInteractive));
 
         AddKeyboardInteractiveMethod(methods, connectionParams);
     }
@@ -804,7 +893,10 @@ public static class SshConnectionFactory
         {
             // Interactive callers can ask the user about ambiguous wording instead of
             // spending a stored password on a first-round verification-code challenge.
-            bool asksForThePassword = (responder is null && single) || LooksLikePasswordPrompt(prompt.Request);
+            // A prompt that names a one-time code is never a password, even when its wording
+            // contains the word (pam_oath: "One-time password (OATH) for `user':").
+            bool asksForThePassword = !LooksLikeOneTimeCodePrompt(prompt.Request)
+                && ((responder is null && single) || LooksLikePasswordPrompt(prompt.Request));
             if (asksForThePassword && !string.IsNullOrEmpty(password) && observation.TryTakePasswordAnswer())
             {
                 prompt.Response = password;
@@ -814,7 +906,7 @@ public static class SshConnectionFactory
                 string? response = responder(prompt.Request);
                 if (response is null)
                 {
-                    throw new OperationCanceledException("SSH authentication input was cancelled.");
+                    throw new KeyboardInteractiveCancelledException();
                 }
 
                 observation.RecordInteractiveAnswer();
@@ -828,6 +920,52 @@ public static class SshConnectionFactory
         }
     }
 
+    /// <summary>
+    /// Records what the "password" method's attempt means for the keyboard-interactive rounds
+    /// that follow it in the same connection attempt.
+    /// </summary>
+    internal static void RecordPasswordMethodOutcome(
+        AuthenticationResult result,
+        KeyboardInteractiveObservation observation)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+
+        // A partial success means the server took the password as one factor and wants
+        // another. That factor must not be answered with the same secret: it would reach an
+        // OTP backend and spend one of its attempts. An outright refusal leaves the fallback
+        // untouched: a server with PasswordAuthentication off still asks the same password
+        // through keyboard-interactive.
+        if (result == AuthenticationResult.PartialSuccess)
+        {
+            observation.MarkPasswordSpent();
+        }
+    }
+
+    /// <summary>
+    /// The SSH.NET password method, reporting its outcome to the connection attempt's
+    /// keyboard-interactive observation.
+    /// </summary>
+    internal sealed class ObservedPasswordAuthenticationMethod : PasswordAuthenticationMethod
+    {
+        private readonly KeyboardInteractiveObservation _observation;
+
+        public ObservedPasswordAuthenticationMethod(
+            string username,
+            string password,
+            KeyboardInteractiveObservation observation)
+            : base(username, password)
+        {
+            _observation = observation ?? throw new ArgumentNullException(nameof(observation));
+        }
+
+        public override AuthenticationResult Authenticate(Session session)
+        {
+            AuthenticationResult result = base.Authenticate(session);
+            RecordPasswordMethodOutcome(result, _observation);
+            return result;
+        }
+    }
+
     private static readonly string[] PasswordPromptMarkers =
     [
         "password",
@@ -836,6 +974,38 @@ public static class SshConnectionFactory
         "passwort",
         "contrase"
     ];
+
+    /// <summary>
+    /// Wording that names a one-time code, in the languages the password markers cover. Matched
+    /// as whole words, so an account or host name containing one of them is not claimed.
+    /// </summary>
+    private static readonly Regex OneTimeCodePromptPattern = new(
+        @"\b(one[- ]time|otp|verification code|token|passcode|usage unique|code de v[ée]rification|"
+        + @"einmal\w*|best[äa]tigungscode|verifizierungscode|un solo uso|c[óo]digo de verificaci[óo]n)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        TimeSpan.FromMilliseconds(OneTimeCodeMatchTimeoutMilliseconds));
+
+    /// <summary>Bound on one prompt match; prompts are short, server-controlled text.</summary>
+    private const int OneTimeCodeMatchTimeoutMilliseconds = 100;
+
+    private static bool LooksLikeOneTimeCodePrompt(string? request)
+    {
+        if (string.IsNullOrWhiteSpace(request))
+        {
+            return false;
+        }
+
+        try
+        {
+            return OneTimeCodePromptPattern.IsMatch(request);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // Unreadable wording is not a password prompt: asking or leaving it unanswered
+            // costs one refusal, sending the secret to the wrong factor cannot be undone.
+            return true;
+        }
+    }
 
     private static bool LooksLikePasswordPrompt(string? request)
     {

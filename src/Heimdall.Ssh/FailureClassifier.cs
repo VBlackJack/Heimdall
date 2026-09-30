@@ -81,6 +81,11 @@ public static class FailureClassifier
             IOException ioEx when ioEx.InnerException is SocketException inner =>
                 ClassifySocketException(inner),
 
+            // The user dismissed a question: a cancellation, never a timeout. Ahead of the
+            // generic arm below, which it would otherwise match as its base type.
+            KeyboardInteractiveCancelledException =>
+                new SshFailureInfo(SshFailureCode.Cancelled, "Authentication input was cancelled.", false, ex),
+
             OperationCanceledException =>
                 new SshFailureInfo(SshFailureCode.AuthTimeout, "Connection cancelled.", false, ex),
 
