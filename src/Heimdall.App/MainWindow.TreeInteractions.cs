@@ -1680,7 +1680,7 @@ public partial class MainWindow
                 DropTargetVisualState.SetInsertion(row, insertion);
                 _treeState.LastDropHighlight = row;
                 SetTreeDropFeedback(string.Format(
-                    vm.Localize(insertion == DropInsertion.Before ? "TreeUxDropBefore" : "TreeUxDropAfter"),
+                    vm.Localize(ResolveServerDropFeedbackKey(insertion, payload.Servers.Count)),
                     payload.Servers.Count, anchor.DisplayName,
                     string.IsNullOrWhiteSpace(anchor.Group) ? vm.Localize("TreeNodeNoGroup") : anchor.Group));
                 UpdateTreeDragNavigation(e, null);
@@ -1716,7 +1716,10 @@ public partial class MainWindow
         string destination = string.IsNullOrWhiteSpace(hoverFolder?.FullPath)
             ? vm.Localize("TreeNodeNoGroup") : hoverFolder.FullPath;
         SetTreeDropFeedback(payload is not null
-            ? string.Format(vm.Localize("TreeUxDropFolder"), payload.Servers.Count, destination)
+            ? string.Format(
+                vm.Localize(ResolveServerDropFeedbackKey(DropInsertion.None, payload.Servers.Count)),
+                payload.Servers.Count,
+                destination)
             : string.Format(vm.Localize("TreeUxDropMoveFolder"), folderPayload!.Folder.Name, destination));
         UpdateTreeDragNavigation(e, hoverFolder);
 
@@ -1787,19 +1790,64 @@ public partial class MainWindow
             return;
         }
 
-        // The single-session wording is kept for a drag that carried one row, so the message a
-        // one-row drag has always produced is unchanged; the count is only spelled out when there
-        // was a set to lose track of.
-        vm.StatusText = payload.Servers.Count == 1
-            ? string.Format(
-                vm.Localize("StatusMovedToGroup"),
-                payload.Servers[0].DisplayName,
-                targetDisplayName)
-            : string.Format(
-                vm.Localize("StatusMovedSessionsToGroup"),
-                moved,
-                targetDisplayName);
+        vm.StatusText = FormatMovedToGroupStatus(vm.Localize, payload.Servers, moved, targetDisplayName);
     }
+
+    /// <summary>
+    /// Words the status line after a drop moved sessions into a folder.
+    /// </summary>
+    /// <param name="localize">Resolves a locale key.</param>
+    /// <param name="dragged">The sessions the drag carried.</param>
+    /// <param name="moved">How many of them the move actually changed.</param>
+    /// <param name="targetDisplayName">The destination folder as the tree shows it.</param>
+    /// <returns>The status text.</returns>
+    internal static string FormatMovedToGroupStatus(
+        Func<string, string> localize,
+        IReadOnlyList<ServerItemViewModel> dragged,
+        int moved,
+        string targetDisplayName)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+        ArgumentNullException.ThrowIfNull(dragged);
+
+        // A one-row drag names the session. A set is counted, and worded from the count the move
+        // reports rather than from the count the drag carried: two dragged with one already in
+        // place used to read "Moved 1 sessions".
+        if (dragged.Count == 1 && moved == 1)
+        {
+            return string.Format(
+                localize("StatusMovedToGroup"),
+                dragged[0].DisplayName,
+                targetDisplayName);
+        }
+
+        return string.Format(
+            localize(moved == 1 ? "StatusMovedSessionsToGroupOne" : "StatusMovedSessionsToGroup"),
+            moved,
+            targetDisplayName);
+    }
+
+    /// <summary>
+    /// The locale key the drop hint uses for a set of dragged sessions.
+    /// </summary>
+    /// <param name="insertion">Where the drop lands relative to a row, or none for a folder drop.</param>
+    /// <param name="count">How many sessions the drag carries.</param>
+    /// <returns>The key to format with the count and the destination.</returns>
+    /// <remarks>
+    /// Each wording comes in two keys, one for a single session and one for several, so no
+    /// language has to fall back on "session(s)". The single one names its number, because the
+    /// French singular also covers zero and a hint reading "une session" for none would lie.
+    /// </remarks>
+    internal static string ResolveServerDropFeedbackKey(DropInsertion insertion, int count) =>
+        (insertion, count == 1) switch
+        {
+            (DropInsertion.Before, true) => "TreeUxDropBeforeOne",
+            (DropInsertion.Before, false) => "TreeUxDropBefore",
+            (DropInsertion.After, true) => "TreeUxDropAfterOne",
+            (DropInsertion.After, false) => "TreeUxDropAfter",
+            (_, true) => "TreeUxDropFolderOne",
+            _ => "TreeUxDropFolder",
+        };
 
     private bool TryResolveTreeGroupDropTarget(
         object sender,

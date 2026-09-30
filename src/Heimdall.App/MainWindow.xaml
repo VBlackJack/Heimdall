@@ -757,7 +757,7 @@
                                                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </Grid>
                                             <TextBlock Grid.Column="2"
-                                                       Text="{Binding ServerCount}"
+                                                       Text="{Binding CountBadgeText}"
                                                        FontSize="{StaticResource FontSizeSmallCaption}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        VerticalAlignment="Center"

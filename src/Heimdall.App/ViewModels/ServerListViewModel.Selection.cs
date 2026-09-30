@@ -91,6 +91,18 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
         HasMultiSelection ? _localizer.Format("SessionTreeSelectionCount", SelectionCount) : "";
 
     /// <summary>
+    /// The bulk bar's Connect label, counting what it would open exactly as the context menu's
+    /// "Connect selected (N)" does.
+    /// </summary>
+    /// <remarks>
+    /// The bar said a bare "Connect" beside a selection that may hold tools and folders it will
+    /// skip, so the click's reach was only learnt afterwards. It now carries the same number the
+    /// menu has always shown.
+    /// </remarks>
+    public string BulkConnectText =>
+        _localizer.Format("TreeCtxConnectSelected", GetBulkConnectTargetCount(SelectedItems));
+
+    /// <summary>
     /// Selects every session on screen, in tree order, keeping the current primary when it is
     /// among them.
     /// </summary>
@@ -115,6 +127,7 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(HasMultiSelection));
         OnPropertyChanged(nameof(SelectionCountText));
+        OnPropertyChanged(nameof(BulkConnectText));
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
         MoveSelectedToProjectCommand.NotifyCanExecuteChanged();

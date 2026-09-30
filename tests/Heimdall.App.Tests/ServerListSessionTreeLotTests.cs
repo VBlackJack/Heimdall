@@ -213,6 +213,92 @@ public sealed partial class ServerListSelectionTests
         Assert.Same(verdict, fixture.ServerById("alpha").HealthState);
     }
 
+    [Fact]
+    public async Task FilterResultCount_SaysSessionInTheSingularForOne()
+    {
+        var timeProvider = new FakeTimeProvider();
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
+        fixture.LoadServers(fixture.ExpandGroups("ops"), CreateServer("alpha", "Alpha", "ops"));
+
+        fixture.ViewModel.SearchText = "Alpha";
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+
+        Assert.Equal("1 / 1 session", fixture.ViewModel.FilterResultCountText);
+    }
+
+    [Fact]
+    public async Task MovedStatus_IsWordedFromTheMovedCount_NotFromTheDraggedCount()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"));
+        List<ServerItemViewModel> dragged = [fixture.ServerById("alpha"), fixture.ServerById("beta")];
+        LocalizationManager localizer = await LoadEnglishLocalizerAsync();
+
+        string oneMoved = MainWindow.FormatMovedToGroupStatus(key => localizer[key], dragged, 1, "lab");
+        string twoMoved = MainWindow.FormatMovedToGroupStatus(key => localizer[key], dragged, 2, "lab");
+
+        Assert.Equal("Moved 1 session to lab", oneMoved);
+        Assert.Equal("Moved 2 sessions to lab", twoMoved);
+    }
+
+    [Theory]
+    [InlineData(DropInsertion.None, 1, "TreeUxDropFolderOne")]
+    [InlineData(DropInsertion.None, 3, "TreeUxDropFolder")]
+    [InlineData(DropInsertion.Before, 1, "TreeUxDropBeforeOne")]
+    [InlineData(DropInsertion.Before, 2, "TreeUxDropBefore")]
+    [InlineData(DropInsertion.After, 1, "TreeUxDropAfterOne")]
+    [InlineData(DropInsertion.After, 2, "TreeUxDropAfter")]
+    public void DropFeedbackKey_FollowsTheDraggedCount(DropInsertion insertion, int count, string expected)
+    {
+        Assert.Equal(expected, MainWindow.ResolveServerDropFeedbackKey(insertion, count));
+    }
+
+    [Fact]
+    public async Task FolderCountBadge_ShowsVisibleOverTotalUnderAFilterOnly()
+    {
+        var timeProvider = new FakeTimeProvider();
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops", "ops/web"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops/web"),
+            CreateServer("gamma", "Gamma", "ops/web"));
+        Assert.Equal("3", fixture.FolderByPath("ops").CountBadgeText);
+
+        fixture.ViewModel.SearchText = "Beta";
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+
+        Assert.Equal("1/3", fixture.FolderByPath("ops").CountBadgeText);
+        Assert.Equal("1/2", fixture.FolderByPath("ops/web").CountBadgeText);
+
+        fixture.ViewModel.SearchText = "";
+
+        Assert.Equal("3", fixture.FolderByPath("ops").CountBadgeText);
+    }
+
+    [Fact]
+    public async Task BulkConnectText_CountsWhatConnectWouldOpen_LikeTheMenu()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"),
+            CreateServer("gamma", "Gamma", "ops"));
+        List<string?> changed = [];
+        fixture.ViewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        fixture.ViewModel.SelectSingle(fixture.ServerById("alpha"));
+        fixture.ViewModel.ToggleSelection(fixture.ServerById("beta"));
+
+        int expected = fixture.ViewModel.GetBulkConnectTargetCount(fixture.ViewModel.SelectedItems);
+        Assert.Equal($"Connect selected ({expected})", fixture.ViewModel.BulkConnectText);
+        Assert.Contains(nameof(ServerListViewModel.BulkConnectText), changed);
+    }
+
     [Theory]
     [InlineData("LaunchingSsh", "Connecting...")]
     [InlineData("EstablishingTunnel", "Connecting...")]
