@@ -230,17 +230,44 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
 
     public bool IsActiveSession => ConnectionStateSets.IsConnected(ConnectionState);
 
+    /// <summary>
+    /// The session state as the product names it: the tooltip and the spoken row name read this.
+    /// </summary>
+    /// <remarks>
+    /// Only three states used to be translated; every other one reached the tooltip and the screen
+    /// reader as the enum member itself, "LaunchingSsh" or "EstablishingTunnel". The steps a
+    /// connection walks through on its way up are one thing to a user, so they share the
+    /// "connecting" wording.
+    /// </remarks>
     public string ConnectionStateDisplayName =>
-        ConnectionState switch
-        {
-            { } state when string.Equals(state, "Connected", StringComparison.OrdinalIgnoreCase)
-                => T("SessionStatusConnected"),
-            { } state when string.Equals(state, "LaunchedExternalClient", StringComparison.OrdinalIgnoreCase)
-                => T("StatusLaunchedExternalClient"),
-            { } state when string.Equals(state, "RemoteSessionHandedOff", StringComparison.OrdinalIgnoreCase)
-                => T("StatusRemoteSessionHandedOff"),
-            _ => ConnectionState
-        };
+        Enum.TryParse(ConnectionState, ignoreCase: true, out Core.Models.ConnectionState state)
+            ? state switch
+            {
+                Core.Models.ConnectionState.Connected => T("SessionStatusConnected"),
+                Core.Models.ConnectionState.LaunchedExternalClient => T("StatusLaunchedExternalClient"),
+                Core.Models.ConnectionState.RemoteSessionHandedOff => T("StatusRemoteSessionHandedOff"),
+                Core.Models.ConnectionState.Disconnected => T("SessionStatusDisconnected"),
+                Core.Models.ConnectionState.Disconnecting => T("SessionStatusDisconnecting"),
+                Core.Models.ConnectionState.Error => T("SessionStatusError"),
+                _ => T("SessionStatusConnecting"),
+            }
+            : ConnectionState;
+
+    /// <summary>
+    /// The protocol as the product names it - the same name the sidebar's protocol filter shows -
+    /// rather than the persisted token.
+    /// </summary>
+    /// <remarks>
+    /// The spoken name and the tooltip read out "WINRM", "LOCAL" or "TOOL:PING", tokens that
+    /// appear nowhere on screen. The filter checklist was fixed the same way earlier; both now
+    /// resolve through <see cref="ConnectionTypeCatalog.GetDisplayNameKey"/>.
+    /// </remarks>
+    public string ProtocolDisplayName =>
+        ConnectionTypeCatalog.GetDisplayNameKey(ConnectionType) is { } key && _localizer?.HasKey(key) == true
+            ? _localizer[key]
+            : ConnectionTypeCatalog.IsToolConnectionType(ConnectionType)
+                ? T("SessionTreeProtocolTool")
+                : ConnectionType.ToUpperInvariant();
 
     public string ConnectionStateTooltip =>
         ConnectionState switch
@@ -269,7 +296,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     public string AccessibleName => Format(
         "SessionTreeServerAccessibleName",
         DisplayName,
-        ConnectionType.ToUpperInvariant(),
+        ProtocolDisplayName,
         StatusShowsConnectionState
             ? ConnectionStateDisplayName
             : HealthTooltipText);
@@ -285,14 +312,14 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     public string? AccessibleHelpText => T("SessionTreeServerAccessibleHelp");
 
     /// <summary>
-    /// Hover text for the row, or <see langword="null"/> when the row already shows everything
-    /// there is to say.
+    /// Hover text for the row: its full name, then what the row does not print.
     /// </summary>
     /// <remarks>
-    /// It used to be bound straight to <see cref="DisplayName"/>, which is the one thing the row
-    /// is already printing, so hovering answered a question nobody had. What the row does not
-    /// print is where the session actually goes: the host and port, who it signs in as, and which
-    /// protocol the coloured icon stands for.
+    /// It used to be bound straight to <see cref="DisplayName"/> alone, and then to leave the name
+    /// out altogether. Neither holds once the row trims a long name with an ellipsis to fit the
+    /// sidebar: the hover is then the only place the whole name is read, so it leads, once. The
+    /// lines after it are where the session actually goes: the host and port, who it signs in as,
+    /// and which protocol the coloured icon stands for.
     ///
     /// <para>
     /// The health verdict is deliberately left out. The status dot carries its own tooltip and is
@@ -307,6 +334,11 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         get
         {
             List<string> lines = [];
+
+            if (!string.IsNullOrWhiteSpace(DisplayName))
+            {
+                lines.Add(DisplayName);
+            }
 
             if (!string.IsNullOrWhiteSpace(Endpoint))
             {
@@ -323,7 +355,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
             {
                 lines.Add(Format(
                     "SessionTreeRowTooltipProtocol",
-                    ConnectionType.ToUpperInvariant()));
+                    ProtocolDisplayName));
             }
 
             // With the badge hidden the row no longer says where it routes; the hover does, so
@@ -427,6 +459,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     partial void OnConnectionTypeChanged(string value)
     {
         OnPropertyChanged(nameof(ConnectionTypeBadge));
+        OnPropertyChanged(nameof(ProtocolDisplayName));
         OnPropertyChanged(nameof(AccessibleName));
         OnPropertyChanged(nameof(RowTooltipText));
         InvalidateSearchTextCache();
@@ -438,6 +471,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     {
         OnPropertyChanged(nameof(SidebarDisplayName));
         OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(RowTooltipText));
         InvalidateSearchTextCache();
     }
 
@@ -685,6 +719,11 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionTreeRowTooltipProtocol" => "Protocol: {0}",
         "SessionTreeRowTooltipGateway" => "Gateway: {0}",
         "SessionStatusConnected" => "Connected",
+        "SessionStatusConnecting" => "Connecting...",
+        "SessionStatusDisconnected" => "Disconnected",
+        "SessionStatusDisconnecting" => "Disconnecting...",
+        "SessionStatusError" => "Error",
+        "SessionTreeProtocolTool" => "Tool",
         "StatusLaunchedExternalClient" => "External client launched",
         "StatusLaunchedExternalClientTooltip" => "The external client was launched.",
         "StatusRemoteSessionHandedOff" => "Session started",

@@ -378,6 +378,7 @@
   "ServerDialogPostConnectInputPlaceholder": "Command to send, for example: sudo -i",
   "SessionTreeRowTooltipHost": "Host: {0}",
   "SessionTreeRowTooltipProtocol": "Protocol: {0}",
+  "SessionTreeProtocolTool": "Tool",
   "SessionTreeRowTooltipGateway": "Gateway: {0}",
   "SessionTreeRowTooltipUser": "User: {0}",
   "SettingsLanguageApplyFailedMessage": "The language file for {0} could not be loaded. The interface stays in the language it was already using.",

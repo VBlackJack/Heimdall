@@ -213,6 +213,80 @@ public sealed partial class ServerListSelectionTests
         Assert.Same(verdict, fixture.ServerById("alpha").HealthState);
     }
 
+    [Theory]
+    [InlineData("LaunchingSsh", "Connecting...")]
+    [InlineData("EstablishingTunnel", "Connecting...")]
+    [InlineData("Initializing", "Connecting...")]
+    [InlineData("Disconnected", "Disconnected")]
+    [InlineData("Disconnecting", "Disconnecting...")]
+    [InlineData("Error", "Error")]
+    [InlineData("Connected", "Connected")]
+    public async Task ConnectionState_IsNamedFromTheLocale_NeverByTheEnumName(string state, string expected)
+    {
+        LocalizationManager localizer = await LoadEnglishLocalizerAsync();
+        ServerItemViewModel server = ServerItemViewModel.FromDto(
+            CreateServer("alpha", "Alpha", "ops"),
+            connectionState: state,
+            localizer: localizer);
+
+        Assert.Equal(expected, server.ConnectionStateDisplayName);
+        Assert.Equal(expected, server.ConnectionStateTooltip);
+        if (server.StatusShowsConnectionState)
+        {
+            Assert.Contains(expected, server.AccessibleName, StringComparison.Ordinal);
+            if (!expected.Contains(state, StringComparison.Ordinal))
+            {
+                Assert.DoesNotContain(state, server.AccessibleName, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("WINRM", "WinRM")]
+    [InlineData("LOCAL", "Local Shell")]
+    [InlineData("TELNET", "Telnet")]
+    public async Task RowNameAndTooltip_NameTheProtocolAsTheFilterMenuDoes(string type, string expected)
+    {
+        LocalizationManager localizer = await LoadEnglishLocalizerAsync();
+        ServerProfileDto dto = CreateServer("alpha", "Alpha", "ops");
+        dto.ConnectionType = type;
+        ServerItemViewModel server = ServerItemViewModel.FromDto(dto, localizer: localizer);
+
+        Assert.Equal($"Alpha, protocol {expected}, state {server.HealthTooltipText}", server.AccessibleName);
+        Assert.Contains($"Protocol: {expected}", server.RowTooltipText ?? "", StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RowName_OfATool_SaysToolRatherThanTheRawType()
+    {
+        LocalizationManager localizer = await LoadEnglishLocalizerAsync();
+        ServerProfileDto dto = CreateServer("ping", "Ping box", "ops");
+        dto.ConnectionType = Heimdall.Core.Configuration.ConnectionTypeCatalog.ToolPrefix + "PING";
+        ServerItemViewModel server = ServerItemViewModel.FromDto(dto, localizer: localizer);
+
+        Assert.DoesNotContain("TOOL", server.AccessibleName, StringComparison.Ordinal);
+        Assert.StartsWith("Ping box, protocol Tool,", server.AccessibleName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RowTooltip_OpensWithTheFullDisplayName_WhichTheRowMayTrim()
+    {
+        LocalizationManager localizer = await LoadEnglishLocalizerAsync();
+        const string LongName = "a-very-long-session-name-that-the-sidebar-cannot-show-in-full.example.internal";
+        ServerItemViewModel server = ServerItemViewModel.FromDto(
+            CreateServer("alpha", LongName, "ops"),
+            localizer: localizer);
+        List<string?> changed = [];
+        server.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        Assert.Equal(LongName, (server.RowTooltipText ?? "").Split(Environment.NewLine)[0]);
+
+        server.DisplayName = "Renamed";
+
+        Assert.Equal("Renamed", (server.RowTooltipText ?? "").Split(Environment.NewLine)[0]);
+        Assert.Contains(nameof(ServerItemViewModel.RowTooltipText), changed);
+    }
+
     private static async Task<LocalizationManager> LoadEnglishLocalizerAsync()
     {
         var localizer = new LocalizationManager();

@@ -378,6 +378,7 @@
   "ServerDialogPostConnectInputPlaceholder": "Commande \u00e0 envoyer, par exemple : sudo -i",
   "SessionTreeRowTooltipHost": "H\u00f4te : {0}",
   "SessionTreeRowTooltipProtocol": "Protocole : {0}",
+  "SessionTreeProtocolTool": "Outil",
   "SessionTreeRowTooltipGateway": "Passerelle : {0}",
   "SessionTreeRowTooltipUser": "Utilisateur : {0}",
   "SettingsLanguageApplyFailedMessage": "Le fichier de langue pour {0} n'a pas pu \u00eatre charg\u00e9. L'interface reste dans la langue qu'elle utilisait d\u00e9j\u00e0.",
