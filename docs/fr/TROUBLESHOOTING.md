@@ -182,7 +182,7 @@ Lorsque le remplissage automatique échoue silencieusement, activez la journalis
 
 **Solution** : approche en deux volets :
 1. **Client IPC Pageant** : le `PageantClient` maison dialogue avec Pageant via la mémoire partagée Win32 (`CreateFileMapping` + `WM_COPYDATA`). Il encapsule les clés en `IPrivateKeySource` pour SSH.NET via `PageantKeyWrapper` + `PageantHostAlgorithm`.
-2. **Repli Plink** : quand `RequiresPageantFallback()` détecte une authentification Pageant seule, utiliser `PlinkTunnelRunner` pour les tunnels et `PipeModeSession` pour le SSH interactif. Plink dialogue nativement avec Pageant.
+2. **Repli Plink** : quand `SshConnectionFactory.RequiresPlinkFallback()` trouve le transfert d'agent activé sur le profil et un agent compatible Plink (Pageant) en cours d'exécution, utiliser `PlinkTunnelRunner` pour les tunnels et `PipeModeSession` pour le SSH interactif. Plink dialogue nativement avec Pageant.
 
 **Fichiers** : `Pageant/PageantClient.cs`, `SshConnectionFactory.cs`, `ConnectionService.cs`
 
@@ -821,7 +821,7 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 
 ## 44. SSH - clé d'hôte indisponible sur le repli Plink {#ssh-host-key-unavailable-plink}
 
-**Symptôme** : une session SSH Pageant seule ou tunnelée échoue avant le lancement de plink, avec un message localisé de clé d'hôte indisponible.
+**Symptôme** : une session SSH ou tunnelée sur le repli Plink (transfert d'agent activé avec Pageant en cours d'exécution) échoue avant le lancement de plink, avec un message localisé de clé d'hôte indisponible.
 
 **Cause racine** : Heimdall n'a pas pu résoudre une empreinte de clé d'hôte via son propre modèle de confiance. Cela arrive lorsqu'aucune empreinte n'est stockée et que l'`IPlinkHostKeyProbe` ne parvient pas à analyser la clé présentée, expire, ou n'est pas disponible. Heimdall refuse délibérément de se rabattre sur le cache de registre de PuTTY/Plink, car cela contournerait le magasin TOFU de l'application.
 
@@ -982,7 +982,7 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 
 ## 54. Terminal SSH (Plink) - les lignes longues reviennent à la ligne en colonne 80 ou écrasent l'invite {#ssh-plink-terminal-width}
 
-**Symptôme** : sur une session qui passe par le repli Plink (authentification Pageant seule, ou nouvel essai après une connexion refusée), bash revient à la ligne en colonne 80 alors que le terminal est plus large, et une longue ligne de commande écrase son propre début.
+**Symptôme** : sur une session qui passe par le repli Plink (transfert d'agent activé sur le profil avec Pageant en cours d'exécution, ou nouvel essai après une connexion refusée), bash revient à la ligne en colonne 80 alors que le terminal est plus large, et une longue ligne de commande écrase son propre début.
 
 **Cause racine** : plink sous Windows prend la taille du PTY distant uniquement dans sa configuration (`TermWidth`/`TermHeight`), jamais dans une console, et n'envoie jamais de changement de taille de fenêtre. Heimdall transporte la taille initiale dans une session PuTTY enregistrée temporaire (`HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-<aléatoire>`) passée avec `-load`. Quand le registre refuse cette session, le lancement retombe en 80x24 et un avertissement `[PlinkSizeSession] Could not create the Plink size session` est écrit dans le journal. Le lancement attend aussi la première taille rapportée par la page du terminal, au plus `PlinkInitialSizeWaitMs` (3000 ms par défaut) ; quand la page est plus lente, il retombe en 80x24 et journalise `SSH opening the PTY for <profil> at the default 80x24: <raison>`.
 

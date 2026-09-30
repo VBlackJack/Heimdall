@@ -182,7 +182,7 @@ When autofill silently fails, enable Debug-level logging for `CredentialAutofill
 
 **Solution**: Two-pronged approach:
 1. **Pageant IPC client**: Custom `PageantClient` communicates with Pageant via Win32 shared memory (`CreateFileMapping` + `WM_COPYDATA`). Wraps keys as `IPrivateKeySource` for SSH.NET via `PageantKeyWrapper` + `PageantHostAlgorithm`.
-2. **Plink fallback**: When `RequiresPageantFallback()` detects Pageant-only auth, use `PlinkTunnelRunner` for tunnels and `PipeModeSession` for interactive SSH. Plink communicates with Pageant natively.
+2. **Plink fallback**: When `SshConnectionFactory.RequiresPlinkFallback()` finds agent forwarding enabled on the profile and a Plink-compatible agent (Pageant) running, use `PlinkTunnelRunner` for tunnels and `PipeModeSession` for interactive SSH. Plink communicates with Pageant natively.
 
 **Files**: `Pageant/PageantClient.cs`, `SshConnectionFactory.cs`, `ConnectionService.cs`
 
@@ -821,7 +821,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ## 44. SSH - Host Key Unavailable on Plink Fallback {#ssh-host-key-unavailable-plink}
 
-**Symptom**: A Pageant-only SSH or tunneled session fails before launching plink with a localized host-key-unavailable message.
+**Symptom**: An SSH or tunneled session on the Plink fallback (agent forwarding enabled with Pageant running) fails before launching plink with a localized host-key-unavailable message.
 
 **Root cause**: Heimdall could not resolve a host-key fingerprint through its own trust model. This can happen when there is no stored fingerprint and the `IPlinkHostKeyProbe` cannot parse a presented key, times out, or is unavailable. Heimdall deliberately refuses to fall back to PuTTY/Plink's registry cache because that would bypass the app's TOFU store.
 
@@ -982,7 +982,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ## 54. SSH Terminal (Plink) - Long Lines Wrap at Column 80 or Overwrite the Prompt {#ssh-plink-terminal-width}
 
-**Symptom**: On a session that runs through the Plink fallback (Pageant-only authentication, or the retry after a refused sign-in), bash wraps at column 80 although the terminal is wider, and a long command line overwrites its own beginning.
+**Symptom**: On a session that runs through the Plink fallback (agent forwarding enabled on the profile with Pageant running, or the retry after a refused sign-in), bash wraps at column 80 although the terminal is wider, and a long command line overwrites its own beginning.
 
 **Root cause**: Windows plink takes the remote PTY size only from its configuration (`TermWidth`/`TermHeight`), never from a console, and never sends a window change. Heimdall carries the initial size in a temporary PuTTY saved session (`HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-<random>`) passed with `-load`. When the registry refuses that session, the launch falls back to 80x24 and a warning `[PlinkSizeSession] Could not create the Plink size session` is written to the log. The launch also waits for the terminal page's first size report, at most `PlinkInitialSizeWaitMs` (default 3000 ms); when the page is slower, it falls back to 80x24 and logs `SSH opening the PTY for <profile> at the default 80x24: <reason>`.
 
