@@ -3531,6 +3531,8 @@
   "ToolsSharingHelp": "Dossier partag\u00e9 : {0}\n\nURL du serveur : {1}\n\nUtilisez ces commandes sur le serveur distant pour t\u00e9l\u00e9charger des fichiers :\n\n  wget {2}\n  curl {3}\n  tftp {4}\n\nL'URL a \u00e9t\u00e9 copi\u00e9e dans votre presse-papiers.\nCollez-la dans votre terminal SSH pour t\u00e9l\u00e9charger des fichiers.\n\nCliquez sur \"Arr\u00eater le serveur\" pour stopper le partage.",
   "CbxEnableTftpShare": "Activer le partage TFTP",
   "LblTftpNoAuthWarning": "Le TFTP n'a aucune authentification - activez-le uniquement sur des LAN de confiance.",
+  "SettingsTftpEnableConfirmTitle": "Activer le TFTP sans authentification ?",
+  "SettingsTftpEnableConfirmBody": "Pendant le partage d'un dossier, le TFTP sert ses fichiers \u00e0 tout appareil qui peut joindre cet ordinateur, sans mot de passe. Ne l'activez que sur un r\u00e9seau local de confiance. Enregistrer et l'activer ?",
   "LblTftpDisabledHint": "(TFTP d\u00e9sactiv\u00e9)",
 
   "X11ServerNotFound": "Aucun serveur X11 trouv\u00e9. Installez VcXsrv ou Xming pour le transfert X11.",

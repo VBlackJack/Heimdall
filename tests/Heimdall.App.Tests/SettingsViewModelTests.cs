@@ -967,7 +967,8 @@ public sealed class SettingsViewModelTests : IDisposable
     public async Task SaveAsync_PersistsFileShareEnableTftp()
     {
         var config = new FakeConfigManager();
-        var viewModel = CreateViewModel(config);
+        // Turning TFTP on is confirmed at Save; see Save_TurningTftpOn_AsksFirstAndWritesNothingWhenDeclined.
+        var viewModel = CreateViewModel(config, new FakeDialogService { ConfirmResult = true });
         viewModel.FileShareEnableTftp = true;
 
         await viewModel.SaveCommand.ExecuteAsync(null);
@@ -1860,6 +1861,40 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal("Green", viewModel.AccentTint);
         Assert.False(viewModel.RequireCredentialGuard);
         Assert.True(viewModel.IsDirty);
+    }
+
+    /// <summary>
+    /// Turning on TFTP is a pending edit like any other, confirmed at Save.
+    /// </summary>
+    /// <remarks>
+    /// The checkbox used to write to disk and restart the share on the tick, so Revert could not
+    /// undo it and a share that answers anyone on the network without a password came on with no
+    /// question asked.
+    /// </remarks>
+    [Fact]
+    public async Task Save_TurningTftpOn_AsksFirstAndWritesNothingWhenDeclined()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.FileShareEnableTftp = true;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var confirm = Assert.Single(dialog.ConfirmCalls);
+        Assert.Equal("SettingsTftpEnableConfirmTitle", confirm.Title);
+        Assert.Equal("warning", confirm.Severity);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.False(config.Settings.FileShareEnableTftp);
+        Assert.True(viewModel.IsDirty);
+        Assert.Empty(dialog.WarningCalls);
+
+        dialog.ConfirmResult = true;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.True(config.Settings.FileShareEnableTftp);
+        Assert.False(viewModel.IsDirty);
     }
 
     [Fact]

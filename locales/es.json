@@ -3534,6 +3534,8 @@
   "ToolsSharingHelp": "Compartiendo carpeta: {0}\n\nURL del servidor: {1}\n\nUsa estos comandos en el servidor remoto para descargar archivos:\n\n  wget {2}\n  curl {3}\n  tftp {4}\n\nLa URL se ha copiado a tu portapapeles.\nPégala en tu terminal SSH para descargar archivos.\n\nHaz clic en \"Detener servidor de archivos\" para dejar de compartir.",
   "CbxEnableTftpShare": "Activar compartición TFTP",
   "LblTftpNoAuthWarning": "TFTP no tiene autenticación; actívalo solo en redes locales de confianza.",
+  "SettingsTftpEnableConfirmTitle": "¿Activar TFTP sin autenticación?",
+  "SettingsTftpEnableConfirmBody": "Mientras se comparte una carpeta, TFTP sirve sus archivos a cualquier dispositivo que pueda llegar a este equipo, sin contraseña. Actívalo solo en una red local de confianza. ¿Guardar y activarlo?",
   "LblTftpDisabledHint": "(TFTP desactivado)",
 
   "X11ServerNotFound": "No se encontró ningún servidor X11. Instala VcXsrv o Xming para el reenvío X11.",

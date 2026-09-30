@@ -776,6 +776,19 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private bool _fileShareEnableTftp;
 
+    /// <summary>The TFTP choice as it stands on disk, so Save knows whether it is being turned on.</summary>
+    private bool _savedFileShareEnableTftp;
+
+    /// <summary>
+    /// Raised after a save that changed whether the file share serves TFTP, so a running share
+    /// can be restarted with the saved choice.
+    /// </summary>
+    /// <remarks>
+    /// The checkbox used to write to disk and restart the share the moment it was ticked, so it
+    /// was the one setting on the panel that Revert could not undo.
+    /// </remarks>
+    public event Action<bool>? FileShareTftpSaved;
+
     // --- Advanced / Logging ---
 
     [ObservableProperty]
@@ -1409,6 +1422,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // Advanced / File sharing
         FileShareEnableTftp = settings.FileShareEnableTftp;
+        _savedFileShareEnableTftp = settings.FileShareEnableTftp;
 
         // Terminal
         TerminalFontFamily = settings.TerminalFontFamily;
@@ -1604,6 +1618,22 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [RelayCommand]
     private async Task SaveAsync(CancellationToken cancellationToken)
     {
+        // Turning on a share that answers anyone on the network without a password is asked
+        // about once, here. Only the explicit Save asks: the leave-tab and close paths have just
+        // put a Save / Discard / Cancel question in front of the user, and the close path runs
+        // inside a Closing handler, where a second modal is a shape this repository avoids.
+        if (FileShareEnableTftp && !_savedFileShareEnableTftp)
+        {
+            bool confirmed = await _dialogService.ShowConfirmAsync(
+                _localizer["SettingsTftpEnableConfirmTitle"],
+                _localizer["SettingsTftpEnableConfirmBody"],
+                "warning");
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
         if (await TrySaveAsync(cancellationToken) || cancellationToken.IsCancellationRequested)
         {
             return;
@@ -1868,6 +1898,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         _originalTheme = DefaultTheme;
         _originalAccentTint = AccentTint;
+        bool tftpChanged = FileShareEnableTftp != _savedFileShareEnableTftp;
+        _savedFileShareEnableTftp = FileShareEnableTftp;
 
         // The saved language is already on screen - it was applied when it was picked. What
         // saving adds is that it becomes the language a later discard has to come back to.
@@ -1880,6 +1912,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         try
         {
             ConfigurationChanged?.Invoke();
+            if (tftpChanged)
+            {
+                FileShareTftpSaved?.Invoke(FileShareEnableTftp);
+            }
         }
         catch (Exception ex)
         {

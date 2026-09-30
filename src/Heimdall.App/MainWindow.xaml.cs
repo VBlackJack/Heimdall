@@ -92,7 +92,6 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private bool _isRdpImportDragActive;
     private bool _suppressFileShareStartDialog;
     private bool _settingsRuntimeBridgeInitialized;
-    private bool _suppressFileShareTftpSettingBridge;
     private OnboardingFlowViewModel? _onboardingVm;
     private bool _threadPreprocessMessageHooked;
 
@@ -127,6 +126,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private System.ComponentModel.PropertyChangedEventHandler? _connectionPropertyChangedHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _serverListPropertyChangedHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _settingsPropertyChangedHandler;
+    private Action<bool>? _fileShareTftpSavedHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _selectedExternalToolPropertyChangedHandler;
     private Action? _externalToolsChangedHandler;
     private Action<string>? _localeChangedHandler;
@@ -225,14 +225,18 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 AttachSelectedExternalToolPreviewTracking(viewModel.Settings.SelectedExternalTool);
                 Dispatcher.BeginInvoke(() => RefreshExternalToolSettingsUi(viewModel));
             }
-            else if (string.Equals(e.PropertyName, nameof(SettingsViewModel.FileShareEnableTftp), StringComparison.Ordinal)
-                     && _settingsRuntimeBridgeInitialized
-                     && !_suppressFileShareTftpSettingBridge)
-            {
-                _ = ApplyFileShareTftpSettingAsync(viewModel, viewModel.Settings.FileShareEnableTftp);
-            }
         };
         viewModel.Settings.PropertyChanged += _settingsPropertyChangedHandler;
+
+        // The TFTP choice reaches a running share only once it is saved, like every other setting.
+        _fileShareTftpSavedHandler = enabled =>
+        {
+            if (_settingsRuntimeBridgeInitialized)
+            {
+                _ = RestartFileShareForSavedSettingsAsync(viewModel);
+            }
+        };
+        viewModel.Settings.FileShareTftpSaved += _fileShareTftpSavedHandler;
         AttachSelectedExternalToolPreviewTracking(viewModel.Settings.SelectedExternalTool);
 
         // Refresh Tools tab and Settings status when background scan discovers external tools
@@ -3319,47 +3323,36 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         await _fileShareService.StartAsync(dialog.SelectedPath, vm.CurrentSettings);
     }
 
-    private async Task ApplyFileShareTftpSettingAsync(MainViewModel vm, bool enableTftp)
+    /// <summary>
+    /// Restarts a running file share so it serves what the settings now say.
+    /// </summary>
+    /// <remarks>
+    /// Called after the settings are saved, never on the checkbox: the setting is already on disk
+    /// and in <see cref="MainViewModel.CurrentSettings"/>, so a failure here leaves the share as it
+    /// was and is logged, with nothing to roll back.
+    /// </remarks>
+    private async Task RestartFileShareForSavedSettingsAsync(MainViewModel vm)
     {
-        if (vm.CurrentSettings is null)
+        if (vm.CurrentSettings is null
+            || !_fileShareService.IsSharing
+            || _fileShareService.CurrentDirectory is not { } currentDirectory)
         {
             return;
         }
 
-        var previousValue = vm.CurrentSettings.FileShareEnableTftp;
-
         try
         {
-            vm.CurrentSettings.FileShareEnableTftp = enableTftp;
-            await vm.ConfigManager.MergeSettingAsync(settings => settings.FileShareEnableTftp = enableTftp);
-
-            if (_fileShareService.IsSharing && _fileShareService.CurrentDirectory is { } currentDirectory)
-            {
-                _suppressFileShareStartDialog = true;
-                try
-                {
-                    await _fileShareService.StopAsync();
-                    await _fileShareService.StartAsync(currentDirectory, vm.CurrentSettings);
-                }
-                finally
-                {
-                    _suppressFileShareStartDialog = false;
-                }
-            }
+            _suppressFileShareStartDialog = true;
+            await _fileShareService.StopAsync();
+            await _fileShareService.StartAsync(currentDirectory, vm.CurrentSettings);
         }
         catch (Exception ex)
         {
-            Core.Logging.FileLogger.Error($"[MainWindow] Failed to update TFTP file share setting: {ex.Message}");
-            vm.CurrentSettings.FileShareEnableTftp = previousValue;
-            _suppressFileShareTftpSettingBridge = true;
-            try
-            {
-                vm.Settings.FileShareEnableTftp = previousValue;
-            }
-            finally
-            {
-                _suppressFileShareTftpSettingBridge = false;
-            }
+            Core.Logging.FileLogger.Error($"[MainWindow] Failed to restart the file share after a settings save: {ex.Message}");
+        }
+        finally
+        {
+            _suppressFileShareStartDialog = false;
         }
     }
 
@@ -3902,6 +3895,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 vm.ServerList.PropertyChanged -= _serverListPropertyChangedHandler;
             if (_settingsPropertyChangedHandler is not null)
                 vm.Settings.PropertyChanged -= _settingsPropertyChangedHandler;
+            if (_fileShareTftpSavedHandler is not null)
+                vm.Settings.FileShareTftpSaved -= _fileShareTftpSavedHandler;
             if (_trackedExternalToolForPreview is not null
                 && _selectedExternalToolPropertyChangedHandler is not null)
             {

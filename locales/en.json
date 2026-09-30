@@ -3534,6 +3534,8 @@
   "ToolsSharingHelp": "Sharing folder: {0}\n\nServer URL: {1}\n\nUse these commands on the remote server to download files:\n\n  wget {2}\n  curl {3}\n  tftp {4}\n\nThe URL has been copied to your clipboard.\nPaste it in your SSH terminal to download files.\n\nClick 'Stop File Server' to stop sharing.",
   "CbxEnableTftpShare": "Enable TFTP sharing",
   "LblTftpNoAuthWarning": "TFTP has no authentication - only enable it on trusted LANs.",
+  "SettingsTftpEnableConfirmTitle": "Turn on unauthenticated TFTP?",
+  "SettingsTftpEnableConfirmBody": "While a folder is shared, TFTP serves its files to any device that can reach this computer, with no password. Only turn it on for a trusted local network. Save and turn it on?",
   "LblTftpDisabledHint": "(TFTP disabled)",
 
   "X11ServerNotFound": "No X11 server found. Install VcXsrv or Xming for X11 forwarding support.",
