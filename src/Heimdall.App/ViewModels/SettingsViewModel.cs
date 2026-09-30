@@ -1140,6 +1140,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RevertChangesCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private bool _isDirty;
 
     [ObservableProperty]
@@ -1771,7 +1772,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         AutoLockIdleMinutesText = AutoLockIdleMinutes.ToString(CultureInfo.InvariantCulture);
     }
 
-    [RelayCommand]
+    /// <summary>
+    /// Save is offered only when there is something to save. It was always enabled, so pressing it
+    /// on a clean panel looked like it did something, and nothing distinguished a panel with edits
+    /// pending from one without. Ctrl+S goes through the same gate.
+    /// </summary>
+    private bool CanSave() => IsDirty;
+
+    [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync(CancellationToken cancellationToken)
     {
         // Turning on a share that answers anyone on the network without a password is asked

@@ -2054,6 +2054,25 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal(0, config.MergeSettingCallCount);
     }
 
+    // Save was enabled on a clean panel, so it looked like it did something when there was nothing
+    // to save. The keyboard shortcut runs the same command through CanExecute.
+    [Fact]
+    public void Save_IsOfferedOnlyWhenThereIsSomethingToSave()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        int changes = 0;
+        viewModel.SaveCommand.CanExecuteChanged += (_, _) => changes++;
+
+        Assert.False(viewModel.SaveCommand.CanExecute(null));
+
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+
+        Assert.True(viewModel.SaveCommand.CanExecute(null));
+        Assert.True(changes > 0);
+    }
+
     [Fact]
     public async Task ResetToDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {

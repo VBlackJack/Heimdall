@@ -2532,9 +2532,9 @@
   "SettingsLabelMaxEmbeddedSessions": "Max embedded sessions",
   "SessionLimitReachedTitle": "Embedded session limit reached",
   "SessionLimitReachedMessage": "The maximum of {0} remote embedded sessions is already open. Close a session before opening another.",
-  "SettingsBtnSaveSettings": "Save Settings",
-  "SettingsBtnResetDefaults": "Reset Defaults",
-  "SettingsBtnRevertChanges": "Undo Changes",
+  "SettingsBtnSaveSettings": "Save settings",
+  "SettingsBtnResetDefaults": "Reset defaults",
+  "SettingsBtnRevertChanges": "Undo changes",
   "SettingsGatewayBadgeKey": "[KEY]",
 
   "AboutTagline": "Secure Windows RDP/SSH/SFTP connection manager",
