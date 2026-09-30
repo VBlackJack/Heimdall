@@ -3580,7 +3580,7 @@
   "SettingsResetRdpDefaultsConfirmTitle": "Reset RDP defaults?",
   "SettingsResetRdpDefaultsConfirmBody": "Restore all RDP-related defaults to their factory values? Existing servers are not affected.",
   "SettingsResetDefaultsConfirmTitle": "Reset all settings?",
-  "SettingsResetDefaultsConfirmBody": "Restore every Settings tab to factory defaults? Unsaved changes in Settings will be discarded. Your servers, SSH gateways and projects are kept.",
+  "SettingsResetDefaultsConfirmBody": "Restore every Settings tab to factory defaults? Unsaved changes in Settings will be discarded. On the Security tab this turns off the external credential provider, the Credential Guard requirement, the Windows Hello requirement on connect and the TFTP share, and resets the Windows Hello grace period, the auto-lock delay and disconnect on lock. Your language, theme, sessions, SSH gateways, master password, PIN and Windows Hello enrolment are kept. Nothing is written until you save.",
   "SettingsRevertChangesConfirmTitle": "Undo unsaved changes?",
   "SettingsRevertChangesConfirmBody": "Every unsaved change in Settings will be discarded and the values reloaded from disk. Your saved settings, servers, SSH gateways and projects are untouched.",
   "ApplyAllNoChanges": "All servers already use this mode.",

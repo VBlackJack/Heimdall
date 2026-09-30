@@ -3577,7 +3577,7 @@
   "SettingsResetRdpDefaultsConfirmTitle": "R\u00e9initialiser les valeurs RDP ?",
   "SettingsResetRdpDefaultsConfirmBody": "Restaurer toutes les valeurs RDP par d\u00e9faut ? Les serveurs existants ne sont pas affect\u00e9s.",
   "SettingsResetDefaultsConfirmTitle": "R\u00e9initialiser tous les r\u00e9glages ?",
-  "SettingsResetDefaultsConfirmBody": "Restaurer tous les onglets Settings aux valeurs d'usine ? Les modifications non enregistr\u00e9es dans Settings seront perdues. Vos serveurs, passerelles SSH et projets sont conserv\u00e9s.",
+  "SettingsResetDefaultsConfirmBody": "Restaurer tous les onglets des Param\u00e8tres aux valeurs d'usine ? Les modifications non enregistr\u00e9es dans les Param\u00e8tres seront perdues. Dans l'onglet S\u00e9curit\u00e9, cela d\u00e9sactive le fournisseur d'identifiants externe, l'exigence Credential Guard, l'exigence Windows Hello \u00e0 la connexion et le partage TFTP, et r\u00e9initialise le d\u00e9lai de gr\u00e2ce Windows Hello, le d\u00e9lai de verrouillage automatique et la d\u00e9connexion au verrouillage. Votre langue, votre th\u00e8me, vos sessions, passerelles SSH, mot de passe ma\u00eetre, code PIN et inscription Windows Hello sont conserv\u00e9s. Rien n'est \u00e9crit avant l'enregistrement.",
   "SettingsRevertChangesConfirmTitle": "Annuler les modifications non enregistr\u00e9es ?",
   "SettingsRevertChangesConfirmBody": "Toutes les modifications non enregistr\u00e9es des r\u00e9glages seront abandonn\u00e9es et les valeurs recharg\u00e9es depuis le disque. Vos r\u00e9glages enregistr\u00e9s, vos serveurs, vos passerelles SSH et vos projets ne sont pas touch\u00e9s.",
   "ApplyAllNoChanges": "Tous les serveurs utilisent d\u00e9j\u00e0 ce mode.",

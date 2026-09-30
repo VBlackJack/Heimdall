@@ -1779,7 +1779,8 @@ public sealed class SettingsViewModelTests : IDisposable
         await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
 
         var expected = await LoadExpectedFactoryDefaultsAsync();
-        Assert.Equal(expected.DefaultTheme, viewModel.DefaultTheme);
+        // The theme is kept on purpose: see ResetToDefaults_KeepsLanguageThemeAndSecurityState.
+        Assert.Equal("Buffy", viewModel.DefaultTheme);
         Assert.Equal(expected.MaxEmbeddedSessions, viewModel.MaxEmbeddedSessions);
         Assert.Equal(expected.TerminalFontSize, viewModel.TerminalFontSize);
         Assert.True(viewModel.IsDirty);
@@ -1813,7 +1814,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
         // Preferences go back to factory values, which is what the button promises.
         var expected = await LoadExpectedFactoryDefaultsAsync();
-        Assert.Equal(expected.DefaultTheme, viewModel.DefaultTheme);
+        Assert.Equal(expected.TerminalFontSize, viewModel.TerminalFontSize);
 
         // The inventory survives. A gateway's stored password is only ever reported
         // back as a boolean, so dropping it here would destroy a secret the user
@@ -1826,6 +1827,39 @@ public sealed class SettingsViewModelTests : IDisposable
 
         var project = Assert.Single(viewModel.Projects);
         Assert.Equal("Production", project.Name);
+    }
+
+    /// <summary>
+    /// A factory reset changes preferences, not the language on screen and not what is enrolled.
+    /// </summary>
+    /// <remarks>
+    /// Loaded from the factory file, the vault read as disabled and its lock controls vanished while
+    /// the vault stayed on; the PIN read as absent; and the interface switched to English under a
+    /// user who had picked French, in the one panel they would need to read to undo it.
+    /// </remarks>
+    [Fact]
+    public async Task ResetToDefaults_KeepsLanguageThemeAndSecurityState()
+    {
+        FakeConfigManager config = new();
+        config.Settings.VaultEnabled = true;
+        config.Settings.PinHash = "hash";
+        config.Settings.PinSalt = "salt";
+        config.Settings.DefaultTheme = "Tarn";
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.AccentTint = "Green";
+        viewModel.RequireCredentialGuard = true;
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsVaultEnabled);
+        Assert.True(viewModel.VaultEnabledActionsVisible);
+        Assert.True(viewModel.IsPinConfigured);
+        Assert.Equal("Tarn", viewModel.DefaultTheme);
+        Assert.Equal("Green", viewModel.AccentTint);
+        Assert.False(viewModel.RequireCredentialGuard);
+        Assert.True(viewModel.IsDirty);
     }
 
     [Fact]

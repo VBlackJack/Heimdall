@@ -1939,13 +1939,35 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // abandoned language the one Discard returns to. This is the parked risk of applying
         // the locale live, arriving through the one path that reloads without leaving.
         string localeToReturnTo = _originalLocale;
+        string themeToReturnTo = _originalTheme;
+        string accentToReturnTo = _originalAccentTint;
 
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         defaults.SshGateways = keptGateways;
         defaults.Projects = keptProjects;
 
+        // The language and the theme are kept. A reset that switches the interface into English
+        // under a user who reads French leaves them in front of a panel they cannot read, the one
+        // place from which they would have to find their way back; the confirmation says so.
+        defaults.DefaultLocale = DefaultLocale;
+        defaults.DefaultTheme = DefaultTheme;
+        defaults.AccentTint = AccentTint;
+
+        // The PIN, the vault and the Windows Hello enrolment are state, not preferences: they are
+        // written the moment they are set up and no reset puts them back. Loaded from the factory
+        // file, the Security tab showed the vault disabled and hid its lock controls while the
+        // vault stayed on, so they are carried across from what is on disk.
+        AppSettings persisted = await _configManager.LoadSettingsAsync();
+        defaults.PinHash = persisted.PinHash;
+        defaults.PinSalt = persisted.PinSalt;
+        defaults.VaultEnabled = persisted.VaultEnabled;
+        defaults.VaultHelloEnrolled = persisted.VaultHelloEnrolled;
+
         LoadFromSettings(defaults);
         _originalLocale = localeToReturnTo;
+        _originalTheme = themeToReturnTo;
+        _originalAccentTint = accentToReturnTo;
+        await RefreshVaultStatusAsync();
 
         _deletedProjectIds.AddRange(keptDeletedProjectIds);
         foreach (string gatewayId in keptDeletedGatewayIds)

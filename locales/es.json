@@ -3580,7 +3580,7 @@
   "SettingsResetRdpDefaultsConfirmTitle": "¿Restablecer valores predeterminados de RDP?",
   "SettingsResetRdpDefaultsConfirmBody": "¿Restaurar todos los valores predeterminados relacionados con RDP a sus valores de fábrica? Los servidores existentes no se ven afectados.",
   "SettingsResetDefaultsConfirmTitle": "¿Restablecer todos los ajustes?",
-  "SettingsResetDefaultsConfirmBody": "¿Restaurar cada pestaña de Ajustes a los valores de fábrica? Se descartarán los cambios sin guardar en Ajustes. Tus servidores, pasarelas SSH y proyectos se conservan.",
+  "SettingsResetDefaultsConfirmBody": "¿Restaurar cada pestaña de Ajustes a los valores de fábrica? Se descartarán los cambios sin guardar en Ajustes. En la pestaña Seguridad esto desactiva el proveedor de credenciales externo, el requisito de Credential Guard, el requisito de Windows Hello al conectar y el recurso compartido TFTP, y restablece el periodo de gracia de Windows Hello, el retardo de bloqueo automático y la desconexión al bloquear. Se conservan tu idioma, tema, sesiones, pasarelas SSH, contraseña maestra, PIN e inscripción de Windows Hello. No se escribe nada hasta que guardes.",
   "SettingsRevertChangesConfirmTitle": "¿Deshacer cambios sin guardar?",
   "SettingsRevertChangesConfirmBody": "Se descartará todo cambio sin guardar en Ajustes y se recargarán los valores desde el disco. Tus ajustes guardados, servidores, pasarelas SSH y proyectos no se tocan.",
   "ApplyAllNoChanges": "Todos los servidores ya usan este modo.",
