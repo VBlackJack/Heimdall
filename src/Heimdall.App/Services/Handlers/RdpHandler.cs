@@ -282,7 +282,27 @@ internal sealed class RdpHandler : IProtocolHandler
             string rdpHost = targetHost;
             int rdpPort = targetPort;
 
-            if (!string.IsNullOrEmpty(server.RdpUsername) &&
+            // Resolved before the credential is staged: the same options decide both the
+            // server-authentication level the .rdp file carries and whether a password may
+            // be handed to that client at all.
+            var redirections = RdpProfileResolver.BuildRedirections(server, settings);
+            bool clientAuthenticatesServer = Heimdall.Rdp.RdpAuthenticationResolver
+                .Resolve(redirections.Nla, redirections.StrictServerAuthentication)
+                .AuthenticatesServer;
+
+            bool hasStoredSecret = !string.IsNullOrEmpty(server.RdpUsername) &&
+                !string.IsNullOrEmpty(server.RdpPasswordEncrypted);
+            if (hasStoredSecret && !clientAuthenticatesServer)
+            {
+                // With NLA off the .rdp file says "authentication level:i:0": mstsc connects
+                // to whoever answers without checking the server, and this path has no
+                // certificate gate of its own. Neither staging the entry nor filling the
+                // prompt: the user types the password into the client, knowingly.
+                Core.Logging.FileLogger.Warn(
+                    $"RDP external launch to {rdpHost}: server authentication is off, sign-in left to the client");
+                warning = _localizer["RdpExternalNoServerAuthenticationNotice"];
+            }
+            else if (!string.IsNullOrEmpty(server.RdpUsername) &&
                 !string.IsNullOrEmpty(server.RdpPasswordEncrypted))
             {
                 rdpPassword = _decryptPassword(server.RdpPasswordEncrypted);
@@ -347,7 +367,6 @@ internal sealed class RdpHandler : IProtocolHandler
             // return below deletes it synchronously before ConnectAsync hands back.
             rdpArtifactPath = rdpFile;
             var resolution = RdpProfileResolver.ResolveResolution(server, settings);
-            var redirections = RdpProfileResolver.BuildRedirections(server, settings);
             if (resolution.EmitDisabledMultiMonitor)
             {
                 redirections.MultiMonitor = false;

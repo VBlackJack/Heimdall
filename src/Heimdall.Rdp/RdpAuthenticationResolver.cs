@@ -27,7 +27,16 @@ namespace Heimdall.Rdp;
 /// <param name="EnableCredSspSupport">Whether CredSSP/NLA support is enabled.</param>
 public readonly record struct RdpAuthenticationSettings(
     int AuthenticationLevel,
-    bool EnableCredSspSupport);
+    bool EnableCredSspSupport)
+{
+    /// <summary>
+    /// Whether the client checks the server's identity at all. False at level 0, where the
+    /// client connects to whoever answers and nothing vouches for the machine a typed or
+    /// staged password is handed to.
+    /// </summary>
+    public bool AuthenticatesServer =>
+        AuthenticationLevel != RdpAuthenticationResolver.NoServerAuthenticationLevel;
+}
 
 /// <summary>
 /// Resolves RDP authentication settings from the NLA and strict server-authentication toggles.
@@ -36,6 +45,15 @@ public readonly record struct RdpAuthenticationSettings(
 /// </summary>
 public static class RdpAuthenticationResolver
 {
+    /// <summary>Level 0: connect without any server-authentication requirement.</summary>
+    public const int NoServerAuthenticationLevel = 0;
+
+    /// <summary>Level 1: fail the connection when the server cannot be authenticated.</summary>
+    public const int RequireServerAuthenticationLevel = 1;
+
+    /// <summary>Level 2: attempt server authentication and warn when it fails.</summary>
+    public const int WarnOnServerAuthenticationFailureLevel = 2;
+
     /// <summary>
     /// Resolves RDP server-authentication and CredSSP settings for the supplied NLA state.
     /// </summary>
@@ -45,11 +63,11 @@ public static class RdpAuthenticationResolver
     {
         if (!nlaEnabled)
         {
-            return new RdpAuthenticationSettings(0, false);
+            return new RdpAuthenticationSettings(NoServerAuthenticationLevel, false);
         }
 
         return strictServerAuthentication
-            ? new RdpAuthenticationSettings(1, true)
-            : new RdpAuthenticationSettings(2, true);
+            ? new RdpAuthenticationSettings(RequireServerAuthenticationLevel, true)
+            : new RdpAuthenticationSettings(WarnOnServerAuthenticationFailureLevel, true);
     }
 }

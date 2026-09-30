@@ -6644,5 +6644,6 @@
   "GatewayDiagnosticStepLine": "{0} : {1} ({2} ms)",
   "ErrorGatewayRouteEmpty": "Un itinéraire de passerelle ne peut pas être vide.",
   "ErrorToolGatewayServicesUnavailable": "Les services de passerelle sont indisponibles : la connexion est refusée plutôt qu'ouverte sans vérification.",
-  "RdpErrorLaunchInFlightForAnotherAccount": "Un lancement vers cet h\u00f4te avec un autre compte est encore en cours. R\u00e9essayez dans quelques secondes."
+  "RdpErrorLaunchInFlightForAnotherAccount": "Un lancement vers cet h\u00f4te avec un autre compte est encore en cours. R\u00e9essayez dans quelques secondes.",
+  "RdpExternalNoServerAuthenticationNotice": "L'authentification au niveau du r\u00e9seau est d\u00e9sactiv\u00e9e pour cette connexion, l'identit\u00e9 du serveur n'est donc pas v\u00e9rifi\u00e9e : Heimdall n'a pas transmis le mot de passe enregistr\u00e9. Saisissez-le dans l'invite Bureau \u00e0 distance."
 }

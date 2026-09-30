@@ -6645,5 +6645,6 @@
   "GatewayDiagnosticStepLine": "{0}: {1} ({2} ms)",
   "ErrorGatewayRouteEmpty": "A gateway route cannot be empty.",
   "ErrorToolGatewayServicesUnavailable": "The gateway services are unavailable, so the connection was refused rather than opened unverified.",
-  "RdpErrorLaunchInFlightForAnotherAccount": "A launch to this host with another account is still in progress. Retry in a few seconds."
+  "RdpErrorLaunchInFlightForAnotherAccount": "A launch to this host with another account is still in progress. Retry in a few seconds.",
+  "RdpExternalNoServerAuthenticationNotice": "Network Level Authentication is off for this connection, so the server's identity is not checked: Heimdall did not hand over the stored password. Enter it in the Remote Desktop prompt."
 }

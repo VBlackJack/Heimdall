@@ -402,6 +402,65 @@ public sealed class RdpHandlerTests : IDisposable
         Assert.Equal(0, launcher.LaunchCalls);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ConnectAsync_ExternalWithoutServerAuthentication_NeitherStagesNorAutofills(
+        bool useGlobalDefaults)
+    {
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = new FakeLaunchedRdpClientProcess(4242)
+        };
+        TrackingRdpCredentialManager credentialManager = new TrackingRdpCredentialManager
+        {
+            CredentialWritten = true
+        };
+        LocalizationManager localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        int autofillCalls = 0;
+        TaskCompletionSource autofillEntered =
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        RdpHandler handler = CreateHandler(
+            launcher,
+            credentialManager,
+            localizer,
+            (_, _, _, _, _) =>
+            {
+                Interlocked.Increment(ref autofillCalls);
+                autofillEntered.TrySetResult();
+                return Task.FromResult(true);
+            });
+        ServerProfileDto server = CreateCredentialedServer();
+        server.RdpUseGlobalDefaults = useGlobalDefaults;
+        server.RdpNla = false;
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1,
+            RdpDefaultNla = false
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            server,
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        Assert.Equal(localizer["RdpExternalNoServerAuthenticationNotice"], result.Warning);
+        Assert.NotEqual("RdpExternalNoServerAuthenticationNotice", result.Warning);
+        Assert.Equal(0, credentialManager.WriteCalls);
+        Assert.Equal(1, launcher.LaunchCalls);
+
+        // Assert-absence; the positive control is ConnectAsync_OwnCredential_InvokesTheAutofillDelegate,
+        // which reaches this very fake inside the same budget once the server is authenticated.
+        Task settled = await Task.WhenAny(autofillEntered.Task, Task.Delay(AutofillObservationBudget));
+
+        Assert.NotSame(autofillEntered.Task, settled);
+        Assert.Equal(0, Volatile.Read(ref autofillCalls));
+    }
+
     [Fact]
     public async Task ConnectAsync_OwnCredential_InvokesTheAutofillDelegate()
     {
