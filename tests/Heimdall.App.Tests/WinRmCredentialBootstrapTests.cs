@@ -78,18 +78,18 @@ public sealed class WinRmCredentialBootstrapTests
     }
 
     [Fact]
-    public void BuildScript_EndsTheHostAtItsFirstLocalPrompt()
+    public void BuildScript_SetsTheEnteredFlagOnlyAfterEnterPSSession()
     {
         ServerProfileDto server = CreateCredentialServer();
 
         string script = WinRmCredentialBootstrap.BuildScript(server, "dpapi-bootstrap-blob");
         string[] lines = script.Split("\r\n");
 
-        // The guard is the second statement, so a failed decryption ends the host too; the
-        // entered flag is set only on the line after Enter-PSSession, inside the try.
+        // The local prompt guard is defined by the launch command, before this script loads.
+        // Here the entered flag is set only on the line after Enter-PSSession, inside the try,
+        // under a Stop preference, so any failure before it leaves the flag false.
         // WinRmLaunchExitGuardExecutionTests runs this script in a real host.
         Assert.Equal("$ErrorActionPreference = 'Stop'", lines[0]);
-        Assert.Equal(WinRmPowerShellLaunchBuilder.LocalPromptExitGuard, lines[1]);
         int enterLine = Array.FindIndex(lines, line => line.TrimStart().StartsWith("Enter-PSSession ", StringComparison.Ordinal));
         Assert.True(enterLine > 1);
         Assert.Equal("    $global:HeimdallWinRmEntered = $true", lines[enterLine + 1]);

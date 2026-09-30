@@ -435,7 +435,7 @@ public sealed class WinRmHandlerGatewayTests
         Assert.True(result.Success);
         Assert.Equal("WarnWinRmGatewayKerberos", result.Warning);
         Assert.NotNull(terminalSession.Arguments);
-        Assert.Contains("-File", terminalSession.Arguments, StringComparison.Ordinal);
+        Assert.Contains("; & 'C:\\Temp\\heimdall_winrm_test.ps1'", terminalSession.Arguments, StringComparison.Ordinal);
     }
 
     [Fact]

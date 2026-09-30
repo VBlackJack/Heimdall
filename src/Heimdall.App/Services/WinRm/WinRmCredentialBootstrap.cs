@@ -186,9 +186,6 @@ internal sealed class WinRmCredentialBootstrap
         string[] lines =
         [
             "$ErrorActionPreference = 'Stop'",
-            // First, so that any failure below (decryption as much as Enter-PSSession) ends the
-            // host at its first local prompt instead of leaving a local shell in a remote tab.
-            WinRmPowerShellLaunchBuilder.LocalPromptExitGuard,
             "$scriptPath = $PSCommandPath",
             "Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue",
             // ProtectedData lives in System.Security on .NET Framework / PS 5.1 and in System.Security.Cryptography.ProtectedData on .NET / PS 7; load whichever the host has, ignore the other.

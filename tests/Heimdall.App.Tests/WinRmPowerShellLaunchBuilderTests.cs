@@ -115,8 +115,14 @@ public sealed class WinRmPowerShellLaunchBuilderTests
         WinRmPowerShellLaunchSpec spec = builder.Build(server, @"C:\Temp\heimdall winrm.ps1");
 
         Assert.Equal("powershell.exe", spec.Executable);
-        Assert.Contains("-ExecutionPolicy Bypass -File", spec.Arguments, StringComparison.Ordinal);
-        Assert.Contains("\"C:\\Temp\\heimdall winrm.ps1\"", spec.Arguments, StringComparison.Ordinal);
+
+        // The guard comes from the command line, ahead of the script: a script refused by the
+        // execution policy never runs, so a guard inside it would never be defined.
+        Assert.Equal(
+            "-NoLogo -NoExit -NoProfile -ExecutionPolicy Bypass -Command \""
+            + WinRmPowerShellLaunchBuilder.LocalPromptExitGuard
+            + "; & 'C:\\Temp\\heimdall winrm.ps1'\"",
+            spec.Arguments);
         Assert.DoesNotContain("CONTOSO", spec.Arguments, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("encrypted", spec.Arguments, StringComparison.OrdinalIgnoreCase);
     }

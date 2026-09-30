@@ -112,10 +112,16 @@ internal sealed class WinRmPowerShellLaunchBuilder
                     "A bootstrap script path is required for WinRM stored-credential sessions.");
             }
 
+            // The guard is defined by the command, not by the script: a script the execution
+            // policy refuses (a Group Policy AllSigned overrides -ExecutionPolicy Bypass) never
+            // runs its first line, and with -File the host then sat at a local prompt.
+            string bootstrapCommand = LocalPromptExitGuard
+                + "; & "
+                + QuotePowerShellLiteral(bootstrapScriptPath);
             return new WinRmPowerShellLaunchSpec(
                 executable,
-                "-NoLogo -NoExit -NoProfile -ExecutionPolicy Bypass -File "
-                + QuoteCommandLineArgument(bootstrapScriptPath));
+                "-NoLogo -NoExit -NoProfile -ExecutionPolicy Bypass -Command "
+                + QuoteCommandLineArgument(bootstrapCommand));
         }
 
         string command = LocalPromptExitGuard

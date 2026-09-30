@@ -54,6 +54,8 @@ public sealed class WinRmLaunchExitGuardExecutionTests
 
     private const string EnteredMarker = "HEIMDALL-TEST-ENTERED";
 
+    private const string ExecutionPolicyBypass = "-ExecutionPolicy Bypass";
+
     private const string DoubleParameters =
         "[CmdletBinding()] param($ComputerName, $Port, $Authentication, [switch]$UseSSL, $SessionOption, $Credential)";
 
@@ -90,12 +92,14 @@ public sealed class WinRmLaunchExitGuardExecutionTests
 
     [Theory]
     [Trait("Category", "CIUnstable")]
-    [InlineData(false, true, WinRmPowerShellLaunchBuilder.RemoteSessionNotEnteredExitCode)]
-    [InlineData(true, false, WinRmPowerShellLaunchBuilder.RemoteSessionNotEnteredExitCode)]
-    [InlineData(true, true, WinRmPowerShellLaunchBuilder.RemoteSessionEndedExitCode)]
+    [InlineData(false, true, false, WinRmPowerShellLaunchBuilder.RemoteSessionNotEnteredExitCode)]
+    [InlineData(true, false, false, WinRmPowerShellLaunchBuilder.RemoteSessionNotEnteredExitCode)]
+    [InlineData(true, true, false, WinRmPowerShellLaunchBuilder.RemoteSessionEndedExitCode)]
+    [InlineData(true, true, true, WinRmPowerShellLaunchBuilder.RemoteSessionNotEnteredExitCode)]
     public async Task CredentialBootstrap_EndsAtFirstLocalPrompt(
         bool enterReturns,
         bool blobDecrypts,
+        bool scriptRefusedByPolicy,
         int expectedExitCode)
     {
         if (!ConPtySession.IsAvailable)
@@ -121,11 +125,20 @@ public sealed class WinRmLaunchExitGuardExecutionTests
                 scriptPath,
                 shadow + "\r\n" + WinRmCredentialBootstrap.BuildScript(server, blob));
             WinRmPowerShellLaunchSpec spec = CreateBuilder().Build(server, scriptPath);
+            string arguments = spec.Arguments;
+            if (scriptRefusedByPolicy)
+            {
+                // A Group Policy execution policy overrides -ExecutionPolicy Bypass, and an
+                // unsigned script is then refused before its first line runs. AllSigned on the
+                // command line refuses it the same way, with the same error.
+                Assert.Contains(ExecutionPolicyBypass, arguments, StringComparison.Ordinal);
+                arguments = arguments.Replace(ExecutionPolicyBypass, "-ExecutionPolicy AllSigned", StringComparison.Ordinal);
+            }
 
-            (int exitCode, string output) = await RunUntilExitAsync(spec.Executable, spec.Arguments);
+            (int exitCode, string output) = await RunUntilExitAsync(spec.Executable, arguments);
 
             Assert.Equal(expectedExitCode, exitCode);
-            if (enterReturns && blobDecrypts)
+            if (enterReturns && blobDecrypts && !scriptRefusedByPolicy)
             {
                 Assert.Contains(EnteredMarker, output, StringComparison.Ordinal);
             }
