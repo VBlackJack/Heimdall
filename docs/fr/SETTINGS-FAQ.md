@@ -20,6 +20,72 @@ Taille de police, ne sont pas répétées ici.
 Quand une réponse dit qu'un réglage ne fait pas quelque chose, c'est une affirmation mesurée ou
 vérifiée dans le code, pas une supposition.
 
+## Comment l'écran Paramètres enregistre
+
+**Rien de ce que vous changez n'est écrit avant d'appuyer sur Enregistrer**, sauf les exceptions
+que chaque carte indique. **Enregistrer** n'est actif que tant que des modifications attendent,
+et Ctrl+S dans l'onglet Paramètres fait de même. Après un enregistrement, "Paramètres enregistrés"
+s'affiche à côté des boutons jusqu'à votre modification suivante. **Annuler les modifications**
+rend à chaque modification en attente sa valeur enregistrée.
+
+Une carte dont les réglages n'attendent pas simplement l'enregistrement le dit sous son titre :
+
+- **S'applique aussitôt, conservé à l'enregistrement** (Apparence) : la langue, le thème et
+  l'accent s'affichent dès que vous les choisissez ; Annuler les modifications revient à
+  l'apparence enregistrée.
+- **S'applique aux sessions ouvertes après l'enregistrement** (Terminal) : un terminal déjà ouvert
+  garde sa police et ses couleurs.
+- **S'applique aux connexions ouvertes après l'enregistrement** (les valeurs par défaut SSH et RDP,
+  et Sécurité de la connexion) : une connexion déjà ouverte garde ce avec quoi elle a été ouverte.
+- **Enregistré aussitôt, sans passer par Enregistrer** (PIN d'application, Mot de passe maître,
+  clés d'hôtes de confiance, certificats RDP de confiance) : ils s'écrivent sur-le-champ, et
+  Annuler les modifications ne peut pas les reprendre.
+
+Le jeton d'accès de la synchronisation Git est lui aussi enregistré dès sa saisie ; les autres
+champs de la synchronisation Git attendent l'enregistrement.
+
+**Deux réglages demandent confirmation avant de s'activer.** Activer le partage TFTP et
+Enregistrer la transcription des sessions demandent chacun une confirmation quand vous appuyez sur
+Enregistrer. Refuser n'écrit rien et laisse vos modifications en attente.
+
+**Quand l'enregistrement est refusé**, le message nomme le réglage et le problème, la case en
+erreur passe en rouge et son infobulle donne la raison, le bandeau dit combien de réglages
+demandent votre attention, et le focus va au premier d'entre eux en ouvrant son onglet.
+
+**Valeurs par défaut** ramène chaque onglet à sa valeur d'usine, sous forme de modifications en
+attente : rien n'est écrit avant l'enregistrement. Il garde votre langue, votre thème et votre
+accent, vos sessions et vos passerelles SSH, ainsi que votre mot de passe maître, votre PIN et
+votre enrôlement Windows Hello. Il désactive en revanche le fournisseur d'identifiants externe,
+les exigences Credential Guard et Windows Hello et le partage TFTP, et réinitialise le délai de
+grâce Windows Hello, le délai de verrouillage automatique et la déconnexion au verrouillage ; la
+confirmation les énumère. **Réinitialiser les valeurs RDP** ne touche que l'onglet RDP : le
+délai de surveillance de connexion RDP, dans Avancé > Diagnostics, garde sa valeur.
+
+**Recherche** - le champ au-dessus des onglets trouve un réglage par son libellé ou son aide,
+infobulles comprises, sans tenir compte de la casse ni des accents. Il ne compte que ce qui est
+affiché pour vous ("Résultat 2 sur 5") ; Entrée passe au résultat suivant, Maj+Entrée au
+précédent, en ouvrant au passage l'onglet et toute section repliée. Ctrl+F dans l'onglet
+Paramètres y place le curseur.
+
+## Fichier de paramètres : exporter et importer
+
+La carte **Fichier de paramètres** de l'onglet Général copie vos préférences vers un autre
+ordinateur, ou en garde une sauvegarde.
+
+**Exporter les paramètres...** écrit les réglages tels qu'ils ont été enregistrés en dernier, pas
+les modifications en attente. Seuls les réglages que cet écran modifie sont exportés, si bien que
+le fichier ne contient jamais de secret : ni mot de passe maître, ni PIN, ni jeton d'accès Git, ni
+secret de déverrouillage du fournisseur d'identifiants, ni passerelle SSH, ni position de
+fenêtre. Les réglages qui désignent un dossier de votre profil utilisateur
+(chemins d'outils, dossier des journaux) appartiennent à cet ordinateur : Heimdall dit combien il
+y en a et demande s'il faut les inclure.
+
+**Importer des paramètres...** lit un fichier écrit par l'export. Tout autre fichier, ou une
+version que ce Heimdall ne sait pas lire, est refusé et rien ne change. Sinon, il énumère les
+réglages qui changeraient et demande. Si vous acceptez, ils sont chargés comme modifications en
+attente et vérifiés comme des valeurs saisies : rien n'est écrit avant d'appuyer sur Enregistrer,
+et Annuler les modifications rétablit tout. Un secret ajouté à la main dans le fichier est ignoré.
+
 ## Verrouiller Heimdall lui-même
 
 Trois contrôles, dans le même écran, qui ne protègent pas la même chose.
@@ -36,7 +102,10 @@ compris pour un programme tournant sous votre propre compte Windows. C'est celui
 poser pour protéger vos identifiants au repos.
 
 **Déverrouillage par Windows Hello** ne remplace ni l'un ni l'autre. Il se pose par-dessus le
-mot de passe maître, pour déverrouiller d'une empreinte au lieu de le saisir.
+mot de passe maître, pour déverrouiller d'une empreinte au lieu de le saisir. **Redemander le mot
+de passe maître après**, juste en dessous, fixe pendant combien de jours Windows Hello peut
+déverrouiller depuis la dernière saisie du mot de passe maître ; ensuite, le mot de passe maître
+est demandé une fois. 0 ne le redemande jamais.
 
 **Lequel vous faut-il ?** Si la crainte est un collègue devant votre poste laissé sans
 surveillance, le PIN suffit. Si elle porte sur le fichier d'identifiants lui-même, seul le mot
@@ -94,6 +163,10 @@ qui doivent d'abord être déverrouillés. Bitwarden et 1Password exigent en plu
 (KeePass2 KPScript, `pass`) impriment le secret suivi d'autres champs : activez-le pour ceux-là.
 Laissez-le désactivé si votre mot de passe contient légitimement un saut de ligne.
 
+**Délai d'expiration de la commande** - combien de temps la commande de mot de passe peut tourner
+avant que Heimdall y renonce, de 1000 à 120000 ms. Augmentez-le pour un coffre qui vous demande de
+confirmer chaque requête.
+
 L'entrée du coffre est cherchée par le **Nom d'entrée du coffre** du profil si vous en
 renseignez un, et par le nom affiché du profil sinon. Renseignez-le quand l'entrée de votre
 coffre ne porte pas exactement le même nom que celle de Heimdall.
@@ -125,6 +198,12 @@ importé (un profil mRemoteNG en 256 couleurs ou 15 bits, un `session bpp` sous 
 **Largeur, Hauteur** - la taille du bureau d'une nouvelle session, et les autres réglages dont
 l'effet sur la mémoire a été mesuré : une session plus petite coûte environ 86 Mo de moins qu'en
 1920x1080. Avec la **Résolution dynamique** active, la session suit plutôt la fenêtre de Heimdall.
+
+**Préréglages de résolution** - les tailles qu'une session embarquée propose dans son menu de
+résolution, une `LARGEURxHAUTEUR` par ligne. La liste est vérifiée quand vous quittez le champ : la
+largeur doit être comprise entre 200 et 7680 et la hauteur entre 200 et 4320. Une ligne hors norme
+est citée dans l'erreur et l'enregistrement est refusé jusqu'à sa correction ; rien n'est retiré
+dans votre dos.
 
 Les mesures complètes sont dans [Mémoire RDP et réglage des sessions](RDP-PERFORMANCE.md).
 
@@ -169,10 +248,15 @@ chaque contrôle inactif retient environ 300 Mo. Le premier réglage dit combien
 que sa mémoire soit rendue (0 le garde jusqu'à la fermeture de Heimdall). Les deux s'appliquent
 sans redémarrage. Voir [RDP-PERFORMANCE.md](RDP-PERFORMANCE.md).
 
-**Intervalle de maintien de session** et **Intervalle anti-inactivité** sont deux choses
-différentes. Le maintien est du trafic protocolaire qui empêche le *serveur* de couper une
-session inactive. L'anti-inactivité simule une activité pour que le *bureau* distant ne se
-verrouille pas ; 0 la désactive.
+**Intervalle de maintien de session** et **Intervalle anti-inactivité**, dans l'onglet RDP,
+sont deux choses différentes. Le maintien est du trafic protocolaire qui empêche le *serveur* de
+couper une session inactive. L'anti-inactivité simule une activité pour que le *bureau* distant
+ne se verrouille pas ; 0 la désactive.
+
+**Intervalle de maintien SSH** (SSH & SFTP > Session, de 5 à 600 secondes) est l'équivalent SSH
+du maintien : la fréquence à laquelle Heimdall envoie des messages de maintien SSH sur les
+sessions terminal, SFTP, les tunnels et les passerelles, pour qu'un pare-feu ou le serveur ne
+coupe pas une connexion inactive.
 
 ## Sondes en arrière-plan
 
@@ -196,6 +280,12 @@ plus de mémoire par session mais isole chaque session dans son processus.
 **Mode SSH par défaut** - `Embedded` utilise le terminal intégré. `External` utilise PuTTY, ce
 qui exige de renseigner **Chemin de PuTTY**.
 
+**Appliquer à toutes les sessions enregistrées** - à côté de chaque mode par défaut, réécrit le
+mode de chaque session enregistrée de ce protocole (celui de SSH ne touche que les sessions SSH)
+et enregistre en même temps le mode par défaut choisi. La confirmation dit combien de sessions
+vont changer, et l'opération ne s'annule pas. Vos autres modifications en attente dans l'écran
+Paramètres restent en attente.
+
 ## Journalisation
 
 **Écrire le journal de diagnostic de l'application** écrit le journal propre à Heimdall : ses
@@ -203,6 +293,11 @@ qui exige de renseigner **Chemin de PuTTY**.
 contenu des sessions terminal dans **Répertoire des journaux de session**. La seconde enregistre
 ce que vous tapez et ce qui revient, mots de passe ou jetons renvoyés par le terminal compris :
 réfléchissez à l'emplacement de ce répertoire ; Heimdall demande confirmation avant de l'activer.
+
+**Réglages qui n'existent plus** - `EnableEventLog`, `EnableSessionPersistence` et
+`EmbeddedIdleTimeoutMs` figuraient dans les réglages mais rien ne les lisait : les changer dans
+`settings.json` ne faisait rien. Ils sont retirés. Un `settings.json` qui les contient encore se
+charge normalement et les garde tels quels.
 
 ## Migration depuis l'ancienne version
 
@@ -223,10 +318,16 @@ l'expliquer.
 
 ## Partage de fichiers
 
-**Activer le partage TFTP** démarre un petit serveur TFTP, pour pousser des firmwares et des
-configurations vers du matériel réseau qui ne parle rien d'autre. TFTP n'a aucune
-authentification ni aucun chiffrement : qui atteint le port peut lire et écrire dans le dossier
-partagé. Activez-le sur un réseau de confiance, le temps du transfert, puis coupez-le.
+**Activer le partage TFTP** (Sécurité > Partage de fichiers) ajoute un petit serveur TFTP au
+partage d'un dossier, pour pousser des firmwares et des configurations vers du matériel réseau qui
+ne parle rien d'autre. TFTP n'a aucune authentification ni aucun chiffrement : tant qu'un dossier
+est partagé, qui atteint le port peut lire chacun de ses fichiers. Le serveur TFTP est en lecture
+seule ; il n'accepte aucun envoi. Activez-le sur un réseau de confiance, le temps du transfert,
+puis coupez-le.
+
+Cocher la case ne change rien à elle seule : appuyer sur Enregistrer demande une confirmation, et
+c'est seulement alors que TFTP est activé et qu'un partage en cours redémarre avec lui. Annuler
+les modifications avant l'enregistrement laisse le partage tel qu'il était.
 
 ## Passerelles SSH, PuTTY et Plink
 
@@ -247,13 +348,19 @@ connexion a été établie, et le reste.
 **Chemin de plink.exe** n'est nécessaire que pour les chemins passant par PuTTY : clés Pageant,
 serveurs en keyboard-interactive, et le repli sur Plink. Des fichiers de clés seuls n'en ont pas
 besoin. **Chemin de PuTTY** n'est nécessaire que si le mode SSH est réglé sur External ; laissé
-vide, il est cherché à côté de plink.exe.
+vide, il est cherché à côté de plink.exe. Un chemin saisi là où il n'y a pas de fichier affiche
+"Aucun fichier à cet emplacement." sous le champ ; un champ vide ne dit rien.
+
+**Importer le fichier known_hosts d'OpenSSH au démarrage** (SSH & SFTP > Clés d'hôtes) ajoute les
+clés d'hôtes de votre `.ssh/known_hosts` à la liste de confiance de Heimdall à chaque démarrage.
+Une clé différente de celle à laquelle Heimdall fait déjà confiance n'est pas remplacée.
 
 ## Détection des outils tiers
 
 **Répertoires Sysinternals, NirSoft et NanaRun** - Heimdall n'embarque pas ces suites. Indiquez
 un dossier où vous en avez déjà installé une, et les outils qui s'y trouvent apparaissent dans
-la boîte à outils. Laissez vide et Heimdall propose simplement ses outils intégrés.
+la boîte à outils. Laissez vide et Heimdall propose simplement ses outils intégrés. Un dossier
+saisi là où il n'y en a pas affiche "Aucun dossier à cet emplacement." sous le champ.
 
 ## Éditeur externe
 
