@@ -623,7 +623,7 @@
                                         </WrapPanel>
                                     </StackPanel>
                                     <WrapPanel Visibility="{Binding ServerList.CanUndoTreeOrganization, Converter={StaticResource BoolToVisibilityConverter}}">
-                                        <TextBlock Text="{loc:Translate TreeUxChanged}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding ServerList.UndoTreeOrganizationText}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         <Button Content="{loc:Translate TreeUxUndo}" Command="{Binding ServerList.UndoTreeOrganizationCommand}"
                                                 Style="{DynamicResource GhostButtonStyle}" AutomationProperties.Name="{loc:Translate TreeUxUndo}"/>
                                     </WrapPanel>

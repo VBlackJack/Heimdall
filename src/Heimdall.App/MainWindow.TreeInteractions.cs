@@ -1145,6 +1145,7 @@ public partial class MainWindow
         {
             ServerRenameResult result =
                 await vm.ServerList.WithOrganizationUndoAsync(
+                    TreeOrganizationChange.Rename,
                     () => new ServerRenameService(vm.ConfigManager).RenameAsync(server.Id, server.EditName),
                     serverIds: new[] { server.Id });
 
@@ -1212,6 +1213,7 @@ public partial class MainWindow
             await vm.ServerList.FlushExpandStateForCloseAsync();
             FolderRenameResult result =
                 await vm.ServerList.WithOrganizationUndoAsync(
+                    TreeOrganizationChange.FolderRename,
                     () => new FolderRenameService(vm.ConfigManager).RenameAsync(oldPath, folder.EditName),
                     result => result.Status == FolderRenameStatus.Renamed
                         ? new FolderRenamePlan(result.NewPath!, oldPath) : null);
@@ -1993,6 +1995,7 @@ public partial class MainWindow
             await vm.ServerList.FlushExpandStateForCloseAsync();
             string oldPath = folder.FullPath;
             FolderMoveResult result = await vm.ServerList.WithOrganizationUndoAsync(
+                TreeOrganizationChange.FolderMove,
                 () => new FolderMoveService(vm.ConfigManager).MoveAsync(oldPath, targetParentPath),
                 result => result.Status == FolderMoveStatus.Moved
                     ? new FolderRenamePlan(result.NewPath!, oldPath) : null);

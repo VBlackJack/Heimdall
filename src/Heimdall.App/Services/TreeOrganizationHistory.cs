@@ -27,6 +27,18 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
     private UndoEntry? _entry;
     public bool CanUndo => _entry is not null;
 
+    /// <summary>
+    /// Counts the entries recorded so far, so a caller can tell a new undoable change from an
+    /// operation that changed nothing and left the previous entry in place.
+    /// </summary>
+    public int RecordedCount { get; private set; }
+
+    /// <summary>
+    /// Forgets the recorded change, for an operation the history cannot reverse or an entry
+    /// that has outlived its offer.
+    /// </summary>
+    public void Clear() => _entry = null;
+
     public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation,
         Func<T, FolderRenamePlan?>? reverseFolder = null,
         IReadOnlyCollection<string>? serverIds = null)
@@ -50,6 +62,7 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
                 {
                     _entry = new(changed, after, reverse,
                         reverse is null ? "" : MetadataFingerprint(await config.LoadSettingsAsync()));
+                    RecordedCount++;
                 }
             }
             catch (Exception ex)

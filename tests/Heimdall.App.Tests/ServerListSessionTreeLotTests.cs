@@ -373,6 +373,42 @@ public sealed partial class ServerListSelectionTests
         Assert.Contains(nameof(ServerItemViewModel.RowTooltipText), changed);
     }
 
+    [Fact]
+    public async Task UndoBar_NamesTheChange_AndWithdrawsAfterItsLifetime()
+    {
+        var timeProvider = new FakeTimeProvider();
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync(timeProvider: timeProvider);
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"),
+            CreateServer("a", "A", "ops"), CreateServer("b", "B", "ops"));
+
+        Assert.True(await fixture.ViewModel.ReorderServersAsync(
+            [fixture.ServerById("a")], fixture.ServerById("b"), true));
+
+        Assert.True(fixture.ViewModel.CanUndoTreeOrganization);
+        Assert.Equal("Sessions reordered.", fixture.ViewModel.UndoTreeOrganizationText);
+
+        timeProvider.Advance(ServerListViewModel.OrganizationUndoLifetime - TimeSpan.FromSeconds(1));
+        Assert.True(fixture.ViewModel.CanUndoTreeOrganization);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        Assert.False(fixture.ViewModel.CanUndoTreeOrganization);
+    }
+
+    [Fact]
+    public async Task ClearOrganizationUndo_WithdrawsTheOffer()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"),
+            CreateServer("a", "A", "ops"), CreateServer("b", "B", "ops"));
+        Assert.True(await fixture.ViewModel.ReorderServersAsync(
+            [fixture.ServerById("a")], fixture.ServerById("b"), true));
+
+        fixture.ViewModel.ClearOrganizationUndo();
+
+        Assert.False(fixture.ViewModel.CanUndoTreeOrganization);
+        Assert.False(fixture.ViewModel.UndoTreeOrganizationCommand.CanExecute(null));
+    }
+
     private static async Task<LocalizationManager> LoadEnglishLocalizerAsync()
     {
         var localizer = new LocalizationManager();

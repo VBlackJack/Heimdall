@@ -354,6 +354,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         _disposed = true;
         DetachStableTreeFolderEvents();
         _searchFilterTimer?.Dispose();
+        _organizationUndoExpiry?.Dispose();
         lock (_expandSaveSync)
         {
             _expandSaveVersion++;

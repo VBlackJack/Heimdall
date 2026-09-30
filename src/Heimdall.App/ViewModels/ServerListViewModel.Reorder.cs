@@ -162,7 +162,7 @@ public partial class ServerListViewModel
         CancellationToken cancellationToken)
     {
         bool written = false;
-        await WithOrganizationUndoAsync(async () =>
+        await WithOrganizationUndoAsync(TreeOrganizationChange.Reorder, async () =>
         {
             await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
             return written;
