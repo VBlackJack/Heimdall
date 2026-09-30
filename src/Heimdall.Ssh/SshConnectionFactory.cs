@@ -137,7 +137,7 @@ public static class SshConnectionFactory
             connectionParams.Username,
             [.. authMethods])
         {
-            Timeout = connectionParams.ConnectTimeout
+            Timeout = ClientTimeout(connectionParams)
         };
 
         return info;
@@ -241,7 +241,7 @@ public static class SshConnectionFactory
                 connectionParams.Username,
                 [.. authMethods])
             {
-                Timeout = connectionParams.ConnectTimeout
+                Timeout = ClientTimeout(connectionParams)
             };
 
             return new OwnedConnectionInfo(info, ownedResources);
@@ -491,6 +491,93 @@ public static class SshConnectionFactory
             throw new OperationCanceledException(ConnectCancelledMessage, ex, cancellationToken);
         }
     }
+
+    /// <summary>
+    /// The timeout SSH.NET applies to every wait of an authenticating client.
+    /// </summary>
+    private static TimeSpan ClientTimeout(SshConnectionParams connectionParams) =>
+        connectionParams.AuthenticationTimeout ?? connectionParams.ConnectTimeout;
+
+    /// <summary>
+    /// Runs <paramref name="connect"/> for <paramref name="client"/> so that the phase before the
+    /// server's host key arrives is bounded by <see cref="SshConnectionParams.ConnectTimeout"/>,
+    /// even when the client's own timeout is the much longer
+    /// <see cref="SshConnectionParams.AuthenticationTimeout"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>SSH.NET has a single timeout for the TCP connect, the banner, the key exchange and
+    /// every authentication wait, so the two phases cannot be separated through its settings.
+    /// This bound is a cancellation of its own, armed before the connect and disarmed on
+    /// <see cref="BaseClient.HostKeyReceived"/>: the host key arrives inside the key exchange,
+    /// after the transport has proved the server answers, and before any question can be put
+    /// to the user. What remains after it (new keys, the service request) runs under the
+    /// client's timeout.</para>
+    /// <para>When the bound fires, the failure is an <see cref="SshOperationTimeoutException"/>,
+    /// classified as a network timeout, never an <see cref="OperationCanceledException"/>: the
+    /// caller's own token was not cancelled, and a cancellation would read as an authentication
+    /// timeout. With no <see cref="SshConnectionParams.AuthenticationTimeout"/>, or one no longer
+    /// than the connect timeout, the client's timeout already bounds the transport and
+    /// <paramref name="connect"/> runs unchanged.</para>
+    /// </remarks>
+    internal static async Task ConnectWithTransportBoundAsync(
+        BaseClient client,
+        SshConnectionParams connectionParams,
+        Func<CancellationToken, Task> connect,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(connectionParams);
+        ArgumentNullException.ThrowIfNull(connect);
+
+        if (connectionParams.AuthenticationTimeout is not { } authenticationTimeout
+            || authenticationTimeout <= connectionParams.ConnectTimeout)
+        {
+            await connect(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        using CancellationTokenSource transportBound =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        EventHandler<HostKeyEventArgs> disarm = (_, _) =>
+        {
+            try
+            {
+                transportBound.CancelAfter(Timeout.InfiniteTimeSpan);
+            }
+            catch (ObjectDisposedException)
+            {
+                // The connect already returned; nothing is left to bound.
+            }
+        };
+        client.HostKeyReceived += disarm;
+        try
+        {
+            transportBound.CancelAfter(connectionParams.ConnectTimeout);
+            await connect(transportBound.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested
+            && transportBound.IsCancellationRequested
+            && !HostKeyRejectionFinder.TryFind(ex, out _))
+        {
+            throw new SshOperationTimeoutException(
+                string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    TransportTimeoutMessage,
+                    (int)connectionParams.ConnectTimeout.TotalMilliseconds),
+                ex);
+        }
+        finally
+        {
+            client.HostKeyReceived -= disarm;
+        }
+    }
+
+    /// <summary>
+    /// Diagnostic message of the timeout raised by <see cref="ConnectWithTransportBoundAsync"/>;
+    /// the user sees the localized network-timeout sentence, not this.
+    /// </summary>
+    private const string TransportTimeoutMessage =
+        "The server did not present its host key within {0} ms.";
 
     internal static async Task<PinnedFingerprintVerifier> ResolvePresentedHostKeyAsync(
         string verificationHost,

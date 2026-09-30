@@ -128,6 +128,27 @@ public sealed class SshHandlerInteractivePromptTests : IDisposable
             harness.Dialog.LastMessage);
     }
 
+    /// <summary>
+    /// The long wait for a human answer governs authentication only, not reaching the server.
+    /// </summary>
+    /// <remarks>
+    /// Audit 2026-09-30 S-03. The handler set ConnectTimeout to the two-minute interactive bound,
+    /// and ConnectTimeout also bounds the host key probe and the banner and key exchange, so an
+    /// unresponsive host took two minutes to fail instead of the usual connect timeout.
+    /// </remarks>
+    [Fact]
+    public async Task TheDialReceivesTheNormalConnectTimeout()
+    {
+        using Harness harness = await CreateHarnessAsync(dialogAnswer: "123456");
+
+        await harness.ConnectAsync();
+
+        SshConnectionParams dialled = Assert.IsType<SshConnectionParams>(harness.DialledParams);
+        Assert.Equal(new SshConnectionParams { Host = "h", Username = "u" }.ConnectTimeout, dialled.ConnectTimeout);
+        Assert.NotNull(dialled.AuthenticationTimeout);
+        Assert.True(dialled.AuthenticationTimeout > dialled.ConnectTimeout);
+    }
+
     private async Task<Harness> CreateHarnessAsync(string? dialogAnswer, string prompt = VerificationCodePrompt)
     {
         LocalizationManager localizer = new LocalizationManager();
@@ -158,6 +179,7 @@ public sealed class SshHandlerInteractivePromptTests : IDisposable
                 {
                     // What SSH.NET does with the prompt handler: it runs it and rethrows what it
                     // raised from Authenticate, unwrapped.
+                    DialledParams = connectionParams;
                     AuthenticationPrompt prompt = new(0, false, promptText);
                     SshConnectionFactory.AnswerKeyboardInteractivePrompts(
                         [prompt],
@@ -173,6 +195,8 @@ public sealed class SshHandlerInteractivePromptTests : IDisposable
         }
 
         public RecordingDialog Dialog { get; }
+
+        public SshConnectionParams? DialledParams { get; private set; }
 
         public List<string> Statuses { get; } = [];
 

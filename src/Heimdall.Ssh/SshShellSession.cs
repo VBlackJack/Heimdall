@@ -222,7 +222,12 @@ public sealed class SshShellSession : IDisposable
             connectionParams,
             pinnedVerifier);
 
-        await _transport.ConnectAsync(client, cancellationToken).ConfigureAwait(false);
+        await SshConnectionFactory.ConnectWithTransportBoundAsync(
+                client,
+                connectionParams,
+                token => _transport.ConnectAsync(client, token),
+                cancellationToken)
+            .ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
         AbandonConnectIfDisposed(client);
