@@ -146,6 +146,88 @@ public sealed class SessionTreeGestureTests
         });
     }
 
+    [Theory]
+    [InlineData(Key.Escape, true, 5, "Clear")]
+    [InlineData(Key.Escape, false, 5, "None")]
+    [InlineData(Key.Down, true, 3, "FocusFirstSession")]
+    [InlineData(Key.Down, false, 3, "FocusFirstSession")]
+    [InlineData(Key.Down, true, 0, "None")]
+    [InlineData(Key.Enter, true, 1, "ConnectOnlyMatch")]
+    [InlineData(Key.Enter, true, 2, "None")]
+    [InlineData(Key.Enter, false, 1, "None")]
+    [InlineData(Key.A, true, 1, "None")]
+    public void FilterBoxGesture_Resolves(Key key, bool hasQuery, int matches, string expected)
+    {
+        Assert.Equal(expected, MainWindow.ResolveSessionFilterGesture(key, ModifierKeys.None, hasQuery, matches).ToString());
+    }
+
+    [Fact]
+    public void FilterBoxGesture_IgnoresModifiedKeys()
+    {
+        Assert.Equal(
+            "None",
+            MainWindow.ResolveSessionFilterGesture(Key.Enter, ModifierKeys.Control, true, 1).ToString());
+    }
+
+    [Fact]
+    public void FilterBoxKeys_RaisedOnTheBox_ClearMoveAndConnect()
+    {
+        RunOnSta(() =>
+        {
+            TextBox box = new() { Text = "web" };
+            Window window = new()
+            {
+                Content = box,
+                Width = 320,
+                Height = 120,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow
+            };
+            window.Show();
+            window.UpdateLayout();
+            int matches = 1;
+            int pendingApplied = 0;
+            int cleared = 0;
+            int focused = 0;
+            int connected = 0;
+            MainWindow.AttachSessionFilterKeys(box, new MainWindow.SessionFilterKeyTarget(
+                MatchCount: () => matches,
+                ApplyPendingFilter: () => pendingApplied++,
+                Clear: () => cleared++,
+                FocusFirstSession: () =>
+                {
+                    focused++;
+                    return true;
+                },
+                ConnectOnlyMatch: () => connected++));
+
+            try
+            {
+                Assert.True(RaiseKey(box, Key.Enter));
+                Assert.Equal(1, pendingApplied);
+                Assert.Equal(1, connected);
+
+                matches = 2;
+                Assert.False(RaiseKey(box, Key.Enter));
+                Assert.Equal(1, connected);
+
+                Assert.True(RaiseKey(box, Key.Down));
+                Assert.Equal(1, focused);
+
+                Assert.True(RaiseKey(box, Key.Escape));
+                Assert.Equal(1, cleared);
+
+                box.Text = "";
+                Assert.False(RaiseKey(box, Key.Escape));
+                Assert.Equal(1, cleared);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
     [Fact]
     public async Task DeleteKeyOnAFolder_SaysWhereFolderDeletionLives()
     {

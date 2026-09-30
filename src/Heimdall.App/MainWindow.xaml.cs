@@ -319,6 +319,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         PreviewMouseDown += OnWindowPreviewMouseDown;
         CommandPalettePopup.Closed += OnCommandPaletteClosed;
         Mw_FilterBox.TextChanged += OnFilterBoxTextChanged;
+        WireSessionFilterKeys();
     }
 
     /// <summary>

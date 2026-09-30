@@ -17,6 +17,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
@@ -55,6 +56,149 @@ public partial class MainWindow
             });
         }
         OpenTreeActionMenu(sender, menu);
+    }
+
+    /// <summary>A keyboard gesture the sessions filter box answers.</summary>
+    internal enum SessionFilterGesture
+    {
+        None,
+        Clear,
+        FocusFirstSession,
+        ConnectOnlyMatch,
+    }
+
+    /// <summary>
+    /// What the sessions filter box does with its keys, handed in as delegates so the wiring the
+    /// window uses is the wiring a test drives.
+    /// </summary>
+    /// <param name="MatchCount">How many sessions the filter currently leaves, after any pending pass.</param>
+    /// <param name="ApplyPendingFilter">Applies a debounced search pass now.</param>
+    /// <param name="Clear">Empties the search.</param>
+    /// <param name="FocusFirstSession">Moves focus to the first visible session row.</param>
+    /// <param name="ConnectOnlyMatch">Opens the one remaining session.</param>
+    internal sealed record SessionFilterKeyTarget(
+        Func<int> MatchCount,
+        Action ApplyPendingFilter,
+        Action Clear,
+        Func<bool> FocusFirstSession,
+        Action ConnectOnlyMatch);
+
+    /// <summary>
+    /// Resolves a filter-box gesture without reading global keyboard state.
+    /// </summary>
+    /// <param name="key">The key raised by the filter box.</param>
+    /// <param name="modifiers">The exact modifier combination for the gesture.</param>
+    /// <param name="hasQuery">Whether the box holds text.</param>
+    /// <param name="matchCount">How many sessions the filter leaves.</param>
+    internal static SessionFilterGesture ResolveSessionFilterGesture(
+        Key key,
+        ModifierKeys modifiers,
+        bool hasQuery,
+        int matchCount)
+    {
+        if (modifiers != ModifierKeys.None)
+        {
+            return SessionFilterGesture.None;
+        }
+
+        return key switch
+        {
+            // An empty box has nothing to clear: the key is left to the shell.
+            Key.Escape when hasQuery => SessionFilterGesture.Clear,
+            Key.Down when matchCount > 0 => SessionFilterGesture.FocusFirstSession,
+
+            // Only an unambiguous result is opened; with two or more, Enter would be a guess.
+            Key.Enter when hasQuery && matchCount == 1 => SessionFilterGesture.ConnectOnlyMatch,
+            _ => SessionFilterGesture.None,
+        };
+    }
+
+    /// <summary>
+    /// Attaches the filter box's keyboard gestures: Escape clears the search, Down moves into
+    /// the tree, Enter opens the session when exactly one matches.
+    /// </summary>
+    /// <param name="box">The filter box.</param>
+    /// <param name="target">What each gesture acts on.</param>
+    internal static void AttachSessionFilterKeys(System.Windows.Controls.TextBox box, SessionFilterKeyTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(box);
+        ArgumentNullException.ThrowIfNull(target);
+
+        box.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                // A debounced pass may still be pending: count what the query WILL leave.
+                target.ApplyPendingFilter();
+            }
+
+            SessionFilterGesture gesture = ResolveSessionFilterGesture(
+                e.Key,
+                Keyboard.Modifiers,
+                !string.IsNullOrEmpty(box.Text),
+                target.MatchCount());
+            switch (gesture)
+            {
+                case SessionFilterGesture.Clear:
+                    target.Clear();
+                    e.Handled = true;
+                    break;
+
+                case SessionFilterGesture.FocusFirstSession:
+                    e.Handled = target.FocusFirstSession();
+                    break;
+
+                case SessionFilterGesture.ConnectOnlyMatch:
+                    target.ConnectOnlyMatch();
+                    e.Handled = true;
+                    break;
+            }
+        };
+    }
+
+    private void WireSessionFilterKeys()
+    {
+        AttachSessionFilterKeys(Mw_FilterBox, new SessionFilterKeyTarget(
+            MatchCount: () => DataContext is MainViewModel vm ? vm.ServerList.Servers.Count : 0,
+            ApplyPendingFilter: () => (DataContext as MainViewModel)?.ServerList.ApplyPendingSearchNow(),
+            Clear: () =>
+            {
+                if (DataContext is MainViewModel vm)
+                {
+                    vm.ServerList.SearchText = "";
+                }
+            },
+            FocusFirstSession: FocusFirstVisibleSessionRow,
+            ConnectOnlyMatch: () =>
+            {
+                if (DataContext is MainViewModel vm && vm.ServerList.Servers.Count == 1)
+                {
+                    ServerItemViewModel only = vm.ServerList.Servers[0];
+                    vm.ServerList.SelectSingle(only);
+                    ApplyTreeActivation(
+                        only,
+                        target => OpenSessionTreeToolTab(vm, target),
+                        target => ConnectSessionTreeServer(vm, target));
+                }
+            }));
+    }
+
+    private bool FocusFirstVisibleSessionRow()
+    {
+        if (DataContext is not MainViewModel vm
+            || SelectionHelpers.EnumerateVisibleLeaves(vm.ServerList.GroupedServers).FirstOrDefault() is not { } first)
+        {
+            return false;
+        }
+
+        TreeViewItem? container = GetOrRealizeSessionTreeItem(first);
+        if (container is null)
+        {
+            return false;
+        }
+
+        container.BringIntoView();
+        return container.Focus();
     }
 
     private static void OpenTreeActionMenu(object sender, ContextMenu menu)

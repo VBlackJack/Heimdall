@@ -215,6 +215,19 @@ public partial class ServerListViewModel
         ApplyFilter();
     }
 
+    /// <summary>
+    /// Applies a search the debounce is still holding back, so a key that acts on the results -
+    /// Enter in the filter box - acts on the results of what has been typed.
+    /// </summary>
+    public void ApplyPendingSearchNow()
+    {
+        if (IsFilterPending)
+        {
+            CancelSearchFilterDebounce();
+            ApplyFilter();
+        }
+    }
+
     private void ScheduleSearchFilter()
     {
         int version = System.Threading.Interlocked.Increment(ref _searchFilterVersion);
