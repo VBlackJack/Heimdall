@@ -470,7 +470,7 @@ Une **barrière Windows Hello** complémentaire (`IWindowsHelloService` au-dessu
 
 **Problème** : certains serveurs n'ont ni SFTP ni SCP (serveurs durcis, conteneurs minimaux, équipements réseau). Les utilisateurs ont besoin d'un moyen rapide de rendre des fichiers locaux accessibles à `wget`/`curl`/`tftp` depuis une session SSH distante.
 
-**Solution** : `EphemeralFileServer` fournit toujours un serveur HTTP en lecture seule (via `HttpListener` avec listage de répertoire), tandis que TFTP (RFC 1350 RRQ minimal sur `UdpClient`) est optionnel, activable dans Paramètres > Avancé > Partage de fichiers. A l'activation, l'interface affiche des commandes de téléchargement prêtes à l'emploi pour les transports actifs et copie automatiquement l'URL du serveur dans le presse-papiers, pour un collage direct dans le terminal SSH actif. L'extrait de commande `tftp` n'apparaît dans la barre de statut que lorsque TFTP est activé. Tous les transports actifs sont libérés lorsque l'utilisateur clique sur "Stop File Server".
+**Solution** : `EphemeralFileServer` fournit toujours un serveur HTTP en lecture seule (via `HttpListener` avec listage de répertoire), tandis que TFTP (RFC 1350 RRQ minimal sur `UdpClient`) est optionnel, activable dans Paramètres > Sécurité > Partage de fichiers et appliqué à l'enregistrement des paramètres. A l'activation, l'interface affiche des commandes de téléchargement prêtes à l'emploi pour les transports actifs et copie automatiquement l'URL du serveur dans le presse-papiers, pour un collage direct dans le terminal SSH actif. L'extrait de commande `tftp` n'apparaît dans la barre de statut que lorsque TFTP est activé. Tous les transports actifs sont libérés lorsque l'utilisateur clique sur "Stop File Server".
 
 ### 25. Détection et gestion automatiques du serveur X11
 
@@ -771,18 +771,18 @@ L'état d'erreur est atteignable depuis Ready ou Busy.
 
 ## Architecture du panneau Paramètres
 
-Le panneau Paramètres utilise un `TabControl` à navigation latérale gauche, avec 6 sous-onglets :
+Le panneau Paramètres utilise un `TabControl` à 6 onglets, dont certains se divisent en sous-onglets segmentés :
 
 | Sous-onglet | Réglages |
 |---------|----------|
-| **Général** | Apparence : langue, thème, nombre maximal de sessions, empêcher la mise en veille, repli des tunnels par défaut |
-| **Terminal** | Famille de police, taille de police, jeu de couleurs |
-| **SSH & SFTP** | Chemin de Plink, mode par défaut, anti-inactivité, réinitialisation de TMOUT, ouverture automatique du SFTP, X11, passerelles |
-| **RDP** | Mode par défaut, résolution, profondeur de couleur, audio, NLA, résolution dynamique, multi-écran, redirection de périphériques, cache, réglage de la reconnexion et du keep-alive, préréglages de résolution modifiables |
-| **Sécurité** | Fournisseur d'identifiants externe (commande/base de données/parcourir/préréglages/test), Credential Guard |
-| **Avancé** | Journalisation, journalisation de session, délais d'expiration (tunnel/RDP/outils externes), Partage de fichiers (activation TFTP + avertissement), Editeur externe (chemin + parcourir), détection des outils tiers, synchronisation de la bibliothèque de commandes, liste des outils externes (éditer/aperçu/test/valider) |
+| **Général** | Apparence : langue, thème, nombre maximal de sessions, empêcher la mise en veille, repli des tunnels par défaut ; mises à jour ; migration depuis l'ancienne version ; Fichier de paramètres (export/import) ; visite guidée |
+| **Terminal** | Famille de police (liste modifiable des familles installées), taille de police, jeu de couleurs |
+| **SSH & SFTP** | Connexion / Session / SFTP et X11 / Clés d'hôtes / Passerelles : chemin de Plink, mode par défaut, anti-inactivité, réinitialisation de TMOUT, intervalle de maintien SSH, ouverture automatique du SFTP, X11, clés d'hôtes de confiance et import de known_hosts au démarrage, passerelles |
+| **RDP** | Affichage et audio / Périphériques / Performance / Comportement / Certificats : mode par défaut, résolution, profondeur de couleur, audio, résolution dynamique, multi-écran, redirection de périphériques, cache, réglage de la reconnexion et du keep-alive, préréglages de résolution vérifiés ; Sécurité de la connexion (NLA, authentification stricte du serveur) avec les certificats de confiance |
+| **Sécurité** | PIN d'application, mot de passe maître (verrouillage automatique, nouvelle demande après Windows Hello), fournisseur d'identifiants externe (commande/base de données/parcourir/préréglages/test, délai d'expiration de la commande), Credential Guard, Windows Hello à la connexion, Partage de fichiers (activation TFTP + avertissement, appliquée à l'enregistrement après une confirmation) |
+| **Avancé** | Diagnostics / Outils et intégrations : journalisation, transcription des sessions (confirmée à l'enregistrement), délais d'expiration (tunnel/RDP/outils externes), surveillance de l'état des sessions, Editeur externe (chemin + parcourir), détection des outils tiers, synchronisation de la bibliothèque de commandes, liste des outils externes (éditer/aperçu/test/valider) |
 
-Les boutons d'action (Enregistrer / Réinitialiser / Exporter / Importer) sont épinglés en bas, toujours visibles quel que soit le sous-onglet.
+Les boutons d'action (Enregistrer / Annuler les modifications / Valeurs par défaut) et la recherche des paramètres se trouvent dans l'en-tête au-dessus des onglets, visibles quel que soit l'onglet. `SaveCommand` ne s'exécute que lorsque `IsDirty` est vrai ; le suivi des modifications est une liste d'autorisation dérivée d'`AppSettings` (une propriété du panneau est une modification en attente quand le type des réglages porte une propriété du même nom, plus son jumeau `Text`), si bien qu'un état écrit aussitôt (statut du coffre, résultat du test du fournisseur) n'arme jamais l'invite de modifications non enregistrées. Activer TFTP ou la transcription des sessions demande une confirmation dans `SaveAsync`. Les écritures du panneau dans `AppSettings` passent par un seul `WritePanelInto`, partagé par l'enregistrement et par l'export du fichier de paramètres, dont la liste d'autorisation (`SettingsTransfer`) est l'ensemble des propriétés d'`AppSettings` que le panneau modifie, moins le secret de déverrouillage du fournisseur d'identifiants et la bascule du panneau d'outils. Le panneau ne modifie plus et n'écrit plus `Projects`.
 
 Persistance des réglages : ViewModel → AppSettings → ConfigManager → settings.json (UTF-8 sans BOM). Les écritures de ConfigManager sont protégées par un `SemaphoreSlim` afin d'éviter la corruption par enregistrements concurrents.
 
@@ -1024,4 +1024,4 @@ Navigateur pleine page sur le rail de navigation principal, indépendant de l'on
 
 ### DialogCommonStyles.xaml
 
-Dictionnaire de ressources partagé (`src/Heimdall.App/Themes/DialogCommonStyles.xaml`) regroupant 8 styles réutilisables extraits de ServerDialog/GatewayDialog/ProjectDialog : `DialogLabelStyle`, `DialogSectionTitleStyle`, `DialogSectionDescriptionStyle`, `DialogHintTextStyle`, `DialogSectionCardStyle`, `DialogFormTextBoxStyle`, `DialogFormComboBoxStyle`, `DialogFormPasswordBoxStyle`.
+Dictionnaire de ressources partagé (`src/Heimdall.App/Themes/DialogCommonStyles.xaml`) regroupant 8 styles réutilisables extraits de ServerDialog, GatewayDialog et de l'ancien ProjectDialog (retiré avec l'édition de projets qu'il servait) : `DialogLabelStyle`, `DialogSectionTitleStyle`, `DialogSectionDescriptionStyle`, `DialogHintTextStyle`, `DialogSectionCardStyle`, `DialogFormTextBoxStyle`, `DialogFormComboBoxStyle`, `DialogFormPasswordBoxStyle`.

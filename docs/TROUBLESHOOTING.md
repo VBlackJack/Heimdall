@@ -73,6 +73,8 @@ Index of all issues encountered during development and their solutions.
 56. [WinRM - The Execution Policy Refused the Sign-in Script](#winrm-execution-policy-refused)
 57. [SSH - A Host That Does Not Answer Fails After 15 Seconds](#ssh-unresponsive-host-timeout)
 58. [FTP/SFTP - Uploading a New File Is Refused](#upload-new-file-refused)
+59. [Settings - Save Is Greyed Out, or Refuses to Save](#settings-save-greyed-or-refused)
+60. [Settings - An Imported Settings File Is Refused or Changes Nothing](#settings-import-refused)
 
 ---
 
@@ -646,7 +648,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ## 33. Ephemeral Server - Port 69 Access Denied {#tftp-port-access-denied}
 
-Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Advanced > File sharing. TFTP is opt-in since Phase 3.7 and the share runs HTTP-only by default.
+Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Security > File sharing, and that the change was saved: ticking the box does nothing until Save settings is pressed and its confirmation accepted. TFTP is opt-in since Phase 3.7 and the share runs HTTP-only by default.
 
 **Symptom**: TFTP server fails to start with "access denied" on port 69.
 
@@ -1065,3 +1067,35 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 3. Over FTP, a file created in the instant between that last check and the move can still be overwritten, because FTP has no command that prevents it. Use SFTP where that matters.
 
 **Files**: `Heimdall.Sftp/SftpAtomicUpload.cs` (`CommitCreate`), `Heimdall.Sftp/FtpAtomicUpload.cs` (`CommitCreateAsync`), `Heimdall.Sftp/SftpBrowser.cs`, `Heimdall.Sftp/FtpBrowser.cs`
+
+---
+
+## 59. Settings - Save Is Greyed Out, or Refuses to Save {#settings-save-greyed-or-refused}
+
+**Symptom**: Save settings cannot be clicked, Ctrl+S does nothing, or pressing Save shows a red banner instead of "Settings saved".
+
+**Root cause**: Save is enabled only while edits are pending. A card marked "Saved immediately, not by Save" (Application PIN, Master password, trusted host keys, trusted RDP certificates) has already written its change, and the Git sync access token is written as soon as it is entered, so neither leaves anything for Save. A refusal means a value failed its check: a number that is not a whole number or is out of its range, or a resolution preset line that is not `WIDTHxHEIGHT` within 200 to 7680 by 200 to 4320.
+
+**Solution**:
+
+1. Nothing to do when Save is greyed out after a change on one of those cards: it is already saved.
+2. On a refusal, read the banner: it names the first setting in error and counts the others. The focus is on the first field in error; its tooltip gives the reason. The red badge on each tab counts that tab's errors.
+3. If a confirmation about TFTP or session transcripts was declined, nothing was written and the edits are still pending: press Save settings again and accept, or turn the option back off.
+
+**Files**: `ViewModels/SettingsViewModel.cs`, `MainWindow.xaml`
+
+---
+
+## 60. Settings - An Imported Settings File Is Refused or Changes Nothing {#settings-import-refused}
+
+**Symptom**: Import settings... says the file is not a Heimdall settings file, or that it holds the settings you already have; or the imported values disappear.
+
+**Root cause**: Import reads only a file written by Export settings..., in a version this Heimdall can read. A file that matches the saved settings has nothing to change. An accepted import loads the values as pending edits: they are written only by Save settings, and Undo changes, Reset defaults or leaving the Settings tab with Discard drops them.
+
+**Solution**:
+
+1. Export again from the source computer with Export settings..., and import that file.
+2. After the import, check the listed changes, then press Save settings.
+3. Secrets never travel in the file (master password, PIN, Git access token, credential provider unlock secret, SSH gateways): set them again on the new computer. Paths inside the user profile travel only when you agreed to include them at export.
+
+**Files**: `ViewModels/Settings/SettingsTransfer.cs`, `ViewModels/SettingsViewModel.cs`

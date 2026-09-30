@@ -469,7 +469,7 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 **Problem**: Some servers have no SFTP or SCP (hardened servers, minimal containers, network equipment). Users need a quick way to make local files available for `wget`/`curl`/`tftp` from a remote SSH session.
 
-**Solution**: `EphemeralFileServer` always provides a read-only HTTP server (via `HttpListener` with directory listing) while TFTP (minimal RFC 1350 RRQ over `UdpClient`) is opt-in through Settings > Advanced > File sharing. On activation, the UI surfaces ready-to-use download commands for the active transports and auto-copies the server URL to clipboard for pasting into the active SSH terminal. The `tftp` command snippet appears in the status bar only when TFTP is enabled. All active transports are disposed when the user clicks "Stop File Server".
+**Solution**: `EphemeralFileServer` always provides a read-only HTTP server (via `HttpListener` with directory listing) while TFTP (minimal RFC 1350 RRQ over `UdpClient`) is opt-in through Settings > Security > File sharing, applied when the settings are saved. On activation, the UI surfaces ready-to-use download commands for the active transports and auto-copies the server URL to clipboard for pasting into the active SSH terminal. The `tftp` command snippet appears in the status bar only when TFTP is enabled. All active transports are disposed when the user clicks "Stop File Server".
 
 ### 25. X11 Server Auto-Detection and Management
 
@@ -766,18 +766,18 @@ Error state reachable from Ready or Busy.
 
 ## Settings Panel Architecture
 
-The Settings panel uses a left-navigation `TabControl` with 6 sub-tabs:
+The Settings panel uses a `TabControl` with 6 tabs, some of them split into segmented sub-tabs:
 
 | Sub-tab | Settings |
 |---------|----------|
-| **General** | Appearance: language, theme, max sessions, prevent sleep, collapse tunnels default |
-| **Terminal** | Font family, font size, color scheme |
-| **SSH & SFTP** | Plink path, default mode, anti-idle, TMOUT reset, SFTP auto-open, X11, gateways |
-| **RDP** | Default mode, resolution, color depth, audio, NLA, dynamic res, multi-monitor, device redirection, caching, reconnect/keep-alive tuning, editable resolution presets |
-| **Security** | External credential provider (command/database/browse/presets/test), Credential Guard |
-| **Advanced** | Logging, session logging, timeouts (tunnel/RDP/external tools), File sharing (TFTP enablement + disclaimer), External editor (path + browse), third-party tool detection, command library sync, external tools list (edit/preview/test/validate) |
+| **General** | Appearance: language, theme, max sessions, prevent sleep, collapse tunnels default; updates; legacy migration; Settings file (export/import); welcome tour |
+| **Terminal** | Font family (editable list of the installed families), font size, color scheme |
+| **SSH & SFTP** | Connection / Session / SFTP & X11 / Host keys / Gateways: Plink path, default mode, anti-idle, TMOUT reset, SSH keep-alive interval, SFTP auto-open, X11, trusted host keys and known_hosts import at startup, gateways |
+| **RDP** | Display & Audio / Devices / Performance / Behavior / Certificates: default mode, resolution, color depth, audio, dynamic res, multi-monitor, device redirection, caching, reconnect/keep-alive tuning, validated resolution presets; Connection security (NLA, strict server authentication) with the trusted certificates |
+| **Security** | Application PIN, master password (auto-lock, Windows Hello re-prompt), external credential provider (command/database/browse/presets/test, command timeout), Credential Guard, Windows Hello on connect, File sharing (TFTP enablement + disclaimer, applied on Save after a confirmation) |
+| **Advanced** | Diagnostics / Tools & integrations: logging, session transcripts (confirmed at Save), timeouts (tunnel/RDP/external tools), session health monitor, External editor (path + browse), third-party tool detection, command library sync, external tools list (edit/preview/test/validate) |
 
-Action buttons (Save / Reset / Export / Import) are pinned at the bottom, always visible regardless of sub-tab.
+The action buttons (Save settings / Undo changes / Reset defaults) and the settings search sit in the header above the tabs, visible whatever the tab. `SaveCommand` can execute only while `IsDirty`; dirty tracking is an allow-list derived from `AppSettings` (a panel property is a pending edit when the settings type carries a property of the same name, plus its `Text` twin), so state written at once (vault status, provider test result) never arms the unsaved-changes prompt. Enabling TFTP or session transcripts asks for a confirmation inside `SaveAsync`. The panel's writes into `AppSettings` go through one `WritePanelInto`, shared by Save and by the settings file export, whose allow-list (`SettingsTransfer`) is the set of `AppSettings` properties the panel edits, minus the credential provider unlock secret and the tools panel toggle. The panel no longer edits or writes `Projects`.
 
 Settings persistence: ViewModel -> AppSettings -> ConfigManager -> settings.json (UTF-8 no BOM). ConfigManager writes are protected by a `SemaphoreSlim` to prevent concurrent save corruption.
 
@@ -1019,4 +1019,4 @@ Full-page browser on the main navigation rail, independent of the sidebar Tools 
 
 ### DialogCommonStyles.xaml
 
-Shared resource dictionary (`src/Heimdall.App/Themes/DialogCommonStyles.xaml`) with 8 reusable styles extracted from ServerDialog/GatewayDialog/ProjectDialog: `DialogLabelStyle`, `DialogSectionTitleStyle`, `DialogSectionDescriptionStyle`, `DialogHintTextStyle`, `DialogSectionCardStyle`, `DialogFormTextBoxStyle`, `DialogFormComboBoxStyle`, `DialogFormPasswordBoxStyle`.
+Shared resource dictionary (`src/Heimdall.App/Themes/DialogCommonStyles.xaml`) with 8 reusable styles extracted from ServerDialog, GatewayDialog and the former ProjectDialog (removed with the project editing it served): `DialogLabelStyle`, `DialogSectionTitleStyle`, `DialogSectionDescriptionStyle`, `DialogHintTextStyle`, `DialogSectionCardStyle`, `DialogFormTextBoxStyle`, `DialogFormComboBoxStyle`, `DialogFormPasswordBoxStyle`.

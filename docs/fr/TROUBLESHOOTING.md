@@ -73,6 +73,8 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 56. [WinRM - la stratégie d'exécution a refusé le script de connexion](#winrm-execution-policy-refused)
 57. [SSH - un hôte qui ne répond pas échoue au bout de 15 secondes](#ssh-unresponsive-host-timeout)
 58. [FTP/SFTP - le téléversement d'un nouveau fichier est refusé](#upload-new-file-refused)
+59. [Paramètres - Enregistrer est grisé, ou refuse d'enregistrer](#settings-save-greyed-or-refused)
+60. [Paramètres - un fichier de paramètres importé est refusé ou ne change rien](#settings-import-refused)
 
 ---
 
@@ -646,7 +648,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ## 33. Serveur éphémère - accès refusé sur le port 69 {#tftp-port-access-denied}
 
-Avant de diagnostiquer la connectivité, vérifiez que TFTP est activé dans Settings > Advanced > File sharing. TFTP est optionnel depuis la phase 3.7 et le partage fonctionne en HTTP uniquement par défaut.
+Avant de diagnostiquer la connectivité, vérifiez que TFTP est activé dans Paramètres > Sécurité > Partage de fichiers, et que la modification a été enregistrée : cocher la case ne fait rien tant qu'Enregistrer n'a pas été pressé et sa confirmation acceptée. TFTP est optionnel depuis la phase 3.7 et le partage fonctionne en HTTP uniquement par défaut.
 
 **Symptôme** : le serveur TFTP ne démarre pas, avec un "access denied" sur le port 69.
 
@@ -1065,3 +1067,35 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 3. En FTP, un fichier créé entre cette dernière vérification et le déplacement peut encore être écrasé, car FTP n'a aucune commande qui l'empêche. Utiliser SFTP là où cela compte.
 
 **Fichiers** : `Heimdall.Sftp/SftpAtomicUpload.cs` (`CommitCreate`), `Heimdall.Sftp/FtpAtomicUpload.cs` (`CommitCreateAsync`), `Heimdall.Sftp/SftpBrowser.cs`, `Heimdall.Sftp/FtpBrowser.cs`
+
+---
+
+## 59. Paramètres - Enregistrer est grisé, ou refuse d'enregistrer {#settings-save-greyed-or-refused}
+
+**Symptôme** : Enregistrer ne se clique pas, Ctrl+S ne fait rien, ou appuyer sur Enregistrer affiche un bandeau rouge au lieu de "Paramètres enregistrés".
+
+**Cause racine** : Enregistrer n'est actif que tant que des modifications attendent. Une carte marquée "Enregistré aussitôt, sans passer par Enregistrer" (PIN d'application, Mot de passe maître, clés d'hôtes de confiance, certificats RDP de confiance) a déjà écrit sa modification, et le jeton d'accès de la synchronisation Git est écrit dès sa saisie : ni l'une ni l'autre ne laisse rien à enregistrer. Un refus signifie qu'une valeur n'a pas passé sa vérification : un nombre qui n'est pas entier ou qui sort de sa plage, ou une ligne de préréglage de résolution qui n'est pas `LARGEURxHAUTEUR` dans les bornes 200 à 7680 sur 200 à 4320.
+
+**Solution** :
+
+1. Rien à faire quand Enregistrer est grisé après une modification sur l'une de ces cartes : elle est déjà enregistrée.
+2. Sur un refus, lire le bandeau : il nomme le premier réglage en erreur et compte les autres. Le focus est sur le premier champ en erreur ; son infobulle donne la raison. La pastille rouge de chaque onglet compte les erreurs de cet onglet.
+3. Si une confirmation sur TFTP ou sur la transcription des sessions a été refusée, rien n'a été écrit et les modifications attendent toujours : appuyer de nouveau sur Enregistrer et accepter, ou désactiver l'option.
+
+**Fichiers** : `ViewModels/SettingsViewModel.cs`, `MainWindow.xaml`
+
+---
+
+## 60. Paramètres - un fichier de paramètres importé est refusé ou ne change rien {#settings-import-refused}
+
+**Symptôme** : Importer des paramètres... dit que le fichier n'est pas un fichier de paramètres Heimdall, ou qu'il contient les réglages que vous avez déjà ; ou les valeurs importées disparaissent.
+
+**Cause racine** : l'import ne lit qu'un fichier écrit par Exporter les paramètres..., dans une version que ce Heimdall sait lire. Un fichier identique aux réglages enregistrés n'a rien à changer. Un import accepté charge les valeurs comme modifications en attente : seul Enregistrer les écrit, et Annuler les modifications, Valeurs par défaut ou quitter l'onglet Paramètres en abandonnant les modifications les efface.
+
+**Solution** :
+
+1. Exporter de nouveau depuis l'ordinateur d'origine avec Exporter les paramètres..., et importer ce fichier.
+2. Après l'import, vérifier les modifications énumérées, puis appuyer sur Enregistrer.
+3. Les secrets ne voyagent jamais dans le fichier (mot de passe maître, PIN, jeton d'accès Git, secret de déverrouillage du fournisseur d'identifiants, passerelles SSH) : les renseigner de nouveau sur le nouvel ordinateur. Les chemins du profil utilisateur ne voyagent que si vous avez accepté de les inclure à l'export.
+
+**Fichiers** : `ViewModels/Settings/SettingsTransfer.cs`, `ViewModels/SettingsViewModel.cs`

@@ -19,6 +19,65 @@ you. Options that do what their name says, such as Theme or Font size, are not r
 Where an answer says a setting does not do something, that is a measured or code-verified
 statement, not a guess.
 
+## How the Settings screen saves
+
+**Nothing you change is written until you press Save settings**, with the exceptions each card
+states. **Save settings** is enabled only while edits are pending, and Ctrl+S on the Settings tab
+does the same. After a save, "Settings saved" shows beside the buttons until your next edit.
+**Undo changes** returns every pending edit to the saved value.
+
+A card whose settings do not simply wait for Save says so under its title:
+
+- **Applies immediately, kept on Save** (Appearance): the language, theme and accent are shown as
+  you pick them; Undo changes returns to the saved look.
+- **Applies to sessions opened after Save** (Terminal): a terminal already open keeps its font and
+  colours.
+- **Applies to connections opened after Save** (the SSH and RDP defaults, and Connection
+  security): a connection already open keeps what it was opened with.
+- **Saved immediately, not by Save** (Application PIN, Master password, trusted host keys, trusted
+  RDP certificates): these write on the spot, so Undo changes cannot take them back.
+
+The Git sync access token is also saved as soon as it is entered; the other Git sync fields wait
+for Save.
+
+**Two settings ask before they are turned on.** Enable TFTP sharing and Record session
+transcripts each ask for a confirmation when you press Save settings. Declining writes nothing
+and leaves your edits pending.
+
+**When Save is refused**, the message names the setting and the problem, the box in error turns
+red and its tooltip gives the reason, the banner says how many settings need attention, and the
+focus moves to the first of them, opening its tab.
+
+**Reset defaults** returns every tab to its factory value, as pending edits: nothing is written
+until you save. It keeps your language, theme and accent, your sessions and SSH gateways, and
+your master password, PIN and Windows Hello enrolment. It does turn off the external credential
+provider, the Credential Guard and Windows Hello requirements and the TFTP share, and resets the
+Windows Hello grace period, the auto-lock delay and disconnect on lock; the confirmation lists
+them. **Reset RDP defaults** touches the RDP tab only: the RDP connection watchdog, on Advanced >
+Diagnostics, keeps its value.
+
+**Search** - the box above the tabs finds a setting by its label or its hint, tooltips included,
+ignoring case and accents. It counts only what is on screen for you ("Result 2 of 5"); Enter
+jumps to the next match, Shift+Enter to the previous one, opening the tab and any collapsed
+section on the way. Ctrl+F on the Settings tab puts the cursor in it.
+
+## Settings file: export and import
+
+The **Settings file** card on General copies your preferences to another computer, or keeps a
+backup of them.
+
+**Export settings...** writes the settings as last saved, not pending edits. Only settings this
+screen edits are exported, so the file never holds a secret: no master password, PIN, Git access
+token, credential provider unlock secret or SSH gateway, and no window position.
+Settings that name a folder inside your user profile (tool paths, the log folder) belong to this
+computer: Heimdall says how many there are and asks whether to include them.
+
+**Import settings...** reads a file written by Export. Any other file, or a version this Heimdall
+cannot read, is refused and nothing changes. Otherwise it lists the settings that would change
+and asks. Accepted, they are loaded as pending edits and checked like typed values: nothing is
+written until you press Save settings, and Undo changes puts everything back. A secret added to
+the file by hand is ignored.
+
 ## Locking Heimdall itself
 
 Three controls, in the same screen, protecting three different things.
@@ -35,7 +94,9 @@ something running under your own Windows account. Set this one if you want your 
 protected at rest.
 
 **Windows Hello unlock** replaces neither. It sits on top of the master password so you can
-unlock with a fingerprint instead of typing it.
+unlock with a fingerprint instead of typing it. **Ask for the master password again after**, under
+it, sets how many days Windows Hello may unlock since the master password was last typed; then the
+master password is asked once. 0 never asks again.
 
 **Which do you actually want?** If the worry is a colleague using your unattended machine, the
 PIN is enough. If the worry is the credential file itself, only the master password answers it.
@@ -88,6 +149,9 @@ first. Bitwarden and 1Password additionally need a session established outside H
 print the secret followed by other fields: turn it on for those. Leave it off if your password
 legitimately contains a newline.
 
+**Command timeout** - how long the password command may run before Heimdall gives up on it, from
+1000 to 120000 ms. Raise it for a vault that asks you to confirm each request.
+
 The vault entry is looked up by the profile's **Vault entry name** if you set one, and by the
 profile's display name otherwise. Set it when the entry in your vault is not named exactly like
 the entry in Heimdall.
@@ -117,6 +181,11 @@ said so.
 **Width, Height** - the default desktop size of a new session, and the other settings measured
 to change memory use: a smaller session costs about 86 MB less than 1920x1080. With **Dynamic
 resolution** on, the session follows the Heimdall window instead.
+
+**Resolution presets** - the sizes an embedded session offers in its resolution menu, one
+`WIDTHxHEIGHT` per line. The list is checked when you leave the box: the width must be 200 to
+7680 and the height 200 to 4320. A line that does not fit is quoted in the error and Save is
+refused until it is corrected; nothing is dropped behind your back.
 
 Full measurements are in [RDP memory and session tuning](RDP-PERFORMANCE.md).
 
@@ -156,9 +225,13 @@ says how many are kept (0 to 8, 0 creates a control per session), the second how
 an idle one is kept before its memory is released (0 keeps it until Heimdall exits). Both apply
 without a restart. See [RDP-PERFORMANCE.md](RDP-PERFORMANCE.md).
 
-**Session keep-alive interval** and **Anti-idle interval** are different things. Keep-alive is
-protocol traffic that stops the *server* dropping an idle session. Anti-idle simulates activity
-so the remote *desktop* does not lock; 0 turns it off.
+**Session keep-alive interval** and **Anti-idle interval**, on the RDP tab, are different things.
+Keep-alive is protocol traffic that stops the *server* dropping an idle session. Anti-idle
+simulates activity so the remote *desktop* does not lock; 0 turns it off.
+
+**SSH keep-alive interval** (SSH & SFTP > Session, 5 to 600 seconds) is the SSH counterpart of
+keep-alive: how often Heimdall sends SSH keep-alives on terminal sessions, SFTP, tunnels and
+gateways, so that a firewall or the server does not drop an idle connection.
 
 ## Background probes
 
@@ -181,6 +254,11 @@ session but isolates each session in its own process.
 **Default SSH mode** - `Embedded` uses the built-in terminal. `External` uses PuTTY, which needs
 **PuTTY path** set.
 
+**Apply to all saved sessions** - beside each default mode, rewrites the mode of every saved
+session of that protocol (the SSH one touches SSH sessions only) and saves the chosen default at
+the same time. The confirmation says how many sessions will change, and it cannot be undone.
+Your other pending edits on the Settings screen are left pending.
+
 ## Logging
 
 **Write the application diagnostics log** writes Heimdall's own log: its events and errors.
@@ -188,6 +266,11 @@ session but isolates each session in its own process.
 log directory**. The second one records what you typed and what came back, passwords or tokens
 echoed to the terminal included, so consider where that directory lives; Heimdall asks before it
 turns it on.
+
+**Settings that no longer exist** - `EnableEventLog`, `EnableSessionPersistence` and
+`EmbeddedIdleTimeoutMs` were in the settings type but nothing read them, so changing them in
+`settings.json` did nothing. They are retired. A `settings.json` that still carries them loads
+normally and keeps them as they are.
 
 ## Legacy migration
 
@@ -207,10 +290,15 @@ will happen at the next start, with no message to explain why.
 
 ## File sharing
 
-**Enable TFTP sharing** starts a small TFTP server, for pushing firmware and configuration to
-network gear that speaks nothing else. TFTP has no authentication and no encryption of any kind:
-anyone who can reach the port can read and write the shared folder. Turn it on for a trusted LAN
-for the length of the transfer, and turn it off afterwards.
+**Enable TFTP sharing** (Security > File sharing) adds a small TFTP server to a folder share,
+for pushing firmware and configuration to network gear that speaks nothing else. TFTP has no
+authentication and no encryption of any kind: while a folder is shared, anyone who can reach the
+port can read every file in it. The TFTP server is read-only; it accepts no uploads. Turn it on
+for a trusted LAN for the length of the transfer, and turn it off afterwards.
+
+Ticking the box changes nothing by itself: pressing Save settings asks for a confirmation, and
+only then is TFTP turned on and a running share restarted with it. Undo changes before Save
+leaves the share as it was.
 
 ## SSH gateways, PuTTY and Plink
 
@@ -229,13 +317,19 @@ question is the name the connection was made through, and it stays so.
 **Path to plink.exe** is needed only for the PuTTY-based paths: Pageant keys,
 keyboard-interactive servers, and the Plink fallback. Key files alone need nothing here.
 **PuTTY path** is needed only when SSH mode is set to External; left blank it is looked for next
-to plink.exe.
+to plink.exe. A path typed where there is no file says "No file at this path." under the field;
+an empty field says nothing.
+
+**Import the OpenSSH known_hosts file at startup** (SSH & SFTP > Host keys) adds the host keys of
+your `.ssh/known_hosts` to Heimdall's trusted list each time Heimdall starts. A key that differs
+from one Heimdall already trusts is not replaced.
 
 ## Third-party tool detection
 
 **Sysinternals, NirSoft and NanaRun directories** - Heimdall does not ship these suites. Point it
 at a folder where you have already installed one, and the tools it finds there appear in the
-toolbox. Leave them empty and Heimdall simply offers its own built-in tools.
+toolbox. Leave them empty and Heimdall simply offers its own built-in tools. A folder typed
+where there is none says "No folder at this path." under the field.
 
 ## External editor
 

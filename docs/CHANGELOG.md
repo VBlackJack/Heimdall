@@ -14,6 +14,149 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### Session tree: a search that finds what you type, and a selection it gives back
+
+- **The search matches every word you type, wherever it is.** "web prod" used to find nothing
+  for web01 filed in the Prod folder, because the whole query had to appear as one piece of
+  text. Each word now has to occur somewhere in the session's name, address, folder, username,
+  protocol, environment, tags or project, in any order. Accents are ignored on both sides, so a
+  folder named with accents is found without typing them.
+- **The filter box answers Escape, Down and Enter.** Escape clears the search (in an empty box
+  the key is left to the rest of the window), Down moves to the first session in the list, and
+  Enter opens the session when exactly one matches. With two matches or more, Enter does nothing
+  rather than guess.
+- **A selection hidden by a search or a closed folder comes back.** A search that hid the
+  selected session cleared the selection for good: clearing the search brought the row back
+  unselected with the detail pane blank, and closing Heimdall then forgot which session had been
+  selected. The selection, several sessions included, is now restored once its rows are visible
+  again, unless you select something else in the meantime, and a hidden selection is never saved
+  as "nothing selected". Ctrl+A over many sessions is announced once instead of once per row.
+- **Right-clicking one of several selected sessions keeps the selection.** It could shrink the
+  selection to that one row and open the single-session menu. A Shift or Ctrl+Shift click on the
+  row that already had focus no longer makes the next plain click behave as if a key were held.
+- **Favorites from the tree.** The context menu, for one session or a selection, offers "Add to
+  favorites" or "Remove from favorites", and a favorite row shows a small star; a screen reader
+  says "favorite" after its name. A favorite could only be set from the session dialog, one
+  session at a time.
+- **Move menus follow the folder tree.** "Move to folder", the selection's Move button and a
+  folder's "Move to" listed every folder as one flat list of full paths. They now nest like the
+  tree: a folder with sub-folders opens a submenu whose first entry, "Into" followed by its name,
+  moves into that folder itself.
+- **Context menus report failures and explain greyed entries.** Creating or deleting a folder
+  that fails, on a locked settings file for example, now says so on the status line instead of
+  failing without a word. "Open in split" and "Copy username" say why they are unavailable. The
+  Delete entry shows the key that works, Del (Suppr in French), where one menu said Ctrl+Del.
+  Pressing Delete on a folder says where folder deletion lives instead of doing nothing.
+- **The undo bar names what it undoes, and does not linger.** It read "Organization updated."
+  whatever the change. It now says "Sessions moved.", "Folder renamed." and so on, withdraws
+  after 30 seconds, and is withdrawn when you delete a folder, since it would otherwise offer to
+  undo the change made before the deletion.
+- **Rows no longer jump under the pointer.** The selection count, the selection actions and the
+  undo bar now appear below the tree instead of above it, where each one pushed every row down
+  between two clicks. The "(No Folder)" drop target shows only while you drag, at the bottom, and
+  says what it is for: "Drop here to take it out of its folder". When nothing matches, one action
+  is offered, Clear search, and only when there is a search to clear.
+- **Status reads by shape as well as colour.** An open, opening or failed session shows a filled
+  dot, and the result of the background reachability check a ring of the same colour. The dots
+  also keep their state when the tree reloads after a move, an undo or a new folder, instead of
+  all turning grey until the next check.
+- **Long names end in an ellipsis** instead of running off the side of the pane, and the row
+  tooltip now opens with the full name. The tree no longer scrolls sideways, and a row takes
+  clicks and drops across the whole width of the tree.
+- **Counts read properly.** "1 / 1 sessions" and "Moved 1 sessions" are gone: each count has a
+  singular and a plural wording. Under a filter, a folder's count reads visible/total, such as
+  2/40, instead of the visible number alone, and the selection's Connect button says how many
+  sessions it will open.
+- **Screen readers hear the product's words.** The tree is named "Sessions". A session's state
+  and protocol are read as the rest of the product names them ("Connecting...", "Tool") instead
+  of internal names such as LaunchingSsh or TOOL:PING. The no-results message and the drag hint
+  are announced. Keyboard focus is a thin outline on the row rather than a frame around a whole
+  open folder, a selected row and a drop target have their own tints, distinct from hover, and
+  the expand arrow takes a click in a larger area.
+- **The empty detail pane gives one hint**, "Ctrl+K connects to a host or opens a tool.", where
+  it mentioned Ctrl+K twice, and the status bar's session count sits on the same line as its
+  neighbours.
+
+### Settings: Save is the rule, and the panel says when it is not
+
+- **Save is offered only when there is something to save.** It was always enabled, so a panel
+  with pending edits looked like one without. Ctrl+S follows the button. After a save, "Settings
+  saved" appears beside the buttons, and is announced, until the next edit. The buttons read
+  "Save settings", "Undo changes" and "Reset defaults".
+- **Each section says when its settings take effect.** A line under a card's title reads
+  "Applies immediately, kept on Save" (Appearance), "Applies to sessions opened after Save"
+  (Terminal), "Applies to connections opened after Save" (the SSH and RDP defaults, Connection
+  security included) or "Saved immediately, not by Save" (PIN, master password, trusted host
+  keys and trusted RDP certificates, which Undo changes cannot take back). The Git sync card says
+  that its access token is saved as soon as it is entered.
+- **Turning TFTP on waits for Save, and asks first.** Ticking "Enable TFTP sharing" wrote the
+  setting and restarted a running share on the spot, and Undo changes could not take it back: the
+  share went on serving files without a password. It is now saved like the rest: pressing Save
+  asks for a confirmation before turning it on, declining writes nothing, and a running share
+  restarts with the saved choice. Turning session transcripts on asks in the same way, and the
+  check box now warns that transcripts keep what you type, passwords echoed to the terminal
+  included.
+- **Reset defaults keeps your language, theme and security enrolment.** It switched the language
+  and the theme on the spot, and showed the master password, the PIN and Windows Hello as off
+  while they stayed on. They are now kept, with your sessions and SSH gateways, and the
+  confirmation names the security settings the reset does change. Nothing is written until you
+  save. Reset RDP defaults no longer resets the RDP connection watchdog, which lives on Advanced.
+- **Export and import your preferences.** A "Settings file" card on General exports the settings
+  the panel edits and imports them on another computer. The file never holds a secret: no master
+  password, PIN, access token, credential provider unlock secret or gateway. Paths inside your
+  user profile stay out unless you ask for them. An import lists what would change and asks, then
+  loads the values as pending edits: nothing is written until Save, and Undo changes puts
+  everything back.
+- **The settings search finds, shows and counts what it matches.** Case and accents are ignored,
+  hints shown only as a tooltip are searched, a match hidden by another setting is no longer
+  counted, a jump opens the tab and the collapsed section that hold the match, and the hint reads
+  "Result 2 of 5" with Enter and Shift+Enter to move. Ctrl+F on the Settings tab goes to the
+  settings search.
+- **A refused Save says which field, and how many.** "This setting must be a whole number" now
+  names the setting, a value out of range turns its box red as well, the box's tooltip gives the
+  reason, the banner counts the errors when there are several, and focus moves to the first
+  field in error, opening its tab.
+- **Resolution presets are checked instead of silently trimmed.** Typing in the presets box
+  removed each line it could not read yet, "1920x" included, and accepted 99999x1. Lines are now
+  checked when you leave the box: each must be WIDTHxHEIGHT within 200 to 7680 by 200 to 4320,
+  and a bad line is quoted in the error and blocks Save.
+- **Apply to all saved sessions keeps your other edits.** Applying the RDP or SSH mode to every
+  saved session reloaded the panel from disk and threw away the other pending edits, the chosen
+  default mode included. They now stay pending. The confirmation counts the sessions that will
+  change, and the SSH mode is written to SSH sessions only.
+- **Test connection for Git sync tests what you typed**, not the saved URL and branch, and says
+  why a test failed: network, token refused, no such repository or branch, or timeout.
+- **Tool paths say when nothing is there.** The Plink, PuTTY, external editor, Sysinternals,
+  NirSoft and NanaRun fields show "No file at this path." or "No folder at this path." as you
+  type, instead of failing at use. The terminal font is picked from the fonts installed on this
+  computer, and any name can still be typed.
+- **Four settings that only settings.json could change are on screen:** the SSH keep-alive
+  interval (SSH & SFTP > Session), importing the OpenSSH known_hosts file at startup (SSH & SFTP >
+  Host keys), how long Windows Hello may unlock before the master password is asked again, and the
+  credential provider command timeout (both on Security). Three settings that had no effect,
+  EnableEventLog, EnableSessionPersistence and EmbeddedIdleTimeoutMs, are retired; a
+  settings.json that still carries them loads and keeps them.
+- **A Save in Settings no longer erases a project written elsewhere.** The panel wrote back the
+  project list it had read when it opened, so a project added meanwhile, by moving sessions from
+  the tree for example, was lost at the next unrelated Save. Settings no longer writes projects.
+- **Actions that take effect at once no longer count as unsaved changes.** Turning the master
+  password on, or testing the credential provider, made Heimdall ask about unsaved settings that
+  Save could not act on.
+- **The unlock secret box shows what is saved.** It was empty after startup while a secret was
+  saved, and kept showing an abandoned one after Undo changes or Reset defaults.
+- **Things sit where you look for them.** Appearance is the first card on General and the welcome
+  tour the last. NLA and strict server authentication move to a Connection security card on RDP >
+  Certificates. Auto-lock and disconnect on lock stay visible while the master password is off,
+  greyed out with a line saying why. The two logging options say what they write: the
+  application diagnostics log, and session transcripts.
+- **Units and zero.** Each unit is shown once and translated, where "(ms)" labels sat above a box
+  followed by "ms", and the watchdog, resolution stabilization, anti-idle and auto-lock labels end
+  with "(0 = off)".
+- **Keyboard and screen readers.** Tab reaches a field before its Browse or Clear button, a Tab
+  pressed elsewhere on the Settings tab no longer jumps to the Plink row, and French and Spanish
+  labels are no longer cut off. Every input has a name, the tab error badges and the unsaved
+  changes dot are spoken, and status lines are announced.
+
 ### SSH: a second factor no longer receives your password
 
 - **Cancelling the verification-code dialog now says the connection was cancelled.** Pressing
