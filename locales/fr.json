@@ -16,7 +16,7 @@
   "TreeUxDropAfter": "Déplacer {0} session(s) après {1} dans {2}",
   "TreeUxDropMoveFolder": "Déplacer le dossier {0} dans {1}",
   "SshInteractivePromptTitle": "Authentification SSH",
-  "SshInteractivePromptMessage": "Serveur : {0}\nCompte : {1}\n\nLe serveur demande :\n{2}\n\nCette réponse est utilisée uniquement pour cette connexion et n'est pas enregistrée.",
+  "SshInteractivePromptMessage": "Le serveur {0} demande au compte {1} de répondre au texte cité ci-dessous. Ce texte a été écrit par le serveur, pas par Heimdall : Heimdall ne demande jamais son mot de passe maître ici.\n\nTexte envoyé par le serveur :\n\"{2}\"\n\nCette réponse est utilisée uniquement pour cette connexion et n'est pas enregistrée.",
   "RdpCopyAnonymous": "Copier le rapport anonymisé",
   "RdpCopyAnonymousHeader": "Rapport de diagnostic RDP (anonymisé)",
   "RdpCopyAnonymousHint": "Contient la date, la version et les codes RDP disponibles. Exclut les adresses, les comptes et le texte des erreurs.",

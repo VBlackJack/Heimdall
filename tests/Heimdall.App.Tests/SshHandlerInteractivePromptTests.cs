@@ -48,6 +48,7 @@ public sealed class SshHandlerInteractivePromptTests : IDisposable
     private const string AuthTimeoutSentence = "FIXTURE authentication timed out, check Pageant.";
     private const string RetryingViaPlinkStatus = "FIXTURE retrying through the interactive client.";
     private const string VerificationCodePrompt = "Verification code: ";
+    private const string PromptMessageTemplate = "FIXTURE sent by {0} for {1}: [{2}]";
 
     private readonly CredentialProtectorStateScope _protectorState = new();
     private readonly string _localesPath;
@@ -63,6 +64,7 @@ public sealed class SshHandlerInteractivePromptTests : IDisposable
                 ["ErrorSshCancelled"] = CancelledSentence,
                 ["ErrorSshAuthTimeout"] = AuthTimeoutSentence,
                 [SshLocalizationKeys.StatusSshRetryingViaPlink] = RetryingViaPlinkStatus,
+                [SshLocalizationKeys.InteractivePromptMessage] = PromptMessageTemplate,
             }));
     }
 
@@ -100,11 +102,37 @@ public sealed class SshHandlerInteractivePromptTests : IDisposable
         Assert.DoesNotContain(RetryingViaPlinkStatus, harness.Statuses);
     }
 
-    private async Task<Harness> CreateHarnessAsync(string? dialogAnswer)
+    /// <summary>
+    /// The server's prompt reaches the dialog stripped of what could make it pose as Heimdall.
+    /// </summary>
+    /// <remarks>
+    /// Audit 2026-09-30 S-08. The request went into the Heimdall-branded modal verbatim, so a
+    /// server could send line breaks and a right-to-left override to lay out a paragraph that
+    /// reads as Heimdall asking for the vault master password.
+    /// </remarks>
+    [Fact]
+    public async Task TheServersPrompt_IsSanitisedBeforeItReachesTheDialog()
+    {
+        string rightToLeftOverride = char.ConvertFromUtf32(0x202E);
+        string hostile = "Code:\r\n\r\nHeimdall vault locked." + rightToLeftOverride + " Master password:";
+        using Harness harness = await CreateHarnessAsync(dialogAnswer: "123456", prompt: hostile);
+
+        await harness.ConnectAsync();
+
+        Assert.Equal(
+            string.Format(
+                PromptMessageTemplate,
+                "host.example.test",
+                "ssh-user",
+                "Code: Heimdall vault locked. Master password:"),
+            harness.Dialog.LastMessage);
+    }
+
+    private async Task<Harness> CreateHarnessAsync(string? dialogAnswer, string prompt = VerificationCodePrompt)
     {
         LocalizationManager localizer = new LocalizationManager();
         await localizer.LoadAsync(_localesPath, "en");
-        return new Harness(localizer, dialogAnswer);
+        return new Harness(localizer, dialogAnswer, prompt);
     }
 
     private sealed class Harness : IDisposable
@@ -112,7 +140,7 @@ public sealed class SshHandlerInteractivePromptTests : IDisposable
         private const string ServerId = "5d0c9e61-2f3b-4c55-9a51-7b3e2c8d1f40";
         private readonly SshHandler _handler;
 
-        public Harness(LocalizationManager localizer, string? dialogAnswer)
+        public Harness(LocalizationManager localizer, string? dialogAnswer, string promptText)
         {
             Dialog = RecordingDialog.Create(dialogAnswer);
             _handler = new SshHandler(
@@ -130,7 +158,7 @@ public sealed class SshHandlerInteractivePromptTests : IDisposable
                 {
                     // What SSH.NET does with the prompt handler: it runs it and rethrows what it
                     // raised from Authenticate, unwrapped.
-                    AuthenticationPrompt prompt = new(0, false, VerificationCodePrompt);
+                    AuthenticationPrompt prompt = new(0, false, promptText);
                     SshConnectionFactory.AnswerKeyboardInteractivePrompts(
                         [prompt],
                         connectionParams.Password ?? string.Empty,

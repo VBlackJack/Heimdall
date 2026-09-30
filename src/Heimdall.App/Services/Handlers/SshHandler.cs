@@ -230,13 +230,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 // SSH.NET invokes this synchronous event on its own authentication worker.
                 // WPF marshals the dialog to the dispatcher; the UI thread never waits here.
                 promptLifetime.Token.ThrowIfCancellationRequested();
+
+                // The request is server text inside a Heimdall dialog: sanitised so it cannot
+                // lay itself out as Heimdall's own words, and framed by the message as sent by
+                // the named host.
                 return _dialogService.ShowPasswordInputAsync(
                     _localizer[SshLocalizationKeys.InteractivePromptTitle],
                     string.Format(
                         _localizer[SshLocalizationKeys.InteractivePromptMessage],
                         server.RemoteServer,
                         server.SshUsername,
-                        request),
+                        ServerPromptText.Sanitize(request)),
                     promptLifetime.Token).GetAwaiter().GetResult();
             }
         };
