@@ -181,6 +181,46 @@ public sealed class RdpUxAuditFixesTests
     }
 
     [Fact]
+    public void TheViewNamesItsMagicNumbersAndStopsCountingMenuItems()
+    {
+        string code = ViewSource.Code();
+
+        Assert.DoesNotContain("reason is 2308", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("reason is 0 or 1 or 2", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("const int StaticItemCount", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("const int totalSegments", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("TimeSpan.FromSeconds(1),", code, StringComparison.Ordinal);
+        Assert.Equal("ResMenuPresetsSeparator", (string?)ViewSource.NamedElement("ResMenuPresetsSeparator")
+            .Attribute(s_xaml + "Name"));
+    }
+
+    [Fact]
+    public void ThePhaseStepperSegmentCountMatchesTheMarkupAndThePolicy()
+    {
+        int segments = ViewSource.Markup().Descendants()
+            .Count(e => ((string?)e.Attribute(s_xaml + "Name"))?.StartsWith("PhaseSegment", StringComparison.Ordinal) == true);
+
+        Assert.Equal(RdpConnectionPhasePolicy.SegmentCount, segments);
+        Assert.Equal(
+            RdpConnectionPhasePolicy.SegmentCount,
+            RdpConnectionPhasePolicy.GetLitSegmentCount(RdpConnectionPhase.Connected));
+    }
+
+    [Theory]
+    [InlineData("en", "Esc")]
+    [InlineData("fr", "\u00c9chap")]
+    [InlineData("es", "Esc")]
+    public async Task ShortcutKeyNamesAreLocalized(string language, string escape)
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), language);
+
+        Assert.Equal(escape, localizer["RdpKeyNameEscape"]);
+        Assert.NotEqual("RdpSessionDurationFormat", localizer["RdpSessionDurationFormat"]);
+        Assert.NotEqual("RdpStabilizingTooltip", localizer["RdpStabilizingTooltip"]);
+    }
+
+    [Fact]
     public async Task TheFrenchDisconnectedMessageCarriesItsAccents()
     {
         LocalizationManager french = new();

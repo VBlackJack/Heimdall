@@ -18,6 +18,9 @@ namespace Heimdall.App.Views.EmbeddedRdp;
 
 internal static class RdpConnectionPhasePolicy
 {
+    /// <summary>Segments of the phase stepper: one per phase from Preparing to Connected.</summary>
+    public const int SegmentCount = 4;
+
     public static int GetLitSegmentCount(RdpConnectionPhase phase) => phase switch
     {
         RdpConnectionPhase.None => 0,

@@ -104,7 +104,8 @@ public sealed class EmbeddedRdpGatewayFailureTests
                 WpfTestHost.Localizer["RdpGatewayAttestationFailed"],
                 statusTextBlock.Text,
                 StringComparison.Ordinal);
-            Assert.Contains(exception.Message, statusTextBlock.Text, StringComparison.Ordinal);
+            Assert.DoesNotContain(exception.Message, statusTextBlock.Text, StringComparison.Ordinal);
+            Assert.Contains(exception.Message, Assert.IsType<string>(statusTextBlock.ToolTip), StringComparison.Ordinal);
             view.Dispose();
         });
     }

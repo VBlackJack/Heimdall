@@ -69,6 +69,22 @@ public partial class EmbeddedRdpView
     private static readonly TimeSpan TransientToastDuration = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan LetterboxHintDisplayDuration = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan LetterboxHintFadeDuration = TimeSpan.FromMilliseconds(600);
+    /// <summary>Size change, in pixels, below which a resize is churn rather than a user action.</summary>
+    private const double SignificantResizeDeltaPixels = 50;
+
+    // Disconnect reason codes the view reasons about (MsTscAx DisconnectReason values).
+    private const int DisconnectReasonNoInformation = 0;
+    private const int DisconnectReasonLocalUser = 1;
+    private const int DisconnectReasonRemoteUserLogoff = 2;
+    private const int DisconnectReasonSocketClosed = 2308;
+    private const int DisconnectReasonSocketConnectFailed = 516;
+    private const int DisconnectReasonConnectionTimeout = 264;
+    private const int DisconnectReasonNetworkError = 772;
+
+    private static readonly TimeSpan CountdownTickInterval = TimeSpan.FromSeconds(1);
+    private const string ShortcutKeySeparator = "+";
+    private const string HealthTooltipFormat = "{0} - {1}";
+    private const string HiddenRedirectionCountFormat = "+{0}";
     private const string EnterFullscreenGlyph = "\uE1D9";
     private const string ExitFullscreenGlyph = "\uE799";
     private const string RedirectionClipboardGlyph = "\uE16D";
@@ -448,42 +464,42 @@ public partial class EmbeddedRdpView
         _transientToastTimer = null;
     }
 
-    private static string FormatShortcutForDisplay(RdpShortcut shortcut)
+    private string FormatShortcutForDisplay(RdpShortcut shortcut)
     {
         var parts = new List<string>();
 
         if (shortcut.Modifiers.HasFlag(ModifierKeys.Control))
         {
-            parts.Add("Ctrl");
+            parts.Add(L("RdpKeyNameCtrl"));
         }
 
         if (shortcut.Modifiers.HasFlag(ModifierKeys.Alt))
         {
-            parts.Add("Alt");
+            parts.Add(L("RdpKeyNameAlt"));
         }
 
         if (shortcut.Modifiers.HasFlag(ModifierKeys.Shift))
         {
-            parts.Add("Shift");
+            parts.Add(L("RdpKeyNameShift"));
         }
 
         if (shortcut.Modifiers.HasFlag(ModifierKeys.Windows))
         {
-            parts.Add("Windows");
+            parts.Add(L("RdpKeyNameWindows"));
         }
 
         parts.Add(FormatKeyForDisplay(shortcut.Key));
-        return string.Join("+", parts);
+        return string.Join(ShortcutKeySeparator, parts);
     }
 
-    private static string FormatKeyForDisplay(Key key)
+    private string FormatKeyForDisplay(Key key)
     {
         return key switch
         {
-            Key.Escape => "Esc",
-            Key.Return => "Enter",
-            Key.Back => "Backspace",
-            Key.Space => "Space",
+            Key.Escape => L("RdpKeyNameEscape"),
+            Key.Return => L("RdpKeyNameEnter"),
+            Key.Back => L("RdpKeyNameBackspace"),
+            Key.Space => L("RdpKeyNameSpace"),
             _ => key.ToString()
         };
     }
@@ -1404,7 +1420,7 @@ public partial class EmbeddedRdpView
         // Only log significant size changes to avoid polluting logs
         double dw = Math.Abs(e.NewSize.Width - e.PreviousSize.Width);
         double dh = Math.Abs(e.NewSize.Height - e.PreviousSize.Height);
-        if (dw > 50 || dh > 50)
+        if (dw > SignificantResizeDeltaPixels || dh > SignificantResizeDeltaPixels)
         {
             Core.Logging.FileLogger.Info(
                 $"EmbeddedRDP SizeChanged: {e.PreviousSize.Width:0}x{e.PreviousSize.Height:0} -> {e.NewSize.Width:0}x{e.NewSize.Height:0}");
@@ -1665,7 +1681,7 @@ public partial class EmbeddedRdpView
             // Skip small resizes caused by tab hover, panel toggles, and scrollbar churn.
             int deltaW = Math.Abs(width - _lastAppliedWidth);
             int deltaH = Math.Abs(height - _lastAppliedHeight);
-            if (deltaW < 50 && deltaH < 50)
+            if (deltaW < SignificantResizeDeltaPixels && deltaH < SignificantResizeDeltaPixels)
             {
                 return;
             }
@@ -2954,7 +2970,6 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        const int totalSegments = 4;
         var phaseLabel = _localizer[statusKey];
         AutomationProperties.SetName(
             ConnectionPhaseStepper,
@@ -2962,7 +2977,7 @@ public partial class EmbeddedRdpView
                 "A11yRdpPhaseAnnouncementFormat",
                 phaseLabel,
                 litSegments,
-                totalSegments));
+                RdpConnectionPhasePolicy.SegmentCount));
         _ = RdpLiveRegion.Announce(ConnectionPhaseStepper);
     }
 
@@ -3008,7 +3023,7 @@ public partial class EmbeddedRdpView
         var endpoint = _server is null ? string.Empty : BuildEndpointText(_server);
         HealthDot.ToolTip = string.IsNullOrWhiteSpace(endpoint)
             ? label
-            : string.Format(CultureInfo.CurrentCulture, "{0} - {1}", label, endpoint);
+            : string.Format(CultureInfo.CurrentCulture, HealthTooltipFormat, label, endpoint);
     }
 
     private static string ResolveHealthDotBrushKey(RdpHealthDotState state) => state switch
@@ -3172,7 +3187,7 @@ public partial class EmbeddedRdpView
         {
             RedirExpandBadge.Content = string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
-                "+{0}",
+                HiddenRedirectionCountFormat,
                 disabledCount);
             RedirExpandBadge.Visibility = Visibility.Visible;
         }
@@ -3988,7 +4003,10 @@ public partial class EmbeddedRdpView
     /// gateway-to-target reachability failure can plausibly explain.
     /// </summary>
     internal static bool IsTunnelAttributableDisconnect(int reason)
-        => reason is 2308 or 516 or 264 or 772;
+        => reason is DisconnectReasonSocketClosed
+            or DisconnectReasonSocketConnectFailed
+            or DisconnectReasonConnectionTimeout
+            or DisconnectReasonNetworkError;
 
     private void ClearPaneDiagnostic()
     {
@@ -4092,16 +4110,15 @@ public partial class EmbeddedRdpView
     /// <summary>
     /// Populates the resolution context menu from AppSettings.RdpResolutionPresets,
     /// with a built-in fallback when the setting is missing or empty.
-    /// Items 0-5 are static (mode header, separator, skip-stab, skip-stab-sep, fit, separator);
-    /// presets are appended starting at index 6.
+    /// Everything up to and including ResMenuPresetsSeparator is static; presets follow it.
     /// </summary>
     private void PopulateResolutionMenu()
     {
-        const int StaticItemCount = 6;
+        int staticItemCount = ResolutionMenu.Items.IndexOf(ResMenuPresetsSeparator) + 1;
 
-        while (ResolutionMenu.Items.Count > StaticItemCount)
+        while (ResolutionMenu.Items.Count > staticItemCount)
         {
-            ResolutionMenu.Items.RemoveAt(StaticItemCount);
+            ResolutionMenu.Items.RemoveAt(staticItemCount);
         }
 
         foreach (var preset in ResolutionPresetCatalog.GetPresets(_settings))
@@ -4315,7 +4332,7 @@ public partial class EmbeddedRdpView
 
         _stabilizationDeadlineUtc = DateTime.UtcNow + delay;
         _stabilizationTimer = new DispatcherTimer(
-            TimeSpan.FromSeconds(1),
+            CountdownTickInterval,
             DispatcherPriority.Background,
             OnStabilizationTimerTick,
             Dispatcher);
@@ -4382,7 +4399,7 @@ public partial class EmbeddedRdpView
         {
             _reconnectStartUtc = DateTime.UtcNow;
             _reconnectElapsedTimer = new DispatcherTimer(
-                TimeSpan.FromSeconds(1),
+                CountdownTickInterval,
                 DispatcherPriority.Background,
                 OnReconnectElapsedTick,
                 Dispatcher);
@@ -4940,7 +4957,7 @@ public partial class EmbeddedRdpView
             : string.Format(CultureInfo.InvariantCulture, "{0} v{1}", appName, version);
     }
 
-    private static string FormatSessionDuration(TimeSpan duration)
+    private string FormatSessionDuration(TimeSpan duration)
     {
         if (duration < TimeSpan.Zero)
         {
@@ -4949,7 +4966,7 @@ public partial class EmbeddedRdpView
 
         return string.Format(
             CultureInfo.InvariantCulture,
-            "{0}m {1:00}s",
+            L("RdpSessionDurationFormat"),
             (int)duration.TotalMinutes,
             duration.Seconds);
     }
@@ -5474,7 +5491,10 @@ public partial class EmbeddedRdpView
     /// Suppresses the reconnect overlay for explicit user disconnects and clean-exit COM codes.
     /// </summary>
     internal static bool ShouldSuppressReconnectOverlay(bool userInitiated, int reason)
-        => userInitiated || reason is 0 or 1 or 2;
+        => userInitiated
+            || reason is DisconnectReasonNoInformation
+                or DisconnectReasonLocalUser
+                or DisconnectReasonRemoteUserLogoff;
 
     internal static bool ShouldHandleStateChange(
         string serverId,

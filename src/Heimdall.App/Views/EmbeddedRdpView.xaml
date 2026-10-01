@@ -228,11 +228,10 @@
                                       Header="{loc:Translate RdpResolutionFitToWindow}"
                                       Click="OnResolutionMenuClick"
                                       Tag="Fit"/>
-                            <Separator/>
+                            <Separator x:Name="ResMenuPresetsSeparator"/>
                             <!-- Preset items populated dynamically by PopulateResolutionMenu()
                                  from AppSettings.RdpResolutionPresets, with a built-in fallback.
-                                 Items 0-5 are static (mode header + separator + skip-stab + skip-stab-sep
-                                 + fit + separator); presets are appended at index 6+. -->
+                                 Everything after ResMenuPresetsSeparator is a preset. -->
                         </ContextMenu>
                     </Button.ContextMenu>
                 </Button>
@@ -312,6 +311,7 @@
                          once a second, and a polite live region firing every second is a flood
                          rather than an announcement. The status line beside them carries the state. -->
                     <TextBlock x:Name="StabilizingStatusText"
+                               ToolTip="{loc:Translate RdpStabilizingTooltip}"
                                FontSize="{StaticResource FontSizeCaption}"
                                FontStyle="Italic"
                                Foreground="{DynamicResource TextSecondaryBrush}"
