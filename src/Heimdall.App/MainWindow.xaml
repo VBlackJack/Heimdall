@@ -2853,7 +2853,7 @@
                                         </StackPanel>
                                         <StackPanel Margin="0,12,0,0">
                                             <TextBlock x:Name="Mw_SettingsPsPolicyLabel" Text="{loc:Translate SettingsPsExecutionPolicy}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                            <ComboBox SelectedValue="{Binding Settings.PowerShellExecutionPolicy}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left"
+                                            <ComboBox x:Name="Mw_SettingsPsExecutionPolicy" SelectedValue="{Binding Settings.PowerShellExecutionPolicy}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left"
                                                       AutomationProperties.LabeledBy="{x:Reference Mw_SettingsPsPolicyLabel}"
                                                       AutomationProperties.HelpText="{loc:Translate SettingsPsExecutionPolicyHint}">
                                                 <ComboBoxItem x:Name="Mw_PsDefault" Content="{loc:Translate PsPolicyDefault}" Tag="Default"/>
@@ -3905,6 +3905,57 @@
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                <!-- Security posture: the security-relevant choices of the whole panel, one
+                                     line each, as they stand now including unsaved edits. Which state is
+                                     risky is decided in SecurityPosture, not here. One row per line rather
+                                     than an items template, so each line's accessible name reaches the
+                                     automation tree. -->
+                                <Border x:Name="Mw_SettingsSecurityPostureCard" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsSecurityPostureTitle" Text="{loc:Translate SecurityPostureTitle}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock Text="{loc:Translate SecurityPostureDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="{x:Type TextBlock}">
+                                                        <Setter Property="Text" Value="&#xE73E;"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Settings.HasSecurityPostureRisk}" Value="True">
+                                                                <Setter Property="Text" Value="&#xE7BA;"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <!-- Polite, and raised through the live-region helper: the count
+                                                 changes as a box is ticked elsewhere on the panel, and a
+                                                 screen reader user is told without moving. -->
+                                            <TextBlock x:Name="Mw_SettingsSecurityPostureSummary"
+                                                       Text="{Binding Settings.SecurityPostureSummary, NotifyOnTargetUpdated=True}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap"
+                                                       VerticalAlignment="Center"
+                                                       AutomationProperties.LiveSetting="Polite"
+                                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                                        </StackPanel>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[RdpNla]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[RdpStrictServerAuthentication]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[TftpSharing]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[SessionTranscripts]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[PowerShellExecutionPolicy]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[Vault]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[AutoLock]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[DisconnectOnLock]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[CredentialGuard]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[WindowsHelloOnConnect]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[UpdateChecks]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[KnownHostsSync]}"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsPinTitle" Text="{loc:Translate SettingsSectionPin}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>

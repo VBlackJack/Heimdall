@@ -1360,13 +1360,16 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SyncNumericTexts();
         IsDirty = false;
 
-        // The markers are worded, so they follow the interface language.
+        // The markers and the posture card are worded, so they follow the interface language.
         _localizer.LocaleChanged += OnPanelLocaleChanged;
+        _savedPosture = PendingPostureInputs();
+        RefreshSecurityPosture();
     }
 
     private void OnPanelLocaleChanged(string locale)
     {
         RefreshAllDefaultMarkers();
+        RefreshSecurityPosture();
     }
 
     /// <summary>
@@ -1856,6 +1859,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // command owns the failure, and the panel is not on screen when settings load.
         TrustedRdpCertificates.RefreshCommand.Execute(null);
         IsDirty = false;
+        ReloadSavedPosture();
         SettingsLoaded?.Invoke();
     }
 
@@ -2234,6 +2238,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         bool tftpChanged = FileShareEnableTftp != _savedFileShareEnableTftp;
         _savedFileShareEnableTftp = FileShareEnableTftp;
         _savedSessionLoggingEnabled = SessionLoggingEnabled;
+        CaptureSavedPostureFromPanel();
 
         // The saved language is already on screen - it was applied when it was picked. What
         // saving adds is that it becomes the language a later discard has to come back to.
@@ -3836,6 +3841,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         {
             IsDirty = true;
             RefreshDefaultMarker(e.PropertyName);
+        }
+
+        if (e.PropertyName is not null && SecurityPosturePropertyNames.Contains(e.PropertyName))
+        {
+            RefreshSecurityPosture();
         }
     }
 
