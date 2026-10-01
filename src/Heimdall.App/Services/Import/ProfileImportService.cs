@@ -115,8 +115,8 @@ public sealed class ProfileImportService(
         }
 
         var result = await _rdpImportService.ApplyAsync(preview, selection, ct);
-        var summary = _localizer.Format(
-            "StatusImportRdpSummary",
+        var summary = ImportSummaryText.RdpFiles(
+            _localizer,
             result.ImportedCount,
             result.ReplacedCount,
             result.RenamedCount,
@@ -185,8 +185,8 @@ public sealed class ProfileImportService(
         }
 
         var result = await ApplyJsonSelectionAsync(preview, selection, importDocument.Gateways, ct);
-        var summary = _localizer.Format(
-            "StatusImportProfileSummary",
+        var summary = ImportSummaryText.Profiles(
+            _localizer,
             result.ImportedCount,
             result.ReplacedCount,
             result.RenamedCount,
@@ -455,8 +455,8 @@ public sealed class ProfileImportService(
         List<string> lines =
         [
             profileSummary,
-            _localizer.Format(
-                "StatusImportProfileGatewaySummary",
+            ImportSummaryText.Gateways(
+                _localizer,
                 result.GatewayCreatedCount,
                 result.GatewayMergedCount,
                 result.GatewayOrphanCount)

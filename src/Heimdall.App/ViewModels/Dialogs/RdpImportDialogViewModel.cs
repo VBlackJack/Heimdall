@@ -46,7 +46,9 @@ public partial class RdpImportDialogViewModel : ObservableObject
         Preview = preview;
 
         DialogTitle = _localizer[_textOptions.TitleKey];
-        SubtitleText = _localizer.Format(_textOptions.SubtitleKey, preview.Entries.Count);
+        SubtitleText = _localizer.Format(
+            _localizer.SelectCountKey(preview.Entries.Count, _textOptions.SubtitleOneKey, _textOptions.SubtitleKey),
+            preview.Entries.Count);
         FileIssuesText = BuildFileIssuesText(preview);
         SelectAllText = _localizer["DialogImportRdpSelectAll"];
         SelectNoneText = _localizer["DialogImportRdpSelectNone"];
@@ -131,18 +133,34 @@ public partial class RdpImportDialogViewModel : ObservableObject
 
     public bool CanConfirm => Rows.Any(row => row.IsSelected);
 
-    public string SummaryText => _textOptions.IncludePasswordWarningsInSummary
-        ? _localizer.Format(
-            _textOptions.SummaryKey,
-            TotalSelectedCount,
-            Rows.Count,
-            Rows.Count(row => row.HasNameConflict),
-            Rows.Count(row => row.HasPasswordBlob))
-        : _localizer.Format(
-            _textOptions.SummaryKey,
-            TotalSelectedCount,
-            Rows.Count,
-            Rows.Count(row => row.HasNameConflict));
+    public string SummaryText
+    {
+        get
+        {
+            int selected = TotalSelectedCount;
+            int conflicts = Rows.Count(row => row.HasNameConflict);
+            string selectedText = _localizer.Format(
+                _localizer.SelectCountKey(selected, _textOptions.SelectedOneKey, _textOptions.SelectedKey),
+                selected,
+                Rows.Count);
+            string conflictsText = _localizer.FormatCount(conflicts, "ImportCountConflictsOne", "ImportCountConflicts", conflicts);
+            if (!_textOptions.IncludePasswordWarningsInSummary)
+            {
+                return _localizer.Format(_textOptions.SummaryKey, selectedText, conflictsText);
+            }
+
+            int passwordWarnings = Rows.Count(row => row.HasPasswordBlob);
+            return _localizer.Format(
+                _textOptions.SummaryKey,
+                selectedText,
+                conflictsText,
+                _localizer.FormatCount(
+                    passwordWarnings,
+                    "ImportCountPasswordWarningsOne",
+                    "ImportCountPasswordWarnings",
+                    passwordWarnings));
+        }
+    }
 
     public RdpImportSelection? Result { get; private set; }
 
@@ -437,8 +455,11 @@ public sealed record RdpImportDialogTextOptions
     {
         TitleKey = "DialogImportProfileTitle",
         SubtitleKey = "DialogImportProfileSubtitle",
+        SubtitleOneKey = "DialogImportProfileSubtitleOne",
         ConfirmKey = "DialogImportProfileBtnImportSelected",
         SummaryKey = "DialogImportProfileSummary",
+        SelectedKey = "DialogImportProfileCountSelected",
+        SelectedOneKey = "DialogImportProfileCountSelectedOne",
         IncludePasswordWarningsInSummary = false
     };
 
@@ -446,9 +467,19 @@ public sealed record RdpImportDialogTextOptions
 
     public string SubtitleKey { get; init; } = "DialogImportRdpSubtitle";
 
+    /// <summary>The subtitle when the item count takes the singular.</summary>
+    public string SubtitleOneKey { get; init; } = "DialogImportRdpSubtitleOne";
+
     public string ConfirmKey { get; init; } = "DialogImportRdpBtnImportSelected";
 
+    /// <summary>The summary sentence; its placeholders receive counted fragments.</summary>
     public string SummaryKey { get; init; } = "DialogImportRdpSummary";
+
+    /// <summary>The selected-out-of-total fragment of the summary, counted by the selected items.</summary>
+    public string SelectedKey { get; init; } = "DialogImportRdpCountSelected";
+
+    /// <summary>The selected-out-of-total fragment when the selected count takes the singular.</summary>
+    public string SelectedOneKey { get; init; } = "DialogImportRdpCountSelectedOne";
 
     public bool IncludePasswordWarningsInSummary { get; init; } = true;
 }

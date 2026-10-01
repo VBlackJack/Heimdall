@@ -246,8 +246,8 @@ public partial class ImportKnownHostsDialogViewModel(
             _syncingSelection = false;
         }
 
-        SummaryText = _localizer.Format(
-            "SummaryKnownHostsItems",
+        SummaryText = ImportSummaryText.KnownHostsPreview(
+            _localizer,
             Items.Count,
             Items.Count(item => item.Status == KnownHostsCandidateStatus.New),
             Items.Count(item => item.Status == KnownHostsCandidateStatus.Existing),

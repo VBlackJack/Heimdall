@@ -66,7 +66,7 @@ public sealed class MigrationPresentationPolicyTests
 
         Assert.Equal(MigrationPresentationKind.Warning, presentation.Kind);
         Assert.Contains(
-            localizer.Format("MigrationPartialSummary", 2, 1, 1),
+            "Migration completed with skipped profiles: 2 examined, 1 imported, 1 skipped.",
             presentation.Message,
             StringComparison.Ordinal);
         Assert.Contains("Rejected profile", presentation.Message, StringComparison.Ordinal);

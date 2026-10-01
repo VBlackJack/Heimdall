@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using Heimdall.App.Services.Import;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
@@ -79,6 +80,15 @@ public sealed class ImportPuttySessionsDialogViewModel(
         var subject = string.IsNullOrWhiteSpace(diagnostic.SessionName)
             ? Localizer["LabelImportPuttyUnknownSession"]
             : diagnostic.SessionName;
+        if (diagnostic.Code == PuttyDiagnosticCode.PortForwardingsCapturedButNotMapped
+            && int.TryParse(diagnostic.Context, NumberStyles.None, CultureInfo.InvariantCulture, out int tunnels))
+        {
+            key = Localizer.SelectCountKey(
+                tunnels,
+                "DiagPuttyPortForwardingsCapturedButNotMappedOne",
+                "DiagPuttyPortForwardingsCapturedButNotMapped");
+        }
+
         var messageBody = key is null
             ? diagnostic.Code.ToString()
             : Localizer.Format(key, subject, diagnostic.Context ?? string.Empty);
