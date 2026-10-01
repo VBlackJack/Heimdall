@@ -405,6 +405,51 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.Equal((EmbeddedSftpViewModel.SftpDownloadOutcome)expected, actual);
     }
 
+    /// <summary>
+    /// The files and the folders are counted apart, each worded by its own number, with or
+    /// without a localizer.
+    /// </summary>
+    [Theory]
+    [InlineData(null, 1, "Downloaded 1 file; skipped 1 folder (folders aren't supported).")]
+    [InlineData(null, 2, "Downloaded 2 files; skipped 1 folder (folders aren't supported).")]
+    [InlineData("en", 1, "Downloaded 1 file; skipped 1 folder (folders aren't supported).")]
+    [InlineData("fr", 1, "1 fichier téléchargé ; 1 dossier ignoré (les dossiers ne sont pas pris en charge).")]
+    [InlineData("fr", 2, "2 fichiers téléchargés ; 1 dossier ignoré (les dossiers ne sont pas pris en charge).")]
+    [InlineData("es", 2, "Se descargaron 2 archivos; se omitió 1 carpeta (las carpetas no son compatibles).")]
+    public async Task DownloadFilesAsync_FilesAndFolders_WordsBothCountsByTheirNumber(
+        string? locale,
+        int files,
+        string expected)
+    {
+        FakeUiDispatcher dispatcher = new();
+        EmbeddedSftpViewModel viewModel = new(dispatcher);
+        FakeRemoteBrowser browser = new();
+        SetBrowser(viewModel, browser);
+        if (locale is not null)
+        {
+            SetLocalizer(viewModel, await CreateLocalizerAsync(locale));
+        }
+
+        string target = Path.Combine(Path.GetTempPath(), "heimdall-count-wording-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(target);
+        try
+        {
+            List<SftpFileInfo> entries = Enumerable.Range(0, files)
+                .Select(i => CreateRemoteEntry($"f{i}.txt", $"/srv/f{i}.txt", isDirectory: false))
+                .ToList();
+            entries.Add(CreateRemoteEntry("logs", "/srv/logs", isDirectory: true));
+
+            await viewModel.DownloadFilesAsync(entries, target);
+
+            Assert.Equal(files, browser.DownloadCallCount);
+            Assert.Equal(expected, viewModel.StatusText);
+        }
+        finally
+        {
+            Directory.Delete(target, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task DownloadFilesAsync_DirectoryOnlySelection_DoesNotDownloadAndReportsSkippedFolders()
     {
@@ -902,11 +947,14 @@ public sealed class EmbeddedSftpViewModelTests
     /// A failure part way used to abandon the batch without a refresh, so the entries already
     /// changed were shown with their old mode. Delete got the per-entry treatment; chmod did not.
     /// </remarks>
-    [Fact]
-    public async Task ChmodEntriesAsync_OneEntryFails_ContinuesRefreshesAndSummarises()
+    [Theory]
+    [InlineData("en", "Permissions could not be changed on 1 item out of 3.")]
+    [InlineData("fr", "Permissions non modifiées pour 1 élément sur 3.")]
+    [InlineData("es", "No se pudieron cambiar los permisos de 1 elemento de 3.")]
+    public async Task ChmodEntriesAsync_OneEntryFails_ContinuesRefreshesAndSummarises(string locale, string expected)
     {
         FakeUiDispatcher dispatcher = new();
-        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        LocalizationManager localizer = await CreateLocalizerAsync(locale);
         EmbeddedSftpViewModel viewModel = new(dispatcher);
         FakeRemoteBrowser browser = new()
         {
@@ -927,7 +975,7 @@ public sealed class EmbeddedSftpViewModelTests
 
         Assert.Equal(3, browser.ChmodCallCount);
         Assert.Equal(1, browser.ListDirectoryCallCount);
-        Assert.Equal(localizer.Format("SftpChmodPartialSummary", 1, 3), viewModel.StatusText);
+        Assert.Equal(expected, viewModel.StatusText);
         Assert.False(viewModel.IsErrorStatus);
     }
 
@@ -1335,9 +1383,7 @@ public sealed class EmbeddedSftpViewModelTests
 
         Assert.Equal(["/srv/first", "/srv/second"], browser.DeleteCalls);
         Assert.Equal(0, browser.ListDirectoryCallCount);
-        Assert.Equal(
-            localizer.Format("SftpDeletePartialSummary", 2, 2),
-            viewModel.StatusText);
+        Assert.Equal("2 items out of 2 could not be deleted.", viewModel.StatusText);
         Assert.True(viewModel.IsErrorStatus);
     }
 
@@ -2330,6 +2376,9 @@ public sealed class EmbeddedSftpViewModelTests
             Interlocked.Increment(ref _downloadCallCount);
             return Task.CompletedTask;
         }
+
+        public Task DownloadFileAsync(string remotePath, string localPath, bool overwrite, CancellationToken ct = default)
+            => DownloadFileAsync(remotePath, localPath, ct);
 
         public Task UploadFileAsync(string localPath, string remotePath, bool overwrite, CancellationToken ct = default)
             => UploadFileAsync(localPath, remotePath, ct);

@@ -2,9 +2,5 @@
 # This list may only SHRINK: see LocaleCountWordingGuardTests. Fixing a key (an "X" / "XOne"
 # pair formatted with LocalizationManager.FormatCount) or deleting it means deleting its line.
 CloseGuardBatchBlockedMessage
-SftpChmodPartialSummary
-SftpDeletePartialSummary
-SftpErrorUploadFailedAfter
-SftpStatusDownloadCompleteWithSkipped
 StatusBulkPasswordUpdatedWithWinRmSkipped
 WarningSnapshotRestorePartial

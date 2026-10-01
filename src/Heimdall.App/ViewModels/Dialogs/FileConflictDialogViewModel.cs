@@ -61,7 +61,10 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
                 "DialogFileConflictSummaryOne",
                 "DialogFileConflictSummary",
                 conflicts.Count)
-            ?? $"{conflicts.Count} conflict(s)";
+            ?? PluralRules.SelectEnglish(
+                conflicts.Count,
+                $"{conflicts.Count} conflicting destination",
+                $"{conflicts.Count} conflicting destinations");
         ApplyToAllText = L("DialogFileConflictApplyAll");
         ApplyAllSkipText = L("DialogFileConflictActionSkip");
         ApplyAllReplaceText = L("DialogFileConflictActionReplace");

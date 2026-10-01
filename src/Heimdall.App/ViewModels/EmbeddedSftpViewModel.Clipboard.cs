@@ -18,6 +18,7 @@ using System.IO;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
+using Heimdall.Core.Localization;
 using Heimdall.Sftp;
 
 namespace Heimdall.App.ViewModels;
@@ -79,8 +80,12 @@ public sealed partial class EmbeddedSftpViewModel
         (string oneKey, string otherKey) = mode == SftpClipboardMode.Cut
             ? ("SftpStatusCutOne", "SftpStatusCut")
             : ("SftpStatusCopiedOne", "SftpStatusCopied");
+        string verb = mode == SftpClipboardMode.Cut ? "cut" : "copied";
         UpdateStatus(_localizer?.FormatCount(selection.Count, oneKey, otherKey, selection.Count.ToString())
-            ?? $"{selection.Count} item(s)");
+            ?? PluralRules.SelectEnglish(
+                selection.Count,
+                $"{selection.Count} item {verb}",
+                $"{selection.Count} items {verb}"));
     }
 
     /// <summary>

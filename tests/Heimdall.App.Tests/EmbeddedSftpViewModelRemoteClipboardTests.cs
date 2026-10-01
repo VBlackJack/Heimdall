@@ -25,6 +25,29 @@ namespace Heimdall.App.Tests;
 
 public sealed class EmbeddedSftpViewModelRemoteClipboardTests
 {
+    /// <summary>Without a localizer the status is an English fallback, worded by its number too.</summary>
+    [Theory]
+    [InlineData(false, 1, "1 item copied")]
+    [InlineData(false, 2, "2 items copied")]
+    [InlineData(true, 1, "1 item cut")]
+    [InlineData(true, 2, "2 items cut")]
+    public void CopyOrCutSelected_WithoutALocalizer_WordsTheCountByItsNumber(bool cut, int count, string expected)
+    {
+        EmbeddedSftpViewModel pane = new(new FakeUiDispatcher(), new RemoteClipboardService())
+        {
+            CurrentPath = "/src",
+            IsConnected = true
+        };
+        SftpFileInfo[] entries = Enumerable.Range(0, count)
+            .Select(i => CreateEntry($"f{i}.txt", $"/src/f{i}.txt", isDirectory: false))
+            .ToArray();
+        pane.SetSelection(entries, entries[0]);
+
+        (cut ? pane.CutSelectedCommand : pane.CopySelectedCommand).Execute(null);
+
+        Assert.Equal(expected, pane.StatusText);
+    }
+
     [Fact]
     public void PasteCommand_SameEndpointConnectedAndNonEmpty_ReturnsTrue()
     {
