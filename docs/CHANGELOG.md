@@ -6704,7 +6704,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 - Structurally blacklisted secrets (`password`, `token`, `secret`, etc.) from
   any auto-prefill path.
 
-## [Unreleased] - 2026-04-14
+## 2026-04-20: session tree moves, sidebar favorites and the MainWindow split (v2026.042001)
 
 ### UX - session-tree move-to-group parity + sidebar favorites
 
@@ -6932,14 +6932,14 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ---
 
-## [Unreleased] - 2026-04-02
+## 2026-04-02: Delete typed in a terminal no longer deletes a session (v2026.040204)
 
 ### Terminal keyboard fix - Delete key no longer triggers server deletion
 
 - **Root cause**: WebView2 SDK routes keys via `AcceleratorKeyPressed` → synthetic WPF `KeyDown`, but `Keyboard.FocusedElement` stays stale on the TreeView. The previous fallback (`FindAncestor<TreeView>` exclusion) was self-defeating in the most common scenario (user clicks TreeView then terminal).
 - **Fix**: Check `e.OriginalSource is WebView2` in the `OnKeyDown` handler - the SDK always sets `OriginalSource` to the WebView2 control for terminal-originated keys. Removed the unreliable `ActiveSession.ConnectionType` + `TreeView` exclusion fallback.
 
-## [Unreleased] - 2026-04-01
+## 2026-04-01: Command Library layout, feedback and search speed (v2026.040102)
 
 ### Command Library UX audit - layout, responsiveness, feedback, performance
 
@@ -7132,7 +7132,7 @@ Baseline after the roadmap: **4,448 passing + 6 skipped** (`4,454` discovered), 
 
 ---
 
-## [Unreleased] - 2026-03-28
+## 2026-03-29: security, i18n and accessibility audit of the tools (v2026.032903)
 
 ### Comprehensive audit - security, i18n, accessibility, and robustness across 49 files
 
