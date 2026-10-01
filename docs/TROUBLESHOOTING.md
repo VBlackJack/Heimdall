@@ -65,6 +65,16 @@ Index of all issues encountered during development and their solutions.
 48. [KeePassXC Credential Provider - Common Gotchas](#keepassxc-credential-provider)
 49. [RDP Embedded - Session Cut Off Shortly After Connecting](#rdp-slow-server-cutoff)
 50. [Scheduled Task - Ran But Connected Nothing](#scheduled-task-connected-nothing)
+51. [SSH - Server Asks an Interactive Question This Client Cannot Answer](#ssh-keyboard-interactive-unsupported-prompt)
+52. [Tunnel - Plink Fallback Refused for a SOCKS Proxy or Reverse Forward](#tunnel-plink-fallback-forwarding-unsupported)
+53. [Update - The Banner Says the Update Did Not Apply](#update-did-not-apply)
+54. [SSH Terminal (Plink) - Long Lines Wrap at Column 80 or Overwrite the Prompt](#ssh-plink-terminal-width)
+55. [WinRM - The Session Ends as Soon as It Opens](#winrm-session-ends-at-sign-in)
+56. [WinRM - The Execution Policy Refused the Sign-in Script](#winrm-execution-policy-refused)
+57. [SSH - A Host That Does Not Answer Fails After 15 Seconds](#ssh-unresponsive-host-timeout)
+58. [FTP/SFTP - Uploading a New File Is Refused](#upload-new-file-refused)
+59. [Settings - Save Is Greyed Out, or Refuses to Save](#settings-save-greyed-or-refused)
+60. [Settings - An Imported Settings File Is Refused or Changes Nothing](#settings-import-refused)
 
 ---
 
@@ -638,7 +648,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ## 33. Ephemeral Server - Port 69 Access Denied {#tftp-port-access-denied}
 
-Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Advanced > File sharing. TFTP is opt-in since Phase 3.7 and the share runs HTTP-only by default.
+Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Security > File sharing, and that the change was saved: ticking the box does nothing until Save settings is pressed and its confirmation accepted. TFTP is opt-in since Phase 3.7 and the share runs HTTP-only by default.
 
 **Symptom**: TFTP server fails to start with "access denied" on port 69.
 
@@ -936,12 +946,13 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 **Symptom**: Connecting with a password fails with a message saying the server asked an interactive question this client cannot answer, naming the question (for example `Verification code:`).
 
-**Root cause**: The server authenticates through keyboard-interactive and asks for a second factor after the password. Heimdall answers a round that asks a single question with the stored password whatever that question is, and in a round that asks several it answers only the prompts that read as a password request, leaving the rest empty and recorded; the refusal that follows an unanswered prompt is reported as that unanswered question (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) rather than as a rejected password. A server whose only question is the second factor therefore receives the stored password as its answer. Before this classification existed the same refusal was blamed on the password.
+**Root cause**: The server authenticates through keyboard-interactive and asks for a second factor, on a connection that cannot ask you: the file browser, gateways and the route test have no dialog for it (the embedded SSH terminal does, and asks you instead). On those paths Heimdall answers a round that asks a single question with the stored password unless that question names a one-time code (one-time, OTP, verification code, token, passcode, and their French, German and Spanish forms), and in a round that asks several it answers only the prompts that read as a password request. Once the server has accepted the `password` method as a first factor, the password is not offered again. Everything else is left empty and recorded; the refusal that follows an unanswered prompt is reported as that unanswered question (`SshFailureCode.KeyboardInteractiveUnsupportedPrompt`) rather than as a rejected password. Before the 2026-09-30 audit, a server whose only question was the second factor received the stored password as its answer, which spent one of the code's attempts; before this classification existed, the same refusal was blamed on the password.
 
 **Solution**:
 
-1. Use a client that supports the server's second factor for that host, or authenticate with a key the server accepts without a challenge.
-2. If the server is yours, exempt the client's source or account from the second factor, or enable public key authentication.
+1. Open the session in the SSH terminal, which asks you the question in a dialog.
+2. For the file browser or a gateway, authenticate with a key the server accepts without a challenge.
+3. If the server is yours, exempt the client's source or account from the second factor, or enable public key authentication.
 
 **Key lesson**: A password refusal reported after a keyboard-interactive round must be read together with what the round asked; the classifier does that from `SshConnectionParams.KeyboardInteractive`.
 
@@ -984,7 +995,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 **Symptom**: On a session that runs through the Plink fallback (agent forwarding enabled on the profile with Pageant running, or the retry after a refused sign-in), bash wraps at column 80 although the terminal is wider, and a long command line overwrites its own beginning.
 
-**Root cause**: Windows plink takes the remote PTY size only from its configuration (`TermWidth`/`TermHeight`), never from a console, and never sends a window change. Heimdall carries the initial size in a temporary PuTTY saved session (`HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-<random>`) passed with `-load`. When the registry refuses that session, the launch falls back to 80x24 and a warning `[PlinkSizeSession] Could not create the Plink size session` is written to the log. The launch also waits for the terminal page's first size report, at most `PlinkInitialSizeWaitMs` (default 3000 ms); when the page is slower, it falls back to 80x24 and logs `SSH opening the PTY for <profile> at the default 80x24: <reason>`.
+**Root cause**: Windows plink takes the remote PTY size only from its configuration (`TermWidth`/`TermHeight`), never from a console, and never sends a window change. Heimdall carries the initial size in a temporary PuTTY saved session (`HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-p<pid>-t<start time>-<guid>`) passed with `-load`. The name records the process that created it: when Heimdall starts it removes only the size sessions whose process has gone (same id and same start time), and those left by versions before the 2026-09-30 audit, which record no owner. Before that change, starting another copy of Heimdall (a portable one beside an installed one, for example) deleted a session the first copy had just created, before its plink had read it, and that launch opened at 80x24. When the registry refuses that session, the launch falls back to 80x24 and a warning `[PlinkSizeSession] Could not create the Plink size session` is written to the log. The launch also waits for the terminal page's first size report, at most `PlinkInitialSizeWaitMs` (default 3000 ms); when the page is slower, it falls back to 80x24 and logs `SSH opening the PTY for <profile> at the default 80x24: <reason>`.
 
 **Solution**:
 
@@ -992,4 +1003,99 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 2. Resize before connecting, not after: the size is taken once, at launch. Resizing the window after start cannot reach the remote PTY on this path; reconnect to apply a new size.
 3. In the remote shell, `stty cols <n> rows <m>` sets the size by hand for the current session.
 
-**Files**: `Services/Handlers/PlinkSizeSession.cs`, `Services/PlinkSizeSessionJanitor.cs`, `Services/Handlers/SshHandler.cs` (`ConnectSshViaPlinkAsync`, `BuildPipeModeArguments`), `Heimdall.Terminal/PipeModeSession.cs`
+**Files**: `Services/Handlers/PlinkSizeSession.cs`, `Services/PlinkSizeSessionJanitor.cs`, `Heimdall.Ssh/Plink/PlinkSizeSessionNaming.cs`, `Services/Handlers/SshHandler.cs` (`ConnectSshViaPlinkAsync`, `BuildPipeModeArguments`), `Heimdall.Terminal/PipeModeSession.cs`
+
+---
+
+## 55. WinRM - The Session Ends as Soon as It Opens {#winrm-session-ends-at-sign-in}
+
+**Symptom**: A WinRM tab prints a PowerShell error (access denied, a Kerberos or TrustedHosts error, WinHTTP `12152`, a host that cannot be reached), then `Process exited with code 1`, and offers to reconnect. After `exit` is typed in a working session, or when its connection drops, the tab ends the same way with code 0.
+
+**Root cause**: By design since the 2026-09-30 audit. Both WinRM launches run PowerShell with `-NoExit`. When `Enter-PSSession` failed, or the remote session ended, PowerShell used to fall back to a prompt on the local machine, inside a tab titled with the remote host, where broadcast, the Command Library and macros then ran their commands locally. A global `prompt` function defined before `Enter-PSSession` now ends the host at the first local prompt: exit code 1 when the remote session was never entered, 0 once it was. WinRM never reconnects on its own after a process exit, so a refused sign-in cannot loop.
+
+**Solution**:
+
+1. Read the error printed above the end marker. It is PowerShell's own and names the cause; for WinHTTP `12152` through a gateway, see [47](#winrm-gateway-12152). When Heimdall recognizes the error it adds a localized explanation below it.
+2. Through an SSH gateway no reachability check runs before the launch (it would only reach the local end of the tunnel), so an unreachable target shows here, as the `Enter-PSSession` error.
+3. Under Constrained Language Mode the guard cannot end the host, and a local prompt still follows a failure. Close the tab instead of typing in it.
+
+**Files**: `Services/WinRm/WinRmPowerShellLaunchBuilder.cs`, `Services/WinRm/WinRmCredentialBootstrap.cs`, `Services/WinRm/WinRmEarlyOutputDiagnostic.cs`, `Services/Handlers/WinRmHandler.cs`
+
+---
+
+## 56. WinRM - The Execution Policy Refused the Sign-in Script {#winrm-execution-policy-refused}
+
+**Symptom**: A WinRM profile that uses a stored credential ends at once with "The PowerShell execution policy refused the WinRM sign-in script. Your organization may require signed scripts: use the current Windows identity for this host, or ask your administrator."
+
+**Root cause**: Stored-credential mode runs a local sign-in script with `-ExecutionPolicy Bypass`. An execution policy enforced at machine or user policy scope (`AllSigned`, or `RemoteSigned` applied that way) overrides the command-line value, and the unsigned script is refused before it runs. Heimdall recognizes the refusal in PowerShell's early output, which names the `about_Execution_Policies` help topic untranslated in every host language. The current Windows identity mode runs no script and is not affected.
+
+**Solution**:
+
+1. Switch the profile to the current Windows identity (Kerberos) if the host accepts it.
+2. Otherwise ask the administrator who sets the execution policy; Heimdall does not work around it.
+3. `Get-ExecutionPolicy -List` in a local PowerShell shows which scope sets the policy.
+
+**Files**: `Services/WinRm/WinRmEarlyOutputDiagnostic.cs`, `Services/WinRm/WinRmCredentialBootstrap.cs`, `Services/WinRm/WinRmPowerShellLaunchBuilder.cs`
+
+---
+
+## 57. SSH - A Host That Does Not Answer Fails After 15 Seconds {#ssh-unresponsive-host-timeout}
+
+**Symptom**: An embedded SSH session to a host that is switched off or filtered reports a network timeout after about 15 seconds. Before the 2026-09-30 audit the same failure took two minutes.
+
+**Root cause**: The embedded SSH path used the two-minute bound meant for answering a verification-code question as its connect timeout, and SSH.NET applies one timeout to every phase: the TCP connect, the banner, the key exchange and each authentication wait. The connect now keeps the normal 15-second bound until the server's host key has been received; the two minutes apply only to the authentication waits after that point, when a question can reach you.
+
+**Solution**:
+
+1. A timeout at 15 seconds means the host did not complete the key exchange: check the address, the port and the firewall.
+2. A question that takes long to answer, such as a code read on another device, still has two minutes.
+
+**Files**: `Heimdall.Ssh/SshConnectionFactory.cs` (`ConnectWithTransportBoundAsync`), `Heimdall.Ssh/SshConnectionParams.cs` (`AuthenticationTimeout`), `Heimdall.Ssh/SshShellSession.cs`, `Services/Handlers/SshHandler.cs`
+
+---
+
+## 58. FTP/SFTP - Uploading a New File Is Refused {#upload-new-file-refused}
+
+**Symptom**: Uploading a file that does not exist on the server yet fails with "The upload could not be confirmed without replacing a file. Refresh the destination before retrying. Safe creation requires SFTP with a working SSH command channel; FTP cannot guarantee it." Over FTP and FTPS this happened to every new file from v2026.090801 on; over SFTP, on accounts restricted to `internal-sftp`, on Windows OpenSSH and behind SFTP gateways.
+
+**Root cause**: Since v2026.090801 a new file is uploaded with no replacement consented to, and the only commit that honoured that was an `ln` command run over an extra SSH exec channel. FTP has no such channel, and restricted SFTP servers refuse exec. Fixed by the 2026-09-30 audit: each transport now commits a new file itself. SFTP uses the protocol version 3 rename, which fails on an existing name and needs no exec channel; FTP checks the name again just before the final move and refuses an occupied one.
+
+**Solution**:
+
+1. Update to a version that carries the fix.
+2. If the message is now "The destination is now occupied and was not replaced", another client created that name during the upload: refresh the folder and retry with a new name or an explicit replacement choice.
+3. Over FTP, a file created in the instant between that last check and the move can still be overwritten, because FTP has no command that prevents it. Use SFTP where that matters.
+
+**Files**: `Heimdall.Sftp/SftpAtomicUpload.cs` (`CommitCreate`), `Heimdall.Sftp/FtpAtomicUpload.cs` (`CommitCreateAsync`), `Heimdall.Sftp/SftpBrowser.cs`, `Heimdall.Sftp/FtpBrowser.cs`
+
+---
+
+## 59. Settings - Save Is Greyed Out, or Refuses to Save {#settings-save-greyed-or-refused}
+
+**Symptom**: Save settings cannot be clicked, Ctrl+S does nothing, or pressing Save shows a red banner instead of "Settings saved".
+
+**Root cause**: Save is enabled only while edits are pending. A card marked "Saved immediately, not by Save" (Application PIN, Master password, trusted host keys, trusted RDP certificates) has already written its change, and the Git sync access token is written as soon as it is entered, so neither leaves anything for Save. A refusal means a value failed its check: a number that is not a whole number or is out of its range, or a resolution preset line that is not `WIDTHxHEIGHT` within 200 to 7680 by 200 to 4320.
+
+**Solution**:
+
+1. Nothing to do when Save is greyed out after a change on one of those cards: it is already saved.
+2. On a refusal, read the banner: it names the first setting in error and counts the others. The focus is on the first field in error; its tooltip gives the reason. The red badge on each tab counts that tab's errors.
+3. If a confirmation about TFTP or session transcripts was declined, nothing was written and the edits are still pending: press Save settings again and accept, or turn the option back off.
+
+**Files**: `ViewModels/SettingsViewModel.cs`, `MainWindow.xaml`
+
+---
+
+## 60. Settings - An Imported Settings File Is Refused or Changes Nothing {#settings-import-refused}
+
+**Symptom**: Import settings... says the file is not a Heimdall settings file, or that it holds the settings you already have; or the imported values disappear.
+
+**Root cause**: Import reads only a file written by Export settings..., in a version this Heimdall can read. A file that matches the saved settings has nothing to change. An accepted import loads the values as pending edits: they are written only by Save settings, and Undo changes, Reset defaults or leaving the Settings tab with Discard drops them.
+
+**Solution**:
+
+1. Export again from the source computer with Export settings..., and import that file.
+2. After the import, check the listed changes, then press Save settings.
+3. Secrets never travel in the file (master password, PIN, Git access token, credential provider unlock secret, SSH gateways): set them again on the new computer. Paths inside the user profile travel only when you agreed to include them at export.
+
+**Files**: `ViewModels/Settings/SettingsTransfer.cs`, `ViewModels/SettingsViewModel.cs`

@@ -568,8 +568,6 @@ public sealed class ServerDialogOriginPreservationTests
 
         public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null) => Task.FromResult(GatewayDialogResultToReturn);
 
-        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null) => Task.FromResult<ProjectDialogResult?>(null);
-
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(ScheduledTaskDialogViewModel? editVm = null) => Task.FromResult<ScheduledTaskDialogResult?>(null);
 
         public Task ShowPinDialogAsync(PinDialogViewModel viewModel) => Task.CompletedTask;

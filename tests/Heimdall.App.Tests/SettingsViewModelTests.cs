@@ -967,7 +967,8 @@ public sealed class SettingsViewModelTests : IDisposable
     public async Task SaveAsync_PersistsFileShareEnableTftp()
     {
         var config = new FakeConfigManager();
-        var viewModel = CreateViewModel(config);
+        // Turning TFTP on is confirmed at Save; see Save_TurningTftpOn_AsksFirstAndWritesNothingWhenDeclined.
+        var viewModel = CreateViewModel(config, new FakeDialogService { ConfirmResult = true });
         viewModel.FileShareEnableTftp = true;
 
         await viewModel.SaveCommand.ExecuteAsync(null);
@@ -1035,45 +1036,27 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal("Buffy", saved.DefaultTheme);
     }
 
+    // The panel no longer edits projects (their UI was removed on purpose), so its Save must not
+    // write the project list either: it used to write back the snapshot taken at load, which erased
+    // any project another surface had persisted while the panel was open.
     [Fact]
-    public async Task ProjectDeletion_ClearsInventoryProjectIds_RecoverableIfInterrupted()
+    public async Task Save_LeavesProjectsAsTheyAreOnDisk()
     {
         var config = new FakeConfigManager
         {
             Settings = new AppSettings
             {
-                Projects =
-                [
-                    new ProjectDto
-                    {
-                        Id = "project-a",
-                        Name = "Project A"
-                    }
-                ]
-            },
-            Servers =
-            [
-                new ServerProfileDto
-                {
-                    Id = "alpha",
-                    DisplayName = "Alpha",
-                    RemoteServer = "alpha.example.test",
-                    ProjectId = "project-a"
-                }
-            ]
+                Projects = [new ProjectDto { Id = "project-a", Name = "Project A" }]
+            }
         };
-        var dialog = new FakeDialogService { ConfirmResult = true };
-        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        SettingsViewModel viewModel = CreateViewModel(config);
         viewModel.LoadFromSettings(config.Settings);
-        viewModel.SelectedProject = Assert.Single(viewModel.Projects);
-        await viewModel.DeleteProjectCommand.ExecuteAsync(null);
-        config.FailOnMergeSetting = true;
+        config.Settings.Projects.Add(new ProjectDto { Id = "project-b", Name = "Project B" });
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
 
-        bool saved = await viewModel.TrySaveAsync();
+        Assert.True(await viewModel.TrySaveAsync());
 
-        Assert.False(saved);
-        Assert.Null(Assert.Single(config.Servers).ProjectId);
-        Assert.Contains(config.Settings.Projects, project => project.Id == "project-a");
+        Assert.Equal(["project-a", "project-b"], config.Settings.Projects.Select(project => project.Id));
     }
 
     [Fact]
@@ -1779,7 +1762,8 @@ public sealed class SettingsViewModelTests : IDisposable
         await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
 
         var expected = await LoadExpectedFactoryDefaultsAsync();
-        Assert.Equal(expected.DefaultTheme, viewModel.DefaultTheme);
+        // The theme is kept on purpose: see ResetToDefaults_KeepsLanguageThemeAndSecurityState.
+        Assert.Equal("Buffy", viewModel.DefaultTheme);
         Assert.Equal(expected.MaxEmbeddedSessions, viewModel.MaxEmbeddedSessions);
         Assert.Equal(expected.TerminalFontSize, viewModel.TerminalFontSize);
         Assert.True(viewModel.IsDirty);
@@ -1790,7 +1774,7 @@ public sealed class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task ResetToDefaultsCommand_RestoresPreferencesButKeepsGatewaysAndProjects()
+    public async Task ResetToDefaultsCommand_RestoresPreferencesButKeepsGateways()
     {
         var dialog = new FakeDialogService { ConfirmResult = true };
         var viewModel = CreateViewModel(new FakeConfigManager(), dialog);
@@ -1805,7 +1789,6 @@ public sealed class SettingsViewModelTests : IDisposable
             User = "ops",
             SshPasswordEncrypted = "encrypted-secret"
         });
-        seeded.Projects.Add(new ProjectDto { Id = "prj-1", Name = "Production" });
         viewModel.LoadFromSettings(seeded);
         viewModel.DefaultTheme = "Buffy";
 
@@ -1813,7 +1796,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
         // Preferences go back to factory values, which is what the button promises.
         var expected = await LoadExpectedFactoryDefaultsAsync();
-        Assert.Equal(expected.DefaultTheme, viewModel.DefaultTheme);
+        Assert.Equal(expected.TerminalFontSize, viewModel.TerminalFontSize);
 
         // The inventory survives. A gateway's stored password is only ever reported
         // back as a boolean, so dropping it here would destroy a secret the user
@@ -1823,9 +1806,434 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal("10.0.0.1", gateway.Host);
         Assert.Equal(2222, gateway.Port);
         Assert.True(gateway.HasPassword);
+    }
 
-        var project = Assert.Single(viewModel.Projects);
-        Assert.Equal("Production", project.Name);
+    /// <summary>
+    /// A factory reset changes preferences, not the language on screen and not what is enrolled.
+    /// </summary>
+    /// <remarks>
+    /// Loaded from the factory file, the vault read as disabled and its lock controls vanished while
+    /// the vault stayed on; the PIN read as absent; and the interface switched to English under a
+    /// user who had picked French, in the one panel they would need to read to undo it.
+    /// </remarks>
+    [Fact]
+    public async Task ResetToDefaults_KeepsLanguageThemeAndSecurityState()
+    {
+        FakeConfigManager config = new();
+        config.Settings.VaultEnabled = true;
+        config.Settings.PinHash = "hash";
+        config.Settings.PinSalt = "salt";
+        config.Settings.DefaultTheme = "Tarn";
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.AccentTint = "Green";
+        viewModel.RequireCredentialGuard = true;
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsVaultEnabled);
+        Assert.True(viewModel.VaultEnabledActionsVisible);
+        Assert.True(viewModel.IsPinConfigured);
+        Assert.Equal("Tarn", viewModel.DefaultTheme);
+        Assert.Equal("Green", viewModel.AccentTint);
+        Assert.False(viewModel.RequireCredentialGuard);
+        Assert.True(viewModel.IsDirty);
+    }
+
+    /// <summary>
+    /// Turning on TFTP is a pending edit like any other, confirmed at Save.
+    /// </summary>
+    /// <remarks>
+    /// The checkbox used to write to disk and restart the share on the tick, so Revert could not
+    /// undo it and a share that answers anyone on the network without a password came on with no
+    /// question asked.
+    /// </remarks>
+    [Fact]
+    public async Task Save_TurningTftpOn_AsksFirstAndWritesNothingWhenDeclined()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.FileShareEnableTftp = true;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var confirm = Assert.Single(dialog.ConfirmCalls);
+        Assert.Equal("SettingsTftpEnableConfirmTitle", confirm.Title);
+        Assert.Equal("warning", confirm.Severity);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.False(config.Settings.FileShareEnableTftp);
+        Assert.True(viewModel.IsDirty);
+        Assert.Empty(dialog.WarningCalls);
+
+        dialog.ConfirmResult = true;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.True(config.Settings.FileShareEnableTftp);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    // The unlock secret lives in a PasswordBox, which cannot be bound, so the window refills it on
+    // this signal. Every path that reseeds the panel has to raise it: the startup load, a revert
+    // and a factory reset each left the box showing a secret that was not the pending one.
+    [Fact]
+    public async Task EveryReloadOfThePanel_SignalsTheViewToRefillUnboundFields()
+    {
+        FakeConfigManager config = new();
+        config.Settings.CredentialProviderUnlockSecretEncrypted = null;
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        int loads = 0;
+        viewModel.SettingsLoaded += () => loads++;
+
+        viewModel.LoadFromSettings(config.Settings);
+        Assert.Equal(1, loads);
+
+        viewModel.CredentialProviderUnlockSecret = "typed";
+        await viewModel.RevertChangesCommand.ExecuteAsync(null);
+        Assert.Equal(2, loads);
+        Assert.Equal(string.Empty, viewModel.CredentialProviderUnlockSecret);
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+        Assert.Equal(3, loads);
+    }
+
+    /// <summary>
+    /// A mistyped resolution preset is reported by name and refuses the save; it is never dropped.
+    /// </summary>
+    /// <remarks>
+    /// The setter used to filter the box on every keystroke, silently removing any line it could not
+    /// parse, and it checked no bound, so "99999x1" reached every RDP session menu.
+    /// </remarks>
+    [Fact]
+    public async Task ResolutionPresets_InvalidLinesAreNamedAndRefuseTheSave()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        string[] before = viewModel.RdpResolutionPresets;
+
+        viewModel.RdpResolutionPresetsText = "1920x1080" + Environment.NewLine + "99999x1" + Environment.NewLine + "wide";
+
+        Assert.Equal(before, viewModel.RdpResolutionPresets);
+        Assert.Contains("99999x1", viewModel.RdpResolutionPresetsText, StringComparison.Ordinal);
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.NotNull(viewModel.ValidationSummary);
+        Assert.Contains("99999x1", viewModel.ValidationSummary, StringComparison.Ordinal);
+        Assert.Contains("wide", viewModel.ValidationSummary, StringComparison.Ordinal);
+        Assert.True(viewModel.RdpTabErrorCount > 0);
+
+        viewModel.RdpResolutionPresetsText = "1920x1080" + Environment.NewLine + "1280x720";
+        Assert.Equal(new[] { "1920x1080", "1280x720" }, viewModel.RdpResolutionPresets);
+        Assert.True(await viewModel.TrySaveAsync());
+    }
+
+    /// <summary>
+    /// A refused save names the field, marks the box, counts the errors and says where to go.
+    /// </summary>
+    /// <remarks>
+    /// "This setting must be a whole number." named no setting; an out-of-range entry left the box
+    /// itself looking valid because the range was checked on the number and the box is bound to
+    /// the text; and the banner showed the first error alone, so fixing it led to a second refusal
+    /// over a field nobody had pointed at.
+    /// </remarks>
+    [Fact]
+    public async Task RefusedSave_NamesTheFieldMarksTheBoxAndCountsTheErrors()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.MaxEmbeddedSessionsText = "many";
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.Contains(localizer["SettingsLabelMaxEmbeddedSessions"], viewModel.ValidationSummary, StringComparison.Ordinal);
+
+        viewModel.MaxEmbeddedSessionsText = "0";
+        Assert.NotEmpty(viewModel.GetErrors(nameof(SettingsViewModel.MaxEmbeddedSessionsText)).Cast<object>());
+
+        viewModel.TerminalFontSizeText = "big";
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.Contains("2", viewModel.ValidationSummary, StringComparison.Ordinal);
+        Assert.Equal(
+            localizer.Format(
+                "SettingsValidationSummaryCount",
+                2,
+                localizer.Format(
+                    "ValidationSettingsMaxSessions",
+                    SettingRanges.Of(nameof(AppSettings.MaxEmbeddedSessions)).Min,
+                    SettingRanges.Of(nameof(AppSettings.MaxEmbeddedSessions)).Max)),
+            viewModel.ValidationSummary);
+        Assert.Equal(0, config.MergeSettingCallCount);
+    }
+
+    // The window moves focus on this signal; the property is the one the box is bound to, the
+    // text of a number field, so the view can find the box by its binding.
+    [Fact]
+    public async Task RefusedSave_AsksTheViewToFocusTheFirstInvalidBox()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        List<string> requests = [];
+        viewModel.InvalidFieldFocusRequested += requests.Add;
+
+        viewModel.AutoLockIdleMinutesText = "soon";
+        viewModel.TerminalFontSize = int.MaxValue;
+        Assert.False(await viewModel.TrySaveAsync());
+
+        // The error sits on the number; the box the user has to reach is bound to its text.
+        Assert.Equal([nameof(SettingsViewModel.TerminalFontSizeText)], requests);
+        Assert.NotNull(viewModel.DescribeFieldError(nameof(SettingsViewModel.AutoLockIdleMinutesText)));
+    }
+
+    /// <summary>
+    /// Test connection tries what is typed, and says why it failed in a status line.
+    /// </summary>
+    /// <remarks>
+    /// The button tested the saved configuration, so a corrected URL failed until Save, and it
+    /// replaced its own label with a bare "Connection failed" for the rest of the session.
+    /// </remarks>
+    [Fact]
+    public async Task GitSyncTest_UsesTheTypedValuesAndReportsTheReason()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        config.Settings.CmdLibGitSyncUrl = "https://saved.example.test/repo.git";
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        List<(string Url, string? Branch)> probes = [];
+        viewModel.GitConnectionTester = (url, branch) =>
+        {
+            probes.Add((url, branch));
+            return Task.FromResult(TwinShell.Core.Interfaces.GitOperationResult.Fail(
+                "Branch not found on the remote repository",
+                TwinShell.Core.Interfaces.GitSyncErrorCode.BranchNotFound,
+                "release"));
+        };
+
+        viewModel.CmdLibGitSyncUrl = "https://typed.example.test/repo.git";
+        viewModel.CmdLibGitSyncBranch = "release";
+        await viewModel.TestGitSyncConnectionCommand.ExecuteAsync(null);
+
+        Assert.Equal([("https://typed.example.test/repo.git", (string?)"release")], probes);
+        Assert.Equal(
+            localizer.Format(
+                "SettingsCmdLibSyncTestFailedReason",
+                localizer.Format("SettingsCmdLibSyncTestReasonBranch", "release")),
+            viewModel.GitSyncTestStatusText);
+        Assert.Equal(0, config.MergeSettingCallCount);
+    }
+
+    // Save was enabled on a clean panel, so it looked like it did something when there was nothing
+    // to save. The keyboard shortcut runs the same command through CanExecute.
+    [Fact]
+    public void Save_IsOfferedOnlyWhenThereIsSomethingToSave()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        int changes = 0;
+        viewModel.SaveCommand.CanExecuteChanged += (_, _) => changes++;
+
+        Assert.False(viewModel.SaveCommand.CanExecute(null));
+
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+
+        Assert.True(viewModel.SaveCommand.CanExecute(null));
+        Assert.True(changes > 0);
+    }
+
+    // A transcript keeps typed input as well as output, secrets echoed to the terminal included.
+    // Turning it on was one silent tick.
+    [Fact]
+    public async Task Save_TurningSessionTranscriptsOn_AsksFirstAndWritesNothingWhenDeclined()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SessionLoggingEnabled = true;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal("SettingsSessionLoggingEnableConfirmTitle", Assert.Single(dialog.ConfirmCalls).Title);
+        Assert.False(config.Settings.SessionLoggingEnabled);
+        Assert.True(viewModel.IsDirty);
+
+        dialog.ConfirmResult = true;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.True(config.Settings.SessionLoggingEnabled);
+
+        // Already on: saving an unrelated edit asks nothing more.
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(2, dialog.ConfirmCalls.Count);
+    }
+
+    // Four settings were read by the product and editable only in settings.json. They now have
+    // fields; the panel has to carry each from the file and back.
+    [Fact]
+    public async Task FormerlyHiddenSettings_LoadAndSaveThroughThePanel()
+    {
+        FakeConfigManager config = new();
+        config.Settings.SyncKnownHostsAtStartup = true;
+        config.Settings.SshKeepAliveIntervalSeconds = 45;
+        config.Settings.CredentialProviderTimeoutMs = 20000;
+        config.Settings.VaultHelloMaxDaysBeforeMasterPassword = 30;
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+
+        Assert.True(viewModel.SyncKnownHostsAtStartup);
+        Assert.Equal("45", viewModel.SshKeepAliveIntervalSecondsText);
+        Assert.Equal("20000", viewModel.CredentialProviderTimeoutMsText);
+        Assert.Equal("30", viewModel.VaultHelloMaxDaysBeforeMasterPasswordText);
+
+        viewModel.SyncKnownHostsAtStartup = false;
+        viewModel.SshKeepAliveIntervalSecondsText = "60";
+        viewModel.CredentialProviderTimeoutMsText = "30000";
+        viewModel.VaultHelloMaxDaysBeforeMasterPasswordText = "0";
+        Assert.True(viewModel.IsDirty);
+        Assert.True(await viewModel.TrySaveAsync());
+
+        Assert.False(config.Settings.SyncKnownHostsAtStartup);
+        Assert.Equal(60, config.Settings.SshKeepAliveIntervalSeconds);
+        Assert.Equal(30000, config.Settings.CredentialProviderTimeoutMs);
+        Assert.Equal(0, config.Settings.VaultHelloMaxDaysBeforeMasterPassword);
+
+        viewModel.SshKeepAliveIntervalSecondsText = "1";
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.True(viewModel.SshTabErrorCount > 0);
+    }
+
+    // The tool paths were accepted as typed and failed only at use. A typed path with nothing
+    // behind it now says so beside the field, on load and after each edit; an empty one says
+    // nothing, since empty means "not used" or "look for it".
+    [Fact]
+    public void ToolPaths_SayWhenNothingIsThere()
+    {
+        FakeConfigManager config = new();
+        config.Settings.PlinkPath = @"C:\Tools\plink.exe";
+        config.Settings.SysinternalsPath = @"C:\Tools\Sysinternals";
+        SettingsViewModel viewModel = CreateViewModel(config);
+        HashSet<string> files = new(StringComparer.OrdinalIgnoreCase) { @"C:\Tools\plink.exe" };
+        HashSet<string> folders = new(StringComparer.OrdinalIgnoreCase);
+        viewModel.FileExists = files.Contains;
+        viewModel.DirectoryExists = folders.Contains;
+        List<string> raised = [];
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        viewModel.LoadFromSettings(config.Settings);
+
+        Assert.False(viewModel.IsPlinkPathMissing);
+        Assert.True(viewModel.IsSysinternalsPathMissing);
+        Assert.False(viewModel.IsPuttyPathMissing);
+        Assert.False(viewModel.IsNirSoftPathMissing);
+
+        viewModel.PlinkPath = @"C:\Tool\plink.exe";
+        Assert.True(viewModel.IsPlinkPathMissing);
+        Assert.Contains(nameof(SettingsViewModel.IsPlinkPathMissing), raised);
+
+        folders.Add(@"C:\Tools\Sysinternals");
+        viewModel.SysinternalsPath = @"C:\Tools\Sysinternals ";
+        Assert.False(viewModel.IsSysinternalsPathMissing);
+    }
+
+    // Save answered with nothing but a button going grey. It now says so, once, and the line goes
+    // with the next edit so it never describes a panel that has changed since.
+    [Fact]
+    public async Task Save_SaysSettingsSaved_UntilTheNextEdit()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer["SettingsSavedAnnouncement"], viewModel.SaveStatusText);
+        Assert.False(viewModel.IsDirty);
+
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+        Assert.Equal(string.Empty, viewModel.SaveStatusText);
+
+        config.FailOnMergeSetting = true;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(string.Empty, viewModel.SaveStatusText);
+    }
+
+    // The terminal font box offers the installed families, read once, and a name it does not list
+    // is still accepted: the box stays editable.
+    [Fact]
+    public void TerminalFont_OffersInstalledFamiliesAndAcceptsAnyName()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        int reads = 0;
+        viewModel.InstalledFontFamiliesProvider = () =>
+        {
+            reads++;
+            return ["Cascadia Mono", "Consolas"];
+        };
+
+        Assert.Equal(["Cascadia Mono", "Consolas"], viewModel.InstalledFontFamilies);
+        Assert.Same(viewModel.InstalledFontFamilies, viewModel.InstalledFontFamilies);
+        Assert.Equal(1, reads);
+
+        viewModel.TerminalFontFamily = "Iosevka Term";
+        Assert.Equal("Iosevka Term", viewModel.TerminalFontFamily);
+        Assert.True(viewModel.IsDirty);
+    }
+
+    // I-01: export the saved preferences, import them on another machine as pending edits that go
+    // through the panel's own validation, and write nothing until Save.
+    [Fact]
+    public async Task SettingsFile_ExportsSavedValues_ImportsThemAsPendingEdits()
+    {
+        string file = Path.Combine(Path.GetTempPath(), "heimdall-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            FakeConfigManager source = new();
+            source.Settings.TerminalFontSize = 18;
+            source.Settings.PinHash = "pin-hash";
+            FakeDialogService sourceDialog = new() { ConfirmResult = false };
+            SettingsViewModel exporter = CreateViewModel(source, sourceDialog);
+            exporter.SettingsExportPathProvider = () => file;
+            exporter.UserProfileFolder = @"C:\Users\nobody-here";
+            await exporter.ExportSettingsCommand.ExecuteAsync(null);
+            Assert.DoesNotContain("pin-hash", File.ReadAllText(file), StringComparison.Ordinal);
+
+            // A value the panel refuses travels like any other and is reported, not saved.
+            System.Text.Json.Nodes.JsonNode document = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file))!;
+            document["settings"]![nameof(AppSettings.MaxEmbeddedSessions)] = 0;
+            File.WriteAllText(file, document.ToJsonString());
+
+            FakeConfigManager target = new();
+            FakeDialogService targetDialog = new() { ConfirmResult = true };
+            SettingsViewModel importer = CreateViewModel(target, targetDialog, localizer: await CreateLocalizerAsync());
+            importer.LoadFromSettings(target.Settings);
+            importer.SettingsImportPathProvider = () => file;
+
+            await importer.ImportSettingsCommand.ExecuteAsync(null);
+
+            Assert.Equal(18, importer.TerminalFontSize);
+            Assert.Equal("18", importer.TerminalFontSizeText);
+            Assert.True(importer.IsDirty);
+            Assert.True(importer.HasValidationErrors);
+            Assert.Equal(0, target.MergeSettingCallCount);
+            Assert.Contains(nameof(AppSettings.TerminalFontSize), Assert.Single(targetDialog.ConfirmCalls).Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
     }
 
     [Fact]
@@ -2341,6 +2749,21 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal(22, viewModel.TerminalFontSize);
     }
 
+    // The RDP connect watchdog is edited on Advanced > Diagnostics, and the button's tooltip
+    // promises that settings outside the RDP defaults are untouched.
+    [Fact]
+    public async Task ResetRdpDefaultsCommand_LeavesTheWatchdogOnTheDiagnosticsTabAlone()
+    {
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(new FakeConfigManager(), dialog);
+        viewModel.RdpConnectWatchdogTimeoutMsText = "0";
+
+        await viewModel.ResetRdpDefaultsCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, viewModel.RdpConnectWatchdogTimeoutMs);
+        Assert.Equal("0", viewModel.RdpConnectWatchdogTimeoutMsText);
+    }
+
     [Fact]
     public async Task ResetRdpDefaultsCommand_CancelledConfirmationDoesNotModifyState()
     {
@@ -2383,6 +2806,221 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.Equal("External", config.Servers[2].RdpMode);
         var confirm = Assert.Single(dialog.ConfirmCalls);
         Assert.Equal("danger", confirm.Severity);
+    }
+
+    /// <summary>
+    /// State the panel shows but Save does not write never arms the unsaved-changes prompt.
+    /// </summary>
+    /// <remarks>
+    /// Enabling the vault writes to disk at once and then flipped the vault status, the action
+    /// visibility flags and the status text - each of which marked the panel dirty, so leaving the
+    /// tab asked the user to save or discard a change neither button could reach. The sweep walks
+    /// every writable property the settings type does not carry, so the next status line is caught
+    /// without anyone remembering to list it.
+    /// </remarks>
+    [Fact]
+    public void NonPersistedState_NeverMarksTheSettingsDirty()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        viewModel.LoadFromSettings(new AppSettings());
+        HashSet<string> settingNames = typeof(AppSettings).GetProperties()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        List<string> dirtied = [];
+        List<string> probedNames = [];
+        int probed = 0;
+
+        foreach (PropertyInfo property in typeof(SettingsViewModel).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!property.CanWrite
+                || property.Name == nameof(SettingsViewModel.IsDirty)
+                || settingNames.Contains(property.Name)
+                || settingNames.Contains(StripTextSuffix(property.Name))
+                || PersistedUnderAnotherName.Contains(StripTextSuffix(property.Name))
+                || property.Name is nameof(SettingsViewModel.IsCommandProvider)
+                    or nameof(SettingsViewModel.IsWindowsCredentialManagerProvider))
+            {
+                continue;
+            }
+
+            object? changed = DifferentValue(property.PropertyType, property.GetValue(viewModel));
+            if (changed is null)
+            {
+                continue;
+            }
+
+            viewModel.IsDirty = false;
+            property.SetValue(viewModel, changed);
+            probed++;
+            probedNames.Add(property.Name);
+            if (viewModel.IsDirty)
+            {
+                dirtied.Add(property.Name);
+            }
+        }
+
+        Assert.True(probed >= 10, $"only {probed} non-persisted properties were probed; the sweep is not reading the view model");
+        Assert.Contains(nameof(SettingsViewModel.IsVaultEnabled), probedNames);
+        Assert.Empty(dirtied);
+    }
+
+    /// <summary>Every property Save writes marks the panel dirty when it changes.</summary>
+    [Fact]
+    public void EveryPersistedSetting_MarksTheSettingsDirty()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        viewModel.LoadFromSettings(new AppSettings());
+        HashSet<string> settingNames = typeof(AppSettings).GetProperties()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        List<string> silent = [];
+        int probed = 0;
+
+        foreach (PropertyInfo property in typeof(SettingsViewModel).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            bool persisted = settingNames.Contains(property.Name) || PersistedUnderAnotherName.Contains(property.Name);
+            if (!property.CanWrite
+                || !persisted
+                || property.Name == nameof(SettingsViewModel.UpdateSkippedVersion)
+                || property.Name == nameof(SettingsViewModel.DefaultLocale))
+            {
+                continue;
+            }
+
+            object? changed = DifferentValue(property.PropertyType, property.GetValue(viewModel));
+            if (changed is null)
+            {
+                continue;
+            }
+
+            viewModel.IsDirty = false;
+            property.SetValue(viewModel, changed);
+            probed++;
+            if (!viewModel.IsDirty)
+            {
+                silent.Add(property.Name);
+            }
+        }
+
+        Assert.True(probed >= 60, $"only {probed} persisted properties were probed");
+        Assert.Empty(silent);
+    }
+
+    private static readonly HashSet<string> PersistedUnderAnotherName = new(StringComparer.Ordinal)
+    {
+        nameof(SettingsViewModel.AntiIdleInterval),
+        nameof(SettingsViewModel.SshTmoutResetInterval),
+        nameof(SettingsViewModel.CredentialProviderUnlockSecret),
+    };
+
+    private static string StripTextSuffix(string name) =>
+        name.EndsWith("Text", StringComparison.Ordinal) ? name[..^"Text".Length] : name;
+
+    private static object? DifferentValue(Type type, object? current)
+    {
+        if (type == typeof(bool))
+        {
+            return !(bool)current!;
+        }
+
+        if (type == typeof(int))
+        {
+            return (int)current! + 1;
+        }
+
+        if (type == typeof(double))
+        {
+            return (double)current! + 0.5;
+        }
+
+        if (type == typeof(string))
+        {
+            return (current as string) + "1";
+        }
+
+        if (type == typeof(string[]))
+        {
+            return ((string[]?)current ?? []).Append("800x600").ToArray();
+        }
+
+        if (type.IsEnum)
+        {
+            Array values = Enum.GetValues(type);
+            foreach (object value in values)
+            {
+                if (!value.Equals(current))
+                {
+                    return value;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // The confirmation is consent to a rewrite, so the number in it is the size of the rewrite:
+    // the sessions that will change, not every session of the type. Reading "3" before a change
+    // that touches 2 teaches the user that the number on a destructive prompt is decoration.
+    [Fact]
+    public async Task ApplyRdpModeToAll_ConfirmationCountsTheSessionsThatChange()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        var config = new FakeConfigManager
+        {
+            Servers =
+            [
+                new ServerProfileDto { ConnectionType = "RDP", RdpMode = "Embedded" },
+                new ServerProfileDto { ConnectionType = "RDP", RdpMode = "External" },
+                new ServerProfileDto { ConnectionType = "RDP", RdpMode = "Embedded" },
+            ]
+        };
+        var dialog = new FakeDialogService { ConfirmResult = false };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.RdpDefaultMode = "External";
+
+        await viewModel.ApplyRdpModeToAllCommand.ExecuteAsync(null);
+
+        var confirm = Assert.Single(dialog.ConfirmCalls);
+        Assert.Equal(
+            localizer.Format(
+                "SettingsApplyModeToAllConfirmBody",
+                localizer["SettingsRdpModeExternal"],
+                2,
+                3),
+            confirm.Message);
+    }
+
+    // SshMode is read by the SSH handler only. Writing it into an RDP or VNC profile changed
+    // nothing the user could see and counted those profiles in the confirmation as changes.
+    [Fact]
+    public async Task ApplySshModeToAll_RewritesSshSessionsOnlyAndNamesTheModeInTheUiLanguage()
+    {
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "fr");
+        var config = new FakeConfigManager
+        {
+            Servers =
+            [
+                new ServerProfileDto { Id = "ssh-1", ConnectionType = "SSH", SshMode = "Embedded" },
+                new ServerProfileDto { Id = "rdp-1", ConnectionType = "RDP", SshMode = "Embedded" },
+                new ServerProfileDto { Id = "ssh-2", ConnectionType = "SSH", SshMode = "External" },
+            ]
+        };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.SshDefaultMode = "External";
+        bool fullReload = false;
+        viewModel.ConfigurationChanged += () => fullReload = true;
+
+        await viewModel.ApplySshModeToAllCommand.ExecuteAsync(null);
+
+        Assert.Equal("External", config.Servers.Single(server => server.Id == "ssh-1").SshMode);
+        Assert.Equal("Embedded", config.Servers.Single(server => server.Id == "rdp-1").SshMode);
+        var confirm = Assert.Single(dialog.ConfirmCalls);
+        Assert.Contains(localizer["SettingsSshModeExternal"], confirm.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("'External'", confirm.Message, StringComparison.Ordinal);
+        Assert.Equal("External", config.Settings.SshDefaultMode);
+        Assert.False(fullReload);
     }
 
     [Fact]
@@ -3581,9 +4219,6 @@ public sealed class SettingsViewModelTests : IDisposable
             LastGatewayOverviewViewModel = viewModel;
             return Task.CompletedTask;
         }
-
-        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null)
-            => Task.FromResult<ProjectDialogResult?>(null);
 
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(ScheduledTaskDialogViewModel? editVm = null)
             => Task.FromResult<ScheduledTaskDialogResult?>(null);

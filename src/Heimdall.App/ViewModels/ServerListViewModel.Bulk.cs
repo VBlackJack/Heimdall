@@ -1553,7 +1553,7 @@ public partial class ServerListViewModel
             .ToHashSet(StringComparer.Ordinal);
         var moved = false;
 
-        await WithOrganizationUndoAsync(async () =>
+        await WithOrganizationUndoAsync(TreeOrganizationChange.Move, async () =>
         {
             await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
             return moved;

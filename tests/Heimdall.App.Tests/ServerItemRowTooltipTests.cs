@@ -46,7 +46,12 @@ public sealed class ServerItemRowTooltipTests
         Assert.Contains("alpha.example.test:2222", tooltip, StringComparison.Ordinal);
         Assert.Contains("operator", tooltip, StringComparison.Ordinal);
         Assert.Contains("SSH", tooltip, StringComparison.Ordinal);
-        Assert.DoesNotContain("Alpha", tooltip, StringComparison.Ordinal);
+
+        // The name leads, once: the row trims a long name with an ellipsis, so the hover is where
+        // the whole of it is read.
+        string[] lines = tooltip.Split(Environment.NewLine);
+        Assert.Equal("Alpha", lines[0]);
+        Assert.DoesNotContain(lines.Skip(1), line => line.Contains("Alpha", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -68,11 +73,11 @@ public sealed class ServerItemRowTooltipTests
     }
 
     /// <summary>
-    /// A tool row has no host, no account and no protocol worth naming. Nothing to add means no
-    /// tooltip, rather than a tooltip that repeats the row back at the reader.
+    /// A tool row has no host, no account and no protocol worth naming, so its hover is its name
+    /// alone - the one thing a row trimmed by the sidebar's width may not show in full.
     /// </summary>
     [Fact]
-    public void RowTooltip_IsAbsentWhenThereIsNothingTheRowDoesNotAlreadyShow()
+    public void RowTooltip_OfAToolIsItsFullNameAlone()
     {
         ServerItemViewModel tool = ServerItemViewModel.FromDto(new ServerProfileDto
         {
@@ -82,7 +87,7 @@ public sealed class ServerItemRowTooltipTests
             ConnectionType = "tool:base64"
         });
 
-        Assert.Null(tool.RowTooltipText);
+        Assert.Equal("Base64", tool.RowTooltipText);
     }
 
     /// <summary>

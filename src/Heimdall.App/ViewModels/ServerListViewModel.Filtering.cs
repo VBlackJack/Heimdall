@@ -79,8 +79,12 @@ public partial class ServerListViewModel
     public bool HasAppliedFilterResult =>
         AppliedFilterSpec.IsActive && !IsFilterPending;
 
+    /// <summary>"3 / 12 sessions": the noun agrees with the total it follows.</summary>
     public string FilterResultCountText =>
-        _localizer.Format("FilterResultCount", FilteredCount, _allServers.Count);
+        _localizer.Format(
+            _allServers.Count == 1 ? "FilterResultCountOne" : "FilterResultCount",
+            FilteredCount,
+            _allServers.Count);
 
     public bool HasActiveFacetFilter =>
         FavoriteFilterEnabled
@@ -88,10 +92,24 @@ public partial class ServerListViewModel
         || GatewayFilterEnabled
         || ProtocolFilters.Any(option => option.IsSelected);
 
+    /// <summary>
+    /// Whether a drag started in the tree is in progress; set by the view around its drag loop.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNoGroupDropZone))]
+    private bool _isTreeDragInProgress;
+
+    /// <summary>Whether the "take it out of its folder" drop target is on screen.</summary>
+    /// <remarks>
+    /// It used to stand above the tree permanently, a second "(No Folder)" that read like a node
+    /// of the tree and did nothing until something was dragged onto it. It now appears only
+    /// while a drag is under way, when it is the thing the user is looking for.
+    /// </remarks>
     public bool ShowNoGroupDropZone =>
-        !AppliedFilterSpec.IsActive
-        || _stableTreeRoot.Children.Any(node =>
-            node.IsNoGroup && node.ViewModel!.Servers.Count > 0);
+        IsTreeDragInProgress
+        && (!AppliedFilterSpec.IsActive
+            || _stableTreeRoot.Children.Any(node =>
+                node.IsNoGroup && node.ViewModel!.Servers.Count > 0));
 
     internal int StableTreeBuildCount { get; private set; }
 
@@ -211,6 +229,19 @@ public partial class ServerListViewModel
         ApplyFilter();
     }
 
+    /// <summary>
+    /// Applies a search the debounce is still holding back, so a key that acts on the results -
+    /// Enter in the filter box - acts on the results of what has been typed.
+    /// </summary>
+    public void ApplyPendingSearchNow()
+    {
+        if (IsFilterPending)
+        {
+            CancelSearchFilterDebounce();
+            ApplyFilter();
+        }
+    }
+
     private void ScheduleSearchFilter()
     {
         int version = System.Threading.Interlocked.Increment(ref _searchFilterVersion);
@@ -300,7 +331,7 @@ public partial class ServerListViewModel
         {
             foreach (StableFolderNode child in _stableTreeRoot.Children)
             {
-                int descendantCount = ApplyFolderMembership(child, matches, spec.IsActive);
+                int descendantCount = ApplyFolderMembership(child, matches, spec.IsActive, out _);
                 if (!spec.IsActive || descendantCount > 0)
                 {
                     visibleRootFolders.Add(child.ViewModel!);
@@ -347,18 +378,21 @@ public partial class ServerListViewModel
     private int ApplyFolderMembership(
         StableFolderNode node,
         HashSet<ServerItemViewModel> matches,
-        bool filterActive)
+        bool filterActive,
+        out int totalCount)
     {
         var visibleServers = node.Servers
             .Where(matches.Contains)
             .ToList();
         var visibleFolders = new List<FolderViewModel>(node.Children.Count);
         int descendantCount = visibleServers.Count;
+        totalCount = node.Servers.Count;
 
         foreach (StableFolderNode child in node.Children)
         {
-            int childCount = ApplyFolderMembership(child, matches, filterActive);
+            int childCount = ApplyFolderMembership(child, matches, filterActive, out int childTotal);
             descendantCount += childCount;
+            totalCount += childTotal;
             if (!filterActive || childCount > 0)
             {
                 visibleFolders.Add(child.ViewModel!);
@@ -367,6 +401,7 @@ public partial class ServerListViewModel
 
         FolderViewModel viewModel = node.ViewModel!;
         viewModel.SynchronizeVisibleChildren(visibleFolders, visibleServers);
+        viewModel.SetFilteredTotal(filterActive ? totalCount : null);
 
         // A branch that survives the filter holds a match, and a match inside a closed branch is
         // a result the user is told about but cannot see. Opening every surviving branch needs no

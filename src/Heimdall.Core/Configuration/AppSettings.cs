@@ -198,7 +198,6 @@ public sealed class AppSettings
     public DateTime? HmacKeyCreatedAt { get; set; }
     public string? LastDpapiUser { get; set; }
     public bool RequireCredentialGuard { get; set; }
-    public bool EnableEventLog { get; set; }
 
     // Terminal appearance
     public string TerminalFontFamily { get; set; } = "Consolas";
@@ -280,18 +279,22 @@ public sealed class AppSettings
     /// header's resolution menu. Values are formatted as "WIDTHxHEIGHT". Empty
     /// or null falls back to the built-in 10-preset set.
     /// </summary>
-    public string[] RdpResolutionPresets { get; set; } =
+    public string[] RdpResolutionPresets { get; set; } = [.. DefaultRdpResolutionPresets];
+
+    /// <summary>
+    /// The built-in resolution presets: the factory value of <see cref="RdpResolutionPresets"/>,
+    /// what the settings panel's reset puts back, and what the session menu falls back to.
+    /// </summary>
+    public static IReadOnlyList<string> DefaultRdpResolutionPresets { get; } =
     [
         "1920x1080", "1680x1050", "1600x900", "1440x900", "1366x768",
         "1280x1024", "1280x720", "1024x768", "2560x1440", "3840x2160"
     ];
 
     // Session
-    public bool EnableSessionPersistence { get; set; }
     public const int DefaultMaxEmbeddedSessions = 10;
     [SettingRange(1, 20)]
     public int MaxEmbeddedSessions { get; set; } = DefaultMaxEmbeddedSessions;
-    public int EmbeddedIdleTimeoutMs { get; set; }
     public bool SftpBrowserEnabled { get; set; } = true;
     public bool SftpAutoOpenOnSsh { get; set; } = true;
     public bool SftpFollowSshDirectory { get; set; }
@@ -475,9 +478,12 @@ public sealed class AppSettings
     public bool CmdLibGitSyncEnabled { get; set; }
     public string? CmdLibGitSyncUrl { get; set; }
     public string? CmdLibGitSyncToken { get; set; }
-    public string CmdLibGitSyncBranch { get; set; } = "main";
-    public string CmdLibGitSyncAuthorName { get; set; } = "Heimdall User";
-    public string CmdLibGitSyncAuthorEmail { get; set; } = "heimdall@local";
+    public const string DefaultCmdLibGitSyncBranch = "main";
+    public const string DefaultCmdLibGitSyncAuthorName = "Heimdall User";
+    public const string DefaultCmdLibGitSyncAuthorEmail = "heimdall@local";
+    public string CmdLibGitSyncBranch { get; set; } = DefaultCmdLibGitSyncBranch;
+    public string CmdLibGitSyncAuthorName { get; set; } = DefaultCmdLibGitSyncAuthorName;
+    public string CmdLibGitSyncAuthorEmail { get; set; } = DefaultCmdLibGitSyncAuthorEmail;
     public bool CmdLibGitSyncOnStartup { get; set; }
     public bool CmdLibGitSyncAutoPush { get; set; } = true;
 

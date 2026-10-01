@@ -782,9 +782,12 @@ public sealed partial class SessionCoordinatorPreMountTests
             return Task.FromResult<bool?>(false);
         }
 
+        /// <summary>Answers an input prompt instead of echoing its default, when set.</summary>
+        public Func<string?>? InputAnswer { get; set; }
+
         public Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null)
         {
-            return Task.FromResult(defaultValue);
+            return Task.FromResult(InputAnswer is null ? defaultValue : InputAnswer());
         }
 
         public Task<string?> ShowPasswordInputAsync(
@@ -803,11 +806,6 @@ public sealed partial class SessionCoordinatorPreMountTests
         public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null)
         {
             return Task.FromResult<GatewayDialogResult?>(null);
-        }
-
-        public Task<ProjectDialogResult?> ShowProjectDialogAsync(ProjectDialogViewModel? editVm = null)
-        {
-            return Task.FromResult<ProjectDialogResult?>(null);
         }
 
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(

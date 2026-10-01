@@ -27,19 +27,13 @@ public readonly record struct ResolutionPreset(int Width, int Height)
 
 public static class ResolutionPresetCatalog
 {
-    private static readonly string[] DefaultResolutionPresets =
-    [
-        "1920x1080", "1680x1050", "1600x900", "1440x900", "1366x768",
-        "1280x1024", "1280x720", "1024x768", "2560x1440", "3840x2160"
-    ];
-
     public static IReadOnlyList<ResolutionPreset> GetPresets(AppSettings? settings)
     {
-        var configured = settings?.RdpResolutionPresets is { Length: > 0 } presets
+        IReadOnlyList<string> configured = settings?.RdpResolutionPresets is { Length: > 0 } presets
             ? presets
-            : DefaultResolutionPresets;
+            : AppSettings.DefaultRdpResolutionPresets;
 
-        var result = new List<ResolutionPreset>(configured.Length);
+        var result = new List<ResolutionPreset>(configured.Count);
         foreach (var preset in configured)
         {
             if (TryParse(preset, out var parsed))

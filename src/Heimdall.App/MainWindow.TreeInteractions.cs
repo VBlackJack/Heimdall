@@ -391,9 +391,7 @@ public partial class MainWindow
         (bool toggle, bool extend, bool additive) = ResolveTreePointerSelection(modifiers);
         if (additive)
         {
-            _treeState.SuppressSelectedItemSync = true;
-            vm.ServerList.AddSelectionRangeTo(server);
-            treeViewItem.Focus();
+            ApplyTreeRangePress(_treeState, treeViewItem, () => vm.ServerList.AddSelectionRangeTo(server));
             ShowTreeSelection(vm, vm.ServerList.SelectedServer);
             e.Handled = true;
             return;
@@ -412,9 +410,7 @@ public partial class MainWindow
 
         if (extend)
         {
-            _treeState.SuppressSelectedItemSync = true;
-            vm.ServerList.ExtendSelectionTo(server);
-            treeViewItem.Focus();
+            ApplyTreeRangePress(_treeState, treeViewItem, () => vm.ServerList.ExtendSelectionTo(server));
             ShowTreeSelection(vm, vm.ServerList.SelectedServer);
             e.Handled = true;
             return;
@@ -433,6 +429,87 @@ public partial class MainWindow
             SynchronizeNativeTreeSelection(_treeState, treeViewItem);
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// Applies a Shift or Ctrl+Shift range press, then puts focus on the pressed row without
+    /// letting that focus rewrite the selection the range has just made.
+    /// </summary>
+    /// <param name="treeState">The transient TreeView interaction state.</param>
+    /// <param name="pressedContainer">The row under the pointer.</param>
+    /// <param name="applyRange">Extends or adds the range in the view model.</param>
+    internal static void ApplyTreeRangePress(
+        TreeInteractionState treeState,
+        TreeViewItem pressedContainer,
+        Action applyRange)
+    {
+        ArgumentNullException.ThrowIfNull(treeState);
+        ArgumentNullException.ThrowIfNull(pressedContainer);
+        ArgumentNullException.ThrowIfNull(applyRange);
+
+        // The flag used to be set and left for the selection-changed handler to clear. Focusing
+        // the row that already has focus raises no selection change, so nothing cleared it, and
+        // the next genuine click was taken for a modifier gesture and swallowed.
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            applyRange();
+            pressedContainer.Focus();
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
+        }
+    }
+
+    /// <summary>
+    /// Focuses the row a right-click lands on before its context menu opens.
+    /// </summary>
+    /// <param name="treeState">The transient TreeView interaction state.</param>
+    /// <param name="container">The row under the pointer.</param>
+    /// <param name="opensBulkMenu">Whether the row belongs to a multi-selection the menu will act on.</param>
+    internal static void FocusRowForContextMenu(
+        TreeInteractionState treeState,
+        TreeViewItem container,
+        bool opensBulkMenu)
+    {
+        ArgumentNullException.ThrowIfNull(treeState);
+        ArgumentNullException.ThrowIfNull(container);
+
+        if (!opensBulkMenu)
+        {
+            // Outside a multi-selection a right-click selects the row, which is what WPF's own
+            // focus-then-select does through the selection sync.
+            container.Focus();
+            return;
+        }
+
+        // A row of the multi-selection that lacks keyboard focus is not WPF's selected row:
+        // focusing it selects it, and an unsuppressed sync collapses the selection onto it
+        // before the bulk menu the right-click asked for can open.
+        treeState.SuppressSelectedItemSync = true;
+        try
+        {
+            container.Focus();
+        }
+        finally
+        {
+            treeState.SuppressSelectedItemSync = false;
+        }
+    }
+
+    /// <summary>
+    /// The status line a Delete press on a folder shows, or <see langword="null"/> when the press
+    /// is not one the tree refuses.
+    /// </summary>
+    /// <param name="focusedNode">The data context of the container owning keyboard focus.</param>
+    /// <param name="localize">Resolves a locale key.</param>
+    internal static string? DescribeRefusedTreeDeletion(object? focusedNode, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+        return focusedNode is FolderViewModel
+            ? string.Format(localize("TreeStatusDeleteFolderHint"), localize("TreeCtxDeleteGroup"))
+            : null;
     }
 
     /// <summary>
@@ -575,11 +652,17 @@ public partial class MainWindow
 
         if (treeViewItem is not null)
         {
-            treeViewItem.Focus();
+            // Asked before the focus moves: focusing a row WPF has not selected selects it, and
+            // the selection sync that follows would collapse the very multi-selection the menu
+            // is about to act on.
+            bool opensBulkMenu = treeViewItem.DataContext is ServerItemViewModel pressed
+                && DataContext is MainViewModel bulkViewModel
+                && bulkViewModel.ServerList.ShouldOpenBulkContextMenu(pressed);
+            FocusRowForContextMenu(_treeState, treeViewItem, opensBulkMenu);
 
             if (treeViewItem.DataContext is ServerItemViewModel server && DataContext is MainViewModel vm)
             {
-                if (vm.ServerList.ShouldOpenBulkContextMenu(server))
+                if (opensBulkMenu)
                 {
                     _treeState.ContextTarget = vm.ServerList.CreateBulkSelectionContext() ?? (object)server;
                     ShowTreeSelection(vm, vm.ServerList.SelectedServer);
@@ -783,6 +866,15 @@ public partial class MainWindow
 
         if (!deleteSelection)
         {
+            // A folder refuses the key rather than deleting the session selected elsewhere, and
+            // says so: a key that does nothing, silently, reads as a key that is broken.
+            if (DescribeRefusedTreeDeletion(
+                    FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext,
+                    vm.Localize) is { } refusal)
+            {
+                vm.StatusText = refusal;
+            }
+
             return;
         }
 
@@ -1053,6 +1145,7 @@ public partial class MainWindow
         {
             ServerRenameResult result =
                 await vm.ServerList.WithOrganizationUndoAsync(
+                    TreeOrganizationChange.Rename,
                     () => new ServerRenameService(vm.ConfigManager).RenameAsync(server.Id, server.EditName),
                     serverIds: new[] { server.Id });
 
@@ -1120,6 +1213,7 @@ public partial class MainWindow
             await vm.ServerList.FlushExpandStateForCloseAsync();
             FolderRenameResult result =
                 await vm.ServerList.WithOrganizationUndoAsync(
+                    TreeOrganizationChange.FolderRename,
                     () => new FolderRenameService(vm.ConfigManager).RenameAsync(oldPath, folder.EditName),
                     result => result.Status == FolderRenameStatus.Renamed
                         ? new FolderRenamePlan(result.NewPath!, oldPath) : null);
@@ -1268,7 +1362,19 @@ public partial class MainWindow
                     return;
                 }
 
-                SelectRowProgrammatically(_treeState, container, server, vm.ServerList.SelectSingle);
+                // A restored multi-selection already holds this row: selecting it alone would
+                // throw the rest of the restored selection away.
+                SelectRowProgrammatically(
+                    _treeState,
+                    container,
+                    server,
+                    row =>
+                    {
+                        if (!vm.ServerList.SelectedItems.Contains(row))
+                        {
+                            vm.ServerList.SelectSingle(row);
+                        }
+                    });
                 container.BringIntoView();
             }));
     }
@@ -1387,6 +1493,8 @@ public partial class MainWindow
 
         try
         {
+            // DoDragDrop runs its own loop until the drop: the drop zone shows for exactly that long.
+            vm.ServerList.IsTreeDragInProgress = true;
             switch (sourceItem)
             {
                 case ServerItemViewModel sourceServer:
@@ -1417,6 +1525,7 @@ public partial class MainWindow
         }
         finally
         {
+            vm.ServerList.IsTreeDragInProgress = false;
             StopTreeDragNavigation();
             ClearDropHighlight();
         }
@@ -1668,7 +1777,7 @@ public partial class MainWindow
                 DropTargetVisualState.SetInsertion(row, insertion);
                 _treeState.LastDropHighlight = row;
                 SetTreeDropFeedback(string.Format(
-                    vm.Localize(insertion == DropInsertion.Before ? "TreeUxDropBefore" : "TreeUxDropAfter"),
+                    vm.Localize(ResolveServerDropFeedbackKey(insertion, payload.Servers.Count)),
                     payload.Servers.Count, anchor.DisplayName,
                     string.IsNullOrWhiteSpace(anchor.Group) ? vm.Localize("TreeNodeNoGroup") : anchor.Group));
                 UpdateTreeDragNavigation(e, null);
@@ -1704,7 +1813,10 @@ public partial class MainWindow
         string destination = string.IsNullOrWhiteSpace(hoverFolder?.FullPath)
             ? vm.Localize("TreeNodeNoGroup") : hoverFolder.FullPath;
         SetTreeDropFeedback(payload is not null
-            ? string.Format(vm.Localize("TreeUxDropFolder"), payload.Servers.Count, destination)
+            ? string.Format(
+                vm.Localize(ResolveServerDropFeedbackKey(DropInsertion.None, payload.Servers.Count)),
+                payload.Servers.Count,
+                destination)
             : string.Format(vm.Localize("TreeUxDropMoveFolder"), folderPayload!.Folder.Name, destination));
         UpdateTreeDragNavigation(e, hoverFolder);
 
@@ -1775,19 +1887,64 @@ public partial class MainWindow
             return;
         }
 
-        // The single-session wording is kept for a drag that carried one row, so the message a
-        // one-row drag has always produced is unchanged; the count is only spelled out when there
-        // was a set to lose track of.
-        vm.StatusText = payload.Servers.Count == 1
-            ? string.Format(
-                vm.Localize("StatusMovedToGroup"),
-                payload.Servers[0].DisplayName,
-                targetDisplayName)
-            : string.Format(
-                vm.Localize("StatusMovedSessionsToGroup"),
-                moved,
-                targetDisplayName);
+        vm.StatusText = FormatMovedToGroupStatus(vm.Localize, payload.Servers, moved, targetDisplayName);
     }
+
+    /// <summary>
+    /// Words the status line after a drop moved sessions into a folder.
+    /// </summary>
+    /// <param name="localize">Resolves a locale key.</param>
+    /// <param name="dragged">The sessions the drag carried.</param>
+    /// <param name="moved">How many of them the move actually changed.</param>
+    /// <param name="targetDisplayName">The destination folder as the tree shows it.</param>
+    /// <returns>The status text.</returns>
+    internal static string FormatMovedToGroupStatus(
+        Func<string, string> localize,
+        IReadOnlyList<ServerItemViewModel> dragged,
+        int moved,
+        string targetDisplayName)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+        ArgumentNullException.ThrowIfNull(dragged);
+
+        // A one-row drag names the session. A set is counted, and worded from the count the move
+        // reports rather than from the count the drag carried: two dragged with one already in
+        // place used to read "Moved 1 sessions".
+        if (dragged.Count == 1 && moved == 1)
+        {
+            return string.Format(
+                localize("StatusMovedToGroup"),
+                dragged[0].DisplayName,
+                targetDisplayName);
+        }
+
+        return string.Format(
+            localize(moved == 1 ? "StatusMovedSessionsToGroupOne" : "StatusMovedSessionsToGroup"),
+            moved,
+            targetDisplayName);
+    }
+
+    /// <summary>
+    /// The locale key the drop hint uses for a set of dragged sessions.
+    /// </summary>
+    /// <param name="insertion">Where the drop lands relative to a row, or none for a folder drop.</param>
+    /// <param name="count">How many sessions the drag carries.</param>
+    /// <returns>The key to format with the count and the destination.</returns>
+    /// <remarks>
+    /// Each wording comes in two keys, one for a single session and one for several, so no
+    /// language has to fall back on "session(s)". The single one names its number, because the
+    /// French singular also covers zero and a hint reading "une session" for none would lie.
+    /// </remarks>
+    internal static string ResolveServerDropFeedbackKey(DropInsertion insertion, int count) =>
+        (insertion, count == 1) switch
+        {
+            (DropInsertion.Before, true) => "TreeUxDropBeforeOne",
+            (DropInsertion.Before, false) => "TreeUxDropBefore",
+            (DropInsertion.After, true) => "TreeUxDropAfterOne",
+            (DropInsertion.After, false) => "TreeUxDropAfter",
+            (_, true) => "TreeUxDropFolderOne",
+            _ => "TreeUxDropFolder",
+        };
 
     private bool TryResolveTreeGroupDropTarget(
         object sender,
@@ -1841,6 +1998,7 @@ public partial class MainWindow
             await vm.ServerList.FlushExpandStateForCloseAsync();
             string oldPath = folder.FullPath;
             FolderMoveResult result = await vm.ServerList.WithOrganizationUndoAsync(
+                TreeOrganizationChange.FolderMove,
                 () => new FolderMoveService(vm.ConfigManager).MoveAsync(oldPath, targetParentPath),
                 result => result.Status == FolderMoveStatus.Moved
                     ? new FolderRenamePlan(result.NewPath!, oldPath) : null);

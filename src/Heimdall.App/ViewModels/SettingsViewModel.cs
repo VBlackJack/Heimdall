@@ -173,10 +173,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// this panel, and one copy of that sequence is the point.
     /// </summary>
     private IGatewayCreationService? _gatewayCreation;
-    private List<ProjectDto> _pendingProjects = new();
-
-    // Projects removed before Save - servers are unassigned on flush
-    private readonly List<string> _deletedProjectIds = new();
 
     // Gateways removed before Save - all reverse references are cleared on flush
     private readonly HashSet<string> _deletedGatewayIds = new(StringComparer.OrdinalIgnoreCase);
@@ -301,6 +297,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private string _terminalFontFamily = "Consolas";
 
+    private IReadOnlyList<string>? _installedFontFamilies;
+
+    /// <summary>Lists the font families installed on this machine; replaceable for tests.</summary>
+    internal Func<IReadOnlyList<string>> InstalledFontFamiliesProvider { get; set; } = ReadInstalledFontFamilies;
+
+    /// <summary>
+    /// The installed font families the terminal font box offers, read once, on first use.
+    /// </summary>
+    /// <remarks>
+    /// The font was a free text box, so a misspelt family silently fell back to the terminal's
+    /// default. The box offers what is installed and stays editable, so a font it does not list -
+    /// one installed later, or a CSS fallback list - can still be typed.
+    /// </remarks>
+    public IReadOnlyList<string> InstalledFontFamilies => _installedFontFamilies ??= InstalledFontFamiliesProvider();
+
+    private static IReadOnlyList<string> ReadInstalledFontFamilies() =>
+        System.Windows.Media.Fonts.SystemFontFamilies
+            .Select(family => family.Source)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [SettingRangeOf(nameof(AppSettings.TerminalFontSize))]
@@ -364,6 +383,24 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         => CommitNumericText(value, parsed => SshTmoutResetInterval = parsed);
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.SshKeepAliveIntervalSeconds))]
+    private int _sshKeepAliveIntervalSeconds = AppSettings.DefaultSshKeepAliveIntervalSeconds;
+
+    /// <summary>Text of the field that edits <see cref="SshKeepAliveIntervalSeconds"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sshKeepAliveIntervalSecondsText = string.Empty;
+
+    partial void OnSshKeepAliveIntervalSecondsTextChanged(string value)
+        => CommitNumericText(value, parsed => SshKeepAliveIntervalSeconds = parsed);
+
+    /// <summary>Whether Heimdall imports the OpenSSH known_hosts file each time it starts.</summary>
+    [ObservableProperty]
+    private bool _syncKnownHostsAtStartup;
+
+    [ObservableProperty]
     private bool _sshAutoReconnect;
 
     [ObservableProperty]
@@ -406,6 +443,52 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private string _nanaRunPath = "";
 
+    /// <summary>Checks a file path; replaceable so the "not found" hints can be exercised without a disk.</summary>
+    internal Func<string, bool> FileExists { get; set; } = File.Exists;
+
+    /// <summary>Checks a folder path; replaceable for the same reason as <see cref="FileExists"/>.</summary>
+    internal Func<string, bool> DirectoryExists { get; set; } = Directory.Exists;
+
+    /// <summary>True when a Plink path is typed and no file is there.</summary>
+    /// <remarks>
+    /// The six tool paths were accepted as typed and failed only at use: a mistyped Plink path
+    /// surfaced as a connection that fell back or failed, far from the field that caused it.
+    /// </remarks>
+    public bool IsPlinkPathMissing => IsFileMissing(PlinkPath);
+
+    /// <summary>True when a PuTTY path is typed and no file is there.</summary>
+    public bool IsPuttyPathMissing => IsFileMissing(PuttyPath);
+
+    /// <summary>True when an external editor path is typed and no file is there.</summary>
+    public bool IsExternalEditorPathMissing => IsFileMissing(ExternalEditorPath);
+
+    /// <summary>True when a Sysinternals folder is typed and does not exist.</summary>
+    public bool IsSysinternalsPathMissing => IsFolderMissing(SysinternalsPath);
+
+    /// <summary>True when a NirSoft folder is typed and does not exist.</summary>
+    public bool IsNirSoftPathMissing => IsFolderMissing(NirSoftPath);
+
+    /// <summary>True when a NanaRun folder is typed and does not exist.</summary>
+    public bool IsNanaRunPathMissing => IsFolderMissing(NanaRunPath);
+
+    private bool IsFileMissing(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && !FileExists(Environment.ExpandEnvironmentVariables(path.Trim()));
+
+    private bool IsFolderMissing(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && !DirectoryExists(Environment.ExpandEnvironmentVariables(path.Trim()));
+
+    partial void OnPlinkPathChanged(string value) => OnPropertyChanged(nameof(IsPlinkPathMissing));
+
+    partial void OnPuttyPathChanged(string value) => OnPropertyChanged(nameof(IsPuttyPathMissing));
+
+    partial void OnExternalEditorPathChanged(string value) => OnPropertyChanged(nameof(IsExternalEditorPathMissing));
+
+    partial void OnSysinternalsPathChanged(string value) => OnPropertyChanged(nameof(IsSysinternalsPathMissing));
+
+    partial void OnNirSoftPathChanged(string value) => OnPropertyChanged(nameof(IsNirSoftPathMissing));
+
+    partial void OnNanaRunPathChanged(string value) => OnPropertyChanged(nameof(IsNanaRunPathMissing));
+
     // --- Command Library Git Sync ---
 
     [ObservableProperty]
@@ -415,19 +498,97 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _cmdLibGitSyncUrl = "";
 
     [ObservableProperty]
-    private string _cmdLibGitSyncBranch = "main";
+    private string _cmdLibGitSyncBranch = AppSettings.DefaultCmdLibGitSyncBranch;
 
     [ObservableProperty]
-    private string _cmdLibGitSyncAuthorName = "Heimdall User";
+    private string _cmdLibGitSyncAuthorName = AppSettings.DefaultCmdLibGitSyncAuthorName;
 
     [ObservableProperty]
-    private string _cmdLibGitSyncAuthorEmail = "heimdall@local";
+    private string _cmdLibGitSyncAuthorEmail = AppSettings.DefaultCmdLibGitSyncAuthorEmail;
 
     [ObservableProperty]
     private bool _cmdLibGitSyncOnStartup;
 
     [ObservableProperty]
     private bool _cmdLibGitSyncAutoPush = true;
+
+    /// <summary>
+    /// Tests a typed repository URL and branch; supplied by the window, which owns the sync service.
+    /// </summary>
+    internal Func<string, string?, Task<TwinShell.Core.Interfaces.GitOperationResult>>? GitConnectionTester { get; set; }
+
+    /// <summary>The outcome of the last connection test, with its reason, or empty.</summary>
+    [ObservableProperty]
+    private string _gitSyncTestStatusText = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(TestGitSyncConnectionCommand))]
+    private bool _isTestingGitSyncConnection;
+
+    private bool CanTestGitSyncConnection() => !IsTestingGitSyncConnection;
+
+    /// <summary>
+    /// Tests the repository URL and branch as typed, and reports the outcome and its reason in a
+    /// status line.
+    /// </summary>
+    /// <remarks>
+    /// The button used to test the saved configuration - so a corrected URL failed until Save and
+    /// a mistyped one passed when the saved one was good - and it replaced its own label with
+    /// "Connection OK" or "Connection failed" for the rest of the session, without saying why.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanTestGitSyncConnection))]
+    private async Task TestGitSyncConnectionAsync()
+    {
+        if (GitConnectionTester is null)
+        {
+            return;
+        }
+
+        IsTestingGitSyncConnection = true;
+        GitSyncTestStatusText = _localizer["SettingsCmdLibSyncTestRunning"];
+        try
+        {
+            TwinShell.Core.Interfaces.GitOperationResult result = await GitConnectionTester(
+                CmdLibGitSyncUrl.Trim(),
+                string.IsNullOrWhiteSpace(CmdLibGitSyncBranch) ? null : CmdLibGitSyncBranch.Trim());
+            GitSyncTestStatusText = DescribeGitTest(result);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[GitSync] Test connection failed: {ex.Message}");
+            GitSyncTestStatusText = _localizer.Format(
+                "SettingsCmdLibSyncTestFailedReason",
+                _localizer["SettingsCmdLibSyncTestReasonOther"]);
+        }
+        finally
+        {
+            IsTestingGitSyncConnection = false;
+        }
+    }
+
+    private string DescribeGitTest(TwinShell.Core.Interfaces.GitOperationResult result)
+    {
+        if (result.Success)
+        {
+            return _localizer["SettingsCmdLibSyncTestSuccess"];
+        }
+
+        string reasonKey = result.ErrorCode switch
+        {
+            TwinShell.Core.Interfaces.GitSyncErrorCode.NetworkError => "SettingsCmdLibSyncTestReasonNetwork",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.AuthenticationFailed => "SettingsCmdLibSyncTestReasonAuth",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.RepositoryNotFound => "SettingsCmdLibSyncTestReasonNotFound",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.BranchNotFound => "SettingsCmdLibSyncTestReasonBranch",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.InvalidConfiguration => "SettingsCmdLibSyncTestReasonConfig",
+            TwinShell.Core.Interfaces.GitSyncErrorCode.Timeout => "SettingsCmdLibSyncTestReasonTimeout",
+            _ => "SettingsCmdLibSyncTestReasonOther",
+        };
+
+        string reason = result.ErrorCode == TwinShell.Core.Interfaces.GitSyncErrorCode.BranchNotFound
+            ? _localizer.Format(reasonKey, result.ErrorDetails ?? CmdLibGitSyncBranch)
+            : _localizer[reasonKey];
+        return _localizer.Format("SettingsCmdLibSyncTestFailedReason", reason);
+    }
 
     // --- RDP defaults ---
 
@@ -525,50 +686,115 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _rdpDialogAdvancedDefault;
 
     /// <summary>
-    /// Multi-line text representation of <see cref="RdpResolutionPresets"/>
-    /// for the Settings UI: one preset per line, format <c>WIDTHxHEIGHT</c>.
-    /// Setter parses, trims, validates and rebuilds the array. Invalid lines
-    /// are silently dropped - the user keeps editing what's left in the box.
+    /// Multi-line text of <see cref="RdpResolutionPresets"/> for the Settings UI: one preset per
+    /// line, format <c>WIDTHxHEIGHT</c>.
     /// </summary>
-    public string RdpResolutionPresetsText
-    {
-        get => string.Join(Environment.NewLine, RdpResolutionPresets);
-        set
-        {
-            var parsed = (value ?? string.Empty)
-                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-                .Select(line => line.Trim())
-                .Where(line =>
-                {
-                    var parts = line.Split(['x', 'X', '\u00D7'], 2);
-                    return parts.Length == 2
-                        && int.TryParse(parts[0].Trim(), out var w) && w > 0
-                        && int.TryParse(parts[1].Trim(), out var h) && h > 0;
-                })
-                .ToArray();
+    /// <remarks>
+    /// The box commits when it loses focus and the text is validated as a whole. It used to commit
+    /// on every keystroke through a setter that dropped any line it could not parse, so typing
+    /// "1920x" removed the line under the caret and a mistyped preset vanished without a word; the
+    /// bounds were not checked at all, so "99999x1" was offered to every RDP session menu.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateResolutionPresetsText))]
+    private string _rdpResolutionPresetsText = string.Empty;
 
-            if (!parsed.SequenceEqual(RdpResolutionPresets))
-            {
-                RdpResolutionPresets = parsed;
-                OnPropertyChanged();
-            }
+    /// <summary>Set while the text is being rewritten from the preset list, so it is not parsed back.</summary>
+    private bool _syncingResolutionPresetsText;
+
+    /// <summary>Prefix of the error <see cref="ValidateResolutionPresetsText"/> raises; the bad lines follow it.</summary>
+    private const string ResolutionPresetsErrorPrefix = "RdpResolutionPresetsInvalid:";
+
+    /// <summary>Separator between the bad lines quoted in the preset error.</summary>
+    private const string ResolutionPresetsErrorSeparator = ", ";
+
+    partial void OnRdpResolutionPresetsTextChanged(string value)
+    {
+        if (_syncingResolutionPresetsText)
+        {
+            return;
+        }
+
+        string[] parsed = ParseResolutionPresets(value, out List<string> invalid);
+        if (invalid.Count == 0 && !parsed.SequenceEqual(RdpResolutionPresets))
+        {
+            RdpResolutionPresets = parsed;
         }
     }
 
     [RelayCommand]
     private void ResetRdpResolutionPresets()
     {
-        RdpResolutionPresets =
-        [
-            "1920x1080", "1680x1050", "1600x900", "1440x900", "1366x768",
-            "1280x1024", "1280x720", "1024x768", "2560x1440", "3840x2160"
-        ];
-        OnPropertyChanged(nameof(RdpResolutionPresetsText));
+        RdpResolutionPresets = [.. AppSettings.DefaultRdpResolutionPresets];
     }
 
     partial void OnRdpResolutionPresetsChanged(string[] value)
     {
-        OnPropertyChanged(nameof(RdpResolutionPresetsText));
+        string text = string.Join(Environment.NewLine, value);
+        if (string.Equals(text, RdpResolutionPresetsText, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _syncingResolutionPresetsText = true;
+        try
+        {
+            RdpResolutionPresetsText = text;
+        }
+        finally
+        {
+            _syncingResolutionPresetsText = false;
+        }
+    }
+
+    /// <summary>
+    /// Validates the preset box: every non-blank line must be <c>WIDTHxHEIGHT</c> within the fixed
+    /// desktop bounds an RDP session accepts.
+    /// </summary>
+    public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateResolutionPresetsText(
+        string? value,
+        ValidationContext context)
+    {
+        _ = context;
+        _ = ParseResolutionPresets(value, out List<string> invalid);
+        return invalid.Count == 0
+            ? System.ComponentModel.DataAnnotations.ValidationResult.Success
+            : new System.ComponentModel.DataAnnotations.ValidationResult(
+                ResolutionPresetsErrorPrefix + string.Join(ResolutionPresetsErrorSeparator, invalid));
+    }
+
+    /// <summary>Parses the preset box, returning the valid presets and collecting the lines that are not.</summary>
+    internal static string[] ParseResolutionPresets(string? text, out List<string> invalid)
+    {
+        invalid = [];
+        List<string> presets = [];
+        foreach (string raw in (text ?? string.Empty).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            string line = raw.Trim();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            string[] parts = line.Split(['x', 'X', '\u00D7'], 2);
+            if (parts.Length == 2
+                && int.TryParse(parts[0].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int width)
+                && int.TryParse(parts[1].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int height)
+                && width >= RdpDisplayLimits.MinimumFixedDimension
+                && width <= RdpDisplayLimits.MaximumFixedWidth
+                && height >= RdpDisplayLimits.MinimumFixedDimension
+                && height <= RdpDisplayLimits.MaximumFixedHeight)
+            {
+                presets.Add(string.Create(CultureInfo.InvariantCulture, $"{width}x{height}"));
+            }
+            else
+            {
+                invalid.Add(line);
+            }
+        }
+
+        return [.. presets];
     }
 
     // --- Security ---
@@ -631,7 +857,36 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _credentialProviderUnlockSecret = "";
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.CredentialProviderTimeoutMs))]
     private int _credentialProviderTimeoutMs = 10000;
+
+    /// <summary>Text of the field that edits <see cref="CredentialProviderTimeoutMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _credentialProviderTimeoutMsText = string.Empty;
+
+    partial void OnCredentialProviderTimeoutMsTextChanged(string value)
+        => CommitNumericText(value, parsed => CredentialProviderTimeoutMs = parsed);
+
+    /// <summary>
+    /// Days a Windows Hello unlock stays accepted before the master password is asked again; 0
+    /// never asks.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.VaultHelloMaxDaysBeforeMasterPassword))]
+    private int _vaultHelloMaxDaysBeforeMasterPassword;
+
+    /// <summary>Text of the field that edits <see cref="VaultHelloMaxDaysBeforeMasterPassword"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _vaultHelloMaxDaysBeforeMasterPasswordText = string.Empty;
+
+    partial void OnVaultHelloMaxDaysBeforeMasterPasswordTextChanged(string value)
+        => CommitNumericText(value, parsed => VaultHelloMaxDaysBeforeMasterPassword = parsed);
 
     [ObservableProperty]
     private bool _requireCredentialGuard;
@@ -721,6 +976,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnIsVaultEnabledChanged(bool value)
     {
         OnPropertyChanged(nameof(VaultStatusText));
+        OnPropertyChanged(nameof(AutoLockAvailabilityHint));
         OnPropertyChanged(nameof(VaultDisabledActionsVisible));
         OnPropertyChanged(nameof(VaultEnabledActionsVisible));
         RefreshVaultHelloUiState();
@@ -729,6 +985,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     public string VaultStatusText => IsVaultEnabled
         ? _localizer["SettingsVaultStatusEnabled"]
         : _localizer["SettingsVaultStatusDisabled"];
+
+    /// <summary>
+    /// Why the auto-lock controls are disabled, for the accessible help text of their group; empty
+    /// when they are available.
+    /// </summary>
+    public string AutoLockAvailabilityHint => IsVaultEnabled
+        ? string.Empty
+        : _localizer["SettingsAutoLockRequiresVault"];
 
     /// <summary>Visibility flag for the "Enable" action (vault not yet configured).</summary>
     public bool VaultDisabledActionsVisible => !IsVaultEnabled;
@@ -776,6 +1040,19 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private bool _fileShareEnableTftp;
 
+    /// <summary>The TFTP choice as it stands on disk, so Save knows whether it is being turned on.</summary>
+    private bool _savedFileShareEnableTftp;
+
+    /// <summary>
+    /// Raised after a save that changed whether the file share serves TFTP, so a running share
+    /// can be restarted with the saved choice.
+    /// </summary>
+    /// <remarks>
+    /// The checkbox used to write to disk and restart the share the moment it was ticked, so it
+    /// was the one setting on the panel that Revert could not undo.
+    /// </remarks>
+    public event Action<bool>? FileShareTftpSaved;
+
     // --- Advanced / Logging ---
 
     [ObservableProperty]
@@ -783,6 +1060,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     private bool _sessionLoggingEnabled;
+
+    /// <summary>The session transcript choice as it stands on disk, so Save knows whether it is being turned on.</summary>
+    private bool _savedSessionLoggingEnabled;
 
     [ObservableProperty]
     private string _sessionLogDirectory = @"logs\sessions";
@@ -984,6 +1264,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RevertChangesCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private bool _isDirty;
 
     [ObservableProperty]
@@ -996,14 +1277,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [NotifyCanExecuteChangedFor(nameof(EditGatewayCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteGatewayCommand))]
     private GatewayItemViewModel? _selectedGateway;
-
-    [ObservableProperty]
-    private ObservableCollection<ProjectItemViewModel> _projects = new();
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(EditProjectCommand))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteProjectCommand))]
-    private ProjectItemViewModel? _selectedProject;
 
     /// <summary>
     /// Raised after a server import completes so the main shell can reload
@@ -1018,6 +1291,18 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     public event Action<string>? ThemeChanged;
 
     public event Action<string>? AccentTintChanged;
+
+    /// <summary>
+    /// Raised at the end of every <see cref="LoadFromSettings"/>, so fields the view fills by hand
+    /// rather than through a binding can follow.
+    /// </summary>
+    /// <remarks>
+    /// A PasswordBox cannot be bound. The credential provider unlock secret was pushed into its box
+    /// only when the window was built and when the language changed - before the first load, so the
+    /// box was empty after startup, and never after a revert or a reset, so it then showed a secret
+    /// that was no longer the pending one.
+    /// </remarks>
+    public event Action? SettingsLoaded;
 
     /// <summary>
     /// Raised when the user asks to see the welcome tour again.
@@ -1253,25 +1538,100 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     internal Func<GatewayOverviewMutationRequest, CancellationToken, Task<int>>? GatewayReferenceMutationHandler { get; set; }
 
+    /// <summary>The connection type whose saved sessions carry <see cref="ServerProfileDto.SshMode"/>.</summary>
+    private const string SshConnectionType = "SSH";
+
+    /// <summary>The connection type whose saved sessions carry <see cref="ServerProfileDto.RdpMode"/>.</summary>
+    private const string RdpConnectionType = "RDP";
+
     /// <summary>
-    /// Applies the current <see cref="SshDefaultMode"/> to every server in the inventory.
+    /// Raised after a write that changed saved sessions but none of the settings this panel edits
+    /// as pending values.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ConfigurationChanged"/> reloads this panel from disk, which is right after an
+    /// import and wrong here: the "apply to all" buttons sit in the middle of an editing visit, and a
+    /// reload threw away every other pending edit, dropped the dirty flag, and put back a language
+    /// or theme the user was still previewing.
+    /// </remarks>
+    public event Action? ServerInventoryChanged;
+
+    /// <summary>
+    /// Makes the current <see cref="SshDefaultMode"/> the saved default and rewrites it into every
+    /// saved SSH session.
     /// </summary>
     [RelayCommand]
-    private async Task ApplySshModeToAllAsync()
+    private Task ApplySshModeToAllAsync()
+        => ApplyModeToAllAsync(
+            SshConnectionType,
+            SshDefaultMode,
+            _localizer[SshModeDisplayKey(SshDefaultMode)],
+            server => server.SshMode,
+            (server, mode) => server.SshMode = mode,
+            (settings, mode) => settings.SshDefaultMode = mode,
+            "ConfirmApplyAllTitle",
+            "ConfirmApplySshModeMessage");
+
+    /// <summary>
+    /// Makes the current <see cref="RdpDefaultMode"/> the saved default and rewrites it into every
+    /// saved RDP session.
+    /// </summary>
+    [RelayCommand]
+    private Task ApplyRdpModeToAllAsync()
+        => ApplyModeToAllAsync(
+            RdpConnectionType,
+            RdpDefaultMode,
+            _localizer[RdpModeDisplayKey(RdpDefaultMode)],
+            server => server.RdpMode,
+            (server, mode) => server.RdpMode = mode,
+            (settings, mode) => settings.RdpDefaultMode = mode,
+            "SettingsApplyModeToAllConfirmTitle",
+            "SettingsApplyModeToAllConfirmBody");
+
+    private static string SshModeDisplayKey(string mode) =>
+        string.Equals(mode, "External", StringComparison.Ordinal)
+            ? "SettingsSshModeExternal"
+            : "SettingsSshModeEmbedded";
+
+    private static string RdpModeDisplayKey(string mode) =>
+        string.Equals(mode, "External", StringComparison.Ordinal)
+            ? "SettingsRdpModeExternal"
+            : "SettingsRdpModeEmbedded";
+
+    /// <summary>
+    /// Rewrites one mode into every saved session of one connection type, and saves that mode as
+    /// the default in the same gesture.
+    /// </summary>
+    /// <remarks>
+    /// The confirmation counts the sessions that will change, not the sessions of the type: the
+    /// user is agreeing to a rewrite, and the number they read is the size of it. Only the mode
+    /// field of the settings is written, so every other pending edit on the panel stays pending.
+    /// </remarks>
+    private async Task ApplyModeToAllAsync(
+        string connectionType,
+        string mode,
+        string modeDisplayName,
+        Func<ServerProfileDto, string?> readMode,
+        Action<ServerProfileDto, string> writeMode,
+        Action<AppSettings, string> writeDefault,
+        string titleKey,
+        string bodyKey)
     {
-        var servers = await _configManager.LoadServersAsync();
-        var mode = SshDefaultMode;
-        var changeCount = servers.Count(s => !string.Equals(s.SshMode, mode, StringComparison.Ordinal));
+        List<ServerProfileDto> servers = await _configManager.LoadServersAsync();
+        List<ServerProfileDto> ofType = servers
+            .Where(server => string.Equals(server.ConnectionType, connectionType, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        int changeCount = ofType.Count(server => !string.Equals(readMode(server), mode, StringComparison.Ordinal));
 
         if (changeCount == 0)
         {
-            FileLogger.Info("ApplySshModeToAll: no changes needed.");
+            FileLogger.Info($"ApplyModeToAll {connectionType}: no changes needed.");
             return;
         }
 
-        var confirmed = await _dialogService.ShowConfirmAsync(
-            _localizer["ConfirmApplyAllTitle"],
-            _localizer.Format("ConfirmApplySshModeMessage", mode, changeCount, servers.Count),
+        bool confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer[titleKey],
+            _localizer.Format(bodyKey, modeDisplayName, changeCount, ofType.Count),
             "danger");
 
         if (!confirmed) return;
@@ -1279,71 +1639,28 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         var update = await _configManager.MutateServersAsync(currentServers =>
         {
             int updatedCount = 0;
+            int totalCount = 0;
             foreach (ServerProfileDto server in currentServers)
             {
-                if (!string.Equals(server.SshMode, mode, StringComparison.Ordinal))
+                if (!string.Equals(server.ConnectionType, connectionType, StringComparison.OrdinalIgnoreCase))
                 {
-                    server.SshMode = mode;
+                    continue;
+                }
+
+                totalCount++;
+                if (!string.Equals(readMode(server), mode, StringComparison.Ordinal))
+                {
+                    writeMode(server, mode);
                     updatedCount++;
                 }
             }
 
-            return (UpdatedCount: updatedCount, TotalCount: currentServers.Count);
+            return (UpdatedCount: updatedCount, TotalCount: totalCount);
         });
-        ConfigurationChanged?.Invoke();
+        await _configManager.MergeSettingAsync(settings => writeDefault(settings, mode));
+        ServerInventoryChanged?.Invoke();
         FileLogger.Info(
-            $"Applied SSH mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} servers.");
-    }
-
-    /// <summary>
-    /// Applies the current <see cref="RdpDefaultMode"/> to every server in the inventory.
-    /// </summary>
-    [RelayCommand]
-    private async Task ApplyRdpModeToAllAsync()
-    {
-        var servers = await _configManager.LoadServersAsync();
-        var rdpServers = servers
-            .Where(s => string.Equals(s.ConnectionType, "RDP", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var mode = RdpDefaultMode;
-        var changeCount = rdpServers.Count(s => !string.Equals(s.RdpMode, mode, StringComparison.Ordinal));
-
-        if (changeCount == 0)
-        {
-            FileLogger.Info("ApplyRdpModeToAll: no changes needed.");
-            return;
-        }
-
-        var confirmed = await _dialogService.ShowConfirmAsync(
-            _localizer["SettingsApplyModeToAllConfirmTitle"],
-            _localizer.Format("SettingsApplyModeToAllConfirmBody", rdpServers.Count),
-            "danger");
-
-        if (!confirmed) return;
-
-        var update = await _configManager.MutateServersAsync(currentServers =>
-        {
-            List<ServerProfileDto> currentRdpServers = currentServers
-                .Where(server => string.Equals(
-                    server.ConnectionType,
-                    "RDP",
-                    StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            int updatedCount = 0;
-            foreach (ServerProfileDto server in currentRdpServers)
-            {
-                if (!string.Equals(server.RdpMode, mode, StringComparison.Ordinal))
-                {
-                    server.RdpMode = mode;
-                    updatedCount++;
-                }
-            }
-
-            return (UpdatedCount: updatedCount, TotalCount: currentRdpServers.Count);
-        });
-        ConfigurationChanged?.Invoke();
-        FileLogger.Info(
-            $"Applied RDP mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} RDP servers.");
+            $"Applied {connectionType} mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} saved sessions.");
     }
 
     /// <summary>
@@ -1377,6 +1694,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // Advanced / File sharing
         FileShareEnableTftp = settings.FileShareEnableTftp;
+        _savedFileShareEnableTftp = settings.FileShareEnableTftp;
 
         // Terminal
         TerminalFontFamily = settings.TerminalFontFamily;
@@ -1391,6 +1709,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SshAgentPreference = settings.SshAgentPreference.ToString();
         AntiIdleInterval = settings.AntiIdleIntervalSeconds;
         SshTmoutResetInterval = settings.SshTmoutResetIntervalSeconds;
+        SshKeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds;
+        SyncKnownHostsAtStartup = settings.SyncKnownHostsAtStartup;
         SshAutoReconnect = settings.SshAutoReconnect;
         SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
         SftpBrowserEnabled = settings.SftpBrowserEnabled;
@@ -1453,6 +1773,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         CredentialProviderUnlockSecret =
             CredentialProtector.Unprotect(settings.CredentialProviderUnlockSecretEncrypted) ?? "";
         CredentialProviderTimeoutMs = settings.CredentialProviderTimeoutMs;
+        VaultHelloMaxDaysBeforeMasterPassword = settings.VaultHelloMaxDaysBeforeMasterPassword;
         RequireCredentialGuard = settings.RequireCredentialGuard;
         RequireWindowsHelloOnConnect = settings.RequireWindowsHelloOnConnect;
         WindowsHelloGraceMinutes = settings.WindowsHelloGraceMinutes;
@@ -1467,6 +1788,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Advanced / Logging
         EnableLogging = settings.EnableLogging;
         SessionLoggingEnabled = settings.SessionLoggingEnabled;
+        _savedSessionLoggingEnabled = settings.SessionLoggingEnabled;
         SessionLogDirectory = settings.SessionLogDirectory;
         TunnelEstablishmentDelayMs = settings.TunnelEstablishmentDelayMs;
         RdpConnectWatchdogTimeoutMs = settings.RdpConnectWatchdogTimeoutMs;
@@ -1507,19 +1829,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 ParentGatewayId = g.ParentGatewayId
             }));
 
-        Projects = new ObservableCollection<ProjectItemViewModel>(
-            settings.Projects.Select(p => new ProjectItemViewModel
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Color = p.Color ?? "#3B82F6",
-                Description = p.Description ?? ""
-            }));
-
         // Seed working buffers from loaded settings
         _pendingGateways = settings.SshGateways.Select(CloneGateway).ToList();
-        _pendingProjects = settings.Projects.Select(CloneProject).ToList();
-        _deletedProjectIds.Clear();
         _deletedGatewayIds.Clear();
 
         SyncNumericTexts();
@@ -1531,6 +1842,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // command owns the failure, and the panel is not on screen when settings load.
         TrustedRdpCertificates.RefreshCommand.Execute(null);
         IsDirty = false;
+        SettingsLoaded?.Invoke();
     }
 
     /// <summary>
@@ -1550,6 +1862,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         AntiIdleIntervalText = AntiIdleInterval.ToString(CultureInfo.InvariantCulture);
         SshTmoutResetIntervalText = SshTmoutResetInterval.ToString(CultureInfo.InvariantCulture);
         SshAutoReconnectAttemptsText = SshAutoReconnectAttempts.ToString(CultureInfo.InvariantCulture);
+        SshKeepAliveIntervalSecondsText = SshKeepAliveIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+        CredentialProviderTimeoutMsText = CredentialProviderTimeoutMs.ToString(CultureInfo.InvariantCulture);
+        VaultHelloMaxDaysBeforeMasterPasswordText = VaultHelloMaxDaysBeforeMasterPassword.ToString(CultureInfo.InvariantCulture);
         TunnelEstablishmentDelayMsText = TunnelEstablishmentDelayMs.ToString(CultureInfo.InvariantCulture);
         RdpConnectWatchdogTimeoutMsText = RdpConnectWatchdogTimeoutMs.ToString(CultureInfo.InvariantCulture);
         ExternalToolTimeoutMsText = ExternalToolTimeoutMs.ToString(CultureInfo.InvariantCulture);
@@ -1569,10 +1884,65 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         AutoLockIdleMinutesText = AutoLockIdleMinutes.ToString(CultureInfo.InvariantCulture);
     }
 
-    [RelayCommand]
+    /// <summary>
+    /// A short confirmation after a successful Save, announced through a live region; empty
+    /// otherwise, and cleared by the next edit.
+    /// </summary>
+    /// <remarks>
+    /// Save used to answer with nothing but a button going grey, which a screen reader does not
+    /// report and a sighted user can miss.
+    /// </remarks>
+    [ObservableProperty]
+    private string _saveStatusText = string.Empty;
+
+    partial void OnIsDirtyChanged(bool value)
+    {
+        if (value)
+        {
+            SaveStatusText = string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Save is offered only when there is something to save. It was always enabled, so pressing it
+    /// on a clean panel looked like it did something, and nothing distinguished a panel with edits
+    /// pending from one without. Ctrl+S goes through the same gate.
+    /// </summary>
+    private bool CanSave() => IsDirty;
+
+    [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync(CancellationToken cancellationToken)
     {
-        if (await TrySaveAsync(cancellationToken) || cancellationToken.IsCancellationRequested)
+        // Turning on a share that answers anyone on the network without a password, or a
+        // transcript that keeps what is typed into every session, is asked about once, here. Only
+        // the explicit Save asks: the leave-tab and close paths have just put a Save / Discard /
+        // Cancel question in front of the user, and the close path runs inside a Closing handler,
+        // where a second modal is a shape this repository avoids.
+        if (FileShareEnableTftp && !_savedFileShareEnableTftp
+            && !await _dialogService.ShowConfirmAsync(
+                _localizer["SettingsTftpEnableConfirmTitle"],
+                _localizer["SettingsTftpEnableConfirmBody"],
+                "warning"))
+        {
+            return;
+        }
+
+        if (SessionLoggingEnabled && !_savedSessionLoggingEnabled
+            && !await _dialogService.ShowConfirmAsync(
+                _localizer["SettingsSessionLoggingEnableConfirmTitle"],
+                _localizer["SettingsSessionLoggingEnableConfirmBody"],
+                "warning"))
+        {
+            return;
+        }
+
+        if (await TrySaveAsync(cancellationToken))
+        {
+            SaveStatusText = _localizer["SettingsSavedAnnouncement"];
+            return;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
         {
             return;
         }
@@ -1610,6 +1980,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (HasErrors)
         {
+            if (FirstInvalidFieldProperty() is { } firstInvalid)
+            {
+                InvalidFieldFocusRequested?.Invoke(firstInvalid);
+            }
+
             return false;
         }
 
@@ -1638,7 +2013,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
     }
 
-    private async Task PersistValidatedSettingsAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Writes every value this panel edits into <paramref name="settings"/>, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Save runs it inside the merge; the settings import runs it to build what the panel holds
+    /// before an imported file is laid over it.
+    /// </remarks>
+    private void WritePanelInto(AppSettings settings)
     {
         SshAgentPreferenceEnum parsedSshAgentPreference = Enum.TryParse<SshAgentPreferenceEnum>(
                 SshAgentPreference,
@@ -1655,27 +2037,144 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             RunAsAdministrator = tool.RunAsAdministrator,
             RunHidden = tool.RunHidden
         }).ToList();
+
+        // General
+        settings.DefaultLocale = DefaultLocale;
+        settings.DefaultTheme = DefaultTheme;
+        settings.AccentTint = AccentTint;
+        settings.MaxEmbeddedSessions = MaxEmbeddedSessions;
+        settings.PreventSleepDuringSession = PreventSleepDuringSession;
+        settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
+        settings.ExternalEditorPath = ExternalEditorPath;
+        settings.UpdateCheckEnabled = UpdateCheckEnabled;
+        settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
+
+        // Terminal
+        settings.TerminalFontFamily = TerminalFontFamily;
+        settings.TerminalFontSize = TerminalFontSize;
+        settings.TerminalColorScheme = TerminalColorScheme;
+        settings.PowerShellExecutionPolicy = PowerShellExecutionPolicy;
+
+        // SSH & SFTP
+        settings.PlinkPath = PlinkPath;
+        settings.PuttyPath = string.IsNullOrWhiteSpace(PuttyPath) ? null : PuttyPath;
+        settings.SshDefaultMode = SshDefaultMode;
+        settings.SshAgentPreference = parsedSshAgentPreference;
+        settings.AntiIdleIntervalSeconds = AntiIdleInterval;
+        settings.SshTmoutResetIntervalSeconds = SshTmoutResetInterval;
+        settings.SshKeepAliveIntervalSeconds = SshKeepAliveIntervalSeconds;
+        settings.SyncKnownHostsAtStartup = SyncKnownHostsAtStartup;
+        settings.SshAutoReconnect = SshAutoReconnect;
+        settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
+        settings.SftpBrowserEnabled = SftpBrowserEnabled;
+        settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
+        settings.SftpFollowSshDirectory = SftpFollowSshDirectory;
+        settings.X11ServerPath = string.IsNullOrWhiteSpace(X11ServerPath) ? null : X11ServerPath;
+        settings.X11AutoStart = X11AutoStart;
+        settings.SysinternalsPath = string.IsNullOrWhiteSpace(SysinternalsPath) ? null : SysinternalsPath;
+        settings.NirSoftPath = string.IsNullOrWhiteSpace(NirSoftPath) ? null : NirSoftPath;
+        settings.NanaRunPath = string.IsNullOrWhiteSpace(NanaRunPath) ? null : NanaRunPath;
+
+        // Command Library Git Sync
+        settings.CmdLibGitSyncEnabled = CmdLibGitSyncEnabled;
+        settings.CmdLibGitSyncUrl = string.IsNullOrWhiteSpace(CmdLibGitSyncUrl) ? null : CmdLibGitSyncUrl;
+        settings.CmdLibGitSyncBranch = CmdLibGitSyncBranch;
+        settings.CmdLibGitSyncAuthorName = CmdLibGitSyncAuthorName;
+        settings.CmdLibGitSyncAuthorEmail = CmdLibGitSyncAuthorEmail;
+        settings.CmdLibGitSyncOnStartup = CmdLibGitSyncOnStartup;
+        settings.CmdLibGitSyncAutoPush = CmdLibGitSyncAutoPush;
+
+        // Session Health Monitor
+        settings.SessionHealthMonitorEnabled = SessionHealthMonitorEnabled;
+        settings.SessionHealthCheckIntervalSeconds = SessionHealthCheckIntervalSeconds;
+        settings.SessionHealthProbeTimeoutMs = SessionHealthProbeTimeoutMs;
+        settings.SessionHealthMaxConcurrent = SessionHealthMaxConcurrent;
+
+        // RDP defaults
+        settings.DefaultResolutionWidth = DefaultResolutionWidth;
+        settings.DefaultResolutionHeight = DefaultResolutionHeight;
+        settings.RdpDefaultMode = RdpDefaultMode;
+        settings.RdpDefaultNla = RdpDefaultNla;
+        settings.RdpDefaultStrictServerAuthentication = RdpDefaultStrictServerAuthentication;
+        settings.RdpDefaultColorDepth = RdpDefaultColorDepth;
+        settings.RdpDefaultDynamicResolution = RdpDefaultDynamicResolution;
+        settings.RdpDefaultMultiMonitor = RdpDefaultMultiMonitor;
+        settings.RdpDefaultRedirectClipboard = RdpDefaultRedirectClipboard;
+        settings.RdpDefaultRedirectDrives = RdpDefaultRedirectDrives;
+        settings.RdpDefaultRedirectPrinters = RdpDefaultRedirectPrinters;
+        settings.RdpDefaultRedirectComPorts = RdpDefaultRedirectComPorts;
+        settings.RdpDefaultRedirectSmartCards = RdpDefaultRedirectSmartCards;
+        settings.RdpDefaultRedirectWebcam = RdpDefaultRedirectWebcam;
+        settings.RdpDefaultRedirectUsb = RdpDefaultRedirectUsb;
+        settings.RdpDefaultAudioCapture = RdpDefaultAudioCapture;
+        settings.RdpDefaultAutoReconnect = RdpDefaultAutoReconnect;
+        settings.RdpDefaultBitmapCaching = RdpDefaultBitmapCaching;
+        settings.RdpDefaultCompression = RdpDefaultCompression;
+        settings.RdpDefaultHardwareAcceleration = RdpDefaultHardwareAcceleration;
+        settings.RdpDefaultAudioMode = RdpDefaultAudioMode;
+        settings.RdpResolutionPresets = RdpResolutionPresets;
+        settings.RdpDialogAdvancedDefault = RdpDialogAdvancedDefault;
+
+        // Security
+        settings.UseExternalCredentialProvider = UseExternalCredentialProvider;
+        settings.CredentialProviderType = CredentialProviderType;
+        settings.CredentialProviderCommand = CredentialProviderCommand;
+        settings.CredentialProviderDatabase = CredentialProviderDatabase;
+        settings.CredentialProviderKeyFile =
+            string.IsNullOrWhiteSpace(CredentialProviderKeyFile)
+                ? null
+                : CredentialProviderKeyFile.Trim();
+        settings.CredentialProviderUsernameCommand = CredentialProviderUsernameCommand;
+        settings.CredentialProviderFirstLineOnly = CredentialProviderFirstLineOnly;
+        settings.CredentialProviderUnlockSecretEncrypted =
+            string.IsNullOrEmpty(CredentialProviderUnlockSecret)
+                ? null
+                : CredentialProtector.Protect(CredentialProviderUnlockSecret);
+        settings.CredentialProviderTimeoutMs = CredentialProviderTimeoutMs;
+        settings.VaultHelloMaxDaysBeforeMasterPassword = VaultHelloMaxDaysBeforeMasterPassword;
+        settings.RequireCredentialGuard = RequireCredentialGuard;
+        settings.RequireWindowsHelloOnConnect = RequireWindowsHelloOnConnect;
+        settings.WindowsHelloGraceMinutes = WindowsHelloGraceMinutes;
+        settings.AutoLockIdleMinutes = AutoLockIdleMinutes;
+        settings.DisconnectOnLock = DisconnectOnLock;
+
+        // Advanced / Logging
+        settings.EnableLogging = EnableLogging;
+        settings.SessionLoggingEnabled = SessionLoggingEnabled;
+        settings.SessionLogDirectory = SessionLogDirectory;
+        settings.TunnelEstablishmentDelayMs = TunnelEstablishmentDelayMs;
+        settings.RdpConnectWatchdogTimeoutMs = RdpConnectWatchdogTimeoutMs;
+        settings.ExternalToolTimeoutMs = ExternalToolTimeoutMs;
+        settings.RdpResizeEnableDelayMs = RdpResizeEnableDelayMs;
+        settings.RdpArtifactCleanupDelayMs = RdpArtifactCleanupDelayMs;
+        settings.RdpCredentialAutofillTimeoutMs = RdpCredentialAutofillTimeoutMs;
+        settings.RdpAutoReconnectMaxAttempts = RdpAutoReconnectMaxAttempts;
+        settings.RdpKeepAliveIntervalMs = RdpKeepAliveIntervalMs;
+        settings.RdpHostPoolCapacity = RdpHostPoolCapacity;
+        settings.RdpHostPoolIdleExpiryMinutes = RdpHostPoolIdleExpiryMinutes;
+
+        // UI state
+        settings.ShowToolsPanel = ShowToolsPanel;
+
+        // Advanced / File sharing
+        settings.FileShareEnableTftp = FileShareEnableTftp;
+        settings.ExternalTools = externalTools;
+    }
+
+    private async Task PersistValidatedSettingsAsync(CancellationToken cancellationToken)
+    {
         List<SshGatewayDto> sshGateways = _pendingGateways.Select(CloneGateway).ToList();
-        List<ProjectDto> projects = _pendingProjects.Select(CloneProject).ToList();
-        HashSet<string> deletedProjectIds = _deletedProjectIds.ToHashSet(StringComparer.Ordinal);
         HashSet<string> deletedGatewayIds = new(_deletedGatewayIds, StringComparer.OrdinalIgnoreCase);
 
         // Clear inventory references first. If the following settings commit is interrupted,
-        // the project or gateway still exists and can be reassigned; the inverse order leaves
-        // dangling IDs.
-        if (deletedProjectIds.Count > 0 || deletedGatewayIds.Count > 0)
+        // the gateway still exists and can be reassigned; the inverse order leaves dangling IDs.
+        if (deletedGatewayIds.Count > 0)
         {
             await _configManager.MutateServersAsync(servers =>
             {
                 int changedCount = 0;
                 foreach (ServerProfileDto server in servers)
                 {
-                    if (server.ProjectId is not null && deletedProjectIds.Contains(server.ProjectId))
-                    {
-                        server.ProjectId = null;
-                        changedCount++;
-                    }
-
                     if (server.SshGatewayId is not null && deletedGatewayIds.Contains(server.SshGatewayId))
                     {
                         server.SshGatewayId = null;
@@ -1701,141 +2200,26 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 }
             }
 
-            // General
-            settings.DefaultLocale = DefaultLocale;
-            settings.DefaultTheme = DefaultTheme;
-            settings.AccentTint = AccentTint;
-            settings.MaxEmbeddedSessions = MaxEmbeddedSessions;
-            settings.PreventSleepDuringSession = PreventSleepDuringSession;
-            settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
-            settings.ExternalEditorPath = ExternalEditorPath;
-            settings.UpdateCheckEnabled = UpdateCheckEnabled;
-            settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
+            WritePanelInto(settings);
 
-            // Terminal
-            settings.TerminalFontFamily = TerminalFontFamily;
-            settings.TerminalFontSize = TerminalFontSize;
-            settings.TerminalColorScheme = TerminalColorScheme;
-            settings.PowerShellExecutionPolicy = PowerShellExecutionPolicy;
-
-            // SSH & SFTP
-            settings.PlinkPath = PlinkPath;
-            settings.PuttyPath = string.IsNullOrWhiteSpace(PuttyPath) ? null : PuttyPath;
-            settings.SshDefaultMode = SshDefaultMode;
-            settings.SshAgentPreference = parsedSshAgentPreference;
-            settings.AntiIdleIntervalSeconds = AntiIdleInterval;
-            settings.SshTmoutResetIntervalSeconds = SshTmoutResetInterval;
-            settings.SshAutoReconnect = SshAutoReconnect;
-            settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
-            settings.SftpBrowserEnabled = SftpBrowserEnabled;
-            settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
-            settings.SftpFollowSshDirectory = SftpFollowSshDirectory;
-            settings.X11ServerPath = string.IsNullOrWhiteSpace(X11ServerPath) ? null : X11ServerPath;
-            settings.X11AutoStart = X11AutoStart;
-            settings.SysinternalsPath = string.IsNullOrWhiteSpace(SysinternalsPath) ? null : SysinternalsPath;
-            settings.NirSoftPath = string.IsNullOrWhiteSpace(NirSoftPath) ? null : NirSoftPath;
-            settings.NanaRunPath = string.IsNullOrWhiteSpace(NanaRunPath) ? null : NanaRunPath;
-
-            // Command Library Git Sync
-            settings.CmdLibGitSyncEnabled = CmdLibGitSyncEnabled;
-            settings.CmdLibGitSyncUrl = string.IsNullOrWhiteSpace(CmdLibGitSyncUrl) ? null : CmdLibGitSyncUrl;
-            settings.CmdLibGitSyncBranch = CmdLibGitSyncBranch;
-            settings.CmdLibGitSyncAuthorName = CmdLibGitSyncAuthorName;
-            settings.CmdLibGitSyncAuthorEmail = CmdLibGitSyncAuthorEmail;
-            settings.CmdLibGitSyncOnStartup = CmdLibGitSyncOnStartup;
-            settings.CmdLibGitSyncAutoPush = CmdLibGitSyncAutoPush;
-
-            // Session Health Monitor
-            settings.SessionHealthMonitorEnabled = SessionHealthMonitorEnabled;
-            settings.SessionHealthCheckIntervalSeconds = SessionHealthCheckIntervalSeconds;
-            settings.SessionHealthProbeTimeoutMs = SessionHealthProbeTimeoutMs;
-            settings.SessionHealthMaxConcurrent = SessionHealthMaxConcurrent;
-
-            // RDP defaults
-            settings.DefaultResolutionWidth = DefaultResolutionWidth;
-            settings.DefaultResolutionHeight = DefaultResolutionHeight;
-            settings.RdpDefaultMode = RdpDefaultMode;
-            settings.RdpDefaultNla = RdpDefaultNla;
-            settings.RdpDefaultStrictServerAuthentication = RdpDefaultStrictServerAuthentication;
-            settings.RdpDefaultColorDepth = RdpDefaultColorDepth;
-            settings.RdpDefaultDynamicResolution = RdpDefaultDynamicResolution;
-            settings.RdpDefaultMultiMonitor = RdpDefaultMultiMonitor;
-            settings.RdpDefaultRedirectClipboard = RdpDefaultRedirectClipboard;
-            settings.RdpDefaultRedirectDrives = RdpDefaultRedirectDrives;
-            settings.RdpDefaultRedirectPrinters = RdpDefaultRedirectPrinters;
-            settings.RdpDefaultRedirectComPorts = RdpDefaultRedirectComPorts;
-            settings.RdpDefaultRedirectSmartCards = RdpDefaultRedirectSmartCards;
-            settings.RdpDefaultRedirectWebcam = RdpDefaultRedirectWebcam;
-            settings.RdpDefaultRedirectUsb = RdpDefaultRedirectUsb;
-            settings.RdpDefaultAudioCapture = RdpDefaultAudioCapture;
-            settings.RdpDefaultAutoReconnect = RdpDefaultAutoReconnect;
-            settings.RdpDefaultBitmapCaching = RdpDefaultBitmapCaching;
-            settings.RdpDefaultCompression = RdpDefaultCompression;
-            settings.RdpDefaultHardwareAcceleration = RdpDefaultHardwareAcceleration;
-            settings.RdpDefaultAudioMode = RdpDefaultAudioMode;
-            settings.RdpResolutionPresets = RdpResolutionPresets;
-            settings.RdpDialogAdvancedDefault = RdpDialogAdvancedDefault;
-
-            // Security
-            settings.UseExternalCredentialProvider = UseExternalCredentialProvider;
-            settings.CredentialProviderType = CredentialProviderType;
-            settings.CredentialProviderCommand = CredentialProviderCommand;
-            settings.CredentialProviderDatabase = CredentialProviderDatabase;
-            settings.CredentialProviderKeyFile =
-                string.IsNullOrWhiteSpace(CredentialProviderKeyFile)
-                    ? null
-                    : CredentialProviderKeyFile.Trim();
-            settings.CredentialProviderUsernameCommand = CredentialProviderUsernameCommand;
-            settings.CredentialProviderFirstLineOnly = CredentialProviderFirstLineOnly;
-            settings.CredentialProviderUnlockSecretEncrypted =
-                string.IsNullOrEmpty(CredentialProviderUnlockSecret)
-                    ? null
-                    : CredentialProtector.Protect(CredentialProviderUnlockSecret);
-            settings.CredentialProviderTimeoutMs = CredentialProviderTimeoutMs;
-            settings.RequireCredentialGuard = RequireCredentialGuard;
-            settings.RequireWindowsHelloOnConnect = RequireWindowsHelloOnConnect;
-            settings.WindowsHelloGraceMinutes = WindowsHelloGraceMinutes;
-            settings.AutoLockIdleMinutes = AutoLockIdleMinutes;
-            settings.DisconnectOnLock = DisconnectOnLock;
-
-            // Advanced / Logging
-            settings.EnableLogging = EnableLogging;
-            settings.SessionLoggingEnabled = SessionLoggingEnabled;
-            settings.SessionLogDirectory = SessionLogDirectory;
-            settings.TunnelEstablishmentDelayMs = TunnelEstablishmentDelayMs;
-            settings.RdpConnectWatchdogTimeoutMs = RdpConnectWatchdogTimeoutMs;
-            settings.ExternalToolTimeoutMs = ExternalToolTimeoutMs;
-            settings.RdpResizeEnableDelayMs = RdpResizeEnableDelayMs;
-            settings.RdpArtifactCleanupDelayMs = RdpArtifactCleanupDelayMs;
-            settings.RdpCredentialAutofillTimeoutMs = RdpCredentialAutofillTimeoutMs;
-            settings.RdpAutoReconnectMaxAttempts = RdpAutoReconnectMaxAttempts;
-            settings.RdpKeepAliveIntervalMs = RdpKeepAliveIntervalMs;
-            settings.RdpHostPoolCapacity = RdpHostPoolCapacity;
-            settings.RdpHostPoolIdleExpiryMinutes = RdpHostPoolIdleExpiryMinutes;
-
-            // UI state
-            settings.ShowToolsPanel = ShowToolsPanel;
-
-            // Advanced / File sharing
-            settings.FileShareEnableTftp = FileShareEnableTftp;
-            settings.ExternalTools = externalTools;
-
-            // Flush buffered gateways and projects. Gateways RECONCILE against what was
-            // just read from disk instead of replacing it: the buffer is a snapshot taken
-            // at LoadFromSettings, nothing reseeds it afterwards, and assigning it wholesale
-            // erased every gateway another surface had persisted meanwhile.
+            // Flush buffered gateways. They RECONCILE against what was just read from disk
+            // instead of replacing it: the buffer is a snapshot taken at LoadFromSettings,
+            // nothing reseeds it afterwards, and assigning it wholesale erased every gateway
+            // another surface had persisted meanwhile. Projects are not edited here any more
+            // and are left as they are on disk.
             settings.SshGateways = ReconcileGateways(
                 settings.SshGateways,
                 sshGateways,
                 deletedGatewayIds);
-            settings.Projects = projects;
         });
 
-        _deletedProjectIds.Clear();
         _deletedGatewayIds.Clear();
 
         _originalTheme = DefaultTheme;
         _originalAccentTint = AccentTint;
+        bool tftpChanged = FileShareEnableTftp != _savedFileShareEnableTftp;
+        _savedFileShareEnableTftp = FileShareEnableTftp;
+        _savedSessionLoggingEnabled = SessionLoggingEnabled;
 
         // The saved language is already on screen - it was applied when it was picked. What
         // saving adds is that it becomes the language a later discard has to come back to.
@@ -1848,6 +2232,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         try
         {
             ConfigurationChanged?.Invoke();
+            if (tftpChanged)
+            {
+                FileShareTftpSaved?.Invoke(FileShareEnableTftp);
+            }
         }
         catch (Exception ex)
         {
@@ -1889,16 +2277,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (!confirmed) return;
 
-        // Gateways and projects are inventory, not preferences. A gateway carries a
-        // stored password and passphrase that the interface only ever reports as
-        // booleans, so wiping one destroys a secret no user can read back, and the
-        // servers this reset leaves alone hold references to both. Carry them across
-        // the reload, together with the deletions still pending: LoadFromSettings
-        // clears those sets, and losing them would orphan the references that the
-        // save path cleans up.
+        // Gateways are inventory, not preferences. A gateway carries a stored password and
+        // passphrase that the interface only ever reports as booleans, so wiping one destroys
+        // a secret no user can read back, and the servers this reset leaves alone hold
+        // references to it. Carry them across the reload, together with the deletions still
+        // pending: LoadFromSettings clears that set, and losing it would orphan the references
+        // that the save path cleans up. Projects are not written by Save, so the reset leaves
+        // them on disk as they are.
         List<SshGatewayDto> keptGateways = _pendingGateways.Select(CloneGateway).ToList();
-        List<ProjectDto> keptProjects = _pendingProjects.Select(CloneProject).ToList();
-        List<string> keptDeletedProjectIds = _deletedProjectIds.ToList();
         List<string> keptDeletedGatewayIds = _deletedGatewayIds.ToList();
 
         // The language the user can still get back to. LoadFromSettings reseeds the restore
@@ -1907,15 +2293,35 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // abandoned language the one Discard returns to. This is the parked risk of applying
         // the locale live, arriving through the one path that reloads without leaving.
         string localeToReturnTo = _originalLocale;
+        string themeToReturnTo = _originalTheme;
+        string accentToReturnTo = _originalAccentTint;
 
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         defaults.SshGateways = keptGateways;
-        defaults.Projects = keptProjects;
+
+        // The language and the theme are kept. A reset that switches the interface into English
+        // under a user who reads French leaves them in front of a panel they cannot read, the one
+        // place from which they would have to find their way back; the confirmation says so.
+        defaults.DefaultLocale = DefaultLocale;
+        defaults.DefaultTheme = DefaultTheme;
+        defaults.AccentTint = AccentTint;
+
+        // The PIN, the vault and the Windows Hello enrolment are state, not preferences: they are
+        // written the moment they are set up and no reset puts them back. Loaded from the factory
+        // file, the Security tab showed the vault disabled and hid its lock controls while the
+        // vault stayed on, so they are carried across from what is on disk.
+        AppSettings persisted = await _configManager.LoadSettingsAsync();
+        defaults.PinHash = persisted.PinHash;
+        defaults.PinSalt = persisted.PinSalt;
+        defaults.VaultEnabled = persisted.VaultEnabled;
+        defaults.VaultHelloEnrolled = persisted.VaultHelloEnrolled;
 
         LoadFromSettings(defaults);
         _originalLocale = localeToReturnTo;
+        _originalTheme = themeToReturnTo;
+        _originalAccentTint = accentToReturnTo;
+        await RefreshVaultStatusAsync();
 
-        _deletedProjectIds.AddRange(keptDeletedProjectIds);
         foreach (string gatewayId in keptDeletedGatewayIds)
         {
             _deletedGatewayIds.Add(gatewayId);
@@ -1962,6 +2368,158 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         ApplyRdpDefaults(defaults);
         IsDirty = true;
+    }
+
+    /// <summary>Picks where a settings file is written; replaceable for tests.</summary>
+    internal Func<string?>? SettingsExportPathProvider { get; set; }
+
+    /// <summary>Picks the settings file to read; replaceable for tests.</summary>
+    internal Func<string?>? SettingsImportPathProvider { get; set; }
+
+    /// <summary>The user's profile folder, whose paths stay behind unless the user asks.</summary>
+    internal string UserProfileFolder { get; set; } =
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+    /// <summary>
+    /// Writes the saved preferences to a JSON file another Heimdall can import.
+    /// </summary>
+    /// <remarks>
+    /// The saved values, not the pending ones: an export is a copy of the configuration, and
+    /// exporting an edit the user may still discard would hand on a state that never existed.
+    /// Secrets and machine-specific values are left out; see <see cref="SettingsTransfer"/>.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ExportSettingsAsync(CancellationToken cancellationToken)
+    {
+        string? path = SettingsExportPathProvider is not null
+            ? SettingsExportPathProvider()
+            : PickSettingsFile(save: true);
+        if (path is null)
+        {
+            return;
+        }
+
+        try
+        {
+            AppSettings saved = await _configManager.LoadSettingsAsync();
+            System.Text.Json.Nodes.JsonObject probe = SettingsTransfer.Export(saved, includeUserPaths: false, UserProfileFolder, out int heldBack);
+            bool includeUserPaths = heldBack > 0
+                && await _dialogService.ShowConfirmAsync(
+                    _localizer["SettingsExportTitle"],
+                    _localizer.Format("SettingsExportIncludeUserPaths", heldBack));
+            System.Text.Json.Nodes.JsonObject document = includeUserPaths
+                ? SettingsTransfer.Export(saved, includeUserPaths: true, UserProfileFolder, out _)
+                : probe;
+
+            await File.WriteAllTextAsync(
+                path,
+                document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
+                new System.Text.UTF8Encoding(false),
+                cancellationToken);
+            FileLogger.Info("Settings exported.");
+            _dialogService.ShowInfo(_localizer["SettingsExportTitle"], _localizer["SettingsExportDone"]);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FileLogger.Error("Settings export failed", ex);
+            _dialogService.ShowError(_localizer["SettingsExportTitle"], _localizer.Format("SettingsExportFailed", ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Reads a settings file into the panel as pending edits, after showing what it changes.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is written: the imported values go through the panel's own validation and are
+    /// kept only when the user saves, so a file with an out-of-range number is reported like a
+    /// typed one, and Discard undoes the whole import. The PIN, the vault and Windows Hello
+    /// enrolment, the gateways and the restore points of the language and theme are held across
+    /// the reload the way a factory reset holds them.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ImportSettingsAsync(CancellationToken cancellationToken)
+    {
+        string? path = SettingsImportPathProvider is not null
+            ? SettingsImportPathProvider()
+            : PickSettingsFile(save: false);
+        if (path is null)
+        {
+            return;
+        }
+
+        AppSettings merged;
+        IReadOnlyList<string> changed;
+        try
+        {
+            string json = await File.ReadAllTextAsync(path, cancellationToken);
+            AppSettings current = await _configManager.LoadSettingsAsync();
+            WritePanelInto(current);
+            (merged, changed) = SettingsTransfer.Import(current, System.Text.Json.Nodes.JsonNode.Parse(json));
+        }
+        catch (Exception ex) when (ex is JsonException or FormatException or IOException or UnauthorizedAccessException)
+        {
+            FileLogger.Warn($"Settings import refused: {ex.Message}");
+            _dialogService.ShowError(_localizer["SettingsImportTitle"], _localizer["SettingsImportInvalid"]);
+            return;
+        }
+
+        if (changed.Count == 0)
+        {
+            _dialogService.ShowInfo(_localizer["SettingsImportTitle"], _localizer["SettingsImportNothingToChange"]);
+            return;
+        }
+
+        bool confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer["SettingsImportTitle"],
+            _localizer.Format(
+                "SettingsImportPreview",
+                changed.Count,
+                string.Join(Environment.NewLine, changed.Take(ImportPreviewMaxLines)))
+                + (changed.Count > ImportPreviewMaxLines
+                    ? Environment.NewLine + _localizer.Format("SettingsImportPreviewMore", changed.Count - ImportPreviewMaxLines)
+                    : string.Empty));
+        if (!confirmed)
+        {
+            return;
+        }
+
+        List<SshGatewayDto> keptGateways = _pendingGateways.Select(CloneGateway).ToList();
+        List<string> keptDeletedGatewayIds = _deletedGatewayIds.ToList();
+        string localeToReturnTo = _originalLocale;
+        string themeToReturnTo = _originalTheme;
+        string accentToReturnTo = _originalAccentTint;
+        bool savedTftp = _savedFileShareEnableTftp;
+        bool savedTranscripts = _savedSessionLoggingEnabled;
+        merged.SshGateways = keptGateways;
+
+        LoadFromSettings(merged);
+        _originalLocale = localeToReturnTo;
+        _originalTheme = themeToReturnTo;
+        _originalAccentTint = accentToReturnTo;
+        _savedFileShareEnableTftp = savedTftp;
+        _savedSessionLoggingEnabled = savedTranscripts;
+        foreach (string gatewayId in keptDeletedGatewayIds)
+        {
+            _deletedGatewayIds.Add(gatewayId);
+        }
+
+        await RefreshVaultStatusAsync();
+        IsDirty = true;
+        ValidateAllProperties();
+        RefreshValidationSummary();
+    }
+
+    /// <summary>How many changed settings the import preview names before summing up the rest.</summary>
+    private const int ImportPreviewMaxLines = 20;
+
+    private string? PickSettingsFile(bool save)
+    {
+        Microsoft.Win32.FileDialog dialog = save
+            ? new Microsoft.Win32.SaveFileDialog { FileName = "heimdall-settings.json", DefaultExt = ".json" }
+            : new Microsoft.Win32.OpenFileDialog();
+        dialog.Title = _localizer[save ? "SettingsExportTitle" : "SettingsImportTitle"];
+        dialog.Filter = _localizer["SettingsFileDialogFilter"];
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
     private static async Task<AppSettings> LoadFactoryDefaultsAsync(CancellationToken cancellationToken)
@@ -2015,7 +2573,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpHostPoolIdleExpiryMinutes = defaults.RdpHostPoolIdleExpiryMinutes;
         RdpDialogAdvancedDefault = defaults.RdpDialogAdvancedDefault;
         RdpResolutionPresets = defaults.RdpResolutionPresets;
-        RdpConnectWatchdogTimeoutMs = defaults.RdpConnectWatchdogTimeoutMs;
+
+        // RdpConnectWatchdogTimeoutMs is deliberately not here: it is edited on Advanced >
+        // Diagnostics, and this button promises to leave everything outside the RDP tab alone.
 
         // The factory reset routes through LoadFromSettings, which reseeds every box. This one does
         // not, and the boxes are bound to the text: without the line below they would go on showing
@@ -2036,7 +2596,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpKeepAliveIntervalMsText = RdpKeepAliveIntervalMs.ToString(CultureInfo.InvariantCulture);
         RdpHostPoolCapacityText = RdpHostPoolCapacity.ToString(CultureInfo.InvariantCulture);
         RdpHostPoolIdleExpiryMinutesText = RdpHostPoolIdleExpiryMinutes.ToString(CultureInfo.InvariantCulture);
-        RdpConnectWatchdogTimeoutMsText = RdpConnectWatchdogTimeoutMs.ToString(CultureInfo.InvariantCulture);
     }
 
     [RelayCommand]
@@ -2828,92 +3387,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     }
 
     [RelayCommand]
-    private async Task AddProjectAsync(CancellationToken cancellationToken)
-    {
-        var vm = new ProjectDialogViewModel
-        {
-            DialogTitle = _localizer["ProjectDialogTitleAdd"]
-        };
-
-        var result = await _dialogService.ShowProjectDialogAsync(vm);
-        if (result is not { Saved: true }) return;
-
-        result.Project.Id = Guid.NewGuid().ToString();
-        _pendingProjects.Add(result.Project);
-
-        Projects.Add(new ProjectItemViewModel
-        {
-            Id = result.Project.Id,
-            Name = result.Project.Name,
-            Color = result.Project.Color ?? "#3B82F6",
-            Description = result.Project.Description ?? ""
-        });
-
-        IsDirty = true;
-    }
-
-    private bool CanEditProject() => SelectedProject is not null;
-
-    [RelayCommand(CanExecute = nameof(CanEditProject))]
-    private async Task EditProjectAsync(CancellationToken cancellationToken)
-    {
-        var project = SelectedProject!;
-        var projectDto = _pendingProjects.FirstOrDefault(p => p.Id == project.Id);
-        if (projectDto is null) return;
-
-        var vm = ProjectDialogViewModel.FromDto(projectDto);
-        vm.DialogTitle = _localizer["ProjectDialogTitleEdit"];
-
-        var result = await _dialogService.ShowProjectDialogAsync(vm);
-        if (result is not { Saved: true }) return;
-
-        var idx = _pendingProjects.FindIndex(p => p.Id == projectDto.Id);
-        if (idx >= 0)
-        {
-            result.Project.Id = projectDto.Id;
-            _pendingProjects[idx] = result.Project;
-
-            project.Name = result.Project.Name;
-            project.Color = result.Project.Color ?? "#3B82F6";
-            project.Description = result.Project.Description ?? "";
-        }
-
-        IsDirty = true;
-    }
-
-    private bool CanDeleteProject() => SelectedProject is not null;
-
-    [RelayCommand(CanExecute = nameof(CanDeleteProject))]
-    private async Task DeleteProjectAsync(CancellationToken cancellationToken)
-    {
-        var project = SelectedProject!;
-
-        // Check server usage for the confirmation message
-        var servers = await _configManager.LoadServersAsync();
-        var usageCount = servers.Count(s =>
-            string.Equals(s.ProjectId, project.Id, StringComparison.Ordinal));
-
-        var message = usageCount > 0
-            ? _localizer.Format("ConfirmDeleteProjectInUse", usageCount)
-                + "\n" + _localizer.Format("ConfirmDeleteProjectMessage", project.Name)
-            : _localizer.Format("ConfirmDeleteProjectMessage", project.Name);
-
-        var confirmed = await _dialogService.ShowConfirmAsync(
-            _localizer["ConfirmDeleteProjectTitle"],
-            message,
-            "danger");
-
-        if (!confirmed) return;
-
-        _pendingProjects.RemoveAll(p => p.Id == project.Id);
-        _deletedProjectIds.Add(project.Id);
-
-        Projects.Remove(project);
-        SelectedProject = null;
-        IsDirty = true;
-    }
-
-    [RelayCommand]
     private Task AddExternalToolAsync(CancellationToken cancellationToken)
     {
         var newTool = new ExternalToolItemViewModel
@@ -3334,36 +3807,86 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         base.OnPropertyChanged(e);
 
-        // Mark dirty when any settings property changes, excluding non-settings properties.
-        // LegacyMigrationReofferAvailable belongs in that exclusion: the command that clears it
-        // has already written the decision to disk through the config manager, outside the
-        // pending-edit buffer, so raising the dirty flag would prompt the user about a change
-        // that neither Save nor Discard can act on.
-        if (e.PropertyName is not (nameof(IsDirty) or nameof(IsBusy)
-            or nameof(IsCheckingUpdate) or nameof(UpdateStatusText)
-            or nameof(UpdateSkippedVersion) or nameof(HasSkippedVersion) or nameof(SkippedVersionText)
-            or nameof(CredentialGuardStatusText)
-            or nameof(IsInstallingUpdate) or nameof(DownloadProgress) or nameof(IsUpdateAvailable)
-            or nameof(IsUpdateReleaseAvailable)
-            or nameof(LegacyMigrationReofferAvailable)
-            or nameof(SelectedGateway) or nameof(SelectedProject)
-            or nameof(SelectedExternalTool) or nameof(HasValidationErrors)
-            or nameof(IsPinConfigured) or nameof(PinStatusText)
-            or nameof(IsVaultHelloAvailable) or nameof(IsVaultHelloEnrolled)
-            or nameof(IsVaultHelloBusy) or nameof(VaultHelloStatusText)
-            or nameof(VaultHelloSectionVisible) or nameof(VaultHelloEnrollVisible)
-            or nameof(VaultHelloDisableVisible) or nameof(VaultHelloUnavailableVisible)
-            or nameof(CanEnableVaultHello) or nameof(CanDisableVaultHello)
-            or nameof(ValidationSummary)
-            or nameof(GeneralTabErrorCount) or nameof(HasGeneralTabErrors)
-            or nameof(TerminalTabErrorCount) or nameof(HasTerminalTabErrors)
-            or nameof(SshTabErrorCount) or nameof(HasSshTabErrors)
-            or nameof(AdvancedTabErrorCount) or nameof(HasAdvancedTabErrors)
-            or nameof(RdpTabErrorCount) or nameof(HasRdpTabErrors)
-            or nameof(SecurityTabErrorCount) or nameof(HasSecurityTabErrors)))
+        // Only a property Save writes can make the panel dirty. This used to be the other way
+        // round - every property, minus a list of exclusions - and every status line, visibility
+        // flag or test result added without its exclusion line armed the unsaved-changes prompt:
+        // enabling the vault, which writes to disk at once, then asked the user whether to save
+        // or discard a change neither button could act on.
+        if (e.PropertyName is not null && PersistedPropertyNames.Contains(e.PropertyName))
         {
             IsDirty = true;
         }
+    }
+
+    /// <summary>
+    /// The panel properties whose name differs from the <see cref="AppSettings"/> property Save
+    /// writes them to.
+    /// </summary>
+    private static readonly Dictionary<string, string> PersistedPropertyAliases = new(StringComparer.Ordinal)
+    {
+        [nameof(AntiIdleInterval)] = nameof(AppSettings.AntiIdleIntervalSeconds),
+        [nameof(SshTmoutResetInterval)] = nameof(AppSettings.SshTmoutResetIntervalSeconds),
+        [nameof(CredentialProviderUnlockSecret)] = nameof(AppSettings.CredentialProviderUnlockSecretEncrypted),
+    };
+
+    /// <summary>The <see cref="AppSettings"/> property a panel property is saved to.</summary>
+    internal static string SettingNameOf(string panelPropertyName) =>
+        PersistedPropertyAliases.TryGetValue(panelPropertyName, out string? alias) ? alias : panelPropertyName;
+
+    /// <summary>
+    /// Panel properties named like a setting that are nevertheless written the moment they
+    /// change, outside the pending-edit buffer, so neither Save nor Discard can act on them.
+    /// </summary>
+    private static readonly HashSet<string> WrittenImmediatelyPropertyNames = new(StringComparer.Ordinal)
+    {
+        nameof(UpdateSkippedVersion),
+    };
+
+    /// <summary>
+    /// Every panel property whose change is a pending edit: the ones Save writes into
+    /// <see cref="AppSettings"/>, and the text of every field that edits one of them.
+    /// </summary>
+    /// <remarks>
+    /// Derived from the settings type rather than listed, so a new setting is tracked the day it
+    /// is added to both, and a new status line is not tracked at all.
+    /// </remarks>
+    internal static readonly IReadOnlySet<string> PersistedPropertyNames = BuildPersistedPropertyNames();
+
+    private static HashSet<string> BuildPersistedPropertyNames()
+    {
+        const System.Reflection.BindingFlags Public =
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
+        const string textSuffix = "Text";
+
+        HashSet<string> settingNames = typeof(AppSettings)
+            .GetProperties(Public)
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        HashSet<string> panelNames = typeof(SettingsViewModel)
+            .GetProperties(Public)
+            .Where(property => property.CanWrite)
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        HashSet<string> persisted = new(StringComparer.Ordinal);
+        foreach (string name in panelNames)
+        {
+            string target = PersistedPropertyAliases.TryGetValue(name, out string? alias) ? alias : name;
+            if (settingNames.Contains(target) && !WrittenImmediatelyPropertyNames.Contains(name))
+            {
+                persisted.Add(name);
+            }
+        }
+
+        foreach (string name in persisted.ToList())
+        {
+            if (panelNames.Contains(name + textSuffix))
+            {
+                persisted.Add(name + textSuffix);
+            }
+        }
+
+        return persisted;
     }
 
     [ObservableProperty]
@@ -3418,30 +3941,68 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnSecurityTabErrorCountChanged(int value) => OnPropertyChanged(nameof(HasSecurityTabErrors));
 
     /// <summary>
-    /// Validates the text of a settings field that edits a whole number.
+    /// Validates the text of a settings field that edits a whole number: it has to parse, and the
+    /// number it parses to has to sit in the range the edited setting declares.
     /// </summary>
     /// <param name="value">The text currently in the field.</param>
     /// <param name="context">The validation context supplied by the data annotations pipeline.</param>
-    /// <returns>A validation error when the text is not a whole number.</returns>
+    /// <returns>A validation error when the text is not a whole number, or is out of range.</returns>
     /// <remarks>
-    /// The bounds are deliberately not checked here. The number the text commits to keeps its own
-    /// range attribute and its own translated message, so a value that is merely out of range still
-    /// names the bound it missed instead of being reported as not a number at all.
+    /// The box on screen is bound to the text, so only an error on the text reaches it. The range
+    /// used to be checked on the number alone, and an out-of-range entry then left the box looking
+    /// valid while the banner and the badge reported it. The range error raised here is the same
+    /// token the number's own attribute raises, so it is localized by the same map and names the
+    /// same bounds; <see cref="GetLocalizedFieldError"/> holds the number's copy back so the field
+    /// still counts once.
     /// </remarks>
     public static System.ComponentModel.DataAnnotations.ValidationResult? ValidateWholeNumberText(
         string? value,
         ValidationContext context)
     {
-        _ = context;
+        string? memberName = context?.MemberName;
+        string[] members = memberName is null ? [] : [memberName];
 
-        if (TryParseWholeNumber(value, out _))
+        if (!TryParseWholeNumber(value, out int number))
         {
-            return System.ComponentModel.DataAnnotations.ValidationResult.Success;
+            return new System.ComponentModel.DataAnnotations.ValidationResult(
+                "This setting must be a whole number.",
+                members);
         }
 
-        return new System.ComponentModel.DataAnnotations.ValidationResult(
-            "This setting must be a whole number.");
+        if (memberName is not null
+            && RangeOfNumberEditedBy(memberName) is { } range
+            && !range.Range.Accepts(number))
+        {
+            return new System.ComponentModel.DataAnnotations.ValidationResult(range.SettingsPropertyName, members);
+        }
+
+        return System.ComponentModel.DataAnnotations.ValidationResult.Success;
     }
+
+    private const string NumberTextSuffix = "Text";
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SettingRangeOfAttribute?> RangeByTextProperty = new(StringComparer.Ordinal);
+
+    /// <summary>The range declared on the number a text property edits, or null when it declares none.</summary>
+    private static SettingRangeOfAttribute? RangeOfNumberEditedBy(string textPropertyName)
+        => RangeByTextProperty.GetOrAdd(textPropertyName, static name =>
+        {
+            if (!name.EndsWith(NumberTextSuffix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            string numberName = name[..^NumberTextSuffix.Length];
+
+            // The attribute is written on the backing field the generator turns into the property.
+            string fieldName = "_" + char.ToLowerInvariant(numberName[0]) + numberName[1..];
+            System.Reflection.FieldInfo? field = typeof(SettingsViewModel).GetField(
+                fieldName,
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return field is null
+                ? null
+                : (SettingRangeOfAttribute?)Attribute.GetCustomAttribute(field, typeof(SettingRangeOfAttribute));
+        });
 
     /// <summary>Parses the text of a settings field that edits a whole number.</summary>
     /// <remarks>
@@ -3473,7 +4034,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     private static readonly Dictionary<string, string> SettingsValidationKeyMap = new(StringComparer.Ordinal)
     {
-        // Not per-field: every number field raises this one when its text is not a number at all.
+        // Every number field raises this one when its text is not a number at all; the field's
+        // label is formatted into it, see FieldLabelKeyByNumber.
         ["This setting must be a whole number."] = "ValidationSettingsWholeNumber",
     };
 
@@ -3512,6 +4074,43 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.SessionHealthCheckIntervalSeconds)] = "ValidationSettingsHealthCheckInterval",
         [nameof(AppSettings.SessionHealthProbeTimeoutMs)] = "ValidationSettingsHealthProbeTimeout",
         [nameof(AppSettings.SessionHealthMaxConcurrent)] = "ValidationSettingsHealthMaxConcurrent",
+        [nameof(AppSettings.SshKeepAliveIntervalSeconds)] = "ValidationSettingsSshKeepAlive",
+        [nameof(AppSettings.CredentialProviderTimeoutMs)] = "ValidationSettingsCredProviderTimeout",
+        [nameof(AppSettings.VaultHelloMaxDaysBeforeMasterPassword)] = "ValidationSettingsVaultHelloMaxDays",
+    };
+
+    /// <summary>
+    /// The label key of every number field, so the "not a whole number" message says which field
+    /// it is about. The range messages name their setting already.
+    /// </summary>
+    private static readonly Dictionary<string, string> FieldLabelKeyByNumber = new(StringComparer.Ordinal)
+    {
+        [nameof(MaxEmbeddedSessions)] = "SettingsLabelMaxEmbeddedSessions",
+        [nameof(UpdateCheckIntervalHours)] = "SettingsLabelUpdateInterval",
+        [nameof(TerminalFontSize)] = "SettingsLabelTerminalFontSize",
+        [nameof(AntiIdleInterval)] = "SettingsLabelAntiIdleInterval",
+        [nameof(SshTmoutResetInterval)] = "SettingsLabelSshTmoutReset",
+        [nameof(SshAutoReconnectAttempts)] = "SettingsSshAutoReconnectMaxAttempts",
+        [nameof(TunnelEstablishmentDelayMs)] = "SettingsLabelTunnelDelay",
+        [nameof(RdpConnectWatchdogTimeoutMs)] = "SettingsLabelRdpTimeout",
+        [nameof(ExternalToolTimeoutMs)] = "SettingsLabelExtToolTimeout",
+        [nameof(RdpResizeEnableDelayMs)] = "SettingsLabelRdpResizeEnableDelay",
+        [nameof(RdpArtifactCleanupDelayMs)] = "SettingsLabelRdpArtifactCleanupDelay",
+        [nameof(RdpCredentialAutofillTimeoutMs)] = "SettingsLabelRdpCredentialAutofillTimeout",
+        [nameof(RdpAutoReconnectMaxAttempts)] = "SettingsLabelRdpAutoReconnectMaxAttempts",
+        [nameof(RdpKeepAliveIntervalMs)] = "SettingsLabelRdpKeepAliveInterval",
+        [nameof(RdpHostPoolCapacity)] = "SettingsLabelRdpHostPoolCapacity",
+        [nameof(RdpHostPoolIdleExpiryMinutes)] = "SettingsLabelRdpHostPoolIdleExpiry",
+        [nameof(SessionHealthCheckIntervalSeconds)] = "SettingsLabelSessionHealthCheckInterval",
+        [nameof(SessionHealthProbeTimeoutMs)] = "SettingsLabelSessionHealthProbeTimeout",
+        [nameof(SessionHealthMaxConcurrent)] = "SettingsLabelSessionHealthMaxConcurrent",
+        [nameof(DefaultResolutionWidth)] = "SettingsLabelRdpWidth",
+        [nameof(DefaultResolutionHeight)] = "SettingsLabelRdpHeight",
+        [nameof(WindowsHelloGraceMinutes)] = "SettingsLabelWindowsHelloGrace",
+        [nameof(AutoLockIdleMinutes)] = "SettingsAutoLockLabel",
+        [nameof(SshKeepAliveIntervalSeconds)] = "SettingsLabelSshKeepAliveInterval",
+        [nameof(CredentialProviderTimeoutMs)] = "SettingsLabelCredProviderTimeout",
+        [nameof(VaultHelloMaxDaysBeforeMasterPassword)] = "SettingsLabelVaultHelloMaxDays",
     };
 
     private static readonly string[] GeneralValidatedSettingPropertyNames =
@@ -3536,6 +4135,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(SshTmoutResetIntervalText),
         nameof(SshAutoReconnectAttempts),
         nameof(SshAutoReconnectAttemptsText),
+        nameof(SshKeepAliveIntervalSeconds),
+        nameof(SshKeepAliveIntervalSecondsText),
     ];
 
     private static readonly string[] AdvancedValidatedSettingPropertyNames =
@@ -3583,6 +4184,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(DefaultResolutionWidthText),
         nameof(DefaultResolutionHeight),
         nameof(DefaultResolutionHeightText),
+        nameof(RdpResolutionPresetsText),
     ];
 
     /// <summary>
@@ -3600,6 +4202,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(WindowsHelloGraceMinutesText),
         nameof(AutoLockIdleMinutes),
         nameof(AutoLockIdleMinutesText),
+        nameof(CredentialProviderTimeoutMs),
+        nameof(CredentialProviderTimeoutMsText),
+        nameof(VaultHelloMaxDaysBeforeMasterPassword),
+        nameof(VaultHelloMaxDaysBeforeMasterPasswordText),
     ];
 
     private static readonly string[][] AllValidatedSettingPropertyNames =
@@ -3668,7 +4274,23 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         if (SettingsValidationKeyMap.TryGetValue(message, out var key))
         {
-            return _localizer[key];
+            string number = propertyName.EndsWith(NumberTextSuffix, StringComparison.Ordinal)
+                ? propertyName[..^NumberTextSuffix.Length]
+                : propertyName;
+            string label = FieldLabelKeyByNumber.TryGetValue(number, out string? labelKey)
+                ? _localizer[labelKey]
+                : _localizer["SettingsValidationUnnamedField"];
+            return _localizer.Format(key, label);
+        }
+
+        if (message.StartsWith(ResolutionPresetsErrorPrefix, StringComparison.Ordinal))
+        {
+            return _localizer.Format(
+                "ValidationSettingsRdpResolutionPresets",
+                message[ResolutionPresetsErrorPrefix.Length..],
+                RdpDisplayLimits.MinimumFixedDimension,
+                RdpDisplayLimits.MaximumFixedWidth,
+                RdpDisplayLimits.MaximumFixedHeight);
         }
 
         // A ranged field reports the settings property it is bound by; the numbers come from
@@ -3691,17 +4313,62 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpTabErrorCount = CountValidationErrors(RdpValidatedSettingPropertyNames);
         SecurityTabErrorCount = CountValidationErrors(SecurityValidatedSettingPropertyNames);
 
-        string? firstError = GetFirstLocalizedFieldError(GeneralValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(TerminalValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(SshValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(RdpValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(SecurityValidatedSettingPropertyNames)
-            ?? GetFirstLocalizedFieldError(AdvancedValidatedSettingPropertyNames);
+        string? firstInvalid = FirstInvalidProperty();
+        string? firstError = firstInvalid is null ? null : GetLocalizedFieldError(firstInvalid);
+        int errorCount = GeneralTabErrorCount + TerminalTabErrorCount + SshTabErrorCount
+            + AdvancedTabErrorCount + RdpTabErrorCount + SecurityTabErrorCount;
 
         // Field errors keep precedence: a save never reaches the external tools while one stands.
-        ValidationSummary = firstError ?? _externalToolsValidationError;
+        // With several, the banner says how many: showing only the first read as "fix this one
+        // and you are done", and the next Save then refused again over a field nobody had named.
+        ValidationSummary = firstError is null
+            ? _externalToolsValidationError
+            : errorCount > 1
+                ? _localizer.Format("SettingsValidationSummaryCount", errorCount, firstError)
+                : firstError;
         HasValidationErrors = ValidationSummary is not null;
     }
+
+    /// <summary>The first property in error, in tab order, or null when there is none.</summary>
+    private string? FirstInvalidProperty()
+    {
+        foreach (string[] tab in AllValidatedSettingPropertyNames)
+        {
+            foreach (string propertyName in tab)
+            {
+                if (GetLocalizedFieldError(propertyName) is not null)
+                {
+                    return propertyName;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The property of the first field in error, in tab order, named as the box on screen binds it:
+    /// the text of a number field rather than the number.
+    /// </summary>
+    internal string? FirstInvalidFieldProperty()
+    {
+        string? propertyName = FirstInvalidProperty();
+        return propertyName is not null && NumbersEditedThroughText.Contains(propertyName)
+            ? propertyName + NumberTextSuffix
+            : propertyName;
+    }
+
+    /// <summary>
+    /// The localized message for the error a settings box shows, for its tooltip and its
+    /// accessible help text. Null when the property holds no error.
+    /// </summary>
+    public string? DescribeFieldError(string propertyName) => GetLocalizedFieldError(propertyName);
+
+    /// <summary>
+    /// Raised when a save is refused over a field error, with the property the first field in
+    /// error is bound to, so the view can take the user there.
+    /// </summary>
+    public event Action<string>? InvalidFieldFocusRequested;
 
     private int CountValidationErrors(string[] propertyNames)
     {
@@ -3715,20 +4382,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
 
         return count;
-    }
-
-    private string? GetFirstLocalizedFieldError(string[] propertyNames)
-    {
-        foreach (string propertyName in propertyNames)
-        {
-            string? error = GetLocalizedFieldError(propertyName);
-            if (error is not null)
-            {
-                return error;
-            }
-        }
-
-        return null;
     }
 
     /// <summary>
@@ -3787,15 +4440,4 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     // Field-by-field this raised the passphrase presence flag on every copy, which flips
     // UsesLegacySshCredentialMapping and changes how the gateway authenticates.
     private static SshGatewayDto CloneGateway(SshGatewayDto g) => g.CloneFaithfully();
-
-    private static ProjectDto CloneProject(ProjectDto p) => new()
-    {
-        Id = p.Id,
-        Name = p.Name,
-        Description = p.Description,
-        Color = p.Color,
-        DefaultSshUsername = p.DefaultSshUsername,
-        DefaultSshKeyPath = p.DefaultSshKeyPath,
-        DefaultGatewayId = p.DefaultGatewayId
-    };
 }

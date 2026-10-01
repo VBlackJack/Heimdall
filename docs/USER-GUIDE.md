@@ -96,11 +96,18 @@ directly such as `admin@192.168.1.10`. It is the fastest way to reach something 
 
 ### Find and organize sessions in the tree
 
-- Active filters appear below the search controls. Remove one with its cross, or use **Reset all filters** to clear the search and all filters. Display preferences are preserved.
-- Search results include the folder path and host address. Hover over that line to read the full values. If nothing matches, use **Clear search** or **Reset all filters**.
-- Select several sessions to show **Connect**, **Move**, and **More actions** below the selection count. These use the same checks as the context menu.
-- While dragging, a hint names the destination and the number of sessions, or the folder being moved. Hold over a closed folder to expand it; approach the top or bottom of the tree to scroll.
-- After a move, inline rename, or session reorder, use **Undo** to reverse the latest organization change. One step is kept during the current application session. Undo does not cover deletion, and refuses an incompatible later edit. For folders, a later organization or folder-defaults change prevents undo.
+- Type in the filter box above the tree to search. Every word you type has to appear somewhere in a session's name, address, folder, username, protocol, environment, tags or project, in any order, and accents are ignored: `web prod` finds web01 in the Prod folder.
+- In the filter box, **Escape** clears the search, **Down** moves to the first session in the list, and **Enter** opens the session when exactly one matches. With two matches or more, Enter does nothing.
+- Active filters appear below the search controls. Remove one with its cross, or use **Reset all filters** to clear the search and all filters. Display preferences are preserved. While a filter is on, a folder's count reads visible/total, such as `2/40`.
+- Search results include the folder path and host address. Hover over that line to read the full values. If nothing matches, use **Clear search**.
+- A selection that a search or a closed folder hides is given back once its rows are visible again, unless you selected something else in the meantime.
+- Right-click a session, or several, and choose **Add to favorites** to mark them. A favorite shows a small star, and the filter menu can keep favorites only.
+- The dot before a session shows its state. A filled dot is the connection: open, opening or failed. A ring of the same colours is the background check of whether the host answers. Hover a row for its full name, protocol and state.
+- Select several sessions to show the selection count with **Connect selected**, **Move** and **More actions** below the tree. These use the same checks as the context menu.
+- **Move to folder** follows the folder tree: a folder with sub-folders opens a submenu, and its first entry, **Into** followed by the folder's name, moves into that folder itself.
+- While dragging, a hint names the destination and the number of sessions, or the folder being moved. Hold over a closed folder to expand it; approach the top or bottom of the tree to scroll. To take a session or a folder out of its folder, drop it on **Drop here to take it out of its folder**, which appears below the tree while you drag.
+- After a move, inline rename, or session reorder, the bar below the tree names the change and offers **Undo** for 30 seconds. One step is kept during the current application session. Undo does not cover deletion, and refuses an incompatible later edit. Deleting a folder withdraws the offer. For folders, a later organization or folder-defaults change prevents undo.
+- The **Delete** key acts on sessions, never on a folder: to delete a folder, use **Delete folder** in its menu.
 
 ## Where your passwords are kept
 
@@ -144,7 +151,8 @@ remote machine on the other.
 - **Right-click** a row to act on it: the row under the pointer is selected before the menu opens.
 - **Edit in external editor** uses the editor chosen in Settings, for remote files too. Heimdall
   keeps a local copy while that editor is open and uploads each save; closing the pane while a
-  file is still open there asks you first.
+  file is still open there asks you first. If the server refuses an upload (permission denied,
+  for example), the pane says why once and tries again the next time you save.
 - In the built-in editor, **Ctrl+S** saves and **Ctrl+W** closes. A file that is not UTF-8 opens
   as Latin-1 and says so in the editor's status bar.
 
@@ -159,10 +167,11 @@ Heimdall shows the reason in plain language wherever it can. The common ones:
 
 | What you see | What it usually means |
 |---|---|
-| The password is refused | Wrong password, or the account is locked on the remote machine. If the server's only question is a verification code, Heimdall answers it with your password and the refusal arrives here. |
-| The connection times out | The machine is off, or a firewall is in the way. Check the address. |
+| The password is refused | Wrong password, or the account is locked on the remote machine. |
+| The connection times out | The machine is off, or a firewall is in the way. Check the address. An SSH host that does not answer is reported after 15 seconds. |
 | The host key changed | See the warning above. Do not accept it without asking. |
-| The server asks a question this client cannot answer | The server wants a verification code or another second factor. Heimdall only answers password prompts; use another client for that server. |
+| The server asks a question this client cannot answer | The server wants a verification code or another second factor, and this connection cannot ask you: the file browser, gateways and the route test only answer password prompts, and never with your password when the question names a one-time code. The SSH terminal asks you instead. |
+| A WinRM session ends as soon as it opens | The sign-in failed, and the error above the end marker says why (access denied, Kerberos, TrustedHosts, a host unreachable behind a gateway). Heimdall ends PowerShell rather than leave you at a prompt on your own machine in that tab. If the message says the execution policy refused the sign-in script, use the current Windows identity for that host, or ask your administrator. |
 | A message about WebView2 | The machine has no Microsoft Edge. See [Installing](#installing). |
 | "SSH gateway not found" | The session points at a gateway that no longer exists. Edit the session and choose one, or recreate it in Settings. |
 
@@ -186,7 +195,7 @@ Each step shows its duration and an action to take if it fails; later steps stop
 Use **Stop test** or close the dialog to cancel. Changing the form clears the previous report.
 
 The diagnostic uses existing SSH trusted host keys and never accepts a new or changed key for you.
-Its per-step deadline uses the host-key probe timeout in Settings. **Copy diagnostic report**
+Each step gets 15 seconds, the time a real tunnel gives each hop. **Copy diagnostic report**
 omits hostnames, accounts, key paths and raw errors. A successful destination step proves TCP
 access only, not that an RDP, database or other application login will work.
 
@@ -246,7 +255,8 @@ Press **F1** at any time for the full list. The ones that pay for themselves imm
 | `Ctrl+N` | Add a session |
 | `Ctrl+E` | Edit the selected session |
 | `Ctrl+B` | Show or hide the left panel |
-| `Ctrl+F` | Jump to the search box |
+| `Ctrl+F` | Jump to the sessions filter box; on the Settings tab, to the settings search |
+| `Ctrl+S` | On the Settings tab, save the settings when there are changes to save |
 | `F11` | Fullscreen, `Escape` to leave it |
 | `Ctrl+Shift+T` | Switch the left panel between Sessions and Tools |
 | `Ctrl+A` | In the sessions tree, select every session in the open folders |

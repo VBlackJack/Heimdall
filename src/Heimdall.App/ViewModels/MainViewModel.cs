@@ -69,6 +69,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     private SessionTabViewModel? _observedSession;
     private PropertyChangedEventHandler? _observedSessionHandler;
     private Action? _onConfigurationChanged;
+    private Action? _onServerInventoryChanged;
     private Action<string, string, Core.Models.ToolContext>? _onToolSessionRequested;
     private Action<string>? _onStatusMessageRequested;
     private System.ComponentModel.PropertyChangedEventHandler? _connectionPropertyChangedHandler;
@@ -445,6 +446,11 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _onConfigurationChanged = async () =>
             await ReloadConfigurationAsync(await _configManager.LoadSettingsAsync());
         Settings.ConfigurationChanged += _onConfigurationChanged;
+
+        // Saved sessions rewritten from the settings panel: the list follows, the panel does not,
+        // because the panel is holding the user's pending edits.
+        _onServerInventoryChanged = async () => await ReloadServerInventoryAsync();
+        Settings.ServerInventoryChanged += _onServerInventoryChanged;
         Settings.GatewayReferenceMutationHandler = async (request, cancellationToken) =>
             await ServerList.UpdateGatewayReferencesAsync(
                 request.ServerIds,
@@ -826,6 +832,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         Session.Dispose();
         _configManager.SettingsChanged -= OnSettingsChanged;
         Settings.ConfigurationChanged -= _onConfigurationChanged;
+        Settings.ServerInventoryChanged -= _onServerInventoryChanged;
         Settings.GatewayReferenceMutationHandler = null;
         Settings.ThemeChanged -= OnSettingsThemePreview;
         Settings.AccentTintChanged -= OnSettingsAccentTintPreview;
@@ -1152,6 +1159,24 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         Settings.LoadFromSettings(settings);
         await Settings.RefreshVaultStatusAsync();
         Scheduled.Load(settings);
+        WindowTitle = _localizer.Format("WindowTitle", ServerCount);
+    }
+
+    /// <summary>
+    /// Reloads the saved sessions and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// The sibling of <see cref="ReloadConfigurationAsync"/> for writes made from inside the settings
+    /// panel. That one reseeds the panel from disk too, which discards whatever the user has not
+    /// saved yet.
+    /// </remarks>
+    internal async Task ReloadServerInventoryAsync()
+    {
+        AppSettings settings = _currentSettings ?? await _configManager.LoadSettingsAsync();
+        List<ServerProfileDto> servers = await _configManager.LoadServersAsync();
+
+        ServerCount = servers.Count;
+        ServerList.LoadServers(servers, settings);
         WindowTitle = _localizer.Format("WindowTitle", ServerCount);
     }
 

@@ -92,7 +92,6 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private bool _isRdpImportDragActive;
     private bool _suppressFileShareStartDialog;
     private bool _settingsRuntimeBridgeInitialized;
-    private bool _suppressFileShareTftpSettingBridge;
     private OnboardingFlowViewModel? _onboardingVm;
     private bool _threadPreprocessMessageHooked;
 
@@ -127,6 +126,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private System.ComponentModel.PropertyChangedEventHandler? _connectionPropertyChangedHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _serverListPropertyChangedHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _settingsPropertyChangedHandler;
+    private Action<bool>? _fileShareTftpSavedHandler;
+    private Action? _settingsLoadedHandler;
+    private Action<string>? _invalidFieldFocusHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _selectedExternalToolPropertyChangedHandler;
     private Action? _externalToolsChangedHandler;
     private Action<string>? _localeChangedHandler;
@@ -211,6 +213,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             }
         };
         viewModel.ServerList.PropertyChanged += _serverListPropertyChangedHandler;
+
+        // A selection a search or a collapsed folder had hidden comes back on the view model;
+        // WPF's own row selection has to follow, and the row has to scroll into view.
+        viewModel.ServerList.HiddenSelectionRestored += RestoreTreeSelectionRow;
         _toolContext.SetSelectedServer(viewModel.ServerList.SelectedServer);
 
         _selectedExternalToolPropertyChangedHandler = (_, _) =>
@@ -225,14 +231,37 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 AttachSelectedExternalToolPreviewTracking(viewModel.Settings.SelectedExternalTool);
                 Dispatcher.BeginInvoke(() => RefreshExternalToolSettingsUi(viewModel));
             }
-            else if (string.Equals(e.PropertyName, nameof(SettingsViewModel.FileShareEnableTftp), StringComparison.Ordinal)
-                     && _settingsRuntimeBridgeInitialized
-                     && !_suppressFileShareTftpSettingBridge)
-            {
-                _ = ApplyFileShareTftpSettingAsync(viewModel, viewModel.Settings.FileShareEnableTftp);
-            }
         };
         viewModel.Settings.PropertyChanged += _settingsPropertyChangedHandler;
+
+        // The TFTP choice reaches a running share only once it is saved, like every other setting.
+        _fileShareTftpSavedHandler = enabled =>
+        {
+            if (_settingsRuntimeBridgeInitialized)
+            {
+                _ = RestartFileShareForSavedSettingsAsync(viewModel);
+            }
+        };
+        viewModel.Settings.FileShareTftpSaved += _fileShareTftpSavedHandler;
+
+        _settingsLoadedHandler = () => Dispatcher.BeginInvoke(() => PopulateCredentialProviderUnlockSecret(viewModel));
+        viewModel.Settings.SettingsLoaded += _settingsLoadedHandler;
+
+        // A refused save takes the user to the first field in error rather than leaving them to
+        // hunt for it across six tabs from a banner that names it.
+        _invalidFieldFocusHandler = property => Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() => FocusSettingsField(property)));
+        viewModel.Settings.InvalidFieldFocusRequested += _invalidFieldFocusHandler;
+
+        // The sync service lives in the TwinShell container; the panel tests typed values through it.
+        viewModel.Settings.GitConnectionTester = (remoteUrl, branch) =>
+            (System.Windows.Application.Current as App)?.Services?
+                .GetService(typeof(TwinShell.Core.Interfaces.IGitSyncService)) is TwinShell.Core.Interfaces.IGitSyncService gitSync
+                ? gitSync.TestConnectionAsync(remoteUrl, branch)
+                : Task.FromResult(TwinShell.Core.Interfaces.GitOperationResult.Fail(
+                    string.Empty,
+                    TwinShell.Core.Interfaces.GitSyncErrorCode.InvalidConfiguration));
         AttachSelectedExternalToolPreviewTracking(viewModel.Settings.SelectedExternalTool);
 
         // Refresh Tools tab and Settings status when background scan discovers external tools
@@ -315,6 +344,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         PreviewMouseDown += OnWindowPreviewMouseDown;
         CommandPalettePopup.Closed += OnCommandPaletteClosed;
         Mw_FilterBox.TextChanged += OnFilterBoxTextChanged;
+        WireSessionFilterKeys();
     }
 
     /// <summary>
@@ -1130,6 +1160,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private DispatcherTimer? _settingsSearchHighlightTimer;
 
+    /// <summary>How long a settings search match stays highlighted after a jump.</summary>
+    private static readonly TimeSpan SettingsSearchHighlightDuration = TimeSpan.FromMilliseconds(1500);
+
+    /// <summary>The highlight opacity when the theme token cannot be found.</summary>
+    private const double SettingsSearchHighlightFallbackOpacity = 0.55;
+
     private void OnSettingsSearchTextChanged(object sender, TextChangedEventArgs e)
     {
         string query = Mw_SettingsSearchBox.Text?.Trim() ?? string.Empty;
@@ -1146,7 +1182,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         _settingsSearchMatches = GetSettingsSearchIndex()
             .Where((SettingsSearchEntry entry) =>
-                GetSettingsSearchEntryText(entry).IndexOf(query, StringComparison.InvariantCultureIgnoreCase) >= 0)
+                SettingsSearchMatches(GetSettingsSearchEntryText(entry), query)
+                && IsSettingsSearchEntryReachable(entry.Target))
             .ToList();
 
         if (DataContext is MainViewModel vm)
@@ -1253,14 +1290,22 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             gesture == SettingsSearchGesture.StepBack);
         SettingsSearchEntry entry = _settingsSearchMatches[_settingsSearchMatchIndex];
         FrameworkElement jumpTarget = ResolveSettingsSearchJumpTarget(entry.Target);
+
+        // Selecting the tabs is not enough: a match inside a collapsed expander was jumped to with
+        // nothing on screen and nothing highlighted. Every tab and expander on the way is opened.
         Mw_SettingsSubTabControl.SelectedItem = entry.TopTab;
-        if (entry.SubTab is not null)
+        RevealSettingsElement(jumpTarget);
+        if (DataContext is MainViewModel searchVm)
         {
-            entry.SubTab.IsSelected = true;
+            Mw_SettingsSearchHintText.Text = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                searchVm.Localize("SettingsSearchResultPosition"),
+                _settingsSearchMatchIndex + 1,
+                _settingsSearchMatches.Count);
         }
 
         Dispatcher.BeginInvoke(
-            DispatcherPriority.Background,
+            DispatcherPriority.Loaded,
             new Action(() =>
             {
                 entry.TopTab.UpdateLayout();
@@ -1333,6 +1378,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
+        // A hint that exists only as a tooltip - most of the RDP check boxes, the host pool
+        // fields - is text the user can read on hover and could not search for.
+        if (node is FrameworkElement { ToolTip: string } withTooltip
+            && node is not ContentControl { Content: string })
+        {
+            entries.Add(new SettingsSearchEntry(withTooltip, topTab, subTab));
+        }
+
         // A control whose Content is a plain string puts no TextBlock in the logical tree,
         // so the walk below can never reach its label and the search answers "no matching
         // settings" for words the user is reading. Only string Content is taken here: a
@@ -1360,17 +1413,52 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (entry.Target is TextBlock textBlock)
+        string own = entry.Target switch
         {
-            return textBlock.Text ?? string.Empty;
+            TextBlock textBlock => textBlock.Text ?? string.Empty,
+            ContentControl { Content: string text } => text,
+            _ => string.Empty,
+        };
+
+        return entry.Target.ToolTip is string tooltip && tooltip.Length > 0
+            ? own.Length == 0 ? tooltip : own + " " + tooltip
+            : own;
+    }
+
+    /// <summary>
+    /// Whether a settings search query matches a text, ignoring case and accents.
+    /// </summary>
+    /// <remarks>
+    /// "delai" has to find "Délai": French labels are full of accents a search box is often typed
+    /// without, and an ordinal-ignore-case comparison missed every one of them.
+    /// </remarks>
+    internal static bool SettingsSearchMatches(string text, string query)
+        => !string.IsNullOrEmpty(query)
+            && System.Globalization.CultureInfo.InvariantCulture.CompareInfo.IndexOf(
+                text ?? string.Empty,
+                query,
+                System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace) >= 0;
+
+    /// <summary>
+    /// Whether a jump could show the element: nothing on its logical path is hidden.
+    /// </summary>
+    /// <remarks>
+    /// An unselected tab and a collapsed expander hide content without collapsing it, and the
+    /// jump opens both. Anything collapsed for another reason - the vault controls with the vault
+    /// off, a provider's fields with another provider selected - was counted and then jumped to
+    /// with nothing on screen.
+    /// </remarks>
+    internal static bool IsSettingsSearchEntryReachable(FrameworkElement target)
+    {
+        for (DependencyObject? node = target; node is not null; node = LogicalTreeHelper.GetParent(node))
+        {
+            if (node is UIElement { Visibility: not Visibility.Visible })
+            {
+                return false;
+            }
         }
 
-        if (entry.Target is ContentControl { Content: string text })
-        {
-            return text;
-        }
-
-        return string.Empty;
+        return true;
     }
 
     /// <summary>
@@ -1415,7 +1503,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         FrameworkElement highlightElement = GetSettingsSearchHighlightElement(target);
         Brush highlightBrush = accentBrush.CloneCurrentValue();
-        highlightBrush.Opacity = 0.55;
+        highlightBrush.Opacity = TryFindResource("OpacitySearchHighlight") is double opacity
+            ? opacity
+            : SettingsSearchHighlightFallbackOpacity;
 
         _settingsSearchHighlightElement = highlightElement;
         _settingsSearchHighlightOriginalBackground = GetSettingsSearchBackground(highlightElement);
@@ -1423,7 +1513,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         DispatcherTimer timer = new()
         {
-            Interval = TimeSpan.FromMilliseconds(1500),
+            Interval = SettingsSearchHighlightDuration,
         };
         timer.Tick += OnSettingsSearchHighlightTimerTick;
         _settingsSearchHighlightTimer = timer;
@@ -1523,6 +1613,78 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
+    /// <summary>Takes keyboard focus to the settings box bound to <paramref name="property"/>.</summary>
+    private void FocusSettingsField(string property)
+    {
+        if (FindSettingsField(Mw_SettingsSubTabControl, property) is not { } box)
+        {
+            return;
+        }
+
+        RevealSettingsElement(box);
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                box.BringIntoView();
+                box.Focus();
+                Keyboard.Focus(box);
+            }));
+    }
+
+    /// <summary>
+    /// Finds the settings text box whose Text is bound to <c>Settings.</c><paramref name="property"/>.
+    /// </summary>
+    /// <remarks>
+    /// Walks the logical tree, which holds the content of tabs that have never been shown; the
+    /// visual tree of an unselected tab does not exist yet.
+    /// </remarks>
+    internal static System.Windows.Controls.TextBox? FindSettingsField(DependencyObject root, string property)
+    {
+        string path = Converters.SettingsFieldErrorConverter.SettingsPathPrefix + property;
+        if (root is System.Windows.Controls.TextBox box
+            && string.Equals(
+                System.Windows.Data.BindingOperations
+                    .GetBindingExpression(box, System.Windows.Controls.TextBox.TextProperty)?
+                    .ParentBinding.Path?.Path,
+                path,
+                StringComparison.Ordinal))
+        {
+            return box;
+        }
+
+        foreach (object child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is DependencyObject node && FindSettingsField(node, property) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Makes a settings element reachable: selects every tab that holds it and opens every
+    /// expander it sits in.
+    /// </summary>
+    internal static void RevealSettingsElement(DependencyObject element)
+    {
+        for (DependencyObject? node = LogicalTreeHelper.GetParent(element);
+            node is not null;
+            node = LogicalTreeHelper.GetParent(node))
+        {
+            if (node is TabItem tab)
+            {
+                tab.IsSelected = true;
+            }
+            else if (node is Expander expander)
+            {
+                expander.IsExpanded = true;
+            }
+        }
+    }
+
     private void OnSettingsSearchClearClick(object sender, RoutedEventArgs e)
     {
         Mw_SettingsSearchBox.Text = string.Empty;
@@ -1596,6 +1758,18 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             Mw_FilterBox.Focus();
             Mw_FilterBox.SelectAll();
         }, canExecute: () => CanFocusServerFilter(IsTerminalFocusedContext(), Mw_FilterBox.IsVisible));
+
+        // Ctrl+F on the Settings tab: focus the settings search. Registered after the sessions
+        // filter, whose own gate needs the filter box on screen, so the two never compete.
+        RegisterSettingsSearchShortcut(
+            _keyboardShortcutService,
+            IsTerminalFocusedContext,
+            () => GetMainVm()?.IsSettingsTabSelected == true,
+            () =>
+            {
+                Mw_SettingsSearchBox.Focus();
+                Mw_SettingsSearchBox.SelectAll();
+            });
 
         // Ctrl+B: toggle sidebar
         _keyboardShortcutService.Register(Key.B, ModifierKeys.Control,
@@ -1773,6 +1947,32 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             Key.S,
             ModifierKeys.Control,
             save,
+            canExecute: () => !isTerminalFocused() && isSettingsTabSelected());
+    }
+
+    /// <summary>
+    /// Registers Ctrl+F on the settings search box while the Settings tab is shown.
+    /// </summary>
+    /// <remarks>
+    /// The sessions filter owns Ctrl+F elsewhere, and its gate already refuses the key when its box
+    /// is off screen, which it is on the Settings tab; this binding sits behind it and takes the
+    /// key only there. Parameters, not window state, so the gates can be exercised without one.
+    /// </remarks>
+    internal static void RegisterSettingsSearchShortcut(
+        KeyboardShortcutService service,
+        Func<bool> isTerminalFocused,
+        Func<bool> isSettingsTabSelected,
+        Action focusSearch)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(isTerminalFocused);
+        ArgumentNullException.ThrowIfNull(isSettingsTabSelected);
+        ArgumentNullException.ThrowIfNull(focusSearch);
+
+        service.Register(
+            Key.F,
+            ModifierKeys.Control,
+            focusSearch,
             canExecute: () => !isTerminalFocused() && isSettingsTabSelected());
     }
 
@@ -2484,37 +2684,6 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
-    private async void OnCmdLibSyncTestClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm) return;
-
-        var app = System.Windows.Application.Current as App;
-        var gitSync = app?.Services?
-            .GetService(typeof(TwinShell.Core.Interfaces.IGitSyncService))
-                as TwinShell.Core.Interfaces.IGitSyncService;
-        if (gitSync is null) return;
-
-        Mw_SettingsCmdLibSyncTestBtn.IsEnabled = false;
-        Mw_SettingsCmdLibSyncTestBtn.Content = "...";
-
-        try
-        {
-            var result = await gitSync.TestConnectionAsync();
-            Mw_SettingsCmdLibSyncTestBtn.Content = result.Success
-                ? vm.Localize("SettingsCmdLibSyncTestSuccess")
-                : vm.Localize("SettingsCmdLibSyncTestFailed");
-        }
-        catch (Exception ex)
-        {
-            Mw_SettingsCmdLibSyncTestBtn.Content = vm.Localize("SettingsCmdLibSyncTestFailed");
-            Core.Logging.FileLogger.Warn($"[GitSync] Test connection failed: {ex.Message}");
-        }
-        finally
-        {
-            Mw_SettingsCmdLibSyncTestBtn.IsEnabled = true;
-        }
-    }
-
     private async void OnRescanExternalToolsClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
@@ -2547,6 +2716,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         Mw_SettingsBtnRescan.IsEnabled = true;
         Mw_SettingsExtProvStatus.Text = _externalToolSettingsService.BuildDetectedToolsStatus();
 
+        // Set by hand, so no binding raises the live region: the scan result is announced here.
+        Views.EmbeddedRdp.RdpLiveRegion.Announce(Mw_SettingsExtProvStatus);
+
         // Refresh tools tab to show newly detected tools
         vm.ToolsTab.OnExternalToolsChanged();
     }
@@ -2556,7 +2728,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (DataContext is not MainViewModel vm) return;
         using var dlg = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "Sysinternals",
+            Description = vm.Localize("BrowseSysinternalsPathTitle"),
             ShowNewFolderButton = false
         };
         if (!string.IsNullOrEmpty(vm.Settings.SysinternalsPath)
@@ -2574,7 +2746,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (DataContext is not MainViewModel vm) return;
         using var dlg = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "NirSoft",
+            Description = vm.Localize("BrowseNirSoftPathTitle"),
             ShowNewFolderButton = false
         };
         if (!string.IsNullOrEmpty(vm.Settings.NirSoftPath)
@@ -2592,7 +2764,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (DataContext is not MainViewModel vm) return;
         using var dlg = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "NanaRun",
+            Description = vm.Localize("BrowseNanaRunPathTitle"),
             ShowNewFolderButton = false
         };
         if (!string.IsNullOrEmpty(vm.Settings.NanaRunPath)
@@ -3319,47 +3491,36 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         await _fileShareService.StartAsync(dialog.SelectedPath, vm.CurrentSettings);
     }
 
-    private async Task ApplyFileShareTftpSettingAsync(MainViewModel vm, bool enableTftp)
+    /// <summary>
+    /// Restarts a running file share so it serves what the settings now say.
+    /// </summary>
+    /// <remarks>
+    /// Called after the settings are saved, never on the checkbox: the setting is already on disk
+    /// and in <see cref="MainViewModel.CurrentSettings"/>, so a failure here leaves the share as it
+    /// was and is logged, with nothing to roll back.
+    /// </remarks>
+    private async Task RestartFileShareForSavedSettingsAsync(MainViewModel vm)
     {
-        if (vm.CurrentSettings is null)
+        if (vm.CurrentSettings is null
+            || !_fileShareService.IsSharing
+            || _fileShareService.CurrentDirectory is not { } currentDirectory)
         {
             return;
         }
 
-        var previousValue = vm.CurrentSettings.FileShareEnableTftp;
-
         try
         {
-            vm.CurrentSettings.FileShareEnableTftp = enableTftp;
-            await vm.ConfigManager.MergeSettingAsync(settings => settings.FileShareEnableTftp = enableTftp);
-
-            if (_fileShareService.IsSharing && _fileShareService.CurrentDirectory is { } currentDirectory)
-            {
-                _suppressFileShareStartDialog = true;
-                try
-                {
-                    await _fileShareService.StopAsync();
-                    await _fileShareService.StartAsync(currentDirectory, vm.CurrentSettings);
-                }
-                finally
-                {
-                    _suppressFileShareStartDialog = false;
-                }
-            }
+            _suppressFileShareStartDialog = true;
+            await _fileShareService.StopAsync();
+            await _fileShareService.StartAsync(currentDirectory, vm.CurrentSettings);
         }
         catch (Exception ex)
         {
-            Core.Logging.FileLogger.Error($"[MainWindow] Failed to update TFTP file share setting: {ex.Message}");
-            vm.CurrentSettings.FileShareEnableTftp = previousValue;
-            _suppressFileShareTftpSettingBridge = true;
-            try
-            {
-                vm.Settings.FileShareEnableTftp = previousValue;
-            }
-            finally
-            {
-                _suppressFileShareTftpSettingBridge = false;
-            }
+            Core.Logging.FileLogger.Error($"[MainWindow] Failed to restart the file share after a settings save: {ex.Message}");
+        }
+        finally
+        {
+            _suppressFileShareStartDialog = false;
         }
     }
 
@@ -3902,6 +4063,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 vm.ServerList.PropertyChanged -= _serverListPropertyChangedHandler;
             if (_settingsPropertyChangedHandler is not null)
                 vm.Settings.PropertyChanged -= _settingsPropertyChangedHandler;
+            if (_fileShareTftpSavedHandler is not null)
+                vm.Settings.FileShareTftpSaved -= _fileShareTftpSavedHandler;
+            if (_settingsLoadedHandler is not null)
+                vm.Settings.SettingsLoaded -= _settingsLoadedHandler;
+            if (_invalidFieldFocusHandler is not null)
+                vm.Settings.InvalidFieldFocusRequested -= _invalidFieldFocusHandler;
             if (_trackedExternalToolForPreview is not null
                 && _selectedExternalToolPropertyChangedHandler is not null)
             {
@@ -3912,6 +4079,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             if (_localeChangedHandler is not null)
                 vm.GetLocalizer().LocaleChanged -= _localeChangedHandler;
             vm.ToolsTab.SectionsInvalidated -= OnToolsTabSectionsInvalidated;
+            vm.ServerList.HiddenSelectionRestored -= RestoreTreeSelectionRow;
         }
 
         _fileShareService.SharingStarted -= OnFileShareSharingStarted;

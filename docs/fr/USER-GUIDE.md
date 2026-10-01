@@ -102,11 +102,18 @@ que vous utilisez souvent.
 
 ### Retrouver et organiser les sessions dans l'arbre
 
-- Les filtres actifs apparaissent sous la recherche. Retirez-en un avec sa croix, ou utilisez **Réinitialiser les filtres** pour effacer la recherche et tous les filtres. Les préférences d'affichage sont conservées.
-- Les résultats de recherche affichent le chemin du dossier et l'adresse de l'hôte. Survolez cette ligne pour lire les valeurs complètes. Sans résultat, utilisez **Effacer la recherche** ou **Réinitialiser les filtres**.
-- Sélectionnez plusieurs sessions pour afficher les actions **Connecter**, **Déplacer** et **Autres actions** sous le compteur de sélection. Elles utilisent les mêmes contrôles que le menu contextuel.
-- Pendant un glisser-déposer, une indication précise la destination et le nombre de sessions, ou le dossier déplacé. Maintenez le pointeur sur un dossier fermé pour l'ouvrir ; approchez du haut ou du bas de l'arbre pour faire défiler.
-- Après un déplacement, un renommage dans l'arbre ou un réordonnancement de sessions, **Annuler** rétablit la dernière modification d'organisation. Une seule étape est conservée pendant la session courante de l'application. L'annulation ne couvre pas la suppression et refuse une modification ultérieure incompatible. Pour les dossiers, un changement ultérieur d'organisation ou de valeurs par défaut empêche l'annulation.
+- Tapez dans le champ de filtre au-dessus de l'arbre pour chercher. Chaque mot tapé doit figurer quelque part dans le nom, l'adresse, le dossier, le nom d'utilisateur, le protocole, l'environnement, les étiquettes ou le projet d'une session, dans n'importe quel ordre, et les accents sont ignorés : `web prod` trouve web01 rangée dans le dossier Prod.
+- Dans le champ de filtre, **Echap** efface la recherche, **Bas** passe à la première session de la liste, et **Entrée** ouvre la session quand une seule correspond. Avec deux résultats ou plus, Entrée ne fait rien.
+- Les filtres actifs apparaissent sous la recherche. Retirez-en un avec sa croix, ou utilisez **Réinitialiser les filtres** pour effacer la recherche et tous les filtres. Les préférences d'affichage sont conservées. Tant qu'un filtre est actif, le compteur d'un dossier se lit visibles/total, par exemple `2/40`.
+- Les résultats de recherche affichent le chemin du dossier et l'adresse de l'hôte. Survolez cette ligne pour lire les valeurs complètes. Sans résultat, utilisez **Effacer la recherche**.
+- Une sélection masquée par une recherche ou par un dossier fermé revient dès que ses lignes sont de nouveau visibles, sauf si vous avez sélectionné autre chose entre-temps.
+- Faites un clic droit sur une session, ou sur plusieurs, et choisissez **Ajouter aux favoris** pour les marquer. Un favori porte une petite étoile, et le menu de filtre peut ne garder que les favoris.
+- La pastille devant une session indique son état. Une pastille pleine concerne la connexion : ouverte, en cours d'ouverture ou en échec. Un anneau des mêmes couleurs donne le résultat du contrôle en arrière-plan, qui vérifie si l'hôte répond. Survolez une ligne pour lire son nom complet, son protocole et son état.
+- Sélectionnez plusieurs sessions pour afficher le compteur de sélection avec **Connecter la sélection**, **Déplacer** et **Autres actions** sous l'arbre. Elles utilisent les mêmes contrôles que le menu contextuel.
+- **Déplacer vers le dossier** suit l'arborescence des dossiers : un dossier qui a des sous-dossiers ouvre un sous-menu, dont la première entrée, **Dans** suivi du nom du dossier, déplace dans ce dossier lui-même.
+- Pendant un glisser-déposer, une indication précise la destination et le nombre de sessions, ou le dossier déplacé. Maintenez le pointeur sur un dossier fermé pour l'ouvrir ; approchez du haut ou du bas de l'arbre pour faire défiler. Pour sortir une session ou un dossier de son dossier, déposez-le sur **Déposer ici pour le sortir de son dossier**, qui apparaît sous l'arbre pendant le glisser.
+- Après un déplacement, un renommage dans l'arbre ou un réordonnancement de sessions, la barre sous l'arbre nomme la modification et propose **Annuler** pendant 30 secondes. Une seule étape est conservée pendant la session courante de l'application. L'annulation ne couvre pas la suppression et refuse une modification ultérieure incompatible. Supprimer un dossier retire la proposition. Pour les dossiers, un changement ultérieur d'organisation ou de valeurs par défaut empêche l'annulation.
+- La touche **Suppr** agit sur les sessions, jamais sur un dossier : pour supprimer un dossier, utilisez **Supprimer le dossier** dans son menu.
 
 ## Où vivent vos mots de passe
 
@@ -154,6 +161,8 @@ machine d'un côté, la machine distante de l'autre.
 - **Modifier dans l'éditeur externe** utilise l'éditeur choisi dans les réglages, pour les fichiers
   distants aussi. Heimdall garde une copie locale tant que cet éditeur est ouvert et renvoie chaque
   enregistrement ; fermer le volet pendant qu'un fichier y est encore ouvert vous demande d'abord.
+  Si le serveur refuse un envoi (permission refusée, par exemple), le volet le dit une fois et
+  réessaie au prochain enregistrement.
 - Dans l'éditeur intégré, **Ctrl+S** enregistre et **Ctrl+W** ferme. Un fichier qui n'est pas en
   UTF-8 s'ouvre en Latin-1 et le dit dans la barre d'état de l'éditeur.
 
@@ -169,10 +178,11 @@ Heimdall affiche la raison en clair partout où il le peut. Les cas courants :
 
 | Ce que vous voyez | Ce que cela veut dire en général |
 |---|---|
-| Le mot de passe est refusé | Mauvais mot de passe, ou compte verrouillé sur la machine distante. Si la seule question du serveur est un code de vérification, Heimdall y répond avec votre mot de passe et le refus arrive ici. |
-| La connexion expire | La machine est éteinte, ou un pare-feu bloque. Vérifiez l'adresse. |
+| Le mot de passe est refusé | Mauvais mot de passe, ou compte verrouillé sur la machine distante. |
+| La connexion expire | La machine est éteinte, ou un pare-feu bloque. Vérifiez l'adresse. Un hôte SSH qui ne répond pas est signalé au bout de 15 secondes. |
 | La clé d'hôte a changé | Voir l'avertissement plus haut. N'acceptez pas sans demander. |
-| Le serveur pose une question à laquelle ce client ne peut pas répondre | Le serveur veut un code de vérification ou un autre second facteur. Heimdall ne répond qu'aux demandes de mot de passe ; utilisez un autre client pour ce serveur. |
+| Le serveur pose une question à laquelle ce client ne peut pas répondre | Le serveur veut un code de vérification ou un autre second facteur, et cette connexion ne peut pas vous le demander : l'explorateur de fichiers, les passerelles et le test de parcours ne répondent qu'aux demandes de mot de passe, et jamais avec votre mot de passe quand la question nomme un code à usage unique. Le terminal SSH, lui, vous pose la question. |
+| Une session WinRM se termine dès son ouverture | La connexion a été refusée, et l'erreur au-dessus du marqueur de fin dit pourquoi (accès refusé, Kerberos, TrustedHosts, hôte injoignable derrière une passerelle). Heimdall met fin à PowerShell plutôt que de vous laisser dans cet onglet devant une invite de votre propre machine. Si le message dit que la stratégie d'exécution a refusé le script de connexion, utilisez l'identité Windows actuelle pour cet hôte, ou contactez votre administrateur. |
 | Un message parlant de WebView2 | La machine n'a pas Microsoft Edge. Voir [Installation](#installation). |
 | "Passerelle SSH introuvable" | La session pointe vers une passerelle qui n'existe plus. Modifiez la session pour en choisir une, ou recréez-la dans les réglages. |
 
@@ -198,7 +208,7 @@ Utilisez **Arrêter le test** ou fermez le formulaire pour annuler. Modifier le 
 le rapport précédent.
 
 Le diagnostic utilise les clés SSH de confiance existantes et n'accepte aucune clé nouvelle ou
-modifiée à votre place. Son délai par étape correspond au délai de sonde de clé d'hôte des paramètres.
+modifiée à votre place. Chaque étape dispose de 15 secondes, le temps qu'un vrai tunnel accorde à chaque saut.
 **Copier le diagnostic** exclut les noms d'hôtes, comptes, chemins de clés et erreurs brutes.
 Une étape cible réussie prouve uniquement l'accès TCP, pas le fonctionnement d'une authentification
 RDP, de base de données ou d'une autre application.
@@ -263,7 +273,8 @@ Appuyez sur **F1** à tout moment pour la liste complète. Ceux qui se rentabili
 | `Ctrl+N` | Ajouter une session |
 | `Ctrl+E` | Modifier la session sélectionnée |
 | `Ctrl+B` | Afficher ou masquer le panneau de gauche |
-| `Ctrl+F` | Aller au champ de recherche |
+| `Ctrl+F` | Aller au champ de filtre des sessions ; dans l'onglet Paramètres, à la recherche des paramètres |
+| `Ctrl+S` | Dans l'onglet Paramètres, enregistrer les paramètres quand il y a des modifications à enregistrer |
 | `F11` | Plein écran, `Echap` pour en sortir |
 | `Ctrl+Shift+T` | Basculer le panneau gauche entre Sessions et Outils |
 | `Ctrl+A` | Dans l'arborescence, sélectionner toutes les sessions des dossiers ouverts |

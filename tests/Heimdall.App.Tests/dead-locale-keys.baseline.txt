@@ -188,7 +188,6 @@ BtnExitFullscreen
 BtnExportRdp
 BtnFullExport
 BtnFullImport
-BtnGenerateRecoveryFile
 BtnManageCreds
 BtnReleasePorts
 BtnRestart
@@ -981,7 +980,6 @@ SettingsResolution
 SettingsSectionData
 SettingsSectionGateways
 SettingsSectionLogging
-SettingsSectionPinRecovery
 SettingsSectionPlink
 SettingsSectionProjects
 SettingsSectionSessionBehavior
@@ -1300,21 +1298,10 @@ TooltipTreeSearch
 TooltipTunnelPanel
 TooltipUndo
 TreeClearFilters
-TreeCtxClearRecent
-TreeCtxCollapseAll
 TreeCtxDeleteProject
-TreeCtxDisconnect
 TreeCtxEditProject
-TreeCtxExpandAll
 TreeCtxExportProject
-TreeCtxMoveDown
-TreeCtxMoveSelected
-TreeCtxMoveUp
 TreeCtxNewProject
-TreeCtxNewServer
-TreeCtxRenameGroup
-TreeCtxSortAsc
-TreeCtxSortDesc
 TreeFilterActiveCount
 TreeNoSearchResults
 TreeNoSearchResultsHint

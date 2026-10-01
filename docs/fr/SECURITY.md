@@ -184,11 +184,32 @@ hachées et toute ligne multi-hôtes dont les alias ne sont pas tous gérés).
 Le terminal SSH intégré prend en charge l'authentification keyboard-interactive,
 y compris une clé privée suivie d'un code de vérification. Après vérification de la clé
 d'hôte, une demande reconnue de mot de passe peut recevoir une fois le mot de passe
-stocké. Les autres questions ouvrent une saisie masquée indiquant la destination et le
-compte, même si le serveur ne pose qu'une question. La réponse sert uniquement à la
-tentative en cours et n'est enregistrée ni dans le profil ni dans le coffre.
-Annuler l'invite interrompt l'authentification ; annuler la connexion ferme l'invite.
-Le terminal SSH intégré utilise un délai de connexion SSH.NET de deux minutes pour laisser le temps de saisir la réponse.
+stocké. Une question qui nomme un code à usage unique (one-time, OTP, code de
+vérification, token, passcode, et leurs formes française, allemande et espagnole) ne le
+reçoit jamais, même quand son libellé contient aussi "password", comme celui de pam_oath,
+"One-time password (OATH)". Dès que le serveur a accepté la méthode `password` comme un
+succès partiel, le mot de passe stocké est consommé pour le reste de la tentative : le
+second facteur qui suit ne peut donc pas le recevoir non plus. Un refus franc de la
+méthode `password` ne le consomme pas : un serveur dont l'authentification par mot de
+passe est désactivée le demande encore par keyboard-interactive, et le reçoit.
+
+Les autres questions ouvrent une saisie masquée indiquant la destination et le compte,
+même si le serveur ne pose qu'une question. Le texte du serveur y est cité et attribué au
+serveur nommé, avec la mention que Heimdall n'y demande jamais son mot de passe maître.
+Avant affichage, `ServerPromptText.Sanitize` remplace les caractères de contrôle et les
+séparateurs de ligne ou de paragraphe par une espace, retire les caractères de format
+(inversions bidirectionnelles, caractères de largeur nulle, marques d'ordre des octets) et
+les demi-paires de substitution isolées, réduit les suites d'espaces et coupe le texte à
+256 caractères : un serveur ne peut ni ouvrir un paragraphe à lui ni réordonner ce qui est
+lu pour se faire passer pour Heimdall. La réponse sert uniquement à la tentative en cours
+et n'est enregistrée ni dans le profil ni dans le coffre. Annuler l'invite interrompt
+l'authentification et est signalé comme une annulation, sans reprise avec Plink ; annuler
+la connexion ferme l'invite.
+
+Atteindre l'hôte garde le délai de connexion normal de 15 secondes, qui borne la connexion
+TCP, la bannière et l'échange de clés. Le délai de deux minutes qui laisse le temps de
+saisir la réponse ne s'applique qu'aux attentes de l'authentification, à partir du moment
+où la clé d'hôte du serveur a été reçue.
 
 Une réponse interactive refusée termine la tentative sans reprise automatique avec
 Plink, afin de ne pas soumettre une nouvelle authentification après un code refusé.
@@ -197,8 +218,10 @@ serveur en est la cause.
 
 Cette saisie concerne le terminal intégré utilisant SSH.NET. SFTP, la création des
 passerelles SSH et les sondes de diagnostic conservent leur fonctionnement non interactif.
-Sans mécanisme de saisie, le premier tour à question unique reçoit toujours le mot de
-passe enregistré, quel que soit son libellé, puis les questions suivantes sont refusées.
+Sans mécanisme de saisie, le premier tour à question unique reçoit le mot de passe
+enregistré sauf s'il nomme un code à usage unique ; une question de code à usage unique et
+toute question posée après l'usage du mot de passe restent sans réponse, et le refus qui
+suit est signalé comme la question restée sans réponse, pas comme un mot de passe rejeté.
 Ces chemins ne prennent donc pas en charge la saisie d'un code de vérification. Les
 sessions utilisant Plink pour le transfert d'agent restent un chemin distinct.
 
@@ -261,12 +284,23 @@ La révocation d'un certificat est confirmée uniquement après la réussite de 
 Si celui-ci échoue, le certificat reste approuvé et visible dans les réglages, avec un message
 d'erreur permettant de réessayer. Les écritures de confiance sont sérialisées par l'application
 pour empêcher une sauvegarde retardée de rétablir une entrée supprimée.
+La création de dossier et la liste des tâches planifiées n'écrivent que leur propre champ par
+la même fusion : aucune ne peut réécrire une copie des réglages lue avant qu'une révocation
+aboutisse. Une approbation encore en cours d'écriture quand Heimdall se ferme est attendue
+jusqu'à cinq secondes, avant la libération de l'écrivain des réglages ; une écriture qui
+dépasse est journalisée puis abandonnée, comme les autres étapes de fermeture.
 
 Le lancement RDP externe s'arrête si le fichier temporaire `.rdp` ne peut pas être créé avec son
 ACL restrictive. Les contrôles de propriété et les écritures/suppressions dans le Gestionnaire
 d'identifiants partagent un verrou dans le processus. Le nettoyage des entrées périmées relit
 leur marqueur avant suppression. Ce verrou coordonne les opérations de Heimdall ; Windows ne
 fournit pas de suppression conditionnelle face aux modifications d'autres processus.
+Quand un lancement de ce même processus vers le même hôte est encore dans sa fenêtre de
+lancement vivant et a déposé l'entrée pour un autre compte, ou pour un compte que l'entrée ne
+nomme pas lisiblement, un second lancement externe est refusé avec un message au lieu de
+laisser cette entrée en place : mstsc l'aurait lue et ouvert la session sous le premier
+compte. Un second lancement pour le même compte (comparé sans tenir compte de la casse)
+conserve l'entrée et se poursuit, comme avant.
 
 Windows ne conserve qu'**une seule** empreinte de serveur RDP par nom d'hôte.
 Derrière un même nom il y a pourtant souvent plusieurs machines - un pool de
@@ -293,15 +327,26 @@ réseau.
 **La vérification n'existe que sur le chemin embarqué.** `RdpCertificateGate`
 n'a de site d'appel que dans `src/Heimdall.App/Views/EmbeddedRdpView.xaml.cs`,
 nulle part ailleurs. Un lancement qui aboutit au client externe - un profil dont
-le mode RDP vaut `External`, ou un lancement forcé en externe - écrit
-l'identifiant `TERMSRV` et démarre `mstsc.exe` sans aucune vérification de
-certificat côté Heimdall, tandis que `RdpFileGenerator` inscrit dans le fichier
-`.rdp` généré le même `authentication level:i:0` que le chemin embarqué applique
-au contrôle. Sur ce chemin, la vérification de Windows est relâchée et rien ne
+le mode RDP vaut `External`, ou un lancement forcé en externe - démarre
+`mstsc.exe` sans aucune vérification de certificat côté Heimdall, tandis que
+`RdpFileGenerator` inscrit dans le fichier `.rdp` généré le même
+`authentication level:i:0` que le chemin embarqué applique au contrôle quand NLA
+est désactivé. Sur ce chemin, la vérification de Windows est relâchée et rien ne
 la remplace.
 
-**L'identifiant `TERMSRV` est circonscrit à la session et balayé.** L'entrée est
-écrite avec `CRED_PERSIST_SESSION` et un marqueur de propriété Heimdall,
+Ce qui a changé, c'est le mot de passe, pas la vérification. Au niveau 0
+(`RdpAuthenticationSettings.AuthenticatesServer` vaut false), le gestionnaire ne
+déchiffre pas le mot de passe stocké, n'écrit pas l'identifiant `TERMSRV` et ne
+remplit pas l'invite d'identification : mstsc le demande à l'utilisateur, et le
+lancement porte un avis qui explique pourquoi. Fournir le mot de passe à cet
+endroit revenait à ouvrir une session sur ce qui répondait à ce nom ou à ce point
+de sortie de tunnel. Ce qui n'a pas changé : le chemin externe n'a toujours aucune
+vérification de certificat propre à Heimdall. Avec NLA activé (niveaux 1 et 2), le
+mot de passe est déposé et rempli comme avant, et c'est mstsc qui vérifie le
+serveur.
+
+**L'identifiant `TERMSRV` est circonscrit à la session et balayé.** Quand il est
+déposé, l'entrée est écrite avec `CRED_PERSIST_SESSION` et un marqueur de propriété Heimdall,
 supprimée après le délai de nettoyage configurable, et supprimée immédiatement
 quand Heimdall se ferme avec un nettoyage encore en attente. Ce qu'un plantage
 laisse derrière lui est récupéré par
@@ -366,6 +411,55 @@ machines différentes, et cette fonctionnalité remplace une vérification de
 Microsoft qui laisse ensuite passer des identifiants CredSSP - elle ne peut donc
 pas être plus permissive que la vérification qu'elle désactive.
 
+### Connexion WinRM
+
+Les deux lancements WinRM exécutent PowerShell avec `-NoExit`, ce qui garde la session
+interactive. Avant `Enter-PSSession`, ils définissent une fonction globale `prompt` qui met
+fin à l'hôte par `[Environment]::Exit` la première fois qu'une invite locale serait affichée :
+code de sortie 1 quand la session distante n'a jamais été ouverte, 0 une fois qu'elle l'a
+été. Une connexion refusée, un `exit` tapé dans la session distante et une connexion perdue
+terminent donc le processus, au lieu de laisser une invite locale dans un onglet qui porte le
+nom de l'hôte distant, où la diffusion, la Command Library et les macros s'exécuteraient sur
+cette machine. L'erreur reste à l'écran et l'onglet montre la session comme terminée ; WinRM
+ne se reconnecte jamais seul après la fin du processus, une connexion refusée ne peut donc pas
+boucler. Le lancement avec identifiant stocké définit la garde sur sa ligne `-Command` avant
+d'appeler le script, parce que la ligne de commande n'est pas soumise à la stratégie
+d'exécution : un script refusé par la stratégie ne peut pas contourner la garde. Limite : en
+Constrained Language Mode, la fonction `prompt` ne peut pas appeler `[Environment]::Exit`, et
+l'hôte garde son invite par défaut.
+
+Une stratégie d'exécution imposée au niveau machine ou utilisateur (par exemple `AllSigned`)
+l'emporte sur le `-ExecutionPolicy Bypass` que demande le lancement et refuse le script de
+connexion, qui n'est pas signé. Ce refus est reconnu dans la première sortie de PowerShell (la
+rubrique d'aide `about_Execution_Policies`, que toutes les langues de l'hôte nomment sans la
+traduire) et expliqué par un message localisé qui propose l'identité Windows courante, qui ne
+demande aucun script.
+
+Le mode identifiant stocké écrit deux fichiers dans le dossier temporaire, par le même
+écrivain à ACL restrictive : le script de connexion et, à côté, un fichier `.blob` qui contient
+le mot de passe protégé par DPAPI pour l'utilisateur courant. Le script lit le blob et le
+supprime avant toute autre chose, puis se supprime lui-même ; seul le chemin du blob apparaît
+dans le texte du script. La valeur dérivée du secret reste ainsi hors du journal
+Microsoft-Windows-PowerShell/Operational, où la journalisation des blocs de script enregistre le
+texte complet de chaque script exécuté. Chaque chemin de nettoyage (échec du lancement, fin du
+processus, arrêt forcé, libération) supprime les deux fichiers, et un balayage périodique
+retire les scripts et blobs `heimdall_winrm_*` périmés. Un coffre verrouillé, un mot de passe
+stocké impossible à déchiffrer et un refus de protéger le blob sont chacun signalés sous leur
+propre cause.
+
+Le test préalable d'accessibilité (TCP, puis TLS en HTTPS) ne s'exécute que sur les connexions
+directes. À travers une passerelle SSH, il se connecterait à l'extrémité locale du tunnel, qui
+accepte toute connexion quoi que fasse la cible : il est donc sauté, et ce saut est journalisé ;
+une cible injoignable apparaît alors comme l'erreur de `Enter-PSSession`.
+
+L'import efface `WinRmSkipCertificateCheck` sur chaque profil importé, avec ou sans SSL, comme
+il efface `ExecutionConfirmed` : se passer de valider le certificat TLS d'un hôte se décide sur
+la machine qui se connecte, pas chez qui a écrit le fichier. La boîte de dialogue du profil, où
+le réglage est visible, est le seul moyen de le réactiver. Elle refuse aussi à l'enregistrement
+un nom d'utilisateur WinRM que le script de connexion refuserait, et abandonne le mot de passe
+WinRM stocké quand le profil utilise l'identité Windows courante, puisque le champ qui l'affiche
+et l'efface est masqué dans ce mode.
+
 ### Escalade sudo en SFTP et édition distante
 
 Le repli sudo du SFTP est délibérément étroit. `EmbeddedSftpViewModel` n'escalade
@@ -378,16 +472,28 @@ pas des permissions.
 
 Les téléversements privilégiés écrivent dans un répertoire privé voisin de la cible.
 Un remplacement accepté utilise un renommage atomique ; une création seule publie
-par lien physique exclusif. Le nettoyage ne retire que les fichiers temporaires.
-Les décisions de conflit des transferts ordinaires atteignent aussi le commit final :
-une cible libre ou un renommage automatique n'autorise pas de remplacement. FTP ne
-garantit pas la création distante exclusive ; ces téléversements sont donc refusés.
+par lien physique exclusif (`ln -T`, qui refuse une destination devenue un
+répertoire au lieu de créer le lien à l'intérieur). Le nettoyage ne retire que les
+fichiers temporaires. Les décisions de conflit des transferts ordinaires atteignent
+aussi le commit final : une cible libre ou un renommage automatique n'autorise pas de
+remplacement. La façon dont chaque transport crée un nouveau fichier est décrite plus
+bas, sous "Garanties de validation des remontées distantes".
+
+La connexion privilégiée passe par la même connexion annulable que les autres
+connexions SFTP : Annuler l'atteint pendant la négociation. Chaque commande
+privilégiée est bornée : `PrivilegedFileTransfer.ControlCommandTimeout` (dix minutes)
+pour une commande sans charge connue, plus la charge à 32 Kio/s pour un transfert ; un
+lien lent ne peut pas retenir une commande indéfiniment, et un gros téléversement n'est
+pas coupé par une borne fixe.
 
 Un remplacement SFTP applique le GID POSIX de la cible avant le mode et les dates,
 puis relit tous ces attributs. Un échec de changement de GID ou une relecture
 différente refuse la publication. Le listing privilégié utilise GNU find et des
 champs séparés par NUL ; les sauts de ligne ne peuvent pas créer de fausses entrées.
-Les noms enfants non supportés sont exclus avant leur utilisation.
+Il commence par `find -H` : un lien symbolique donné comme répertoire à lister est
+suivi, tandis que les liens parmi ses enfants restent signalés comme des liens ; les
+propriétaires sont indiqués par leur nom (`%u`, `%g`), ou par leur numéro pour un
+identifiant sans nom. Les noms enfants non supportés sont exclus avant leur utilisation.
 
 `RemoteFileEditor` suit les tâches de remontée du surveillant de fichiers par
 session d'édition, propage l'annulation via `CloseEdit` et `Dispose`, et
@@ -395,7 +501,17 @@ observe les fautes de manière synchrone afin que les exceptions de remontée en
 arrière-plan non gérées n'atteignent pas le pipeline
 `UnobservedTaskException` à l'échelle du processus. Les sessions d'édition sudo
 mettent en cache le `PinnedFingerprintVerifier` construit à l'ouverture au lieu
-de résoudre à nouveau la confiance de clé d'hôte à chaque enregistrement.
+de résoudre à nouveau la confiance de clé d'hôte à chaque enregistrement. Un refus
+qu'aucune nouvelle tentative ne peut changer (un refus de permission, une restauration
+de métadonnées que le serveur refuse, une cible qu'il ne prend pas en charge) est
+signalé une fois et ne réarme pas le minuteur de reprise ; l'enregistrement suivant
+réessaie.
+
+Les deux éditeurs déposent un fichier distant dans un dossier de travail local
+restreint à l'utilisateur courant. Quand cette restriction échoue, le dossier est
+supprimé et l'ouverture refusée, plutôt que de déposer le fichier, y compris un
+fichier appartenant à root lu par sudo, dans un dossier que d'autres comptes de
+l'ordinateur pourraient lire.
 
 Les ouvertures d'éditeur externe sont sérialisées et liées à la durée de vie de leur
 propriétaire. Sa fermeture annule les téléchargements en cours ; l'enregistrement,
@@ -437,6 +553,23 @@ silencieusement. Seul le chemin `posix-rename` est atomique vis-à-vis d'une
 telle création concurrente. Un déploiement qui doit exclure cette course
 nécessite un serveur offrant l'extension.
 
+La création d'un nouveau fichier est une validation distincte. Un transfert dont la
+vérification de conflit a trouvé le nom libre, et pour lequel aucun remplacement n'a
+été consenti, ne passe jamais par le renommage qui remplace. SFTP le valide par le
+renommage de la version 3 du protocole (`RenameFile` avec `isPosix: false`,
+`SSH_FXP_RENAME`), dont la spécification impose l'échec sur un nom existant ; mesuré
+sur OpenSSH 10.2p1, il laisse intact un fichier existant et publie sur un nom libre.
+Un renommage en échec est ensuite qualifié par une sonde : une destination occupée
+devient une collision typée, et tout autre cas propage l'échec du renommage. Cela
+n'exige aucun canal exec, et fonctionne donc sur les comptes restreints à
+`internal-sftp`, sur Windows OpenSSH et derrière les passerelles SFTP ; la garantie
+repose sur le respect par le serveur de la sémantique de la version 3. FTP vérifie de
+nouveau la destination juste avant de mettre le fichier téléversé en place, refuse une
+destination occupée et ne la déplace jamais ; un fichier créé entre cette vérification
+et le déplacement peut encore être écrasé, car FTP n'offre aucun renommage qui refuse
+un nom existant. Le collage entre deux endpoints garde la publication côté serveur,
+plus stricte, décrite sous "Collage du presse-papiers entre endpoints distincts".
+
 La copie distante SFTP réserve la destination de façon exclusive, ou bien est
 refusée. La copie s'exécute comme une commande côté serveur sur un canal exec
 SSH épinglé à la clé d'hôte résolue à la connexion, et c'est cette commande qui
@@ -445,6 +578,16 @@ publié par un lien physique, une racine de répertoire est réservée par un
 `mkdir` sans `-p`, et les deux échouent si la destination existe déjà. Si la
 commande ne peut pas être utilisée, la copie est refusée et la raison est
 rapportée ; il n'existe pas de seconde voie.
+
+La commande s'exécute sous `umask 077` : le fichier en attente est privé au compte
+dès sa création, jusqu'à ce que `cp -p` applique le mode de la source à la fin ; une
+source en 0600 était auparavant lisible par tous les utilisateurs locaux du serveur
+pendant toute la copie. Une racine de répertoire dont le `mkdir` échoue termine
+aussitôt la commande : le nettoyage d'une copie en échec ne peut retirer qu'une
+arborescence créée par cette commande, jamais celle qu'un autre client venait de créer
+sous le même nom. Le lien de publication est `ln -T`, qui refuse une destination
+devenue un répertoire au lieu de créer le lien à l'intérieur et d'annoncer un succès ;
+un `ln` sans `-T` (une ancienne BusyBox) rejette l'option, et la copie est refusée.
 
 Il en existait une auparavant. Lorsque la commande côté serveur n'était pas
 disponible, la copie se rabattait sur un téléchargement vers un fichier
@@ -961,7 +1104,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 6 478 clés) et une analyse informative
+  le jeu de clés anglais, actuellement 6 545 clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

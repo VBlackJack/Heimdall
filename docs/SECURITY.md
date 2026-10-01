@@ -168,11 +168,29 @@ aliases are not all managed) verbatim.
 
 Embedded SSH terminals support keyboard-interactive authentication, including a private
 key followed by a verification code. After host-key verification, recognized password
-questions can receive the saved password once. Other questions open a masked dialog
-showing the destination and account, even when the server asks only one question.
-Responses are used for the current attempt and are not saved to the profile or vault.
-Cancelling the dialog aborts authentication; cancelling the connection closes the dialog.
-Embedded SSH uses a two-minute SSH.NET connection timeout to allow time for input.
+questions can receive the saved password once. A question that names a one-time code
+(one-time, OTP, verification code, token, passcode, and their French, German and Spanish
+forms) never receives it, even when its wording also contains "password", as pam_oath's
+"One-time password (OATH)" does. Once the server has accepted the `password` method as a
+partial success, the saved password is spent for the rest of the attempt, so the second
+factor that follows cannot receive it either. An outright refusal of the `password` method
+does not spend it: a server with password authentication off still asks for the password
+through keyboard-interactive, and gets it.
+
+Other questions open a masked dialog showing the destination and account, even when the
+server asks only one question. The server's text is quoted and attributed to the named
+server, with a statement that Heimdall never asks for its master password there. Before it
+is shown, `ServerPromptText.Sanitize` turns control characters and line or paragraph
+separators into one space, drops format characters (bidi overrides, zero-width characters,
+byte order marks) and lone surrogates, collapses whitespace and caps the text at 256
+characters, so a server cannot open a paragraph of its own or reorder what is read in order
+to pose as Heimdall. Responses are used for the current attempt and are not saved to the
+profile or vault. Cancelling the dialog aborts authentication and is reported as a
+cancellation, with no Plink retry; cancelling the connection closes the dialog.
+
+Reaching the host keeps the normal 15-second connect timeout, which bounds the TCP connect,
+the banner and the key exchange. The two-minute bound that leaves time for input applies
+only to the authentication waits, from the moment the server's host key has been received.
 
 A rejected interactive answer ends the attempt without an automatic Plink retry. This
 avoids submitting another authentication attempt after a refused code. An authentication
@@ -181,8 +199,10 @@ refusal does not prove whether the key, password, code or server policy caused i
 This interactive entry applies to the SSH.NET embedded terminal path. SFTP, SSH gateway
 creation and diagnostic probes retain their existing non-interactive behavior. Callers
 without an interactive responder still answer a first single-question round with the
-stored password regardless of wording, and refuse subsequent questions. They therefore
-must not be treated as supporting verification-code entry. Agent-forwarding sessions
+stored password unless it names a one-time code, and leave unanswered a one-time-code
+question and any question asked after the password was used; the refusal that follows is reported as the unanswered
+question, not as a rejected password. They therefore must not be treated as supporting
+verification-code entry. Agent-forwarding sessions
 that use Plink remain a separate authentication path.
 
 An earlier Plink test returned "No supported authentication methods available". That
@@ -239,11 +259,20 @@ endpoint.
 Certificate revocation is acknowledged only after its settings write succeeds. A failed write
 leaves the approval and its settings row visible, with an error and the option to retry. Trust
 writes are serialized by the application so a delayed snapshot cannot restore a removed entry.
+Folder creation and the scheduled task list write only their own field through the same merge,
+so neither can write back a copy of the settings read before a revocation landed. An approval
+still being written when Heimdall exits is awaited for up to five seconds, before the settings
+writer is disposed; a write that overruns is logged and abandoned like the other exit steps.
 
 External RDP launch fails if the temporary `.rdp` file cannot be created with its restricted ACL.
 Credential Manager ownership checks and writes/deletes share a process-wide gate, and stale
 cleanup rechecks ownership after enumeration. This coordinates Heimdall's own operations;
 Windows does not provide conditional credential deletion against changes by unrelated processes.
+When a launch of this same process to the same host is still within its live window and staged
+the entry for another account, or for an account the entry does not name readably, a second
+external launch is refused with a message instead of leaving that entry in place: mstsc would
+have read it and signed in as the first account. A second launch for the same account
+(compared without case) keeps the entry and proceeds, as before.
 
 Windows keeps exactly **one** RDP server thumbprint per host name. Behind a
 single name there is often more than one machine - a pool of domain
@@ -269,13 +298,22 @@ trip.
 **The check is embedded-only.** `RdpCertificateGate` has call sites in
 `src/Heimdall.App/Views/EmbeddedRdpView.xaml.cs` and nowhere else. A launch that
 resolves to the external client - a profile whose RDP mode is `External`, or a
-Force-External launch - writes the `TERMSRV` credential and starts `mstsc.exe`
-with no Heimdall-side certificate check at all, while `RdpFileGenerator` puts
-the same `authentication level:i:0` into the generated `.rdp` file that the
-embedded path applies to the control. On that path the Windows check is relaxed
-and nothing replaces it.
+Force-External launch - starts `mstsc.exe` with no Heimdall-side certificate
+check at all, while `RdpFileGenerator` puts the same `authentication level:i:0`
+into the generated `.rdp` file that the embedded path applies to the control
+when NLA is off. On that path the Windows check is relaxed and nothing replaces
+it.
 
-**The `TERMSRV` credential is session-scoped and swept.** The entry is written
+What changed is the password, not the check. At level 0
+(`RdpAuthenticationSettings.AuthenticatesServer` is false) the handler neither
+decrypts the stored password, nor writes the `TERMSRV` credential, nor fills in
+the credential prompt: mstsc asks the user, and the launch carries a notice
+saying why. Supplying the password there meant signing in to whatever answered
+at that name or tunnel endpoint. What did not change: the external path still
+has no Heimdall certificate gate. With NLA on (levels 1 and 2) the password is
+staged and filled in as before, and it is mstsc that checks the server.
+
+**The `TERMSRV` credential is session-scoped and swept.** When it is staged, the entry is written
 with `CRED_PERSIST_SESSION` and a Heimdall ownership marker, released after the
 configurable cleanup delay, and released at once when Heimdall exits with a
 cleanup still pending. What a crash leaves behind is reclaimed by
@@ -334,6 +372,49 @@ self-signed certificates from two different machines, and this feature replaces
 a Microsoft check that then lets CredSSP credentials through, so it cannot be
 more permissive than the check it disables.
 
+### WinRM sign-in
+
+Both WinRM launches run PowerShell with `-NoExit`, which keeps the session interactive.
+Before `Enter-PSSession` they define a global `prompt` function that ends the host through
+`[Environment]::Exit` the first time a local prompt would be shown: exit code 1 when the
+remote session was never entered, 0 once it was. A failed sign-in, an `exit` typed in the
+remote session and a dropped connection therefore end the process, instead of leaving a
+local prompt in a tab titled with the remote host, where broadcast, the Command Library and
+macros would run on this machine. The error stays on screen and the tab shows the session as
+ended; WinRM never reconnects on its own after a process exit, so a failed sign-in cannot
+loop. The stored-credential launch defines the guard on its `-Command` line before invoking
+the script, because the command line is not subject to the execution policy: a script the
+policy refuses cannot skip the guard. Limit: under Constrained Language Mode the prompt
+function cannot call `[Environment]::Exit`, and the host keeps its default prompt.
+
+An execution policy enforced at machine or user policy scope (for example `AllSigned`)
+overrides the `-ExecutionPolicy Bypass` the launch asks for and refuses the unsigned sign-in
+script. That refusal is recognized from PowerShell's early output (the `about_Execution_Policies`
+help topic, which every host language names untranslated) and explained with a localized
+message that offers the current Windows identity, which needs no script.
+
+Stored-credential mode writes two files in the temporary folder through the same
+restrictive-ACL writer: the sign-in script and, beside it, a `.blob` file holding the password
+protected with DPAPI for the current user. The script reads the blob and deletes it before
+anything else, and deletes itself; only the blob's path appears in the script text. That keeps
+the secret-derived value out of the Microsoft-Windows-PowerShell/Operational log, where
+script-block logging records the full text of every script it runs. Every cleanup path
+(launch failure, process exit, kill, dispose) removes both files, and a periodic sweep removes
+stale `heimdall_winrm_*` scripts and blobs. A locked vault, a stored password that cannot be
+decrypted and a refused protection of the blob are each reported under their own cause.
+
+The reachability preflight (TCP, then TLS for HTTPS) runs on direct connections only. Through
+an SSH gateway it would connect to the local end of the tunnel, which accepts every connection
+whatever the target does, so it is skipped and the skip is logged; an unreachable target then
+shows as the `Enter-PSSession` error.
+
+Import clears `WinRmSkipCertificateCheck` on every imported profile, with or without SSL, as it
+clears `ExecutionConfirmed`: whether a host's TLS certificate need not be validated is decided on
+the machine that connects, not by whoever wrote the file. The profile dialog, where the setting
+is visible, is the only way to turn it back on. The dialog also refuses at save a WinRM username
+the sign-in script would refuse, and drops the stored WinRM password when the profile uses the
+current Windows identity, since the field that shows and clears it is hidden in that mode.
+
 ### SFTP sudo escalation and remote editing
 
 SFTP sudo fallback is deliberately narrow. `EmbeddedSftpViewModel`
@@ -345,23 +426,42 @@ actions on non-permission failures.
 
 Privileged uploads stream into a private directory beside the destination.
 Accepted replacements use atomic rename; creation-only transfers publish by an
-exclusive hard link. Cleanup removes only the staging files. Ordinary upload and
-download conflict decisions also reach the final commit: an unoccupied target or
-automatic rename never authorizes replacement. FTP cannot guarantee exclusive
-remote creation, so such uploads are refused rather than silently weakened.
+exclusive hard link (`ln -T`, which refuses a destination that has become a
+directory instead of linking inside it). Cleanup removes only the staging files.
+Ordinary upload and download conflict decisions also reach the final commit: an
+unoccupied target or automatic rename never authorizes replacement. How each
+transport creates a new file is described under "Remote upload commit guarantees"
+below.
+
+The privileged connection goes through the same cancellable connect as the other
+SFTP connections, so Cancel reaches it during the handshake. Every privileged
+command is bounded: `PrivilegedFileTransfer.ControlCommandTimeout` (ten minutes)
+for a command with no known payload, plus the payload at 32 KiB/s for a transfer,
+so a slow link cannot hold a command forever and a large upload is not cut short
+by a fixed bound.
 
 SFTP replacement copies the destination's POSIX GID before restoring mode and
 timestamps, then verifies all of them. A failed GID change or mismatching
 read-back refuses publication. Privileged listings use GNU find with NUL-separated
-fields; embedded newlines cannot create fictitious rows. Unsupported child names
-are excluded before any operation can consume them.
+fields; embedded newlines cannot create fictitious rows. The listing starts with
+`find -H`, so a symbolic link given as the directory to list is followed, while
+links among its children are still reported as links; owners are reported by name
+(`%u`, `%g`), or by number for an ID with no name. Unsupported child names are
+excluded before any operation can consume them.
 
 `RemoteFileEditor` tracks file-watcher upload tasks per edit session,
 propagates cancellation through `CloseEdit` and `Dispose`, and observes
 faults synchronously so unhandled background upload exceptions do not reach
 the process-wide `UnobservedTaskException` pipeline. Sudo edit sessions
 cache the `PinnedFingerprintVerifier` built at open time instead of resolving
-host-key trust again on every save.
+host-key trust again on every save. A refusal no retry can change (a permission
+refusal, a metadata restore the server refuses, a target it does not support) is
+reported once and does not re-arm the retry timer; the next save tries again.
+
+Both editors stage a remote file in a local working folder restricted to the
+current user. When that restriction fails, the folder is removed and the open is
+refused, rather than staging the file, a root-owned one read through sudo
+included, in a folder other accounts on the computer could read.
 
 External-editor opens are serialized and linked to their owner's lifetime. Closing
 the owner cancels pending downloads; registration, watcher creation and editor launch
@@ -398,6 +498,22 @@ may refuse the rename or may overwrite silently. Only the `posix-rename` path is
 atomic with respect to such a concurrent creation. A deployment that must exclude
 that race needs a server offering the extension.
 
+Creating a new file is a separate commit. A transfer whose conflict check found the
+name free, and for which no replacement was consented to, never goes through the
+replacing rename. SFTP commits it with the protocol version 3 rename
+(`RenameFile` with `isPosix: false`, `SSH_FXP_RENAME`), which the protocol specifies
+to fail on an existing name; measured on OpenSSH 10.2p1, it leaves an existing file
+intact and publishes onto a free name. A failed rename is classified by a probe
+afterwards: an occupied destination becomes a typed collision, and anything else
+propagates the rename failure. This needs no exec channel, so it works on accounts
+restricted to `internal-sftp`, on Windows OpenSSH and behind SFTP gateways, and it
+rests on the server honouring the version 3 semantics. FTP checks the destination
+again immediately before moving the uploaded file into place, refuses an occupied
+one and never moves it aside; a file created between that check and the move can
+still be overwritten, because FTP offers no rename that refuses an existing name.
+Pasting between two endpoints keeps the stricter server-side publish described
+under "Cross-endpoint clipboard paste".
+
 SFTP remote copy either reserves the destination exclusively or is refused. The
 copy runs as a server-side command over an SSH exec channel pinned to the host key
 resolved at connect time, and that command is what makes the no-overwrite contract
@@ -405,6 +521,16 @@ real: a file is staged then published with a hard link, a directory root is
 reserved with `mkdir` without `-p`, and both fail if the destination already
 exists. If the command cannot be used, the copy is refused and the reason is
 reported; there is no second route.
+
+The command runs under `umask 077`, so the staging file is private to the account
+from its creation until `cp -p` applies the source's mode at the end; a 0600 source
+used to be readable by every local user of the server for the whole copy. A
+directory root whose `mkdir` fails ends the command at once, so the cleanup of a
+failed copy can only remove a tree this command created, never one another client
+had just created under the same name. The publish link is `ln -T`, which refuses a
+destination that has become a directory instead of linking inside it and reporting
+success; an `ln` without `-T` (an older BusyBox) rejects the option, and the copy is
+refused.
 
 There used to be one. When the server-side command was unavailable, the copy fell
 back to downloading to a local temporary file and republishing through a plain
@@ -871,7 +997,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 6,478
+  parity (every catalogue holds exactly the English key set, currently 6,545
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on
