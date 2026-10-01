@@ -81,7 +81,7 @@ public sealed partial class SettingsViewModelTests
         Assert.True(updates.IsRisky);
 
         viewModel.LoadFromSettings(new AppSettings());
-        await viewModel.WhenSavedPostureLoadedAsync();
+        await viewModel.WhenSavedSettingsLoadedAsync();
 
         Assert.False(updates.IsRisky);
         Assert.True(updates.IsUnsaved);
@@ -138,7 +138,7 @@ public sealed partial class SettingsViewModelTests
         FakeConfigManager config = new() { Settings = saved };
         SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
         viewModel.LoadFromSettings(saved);
-        await viewModel.WhenSavedPostureLoadedAsync();
+        await viewModel.WhenSavedSettingsLoadedAsync();
         return (viewModel, config);
     }
 }

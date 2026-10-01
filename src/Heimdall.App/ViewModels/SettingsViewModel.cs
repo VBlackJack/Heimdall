@@ -1362,7 +1362,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // The markers and the posture card are worded, so they follow the interface language.
         _localizer.LocaleChanged += OnPanelLocaleChanged;
-        _savedPosture = PendingPostureInputs();
         RefreshSecurityPosture();
     }
 
@@ -1686,6 +1685,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// </summary>
     public void LoadFromSettings(AppSettings settings)
     {
+        // A load is not an edit: nothing assigned below counts as one the comparison cannot see.
+        _loadingPanel = true;
+
         // General. The language on screen is read before the box is reseeded, because reseeding
         // the box is itself capable of changing it.
         _originalLocale = _localizer.CurrentLocale;
@@ -1858,8 +1860,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // while this reload is not. Started through its command rather than awaited: the
         // command owns the failure, and the panel is not on screen when settings load.
         TrustedRdpCertificates.RefreshCommand.Execute(null);
+        _loadingPanel = false;
         IsDirty = false;
-        ReloadSavedPosture();
+        ReloadSavedSettings();
         SettingsLoaded?.Invoke();
     }
 
@@ -2204,6 +2207,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             });
         }
 
+        AppSettings? written = null;
         await _configManager.MergeSettingAsync((AppSettings settings) =>
         {
             if (deletedGatewayIds.Count > 0)
@@ -2219,6 +2223,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             }
 
             WritePanelInto(settings);
+            written = settings;
 
             // Flush buffered gateways. They RECONCILE against what was just read from disk
             // instead of replacing it: the buffer is a snapshot taken at LoadFromSettings,
@@ -2238,7 +2243,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         bool tftpChanged = FileShareEnableTftp != _savedFileShareEnableTftp;
         _savedFileShareEnableTftp = FileShareEnableTftp;
         _savedSessionLoggingEnabled = SessionLoggingEnabled;
-        CaptureSavedPostureFromPanel();
+        CaptureSavedSettings(written);
 
         // The saved language is already on screen - it was applied when it was picked. What
         // saving adds is that it becomes the language a later discard has to come back to.
@@ -2247,6 +2252,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         await QueueLocaleApplyAsync(DefaultLocale, announceFailure: false);
         _originalLocale = _localizer.CurrentLocale;
 
+        _hasEditsTheComparisonCannotSee = false;
         IsDirty = false;
         try
         {
@@ -3051,7 +3057,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             _pendingGateways.Add(result.Gateway);
             Gateways.Add(CreateGatewayItem(result.Gateway));
 
-            IsDirty = true;
+            MarkEditTheComparisonCannotSee();
         }
     }
 
@@ -3171,7 +3177,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 gateway.HasPassword = !string.IsNullOrEmpty(result.Gateway.SshPasswordEncrypted);
             }
 
-            IsDirty = true;
+            MarkEditTheComparisonCannotSee();
         }
     }
 
@@ -3234,7 +3240,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _deletedGatewayIds.Add(impact.GatewayId);
         Gateways.Remove(gateway);
         SelectedGateway = null;
-        IsDirty = true;
+        MarkEditTheComparisonCannotSee();
     }
 
     [RelayCommand]
@@ -3421,7 +3427,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         ExternalTools.Add(newTool);
         SelectedExternalTool = newTool;
-        IsDirty = true;
+        MarkEditTheComparisonCannotSee();
         return Task.CompletedTask;
     }
 
@@ -3432,7 +3438,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         ExternalTools.Remove(SelectedExternalTool);
         SelectedExternalTool = null;
-        IsDirty = true;
+        MarkEditTheComparisonCannotSee();
         return Task.CompletedTask;
     }
 
@@ -3782,6 +3788,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         await WhenLocaleAppliedAsync();
 
         var settings = await _configManager.LoadSettingsAsync();
+        _hasEditsTheComparisonCannotSee = false;
         LoadFromSettings(settings);
         await WhenLocaleAppliedAsync();
     }
@@ -3803,7 +3810,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     private void OnExternalToolItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        IsDirty = true;
+        MarkEditTheComparisonCannotSee();
     }
 
     private void OnExternalToolsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -3839,7 +3846,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // or discard a change neither button could act on.
         if (e.PropertyName is not null && PersistedPropertyNames.Contains(e.PropertyName))
         {
-            IsDirty = true;
+            IsDirty = PendingDiffersFromSaved(e.PropertyName);
             RefreshDefaultMarker(e.PropertyName);
         }
 

@@ -17,7 +17,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.Core.Configuration;
-using Heimdall.Core.Logging;
 using PostureRules = Heimdall.App.ViewModels.Settings.SecurityPosture;
 
 namespace Heimdall.App.ViewModels;
@@ -54,16 +53,6 @@ public partial class SettingsViewModel
 
     private SecurityPostureLines? _securityPosture;
 
-    /// <summary>
-    /// The values on disk the card compares against, or null before they were first read.
-    /// </summary>
-    private SecurityPostureInputs? _savedPosture;
-
-    /// <summary>Bumped by every capture of the saved values, so a slower read cannot overwrite a newer one.</summary>
-    private int _savedPostureVersion;
-
-    private Task _savedPostureLoad = Task.CompletedTask;
-
     /// <summary>The card's lines, looked up by key from the markup.</summary>
     public SecurityPostureLines SecurityPosture => _securityPosture ??= CreateSecurityPostureLines();
 
@@ -86,9 +75,6 @@ public partial class SettingsViewModel
     /// Raised when a "Go to setting" link is followed, with the x:Name of the control to show.
     /// </summary>
     public event Action<string>? SettingNavigationRequested;
-
-    /// <summary>Completes when the saved values the card compares against have been read.</summary>
-    internal Task WhenSavedPostureLoadedAsync() => _savedPostureLoad;
 
     private SecurityPostureLines CreateSecurityPostureLines()
         => new(Enum.GetValues<SecurityPostureKey>()
@@ -122,48 +108,6 @@ public partial class SettingsViewModel
         settings.UpdateCheckEnabled,
         settings.SyncKnownHostsAtStartup);
 
-    /// <summary>Records that what the panel holds is now what is on disk.</summary>
-    private void CaptureSavedPostureFromPanel()
-    {
-        _savedPostureVersion++;
-        _savedPosture = PendingPostureInputs();
-        RefreshSecurityPosture();
-    }
-
-    /// <summary>
-    /// Reads the saved values from disk, after a load that may not have come from disk.
-    /// </summary>
-    /// <remarks>
-    /// The panel is loaded from disk at startup, on a reload and on Discard, but also from the
-    /// factory file by Reset Defaults and from a file by the settings import, and only the disk
-    /// knows which. Reading it is the one answer that is right for every caller.
-    /// </remarks>
-    private void ReloadSavedPosture()
-    {
-        int version = ++_savedPostureVersion;
-        _savedPostureLoad = ReloadSavedPostureAsync(version);
-    }
-
-    private async Task ReloadSavedPostureAsync(int version)
-    {
-        try
-        {
-            AppSettings saved = await _configManager.LoadSettingsAsync();
-            if (version != _savedPostureVersion)
-            {
-                return;
-            }
-
-            _savedPosture = PostureInputsOf(saved);
-            RefreshSecurityPosture();
-        }
-        catch (Exception ex)
-        {
-            // The card keeps the last saved values it knew; a failed read changes nothing else.
-            FileLogger.Warn($"[Settings] The saved security choices could not be read: {ex.Message}");
-        }
-    }
-
     /// <summary>Recomputes every line and the overall line from the pending and saved values.</summary>
     private void RefreshSecurityPosture()
     {
@@ -171,7 +115,8 @@ public partial class SettingsViewModel
 
         // The vault is never pending: it is written the moment it is turned on or off, so the
         // saved side takes the panel's value and the vault never reads as unsaved.
-        SecurityPostureInputs saved = (_savedPosture ?? pending) with { VaultEnabled = pending.VaultEnabled };
+        SecurityPostureInputs onDiskInputs = _savedSettings is null ? pending : PostureInputsOf(_savedSettings);
+        SecurityPostureInputs saved = onDiskInputs with { VaultEnabled = pending.VaultEnabled };
 
         IReadOnlyList<SecurityPostureItem> items = PostureRules.Evaluate(pending);
         Dictionary<SecurityPostureKey, SecurityPostureItem> savedItems = PostureRules
