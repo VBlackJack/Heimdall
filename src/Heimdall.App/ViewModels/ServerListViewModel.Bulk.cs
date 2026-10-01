@@ -394,10 +394,7 @@ public partial class ServerListViewModel
                 $"BulkEditPasswordAsync skipped {selectedItems.Count} ineligible item(s).");
             if (skippedWinRmUsernameCount > 0)
             {
-                StatusMessageRequested?.Invoke(_localizer.Format(
-                    "StatusBulkPasswordUpdatedWithWinRmSkipped",
-                    0,
-                    skippedWinRmUsernameCount));
+                StatusMessageRequested?.Invoke(DescribeWinRmPasswordSkips(skippedWinRmUsernameCount));
             }
 
             return;
@@ -880,10 +877,22 @@ public partial class ServerListViewModel
                     ? "StatusBulkPasswordUpdatedWithWinRmSkipped"
                     : _localizer.SelectCountKey(updatedCount, "StatusBulkPasswordUpdatedOne", "StatusBulkPasswordUpdated"),
                 skippedWinRmUsernameCount > 0
-                    ? [updatedCount, skippedWinRmUsernameCount]
+                    ?
+                    [
+                        _localizer.FormatCount(
+                            updatedCount,
+                            "StatusBulkPasswordUpdatedOne",
+                            "StatusBulkPasswordUpdated",
+                            updatedCount),
+                        DescribeWinRmPasswordSkips(skippedWinRmUsernameCount),
+                    ]
                     : [updatedCount]);
         }
     }
+
+    /// <summary>The sentence naming the WinRM profiles a bulk password edit left alone.</summary>
+    private string DescribeWinRmPasswordSkips(int skipped) =>
+        _localizer.FormatCount(skipped, "StatusBulkPasswordWinRmSkippedOne", "StatusBulkPasswordWinRmSkipped", skipped);
 
     private string BuildBulkDeleteConfirmationMessage(IReadOnlyList<ServerItemViewModel> selectedItems)
     {
