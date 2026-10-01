@@ -59,4 +59,61 @@ public sealed class ServiceStatusServiceModulePathTests
             string.Join(';', AllUsersWindowsPowerShell, SystemWindowsPowerShell, CustomMachineModules),
             startInfo.Environment[WindowsPowerShellModulePath.VariableName]);
     }
+
+    [Fact]
+    public void ServiceAction_InheritedFromPowerShell7_SetsWindowsPowerShellModulePathBeforeTheCmdlet()
+    {
+        string inherited = string.Join(
+            ';',
+            PersonalPowerShell7,
+            SharedPowerShell7,
+            PowerShell7Home,
+            AllUsersWindowsPowerShell,
+            SystemWindowsPowerShell,
+            CustomMachineModules);
+
+        string script = ServiceStatusService.BuildServiceActionScript(
+            "Start-Service",
+            "bits",
+            inherited,
+            Roots,
+            path => string.Equals(path, PowerShell7Host, StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(
+            @"$env:PSModulePath = 'C:\Program Files\WindowsPowerShell\Modules;"
+                + @"C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules;D:\Corp\Modules'; Start-Service 'bits'",
+            script);
+    }
+
+    [Fact]
+    public void ServiceAction_ModulePathWithApostrophe_StaysInsideTheLiteral()
+    {
+        string inherited = string.Join(';', SharedPowerShell7, @"D:\O'Brien's\Modules");
+
+        string script = ServiceStatusService.BuildServiceActionScript(
+            "Stop-Service",
+            "O'Brien",
+            inherited,
+            Roots,
+            _ => false);
+
+        Assert.Equal(@"$env:PSModulePath = 'D:\O''Brien''s\Modules'; Stop-Service 'O''Brien'", script);
+    }
+
+    [Fact]
+    public void ServiceAction_NothingInherited_SetsWindowsPowerShellDefaults()
+    {
+        string script = ServiceStatusService.BuildServiceActionScript(
+            "Restart-Service",
+            "  bits  ",
+            null,
+            Roots,
+            _ => false);
+
+        Assert.Equal(
+            @"$env:PSModulePath = 'C:\Users\u\Documents\WindowsPowerShell\Modules;"
+                + @"C:\Program Files\WindowsPowerShell\Modules;"
+                + @"C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules'; Restart-Service 'bits'",
+            script);
+    }
 }

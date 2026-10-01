@@ -78,8 +78,12 @@ public sealed class ServiceStatusService : IServiceStatusService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
 
-        var safeName = serviceName.Trim().Replace("'", "''", StringComparison.Ordinal);
-        var script = $"{command} '{safeName}'";
+        var script = BuildServiceActionScript(
+            command,
+            serviceName,
+            Environment.GetEnvironmentVariable(WindowsPowerShellModulePath.VariableName),
+            PowerShellModuleRoots.ForCurrentUser(),
+            File.Exists);
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
 
         try
@@ -92,6 +96,27 @@ public sealed class ServiceStatusService : IServiceStatusService
         {
             // Preserve current behavior: UAC declined or unavailable.
         }
+    }
+
+    /// <summary>
+    /// Builds the script the elevated service action runs.
+    /// </summary>
+    /// <param name="command">The service cmdlet to run.</param>
+    /// <param name="serviceName">The service to act on; surrounding whitespace is dropped.</param>
+    /// <param name="inheritedModulePath">The PSModulePath the Heimdall process inherited.</param>
+    /// <param name="moduleRoots">PowerShell 7's fixed module directories and Windows PowerShell's defaults.</param>
+    /// <param name="fileExists">Tells a PowerShell 7 home apart.</param>
+    internal static string BuildServiceActionScript(
+        string command,
+        string serviceName,
+        string? inheritedModulePath,
+        PowerShellModuleRoots moduleRoots,
+        Func<string, bool> fileExists)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
+        string modulePath = WindowsPowerShellModulePath.ScriptAssignment(inheritedModulePath, moduleRoots, fileExists);
+        return $"{modulePath}; {command} {PowerShellSingleQuotedString.Quote(serviceName.Trim())}";
     }
 
     /// <summary>
@@ -127,8 +152,9 @@ public sealed class ServiceStatusService : IServiceStatusService
     /// <remarks>
     /// Heimdall started from a PowerShell 7 session would hand Windows PowerShell PowerShell 7's
     /// module path, and 5.1 then loads PowerShell 7's manifests (measured on 2026-10-01 for the
-    /// update relauncher). The elevated service action cannot get the same treatment: it starts
-    /// through ShellExecute, which does not take an environment.
+    /// update relauncher). The elevated service action starts through ShellExecute, which does
+    /// not take an environment, so its script sets the same module path as its first statement
+    /// (see <see cref="BuildServiceActionScript"/>).
     /// </remarks>
     internal static ProcessStartInfo CreateServiceListStartInfo(
         string? inheritedModulePath,

@@ -105,7 +105,7 @@ public sealed class ServiceStatusServiceTests
         Assert.Contains("-EncodedCommand ", captured.Arguments, StringComparison.Ordinal);
 
         var script = DecodeEncodedCommand(captured.Arguments);
-        Assert.Equal("Start-Service 'O''Brien'", script);
+        Assert.EndsWith("Start-Service 'O''Brien'", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public sealed class ServiceStatusServiceTests
         service.RestartService("  bits  ");
 
         var script = DecodeEncodedCommand(captured!.Arguments);
-        Assert.Equal("Restart-Service 'bits'", script);
+        Assert.EndsWith("; Restart-Service 'bits'", script, StringComparison.Ordinal);
     }
 
     [Fact]
