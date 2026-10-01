@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-10-01: updates no longer stay closed over an apostrophe (v2026.100104)
 
 ### Updates: the installer host runs on Windows PowerShell's own modules
 
