@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Services;
 using Heimdall.App.Services.WinRm;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;

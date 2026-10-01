@@ -16,7 +16,7 @@
 
 using System.IO;
 
-namespace Heimdall.App.Services.WinRm;
+namespace Heimdall.App.Services;
 
 /// <summary>
 /// Module directories that decide the PSModulePath handed to Windows PowerShell.
