@@ -641,6 +641,63 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
         Assert.Contains("(" + harness.Localizer["TreeCtxGestureDelete"] + ")", harness.Main.DeleteSessionTooltip, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The status bar words its two counts by their number, in the language's own rule.
+    /// </summary>
+    /// <remarks>
+    /// It used to print a number next to a fixed plural noun, "1 sessions | 1 tunnels". French
+    /// takes the singular for 0 as well, so the French zero is "0 session".
+    /// </remarks>
+    [Theory]
+    [InlineData("en", 0, "0 sessions", "0 tunnels")]
+    [InlineData("en", 1, "1 session", "1 tunnel")]
+    [InlineData("en", 2, "2 sessions", "2 tunnels")]
+    [InlineData("fr", 0, "0 session", "0 tunnel")]
+    [InlineData("fr", 1, "1 session", "1 tunnel")]
+    [InlineData("fr", 2, "2 sessions", "2 tunnels")]
+    [InlineData("es", 0, "0 sesiones", "0 t\u00faneles")]
+    [InlineData("es", 1, "1 sesi\u00f3n", "1 t\u00fanel")]
+    [InlineData("es", 2, "2 sesiones", "2 t\u00faneles")]
+    public async Task StatusBarCounts_AreWordedByTheirNumber(
+        string locale,
+        int count,
+        string expectedSessions,
+        string expectedTunnels)
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        await harness.Localizer.SwitchLocaleAsync(locale);
+
+        harness.Main.ServerCount = count;
+        harness.Main.Tunnels.Count = count;
+
+        Assert.Equal(expectedSessions, harness.Main.ServerCountText);
+        Assert.Equal(expectedTunnels, harness.Main.Tunnels.CountText);
+    }
+
+    /// <summary>Both counts are raised again when the number or the language changes.</summary>
+    [Fact]
+    public async Task StatusBarCounts_FollowTheNumberAndTheLanguage()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        HashSet<string> mainRaised = [];
+        HashSet<string> tunnelsRaised = [];
+        harness.Main.PropertyChanged += (_, args) => mainRaised.Add(args.PropertyName ?? string.Empty);
+        harness.Main.Tunnels.PropertyChanged += (_, args) => tunnelsRaised.Add(args.PropertyName ?? string.Empty);
+
+        harness.Main.ServerCount = 3;
+        harness.Main.Tunnels.Count = 3;
+
+        Assert.Contains(nameof(MainViewModel.ServerCountText), mainRaised);
+        Assert.Contains(nameof(TunnelsViewModel.CountText), tunnelsRaised);
+
+        mainRaised.Clear();
+        tunnelsRaised.Clear();
+        await harness.Localizer.SwitchLocaleAsync("fr");
+
+        Assert.Contains(nameof(MainViewModel.ServerCountText), mainRaised);
+        Assert.Contains(nameof(TunnelsViewModel.CountText), tunnelsRaised);
+    }
+
     /// <summary>Loads the panel from disk and types one unsaved edit into it.</summary>
     /// <returns>The saved value the edit replaced.</returns>
     private static async Task<int> StartAPendingEditAsync(TestHarness harness)

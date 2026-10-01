@@ -81,7 +81,6 @@ public sealed class SessionTreeVocabularyTests
         "TreeCtxNewGroup",
         "TreeNodeNoGroup",
         "TreeNoGroupDropZoneHint",
-        "TreeTooltipGroupCount",
     };
 
     /// <summary>

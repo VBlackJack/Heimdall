@@ -114,7 +114,12 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ServerCountText))]
     private int _serverCount;
+
+    /// <summary>The session count on the status bar, worded by its number.</summary>
+    public string ServerCountText =>
+        _localizer.FormatCount(ServerCount, "StatusServerCountOne", "StatusServerCount", ServerCount);
 
     [ObservableProperty]
     private bool _isBusy;
@@ -679,6 +684,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         }
 
         OnPropertyChanged(nameof(DropToMergeText));
+        OnPropertyChanged(nameof(ServerCountText));
         OnPropertyChanged(nameof(DeleteSessionTooltip));
         OnPropertyChanged(nameof(DetailActionHintsText));
     }

@@ -160,7 +160,12 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     /// <see cref="List"/> on every refresh.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CountText))]
     private int _count;
+
+    /// <summary>The tunnel count on the status bar, worded by its number.</summary>
+    public string CountText =>
+        _localizer.FormatCount(Count, "StatusTunnelCountOne", "StatusTunnelCount", Count);
 
     /// <summary>True when there are no active tunnels.</summary>
     public bool HasNoTunnels => List.Count == 0;
@@ -639,6 +644,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(TunnelPanelHeaderPrefix));
         OnPropertyChanged(nameof(TunnelPanelHeaderSuffix));
+        OnPropertyChanged(nameof(CountText));
     }
 
     private void OnSettingsChanged(AppSettings settings)
