@@ -2009,6 +2009,7 @@
   "SftpSelectedCount": "{0} selected",
   "SftpSelectedCountOne": "{0} selected",
   "SftpCtxOpenInTerminal": "Open in terminal",
+  "SftpRenameNewName": "New name:",
   "ConnectionTypeLocal": "Local Shell",
   "StatusLaunchingLocal": "Launching local shell...",
   "LogLocalShellLaunching": "Launching local shell session",

@@ -163,7 +163,7 @@ public sealed class EmbeddedSftpUploadConflictTests
 
         Assert.Equal(2, browser.UploadCalls.Count);
         Assert.True(viewModel.IsErrorStatus);
-        Assert.StartsWith("1 file out of 2 uploaded before the failure.", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.StartsWith("SftpErrorUploadFailedAfter", viewModel.StatusText, StringComparison.Ordinal);
     }
 
     /// <remarks>
@@ -364,7 +364,7 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Empty(browser.UploadCalls);
         Assert.Equal(0, presenter.CallCount);
         Assert.Equal(
-            "Skipped 1 upload: the destination already exists and is not a regular file. See the log for details.",
+            "WarnUploadTargetsSkippedUnsupported",
             viewModel.StatusText);
     }
 
@@ -410,7 +410,7 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Equal(1, presenter.CallCount);
         Assert.Empty(browser.UploadCalls);
         Assert.Empty(browser.CreateDirectoryCalls);
-        Assert.Equal("Transfer cancelled", viewModel.StatusText);
+        Assert.Equal("SftpStatusTransferCancelled", viewModel.StatusText);
         Assert.False(viewModel.IsTransferInProgress);
     }
 
@@ -656,7 +656,7 @@ public sealed class EmbeddedSftpUploadConflictTests
             Assert.Empty(browser.UploadCalls);
             Assert.Empty(browser.CreateDirectoryCalls);
             Assert.Equal(
-                "Skipped 1 local link, selected as an upload source or found inside the selected tree. See the log for details.",
+                "WarnUploadSourcesSkippedReparsePoints",
                 viewModel.StatusText);
         }
         finally
@@ -701,7 +701,7 @@ public sealed class EmbeddedSftpUploadConflictTests
                 call => call.RemotePath.StartsWith("/dst/source/directory-link", StringComparison.Ordinal));
             Assert.DoesNotContain("/dst/source/directory-link", browser.CreateDirectoryCalls);
             Assert.Equal(
-                "Skipped 1 local link, selected as an upload source or found inside the selected tree. See the log for details.",
+                "WarnUploadSourcesSkippedReparsePoints",
                 viewModel.StatusText);
         }
         finally

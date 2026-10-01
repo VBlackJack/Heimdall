@@ -137,7 +137,7 @@ public sealed class EmbeddedSftpViewModelTests
 
         Assert.Same(file, viewModel.SelectedFile);
         Assert.Same(selectedFiles, viewModel.SelectedFiles);
-        Assert.Equal("2 selected (1 B)", viewModel.SelectionInfoText);
+        Assert.Equal("SftpSelectedCount (1 B)", viewModel.SelectionInfoText);
     }
 
     [Fact]
@@ -277,7 +277,7 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.True(listingToken.IsCancellationRequested);
         Assert.False(viewModel.IsLoading);
         Assert.False(viewModel.IsErrorStatus);
-        Assert.Equal("Ready", viewModel.StatusText);
+        Assert.Equal("SftpStatusReady", viewModel.StatusText);
     }
 
     [Fact]
@@ -334,7 +334,7 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.Equal("/", viewModel.CurrentPath);
         Assert.False(viewModel.CanGoBack);
         Assert.False(viewModel.IsErrorStatus);
-        Assert.Equal("Ready", viewModel.StatusText);
+        Assert.Equal("SftpStatusReady", viewModel.StatusText);
     }
 
     [Fact]
@@ -410,8 +410,8 @@ public sealed class EmbeddedSftpViewModelTests
     /// without a localizer.
     /// </summary>
     [Theory]
-    [InlineData(null, 1, "Downloaded 1 file; skipped 1 folder (folders aren't supported).")]
-    [InlineData(null, 2, "Downloaded 2 files; skipped 1 folder (folders aren't supported).")]
+    [InlineData(null, 1, "SftpStatusDownloadCompleteWithSkipped")]
+    [InlineData(null, 2, "SftpStatusDownloadCompleteWithSkipped")]
     [InlineData("en", 1, "Downloaded 1 file; skipped 1 folder (folders aren't supported).")]
     [InlineData("fr", 1, "1 fichier téléchargé ; 1 dossier ignoré (les dossiers ne sont pas pris en charge).")]
     [InlineData("fr", 2, "2 fichiers téléchargés ; 1 dossier ignoré (les dossiers ne sont pas pris en charge).")]
@@ -463,7 +463,7 @@ public sealed class EmbeddedSftpViewModelTests
             Path.GetTempPath());
 
         Assert.Equal(0, browser.DownloadCallCount);
-        Assert.Equal("No files downloaded - folders aren't supported.", viewModel.StatusText);
+        Assert.Equal("SftpStatusDownloadNoFilesFoldersSkipped", viewModel.StatusText);
         Assert.False(viewModel.IsErrorStatus);
         Assert.False(viewModel.IsTransferInProgress);
     }
@@ -543,7 +543,7 @@ public sealed class EmbeddedSftpViewModelTests
 
         Assert.Equal(0, browser.UploadCallCount);
         Assert.True(viewModel.IsTransferInProgress);
-        Assert.Equal("A file transfer is already in progress.", viewModel.StatusText);
+        Assert.Equal("SftpTransferInProgress", viewModel.StatusText);
     }
 
     [Fact]
@@ -1815,7 +1815,7 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public void UpdateTransferProgress_WithoutLocalizer_FallsBackToTheEnglishLine()
+    public void UpdateTransferProgress_WithoutLocalizer_ShowsTheKeyAndKeepsThePercentage()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
@@ -1824,9 +1824,7 @@ public sealed class EmbeddedSftpViewModelTests
         viewModel.UpdateTransferProgress(progress);
 
         Assert.Equal(50, viewModel.TransferProgressValue);
-        string transferred = EmbeddedSftpViewModel.FormatSize(512);
-        string total = EmbeddedSftpViewModel.FormatSize(1024);
-        Assert.Equal($"\u2191 app.log - {transferred} / {total} (50%)", viewModel.TransferStatusText);
+        Assert.Equal("SftpStatusTransferProgressUpload", viewModel.TransferStatusText);
     }
 
     [Theory]

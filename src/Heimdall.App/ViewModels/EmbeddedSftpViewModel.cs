@@ -570,11 +570,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         int totalCount = UnfilteredEntries.Count;
         int visibleCount = Files.Count;
         ItemCountText = visibleCount == totalCount
-            ? _localizer?.Format("SftpItemCount", totalCount.ToString()) ?? $"{totalCount} items"
-            : _localizer?.Format(
-                "SftpItemCountFiltered",
-                visibleCount.ToString(),
-                totalCount.ToString()) ?? $"{visibleCount}/{totalCount} items";
+            ? LF("SftpItemCount", totalCount.ToString())
+            : LF("SftpItemCountFiltered", visibleCount.ToString(), totalCount.ToString());
     }
 
     /// <summary>
@@ -754,12 +751,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             .Where(f => !f.IsDirectory)
             .Sum(f => f.Size);
 
-        SelectionInfoText = _localizer?.FormatCount(
-                selectedFiles.Count,
-                "SftpSelectedCountOne",
-                "SftpSelectedCount",
-                selectedFiles.Count.ToString())
-            ?? $"{selectedFiles.Count} selected";
+        SelectionInfoText = LFC(
+            selectedFiles.Count,
+            "SftpSelectedCountOne",
+            "SftpSelectedCount",
+            selectedFiles.Count.ToString());
 
         if (totalSize > 0)
         {
@@ -845,9 +841,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         await RunOnUiAsync(() =>
         {
             SudoMode = !SudoMode;
-            UpdateStatus(SudoMode
-                ? (_localizer?["SftpSudoModeEnabled"] ?? "Sudo mode enabled - browsing as root")
-                : (_localizer?["SftpSudoModeDisabled"] ?? "Sudo mode disabled"));
+            UpdateStatus(L10n(SudoMode ? "SftpSudoModeEnabled" : "SftpSudoModeDisabled"));
         });
 
         await Refresh().ConfigureAwait(false);
@@ -960,8 +954,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             string fileSize = FormatSize(tooLargeException.FileSizeBytes);
             string maxSize = FormatSize(tooLargeException.MaxSizeBytes);
-            return _localizer?.Format("SftpErrorSudoEditFileTooLarge", fileSize, maxSize)
-                ?? "SftpErrorSudoEditFileTooLarge";
+            return LF("SftpErrorSudoEditFileTooLarge", fileSize, maxSize);
         }
 
         if (ex is LocalUploadFileValidationException localUploadException)
@@ -997,14 +990,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         // carried by this exception and read by nothing: every one showed "Transfer failed".
         if (ex is SftpMetadataPreservationException preservationRefusal)
         {
-            return _localizer?.Format(preservationRefusal.MessageKey, preservationRefusal.RemotePath)
-                ?? preservationRefusal.MessageKey;
+            return LF(preservationRefusal.MessageKey, preservationRefusal.RemotePath);
         }
 
         if (ex is RemoteUploadInventoryException inventoryFailure)
         {
-            return _localizer?.Format("SftpErrorUploadInventoryFailed", inventoryFailure.RemoteDirectory)
-                ?? "SftpErrorUploadInventoryFailed";
+            return LF("SftpErrorUploadInventoryFailed", inventoryFailure.RemoteDirectory);
         }
 
         // Two different refusals, two different reasons. FTP has no safe publish at all; SFTP has one
@@ -1043,11 +1034,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         return SetErrorStatus(
-            _localizer?.FormatCount(uploaded, "SftpErrorUploadFailedAfterOne", "SftpErrorUploadFailedAfter", uploaded, total, reason)
-                ?? PluralRules.SelectEnglish(
-                    uploaded,
-                    $"{uploaded} file out of {total} uploaded before the failure. {reason}",
-                    $"{uploaded} files out of {total} uploaded before the failure. {reason}"));
+            LFC(uploaded, "SftpErrorUploadFailedAfterOne", "SftpErrorUploadFailedAfter", uploaded, total, reason));
     }
 
     /// <summary>
@@ -1056,27 +1043,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// </summary>
     private string DescribeDownloadWithSkippedFolders(int downloadedFiles, int skippedDirectories)
     {
-        if (_localizer is null)
-        {
-            string files = PluralRules.SelectEnglish(
-                downloadedFiles,
-                $"Downloaded {downloadedFiles} file",
-                $"Downloaded {downloadedFiles} files");
-            string folders = PluralRules.SelectEnglish(
-                skippedDirectories,
-                $"skipped {skippedDirectories} folder",
-                $"skipped {skippedDirectories} folders");
-            return $"{files}; {folders} (folders aren't supported).";
-        }
-
-        return _localizer.Format(
+        return LF(
             "SftpStatusDownloadCompleteWithSkipped",
-            _localizer.FormatCount(
+            LFC(
                 downloadedFiles,
                 "SftpStatusDownloadCountFilesOne",
                 "SftpStatusDownloadCountFiles",
                 downloadedFiles),
-            _localizer.FormatCount(
+            LFC(
                 skippedDirectories,
                 "SftpStatusDownloadCountSkippedFoldersOne",
                 "SftpStatusDownloadCountSkippedFolders",
@@ -1091,7 +1065,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         if (ex is OperationCanceledException)
         {
-            UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+            UpdateStatus(L10n("SftpStatusTransferCancelled"));
             return;
         }
 
@@ -1134,8 +1108,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         Bookmarks.Add(CurrentPath);
-        UpdateStatus(_localizer?.Format("SftpBookmarkAdded", CurrentPath)
-            ?? $"Bookmarked: {CurrentPath}");
+        UpdateStatus(LF("SftpBookmarkAdded", CurrentPath));
     }
 
     /// <summary>
@@ -1160,7 +1133,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         TransferStartState startState = TryBeginTransfer(out CancellationTokenSource? transferCts);
         if (startState == TransferStartState.Busy)
         {
-            UpdateStatus(_localizer?["SftpTransferInProgress"] ?? "A file transfer is already in progress.");
+            UpdateStatus(L10n("SftpTransferInProgress"));
             return;
         }
 
@@ -1180,9 +1153,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             UploadPlanOutcome outcome = await UploadPlannedEntriesAsync(localPaths, targetRemoteDir, ct);
             refreshAfterTransfer = outcome.Completed;
-            UpdateStatus(outcome.Completed
-                ? _localizer?["SftpStatusTransferComplete"] ?? "Transfer complete"
-                : _localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+            UpdateStatus(L10n(outcome.Completed ? "SftpStatusTransferComplete" : "SftpStatusTransferCancelled"));
 
             if (outcome.Completed && outcome.SkippedUnsupportedTargets.Count > 0)
             {
@@ -1192,35 +1163,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                         $"EmbeddedSFTP skipped upload to unsupported remote destination '{path}'.");
                 }
 
-                string warning = _localizer?.FormatCount(
+                string warning = LFC(
                     outcome.SkippedUnsupportedTargets.Count,
                     "WarnUploadTargetsSkippedUnsupportedOne",
                     "WarnUploadTargetsSkippedUnsupported",
-                    outcome.SkippedUnsupportedTargets.Count)
-                    ?? PluralRules.SelectEnglish(
-                        outcome.SkippedUnsupportedTargets.Count,
-                        $"Skipped {outcome.SkippedUnsupportedTargets.Count} upload: the destination already exists and is not a regular file. See the log for details.",
-                        $"Skipped {outcome.SkippedUnsupportedTargets.Count} uploads: the destination already exists and is not a regular file. See the log for details.");
+                    outcome.SkippedUnsupportedTargets.Count);
                 pendingOperationWarnings.Add(warning);
             }
 
             if (outcome.Completed && outcome.SkippedLocalReparsePoints.Count > 0)
             {
-                string warning = _localizer?.FormatCount(
+                string warning = LFC(
                     outcome.SkippedLocalReparsePoints.Count,
                     "WarnUploadSourcesSkippedReparsePointsOne",
                     "WarnUploadSourcesSkippedReparsePoints",
-                    outcome.SkippedLocalReparsePoints.Count)
-                    ?? PluralRules.SelectEnglish(
-                        outcome.SkippedLocalReparsePoints.Count,
-                        $"Skipped {outcome.SkippedLocalReparsePoints.Count} local link, selected as an upload source or found inside the selected tree. See the log for details.",
-                        $"Skipped {outcome.SkippedLocalReparsePoints.Count} local links, selected as upload sources or found inside the selected tree. See the log for details.");
+                    outcome.SkippedLocalReparsePoints.Count);
                 pendingOperationWarnings.Add(warning);
             }
         }
         catch (OperationCanceledException)
         {
-            finalReport = () => UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+            finalReport = () => UpdateStatus(L10n("SftpStatusTransferCancelled"));
         }
         catch (Exception ex)
         {
@@ -1425,7 +1388,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             item.Action != FileConflictEffectiveAction.Skip
             && plannedOps[item.Index].Kind == RemoteUploadOpKind.MakeDirectory))
         {
-            TransferStatusText = _localizer?["SftpStatusUploadingFolder"] ?? "Uploading folder...";
+            TransferStatusText = L10n("SftpStatusUploadingFolder");
         }
 
         foreach (FileConflictResolvedItem resolved in resolvedOps)
@@ -1465,9 +1428,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             uploadedFiles++;
             string fileName = Path.GetFileName(op.LocalPath);
-            TransferStatusText = _localizer?.Format(
+            TransferStatusText = LF(
                 "SftpStatusUploadingProgress", fileName,
-                $"{uploadedFiles}", $"{totalFiles}") ?? $"Uploading {fileName}...";
+                $"{uploadedFiles}", $"{totalFiles}");
 
             try
             {
@@ -1949,7 +1912,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     .ShowAsync(dialogViewModel);
                 if (dialogResult is null)
                 {
-                    UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+                    UpdateStatus(L10n("SftpStatusTransferCancelled"));
                     return;
                 }
 
@@ -1971,9 +1934,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 }
 
                 (SftpFileInfo file, _, int originalIndex) = plannedDownloads[resolved.Index];
-                TransferStatusText = _localizer?.Format(
+                TransferStatusText = LF(
                     "SftpStatusDownloadingFile", file.Name,
-                    $"{originalIndex + 1}/{files.Count}") ?? $"Downloading {file.Name}...";
+                    $"{originalIndex + 1}/{files.Count}");
 
                 try
                 {
@@ -1995,13 +1958,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     UpdateStatus(DescribeDownloadWithSkippedFolders(downloadedFiles, skippedDirectories));
                     break;
                 case SftpDownloadOutcome.OnlyDirectoriesSkipped:
-                    UpdateStatus(_localizer?["SftpStatusDownloadNoFilesFoldersSkipped"]
-                        ?? "No files downloaded - folders aren't supported.");
+                    UpdateStatus(L10n("SftpStatusDownloadNoFilesFoldersSkipped"));
                     break;
                 case SftpDownloadOutcome.Completed:
                 case SftpDownloadOutcome.Empty:
                 default:
-                    UpdateStatus(_localizer?["SftpStatusTransferComplete"] ?? "Transfer complete");
+                    UpdateStatus(L10n("SftpStatusTransferComplete"));
                     break;
             }
 
@@ -2013,16 +1975,15 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                         $"EmbeddedSFTP skipped unsupported remote entry '{path}' during download.");
                 }
 
-                string warning = _localizer?.Format(
+                string warning = LF(
                     "WarnRemoteEntriesSkippedUnsupported",
-                    skippedUnsupportedPaths.Count)
-                    ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                    skippedUnsupportedPaths.Count);
                 ShowOperationWarning(warning);
             }
         }
         catch (OperationCanceledException)
         {
-            UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled");
+            UpdateStatus(L10n("SftpStatusTransferCancelled"));
         }
         catch (Exception ex)
         {
@@ -2064,22 +2025,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string key = progress.IsUpload
             ? "SftpStatusTransferProgressUpload"
             : "SftpStatusTransferProgressDownload";
-        string localized = _localizer?.Format(
+        TransferStatusText = LF(
             key,
             progress.FileName,
             transferred,
             total,
-            percent.ToString("F0"))
-            ?? string.Empty;
-
-        if (!string.IsNullOrEmpty(localized))
-        {
-            TransferStatusText = localized;
-            return;
-        }
-
-        string direction = progress.IsUpload ? "\u2191" : "\u2193";
-        TransferStatusText = $"{direction} {progress.FileName} - {transferred} / {total} ({percent:F0}%)";
+            percent.ToString("F0"));
     }
 
     /// <summary>
@@ -2668,7 +2619,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         string? newName = await _dialogService.ShowInputAsync(
             L10n("SftpBtnRename"),
-            L10n("SftpNewFolderName"),
+            L10n("SftpRenameNewName"),
             file.Name);
 
         if (string.IsNullOrWhiteSpace(newName)
@@ -2904,10 +2855,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         // A count is not a name: it does not go between the quotes reserved for one.
         string message = entries.Count == 1
-            ? _localizer?.Format("SftpConfirmDelete", entries[0].Name)
-                ?? $"Delete \"{entries[0].Name}\"? This cannot be undone."
-            : _localizer?.Format("SftpConfirmDeleteMultiple", entries.Count.ToString(CultureInfo.InvariantCulture))
-                ?? $"Delete {entries.Count} items? This cannot be undone.";
+            ? LF("SftpConfirmDelete", entries[0].Name)
+            : LF("SftpConfirmDeleteMultiple", entries.Count.ToString(CultureInfo.InvariantCulture));
 
         bool confirmed = await _dialogService.ShowConfirmAsync(
             L10n("SftpConfirmDeleteTitle"),
@@ -2935,8 +2884,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             {
                 granted = await dialogService.ShowConfirmAsync(
                     L10n("SftpConfirmSudoDeleteTitle"),
-                    _localizer?.Format("SftpConfirmSudoDelete", refusedName)
-                        ?? $"Delete \"{refusedName}\" as root?",
+                    LF("SftpConfirmSudoDelete", refusedName),
                     "danger").ConfigureAwait(true);
             }).ConfigureAwait(false);
 
@@ -3090,20 +3038,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 RemoteRecursiveDeleteFailureReason.ShellOrRmUnavailable =>
                     L10n("SftpDeleteRefusedShellUnavailable"),
                 RemoteRecursiveDeleteFailureReason.PermissionDenied =>
-                    _localizer?.Format("SftpDeleteRefusedPermissionDenied", firstFailure.Name)
-                        ?? "SftpDeleteRefusedPermissionDenied",
-                _ => _localizer?.Format("SftpDeleteFailedEntry", firstFailure.Name)
-                    ?? "SftpDeleteFailedEntry",
+                    LF("SftpDeleteRefusedPermissionDenied", firstFailure.Name),
+                _ => LF("SftpDeleteFailedEntry", firstFailure.Name),
             };
         }
 
-        return _localizer?.FormatCount(
-                failures.Count,
-                "SftpDeletePartialSummaryOne",
-                "SftpDeletePartialSummary",
-                failures.Count,
-                totalCount)
-            ?? "SftpDeletePartialSummary";
+        return LFC(
+            failures.Count,
+            "SftpDeletePartialSummaryOne",
+            "SftpDeletePartialSummary",
+            failures.Count,
+            totalCount);
     }
 
     /// <summary>
@@ -3121,9 +3066,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string currentOctal = PermissionsToOctal(primary.Permissions);
 
         string title = entries.Count == 1
-            ? (_localizer?.Format("SftpChmodTitle", primary.Name) ?? $"chmod {primary.Name}")
-            : (_localizer?.Format("SftpChmodTitleMultiple", entries.Count.ToString())
-                ?? $"chmod {entries.Count} items");
+            ? LF("SftpChmodTitle", primary.Name)
+            : LF("SftpChmodTitleMultiple", entries.Count.ToString());
 
         string? newPerms = await _dialogService.ShowInputAsync(
             title,
@@ -3179,13 +3123,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 return;
             }
 
-            string summary = _localizer?.FormatCount(
-                    failedNames.Count,
-                    "SftpChmodPartialSummaryOne",
-                    "SftpChmodPartialSummary",
-                    failedNames.Count,
-                    entries.Count)
-                ?? "SftpChmodPartialSummary";
+            string summary = LFC(
+                failedNames.Count,
+                "SftpChmodPartialSummaryOne",
+                "SftpChmodPartialSummary",
+                failedNames.Count,
+                entries.Count);
             await Refresh().ConfigureAwait(false);
             await RunOnUiAsync(() => ShowOperationWarning(summary)).ConfigureAwait(false);
         }
@@ -3242,9 +3185,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                       $"{L10n("SftpPropertiesOwner")} {file.Owner}  {L10n("SftpPropertiesGroup")} {file.Group}\n" +
                       $"{L10n("SftpPropertiesPath")} {file.FullPath}";
 
-        _dialogService.ShowInfo(
-            _localizer?.Format("SftpPropertiesTitle", file.Name) ?? $"Properties - {file.Name}",
-            body);
+        _dialogService.ShowInfo(LF("SftpPropertiesTitle", file.Name), body);
     }
 
     internal static string GetRemoteEntryKindDisplayKey(RemoteEntryKind kind)
@@ -3449,7 +3390,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         try
         {
-            await RunOnUiAsync(() => UpdateStatus(_localizer?["SftpStatusLoading"] ?? "Loading..."));
+            await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusLoading")));
 
             IReadOnlyList<SftpFileInfo> entries;
 
@@ -3483,7 +3424,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 UnfilteredEntries = [.. entries];
                 ApplyFilterAndSort();
                 CanGoBack = _navigationHistory.Count > 0;
-                UpdateStatus(_localizer?["SftpStatusReady"] ?? "Ready");
+                UpdateStatus(L10n("SftpStatusReady"));
             });
             outcome = LoadDirectoryOutcome.Listed;
         }
@@ -3491,7 +3432,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             outcome = LoadDirectoryOutcome.Cancelled;
             Core.Logging.FileLogger.Debug("SFTP listing cancelled");
-            await RunOnUiAsync(() => UpdateStatus(_localizer?["SftpStatusReady"] ?? "Ready"));
+            await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusReady")));
         }
         catch (Exception ex)
         {
@@ -3674,6 +3615,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         bool IsProtectedRoot = false);
 
     private string L10n(string key) => _localizer?.GetString(key) ?? key;
+
+    /// <summary>Formats a catalogue entry, degrading to the key itself when no localizer is set.</summary>
+    private string LF(string key, params object[] args) => _localizer?.Format(key, args) ?? key;
+
+    /// <summary>Formats a counted catalogue entry, degrading to the plural key when no localizer is set.</summary>
+    private string LFC(long count, string oneKey, string otherKey, params object[] args)
+        => _localizer?.FormatCount(count, oneKey, otherKey, args) ?? otherKey;
 
     private string GetSudoAuthenticationErrorMessage(SudoFailureKind kind)
     {

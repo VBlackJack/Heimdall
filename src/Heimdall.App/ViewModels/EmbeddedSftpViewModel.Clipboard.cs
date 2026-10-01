@@ -80,12 +80,7 @@ public sealed partial class EmbeddedSftpViewModel
         (string oneKey, string otherKey) = mode == SftpClipboardMode.Cut
             ? ("SftpStatusCutOne", "SftpStatusCut")
             : ("SftpStatusCopiedOne", "SftpStatusCopied");
-        string verb = mode == SftpClipboardMode.Cut ? "cut" : "copied";
-        UpdateStatus(_localizer?.FormatCount(selection.Count, oneKey, otherKey, selection.Count.ToString())
-            ?? PluralRules.SelectEnglish(
-                selection.Count,
-                $"{selection.Count} item {verb}",
-                $"{selection.Count} items {verb}"));
+        UpdateStatus(LFC(selection.Count, oneKey, otherKey, selection.Count.ToString()));
     }
 
     /// <summary>
@@ -145,17 +140,15 @@ public sealed partial class EmbeddedSftpViewModel
     /// Reports that a concurrent transfer blocks the operation. Refusing is deliberate: silently
     /// cancelling the running transfer would destroy work the user never asked to abandon.
     /// </summary>
-    private void RefuseConcurrentTransfer() => UpdateStatus(
-        _localizer?["SftpTransferInProgress"] ?? "A file transfer is already in progress.");
+    private void RefuseConcurrentTransfer() => UpdateStatus(L10n("SftpTransferInProgress"));
 
     /// <summary>Progress line shown while a clipboard entry is being transferred.</summary>
     private string TransferringEntryStatus(string entryName, int position, int total)
-        => _localizer?.Format(
+        => LF(
             "SftpStatusTransferringEntry",
             entryName,
             position.ToString(),
-            total.ToString())
-            ?? $"Transferring {entryName} ({position}/{total})...";
+            total.ToString());
 
     /// <summary>
     /// Status shown when the pane holding the cut or copied entries is gone.
@@ -166,7 +159,7 @@ public sealed partial class EmbeddedSftpViewModel
     /// developer-facing only, like every other exception message in this assembly.
     /// </remarks>
     private string SourceSessionUnavailableStatus()
-        => _localizer?["SftpErrorSourceSessionUnavailable"] ?? "Source session no longer available.";
+        => L10n("SftpErrorSourceSessionUnavailable");
 
     private async Task PasteSameEndpointClipboardAsync(SftpClipboardContent clipboard, CancellationToken ct)
     {
@@ -273,10 +266,9 @@ public sealed partial class EmbeddedSftpViewModel
                         $"EmbeddedSFTP skipped unsupported remote entry '{path}' during same-endpoint paste.");
                 }
 
-                string warning = _localizer?.Format(
+                string warning = LF(
                     "WarnRemoteEntriesSkippedUnsupported",
-                    skippedUnsupportedPaths.Count)
-                    ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                    skippedUnsupportedPaths.Count);
                 await RunOnUiAsync(() => ShowOperationWarning(warning));
             }
         }
@@ -431,10 +423,9 @@ public sealed partial class EmbeddedSftpViewModel
                         $"EmbeddedSFTP skipped unsupported remote entry '{path}' during cross-endpoint paste.");
                 }
 
-                string warning = _localizer?.Format(
+                string warning = LF(
                     "WarnRemoteEntriesSkippedUnsupported",
-                    skippedUnsupportedPaths.Count)
-                    ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                    skippedUnsupportedPaths.Count);
                 completionWarnings.Add(warning);
             }
 
@@ -460,7 +451,7 @@ public sealed partial class EmbeddedSftpViewModel
             await ReconcileCutClipboardAsync(clipboard, cut, processedCutSources).ConfigureAwait(false);
             await RefreshAfterPasteAsync().ConfigureAwait(false);
             await RunOnUiAsync(() =>
-                UpdateStatus(_localizer?["SftpStatusTransferCancelled"] ?? "Transfer cancelled"))
+                UpdateStatus(L10n("SftpStatusTransferCancelled")))
                 .ConfigureAwait(false);
         }
         catch (SourceSessionUnavailableException)
@@ -551,8 +542,7 @@ public sealed partial class EmbeddedSftpViewModel
     /// Status shown when the destination transport cannot publish without replacing an existing entry.
     /// </summary>
     private string NoClobberUnsupportedStatus()
-        => _localizer?["SftpErrorPasteNoClobberUnsupported"]
-            ?? "This session cannot paste without risking overwriting existing files.";
+        => L10n("SftpErrorPasteNoClobberUnsupported");
 
     private async Task<RemoteTransferPlan> TransferCrossEndpointRootAsync(
         IRemoteBrowser sourceBrowser,
@@ -838,10 +828,9 @@ public sealed partial class EmbeddedSftpViewModel
                         $"EmbeddedSFTP skipped unsupported remote entry '{path}' during duplicate.");
                 }
 
-                string warning = _localizer?.Format(
+                string warning = LF(
                     "WarnRemoteEntriesSkippedUnsupported",
-                    skippedUnsupportedPaths.Count)
-                    ?? $"Skipped {skippedUnsupportedPaths.Count} entries that are neither files nor directories. See the log for details.";
+                    skippedUnsupportedPaths.Count);
                 await RunOnUiAsync(() => ShowOperationWarning(warning));
             }
         }

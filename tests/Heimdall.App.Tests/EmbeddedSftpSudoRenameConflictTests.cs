@@ -53,7 +53,7 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
             "mv -nT '/remote/old.txt' '/remote/new.txt'",
             "test -e '/remote/old.txt' -o -L '/remote/old.txt'",
         ], executor.Commands);
-        Assert.Equal("Ready", viewModel.StatusText);
+        Assert.Equal("SftpStatusReady", viewModel.StatusText);
         Assert.False(viewModel.IsErrorStatus);
         Assert.Equal(1, browser.ListDirectoryCallCount);
     }
