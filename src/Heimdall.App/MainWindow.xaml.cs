@@ -1692,6 +1692,28 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     }
 
     /// <summary>
+    /// Searches the settings for the "Modified" marker, so the search counts and walks the settings
+    /// that differ from their factory default.
+    /// </summary>
+    /// <remarks>
+    /// The search is a walk, not a filter: nothing on the panel hides a non-matching row, and a
+    /// second visibility mechanism over every row of six tabs was not worth what it would cost.
+    /// The markers are what makes this exact: a marker is collapsed while its value is the default,
+    /// and the search skips anything collapsed, so the count is the number of modified settings.
+    /// </remarks>
+    private void OnSettingsFindModifiedClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        Mw_SettingsSearchBox.Text = vm.Localize("SettingsModifiedBadge");
+        Mw_SettingsSearchBox.CaretIndex = Mw_SettingsSearchBox.Text.Length;
+        Mw_SettingsSearchBox.Focus();
+    }
+
+    /// <summary>
     /// Returns true when the keyboard focus is inside embedded content (terminal
     /// WebView2 or WebView2-based tool view), meaning single-modifier shortcuts
     /// should be forwarded to the content instead of being intercepted by the shell.

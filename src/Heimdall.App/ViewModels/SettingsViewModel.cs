@@ -1359,6 +1359,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // A view model that is constructed and never loaded still has to show its numbers.
         SyncNumericTexts();
         IsDirty = false;
+
+        // The markers are worded, so they follow the interface language.
+        _localizer.LocaleChanged += OnPanelLocaleChanged;
+    }
+
+    private void OnPanelLocaleChanged(string locale)
+    {
+        RefreshAllDefaultMarkers();
     }
 
     /// <summary>
@@ -2526,25 +2534,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         dialog.Title = _localizer[save ? "SettingsExportTitle" : "SettingsImportTitle"];
         dialog.Filter = _localizer["SettingsFileDialogFilter"];
         return dialog.ShowDialog() == true ? dialog.FileName : null;
-    }
-
-    private static async Task<AppSettings> LoadFactoryDefaultsAsync(CancellationToken cancellationToken)
-    {
-        // Load factory defaults from settings.default.json (preserves bundled external tools)
-        // rather than new AppSettings() which has empty defaults for collections.
-        var defaultsPath = System.IO.Path.Combine(
-            AppContext.BaseDirectory,
-            AppConstants.BundledConfigDirectoryName,
-            "settings.default.json");
-
-        if (System.IO.File.Exists(defaultsPath))
-        {
-            var json = await System.IO.File.ReadAllTextAsync(defaultsPath, cancellationToken);
-            return System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json, ImportJsonOptions)
-                   ?? new AppSettings();
-        }
-
-        return new AppSettings();
     }
 
     private void ApplyRdpDefaults(AppSettings defaults)
@@ -3828,6 +3817,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _disposed = true;
 
         UnsubscribeExternalToolTracking();
+        _localizer.LocaleChanged -= OnPanelLocaleChanged;
         TrustedHostKeys.Dispose();
         TrustedRdpCertificates.Dispose();
         GC.SuppressFinalize(this);
@@ -3845,6 +3835,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         if (e.PropertyName is not null && PersistedPropertyNames.Contains(e.PropertyName))
         {
             IsDirty = true;
+            RefreshDefaultMarker(e.PropertyName);
         }
     }
 

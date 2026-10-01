@@ -39,7 +39,7 @@ using Heimdall.Ssh;
 namespace Heimdall.App.Tests;
 
 [Collection(CredentialProtectorAppCollection.Name)]
-public sealed class SettingsViewModelTests : IDisposable
+public sealed partial class SettingsViewModelTests : IDisposable
 {
     // A few tests below enable the vault inside a try and restore it in the finally; the scope
     // pins the same baseline around every test of this class, whatever the previous member left.
