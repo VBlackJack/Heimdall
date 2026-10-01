@@ -12,6 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### Settings opens from the keyboard
+
+- **Ctrl+, opens the Settings tab.** No shortcut reached Settings; Ctrl+, now opens it from
+  anywhere in the window, the same way a click on its tab does, and the F1 help lists it.
+
+### A settings import says what it changes in the words of the Settings screen
+
+- **The import preview names each setting by its label.** Before loading a settings file,
+  Heimdall listed the settings that would change by their internal names ("TerminalFontSize",
+  "SftpBrowserEnabled"), in English whatever the language, with no value. Each line now gives
+  where the setting lives and its current and new value: "Terminal > Terminal Appearance > Font
+  size: 14 -> 18", "On -> Off" for a checkbox. With one change it says "1 setting will change"
+  rather than "1 settings".
+
+### The session tree counts zero the French way
+
+- **"0 / 0 session" in French.** The filter result under the sessions search, the hint shown while
+  dragging sessions and the status after moving them into a folder chose singular or plural by
+  "is it one?", so French read "0 sessions" where zero takes the singular. They now follow each
+  language's rule, as the status bar does.
+
+### Changelog
+
+- **Four old "Unreleased" blocks now name their release.** Entries from late March and April 2026
+  that kept an "[Unreleased]" heading after they shipped are titled with the release that first
+  carried them (v2026.032903, v2026.040102, v2026.040204, v2026.042001).
+
 ## 2026-10-01: imports keep unsaved Settings, and WinRM from PowerShell 7 (v2026.100102)
 
 ### Settings: an import keeps the changes you have not saved yet

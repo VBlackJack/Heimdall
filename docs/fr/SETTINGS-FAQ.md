@@ -17,6 +17,8 @@ compromis, celle dont le libellé induit en erreur, et celles dont la formulatio
 que l'interface ne donne jamais. Les options qui font ce que leur nom annonce, comme Thème ou
 Taille de police, ne sont pas répétées ici.
 
+Ctrl+, ouvre les Paramètres depuis n'importe où dans la fenêtre, comme un clic sur leur onglet.
+
 Quand une réponse dit qu'un réglage ne fait pas quelque chose, c'est une affirmation mesurée ou
 vérifiée dans le code, pas une supposition.
 
@@ -82,7 +84,9 @@ y en a et demande s'il faut les inclure.
 
 **Importer des paramètres...** lit un fichier écrit par l'export. Tout autre fichier, ou une
 version que ce Heimdall ne sait pas lire, est refusé et rien ne change. Sinon, il énumère les
-réglages qui changeraient et demande. Si vous acceptez, ils sont chargés comme modifications en
+réglages qui changeraient, chacun sous le libellé que lui donne cet écran, avec son onglet,
+sa section, sa valeur actuelle et sa nouvelle valeur (par exemple "Terminal > Apparence du
+terminal > Taille de police : 14 -> 18"), et demande. Si vous acceptez, ils sont chargés comme modifications en
 attente et vérifiés comme des valeurs saisies : rien n'est écrit avant d'appuyer sur Enregistrer,
 et Annuler les modifications rétablit tout. Un secret ajouté à la main dans le fichier est ignoré.
 
