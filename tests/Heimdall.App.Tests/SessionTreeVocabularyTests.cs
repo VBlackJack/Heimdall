@@ -59,6 +59,7 @@ public sealed class SessionTreeVocabularyTests
     {
         "A11yServerGroup",
         "ConfirmConnectAllMessage",
+        "ConfirmConnectAllMessageOne",
         "DetailLabelGroup",
         "FilterAllGroups",
         "GatewayOverviewGroupDefaultReferenceType",
