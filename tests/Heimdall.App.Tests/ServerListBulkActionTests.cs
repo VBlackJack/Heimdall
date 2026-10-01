@@ -359,7 +359,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Equal("Project B", fixture.ServerById("beta").ProjectName);
         Assert.Equal("ops/source", fixture.ServerById("alpha").Group);
         Assert.Equal("ops/source", fixture.ServerById("beta").Group);
-        Assert.Equal("Moved 2 item(s) to project \"Project B\".", fixture.LastStatusMessage);
+        Assert.Equal("Moved 2 items to project \"Project B\".", fixture.LastStatusMessage);
 
         var persistedProjects = (await fixture.ConfigManager.LoadServersAsync())
             .Where(server => server.Id is "alpha" or "beta")
@@ -550,7 +550,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Equal(string.Empty, fixture.ServerById("beta").ProjectId);
         Assert.Equal(string.Empty, fixture.ServerById("alpha").ProjectName);
         Assert.Equal(string.Empty, fixture.ServerById("beta").ProjectName);
-        Assert.Equal("Moved 2 item(s) to no project.", fixture.LastStatusMessage);
+        Assert.Equal("Moved 2 items to no project.", fixture.LastStatusMessage);
     }
 
     [Fact]
@@ -700,7 +700,7 @@ public sealed class ServerListBulkActionTests : IDisposable
 
         await fixture.ViewModel.DeleteSelectedCommand.ExecuteAsync(null);
 
-        Assert.Equal("Are you sure you want to delete 11 selected item(s)?", fixture.DialogService.LastConfirmMessage);
+        Assert.Equal("Are you sure you want to delete 11 selected items?", fixture.DialogService.LastConfirmMessage);
         Assert.DoesNotContain("- Server", fixture.DialogService.LastConfirmMessage, StringComparison.Ordinal);
     }
 
@@ -923,7 +923,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         // connect." names an empty selection, which is not what happened: this path used to
         // discard the skip count entirely.
         Assert.Equal(
-            "Nothing to connect: 3 selected server(s) were skipped. Skipped: 3 (tool entry).",
+            "Nothing to connect: 3 selected servers were skipped. Skipped: 3 (tool entry).",
             fixture.LastStatusMessage);
         Assert.Equal(0, fixture.DialogService.ConfirmCallCount);
     }
@@ -953,7 +953,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Equal(
             fixture.ViewModel.SelectedItems.Last().Id,
             fixture.ViewModel.SelectedServer?.Id);
-        Assert.Equal("Duplicated 2 item(s).", fixture.LastStatusMessage);
+        Assert.Equal("Duplicated 2 items.", fixture.LastStatusMessage);
 
         var persistedNames = (await fixture.ConfigManager.LoadServersAsync())
             .Select(server => server.DisplayName)
@@ -1284,7 +1284,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Equal(2022, fixture.ServerById("alpha").EffectivePort);
         Assert.Equal(2022, fixture.ServerById("beta").EffectivePort);
         Assert.Equal(2022, fixture.ServerById("gamma").EffectivePort);
-        Assert.Equal("Updated port on 2 item(s).", fixture.LastStatusMessage);
+        Assert.Equal("Updated port on 2 items.", fixture.LastStatusMessage);
 
         var storedPorts = (await fixture.ConfigManager.LoadServersAsync())
             .Where(server => server.Id is "alpha" or "beta" or "gamma")
@@ -1312,7 +1312,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         AssertSelection(fixture.ViewModel, "alpha", "chmod");
         Assert.Equal(2200, fixture.ServerById("alpha").EffectivePort);
         Assert.Equal(2200, fixture.ServerById("chmod").EffectivePort);
-        Assert.Equal("Updated port on 2 item(s).", fixture.LastStatusMessage);
+        Assert.Equal("Updated port on 2 items.", fixture.LastStatusMessage);
 
         var storedPorts = (await fixture.ConfigManager.LoadServersAsync())
             .Where(server => server.Id is "alpha" or "chmod")
@@ -1476,7 +1476,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Equal("ops", fixture.ServerById("alpha").Username);
         Assert.Equal("ops", fixture.ServerById("beta").Username);
         Assert.Equal("ops", fixture.ServerById("gamma").Username);
-        Assert.Equal("Username updated on 3 server(s).", fixture.LastStatusMessage);
+        Assert.Equal("Username updated on 3 servers.", fixture.LastStatusMessage);
 
         var storedUsernames = (await fixture.ConfigManager.LoadServersAsync())
             .Where(server => server.Id is "alpha" or "beta" or "gamma")
@@ -1547,7 +1547,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         await fixture.ViewModel.BulkEditUsernameCommand.ExecuteAsync(fixture.ViewModel.SelectedItems.ToList());
 
         Assert.Equal(1, configManager.SaveServersCallCount);
-        Assert.Equal("Username updated on 3 server(s).", fixture.LastStatusMessage);
+        Assert.Equal("Username updated on 3 servers.", fixture.LastStatusMessage);
 
         var storedUsernames = (await fixture.ConfigManager.LoadServersAsync())
             .Where(server => server.Id is "alpha" or "beta" or "gamma")
@@ -1742,7 +1742,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Equal(2, fixture.DialogService.LastBulkEditPasswordCount);
         AssertSelection(fixture.ViewModel, "alpha", "beta");
         Assert.Equal("beta", fixture.ViewModel.SelectedServer?.Id);
-        Assert.Equal("Password updated on 2 server(s).", fixture.LastStatusMessage);
+        Assert.Equal("Password updated on 2 servers.", fixture.LastStatusMessage);
 
         ServerProfileDto[] storedServers = (await fixture.ConfigManager.LoadServersAsync())
             .Where(server => server.Id is "alpha" or "beta")
@@ -1866,7 +1866,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Equal(1, fixture.DialogService.BulkEditUsernameCallCount);
         Assert.Equal(1, fixture.DialogService.LastBulkEditUsernameCount);
         Assert.Equal("rdp-user-before", fixture.DialogService.LastBulkEditUsernameInitialUsername);
-        Assert.Equal("Username updated on 1 server(s).", fixture.LastStatusMessage);
+        Assert.Equal("Username updated on 1 server.", fixture.LastStatusMessage);
         AssertSelection(fixture.ViewModel, "rdp", "vnc", "tool", "local", "unknown", "citrix", "telnet");
 
         fixture.DialogService.NextBulkEditPasswordResult = NewPassword;
@@ -1874,7 +1874,7 @@ public sealed class ServerListBulkActionTests : IDisposable
 
         Assert.Equal(1, fixture.DialogService.BulkEditPasswordCallCount);
         Assert.Equal(2, fixture.DialogService.LastBulkEditPasswordCount);
-        Assert.Equal("Password updated on 2 server(s).", fixture.LastStatusMessage);
+        Assert.Equal("Password updated on 2 servers.", fixture.LastStatusMessage);
         AssertSelection(fixture.ViewModel, "rdp", "vnc", "tool", "local", "unknown", "citrix", "telnet");
 
         Dictionary<string, ServerProfileDto> stored = (await fixture.ConfigManager.LoadServersAsync())
@@ -2026,7 +2026,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Null(storedTelnet.SshGatewayId);
         Assert.Equal("gw-target", storedSsh.SshGatewayId);
         Assert.Equal(
-            "Skipped 1 item(s): their protocols do not support SSH gateways.",
+            "Skipped 1 item: its protocol does not support SSH gateways.",
             fixture.LastStatusMessage);
     }
 
@@ -2052,7 +2052,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         ServerProfileDto storedServer = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
         Assert.Equal("gw-original", storedServer.SshGatewayId);
         Assert.Equal(
-            "Skipped 1 item(s): SSH gateway \"gw-removed\" no longer exists.",
+            "Skipped 1 item: SSH gateway \"gw-removed\" no longer exists.",
             fixture.LastStatusMessage);
     }
 
@@ -2201,7 +2201,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.False(storedWinRm.UseDirectConnection);
         Assert.Equal("gw-target", storedSsh.SshGatewayId);
         Assert.Equal(
-            "Skipped 1 WinRM HTTPS profile(s): SSH gateways support WinRM over HTTP only.",
+            "Skipped 1 WinRM HTTPS profile: SSH gateways support WinRM over HTTP only.",
             fixture.LastStatusMessage);
     }
 
@@ -2236,7 +2236,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Null(storedSsh.SshGatewayId);
         Assert.False(storedSsh.UseDirectConnection);
         Assert.Equal(
-            "Skipped 1 WinRM HTTPS profile(s): SSH gateways support WinRM over HTTP only.",
+            "Skipped 1 WinRM HTTPS profile: SSH gateways support WinRM over HTTP only.",
             fixture.LastStatusMessage);
     }
 
@@ -2267,7 +2267,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.False(telnetVm.IsGatewayBadgeVisible);
         Assert.False(telnetVm.IsGatewayMissing);
         Assert.Equal(
-            "Skipped 1 item(s): their protocols do not support SSH gateways.",
+            "Skipped 1 item: its protocol does not support SSH gateways.",
             fixture.LastStatusMessage);
     }
 
@@ -2384,7 +2384,7 @@ public sealed class ServerListBulkActionTests : IDisposable
             await fixture.ConfigManager.LoadServersAsync(),
             server => Assert.Equal("gw-original", server.SshGatewayId));
         Assert.Equal(
-            "Skipped 2 item(s): SSH gateway \"gw-target\" no longer exists.",
+            "Skipped 2 items: SSH gateway \"gw-target\" no longer exists.",
             fixture.LastStatusMessage);
     }
 

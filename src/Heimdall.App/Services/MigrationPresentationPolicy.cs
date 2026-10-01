@@ -50,7 +50,11 @@ internal static class MigrationPresentationPolicy
         {
             return new MigrationPresentation(
                 MigrationPresentationKind.Info,
-                localizer.Format("MigrationSuccess", result.ServersImported));
+                localizer.FormatCount(
+                    result.ServersImported,
+                    "MigrationSuccessOne",
+                    "MigrationSuccess",
+                    result.ServersImported));
         }
 
         List<string> lines =
@@ -79,7 +83,11 @@ internal static class MigrationPresentationPolicy
             MaxDisplayedWarnings);
         if (omittedCount > 0)
         {
-            lines.Add(localizer.Format("MigrationWarningsOmitted", omittedCount));
+            lines.Add(localizer.FormatCount(
+                omittedCount,
+                "MigrationWarningsOmittedOne",
+                "MigrationWarningsOmitted",
+                omittedCount));
         }
 
         return new MigrationPresentation(

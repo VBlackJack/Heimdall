@@ -145,8 +145,16 @@ public sealed partial class GatewayOverviewDialogViewModel : ObservableObject
             StatusMessage = updatedCount <= 0
                 ? _localizer["GatewayOverviewActionNoOp"]
                 : request.TargetGatewayId is null
-                    ? _localizer.Format("GatewayOverviewClearSuccess", updatedCount)
-                    : _localizer.Format("GatewayOverviewReassignSuccess", updatedCount);
+                    ? _localizer.FormatCount(
+                        updatedCount,
+                        "GatewayOverviewClearSuccessOne",
+                        "GatewayOverviewClearSuccess",
+                        updatedCount)
+                    : _localizer.FormatCount(
+                        updatedCount,
+                        "GatewayOverviewReassignSuccessOne",
+                        "GatewayOverviewReassignSuccess",
+                        updatedCount);
         }
         catch (OperationCanceledException)
         {
@@ -166,9 +174,19 @@ public sealed partial class GatewayOverviewDialogViewModel : ObservableObject
 
     private void ApplyOverview(GatewayOverview overview)
     {
-        GatewaySummary = _localizer.Format("GatewayOverviewSummaryGateways", overview.GatewayCount);
-        RoutedSessionSummary = _localizer.Format("GatewayOverviewSummaryRoutedSessions", overview.RoutedSessionCount);
-        MissingReferenceSummary = _localizer.Format(
+        GatewaySummary = _localizer.FormatCount(
+            overview.GatewayCount,
+            "GatewayOverviewSummaryGatewaysOne",
+            "GatewayOverviewSummaryGateways",
+            overview.GatewayCount);
+        RoutedSessionSummary = _localizer.FormatCount(
+            overview.RoutedSessionCount,
+            "GatewayOverviewSummaryRoutedSessionsOne",
+            "GatewayOverviewSummaryRoutedSessions",
+            overview.RoutedSessionCount);
+        MissingReferenceSummary = _localizer.FormatCount(
+            overview.MissingReferenceCount,
+            "GatewayOverviewSummaryMissingReferencesOne",
             "GatewayOverviewSummaryMissingReferences",
             overview.MissingReferenceCount);
 
@@ -215,7 +233,11 @@ public sealed class GatewayOverviewGatewayItemViewModel
         ParentText = string.IsNullOrWhiteSpace(group.ParentGatewayName)
             ? ""
             : localizer.Format("GatewayOverviewParentFormat", group.ParentGatewayName);
-        SessionCountText = localizer.Format("GatewayOverviewSessionCount", group.Sessions.Count);
+        SessionCountText = localizer.FormatCount(
+            group.Sessions.Count,
+            "GatewayOverviewSessionCountOne",
+            "GatewayOverviewSessionCount",
+            group.Sessions.Count);
         EmptySessionsText = localizer["GatewayOverviewNoSessions"];
         Sessions = new ObservableCollection<GatewayOverviewSessionItemViewModel>(
             group.Sessions.Select(session => new GatewayOverviewSessionItemViewModel(session)));
@@ -268,8 +290,14 @@ public sealed partial class GatewayOverviewMissingReferenceItemViewModel : Obser
         _resolveAsync = resolveAsync;
         GatewayId = group.GatewayId;
         HeaderText = localizer.Format("GatewayOverviewMissingHeader", group.GatewayId);
-        SessionCountText = localizer.Format("GatewayOverviewSessionCount", group.Sessions.Count);
-        ConfigurationReferenceCountText = localizer.Format(
+        SessionCountText = localizer.FormatCount(
+            group.Sessions.Count,
+            "GatewayOverviewSessionCountOne",
+            "GatewayOverviewSessionCount",
+            group.Sessions.Count);
+        ConfigurationReferenceCountText = localizer.FormatCount(
+            group.ConfigurationReferences.Count,
+            "GatewayOverviewConfigurationReferenceCountOne",
             "GatewayOverviewConfigurationReferenceCount",
             group.ConfigurationReferences.Count);
         SessionIds = group.Sessions.Select(session => session.Id).ToArray();

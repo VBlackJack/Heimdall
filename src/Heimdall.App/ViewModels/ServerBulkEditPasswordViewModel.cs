@@ -38,7 +38,7 @@ public sealed class ServerBulkEditPasswordViewModel : ObservableObject
     {
         _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
         Count = count;
-        Header = _localizer.Format("BulkEditPasswordHeader", count);
+        Header = _localizer.FormatCount(count, "BulkEditPasswordHeaderOne", "BulkEditPasswordHeader", count);
         Validate();
     }
 

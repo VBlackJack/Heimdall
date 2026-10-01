@@ -102,7 +102,17 @@ public sealed class LocalizationManager
     /// French. Both keys are passed by name so a reader, and the dead-key guard, can find them.
     /// </remarks>
     public string FormatCount(long count, string oneKey, string otherKey, params object[] args)
-        => Format(PluralRules.IsOne(_currentLocale, count) ? oneKey : otherKey, args);
+        => Format(SelectCountKey(count, oneKey, otherKey), args);
+
+    /// <summary>
+    /// The key of the wording <paramref name="count"/> takes in the current language, for a caller
+    /// that hands the key on to be formatted later.
+    /// </summary>
+    /// <param name="count">The number the wording agrees with.</param>
+    /// <param name="oneKey">The key of the singular wording.</param>
+    /// <param name="otherKey">The key of the plural wording.</param>
+    public string SelectCountKey(long count, string oneKey, string otherKey)
+        => PluralRules.IsOne(_currentLocale, count) ? oneKey : otherKey;
 
     /// <summary>
     /// Loads locale strings from a JSON file in the specified locales directory.

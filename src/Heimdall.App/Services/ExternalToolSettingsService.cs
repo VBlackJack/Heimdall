@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using Heimdall.App.ViewModels;
@@ -46,10 +45,7 @@ public sealed class ExternalToolSettingsService
     {
         var count = _externalToolProvider.DetectedTools.Count;
         return count > 0
-            ? string.Format(
-                CultureInfo.InvariantCulture,
-                _localizer["ExtToolStatusDetected"],
-                count)
+            ? _localizer.FormatCount(count, "ExtToolStatusDetectedOne", "ExtToolStatusDetected", count)
             : _localizer["ExtToolStatusNone"];
     }
 

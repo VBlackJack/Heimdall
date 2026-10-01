@@ -106,6 +106,14 @@ public sealed class CSharpLocaleKeyCoverageTests
         @"[A-Za-z_][A-Za-z0-9_]*ocaliz[A-Za-z0-9_]*\s*\??\.\s*(?:GetString|Format)\s*\(\s*""([A-Za-z0-9_]+)""\s*[,)]",
         RegexOptions.Compiled);
 
+    // A count worded by a key pair: _localizer.FormatCount(n, "KeyOne", "Key", n) and
+    // SelectCountKey(n, "KeyOne", "Key"). The count comes first, so the shape above never sees
+    // these keys; the plural may be passed as a variable, so its literal is optional.
+    private static readonly Regex s_localizerCountMethodRegex = new(
+        @"[A-Za-z_][A-Za-z0-9_]*ocaliz[A-Za-z0-9_]*\s*\??\.\s*(?:FormatCount|SelectCountKey)\s*\("
+        + @"[^"";]*?,\s*""([A-Za-z0-9_]+)""\s*,\s*(?:""([A-Za-z0-9_]+)"")?",
+        RegexOptions.Compiled);
+
     // The declaration of a key-translating helper, which is how the shortest and
     // commonest call shape in this repository is found: nothing in "L(...)" says
     // localization, so the callers cannot be recognised on their own. Matched
@@ -290,6 +298,9 @@ public sealed class CSharpLocaleKeyCoverageTests
     [InlineData("helper", @"var text = LocalizeKey(""FixtureKeyAlpha"");")]
     [InlineData("GetString", @"var text = _localizationService.GetString(""FixtureKeyAlpha"");")]
     [InlineData("Format", @"var text = _localizer.Format(""FixtureKeyAlpha"", count);")]
+    [InlineData("FormatCount singular", @"var text = _localizer.FormatCount(items.Count, ""FixtureKeyAlpha"", ""FixtureKeyBeta"", items.Count);")]
+    [InlineData("FormatCount plural", @"var text = _localizer.FormatCount(count, ""FixtureKeyBetaOne"", ""FixtureKeyAlpha"", count);")]
+    [InlineData("SelectCountKey", @"string key = _localizer.SelectCountKey(count, ""FixtureKeyAlpha"", ""FixtureKeyBeta"");")]
     [InlineData("locale key class", """
         internal static class FixtureLocaleKeys
         {
@@ -471,6 +482,17 @@ public sealed class CSharpLocaleKeyCoverageTests
                 {
                     references.Add(
                         new KeyReference(match.Groups[1].Value, document.RelativePath, rule));
+                }
+            }
+
+            foreach (Match match in s_localizerCountMethodRegex.Matches(document.Text))
+            {
+                foreach (Group group in new[] { match.Groups[1], match.Groups[2] }.Where(group => group.Success))
+                {
+                    references.Add(new KeyReference(
+                        group.Value,
+                        document.RelativePath,
+                        DiscoveryRule.LocalizerMethod));
                 }
             }
 

@@ -39,7 +39,7 @@ public sealed class ServerBulkEditUsernameViewModel : ObservableObject
     {
         _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
         Count = count;
-        Header = _localizer.Format("BulkEditUsernameHeader", count);
+        Header = _localizer.FormatCount(count, "BulkEditUsernameHeaderOne", "BulkEditUsernameHeader", count);
         MixedValuesHint = _localizer["BulkEditUsernameMixedValuesHint"];
         _initialUsername = initialUsername;
 

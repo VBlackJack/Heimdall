@@ -76,8 +76,10 @@ public sealed partial class EmbeddedSftpViewModel
             EndpointKey,
             _browser));
 
-        string statusKey = mode == SftpClipboardMode.Cut ? "SftpStatusCut" : "SftpStatusCopied";
-        UpdateStatus(_localizer?.Format(statusKey, selection.Count.ToString())
+        (string oneKey, string otherKey) = mode == SftpClipboardMode.Cut
+            ? ("SftpStatusCutOne", "SftpStatusCut")
+            : ("SftpStatusCopiedOne", "SftpStatusCopied");
+        UpdateStatus(_localizer?.FormatCount(selection.Count, oneKey, otherKey, selection.Count.ToString())
             ?? $"{selection.Count} item(s)");
     }
 

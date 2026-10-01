@@ -3169,7 +3169,7 @@ public sealed class SettingsViewModelTests : IDisposable
             ServerProfileDto savedServer = Assert.Single(config.SavedServers);
             Assert.Equal("WebServer", savedServer.DisplayName);
             (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
-            Assert.Contains("Detected 2 stored password(s)", warning.Message, StringComparison.Ordinal);
+            Assert.Contains("Detected 2 stored passwords", warning.Message, StringComparison.Ordinal);
             Assert.Contains("MobaXterm encrypts them with a proprietary algorithm", warning.Message, StringComparison.Ordinal);
         }
         finally

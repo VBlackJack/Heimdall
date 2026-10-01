@@ -2630,7 +2630,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             var count = servers.Count;
             FileLogger.Info($"Exported {count} server(s) to {dialog.FileName}");
-            string message = _localizer.Format("StatusExportSuccess", count)
+            string message = _localizer.FormatCount(count, "StatusExportSuccessOne", "StatusExportSuccess", count)
                 + "\n\n" + _localizer["StatusExportCredentialsExcluded"];
             _dialogService.ShowInfo(
                 _localizer["ExportDialogTitle"],
@@ -2758,7 +2758,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 if (validationFailures.Count > 0)
                 {
                     string warningText = string.Join("\n", validationFailures.Take(10));
-                    string warningMessage = _localizer.Format("ImportMobaXtermWarnings", validationFailures.Count)
+                    string warningMessage = _localizer.FormatCount(
+                            validationFailures.Count,
+                            "ImportMobaXtermWarningsOne",
+                            "ImportMobaXtermWarnings",
+                            validationFailures.Count)
                         + "\n" + warningText;
                     _dialogService.ShowWarning(_localizer["ImportDialogTitle"], warningMessage);
                 }
@@ -2773,8 +2777,16 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             }
 
             var confirmMessage = ext is ".mxtsessions" or ".ini" or ".mobaconf"
-                ? _localizer.Format("ConfirmImportMobaXtermMessage", imported.Count)
-                : _localizer.Format("ConfirmImportMessage", imported.Count);
+                ? _localizer.FormatCount(
+                    imported.Count,
+                    "ConfirmImportMobaXtermMessageOne",
+                    "ConfirmImportMobaXtermMessage",
+                    imported.Count)
+                : _localizer.FormatCount(
+                    imported.Count,
+                    "ConfirmImportMessageOne",
+                    "ConfirmImportMessage",
+                    imported.Count);
 
             var confirmed = await _dialogService.ShowConfirmAsync(
                 _localizer["ConfirmImportTitle"],
@@ -2830,14 +2842,22 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             if (importWarnings is { Count: > 0 })
             {
                 var warningText = string.Join("\n", importWarnings.Take(10));
-                statusMessage += "\n\n" + _localizer.Format("ImportMobaXtermWarnings", importWarnings.Count)
+                statusMessage += "\n\n" + _localizer.FormatCount(
+                        importWarnings.Count,
+                        "ImportMobaXtermWarningsOne",
+                        "ImportMobaXtermWarnings",
+                        importWarnings.Count)
                     + "\n" + warningText;
             }
 
             if (ext is ".mxtsessions" or ".ini" or ".mobaconf")
             {
                 string passwordNotice = _mobaStoredCredentialCount > 0
-                    ? _localizer.Format("ImportMobaXtermPasswordNoticeDetected", _mobaStoredCredentialCount)
+                    ? _localizer.FormatCount(
+                        _mobaStoredCredentialCount,
+                        "ImportMobaXtermPasswordNoticeDetectedOne",
+                        "ImportMobaXtermPasswordNoticeDetected",
+                        _mobaStoredCredentialCount)
                     : _localizer["ImportMobaXtermPasswordNotice"];
                 statusMessage += "\n\n" + passwordNotice;
                 _dialogService.ShowWarning(_localizer["ImportDialogTitle"], statusMessage);
@@ -2945,7 +2965,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             var confirmed = await _dialogService.ShowConfirmAsync(
                 _localizer["CitrixScanTitle"],
-                _localizer.Format("CitrixScanConfirm", scanResult.Resources.Count));
+                _localizer.FormatCount(
+                    scanResult.Resources.Count,
+                    "CitrixScanConfirmOne",
+                    "CitrixScanConfirm",
+                    scanResult.Resources.Count));
 
             if (!confirmed) return;
 
@@ -2961,7 +2985,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 return imported.Count;
             });
 
-            var statusMsg = _localizer.Format("CitrixScanSuccess", newCount);
+            var statusMsg = _localizer.FormatCount(newCount, "CitrixScanSuccessOne", "CitrixScanSuccess", newCount);
             if (scanResult.Warnings.Count > 0)
             {
                 statusMsg += "\n\n" + string.Join("\n", scanResult.Warnings.Take(5));

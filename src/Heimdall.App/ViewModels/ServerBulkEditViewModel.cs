@@ -39,7 +39,7 @@ public sealed class ServerBulkEditViewModel : ObservableObject
     {
         _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
         Count = count;
-        Header = _localizer.Format("BulkEditPortHeader", count);
+        Header = _localizer.FormatCount(count, "BulkEditPortHeaderOne", "BulkEditPortHeader", count);
         MixedValuesHint = _localizer["BulkEditPortMixedValuesHint"];
         _initialPort = initialPort;
 
