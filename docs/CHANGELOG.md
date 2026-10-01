@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-10-01: new files upload again, and a WinRM tab that stays remote (v2026.100101)
 
 ### Session tree: a search that finds what you type, and a selection it gives back
 
@@ -333,6 +333,22 @@ All notable changes to Heimdall are documented in this file.
 - **Two panes sharing one gateway tunnel no longer lose it when one of them fails to reconnect.**
   The failed attempt's share of the tunnel was released twice, the second time when that pane
   was closed, which closed the tunnel under the other pane. It is now released once.
+
+## 2026-09-29: an SSH terminal stuck at 80 columns (v2026.092901)
+
+### An SSH session through Plink opens at the size of its pane
+
+- **Long command lines no longer overwrite themselves.** A session that goes through Plink (agent
+  forwarding with Pageant running, or the retry after a refused sign-in) opened at 80x24 whatever
+  the width of the pane, so the remote shell wrapped at column 80. It now opens at the pane's real
+  size, handed to Plink through a temporary PuTTY saved session that is removed once Plink runs.
+- **The wait for the terminal's size is bounded** by a new setting, `PlinkInitialSizeWaitMs` (3000 ms
+  by default, 500 to 30000, 0 turns it off). When the terminal does not answer in time, the session
+  opens at 80x24 as before and the log says why.
+- **Resizing the pane during a Plink session is still not passed to the server:** reconnect, or
+  type `stty cols <width> rows <height>` in the remote shell.
+
+## 2026-09-20: the Command Library, and a local shell that ran nothing (v2026.092001)
 
 ### The Command Library ran nothing on a local shell
 
