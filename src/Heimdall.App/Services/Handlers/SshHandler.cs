@@ -360,7 +360,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         ex.Port));
             }
 
-            string cancelledMessage = SshFailureMessageBuilder.Cancelled(_localizer);
+            string cancelledMessage = SshFailureMessageBuilder.HostKeyRejected(_localizer, ex.Host, ex.Port);
             _connectionSm.SetError(server.Id, cancelledMessage);
             return new ConnectionResult(
                 false,

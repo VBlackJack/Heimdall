@@ -112,8 +112,31 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const int MaxResizeColumns = 999;
     private const int MaxResizeRows = 999;
 
+    /// <summary>Bounds of the terminal font zoom, shared with the page through placeholders.</summary>
+    internal const int TerminalFontSizeMin = 8;
+    internal const int TerminalFontSizeMax = 28;
+
+    /// <summary>Width of the server health side panel when it is open.</summary>
+    private const double HealthPanelWidth = 180;
+
+    /// <summary>
+    /// ANSI sequence for the host-written end-of-session marker. Yellow keeps a readable
+    /// contrast on every built-in scheme, unlike the bright-black grey it replaces.
+    /// </summary>
+    private const string TerminalHostMarkerColor = "\x1b[33m";
+    private const string TerminalColorReset = "\x1b[0m";
+
+    /// <summary>
+    /// Argument of the <c>session-ended:</c> message telling the page the host already wrote a
+    /// marker line, so the page must not add its own generic one.
+    /// </summary>
+    private const string SessionEndedMarkedArgument = "marked";
+
     /// <summary>Outbound message: sets the xterm.js convertEol option at runtime.</summary>
     private const string MsgSetConvertEol = "set-convert-eol:";
+
+    /// <summary>Outbound message: the page's localized texts, as a JSON object.</summary>
+    private const string MsgSetLabels = "set-labels:";
 
     /// <summary>
     /// Outbound message: clipboard text the host has confirmed, base64 encoded. The page hands it
@@ -410,7 +433,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         string displayName,
         int keepAliveIntervalSeconds = AppSettings.DefaultSshTmoutResetIntervalSeconds,
         string? endpoint = null,
-        string connectedStatus = "Connected",
+        string connectedStatus = SessionStatusTokens.Connected,
         bool autoReconnectOnProcessExit = true)
     {
         var endpointLabel = string.IsNullOrWhiteSpace(endpoint)
@@ -450,6 +473,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _sessionTab = sessionTab;
+        _sessionTab.PropertyChanged += OnSessionTabPropertyChanged;
+        UpdateGatewayRoute();
         _sessionLogDisplayName = displayName;
         _sessionLogEndpoint = endpoint;
 
@@ -457,7 +482,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         SessionTitleText.Text = displayName;
         EndpointTextBlock.Text = endpoint;
         UpdateConnectingOverlay(displayName, endpoint);
-        UpdateStatus("Connecting");
+        UpdateStatus(SessionStatusTokens.Connecting);
     }
 
     /// <summary>
@@ -505,11 +530,15 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         // null session. Replayed now that there is one to receive it.
         ReplayLastKnownTerminalSize();
 
-        UpdateStatus("Connected");
+        UpdateStatus(SessionStatusTokens.Connected);
         StartKeepAliveTimer(keepAliveIntervalSeconds);
         AcquireSleepPrevention();
         // A successful attach ends the coordinator-owned reconnect chain.
         _autoReconnectAttempt = 0;
+        // A Disconnect click made while connecting belongs to the attempt it cancelled, not to
+        // the session that is now attached.
+        _userInitiatedDisconnect = false;
+        HideConnectingOverlayWhenEstablished();
 
         TryAutoStartSessionLog();
     }
@@ -522,7 +551,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     public void AttachTerminalSession(
         Heimdall.Terminal.ITerminalSession terminalSession,
         int keepAliveIntervalSeconds = AppSettings.DefaultSshTmoutResetIntervalSeconds,
-        string connectedStatus = "Connected",
+        string connectedStatus = SessionStatusTokens.Connected,
         bool autoReconnectOnProcessExit = true)
     {
         ArgumentNullException.ThrowIfNull(terminalSession);
@@ -574,6 +603,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         AcquireSleepPrevention();
         // A successful attach ends the coordinator-owned reconnect chain.
         _autoReconnectAttempt = 0;
+        _userInitiatedDisconnect = false;
+        HideConnectingOverlayWhenEstablished();
 
         TryAutoStartSessionLog();
     }
@@ -597,6 +628,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         IsVisibleChanged -= OnVisibilityChanged;
 
         _terminalReady = false;
+
+        if (_sessionTab is not null)
+        {
+            _sessionTab.PropertyChanged -= OnSessionTabPropertyChanged;
+        }
 
         if (_localeChangeSubscribed && _localizer is not null)
         {
@@ -712,11 +748,19 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        // While connecting there is no session to disconnect: the click cancels the attempt
+        // itself. The status stays "Connecting" until the coordinator tears the placeholder down.
+        if (IsConnectingWithoutSession())
+        {
+            RequestConnectCancellation();
+            return;
+        }
+
         try
         {
             _userInitiatedDisconnect = true;
             Core.Logging.FileLogger.Info("EmbeddedSSH Disconnect requested by user");
-            UpdateStatus("Disconnected");
+            UpdateStatus(SessionStatusTokens.Disconnected);
 
             if (_session is not null)
             {
@@ -731,7 +775,65 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             Core.Logging.FileLogger.Warn(
                 $"EmbeddedSSH manual disconnect failed: {ex.Message}");
-            UpdateStatus("Error");
+            UpdateStatus(SessionStatusTokens.Error);
+        }
+    }
+
+    private void OnSessionTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (!string.Equals(e.PropertyName, nameof(SessionTabViewModel.TunnelRoute), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (!Dispatcher.CheckAccess())
+        {
+            BeginInvokeIfAvailable(UpdateGatewayRoute);
+            return;
+        }
+
+        UpdateGatewayRoute();
+    }
+
+    /// <summary>Shows the resolved gateway / tunnel route ("via ...") in the header, if any.</summary>
+    private void UpdateGatewayRoute()
+    {
+        if (_disposed || _sessionTab is null)
+        {
+            return;
+        }
+
+        string route = _sessionTab.TunnelRoute;
+        GatewayRouteText.Text = route;
+        GatewayRouteText.Visibility = string.IsNullOrWhiteSpace(route)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Raised when the user cancels a connection attempt that has not produced a session yet.
+    /// The coordinator owns the cancellation token of the attempt and answers it.
+    /// </summary>
+    public event Action? CancelConnectRequested;
+
+    internal static bool IsConnectionAttemptPending(bool hasSession, bool disposed)
+        => !hasSession && !disposed;
+
+    private bool IsConnectingWithoutSession()
+        => IsConnectionAttemptPending(_session is not null || _terminalSession is not null, _disposed);
+
+    private void RequestConnectCancellation()
+    {
+        Core.Logging.FileLogger.Info("EmbeddedSSH connection attempt cancelled by user");
+        ConnectingCancelButton.IsEnabled = false;
+        CancelConnectRequested?.Invoke();
+    }
+
+    private void OnConnectingCancelClick(object sender, RoutedEventArgs e)
+    {
+        if (IsConnectingWithoutSession())
+        {
+            RequestConnectCancellation();
         }
     }
 
@@ -762,7 +864,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private void ShowHealthPanel()
     {
         HealthPanel.Visibility = Visibility.Visible;
-        HealthColumnDef.Width = new GridLength(180);
+        HealthColumnDef.Width = new GridLength(HealthPanelWidth);
         LocalizeHealthLabels();
         StartHealthMonitor();
     }
@@ -838,16 +940,27 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
             SetHealthProgressEnabled(true);
             CpuProgressBar.Value = data.CpuPercent;
-            CpuPercentText.Text = $"{data.CpuPercent:F1}%";
+            CpuPercentText.Text = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                L("HealthPanelCpuFormat"),
+                data.CpuPercent);
 
             double ramPercent = data.MemTotalMb > 0
                 ? (double)data.MemUsedMb / data.MemTotalMb * 100.0
                 : 0;
             RamProgressBar.Value = ramPercent;
-            RamDetailText.Text = $"{data.MemUsedMb} / {data.MemTotalMb} MB";
+            RamDetailText.Text = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                L("HealthPanelRamFormat"),
+                data.MemUsedMb,
+                data.MemTotalMb);
 
             DiskProgressBar.Value = data.DiskPercent;
-            DiskDetailText.Text = $"{data.DiskUsed} / {data.DiskTotal}";
+            DiskDetailText.Text = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                L("HealthPanelDiskFormat"),
+                data.DiskUsed,
+                data.DiskTotal);
         });
     }
 
@@ -863,7 +976,6 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         HealthCpuLabel.Text = L("HealthPanelCpu");
         HealthRamLabel.Text = L("HealthPanelRam");
         HealthDiskLabel.Text = L("HealthPanelDisk");
-        HealthToggleButton.ToolTip = L("HealthPanelToggle");
     }
 
     private void OnReconnectClick(object sender, RoutedEventArgs e)
@@ -935,7 +1047,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                     return;
                 }
 
-                OverlayReconnectButton.Focus();
+                // The overlay itself takes the focus, not a button: a Space or Enter typed out
+                // of habit as the session drops must not trigger Reconnect, which closes the tab.
+                ReconnectOverlay.Focus();
             },
             System.Windows.Threading.DispatcherPriority.Input);
     }
@@ -945,14 +1059,37 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         ReconnectOverlay.Visibility = Visibility.Collapsed;
     }
 
+    private void SetReconnectDetail(string? detail)
+    {
+        bool hasDetail = !string.IsNullOrWhiteSpace(detail);
+        ReconnectDetailText.Text = hasDetail ? detail : string.Empty;
+        ReconnectDetailText.Visibility = hasDetail ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Dismisses the veil so the output left in the terminal can be read and copied.</summary>
+    private void OnOverlayViewOutputClick(object sender, RoutedEventArgs e)
+    {
+        HideReconnectOverlay();
+        TerminalWebView.Focus();
+        PostTerminalMessage("focus:");
+    }
+
     internal static int ComputeAutoReconnectDelaySeconds(AppSettings? settings, int attempt)
     {
         return attempt switch
         {
-            1 => settings?.SshAutoReconnectFirstDelaySeconds ?? 2,
-            2 => settings?.SshAutoReconnectSecondDelaySeconds ?? 5,
-            _ => settings?.SshAutoReconnectSubsequentDelaySeconds ?? 15,
+            1 => settings?.SshAutoReconnectFirstDelaySeconds ?? AppSettings.DefaultSshAutoReconnectFirstDelaySeconds,
+            2 => settings?.SshAutoReconnectSecondDelaySeconds ?? AppSettings.DefaultSshAutoReconnectSecondDelaySeconds,
+            _ => settings?.SshAutoReconnectSubsequentDelaySeconds ?? AppSettings.DefaultSshAutoReconnectSubsequentDelaySeconds,
         };
+    }
+
+    private int ResolveMaxAutoReconnectAttempts()
+    {
+        return Math.Clamp(
+            TerminalSettings?.SshAutoReconnectAttempts ?? AppSettings.DefaultSshAutoReconnectAttempts,
+            AppSettings.MinSshAutoReconnectAttempts,
+            AppSettings.MaxSshAutoReconnectAttempts);
     }
 
     internal int AutoReconnectAttempt => _autoReconnectAttempt;
@@ -1001,7 +1138,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                     return;
                 }
 
-                AutoReconnectCancelButton.Focus();
+                // Same reasoning as the reconnect veil: focus the container, not the action.
+                AutoReconnectOverlay.Focus();
             },
             System.Windows.Threading.DispatcherPriority.Input);
 
@@ -1061,6 +1199,22 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         scheduler.Invalidate();
         System.Threading.Timer? stoppedTimer = Interlocked.Exchange(ref timer, null);
         stoppedTimer?.Dispose();
+    }
+
+    /// <summary>
+    /// The connecting veil stays up until the session is attached AND the page is ready:
+    /// the page is ready long before the SSH handshake, and a blank terminal with no sign of
+    /// progress is what the veil is there to prevent.
+    /// </summary>
+    internal static bool ShouldHideConnectingOverlay(bool terminalReady, bool sessionAttached)
+        => terminalReady && sessionAttached;
+
+    private void HideConnectingOverlayWhenEstablished()
+    {
+        if (ShouldHideConnectingOverlay(_terminalReady, _session is not null || _terminalSession is not null))
+        {
+            HideConnectingOverlay();
+        }
     }
 
     private void HideConnectingOverlay()
@@ -1244,7 +1398,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
             FlushPendingTerminalMessages();
             ApplyInitialTerminalFocus();
-            HideConnectingOverlay();
+            HideConnectingOverlayWhenEstablished();
             return;
         }
 
@@ -1569,7 +1723,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             }
 
             UpdateStatus(
-                "RemoteSessionHandedOff",
+                SessionStatusTokens.RemoteSessionHandedOff,
                 displayTextOverride: L(localizationKey),
                 forceErrorBrush: true);
         });
@@ -1595,28 +1749,47 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 disconnectInfo,
                 _localizer,
                 _sessionTab?.Title ?? string.Empty);
-            if (!string.IsNullOrWhiteSpace(errorMessage))
+            bool markerWritten = !string.IsNullOrWhiteSpace(errorMessage);
+            if (markerWritten)
             {
                 string template = L("SshTerminalDisconnectMarker");
                 string marker = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                     template, errorMessage);
-                string disconnectText = $"\r\n\x1b[90m{marker}\x1b[0m\r\n";
+                string disconnectText =
+                    $"\r\n{TerminalHostMarkerColor}{marker}{TerminalColorReset}\r\n";
                 QueueOutput(Encoding.UTF8.GetBytes(disconnectText));
             }
 
-            PostTerminalMessage("session-ended:");
+            // One end-of-session line, not two: the page adds its generic one only when the
+            // host wrote none.
+            PostTerminalMessage(markerWritten
+                ? "session-ended:" + SessionEndedMarkedArgument
+                : "session-ended:");
 
             string? securityDisconnectMessage = _pendingSecurityDisconnectMessage;
             _pendingSecurityDisconnectMessage = null;
             if (!string.IsNullOrWhiteSpace(securityDisconnectMessage))
             {
                 ReconnectMessageText.Text = securityDisconnectMessage;
-                UpdateStatus("Error");
+                SetReconnectDetail(null);
+                UpdateStatus(SessionStatusTokens.Error);
                 ShowReconnectOverlay();
                 return;
             }
 
-            UpdateStatus("Disconnected");
+            // A clean exit is not an alarm; a failure carries its real cause, not a generic line.
+            if (disconnectInfo.IsClean)
+            {
+                ReconnectMessageText.Text = L("SshSessionEndedMessage");
+                SetReconnectDetail(null);
+            }
+            else
+            {
+                ReconnectMessageText.Text = L("SshDisconnectedMessage");
+                SetReconnectDetail(errorMessage);
+            }
+
+            UpdateStatus(SessionStatusTokens.Disconnected);
 
             if (_userInitiatedDisconnect)
             {
@@ -1632,7 +1805,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 return;
             }
 
-            int maxAttempts = Math.Clamp(TerminalSettings?.SshAutoReconnectAttempts ?? 3, 1, 10);
+            int maxAttempts = ResolveMaxAutoReconnectAttempts();
             if (TerminalSettings?.SshAutoReconnect == true
                 && _autoReconnectAttempt < maxAttempts)
             {
@@ -2307,7 +2480,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         OverlayReconnectButton.Content = L("BtnReconnectSession");
         OverlayCloseButton.Content = L("BtnCloseOverlay");
         AutoReconnectCancelButton.Content = L("BtnCancelAutoReconnect");
-        ReconnectMessageText.Text = L("SshDisconnectedMessage");
+        if (ReconnectOverlay.Visibility != Visibility.Visible)
+        {
+            ReconnectMessageText.Text = L("SshDisconnectedMessage");
+        }
+
+        OverlayViewOutputButton.Content = L("BtnViewOutputOverlay");
+        ConnectingCancelButton.Content = L("BtnCancelConnect");
         AdminBadgeText.Text = L("AdminBadgeLabel");
         BroadcastBadgeText.Text = L("BroadcastBadgeLabel");
 
@@ -2327,7 +2506,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         System.Windows.Automation.AutomationProperties.SetName(OverlayReconnectButton, L("A11yReconnectSession"));
         System.Windows.Automation.AutomationProperties.SetName(OverlayCloseButton, L("A11yCloseOverlay"));
         System.Windows.Automation.AutomationProperties.SetName(AutoReconnectCancelButton, L("A11yCancelAutoReconnect"));
-        System.Windows.Automation.AutomationProperties.SetName(StatusTextBlock, L("A11yConnectionStatus"));
+        System.Windows.Automation.AutomationProperties.SetName(OverlayViewOutputButton, L("A11yViewOutputOverlay"));
+        System.Windows.Automation.AutomationProperties.SetName(ConnectingCancelButton, L("A11yCancelConnect"));
+        ConnectingCancelButton.ToolTip = L("TooltipCancelConnect");
+
+        // The status text is the live region: a fixed name would be announced instead of its
+        // content ("Connected", "Error"), so the label travels as help text.
+        System.Windows.Automation.AutomationProperties.SetHelpText(StatusTextBlock, L("A11yConnectionStatus"));
     }
 
     private void OnLocaleChanged(string locale)
@@ -2341,6 +2526,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         LocalizeButtons();
+        PostTerminalMessage(MsgSetLabels + TerminalHtmlLocalizer.BuildLabelsJson(key => _localizer?[key]));
 
         if (_healthPanelVisible)
         {
@@ -2349,7 +2535,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         if (AutoReconnectOverlay.Visibility == Visibility.Visible)
         {
-            int maxAttempts = Math.Clamp(TerminalSettings?.SshAutoReconnectAttempts ?? 3, 1, 10);
+            int maxAttempts = ResolveMaxAutoReconnectAttempts();
             AutoReconnectMessageText.Text = string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
                 L("SshAutoReconnectMessage"),
@@ -2545,7 +2731,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         TerminalWebView.Visibility = System.Windows.Visibility.Collapsed;
         FallbackPanel.Visibility = System.Windows.Visibility.Visible;
         FallbackMessageText.Text = message;
-        UpdateStatus("Error");
+        UpdateStatus(SessionStatusTokens.Error);
     }
 
     private void StartKeepAliveTimer(int intervalSeconds)
@@ -2653,24 +2839,24 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         // Display localized status text while keeping internal state identifier
         var displayText = displayTextOverride ?? status switch
         {
-            "Connected" => L("SshSessionStatusConnected"),
-            "Disconnected" => L("SshSessionStatusDisconnected"),
-            "Error" => L("SshSessionStatusError"),
-            "Connecting" => L("SshSessionStatusConnecting"),
-            "RemoteSessionHandedOff" => L("SshSessionStatusRemoteSessionHandedOff"),
+            SessionStatusTokens.Connected => L("SshSessionStatusConnected"),
+            SessionStatusTokens.Disconnected => L("SshSessionStatusDisconnected"),
+            SessionStatusTokens.Error => L("SshSessionStatusError"),
+            SessionStatusTokens.Connecting => L("SshSessionStatusConnecting"),
+            SessionStatusTokens.RemoteSessionHandedOff => L("SshSessionStatusRemoteSessionHandedOff"),
             _ => status
         };
         StatusTextBlock.Text = displayText;
 
-        var isDisconnected = string.Equals(status, "Disconnected", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(status, "Error", StringComparison.OrdinalIgnoreCase);
+        var isDisconnected = string.Equals(status, SessionStatusTokens.Disconnected, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase);
 
         DisconnectButton.IsEnabled = !_disposed && !isDisconnected;
         DisconnectButton.Visibility = isDisconnected ? Visibility.Collapsed : Visibility.Visible;
         ReconnectButton.Visibility = isDisconnected ? Visibility.Visible : Visibility.Collapsed;
 
         StatusTextBlock.Foreground = forceErrorBrush
-            || string.Equals(status, "Error", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase)
             ? GetBrush("ErrorBrush", Brushes.IndianRed)
             : GetBrush("TextPrimaryBrush", Brushes.White);
     }
@@ -2711,9 +2897,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         // Inject terminal appearance settings from AppSettings
-        string fontFamily = TerminalSettings?.TerminalFontFamily ?? "Consolas";
-        int fontSize = TerminalSettings?.TerminalFontSize ?? 14;
-        string schemeName = TerminalSettings?.TerminalColorScheme ?? "Dracula";
+        string fontFamily = TerminalSettings?.TerminalFontFamily ?? AppSettings.DefaultTerminalFontFamily;
+        int fontSize = TerminalSettings?.TerminalFontSize ?? AppSettings.DefaultTerminalFontSize;
+        string schemeName = TerminalSettings?.TerminalColorScheme ?? AppSettings.DefaultTerminalColorScheme;
         string convertEol = _terminalSession is Heimdall.Terminal.PipeModeSession
             ? "true"
             : "false";
@@ -2727,12 +2913,20 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         string safeFontFamily = System.Text.RegularExpressions.Regex.Replace(
             fontFamily, @"[^a-zA-Z0-9\s,'""\-]", "");
 
-        int safeFontSize = Math.Clamp(fontSize, 8, 28);
+        int safeFontSize = Math.Clamp(fontSize, TerminalFontSizeMin, TerminalFontSizeMax);
 
         // The offline NavigateToString page requires inline script/style. Keep
         // placeholder values constrained to known constants or sanitized data.
         html = html.Replace("/*{{TERMINAL_FONT_FAMILY}}*/", safeFontFamily, StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_FONT_SIZE}}*/", safeFontSize.ToString(), StringComparison.Ordinal);
+        html = html.Replace(
+            "/*{{TERMINAL_FONT_MIN}}*/",
+            TerminalFontSizeMin.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            StringComparison.Ordinal);
+        html = html.Replace(
+            "/*{{TERMINAL_FONT_MAX}}*/",
+            TerminalFontSizeMax.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_THEME}}*/", themeJson, StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_CONVERT_EOL}}*/", convertEol, StringComparison.Ordinal);
 

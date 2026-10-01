@@ -1049,23 +1049,34 @@
                                                 Padding="8,4"
                                                 BorderThickness="1"
                                                 HorizontalAlignment="Left"
-                                                Cursor="Hand"
-                                                ToolTip="{loc:Translate ServerDialogAgentChipTooltipRefresh}"
                                                 Style="{StaticResource SshAgentChipBorderStyle}">
-                                            <Border.InputBindings>
-                                                <MouseBinding MouseAction="LeftClick"
-                                                              Command="{Binding RefreshAgentChipCommand}"/>
-                                            </Border.InputBindings>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource SshAgentChipIconStyle}"
-                                                           FontSize="{StaticResource FontSizeBodyLarge}"
-                                                           Margin="0,0,6,0"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding AgentChipText}"
-                                                           FontSize="{StaticResource FontSizeCaption}"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            </StackPanel>
+                                            <!-- A real button: focusable, announced, and Invoke-able, so the agent
+                                                 state refresh is reachable without a mouse. -->
+                                            <Button x:Name="DlgSrv_SshAgentChipButton"
+                                                    Command="{Binding RefreshAgentChipCommand}"
+                                                    Cursor="Hand"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    ToolTip="{loc:Translate ServerDialogAgentChipTooltipRefresh}"
+                                                    AutomationProperties.Name="{Binding AgentChipText}"
+                                                    AutomationProperties.HelpText="{loc:Translate ServerDialogAgentChipTooltipRefresh}">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <ContentPresenter/>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Style="{StaticResource SshAgentChipIconStyle}"
+                                                               FontSize="{StaticResource FontSizeBodyLarge}"
+                                                               Margin="0,0,6,0"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding AgentChipText}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                </StackPanel>
+                                            </Button>
                                         </Border>
                                         <StackPanel Visibility="{Binding HasSshKeyPath, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <TextBlock x:Name="DlgSrv_BasicSshKeyPassphraseLabel"
