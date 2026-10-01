@@ -62,15 +62,24 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
     private const double FileListWidthPadding = 10;
     private const double MinimumNameColumnWidth = 200;
-    // Toolbar width (px) below which the labelled actions collapse into the
-    // overflow menu. First estimate - tune against split-pane screenshots.
-    private const double ToolbarCompactThresholdPx = 780;
+
+    // The arrows appended to the header of the column the list is sorted by.
+    private const string SortArrowAscending = " \u25B2";
+    private const string SortArrowDescending = " \u25BC";
+
+    // Distance in pixels from the top or bottom edge of the list inside which a drag scrolls it.
+    private const double DragAutoScrollEdgePx = 24;
+
+    // Vertical distance in pixels a drag scrolls the list per drag-over event inside that zone.
+    private const double DragAutoScrollStepPx = 16;
 
     // Severity hint for the close confirmation: losing an in-flight transfer or unsaved edits is a
     // warning-grade question rather than an informational one.
     private const string CloseGuardConfirmSeverity = "warning";
 
-    private static readonly TimeSpan SftpOperationTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan HealthCheckInterval =
+        TimeSpan.FromSeconds(SftpViewMetrics.HealthCheckIntervalSeconds);
+
     private readonly EmbeddedSftpViewModel _viewModel;
     private readonly IHostKeyVerifier _hostKeyVerifier;
     private readonly EmbeddedSftpCloseGuard _closeGuard;
@@ -121,6 +130,20 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
     private static readonly TimeSpan SaveEscapeSettlePollInterval = TimeSpan.FromMilliseconds(100);
     private bool _toolbarCompact;
+
+    // Drag out of the list: decides when a press becomes a drag, and keeps a multi-selection whole.
+    private FileListDragSource? _dragSource;
+    private System.Windows.Controls.ListViewItem? _highlightedDropRow;
+    private string _dragOverlayText = string.Empty;
+    private object? _dragOverlayDataKey;
+
+    // The scroll position before a listing is replaced, restored after it.
+    private double? _savedScrollOffset;
+
+    // Progress events are coalesced: the transfer thread posts, a timer on the UI thread shows.
+    private readonly SftpProgressCoalescer _progressCoalescer = new();
+    private System.Windows.Threading.DispatcherTimer? _progressTimer;
+    private int _progressTimerRequested;
 
     /// <summary>
     /// Last unsaved-text flag folded into <see cref="_closeGuardEpoch"/>. Held so the stamp only
@@ -231,6 +254,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             DescribeClosePane);
         InitializeComponent();
         DataContext = _viewModel;
+        _dragSource = new FileListDragSource(
+            FileListView,
+            point => HitTestFileRow(point),
+            () => !_disposed && _browser is { IsConnected: true },
+            StartRemoteDrag);
+        _viewModel.FilesReplacing += OnFilesReplacing;
+        _viewModel.SelectionRestoreRequested += OnSelectionRestoreRequested;
     }
 
     internal EmbeddedEditorView? ActiveInlineEditor => _activeInlineEditor;
@@ -378,6 +408,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 SessionLoggingOverride)
             : SessionOperationEmitter.Disabled;
 
+        _viewModel.AttachStateStore(
+            (Application.Current as App)?.Services?.GetService<ISftpBrowserStateStore>());
         _viewModel.Initialize(
             operationsBrowser,
             sessionTab,
@@ -410,6 +442,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         SessionTitleText.Text = displayName;
         EndpointTextBlock.Text = endpoint;
+        UpdateColumnHeaders();
 
         _browser.DirectoryChanged += OnDirectoryChanged;
         _browser.TransferProgress += OnTransferProgress;
@@ -483,9 +516,12 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         _disposed = true;
         DismissInlineEditor();
+        _viewModel.FilesReplacing -= OnFilesReplacing;
+        _viewModel.SelectionRestoreRequested -= OnSelectionRestoreRequested;
         _viewModel.MarkDisposed();
 
         StopHealthTimer();
+        StopProgressTimer();
 
         if (_editor is not null)
         {
@@ -845,53 +881,196 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             return;
         }
 
-        if (!FileBrowserShortcutPolicy.ShouldHandleShortcut(
+        // Alt+key arrives as Key.System with the real key in SystemKey.
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        FileBrowserShortcut shortcut = FileBrowserShortcutPolicy.Resolve(
+            key,
+            Keyboard.Modifiers,
             _activeInlineEditor is not null,
-            Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
+            Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase,
+            FileListView.IsKeyboardFocusWithin);
+
+        if (shortcut != FileBrowserShortcut.None && ExecuteShortcut(shortcut))
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <returns>Whether the shortcut was acted on, so a key is consumed only when it did something.</returns>
+    private bool ExecuteShortcut(FileBrowserShortcut shortcut)
+    {
+        switch (shortcut)
+        {
+            case FileBrowserShortcut.Refresh:
+                _ = _viewModel.Refresh();
+                return true;
+
+            case FileBrowserShortcut.FocusFilter:
+                FilterTextBox.Focus();
+                FilterTextBox.SelectAll();
+                return true;
+
+            case FileBrowserShortcut.FocusPath:
+                PathTextBox.Focus();
+                PathTextBox.SelectAll();
+                return true;
+
+            case FileBrowserShortcut.NewFolder:
+                _viewModel.CreateFolderCommand.Execute(null);
+                return true;
+
+            case FileBrowserShortcut.Download:
+                _ = StartDownloadAsync();
+                return true;
+
+            case FileBrowserShortcut.Upload:
+                OnUploadClick(this, new RoutedEventArgs());
+                return true;
+
+            case FileBrowserShortcut.NavigateBack:
+                _ = _viewModel.NavigateBack();
+                return true;
+
+            case FileBrowserShortcut.CancelLoad:
+                if (!_viewModel.IsLoading)
+                {
+                    return false;
+                }
+
+                _viewModel.CancelLoad();
+                return true;
+
+            case FileBrowserShortcut.Rename:
+                _viewModel.RenameSelectedCommand.Execute(null);
+                return true;
+
+            case FileBrowserShortcut.Delete:
+                _viewModel.DeleteSelectedCommand.Execute(null);
+                return true;
+
+            case FileBrowserShortcut.Open:
+                if (FileListView.SelectedItem is SftpFileInfo enterFile)
+                {
+                    OpenEntry(enterFile);
+                }
+
+                return true;
+
+            case FileBrowserShortcut.ParentFolder:
+                _ = _viewModel.NavigateUp();
+                return true;
+
+            case FileBrowserShortcut.Cut:
+                _viewModel.CutSelectedCommand.Execute(null);
+                return true;
+
+            case FileBrowserShortcut.Copy:
+                _viewModel.CopySelectedCommand.Execute(null);
+                return true;
+
+            case FileBrowserShortcut.Paste:
+                PasteFromAnyClipboard();
+                return true;
+
+            case FileBrowserShortcut.CopyPath:
+                OnCtxCopyPathClick(this, new RoutedEventArgs());
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Pastes what the user last cut or copied: the remote clipboard when it holds entries, otherwise
+    /// the files Explorer put on the Windows clipboard.
+    /// </summary>
+    private void PasteFromAnyClipboard()
+    {
+        if (_viewModel.HasClipboard && _viewModel.IsConnected)
+        {
+            _viewModel.PasteCommand.Execute(null);
+            return;
+        }
+
+        if (ClipboardHasFileDrop())
+        {
+            OnCtxPasteFromExplorerClick(this, new RoutedEventArgs());
+        }
+    }
+
+    /// <summary>Opens an entry as a double-click does: a folder is entered, a file is opened in the editor.</summary>
+    private void OpenEntry(SftpFileInfo entry)
+    {
+        if (!_viewModel.HandleFileDoubleClick(entry))
+        {
+            _ = EditFileCoreAsync(entry, openedImplicitly: true);
+        }
+    }
+
+    /// <summary>A click on a folder of the breadcrumb goes there.</summary>
+    private void OnPathSegmentClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is SftpPathSegment segment)
+        {
+            _ = NavigateRemoteAsync(segment.FullPath);
+        }
+    }
+
+    /// <summary>A click on the empty part of the breadcrumb turns it into the editable path.</summary>
+    private void OnPathBreadcrumbMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is Button || !PathTextBox.IsEnabled)
         {
             return;
         }
 
+        PathTextBox.Focus();
+        PathTextBox.SelectAll();
+        e.Handled = true;
+    }
+
+    /// <summary>Keeps the deepest folder of the breadcrumb in view when the path is longer than the bar.</summary>
+    private void OnPathBreadcrumbSizeChanged(object sender, SizeChangedEventArgs e)
+        => PathBreadcrumbScroll.ScrollToRightEnd();
+
+    /// <summary>Escape in the filter box clears it; a second Escape hands the keyboard back to the list.</summary>
+    private void OnFilterKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape)
+        {
+            return;
+        }
+
+        if (FilterTextBox.Text.Length > 0)
+        {
+            _viewModel.ClearFilter();
+        }
+        else
+        {
+            FileListView.Focus();
+        }
+
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Enter in the path bar navigates and hands the keyboard to the list; Escape gives the bar back
+    /// the folder actually shown, which a failed navigation also does.
+    /// </summary>
+    private void OnPathKeyDown(object sender, KeyEventArgs e)
+    {
         switch (e.Key)
         {
-            case Key.F5:
-                _ = _viewModel.Refresh();
-                e.Handled = true;
-                break;
-
-            case Key.F2:
-                _viewModel.RenameSelectedCommand.Execute(null);
-                e.Handled = true;
-                break;
-
-            case Key.Delete:
-                _viewModel.DeleteSelectedCommand.Execute(null);
-                e.Handled = true;
-                break;
-
             case Key.Enter:
-                if (FileListView.SelectedItem is SftpFileInfo enterFile)
-                {
-                    if (!_viewModel.HandleFileDoubleClick(enterFile))
-                    {
-                        _ = EditFileAsync(enterFile);
-                    }
-                }
+                _viewModel.GoToPathCommand.Execute(null);
+                FileListView.Focus();
                 e.Handled = true;
                 break;
 
-            case Key.Back:
-                _ = _viewModel.NavigateBack();
-                e.Handled = true;
-                break;
-
-            case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
-                OnCtxCopyPathClick(this, new RoutedEventArgs());
-                e.Handled = true;
-                break;
-
-            case Key.F when Keyboard.Modifiers == ModifierKeys.Control:
-                FilterTextBox.Focus();
+            case Key.Escape:
+                _viewModel.RevertPathBar();
+                FileListView.Focus();
                 e.Handled = true;
                 break;
         }
@@ -912,27 +1091,15 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             return;
         }
 
-        if (FileListView.View is not GridView gridView)
+        // The column says what it is: with the columns free to be reordered, its position said
+        // nothing, and a click sorted the wrong column.
+        string key = SftpColumn.GetKey(header.Column);
+        if (key.Length == 0)
         {
             return;
         }
 
-        int colIndex = gridView.Columns.IndexOf(header.Column);
-        string? columnName = colIndex switch
-        {
-            0 => "Name",
-            1 => "Size",
-            2 => "Modified",
-            3 => "Permissions",
-            4 => "Owner",
-            _ => null
-        };
-        if (columnName is null)
-        {
-            return;
-        }
-
-        _viewModel.ToggleSortColumn(columnName);
+        _viewModel.ToggleSortColumn(key);
         UpdateColumnHeaders();
     }
 
@@ -943,20 +1110,20 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             return;
         }
 
-        string[] names = ["Name", "Size", "Modified", "Permissions", "Owner"];
         string arrow = _viewModel.SortDirection == System.ComponentModel.ListSortDirection.Ascending
-            ? " \u25B2"
-            : " \u25BC";
+            ? SortArrowAscending
+            : SortArrowDescending;
 
-        for (int i = 0; i < gridView.Columns.Count && i < names.Length; i++)
+        foreach (GridViewColumn column in gridView.Columns)
         {
-            // The one fallback left in this file, and it is not the pattern the others were.
-            // `names` is the column identity, used two lines below to match SortColumn, so
-            // the key is derived from it rather than the other way round; falling back to the
-            // key name here would put "SftpColName" in a column header. It stays a literal
-            // English word only in the state where no localizer exists at all.
-            string baseName = _localizer?[$"SftpCol{names[i]}"] ?? names[i];
-            gridView.Columns[i].Header = string.Equals(names[i], _viewModel.SortColumn, StringComparison.Ordinal)
+            string key = SftpColumn.GetKey(column);
+            if (key.Length == 0)
+            {
+                continue;
+            }
+
+            string baseName = L($"SftpCol{key}");
+            column.Header = string.Equals(key, _viewModel.SortColumn, StringComparison.Ordinal)
                 ? baseName + arrow
                 : baseName;
         }
@@ -988,15 +1155,14 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
     private void OnFileDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (FileListView.SelectedItem is not SftpFileInfo file)
+        // Only a row opens. The handler sits on the whole list, and a double-click on a column header,
+        // on its resize grip or on a scrollbar used to open whatever was still selected.
+        if (HitTestFileRow(e.GetPosition(FileListView)) is not { } file)
         {
             return;
         }
 
-        if (!_viewModel.HandleFileDoubleClick(file))
-        {
-            _ = EditFileAsync(file);
-        }
+        OpenEntry(file);
     }
 
     // ------------------------------------------------------------------
@@ -1010,11 +1176,16 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             return;
         }
 
-        double fixedWidth = 0;
-        for (int i = 1; i < gv.Columns.Count; i++)
+        GridViewColumn? nameColumn = gv.Columns.FirstOrDefault(
+            column => string.Equals(SftpColumn.GetKey(column), EmbeddedSftpViewModel.SortColumnName, StringComparison.Ordinal));
+        if (nameColumn is null)
         {
-            fixedWidth += gv.Columns[i].ActualWidth;
+            return;
         }
+
+        double fixedWidth = gv.Columns
+            .Where(column => !ReferenceEquals(column, nameColumn))
+            .Sum(column => column.ActualWidth);
 
         double available = FileListView.ActualWidth
             - fixedWidth
@@ -1023,13 +1194,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
         if (available > MinimumNameColumnWidth)
         {
-            gv.Columns[0].Width = available;
+            nameColumn.Width = available;
         }
     }
 
     private void OnToolbarSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        bool compact = e.NewSize.Width < ToolbarCompactThresholdPx;
+        bool compact = e.NewSize.Width < SftpViewMetrics.ToolbarCompactThresholdPx;
         if (compact == _toolbarCompact)
         {
             return;
@@ -1045,6 +1216,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         Visibility overflow = compact ? Visibility.Visible : Visibility.Collapsed;
 
         BtnUpload.Visibility = inlineActions;
+        BtnDownload.Visibility = inlineActions;
         BtnNewFolder.Visibility = inlineActions;
         ActionsPrivilegeSeparator.Visibility = inlineActions;
         PrivilegeBookmarksSeparator.Visibility = inlineActions;
@@ -1090,20 +1262,38 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             var item = new MenuItem
             {
                 Header = path,
-                Icon = new TextBlock
-                {
-                    FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"),
-                    Text = "\uE8B7",
-                    FontSize = 14
-                }
+                Icon = CreateBookmarkIcon()
             };
             string capturedPath = path;
             item.Click += (_, _) => _ = NavigateRemoteAsync(capturedPath);
             menu.Items.Add(item);
         }
 
+        // A bookmark can be removed: the menu used to promise a management it did not offer.
+        menu.Items.Add(new Separator());
+        var removeMenu = new MenuItem { Header = L("SftpBookmarkRemoveMenu") };
+        foreach (string path in _viewModel.Bookmarks)
+        {
+            var removeItem = new MenuItem
+            {
+                Header = path,
+                Icon = CreateBookmarkIcon()
+            };
+            string capturedPath = path;
+            removeItem.Click += (_, _) => _viewModel.RemoveBookmark(capturedPath);
+            removeMenu.Items.Add(removeItem);
+        }
+
+        menu.Items.Add(removeMenu);
         menu.IsOpen = true;
     }
+
+    private static TextBlock CreateBookmarkIcon() => new()
+    {
+        FontFamily = new System.Windows.Media.FontFamily(SftpViewMetrics.IconFontFamilyName),
+        Text = SftpViewMetrics.FolderGlyph,
+        FontSize = SftpViewMetrics.MenuIconFontSize
+    };
 
     // ------------------------------------------------------------------
     // File operations
@@ -1142,7 +1332,15 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         await _viewModel.UploadFilesAsync(fileNames);
     }
 
-    private async void OnCtxDownloadClick(object sender, RoutedEventArgs e)
+    private void OnDownloadClick(object sender, RoutedEventArgs e) => _ = StartDownloadAsync();
+
+    private void OnCtxDownloadClick(object sender, RoutedEventArgs e) => _ = StartDownloadAsync();
+
+    /// <summary>
+    /// Asks for a destination folder and downloads the selection into it. A transfer already running
+    /// is no obstacle: the batch is queued behind it.
+    /// </summary>
+    private async Task StartDownloadAsync()
     {
         List<SftpFileInfo> selected;
         try
@@ -1156,40 +1354,49 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             return;
         }
 
-        if (selected.Count == 0 || _browser is null)
+        if (selected.Count == 0
+            || _browser is null
+            || !EmbeddedSftpViewModel.CanDownloadSelection(selected))
         {
             return;
         }
 
-        if (_viewModel.IsTransferInProgress)
+        string? targetDirectory = PickDownloadFolder();
+        if (targetDirectory is null)
         {
-            UpdateStatus(L("SftpTransferInProgress"));
             return;
         }
 
-        string targetDirectory;
+        _viewModel.RememberDownloadFolder(targetDirectory);
+        await _viewModel.DownloadFilesAsync(selected, targetDirectory);
+    }
+
+    /// <summary>
+    /// Shows the system folder picker, opened on the folder the last download went to. It replaced a
+    /// legacy picker that was drawn in the old style and forgot its place every time.
+    /// </summary>
+    private string? PickDownloadFolder()
+    {
         try
         {
-            System.Windows.Forms.FolderBrowserDialog dialog = new()
+            OpenFolderDialog dialog = new()
             {
-                Description = L("SftpBtnDownload")
+                Title = L("SftpBtnDownload"),
+                Multiselect = false
             };
-
-            if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            if (_viewModel.RememberedDownloadFolder is { } lastFolder)
             {
-                return;
+                dialog.InitialDirectory = lastFolder;
             }
 
-            targetDirectory = dialog.SelectedPath;
+            return dialog.ShowDialog() == true ? dialog.FolderName : null;
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn(
                 $"[EmbeddedSftpView] download folder dialog failed: {ex.Message}");
-            return;
+            return null;
         }
-
-        await _viewModel.DownloadFilesAsync(selected, targetDirectory);
     }
 
     // ------------------------------------------------------------------
@@ -1198,6 +1405,17 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
     private void OnFileListPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         => ListViewContextMenuHelper.SelectRowOnRightClick(sender, e);
+
+    /// <summary>
+    /// No menu for a session that is gone: every entry of it used to answer "Transfer failed".
+    /// </summary>
+    private void OnFileContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (_disposed || _browser is null || !_browser.IsConnected)
+        {
+            e.Handled = true;
+        }
+    }
 
     private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {
@@ -1212,15 +1430,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         // also hidden on directories, an empty selection, and a multi-selection.
         CtxEdit.Visibility = isRegularFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxEditExternal.Visibility = isRegularFile && singleSelection ? Visibility.Visible : Visibility.Collapsed;
-        // Offered only when the selection holds something the transfer will actually move, using
-        // the same predicate the planner uses. A directory-only selection used to open a folder
-        // picker and then download nothing. The handler keeps no silent guard of its own: if the
-        // action is somehow reached anyway, the existing end-of-transfer message explains what was
-        // skipped, and a silent return would say less than that.
-        CtxDownload.Visibility = EmbeddedSftpViewModel.CanDownloadSelection(
-            FileListView.SelectedItems.OfType<SftpFileInfo>())
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        // Enabled only when the selection holds something the download will actually move, using the
+        // same predicate the planner walks with: a selection of links and pipes alone would open a
+        // folder picker and then download nothing. Shown but grey rather than hidden, so the action
+        // stays discoverable.
+        bool canDownload = EmbeddedSftpViewModel.CanDownloadSelection(FileListView.SelectedItems.OfType<SftpFileInfo>());
+        CtxDownload.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
+        CtxDownload.IsEnabled = canDownload;
         // Rename targets exactly one entry. Native SFTP rename follows a symbolic link to its target,
         // so hide that unsafe action while preserving name-based FTP rename.
         CtxRename.Visibility = singleSelection
@@ -1247,7 +1463,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         CtxCopyPath.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
         CtxProperties.Visibility = hasSelection ? Visibility.Visible : Visibility.Collapsed;
 
-        // Always visible
+        // Always visible: what applies to the folder rather than to a selection.
+        CtxNewFolder.Visibility = Visibility.Visible;
         CtxUploadHere.Visibility = Visibility.Visible;
         CtxOpenInTerminal.Visibility = Visibility.Visible;
     }
@@ -1307,7 +1524,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             }
             else
             {
-                _ = EditFileAsync(file);
+                _ = EditFileCoreAsync(file, openedImplicitly: true);
             }
         }
     }
@@ -1383,7 +1600,15 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         }
     }
 
-    private async Task EditFileAsync(SftpFileInfo file)
+    /// <summary>The explicit "Edit" command: opens the file in the integrated editor, whatever it holds.</summary>
+    private Task EditFileAsync(SftpFileInfo file) => EditFileCoreAsync(file, openedImplicitly: false);
+
+    /// <param name="file">The file to open in the integrated editor.</param>
+    /// <param name="openedImplicitly">
+    /// Whether the file is opened by a double-click or Enter rather than by the explicit "Edit"
+    /// command. Only the implicit open checks for binary content and offers a download instead.
+    /// </param>
+    private async Task EditFileCoreAsync(SftpFileInfo file, bool openedImplicitly)
     {
         if (!file.IsRegularFile)
         {
@@ -1477,6 +1702,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 {
                     ShowInlineEditFileTooLarge(file.Name);
                     CleanupEditTempDir(tempPath);
+                    return;
+                }
+
+                if (openedImplicitly && BinaryFileSniffer.LooksBinary(localPath))
+                {
+                    CleanupEditTempDir(tempPath);
+                    await OfferDownloadForBinaryFileAsync(file);
                     return;
                 }
 
@@ -1675,6 +1907,40 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         }
     }
 
+    /// <summary>
+    /// Offers to download a file that looks binary instead of opening it in a text editor, where it
+    /// would show as garbage and a save would corrupt it.
+    /// </summary>
+    private async Task OfferDownloadForBinaryFileAsync(SftpFileInfo file)
+    {
+        IDialogService? dialogService = _dialogService;
+        if (dialogService is null || _disposed)
+        {
+            return;
+        }
+
+        bool download = await dialogService.ShowConfirmAsync(
+            L("SftpBinaryFileTitle"),
+            LF("SftpBinaryFileMessage", file.Name),
+            CloseGuardConfirmSeverity,
+            L("SftpBtnDownload"),
+            L("BtnCancel"));
+
+        if (!download || _disposed)
+        {
+            return;
+        }
+
+        string? targetDirectory = PickDownloadFolder();
+        if (targetDirectory is null)
+        {
+            return;
+        }
+
+        _viewModel.RememberDownloadFolder(targetDirectory);
+        await _viewModel.DownloadFilesAsync([file], targetDirectory);
+    }
+
     private void CleanupEditTempDir(string tempPath)
     {
         if (!_activeEditTempDirs.Contains(tempPath))
@@ -1703,61 +1969,163 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
 
     private void OnDragOver(object sender, System.Windows.DragEventArgs e)
     {
-        if (_disposed || _browser is null || !_browser.IsConnected)
+        if (_disposed || _browser is null || !_browser.IsConnected || _activeInlineEditor is not null)
         {
-            e.Effects = System.Windows.DragDropEffects.None;
+            RefuseDrag(e);
+            return;
+        }
+
+        AutoScrollDuringDrag(e);
+        SftpFileInfo? hovered = HitTestFileRow(e.GetPosition(FileListView));
+
+        // A drag started in this list: a folder row of the same list receives a move.
+        if (SftpRemoteDragPayload.From(e.Data) is { } remote)
+        {
+            bool canMove = ReferenceEquals(remote.Source, _viewModel)
+                && hovered is { IsDirectory: true } folder
+                && remote.Entries.Any(entry => EmbeddedSftpViewModel.CanMoveInto(entry, folder.FullPath));
+            SetDropHighlight(canMove ? hovered : null);
+            DragOverlay.Visibility = Visibility.Collapsed;
+            e.Effects = canMove ? System.Windows.DragDropEffects.Move : System.Windows.DragDropEffects.None;
             e.Handled = true;
             return;
         }
 
-        bool hasFiles = e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop);
-        e.Effects = hasFiles
-            ? System.Windows.DragDropEffects.Copy
-            : System.Windows.DragDropEffects.None;
-
-        if (hasFiles)
+        if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
         {
-            DragOverlay.Visibility = Visibility.Visible;
+            RefuseDrag(e);
+            return;
         }
 
+        // Files from outside: the row under the pointer, when it is a folder, is the destination.
+        // Say so before the button is released, with how many items go where.
+        string targetDirectory = EmbeddedSftpViewModel.ResolveDropTargetDirectory(hovered, _viewModel.CurrentPath);
+        SetDropHighlight(hovered is { IsDirectory: true } ? hovered : null);
+        DragDropOverlayText.Text = DescribeExternalDrop(e.Data, targetDirectory);
+        DragOverlay.Visibility = Visibility.Visible;
+        e.Effects = System.Windows.DragDropEffects.Copy;
+        e.Handled = true;
+    }
+
+    private void RefuseDrag(System.Windows.DragEventArgs e)
+    {
+        SetDropHighlight(null);
+        DragOverlay.Visibility = Visibility.Collapsed;
+        e.Effects = System.Windows.DragDropEffects.None;
         e.Handled = true;
     }
 
     private void OnDragLeave(object sender, System.Windows.DragEventArgs e)
     {
+        SetDropHighlight(null);
         DragOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// The text of the drop overlay: how many items, and into which folder. The text is rebuilt only
+    /// when the dragged data or the destination changes, since drag-over fires continuously.
+    /// </summary>
+    private string DescribeExternalDrop(System.Windows.IDataObject data, string targetDirectory)
+    {
+        string composedKey = string.Concat(targetDirectory, "|", _viewModel.IsTransferInProgress);
+        if (ReferenceEquals(_dragOverlayDataKey, data) && string.Equals(_dragOverlayText, composedKey, StringComparison.Ordinal))
+        {
+            return DragDropOverlayText.Text;
+        }
+
+        int count = (data.GetData(System.Windows.DataFormats.FileDrop) as string[])?.Length ?? 0;
+        string items = LFC(count, "SftpTransferJobItemsOne", "SftpTransferJobItems");
+        string text = LF(
+            _viewModel.IsTransferInProgress ? "SftpDropOverlayQueued" : "SftpDropOverlayTarget",
+            items,
+            targetDirectory);
+        _dragOverlayDataKey = data;
+        _dragOverlayText = composedKey;
+        return text;
+    }
+
+    /// <summary>Scrolls the list while a drag hovers near its top or bottom edge, so a far row can be reached.</summary>
+    private void AutoScrollDuringDrag(System.Windows.DragEventArgs e)
+    {
+        ScrollViewer? scroller = FindListScrollViewer();
+        if (scroller is null)
+        {
+            return;
+        }
+
+        double y = e.GetPosition(FileListView).Y;
+        if (y < DragAutoScrollEdgePx)
+        {
+            scroller.ScrollToVerticalOffset(scroller.VerticalOffset - DragAutoScrollStepPx);
+        }
+        else if (y > FileListView.ActualHeight - DragAutoScrollEdgePx)
+        {
+            scroller.ScrollToVerticalOffset(scroller.VerticalOffset + DragAutoScrollStepPx);
+        }
+    }
+
+    private void SetDropHighlight(SftpFileInfo? folder)
+    {
+        System.Windows.Controls.ListViewItem? container = folder is null
+            ? null
+            : FileListView.ItemContainerGenerator.ContainerFromItem(folder) as System.Windows.Controls.ListViewItem;
+        if (ReferenceEquals(container, _highlightedDropRow))
+        {
+            return;
+        }
+
+        if (_highlightedDropRow is not null)
+        {
+            SftpDropTarget.SetIsDropTarget(_highlightedDropRow, false);
+        }
+
+        _highlightedDropRow = container;
+        if (container is not null)
+        {
+            SftpDropTarget.SetIsDropTarget(container, true);
+        }
     }
 
     private async void OnDrop(object sender, System.Windows.DragEventArgs e)
     {
         DragOverlay.Visibility = Visibility.Collapsed;
+        SetDropHighlight(null);
 
-        if (_disposed || _browser is null || !_browser.IsConnected)
+        if (_disposed || _browser is null || !_browser.IsConnected || _activeInlineEditor is not null)
         {
             return;
         }
 
         string[] paths;
         string targetDir;
+        SftpRemoteDragPayload? remote;
 
         try
         {
-            if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
-            {
-                return;
-            }
-
-            paths = (string[]?)e.Data.GetData(System.Windows.DataFormats.FileDrop) ?? [];
-            if (paths.Length == 0)
-            {
-                return;
-            }
-
             // Impure hit-test: find the row under the cursor (if any); the pure helper turns it into the
-            // target directory. Dropping onto a folder row uploads into it; anywhere else uses CurrentPath.
+            // target directory. Dropping onto a folder row sends into it; anywhere else uses CurrentPath.
             SftpFileInfo? hoveredEntry = HitTestFileRow(e.GetPosition(FileListView));
             targetDir = EmbeddedSftpViewModel.ResolveDropTargetDirectory(
                 hoveredEntry, _viewModel.CurrentPath);
+
+            remote = SftpRemoteDragPayload.From(e.Data);
+            if (remote is not null)
+            {
+                paths = [];
+            }
+            else
+            {
+                if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+                {
+                    return;
+                }
+
+                paths = (string[]?)e.Data.GetData(System.Windows.DataFormats.FileDrop) ?? [];
+                if (paths.Length == 0)
+                {
+                    return;
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -1766,11 +2134,23 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             return;
         }
 
+        if (remote is not null)
+        {
+            // A move inside this list, onto a folder row. Anything else is not a drop target here.
+            if (ReferenceEquals(remote.Source, _viewModel)
+                && HitTestFileRow(e.GetPosition(FileListView)) is { IsDirectory: true })
+            {
+                await _viewModel.MoveEntriesAsync(remote.Entries, targetDir);
+            }
+
+            return;
+        }
+
         await _viewModel.UploadEntriesAsync(paths, targetDir);
     }
 
     // Maps a point in FileListView coordinates to the SftpFileInfo of the row beneath it, or null when
-    // the drop lands on empty space (or the header). Walks the visual tree up to the row container.
+    // the point lands on empty space, a header or a scrollbar. Walks the visual tree up to the row container.
     private SftpFileInfo? HitTestFileRow(System.Windows.Point point)
     {
         if (FileListView.InputHitTest(point) is not DependencyObject hit)
@@ -1782,21 +2162,181 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
         return (container as System.Windows.Controls.ListViewItem)?.DataContext as SftpFileInfo;
     }
 
+    private ScrollViewer? FindListScrollViewer()
+    {
+        if (_listScrollViewer is not null)
+        {
+            return _listScrollViewer;
+        }
+
+        _listScrollViewer = FindDescendant<ScrollViewer>(FileListView);
+        return _listScrollViewer;
+    }
+
+    private ScrollViewer? _listScrollViewer;
+
+    private static T? FindDescendant<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int index = 0; index < count; index++)
+        {
+            DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            T? nested = FindDescendant<T>(child);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    // ------------------------------------------------------------------
+    // Drag out of the list
+    // ------------------------------------------------------------------
+
+    private void OnFileListPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => _dragSource?.OnPreviewMouseLeftButtonDown(e);
+
+    private void OnFileListPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => _dragSource?.OnPreviewMouseLeftButtonUp(e);
+
+    private void OnFileListPreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+        => _dragSource?.OnPreviewMouseMove(e);
+
+    /// <summary>Runs the drag of the selected rows; what it carries stays inside the application.</summary>
+    private void StartRemoteDrag(IReadOnlyList<object> rows)
+    {
+        List<SftpFileInfo> entries = rows.OfType<SftpFileInfo>().ToList();
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        System.Windows.DataObject data = new();
+        data.SetData(SftpRemoteDragPayload.FormatName, new SftpRemoteDragPayload(_viewModel, entries));
+
+        try
+        {
+            System.Windows.DragDrop.DoDragDrop(
+                FileListView,
+                data,
+                System.Windows.DragDropEffects.Move | System.Windows.DragDropEffects.Copy);
+        }
+        finally
+        {
+            SetDropHighlight(null);
+            DragOverlay.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Listing replacement: keep the scroll position and the selection
+    // ------------------------------------------------------------------
+
+    private void OnFilesReplacing()
+    {
+        _savedScrollOffset = FindListScrollViewer()?.VerticalOffset;
+    }
+
+    private void OnSelectionRestoreRequested(IReadOnlyList<SftpFileInfo> restored)
+    {
+        // Selected again by path, and brought into view: the entry just created or renamed, or the
+        // selection a refresh would otherwise have emptied.
+        _ = Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                FileListView.SelectedItems.Clear();
+                foreach (SftpFileInfo entry in restored)
+                {
+                    FileListView.SelectedItems.Add(entry);
+                }
+
+                FileListView.ScrollIntoView(restored[0]);
+                _savedScrollOffset = null;
+            }));
+    }
+
     // ------------------------------------------------------------------
     // Transfer progress
     // ------------------------------------------------------------------
 
     private void OnTransferProgress(SftpTransferProgress progress)
     {
-        _ = Dispatcher.BeginInvoke(() =>
+        // Called from the transfer thread for every buffer moved. Only the newest event is kept; a
+        // timer on the UI thread shows it a few times a second instead of queueing one dispatcher
+        // call per event, which could fall behind a fast link and freeze the window.
+        _progressCoalescer.Post(progress);
+        RequestProgressTimer();
+    }
+
+    private void RequestProgressTimer()
+    {
+        if (Interlocked.Exchange(ref _progressTimerRequested, 1) != 0)
         {
-            if (_disposed)
+            return;
+        }
+
+        _ = Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Background,
+            new Action(StartProgressTimer));
+    }
+
+    private void StartProgressTimer()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _progressTimer ??= new System.Windows.Threading.DispatcherTimer(
+            TimeSpan.FromMilliseconds(SftpViewMetrics.ProgressRefreshMilliseconds),
+            System.Windows.Threading.DispatcherPriority.Background,
+            OnProgressTimerTick,
+            Dispatcher);
+        _progressTimer.Start();
+        OnProgressTimerTick(this, EventArgs.Empty);
+    }
+
+    private void OnProgressTimerTick(object? sender, EventArgs e)
+    {
+        SftpTransferProgress? progress = _progressCoalescer.Take();
+        if (progress is not null)
+        {
+            if (!_disposed)
             {
-                return;
+                _viewModel.UpdateTransferProgress(progress);
             }
 
-            _viewModel.UpdateTransferProgress(progress);
-        });
+            return;
+        }
+
+        // Nothing arrived since the last tick: sleep until the next event wakes the timer. An event
+        // posted between the take and the reset is caught by the check that follows it.
+        _progressTimer?.Stop();
+        Interlocked.Exchange(ref _progressTimerRequested, 0);
+        if (_progressCoalescer.HasPending)
+        {
+            RequestProgressTimer();
+        }
+    }
+
+    private void StopProgressTimer()
+    {
+        _progressTimer?.Stop();
+        _progressTimer = null;
     }
 
     // ------------------------------------------------------------------
@@ -1806,6 +2346,13 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     private async void OnDisconnectClick(object sender, RoutedEventArgs e)
     {
         if (_disposed)
+        {
+            return;
+        }
+
+        // Cutting the connection under a running transfer loses the files not yet moved: ask first,
+        // as the close guard does for the pane.
+        if (!await _viewModel.ConfirmDisconnectAsync())
         {
             return;
         }
@@ -1879,9 +2426,15 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
                 _pendingBrowserSecurityStatus = null;
                 ShowError(securityStatus);
             }
-            else
+            else if (string.IsNullOrWhiteSpace(errorMessage))
             {
                 UpdateStatus(status);
+            }
+            else
+            {
+                // A session that died on an error is an error: shown with the icon and the colour
+                // of one, not as a neutral status that reads like "Ready".
+                ShowError(status);
             }
         });
     }
@@ -1894,8 +2447,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     {
         _healthTimer = new System.Threading.Timer(
             _ => CheckHealth(), null,
-            SftpOperationTimeout,
-            SftpOperationTimeout);
+            HealthCheckInterval,
+            HealthCheckInterval);
     }
 
     private void StopHealthTimer()
@@ -1917,7 +2470,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
             {
                 if (!_disposed)
                 {
-                    UpdateStatus(L("SftpStatusHealthCheckFailed"));
+                    ShowError(L("SftpStatusHealthCheckFailed"));
                 }
             });
 
@@ -2110,6 +2663,10 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
     /// front of the user, on the line meant to tell them what went wrong.
     /// </remarks>
     private string LF(string key, params object[] args) => _localizer?.Format(key, args) ?? key;
+
+    /// <summary>As <see cref="LF"/> for a counted message: the localizer picks the form for the number.</summary>
+    private string LFC(long count, string oneKey, string otherKey, params object[] args)
+        => _localizer?.FormatCount(count, oneKey, otherKey, args) ?? otherKey;
 
     private void UpdateStatus(string text)
     {

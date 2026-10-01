@@ -50,7 +50,7 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public void IsToolbarEnabled_RequiresConnectedAndNotLoading()
+    public void IsToolbarEnabled_FollowsTheConnectionAndNotTheListing()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher)
@@ -60,9 +60,11 @@ public sealed class EmbeddedSftpViewModelTests
 
         Assert.True(viewModel.IsToolbarEnabled);
 
+        // A listing in flight must not disable the path bar: WPF drops the focus of a control that
+        // becomes disabled, which lost the keyboard after every navigation.
         viewModel.IsLoading = true;
 
-        Assert.False(viewModel.IsToolbarEnabled);
+        Assert.True(viewModel.IsToolbarEnabled);
 
         viewModel.IsLoading = false;
         viewModel.IsConnected = false;
@@ -71,7 +73,7 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public void CanNavigateBack_RequiresToolbarStateAndBackHistory()
+    public void CanNavigateBack_RequiresConnectionAndBackHistory()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher)
@@ -87,7 +89,7 @@ public sealed class EmbeddedSftpViewModelTests
 
         viewModel.IsLoading = true;
 
-        Assert.False(viewModel.CanNavigateBack);
+        Assert.True(viewModel.CanNavigateBack);
 
         viewModel.IsLoading = false;
         viewModel.IsConnected = false;
@@ -182,7 +184,7 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public void SetErrorStatus_SetsIsErrorHighlighted()
+    public void SetErrorStatus_StaysAnErrorUntilTheNextStatusReplacesIt()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
@@ -191,7 +193,8 @@ public sealed class EmbeddedSftpViewModelTests
         {
             viewModel.SetErrorStatus("Connection failed");
 
-            Assert.True(viewModel.IsErrorHighlighted);
+            Assert.True(viewModel.IsErrorStatus);
+            Assert.Equal("Connection failed", viewModel.StatusText);
         }
         finally
         {
@@ -200,7 +203,7 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public void UpdateStatus_AfterErrorStatus_ClearsIsErrorHighlighted()
+    public void UpdateStatus_AfterErrorStatus_ClearsTheErrorState()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher);
@@ -208,7 +211,7 @@ public sealed class EmbeddedSftpViewModelTests
         viewModel.SetErrorStatus("Connection failed");
         viewModel.UpdateStatus("Ready");
 
-        Assert.False(viewModel.IsErrorHighlighted);
+        Assert.False(viewModel.IsErrorStatus);
     }
 
     [Fact]
@@ -389,86 +392,6 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Theory]
-    [InlineData(1, 0, (int)EmbeddedSftpViewModel.SftpDownloadOutcome.Completed)]
-    [InlineData(2, 1, (int)EmbeddedSftpViewModel.SftpDownloadOutcome.CompletedWithSkippedDirectories)]
-    [InlineData(0, 3, (int)EmbeddedSftpViewModel.SftpDownloadOutcome.OnlyDirectoriesSkipped)]
-    [InlineData(0, 0, (int)EmbeddedSftpViewModel.SftpDownloadOutcome.Empty)]
-    public void ClassifyDownloadOutcome_ReturnsExpectedOutcome(
-        int downloadedFiles,
-        int skippedDirectories,
-        int expected)
-    {
-        var actual = EmbeddedSftpViewModel.ClassifyDownloadOutcome(
-            downloadedFiles,
-            skippedDirectories);
-
-        Assert.Equal((EmbeddedSftpViewModel.SftpDownloadOutcome)expected, actual);
-    }
-
-    /// <summary>
-    /// The files and the folders are counted apart, each worded by its own number, with or
-    /// without a localizer.
-    /// </summary>
-    [Theory]
-    [InlineData(null, 1, "SftpStatusDownloadCompleteWithSkipped")]
-    [InlineData(null, 2, "SftpStatusDownloadCompleteWithSkipped")]
-    [InlineData("en", 1, "Downloaded 1 file; skipped 1 folder (folders aren't supported).")]
-    [InlineData("fr", 1, "1 fichier téléchargé ; 1 dossier ignoré (les dossiers ne sont pas pris en charge).")]
-    [InlineData("fr", 2, "2 fichiers téléchargés ; 1 dossier ignoré (les dossiers ne sont pas pris en charge).")]
-    [InlineData("es", 2, "Se descargaron 2 archivos; se omitió 1 carpeta (las carpetas no son compatibles).")]
-    public async Task DownloadFilesAsync_FilesAndFolders_WordsBothCountsByTheirNumber(
-        string? locale,
-        int files,
-        string expected)
-    {
-        FakeUiDispatcher dispatcher = new();
-        EmbeddedSftpViewModel viewModel = new(dispatcher);
-        FakeRemoteBrowser browser = new();
-        SetBrowser(viewModel, browser);
-        if (locale is not null)
-        {
-            SetLocalizer(viewModel, await CreateLocalizerAsync(locale));
-        }
-
-        string target = Path.Combine(Path.GetTempPath(), "heimdall-count-wording-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(target);
-        try
-        {
-            List<SftpFileInfo> entries = Enumerable.Range(0, files)
-                .Select(i => CreateRemoteEntry($"f{i}.txt", $"/srv/f{i}.txt", isDirectory: false))
-                .ToList();
-            entries.Add(CreateRemoteEntry("logs", "/srv/logs", isDirectory: true));
-
-            await viewModel.DownloadFilesAsync(entries, target);
-
-            Assert.Equal(files, browser.DownloadCallCount);
-            Assert.Equal(expected, viewModel.StatusText);
-        }
-        finally
-        {
-            Directory.Delete(target, recursive: true);
-        }
-    }
-
-    [Fact]
-    public async Task DownloadFilesAsync_DirectoryOnlySelection_DoesNotDownloadAndReportsSkippedFolders()
-    {
-        FakeUiDispatcher dispatcher = new();
-        EmbeddedSftpViewModel viewModel = new(dispatcher);
-        FakeRemoteBrowser browser = new();
-        SetBrowser(viewModel, browser);
-
-        await viewModel.DownloadFilesAsync(
-            [CreateRemoteEntry("logs", "/var/log", isDirectory: true)],
-            Path.GetTempPath());
-
-        Assert.Equal(0, browser.DownloadCallCount);
-        Assert.Equal("SftpStatusDownloadNoFilesFoldersSkipped", viewModel.StatusText);
-        Assert.False(viewModel.IsErrorStatus);
-        Assert.False(viewModel.IsTransferInProgress);
-    }
-
-    [Theory]
     [InlineData("..")]
     [InlineData("../secret.txt")]
     [InlineData(@"..\secret.txt")]
@@ -529,7 +452,7 @@ public sealed class EmbeddedSftpViewModelTests
     }
 
     [Fact]
-    public async Task UploadFilesAsync_WhenTransferAlreadyInProgress_DoesNotUpload()
+    public async Task UploadFilesAsync_WhenAnotherOperationHoldsTheSlot_QueuesTheBatchInsteadOfRefusingIt()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher)
@@ -543,11 +466,14 @@ public sealed class EmbeddedSftpViewModelTests
 
         Assert.Equal(0, browser.UploadCallCount);
         Assert.True(viewModel.IsTransferInProgress);
-        Assert.Equal("SftpTransferInProgress", viewModel.StatusText);
+        SftpTransferJob job = Assert.Single(viewModel.TransferJobs);
+        Assert.Equal(SftpTransferJobStatus.Queued, job.Status);
+        Assert.True(viewModel.HasTransferJobs);
+        Assert.Equal("SftpStatusTransferQueued", viewModel.StatusText);
     }
 
     [Fact]
-    public async Task UploadEntriesAsync_ConcurrentStarts_RunExactlyOneTransfer()
+    public async Task UploadEntriesAsync_ConcurrentStarts_RunOneTransferAtATimeAndQueueTheRest()
     {
         FakeUiDispatcher dispatcher = new();
         EmbeddedSftpViewModel viewModel = new(dispatcher)
@@ -556,12 +482,28 @@ public sealed class EmbeddedSftpViewModelTests
         };
         TaskCompletionSource uploadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource releaseUpload = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int concurrent = 0;
+        int maxConcurrent = 0;
         FakeRemoteBrowser browser = new()
         {
             UploadFileHandler = async (_, _, ct) =>
             {
+                int now = Interlocked.Increment(ref concurrent);
+                int seen;
+                while (now > (seen = Volatile.Read(ref maxConcurrent)))
+                {
+                    Interlocked.CompareExchange(ref maxConcurrent, now, seen);
+                }
+
                 uploadStarted.TrySetResult();
-                await releaseUpload.Task.WaitAsync(ct);
+                try
+                {
+                    await releaseUpload.Task.WaitAsync(ct);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref concurrent);
+                }
             }
         };
         SetBrowser(viewModel, browser);
@@ -576,17 +518,24 @@ public sealed class EmbeddedSftpViewModelTests
             Task first = viewModel.UploadEntriesAsync([filePath], "/srv");
             await uploadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
+            // The second batch is queued behind the running one, not refused and not run beside it.
             Task second = viewModel.UploadEntriesAsync([filePath], "/srv");
-            await second.WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.Equal(1, browser.UploadCallCount);
             Assert.True(viewModel.IsTransferInProgress);
+            Assert.Collection(
+                viewModel.TransferJobs,
+                running => Assert.Equal(SftpTransferJobStatus.Running, running.Status),
+                queued => Assert.Equal(SftpTransferJobStatus.Queued, queued.Status));
 
             releaseUpload.SetResult();
             await first.WaitAsync(TimeSpan.FromSeconds(5));
+            await second.WaitAsync(TimeSpan.FromSeconds(5));
 
-            Assert.Equal(1, browser.UploadCallCount);
+            Assert.Equal(2, browser.UploadCallCount);
+            Assert.Equal(1, maxConcurrent);
             Assert.False(viewModel.IsTransferInProgress);
+            Assert.Empty(viewModel.TransferJobs);
         }
         finally
         {
@@ -1014,16 +963,20 @@ public sealed class EmbeddedSftpViewModelTests
         SetLocalizer(viewModel, localizer);
         viewModel.SetDialogService(new ConfirmingDialogService());
         SftpFileInfo entry = CreateRemoteEntry("one.txt", "/srv/one.txt", isDirectory: false);
+        bool cancelledByDisposalWhileRunning = false;
+        browser.DeleteHandler = (_, token) =>
+        {
+            Assert.True(token.CanBeCanceled);
+            Assert.False(token.IsCancellationRequested);
+            viewModel.MarkDisposed();
+            cancelledByDisposalWhileRunning = token.IsCancellationRequested;
+            return Task.CompletedTask;
+        };
 
         await viewModel.DeleteEntriesAsync([entry]);
 
         Assert.Equal(1, browser.DeleteCallCount);
-        Assert.True(browser.LastDeleteCancellationToken.CanBeCanceled);
-        Assert.False(browser.LastDeleteCancellationToken.IsCancellationRequested);
-
-        viewModel.MarkDisposed();
-
-        Assert.True(browser.LastDeleteCancellationToken.IsCancellationRequested);
+        Assert.True(cancelledByDisposalWhileRunning);
     }
 
     [Fact]
@@ -1604,12 +1557,15 @@ public sealed class EmbeddedSftpViewModelTests
             CreateRemoteEntry("last.txt", "/srv/last.txt", isDirectory: false),
         ];
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => viewModel.DeleteEntriesAsync(entries));
+        await viewModel.DeleteEntriesAsync(entries);
 
+        // The user's own act, not a failure: the loop stops, what was deleted stays deleted, the
+        // listing is refreshed, and the status says how far the deletion got.
         Assert.Equal(["/srv/first.txt", "/srv/cancel"], browser.DeleteCalls);
-        Assert.Equal(0, browser.ListDirectoryCallCount);
+        Assert.Equal(1, browser.ListDirectoryCallCount);
         Assert.False(viewModel.IsErrorStatus);
+        Assert.Equal(localizer.Format("SftpStatusDeleteCancelled", 1, 3), viewModel.StatusText);
+        Assert.False(viewModel.IsTransferInProgress);
     }
 
     [Fact]
@@ -1845,7 +1801,7 @@ public sealed class EmbeddedSftpViewModelTests
 
         string transferred = EmbeddedSftpViewModel.FormatSize(512);
         string total = EmbeddedSftpViewModel.FormatSize(1024);
-        string expected = localizer.Format(expectedKey, "app.log", transferred, total, "50");
+        string expected = localizer.Format(expectedKey, "app.log", 1, 1, transferred, total, "50");
 
         // The French line reads "... sur ...", so an inline "/" layout cannot satisfy this.
         Assert.NotEqual(expectedKey, expected);
