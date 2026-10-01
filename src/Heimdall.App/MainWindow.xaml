@@ -1787,12 +1787,12 @@
                                             CommandParameter="{Binding ServerList.SelectedServer}"
                                             Style="{DynamicResource SecondaryButtonStyle}"
                                             Foreground="{DynamicResource ErrorTextBrush}"
-                                            ToolTip="{loc:Translate TooltipDelete}"
+                                            ToolTip="{Binding DeleteSessionTooltip}"
                                             AutomationProperties.Name="{loc:Translate BtnDelete}"
                                             Padding="12,6"/>
                                 </StackPanel>
                                 <!-- Subtle shortcut hints for detail panel actions -->
-                                <TextBlock x:Name="Mw_DetailActionHints" Text="{loc:Translate DetailActionHints}"
+                                <TextBlock x:Name="Mw_DetailActionHints" Text="{Binding DetailActionHintsText}"
                                            FontSize="{StaticResource FontSizeSmallCaption}"
                                            Foreground="{DynamicResource TextDisabledBrush}"
                                            Margin="0,8,0,0"/>

@@ -261,7 +261,7 @@
   "TooltipAdd": "Añadir nueva sesión (Ctrl+N)",
   "TooltipEdit": "Editar la sesión seleccionada (Ctrl+E)",
   "TooltipDuplicate": "Duplicar la sesión seleccionada (Ctrl+D)",
-  "TooltipDelete": "Eliminar la sesión seleccionada (Ctrl+Supr)",
+  "TooltipDelete": "Eliminar la sesión seleccionada ({0})",
   "TooltipConnect": "Conectar a la sesión seleccionada (Intro)",
   "TooltipDisconnect": "Cerrar el túnel de la sesión seleccionada",
   "TooltipReleasePorts": "Cerrar todos los procesos de plink para liberar puertos bloqueados",
@@ -2430,7 +2430,7 @@
   "HintQuickConnect": "Ctrl+K: conexión rápida a un host o apertura de una herramienta.",
   "EmptyStateShortcutHints": "Ctrl+N para añadir una sesión · Ctrl+K para conexión rápida · F1 para todos los atajos",
   "StatusBarShortcutHint": "F1 para atajos",
-  "DetailActionHints": "Ctrl+E editar · Ctrl+Supr eliminar · F1 todos los atajos",
+  "DetailActionHints": "{0} editar · {1} eliminar · F1 todos los atajos",
 
   "TunnelsSectionTitle": "Túneles activos",
   "TunnelsBtnNew": "+ Nuevo",
@@ -3689,7 +3689,7 @@
   "RdpDisconnectedMessage": "La sesión de Escritorio remoto ha terminado.",
 
   "HelpShortcutsTitle": "Atajos de teclado",
-  "HelpShortcutsContent": "Navegación\n  Ctrl+N\tAñadir nuevo servidor\n  Ctrl+E\tEditar servidor seleccionado\n  Ctrl+Supr\tEliminar servidor seleccionado\n  Ctrl+F\tBuscar servidores\n  Ctrl+B\tMostrar/ocultar barra lateral\n  F11\tAlternar pantalla completa\n  Ctrl+Mayús+F11\tAlternar pantalla completa sobre sesiones incrustadas\n\nConexiones\n  Ctrl+K\tConexión rápida\n  Intro\tConectar al servidor seleccionado\n\nSesión\n  Ctrl+W\tCerrar pestaña actual\n  Ctrl+Tab\tPestaña siguiente\n  Ctrl+Mayús+Tab\tPestaña anterior\n  Ctrl+Mayús+S\tCapturar pantalla\n  Ctrl+Mayús+N\tEscáner de red\n  Ctrl+Mayús+O\tAlternar orientación de la división\n  Ctrl+Mayús+T\tMostrar/ocultar panel de herramientas\n\nAjustes\n  Ctrl+S\tGuardar ajustes\n\nGeneral\n  F1\tMostrar esta ayuda\n  Esc\tSalir de pantalla completa / cerrar paleta",
+  "HelpShortcutsContent": "Navegación\n  {0}\tAñadir nuevo servidor\n  {1}\tEditar servidor seleccionado\n  {2}\tEliminar servidor seleccionado\n  Ctrl+F\tBuscar servidores\n  Ctrl+B\tMostrar/ocultar barra lateral\n  F11\tAlternar pantalla completa\n  Ctrl+Mayús+F11\tAlternar pantalla completa sobre sesiones incrustadas\n\nConexiones\n  Ctrl+K\tConexión rápida\n  Intro\tConectar al servidor seleccionado\n\nSesión\n  Ctrl+W\tCerrar pestaña actual\n  Ctrl+Tab\tPestaña siguiente\n  Ctrl+Mayús+Tab\tPestaña anterior\n  Ctrl+Mayús+S\tCapturar pantalla\n  Ctrl+Mayús+N\tEscáner de red\n  Ctrl+Mayús+O\tAlternar orientación de la división\n  Ctrl+Mayús+T\tMostrar/ocultar panel de herramientas\n\nAjustes\n  Ctrl+S\tGuardar ajustes\n\nGeneral\n  F1\tMostrar esta ayuda\n  Esc\tSalir de pantalla completa / cerrar paleta",
 
   "BtnYes": "Sí",
   "BtnNo": "No",

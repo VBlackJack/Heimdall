@@ -2090,7 +2090,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             _dialogService.ShowInfo(
                 vm.Localize("HelpShortcutsTitle"),
-                vm.Localize("HelpShortcutsContent"));
+                vm.HelpShortcutsText);
         }
         finally
         {

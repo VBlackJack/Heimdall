@@ -679,6 +679,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         }
 
         OnPropertyChanged(nameof(DropToMergeText));
+        OnPropertyChanged(nameof(DeleteSessionTooltip));
+        OnPropertyChanged(nameof(DetailActionHintsText));
     }
 
     /// <summary>
@@ -1132,6 +1134,32 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// Localized text for the drag-to-split drop zone.
     /// </summary>
     public string DropToMergeText => _localizer["SplitDropToMerge"];
+
+    /// <summary>
+    /// Tooltip of the detail pane's Delete button, naming the gesture with the context menus' label.
+    /// </summary>
+    /// <remarks>
+    /// The gesture texts below take their key labels as arguments instead of spelling them out:
+    /// the menus were corrected to plain Delete while these went on teaching Ctrl+Del, and one
+    /// label read in one place cannot disagree with itself.
+    /// </remarks>
+    public string DeleteSessionTooltip =>
+        _localizer.Format("TooltipDelete", _localizer["TreeCtxGestureDelete"]);
+
+    /// <summary>The hint line under the detail pane's buttons.</summary>
+    public string DetailActionHintsText =>
+        _localizer.Format(
+            "DetailActionHints",
+            _localizer["TreeCtxGestureEdit"],
+            _localizer["TreeCtxGestureDelete"]);
+
+    /// <summary>The body of the F1 keyboard shortcut help.</summary>
+    public string HelpShortcutsText =>
+        _localizer.Format(
+            "HelpShortcutsContent",
+            _localizer["TreeCtxGestureAddServer"],
+            _localizer["TreeCtxGestureEdit"],
+            _localizer["TreeCtxGestureDelete"]);
 
     /// <summary>
     /// Tracks a tool ID as recently used for the palette's "recent tools" section.

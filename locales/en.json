@@ -261,7 +261,7 @@
   "TooltipAdd": "Add new session (Ctrl+N)",
   "TooltipEdit": "Edit selected session (Ctrl+E)",
   "TooltipDuplicate": "Duplicate selected session (Ctrl+D)",
-  "TooltipDelete": "Delete selected session (Ctrl+Del)",
+  "TooltipDelete": "Delete selected session ({0})",
   "TooltipConnect": "Connect to selected session (Enter)",
   "TooltipDisconnect": "Close tunnel for selected session",
   "TooltipReleasePorts": "Kill all plink processes to release locked ports",
@@ -2430,7 +2430,7 @@
   "HintQuickConnect": "Ctrl+K connects to a host or opens a tool.",
   "EmptyStateShortcutHints": "Ctrl+N to add a session \u00b7 Ctrl+K to quick connect \u00b7 F1 for all shortcuts",
   "StatusBarShortcutHint": "F1 for shortcuts",
-  "DetailActionHints": "Ctrl+E edit \u00b7 Ctrl+Del delete \u00b7 F1 all shortcuts",
+  "DetailActionHints": "{0} edit \u00b7 {1} delete \u00b7 F1 all shortcuts",
 
   "TunnelsSectionTitle": "Active Tunnels",
   "TunnelsBtnNew": "+ New",
@@ -3689,7 +3689,7 @@
   "RdpDisconnectedMessage": "The Remote Desktop session has ended.",
 
   "HelpShortcutsTitle": "Keyboard Shortcuts",
-  "HelpShortcutsContent": "Navigation\n  Ctrl+N\tAdd new server\n  Ctrl+E\tEdit selected server\n  Ctrl+Del\tDelete selected server\n  Ctrl+F\tSearch servers\n  Ctrl+B\tToggle sidebar\n  F11\tToggle fullscreen\n  Ctrl+Shift+F11\tToggle fullscreen over embedded sessions\n\nConnections\n  Ctrl+K\tQuick Connect\n  Enter\tConnect to selected server\n\nSession\n  Ctrl+W\tClose current tab\n  Ctrl+Tab\tNext tab\n  Ctrl+Shift+Tab\tPrevious tab\n  Ctrl+Shift+S\tCapture screenshot\n  Ctrl+Shift+N\tNetwork scanner\n  Ctrl+Shift+O\tToggle split orientation\n  Ctrl+Shift+T\tToggle tools panel\n\nSettings\n  Ctrl+S\tSave settings\n\nGeneral\n  F1\tShow this help\n  Esc\tExit fullscreen / close palette",
+  "HelpShortcutsContent": "Navigation\n  {0}\tAdd new server\n  {1}\tEdit selected server\n  {2}\tDelete selected server\n  Ctrl+F\tSearch servers\n  Ctrl+B\tToggle sidebar\n  F11\tToggle fullscreen\n  Ctrl+Shift+F11\tToggle fullscreen over embedded sessions\n\nConnections\n  Ctrl+K\tQuick Connect\n  Enter\tConnect to selected server\n\nSession\n  Ctrl+W\tClose current tab\n  Ctrl+Tab\tNext tab\n  Ctrl+Shift+Tab\tPrevious tab\n  Ctrl+Shift+S\tCapture screenshot\n  Ctrl+Shift+N\tNetwork scanner\n  Ctrl+Shift+O\tToggle split orientation\n  Ctrl+Shift+T\tToggle tools panel\n\nSettings\n  Ctrl+S\tSave settings\n\nGeneral\n  F1\tShow this help\n  Esc\tExit fullscreen / close palette",
 
   "BtnYes": "Yes",
   "BtnNo": "No",

@@ -588,6 +588,59 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
         Assert.Equal(1, harness.Main.ServerCount);
     }
 
+    /// <summary>
+    /// The detail pane tooltip, the hint line under its buttons and the F1 help name the delete
+    /// gesture with the same localized label as the context menus.
+    /// </summary>
+    /// <remarks>
+    /// The menus were corrected to plain Delete (Suppr, Supr) while these three surfaces went on
+    /// teaching Ctrl+Del, so one product named two gestures for one action.
+    /// </remarks>
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    public async Task DeleteGestureTexts_NameTheSameLabelAsTheMenus(string locale)
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        await harness.Localizer.SwitchLocaleAsync(locale);
+        string delete = harness.Localizer["TreeCtxGestureDelete"];
+        string edit = harness.Localizer["TreeCtxGestureEdit"];
+        string addServer = harness.Localizer["TreeCtxGestureAddServer"];
+
+        Assert.EndsWith("(" + delete + ")", harness.Main.DeleteSessionTooltip, StringComparison.Ordinal);
+        Assert.StartsWith(edit + " ", harness.Main.DetailActionHintsText, StringComparison.Ordinal);
+        Assert.Contains(" " + delete + " ", harness.Main.DetailActionHintsText, StringComparison.Ordinal);
+        Assert.Contains("  " + delete + "\t", harness.Main.HelpShortcutsText, StringComparison.Ordinal);
+        Assert.Contains("  " + edit + "\t", harness.Main.HelpShortcutsText, StringComparison.Ordinal);
+        Assert.Contains("  " + addServer + "\t", harness.Main.HelpShortcutsText, StringComparison.Ordinal);
+        foreach (string text in new[]
+        {
+            harness.Main.DeleteSessionTooltip,
+            harness.Main.DetailActionHintsText,
+            harness.Main.HelpShortcutsText,
+        })
+        {
+            Assert.DoesNotContain("Ctrl+" + delete, text, StringComparison.Ordinal);
+            Assert.DoesNotContain("{", text, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>The composed shortcut texts follow a language change made while the window is up.</summary>
+    [Fact]
+    public async Task DeleteGestureTexts_AreRaisedAgainWhenTheLanguageChanges()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        HashSet<string> raised = [];
+        harness.Main.PropertyChanged += (_, args) => raised.Add(args.PropertyName ?? string.Empty);
+
+        await harness.Localizer.SwitchLocaleAsync("fr");
+
+        Assert.Contains(nameof(MainViewModel.DeleteSessionTooltip), raised);
+        Assert.Contains(nameof(MainViewModel.DetailActionHintsText), raised);
+        Assert.Contains("(" + harness.Localizer["TreeCtxGestureDelete"] + ")", harness.Main.DeleteSessionTooltip, StringComparison.Ordinal);
+    }
+
     /// <summary>Loads the panel from disk and types one unsaved edit into it.</summary>
     /// <returns>The saved value the edit replaced.</returns>
     private static async Task<int> StartAPendingEditAsync(TestHarness harness)
