@@ -237,11 +237,30 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
     /// user last browsed, and a child holding a handle on the install directory is also the
     /// thing the relauncher is about to replace.
     /// </summary>
-    internal static ProcessStartInfo CreateDetachedStartInfo(string fileName, string arguments)
+    /// <remarks>
+    /// The module path is not inherited verbatim either. Heimdall started from a PowerShell 7
+    /// session carries PowerShell 7's PSModulePath, and Windows PowerShell given it loads
+    /// PowerShell 7's core manifests and cannot load its Security module, so the relauncher ran
+    /// without Get-AuthenticodeSignature. The child gets the path PowerShell 7 would have given it.
+    /// </remarks>
+    internal static ProcessStartInfo CreateDetachedStartInfo(string fileName, string arguments) =>
+        CreateDetachedStartInfo(
+            fileName,
+            arguments,
+            Environment.GetEnvironmentVariable(WindowsPowerShellModulePath.VariableName),
+            PowerShellModuleRoots.ForCurrentUser(),
+            File.Exists);
+
+    internal static ProcessStartInfo CreateDetachedStartInfo(
+        string fileName,
+        string arguments,
+        string? inheritedModulePath,
+        PowerShellModuleRoots moduleRoots,
+        Func<string, bool> fileExists)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
 
-        return new ProcessStartInfo
+        var startInfo = new ProcessStartInfo
         {
             FileName = fileName,
             Arguments = arguments,
@@ -250,5 +269,7 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
             WindowStyle = ProcessWindowStyle.Hidden,
             WorkingDirectory = SystemExecutablePath.SystemDirectory,
         };
+        WindowsPowerShellModulePath.ApplyTo(startInfo, inheritedModulePath, moduleRoots, fileExists);
+        return startInfo;
     }
 }

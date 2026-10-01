@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
 using System.IO;
 
 namespace Heimdall.App.Services;
@@ -62,7 +63,10 @@ internal sealed record PowerShellModuleRoots(
 /// Heimdall started from a PowerShell 7 session inherits PowerShell 7's module path, and a
 /// Windows PowerShell child given it verbatim loads PowerShell 7's PSReadLine. Under an AllSigned
 /// execution policy that module's format file asks "Do you want to run software from this
-/// untrusted publisher?" before anything else runs (CI run 36765683841). PowerShell 7 itself
+/// untrusted publisher?" before anything else runs (CI run 36765683841). The update relauncher
+/// given it loads PowerShell 7's manifests for Microsoft.PowerShell.Utility, Management and Host,
+/// and cannot load its Security module at all, so Get-AuthenticodeSignature does not exist
+/// (CI run 36870815225). PowerShell 7 itself
 /// removes its personal, shared and $PSHOME module directories when it starts powershell.exe and
 /// keeps every other entry; this does the same.
 /// </remarks>
@@ -128,6 +132,41 @@ internal static class WindowsPowerShellModulePath
 
         // Windows PowerShell keeps an inherited module path verbatim, an empty one included.
         return string.Join(EntrySeparator, kept.Count > 0 ? kept : roots.WindowsPowerShellDefaults);
+    }
+
+    /// <summary>
+    /// Gives a Windows PowerShell child the module path <see cref="FromInherited"/> derives, and
+    /// leaves any other host's environment as it found it.
+    /// </summary>
+    /// <param name="startInfo">The launch to adjust; its FileName decides whether anything changes.</param>
+    /// <param name="inheritedModulePath">The PSModulePath the launching process inherited.</param>
+    /// <param name="roots">PowerShell 7's fixed module directories and Windows PowerShell's defaults.</param>
+    /// <param name="fileExists">Tells a PowerShell 7 home apart, as in <see cref="FromInherited"/>.</param>
+    /// <remarks>
+    /// Nothing inherited removes the variable rather than writing it empty: Windows PowerShell
+    /// keeps an inherited value verbatim, an empty one included, and builds its own defaults only
+    /// when there is none.
+    /// </remarks>
+    internal static void ApplyTo(
+        ProcessStartInfo startInfo,
+        string? inheritedModulePath,
+        PowerShellModuleRoots roots,
+        Func<string, bool> fileExists)
+    {
+        ArgumentNullException.ThrowIfNull(startInfo);
+        if (!IsWindowsPowerShell(startInfo.FileName))
+        {
+            return;
+        }
+
+        string? modulePath = FromInherited(inheritedModulePath, roots, fileExists);
+        if (modulePath is null)
+        {
+            startInfo.Environment.Remove(VariableName);
+            return;
+        }
+
+        startInfo.Environment[VariableName] = modulePath;
     }
 
     private static bool IsPowerShell7Home(string entry, Func<string, bool> fileExists)
