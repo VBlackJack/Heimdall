@@ -24,7 +24,9 @@ statement, not a guess.
 **Nothing you change is written until you press Save settings**, with the exceptions each card
 states. **Save settings** is enabled only while edits are pending, and Ctrl+S on the Settings tab
 does the same. After a save, "Settings saved" shows beside the buttons until your next edit.
-**Undo changes** returns every pending edit to the saved value.
+**Undo changes** returns every pending edit to the saved value. Pending means different from what
+is saved: change a value and change it back, and nothing is pending any more. Edits to the SSH
+gateways and the external tools stay pending until you save or undo them.
 
 A card whose settings do not simply wait for Save says so under its title:
 

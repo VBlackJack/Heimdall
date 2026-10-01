@@ -24,6 +24,9 @@ All notable changes to Heimdall are documented in this file.
   the settings saved immediately carry no badge.
 - **Find modified settings**, beside the search box, counts the settings that differ from their
   default and walks through them with Enter.
+- **Changing a setting back clears the pending state.** Ticking a box and unticking it again left
+  Save enabled and the unsaved dot on the Settings tab, over a panel identical to the saved one.
+  The panel now compares what it holds with what is saved.
 
 ### Settings: a security overview
 

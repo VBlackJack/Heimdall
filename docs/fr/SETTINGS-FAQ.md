@@ -26,7 +26,10 @@ vérifiée dans le code, pas une supposition.
 que chaque carte indique. **Enregistrer** n'est actif que tant que des modifications attendent,
 et Ctrl+S dans l'onglet Paramètres fait de même. Après un enregistrement, "Paramètres enregistrés"
 s'affiche à côté des boutons jusqu'à votre modification suivante. **Annuler les modifications**
-rend à chaque modification en attente sa valeur enregistrée.
+rend à chaque modification en attente sa valeur enregistrée. En attente veut dire différent de ce
+qui est enregistré : changez une valeur puis remettez-la, et plus rien n'attend. Les modifications
+des passerelles SSH et des outils externes restent en attente jusqu'à l'enregistrement ou
+l'annulation.
 
 Une carte dont les réglages n'attendent pas simplement l'enregistrement le dit sous son titre :
 
