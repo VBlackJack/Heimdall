@@ -29,6 +29,10 @@
     <Thickness x:Key="ContentAreaMargin">16,0,16,16</Thickness>
     <!-- Settings sub-tab content margin (trimmed top; the tab strip and card padding already provide spacing) -->
     <Thickness x:Key="SettingsTabContentMargin">20,4,20,20</Thickness>
+    <!-- Widest a settings tab grows, the width of a one-number field, and the gap above a field row. -->
+    <sys:Double x:Key="SettingsContentMaxWidth">900</sys:Double>
+    <sys:Double x:Key="SettingsNumericFieldWidth">100</sys:Double>
+    <Thickness x:Key="SettingsFieldGap">0,12,0,0</Thickness>
 
     <!-- Max width for single-column tool content panels -->
     <sys:Double x:Key="ToolContentMaxWidth">700</sys:Double>
@@ -113,6 +117,7 @@
 
     <!-- Design Tokens: Font Family                                -->
     <FontFamily x:Key="FontFamilyMonospace">Consolas, Courier New, monospace</FontFamily>
+    <FontFamily x:Key="FontFamilyIcons">Segoe MDL2 Assets</FontFamily>
 
     <!-- Design Tokens: Corner Radius                              -->
     <CornerRadius x:Key="CornerRadiusXs">2</CornerRadius>
@@ -162,6 +167,9 @@
 
     <!-- Height, and minimum width, of a round count badge (the Settings tab error badges). -->
     <sys:Double x:Key="BadgeHeight">18</sys:Double>
+
+    <!-- Smallest pointer target of an interactive control (WCAG 2.5.8). -->
+    <sys:Double x:Key="TargetMinSize">24</sys:Double>
 
     <!-- Design Tokens: Icon Sizes                                 -->
     <sys:Double x:Key="IconSizeSmall">12</sys:Double>
@@ -475,8 +483,20 @@
     <!-- ========================================================= -->
     <!-- Validation Error Template                                -->
     <!-- ========================================================= -->
+    <!-- A field in error is marked by colour AND a glyph (WCAG 1.4.1). The glyph is drawn in the
+         adorner layer, so it takes no room and moves nothing around the field. -->
     <ControlTemplate x:Key="ValidationErrorTemplate">
-        <AdornedElementPlaceholder/>
+        <Grid>
+            <AdornedElementPlaceholder/>
+            <TextBlock Text="&#xE783;"
+                       FontFamily="{StaticResource FontFamilyIcons}"
+                       FontSize="{StaticResource IconSizeSmall}"
+                       Foreground="{DynamicResource ErrorTextBrush}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0"
+                       IsHitTestVisible="False"/>
+        </Grid>
     </ControlTemplate>
 
     <!-- ========================================================= -->
@@ -522,7 +542,6 @@
                         </Trigger>
                         <Trigger Property="Validation.HasError" Value="True">
                             <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
-                            <Setter TargetName="TextBoxBorder" Property="BorderThickness" Value="2"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

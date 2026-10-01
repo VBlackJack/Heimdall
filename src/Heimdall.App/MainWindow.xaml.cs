@@ -18,6 +18,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
@@ -1169,7 +1170,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private DispatcherTimer? _settingsSearchHighlightTimer;
 
     /// <summary>How long a settings search match stays highlighted after a jump.</summary>
-    private static readonly TimeSpan SettingsSearchHighlightDuration = TimeSpan.FromMilliseconds(1500);
+    private static readonly TimeSpan SettingsSearchHighlightDuration = TimeSpan.FromMilliseconds(SettingsSearchHighlightMilliseconds);
+
+    /// <summary>Long enough for a low-vision user to find the match after the jump.</summary>
+    private const int SettingsSearchHighlightMilliseconds = 4000;
 
     /// <summary>The highlight opacity when the theme token cannot be found.</summary>
     private const double SettingsSearchHighlightFallbackOpacity = 0.55;
@@ -1386,6 +1390,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
+        // An expander's header is the only label of what it folds away.
+        if (node is Expander { Header: string })
+        {
+            entries.Add(new SettingsSearchEntry((FrameworkElement)node, topTab, subTab));
+        }
+
         // A hint that exists only as a tooltip - most of the RDP check boxes, the host pool
         // fields - is text the user can read on hover and could not search for.
         if (node is FrameworkElement { ToolTip: string } withTooltip
@@ -1425,6 +1435,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             TextBlock textBlock => textBlock.Text ?? string.Empty,
             ContentControl { Content: string text } => text,
+            Expander { Header: string header } => header,
             _ => string.Empty,
         };
 
@@ -2743,28 +2754,64 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         vm.Settings.IsDirty = true;
     }
 
-    private async void OnCmdLibSyncTokenChanged(object sender, RoutedEventArgs e)
+    // The Git token is a secret stored in the credential vault, not a buffered setting: it is
+    // committed once, when the field loses focus, never on each keystroke. Writes are serialised
+    // so a slow earlier write can never land after a later one.
+    private bool _cmdLibTokenEdited;
+    private readonly SemaphoreSlim _cmdLibTokenWriteGate = new(1, 1);
+
+    private void OnCmdLibSyncTokenChanged(object sender, RoutedEventArgs e)
     {
+        _cmdLibTokenEdited = true;
+    }
+
+    private async void OnCmdLibSyncTokenLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (!_cmdLibTokenEdited)
+        {
+            return;
+        }
+
+        _cmdLibTokenEdited = false;
         string password = Mw_SettingsCmdLibSyncToken.Password;
         if (string.IsNullOrEmpty(password))
         {
             return;
         }
 
-        bool saved = await _commandLibrarySettingsService.TrySaveTokenAsync(password).ConfigureAwait(true);
-        if (saved)
+        await _cmdLibTokenWriteGate.WaitAsync().ConfigureAwait(true);
+        try
         {
-            ApplyCommandLibraryTokenStatus(true);
+            bool saved = await _commandLibrarySettingsService.TrySaveTokenAsync(password).ConfigureAwait(true);
+            if (saved)
+            {
+                ApplyCommandLibraryTokenStatus(true);
+            }
+            else
+            {
+                ApplyCommandLibraryTokenSaveError();
+            }
         }
-        else
+        finally
         {
-            ApplyCommandLibraryTokenSaveError();
+            _cmdLibTokenWriteGate.Release();
         }
     }
 
     private async void OnCmdLibSyncTokenClear(object sender, RoutedEventArgs e)
     {
-        bool cleared = await _commandLibrarySettingsService.TryClearTokenAsync().ConfigureAwait(true);
+        await _cmdLibTokenWriteGate.WaitAsync().ConfigureAwait(true);
+        bool cleared;
+        try
+        {
+            cleared = await _commandLibrarySettingsService.TryClearTokenAsync().ConfigureAwait(true);
+        }
+        finally
+        {
+            _cmdLibTokenWriteGate.Release();
+        }
+
+        _cmdLibTokenEdited = false;
         Mw_SettingsCmdLibSyncToken.Password = "";
         if (cleared)
         {
