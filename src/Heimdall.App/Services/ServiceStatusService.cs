@@ -16,6 +16,7 @@
 
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 using Heimdall.Core.Security;
 using Heimdall.Core.SystemInfo;
@@ -114,9 +115,27 @@ public sealed class ServiceStatusService : IServiceStatusService
     /// <summary>
     /// Builds the start info for the service listing.
     /// </summary>
-    internal static ProcessStartInfo CreateServiceListStartInfo()
+    internal static ProcessStartInfo CreateServiceListStartInfo() =>
+        CreateServiceListStartInfo(
+            Environment.GetEnvironmentVariable(WindowsPowerShellModulePath.VariableName),
+            PowerShellModuleRoots.ForCurrentUser(),
+            File.Exists);
+
+    /// <summary>
+    /// Builds the start info for the service listing from an explicit inherited module path.
+    /// </summary>
+    /// <remarks>
+    /// Heimdall started from a PowerShell 7 session would hand Windows PowerShell PowerShell 7's
+    /// module path, and 5.1 then loads PowerShell 7's manifests (measured on 2026-10-01 for the
+    /// update relauncher). The elevated service action cannot get the same treatment: it starts
+    /// through ShellExecute, which does not take an environment.
+    /// </remarks>
+    internal static ProcessStartInfo CreateServiceListStartInfo(
+        string? inheritedModulePath,
+        PowerShellModuleRoots moduleRoots,
+        Func<string, bool> fileExists)
     {
-        return new ProcessStartInfo
+        var startInfo = new ProcessStartInfo
         {
             FileName = SystemExecutablePath.WindowsPowerShell,
             Arguments = $"-NoProfile -Command \"{ServiceListScript}\"",
@@ -127,6 +146,8 @@ public sealed class ServiceStatusService : IServiceStatusService
             StandardOutputEncoding = Encoding.UTF8,
             WorkingDirectory = SystemExecutablePath.SystemDirectory,
         };
+        WindowsPowerShellModulePath.ApplyTo(startInfo, inheritedModulePath, moduleRoots, fileExists);
+        return startInfo;
     }
 
     private static async Task<string> DefaultLoadCsvAsync(CancellationToken ct)
