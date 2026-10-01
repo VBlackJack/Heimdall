@@ -25,13 +25,13 @@ namespace Heimdall.App.Tests;
 
 public sealed class EmbeddedSftpViewModelRemoteClipboardTests
 {
-    /// <summary>Without a localizer the status is an English fallback, worded by its number too.</summary>
+    /// <summary>Without a localizer the status degrades to the plural catalogue key, never to prose.</summary>
     [Theory]
-    [InlineData(false, 1, "1 item copied")]
-    [InlineData(false, 2, "2 items copied")]
-    [InlineData(true, 1, "1 item cut")]
-    [InlineData(true, 2, "2 items cut")]
-    public void CopyOrCutSelected_WithoutALocalizer_WordsTheCountByItsNumber(bool cut, int count, string expected)
+    [InlineData(false, 1, "SftpStatusCopied")]
+    [InlineData(false, 2, "SftpStatusCopied")]
+    [InlineData(true, 1, "SftpStatusCut")]
+    [InlineData(true, 2, "SftpStatusCut")]
+    public void CopyOrCutSelected_WithoutALocalizer_ShowsTheCatalogueKey(bool cut, int count, string expected)
     {
         EmbeddedSftpViewModel pane = new(new FakeUiDispatcher(), new RemoteClipboardService())
         {
@@ -1099,7 +1099,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
 
         Assert.Single(targetBrowser.CopyCalls);
         Assert.False(targetPane.IsErrorStatus);
-        Assert.Equal("Transfer cancelled", targetPane.StatusText);
+        Assert.Equal("SftpStatusTransferCancelled", targetPane.StatusText);
     }
 
     [Fact]
@@ -1126,7 +1126,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
             await targetPane.PasteClipboardAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.Single(targetBrowser.CopyCalls);
-            Assert.Equal("A file transfer is already in progress.", targetPane.StatusText);
+            Assert.Equal("SftpTransferInProgress", targetPane.StatusText);
 
             releaseCopy.SetResult();
             await running.WaitAsync(TimeSpan.FromSeconds(5));
@@ -1169,7 +1169,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
             await targetPane.PasteClipboardAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.Empty(sourceBrowser.DownloadCalls);
-            Assert.Equal("A file transfer is already in progress.", targetPane.StatusText);
+            Assert.Equal("SftpTransferInProgress", targetPane.StatusText);
 
             releaseCopy.SetResult();
             await running.WaitAsync(TimeSpan.FromSeconds(5));
@@ -1206,7 +1206,7 @@ public sealed class EmbeddedSftpViewModelRemoteClipboardTests
                 .WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.Single(browser.CopyCalls);
-            Assert.Equal("A file transfer is already in progress.", pane.StatusText);
+            Assert.Equal("SftpTransferInProgress", pane.StatusText);
 
             releaseCopy.SetResult();
             await running.WaitAsync(TimeSpan.FromSeconds(5));

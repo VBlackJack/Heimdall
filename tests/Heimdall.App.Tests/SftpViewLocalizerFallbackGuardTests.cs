@@ -34,9 +34,9 @@ namespace Heimdall.App.Tests;
 /// "upload error" as an argument, which did reach a French user.
 /// </para>
 /// <para>
-/// One fallback is left on purpose, and this guard allows exactly it: the column header
-/// derives its key from the column identity, so falling back to the key would put
-/// "SftpColName" in a header.
+/// No fallback to prose is left. The column header used to fall back to the column identity, so
+/// that a header would not read "SftpColName"; the headers now derive their text from the key
+/// the column carries, and the only fallbacks are the three helpers, which return their key.
 /// </para>
 /// </remarks>
 public sealed class SftpViewLocalizerFallbackGuardTests
@@ -47,8 +47,8 @@ public sealed class SftpViewLocalizerFallbackGuardTests
     private const int MinimumHelperCalls = 20;
 
     /// <summary>
-    /// The column header, which falls back to the column identity, and the two helpers, which
-    /// fall back to the key they were handed.
+    /// The three helpers (<c>L</c>, <c>LF</c> and <c>LFC</c>), which fall back to the key they were
+    /// handed.
     /// </summary>
     /// <remarks>
     /// Raised from two to three on 2026-09-14, and the reason is the defect this whole file was
@@ -58,6 +58,10 @@ public sealed class SftpViewLocalizerFallbackGuardTests
     /// were REMOVED and none measured that what replaced them worked. <c>L</c> now falls back to
     /// its key, exactly as <c>LF</c> already did, which is a third arm of the permitted shape and
     /// not a new exception to the rule: no English literal has come back.
+    /// <para>
+    /// The count did not move when the column header lost its own fallback and the counted helper
+    /// <c>LFC</c> was added: one arm left, one arm arrived, both of the permitted shape.
+    /// </para>
     /// </remarks>
     private const int PermittedExpressionFallbacks = 3;
 
@@ -139,12 +143,11 @@ public sealed class SftpViewLocalizerFallbackGuardTests
     }
 
     [Fact]
-    public void OnlyTheTwoKnownExpressionFallbacksRemain()
+    public void OnlyTheThreeKnownHelperFallbacksRemain()
     {
-        // The complement of the reading above, and the reason it is not vacuous: these two
-        // are what a localizer arm is still allowed to look like here - the column header
-        // falling back to the column identity, and the LF helper falling back to the key it
-        // was given. A third would be a new exception, added quietly.
+        // The complement of the reading above, and the reason it is not vacuous: these are what a
+        // localizer arm is still allowed to look like here - a helper falling back to the key it
+        // was given. A fourth would be a new exception, added quietly.
         string blanked = ViewSource.WithoutCommentsAndLiterals(ReadViewSource());
 
         int permitted = ExpressionFallbackArm.Matches(blanked).Count;

@@ -633,6 +633,8 @@ public partial class App : System.Windows.Application
         // view model can reach it any more: their parameterless constructors are gone.
         services.AddSingleton<IPasswordPresetStorage>(
             _ => new PasswordPresetStorage(ApplicationDataPathResolver.Resolve()));
+        services.AddSingleton<ISftpBrowserStateStore>(
+            _ => new SftpBrowserStateStore(_dataRoot ?? ApplicationDataPathResolver.Resolve()));
         services.AddSingleton<HeimdallThemeService>();
 
         // Updater services (no UI wiring yet)

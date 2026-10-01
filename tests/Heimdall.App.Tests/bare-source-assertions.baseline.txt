@@ -77,8 +77,6 @@ tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpEntryKind
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SshHealthButton_TracksMaterializedSessionType|assert-presence|"ShowHealthButton(true);"
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SshHealthButton_TracksMaterializedSessionType|assert-presence|"ShowHealthButton(false);"
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|ElevateButton_RequiresAnActiveSubscriber|assert-presence|"ElevateRequested is not null"
-tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpDownload_TheMenuAndThePlannerAskTheSamePredicate|assert-presence|"CtxDownload.Visibility = EmbeddedSftpViewModel.CanDownloadSelection("
-tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpDownload_TheMenuAndThePlannerAskTheSamePredicate|assert-presence|"if (!IsDownloadable(file))"
 tests/Heimdall.App.Tests/FavoriteToolSetTests.cs|TheShellPersistsBeforeItTouchesAnythingInMemory|assert-presence|"FavoriteToolSet.Toggle(_currentSettings.FavoriteToolIds, toolId)"
 tests/Heimdall.App.Tests/LoggingRemoteBrowserTests.cs|CreateOperationsBrowser_WithoutASink_ReturnsTheRawBrowserUnwrapped|index-of|"private IRemoteBrowser CreateOperationsBrowser("
 tests/Heimdall.App.Tests/LoggingRemoteBrowserTests.cs|CreateOperationsBrowser_WithoutASink_ReturnsTheRawBrowserUnwrapped|index-of|"SessionOperationLog is null"
