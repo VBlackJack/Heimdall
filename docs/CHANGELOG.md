@@ -30,9 +30,14 @@ All notable changes to Heimdall are documented in this file.
   Start, Stop and Restart in the Service Status Dashboard run an elevated Windows PowerShell,
   which cannot be given an environment, so it inherited PowerShell 7's module directories and
   loaded PowerShell 7's Management module for the service cmdlet. Its script now sets the same
-  module path as the listing before anything else runs. A module path or a service name holding
-  a typographic single quote is now escaped like an apostrophe: PowerShell ends a quoted string
-  on either, and the script used to stop there.
+  module path as the listing before anything else runs.
+- **Paths and names with a typographic apostrophe no longer break or alter the update and
+  service scripts.** PowerShell ends a quoted string on a typographic single quote as well as on
+  an apostrophe, and Heimdall escaped only the apostrophe. A Windows profile named like O'Brien
+  but typed with a typographic apostrophe made the update relauncher fail to start, which left
+  Heimdall closed after an update. The same applied to the service actions, the WinRM launch,
+  the PowerShell cd command sent from a file path, and Windows commands generated from the
+  command library. All of them now escape every kind of single quote.
 
 ## 2026-10-01: settings show what you changed, and a security overview (v2026.100103)
 
