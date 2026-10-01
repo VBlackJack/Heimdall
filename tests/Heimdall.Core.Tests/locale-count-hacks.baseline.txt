@@ -1,44 +1,6 @@
 # Locale keys whose value still words a count with a parenthesised plural, "session(s)".
 # This list may only SHRINK: see LocaleCountWordingGuardTests. Fixing a key (an "X" / "XOne"
 # pair formatted with LocalizationManager.FormatCount) or deleting it means deleting its line.
-AuditCheckAcc01SummaryFail
-AuditCheckAcc01SummaryPass
-AuditCheckAcc02SummaryFail
-AuditCheckAcc02SummaryPass
-AuditCheckAcc03SummaryFail
-AuditCheckAcc03SummaryPass
-AuditCheckCry01SummaryFail
-AuditCheckCry01SummaryPass
-AuditCheckCry02SummaryFail
-AuditCheckCry02SummaryPass
-AuditCheckCry03SummaryFail
-AuditCheckCry03SummaryPass
-AuditCheckCry03SummaryWarn
-AuditCheckCry04SummaryFail
-AuditCheckCry04SummaryPass
-AuditCheckNet01Summary
-AuditCheckNet02SummaryWarn
-AuditCheckNet03SummaryFail
-AuditCheckNet03SummaryPass
-AuditCheckNet04SummaryNoVlan
-AuditCheckNet04SummaryVlan
-AuditCheckOps01SummaryPass
-AuditCheckOps01SummaryWarn
-AuditCheckOps02SummaryPass
-AuditCheckOps02SummaryWarn
-AuditCheckOps03SummaryFail
-AuditCheckOps03SummaryPass
-AuditCheckOps04Summary
-AuditCheckOps04SummaryOs
-AuditEvidenceDeprecatedProto
-AuditEvidenceMissingEmailAuth
-AuditEvidenceMissingHeaders
-AuditEvidenceNonStdPort
-AuditEvidenceOpenPorts
-AuditEvidenceOsCount
-AuditEvidenceServiceCount
-AuditEvidenceSnmpDefault
-AuditEvidenceVlan
 CloseGuardBatchBlockedMessage
 DiagPuttyPortForwardingsCapturedButNotMapped
 DialogImportProfileSubtitle
@@ -62,8 +24,6 @@ SummaryKnownHostsItems
 ToastImportKnownHostsResult
 ToastImportOpenSshResult
 ToastImportPuttyResult
-ToolAuditDetectedHosts
-ToolAuditEvidenceCount
 ToolCertScanFound
 ToolCmdLibImportResultMessage
 ToolCveSummary
@@ -78,7 +38,6 @@ ToolOpenPortsStatus
 ToolPwdGenSavedPresetsElsewhere
 ToolRegexMatchCount
 ToolRouteTableStatus
-ToolSubnetDetected
 ToolTcpPingStatus
 ToolWifiStatus
 WarningSnapshotRestorePartial
