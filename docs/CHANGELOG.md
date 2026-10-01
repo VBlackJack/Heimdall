@@ -12,6 +12,18 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### Updates: the installer host runs on Windows PowerShell's own modules
+
+- **An update started from a PowerShell 7 session no longer runs on PowerShell 7's modules.**
+  Heimdall started from a PowerShell 7 session handed PowerShell 7's module directories to the
+  Windows PowerShell that installs an update, which then ran on PowerShell 7's core modules, a
+  combination neither PowerShell supports. The installer's signature and SHA-256 checks still ran,
+  because the Security module is loaded from Windows PowerShell's own directory by path. It now
+  gets the inherited module path without PowerShell 7's entries, every other entry kept, as the
+  WinRM tab already does.
+
 ## 2026-10-01: settings show what you changed, and a security overview (v2026.100103)
 
 ### Settings: see what you changed, and put one setting back
