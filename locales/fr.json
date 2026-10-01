@@ -2357,7 +2357,7 @@
   "SnippetProductionConfirmMessage": "Vous \u00eates sur le point d'envoyer un snippet vers un serveur de production ({0}). \u00cates-vous s\u00fbr ?",
 
   "ErrorSshAuthFailed": "L'authentification SSH a \u00e9chou\u00e9. V\u00e9rifiez vos identifiants et que la bonne cl\u00e9 est charg\u00e9e dans Pageant.",
-  "ErrorSshAuthTimeout": "L'authentification SSH a expir\u00e9 apr\u00e8s 20 secondes. V\u00e9rifiez que Pageant est lanc\u00e9 et que la bonne cl\u00e9 est charg\u00e9e.",
+  "ErrorSshAuthTimeout": "L'authentification SSH a expir\u00e9. V\u00e9rifiez que Pageant est lanc\u00e9 et que la bonne cl\u00e9 est charg\u00e9e.",
   "ErrorCitrixLaunchFailed": "\u00c9chec du lancement de la session Citrix : {0}",
   "ErrorFtpConnectionFailed": "La connexion FTP a \u00e9chou\u00e9.",
   "WarnFtpCleartext": "La session FTP vers {0}:{1} utilise un canal en clair. Les identifiants et le contenu des fichiers sont transmis sans chiffrement. Pr\u00e9f\u00e9rez SFTP ou FTPS lorsque c'est possible.",
@@ -3085,6 +3085,8 @@
   "TunnelCtxClose": "Fermer le tunnel",
   "TunnelCtxCopyPort": "Copier le port local",
   "TunnelCtxCloseAll": "Fermer tous les tunnels",
+  "TunnelStatusActive": "Actif",
+  "TunnelStatusInterrupted": "Interrompu",
   "StatusTunnelClosed": "Tunnel sur le port {0} ferm\u00e9.",
   "StatusAllTunnelsClosed": "Tous les tunnels ferm\u00e9s.",
   "StatusPortCopied": "Port {0} copi\u00e9 dans le presse-papiers.",

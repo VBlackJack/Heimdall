@@ -120,7 +120,7 @@
                                Text="{loc:Translate BroadcastBadgeLabel}"
                                FontSize="{StaticResource FontSizeSmallCaption}"
                                FontWeight="Bold"
-                               Foreground="{DynamicResource ErrorTextBrush}"/>
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </Border>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">

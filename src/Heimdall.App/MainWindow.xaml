@@ -2028,20 +2028,26 @@
                                         <DataGridTemplateColumn Header="" Width="24">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Ellipse Width="7" Height="7"
+                                                    <TextBlock FontSize="{StaticResource FontSizeCaption}"
                                                              HorizontalAlignment="Center"
                                                              VerticalAlignment="Center">
-                                                        <Ellipse.Style>
-                                                            <Style TargetType="Ellipse">
-                                                                <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="&#x25CF;"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                                <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusActive}"/>
+                                                                <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusActive}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsAlive}" Value="False">
-                                                                        <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
+                                                                        <Setter Property="Text" Value="&#x2716;"/>
+                                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                        <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusInterrupted}"/>
+                                                                        <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusInterrupted}"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
-                                                        </Ellipse.Style>
-                                                    </Ellipse>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
@@ -2152,20 +2158,26 @@
                             <DataGridTemplateColumn Header="" Width="28">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Ellipse Width="8" Height="8"
+                                        <TextBlock FontSize="{StaticResource FontSizeCaption}"
                                                  HorizontalAlignment="Center"
                                                  VerticalAlignment="Center">
-                                            <Ellipse.Style>
-                                                <Style TargetType="Ellipse">
-                                                    <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="&#x25CF;"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                    <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusActive}"/>
+                                                    <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusActive}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsAlive}" Value="False">
-                                                            <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
+                                                            <Setter Property="Text" Value="&#x2716;"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                            <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusInterrupted}"/>
+                                                            <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusInterrupted}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </Ellipse.Style>
-                                        </Ellipse>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

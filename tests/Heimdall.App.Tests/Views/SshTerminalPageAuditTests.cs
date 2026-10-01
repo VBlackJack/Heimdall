@@ -112,6 +112,28 @@ public sealed class SshTerminalPageAuditTests
         result.Should().Contain("\"" + TerminalHtmlLocalizer.FallbackSearchNoResults + "\"");
     }
 
+    [Fact]
+    public void Page_AppliesNewLabelsOnLanguageChange()
+    {
+        Html.Should().Contain("'set-labels:'");
+        Html.Should().Contain("function applyLabels(");
+    }
+
+    [Fact]
+    public void LabelsJson_CarriesEveryTextTheLanguageChangeMustRefresh()
+    {
+        string json = TerminalHtmlLocalizer.BuildLabelsJson(static key => key == TerminalHtmlLocalizer.KeySearchNext ? "Suivant" : null);
+
+        using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(json);
+        System.Text.Json.JsonElement root = document.RootElement;
+        root.GetProperty("next").GetString().Should().Be("Suivant");
+        root.GetProperty("previous").GetString().Should().Be(TerminalHtmlLocalizer.FallbackSearchPrevious);
+        foreach (string name in new[] { "placeholder", "close", "noResults", "countFormat", "sessionEnded" })
+        {
+            root.GetProperty(name).GetString().Should().NotBeNullOrWhiteSpace(name);
+        }
+    }
+
     [Theory]
     [InlineData(false, false, false)]
     [InlineData(true, false, false)]

@@ -2357,7 +2357,7 @@
   "SnippetProductionConfirmMessage": "You are about to send a snippet to a production server ({0}). Are you sure?",
 
   "ErrorSshAuthFailed": "SSH authentication failed. Check your credentials and that the correct key is loaded in Pageant.",
-  "ErrorSshAuthTimeout": "SSH authentication timed out after 20 seconds. Check that Pageant is running and the correct key is loaded.",
+  "ErrorSshAuthTimeout": "SSH authentication timed out. Check that Pageant is running and the correct key is loaded.",
   "ErrorCitrixLaunchFailed": "Failed to launch Citrix session: {0}",
   "ErrorFtpConnectionFailed": "FTP connection failed.",
   "WarnFtpCleartext": "FTP session to {0}:{1} is using a cleartext channel. Credentials and file contents are transmitted unencrypted. Prefer SFTP or FTPS when available.",
@@ -3088,6 +3088,8 @@
   "TunnelCtxClose": "Close Tunnel",
   "TunnelCtxCopyPort": "Copy Local Port",
   "TunnelCtxCloseAll": "Close All Tunnels",
+  "TunnelStatusActive": "Active",
+  "TunnelStatusInterrupted": "Interrupted",
   "StatusTunnelClosed": "Tunnel on port {0} closed.",
   "StatusAllTunnelsClosed": "All tunnels closed.",
   "StatusPortCopied": "Port {0} copied to clipboard.",

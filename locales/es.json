@@ -2357,7 +2357,7 @@
   "SnippetProductionConfirmMessage": "Estás a punto de enviar un fragmento a un servidor de producción ({0}). ¿Seguro?",
 
   "ErrorSshAuthFailed": "Falló la autenticación SSH. Comprueba tus credenciales y que la clave correcta esté cargada en Pageant.",
-  "ErrorSshAuthTimeout": "Se agotó el tiempo de espera de la autenticación SSH tras 20 segundos. Comprueba que Pageant esté en ejecución y la clave correcta esté cargada.",
+  "ErrorSshAuthTimeout": "Se agotó el tiempo de espera de la autenticación SSH. Comprueba que Pageant esté en ejecución y la clave correcta esté cargada.",
   "ErrorCitrixLaunchFailed": "No se pudo iniciar la sesión de Citrix: {0}",
   "ErrorFtpConnectionFailed": "Falló la conexión FTP.",
   "WarnFtpCleartext": "La sesión FTP a {0}:{1} está usando un canal en texto claro. Las credenciales y el contenido de los archivos se transmiten sin cifrar. Usa SFTP o FTPS cuando estén disponibles.",
@@ -3088,6 +3088,8 @@
   "TunnelCtxClose": "Cerrar túnel",
   "TunnelCtxCopyPort": "Copiar puerto local",
   "TunnelCtxCloseAll": "Cerrar todos los túneles",
+  "TunnelStatusActive": "Activo",
+  "TunnelStatusInterrupted": "Interrumpido",
   "StatusTunnelClosed": "Túnel en el puerto {0} cerrado.",
   "StatusAllTunnelsClosed": "Todos los túneles cerrados.",
   "StatusPortCopied": "Puerto {0} copiado al portapapeles.",

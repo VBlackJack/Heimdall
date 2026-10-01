@@ -97,6 +97,26 @@ internal static class TerminalHtmlLocalizer
         return localizedHtml;
     }
 
+    /// <summary>
+    /// The page's localized texts as one JSON object, for the <c>set-labels:</c> message sent
+    /// when the interface language changes after the page was built.
+    /// </summary>
+    public static string BuildLabelsJson(Func<string, string?> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+
+        return JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["placeholder"] = ResolveOrFallback(localize, KeySearchPlaceholder, FallbackSearchPlaceholder),
+            ["previous"] = ResolveOrFallback(localize, KeySearchPrevious, FallbackSearchPrevious),
+            ["next"] = ResolveOrFallback(localize, KeySearchNext, FallbackSearchNext),
+            ["close"] = ResolveOrFallback(localize, KeySearchClose, FallbackSearchClose),
+            ["noResults"] = ResolveOrFallback(localize, KeySearchNoResults, FallbackSearchNoResults),
+            ["countFormat"] = ResolveOrFallback(localize, KeySearchCountFormat, FallbackSearchCountFormat),
+            ["sessionEnded"] = ResolveOrFallback(localize, KeySessionEnded, FallbackSessionEnded),
+        });
+    }
+
     private static string ResolveOrFallback(
         Func<string, string?> localize,
         string key,

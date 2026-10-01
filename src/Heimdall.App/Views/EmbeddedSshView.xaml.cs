@@ -135,6 +135,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// <summary>Outbound message: sets the xterm.js convertEol option at runtime.</summary>
     private const string MsgSetConvertEol = "set-convert-eol:";
 
+    /// <summary>Outbound message: the page's localized texts, as a JSON object.</summary>
+    private const string MsgSetLabels = "set-labels:";
+
     /// <summary>
     /// Outbound message: clipboard text the host has confirmed, base64 encoded. The page hands it
     /// to xterm's own paste path so bracketed paste and newline folding apply.
@@ -2514,6 +2517,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         LocalizeButtons();
+        PostTerminalMessage(MsgSetLabels + TerminalHtmlLocalizer.BuildLabelsJson(key => _localizer?[key]));
 
         if (_healthPanelVisible)
         {
