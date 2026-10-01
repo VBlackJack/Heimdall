@@ -73,6 +73,21 @@ public sealed class WinRmPreflightTests
     }
 
     [Fact]
+    public async Task EnsureReachableAsync_TlsFailureWithCertificateCheckSkipped_UsesNoVerifyKey()
+    {
+        WinRmPreflight preflight = new WinRmPreflight(
+            tcpProbe: SucceedProbeAsync,
+            tlsProbe: AuthenticationFailureProbeAsync);
+        ServerProfileDto server = CreateServer(useSsl: true);
+        server.WinRmSkipCertificateCheck = true;
+
+        WinRmPreflightException exception = await Assert.ThrowsAsync<WinRmPreflightException>(
+            () => preflight.EnsureReachableAsync(server, CancellationToken.None));
+
+        Assert.Equal("ErrorWinRmPreflightTlsFailedNoVerify", exception.LocalizationKey);
+    }
+
+    [Fact]
     public async Task EnsureReachableAsync_NonSsl_SkipsTlsProbe()
     {
         bool tlsInvoked = false;

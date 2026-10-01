@@ -184,5 +184,45 @@ public sealed class WinRmEarlyOutputDiagnosticTests
         Assert.False(diagnostic.IsActive);
     }
 
+    [Theory]
+    [InlineData("Enter-PSSession : The WinRM client cannot process the request. Add the destination to the TrustedHosts configuration setting.", "ErrorWinRmTrustedHosts")]
+    [InlineData("Enter-PSSession : WinRM error 0x803381A1 while connecting.", "ErrorWinRmTrustedHosts")]
+    [InlineData("Enter-PSSession : WinRM Kerberos error 0x80090322 occurred.", "ErrorWinRmKerberosPrincipal")]
+    [InlineData("Enter-PSSession : WinRM connection failed. 0x80070005 Access is denied.", "ErrorWinRmAccessDenied")]
+    [InlineData("Enter-PSSession : WinRM logon failure 0x8009030C.", "ErrorWinRmLogonFailed")]
+    [InlineData("Enter-PSSession : WSMan returned 0x8007052e.", "ErrorWinRmLogonFailed")]
+    public void Observe_AuthenticationFailureToken_ReturnsActionableKey(string output, string expectedKey)
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes(output));
+
+        Assert.Equal(expectedKey, result);
+        Assert.False(diagnostic.IsActive);
+    }
+
+    [Theory]
+    [InlineData("Process returned 0x80090322.")]
+    [InlineData("Copy failed: 0x80070005 Access is denied.")]
+    [InlineData("See the TrustedHosts article in the wiki.")]
+    public void Observe_AuthenticationTokenWithoutWinRmContext_DoesNotMatch(string output)
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        Assert.Null(diagnostic.Observe(Bytes(output)));
+        Assert.True(diagnostic.IsActive);
+    }
+
+    [Fact]
+    public void Observe_TrustedHostsRefusalMentioningKerberos_PrefersTrustedHostsKey()
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes(
+            "Enter-PSSession : WinRM Kerberos 0x80090322 ... add the host to TrustedHosts."));
+
+        Assert.Equal("ErrorWinRmTrustedHosts", result);
+    }
+
     private static byte[] Bytes(string value) => Encoding.UTF8.GetBytes(value);
 }
