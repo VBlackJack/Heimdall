@@ -130,6 +130,7 @@
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                MaxWidth="300"/>
                     <TextBlock x:Name="EndpointTextBlock"
                                Margin="8,0,0,0"
@@ -137,6 +138,17 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                               MaxWidth="250"/>
+                    <!-- Gateway / tunnel route ("via ..."), shown once the route is resolved. -->
+                    <TextBlock x:Name="GatewayRouteText"
+                               Margin="8,0,0,0"
+                               Visibility="Collapsed"
+                               FontSize="{StaticResource FontSizeCaption}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                MaxWidth="250"/>
                     <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
@@ -191,6 +203,7 @@
                     <Border x:Name="ReconnectOverlay"
                             Style="{StaticResource FadeInPanelStyle}"
                             Visibility="Collapsed"
+                            Focusable="True"
                             Background="{DynamicResource OverlayBackground}"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Stretch">
@@ -199,12 +212,21 @@
                             <!-- Message text group: capped width so long messages wrap nicely. -->
                             <StackPanel MaxWidth="400">
                             <TextBlock x:Name="ReconnectMessageText"
+                                       AutomationProperties.LiveSetting="Assertive"
                                        Text="{loc:Translate SshDisconnectedMessage}"
                                        FontSize="{StaticResource FontSizeSubtitle}"
                                        FontWeight="SemiBold"
                                        TextAlignment="Center"
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <!-- Real cause of the disconnect, when there is one. -->
+                            <TextBlock x:Name="ReconnectDetailText"
+                                       Visibility="Collapsed"
+                                       Margin="0,8,0,0"
+                                       FontSize="{StaticResource FontSizeBody}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                             </StackPanel>
                             <!-- Button row: WrapPanel so localized labels wrap instead of clipping. -->
                             <WrapPanel Orientation="Horizontal"
@@ -227,6 +249,14 @@
                                         Padding="16,6"
                                         FontSize="{StaticResource FontSizeBodyLarge}"
                                         Margin="0,0,8,0"/>
+                                <Button x:Name="OverlayViewOutputButton"
+                                        Content="{loc:Translate BtnViewOutputOverlay}"
+                                        Click="OnOverlayViewOutputClick"
+                                        AutomationProperties.Name="{loc:Translate A11yViewOutputOverlay}"
+                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                        Padding="16,6"
+                                        FontSize="{StaticResource FontSizeBodyLarge}"
+                                        Margin="0,0,8,0"/>
                                 <Button x:Name="OverlayCloseButton"
                                         Content="{loc:Translate BtnCloseOverlay}"
                                         Click="OnOverlayCloseClick"
@@ -243,6 +273,7 @@
                     <Border x:Name="AutoReconnectOverlay"
                             Style="{StaticResource FadeInPanelStyle}"
                             Visibility="Collapsed"
+                            Focusable="True"
                             Background="{DynamicResource OverlayBackground}"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Stretch">
@@ -257,6 +288,7 @@
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
                             <TextBlock x:Name="AutoReconnectCountdownText"
+                                       AutomationProperties.LiveSetting="Polite"
                                        Margin="0,8,0,0"
                                        TextAlignment="Center"
                                        FontSize="{StaticResource FontSizeBodyLarge}"
@@ -279,7 +311,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Initial connect overlay (visible until xterm.js signals ready) -->
+                    <!-- Initial connect overlay (visible until the session is attached and the page is ready) -->
                     <Border x:Name="ConnectingOverlay"
                             Style="{StaticResource FadeInPanelStyle}"
                             Background="{DynamicResource OverlayBackground}"
@@ -289,6 +321,7 @@
                                     HorizontalAlignment="Center"
                                     MaxWidth="400">
                             <TextBlock x:Name="ConnectingTitleText"
+                                       AutomationProperties.LiveSetting="Polite"
                                        Text="{loc:Translate SshConnectingTitle}"
                                        FontSize="{StaticResource FontSizeSubtitle}"
                                        FontWeight="SemiBold"
@@ -303,10 +336,19 @@
                             <ProgressBar IsIndeterminate="True"
                                          Height="2"
                                          Width="220"
-                                         Margin="0,16,0,0"
+                                         Margin="0,16,0,16"
                                          Foreground="{DynamicResource AccentBrush}"
                                          Background="Transparent"
                                          BorderThickness="0"/>
+                            <Button x:Name="ConnectingCancelButton"
+                                    Content="{loc:Translate BtnCancelConnect}"
+                                    Click="OnConnectingCancelClick"
+                                    ToolTip="{loc:Translate TooltipCancelConnect}"
+                                    AutomationProperties.Name="{loc:Translate A11yCancelConnect}"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Padding="16,6"
+                                    FontSize="{StaticResource FontSizeBodyLarge}"
+                                    HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -330,12 +372,12 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,0,0,4"/>
                         <ProgressBar x:Name="CpuProgressBar"
+                                     AutomationProperties.LabeledBy="{x:Reference HealthCpuLabel}"
                                      Height="14"
                                      Minimum="0" Maximum="100" Value="0"
                                      Foreground="{DynamicResource AccentBrush}"
                                      Background="{DynamicResource BackgroundBrush}"/>
                         <TextBlock x:Name="CpuPercentText"
-                                   Text="0%"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    HorizontalAlignment="Right"
@@ -348,12 +390,12 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,0,0,4"/>
                         <ProgressBar x:Name="RamProgressBar"
+                                     AutomationProperties.LabeledBy="{x:Reference HealthRamLabel}"
                                      Height="14"
                                      Minimum="0" Maximum="100" Value="0"
                                      Foreground="{DynamicResource AccentBrush}"
                                      Background="{DynamicResource BackgroundBrush}"/>
                         <TextBlock x:Name="RamDetailText"
-                                   Text="0 / 0 MB"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    HorizontalAlignment="Right"
@@ -366,12 +408,12 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,0,0,4"/>
                         <ProgressBar x:Name="DiskProgressBar"
+                                     AutomationProperties.LabeledBy="{x:Reference HealthDiskLabel}"
                                      Height="14"
                                      Minimum="0" Maximum="100" Value="0"
                                      Foreground="{DynamicResource AccentBrush}"
                                      Background="{DynamicResource BackgroundBrush}"/>
                         <TextBlock x:Name="DiskDetailText"
-                                   Text="0 / 0"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    HorizontalAlignment="Right"
