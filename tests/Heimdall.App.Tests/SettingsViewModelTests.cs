@@ -2228,7 +2228,49 @@ public sealed partial class SettingsViewModelTests : IDisposable
             Assert.True(importer.IsDirty);
             Assert.True(importer.HasValidationErrors);
             Assert.Equal(0, target.MergeSettingCallCount);
-            Assert.Contains(nameof(AppSettings.TerminalFontSize), Assert.Single(targetDialog.ConfirmCalls).Message, StringComparison.Ordinal);
+            Assert.Contains("Font size: 14 -> 18", Assert.Single(targetDialog.ConfirmCalls).Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    // The import preview names each change the way the panel does - its label, where it lives,
+    // the value it had and the value it takes - rather than by the settings file's property name.
+    [Fact]
+    public async Task SettingsImport_PreviewNamesEachChangeByItsPanelLabel_WhereItLives_WithBothValues()
+    {
+        string file = Path.Combine(Path.GetTempPath(), "heimdall-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            System.Text.Json.Nodes.JsonObject document = new()
+            {
+                [SettingsTransfer.FormatProperty] = SettingsTransfer.FormatName,
+                [SettingsTransfer.VersionProperty] = SettingsTransfer.FormatVersion,
+                [SettingsTransfer.SettingsProperty] = new System.Text.Json.Nodes.JsonObject
+                {
+                    [nameof(AppSettings.TerminalFontSize)] = 18,
+                    [nameof(AppSettings.SftpBrowserEnabled)] = false,
+                },
+            };
+            File.WriteAllText(file, document.ToJsonString());
+
+            FakeConfigManager target = new();
+            target.Settings.TerminalFontSize = 14;
+            target.Settings.SftpBrowserEnabled = true;
+            FakeDialogService dialog = new() { ConfirmResult = false };
+            SettingsViewModel importer = CreateViewModel(target, dialog, localizer: await CreateLocalizerAsync());
+            importer.LoadFromSettings(target.Settings);
+            importer.SettingsImportPathProvider = () => file;
+
+            await importer.ImportSettingsCommand.ExecuteAsync(null);
+
+            string message = Assert.Single(dialog.ConfirmCalls).Message;
+            Assert.Contains("Terminal > Terminal Appearance > Font size: 14 -> 18", message, StringComparison.Ordinal);
+            Assert.Contains("SSH & SFTP > SFTP & X11 > Enable integrated SFTP browser: On -> Off", message, StringComparison.Ordinal);
+            Assert.DoesNotContain(nameof(AppSettings.TerminalFontSize), message, StringComparison.Ordinal);
+            Assert.DoesNotContain(nameof(AppSettings.SftpBrowserEnabled), message, StringComparison.Ordinal);
         }
         finally
         {

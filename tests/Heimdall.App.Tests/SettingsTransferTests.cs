@@ -17,6 +17,7 @@
 using System.Text.Json.Nodes;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.App.Tests;
 
@@ -92,11 +93,99 @@ public sealed class SettingsTransferTests
             },
         };
 
-        (AppSettings merged, IReadOnlyList<string> changed) = SettingsTransfer.Import(current, file);
+        (AppSettings merged, IReadOnlyList<SettingsTransferChange> changed) = SettingsTransfer.Import(current, file);
 
         Assert.Equal("Tarn", merged.DefaultTheme);
         Assert.Equal("mine", merged.PinHash);
-        Assert.Equal([nameof(AppSettings.DefaultTheme)], changed);
+        SettingsTransferChange change = Assert.Single(changed);
+        Assert.Equal(nameof(AppSettings.DefaultTheme), change.Key);
+        Assert.Equal("Drakul", change.Before!.GetValue<string>());
+        Assert.Equal("Tarn", change.After!.GetValue<string>());
+    }
+
+    // The preview names a change by its panel label; a transferable setting without one would
+    // reach the user under its property name, so every one must have a place in the catalog.
+    [Fact]
+    public async Task EveryTransferableSetting_HasAPanelLabel_WhoseKeysExistInEveryLanguage()
+    {
+        Assert.True(SettingsTransfer.TransferableKeys.Count >= 60, "the allow-list is not reading the panel");
+
+        Assert.Empty(SettingsLabelCatalog.Unplaced(SettingsTransfer.TransferableKeys));
+
+        foreach (string locale in new[] { "en", "fr", "es" })
+        {
+            LocalizationManager localizer = await LoadLocalizerAsync(locale);
+            foreach (SettingsPanelPlace place in SettingsLabelCatalog.AllPlaces)
+            {
+                Assert.True(localizer.HasKey(place.LabelKey), $"{locale}: {place.LabelKey}");
+                Assert.True(localizer.HasKey(place.TabKey), $"{locale}: {place.TabKey}");
+                Assert.True(localizer.HasKey(place.AreaKey), $"{locale}: {place.AreaKey}");
+            }
+        }
+    }
+
+    // Positive control for the test above: the check does report a setting the catalog lacks.
+    [Fact]
+    public void TheLabelCheck_ReportsASettingTheCatalogLacks()
+    {
+        Assert.Equal(
+            ["NotAPanelSetting"],
+            SettingsLabelCatalog.Unplaced([nameof(AppSettings.DefaultTheme), "NotAPanelSetting"]));
+    }
+
+    [Fact]
+    public async Task APreviewLine_FallsBackOnThePropertyName_OnlyForASettingWithoutAPlace()
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync("en");
+
+        string labelled = SettingsImportPreview.DescribeChange(
+            localizer,
+            new SettingsTransferChange(nameof(AppSettings.DefaultTheme), JsonValue.Create("Drakul"), JsonValue.Create("Tarn")));
+        string unlabelled = SettingsImportPreview.DescribeChange(
+            localizer,
+            new SettingsTransferChange("NotAPanelSetting", JsonValue.Create(1), JsonValue.Create(2)));
+
+        Assert.Equal("General > Appearance > Theme: Drakul -> Tarn", labelled);
+        Assert.Equal("NotAPanelSetting: 1 -> 2", unlabelled);
+    }
+
+    [Fact]
+    public async Task PreviewValues_AreWordedForTheReader()
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync("en");
+
+        Assert.Equal("On", SettingsImportPreview.DescribeValue(localizer, JsonValue.Create(true)));
+        Assert.Equal("Off", SettingsImportPreview.DescribeValue(localizer, JsonValue.Create(false)));
+        Assert.Equal("(empty)", SettingsImportPreview.DescribeValue(localizer, JsonValue.Create("")));
+        Assert.Equal("(empty)", SettingsImportPreview.DescribeValue(localizer, null));
+        Assert.Equal("1920x1080, 1280x720", SettingsImportPreview.DescribeValue(localizer, new JsonArray("1920x1080", "1280x720")));
+        Assert.Equal("1 item", SettingsImportPreview.DescribeValue(localizer, new JsonArray(new JsonObject { ["Name"] = "tool" })));
+        Assert.Equal("0 items", SettingsImportPreview.DescribeValue(localizer, new JsonArray()));
+        string longValue = new('x', SettingsImportPreview.MaxValueLength + 10);
+        Assert.Equal(SettingsImportPreview.MaxValueLength, SettingsImportPreview.DescribeValue(localizer, JsonValue.Create(longValue)).Length);
+    }
+
+    [Theory]
+    [InlineData("en", 1, "1 setting will change.")]
+    [InlineData("en", 2, "2 settings will change.")]
+    [InlineData("fr", 1, "1 param\u00E8tre va changer.")]
+    [InlineData("fr", 2, "2 param\u00E8tres vont changer.")]
+    public async Task ThePreviewHeader_AgreesWithTheNumberOfChanges(string locale, int count, string expectedStart)
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync(locale);
+        SettingsTransferChange[] changes = Enumerable
+            .Range(0, count)
+            .Select(index => new SettingsTransferChange(nameof(AppSettings.TerminalFontSize), JsonValue.Create(index), JsonValue.Create(index + 1)))
+            .ToArray();
+
+        Assert.StartsWith(expectedStart, SettingsImportPreview.Compose(localizer, changes), StringComparison.Ordinal);
+    }
+
+    private static async Task<LocalizationManager> LoadLocalizerAsync(string locale)
+    {
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(System.IO.Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+        return localizer;
     }
 
     [Fact]

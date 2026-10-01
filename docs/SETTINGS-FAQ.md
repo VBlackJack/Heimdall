@@ -16,6 +16,8 @@ refer to. This page covers those: the ambiguous ones, the ones carrying a real t
 whose label is misleading, and the ones whose wording assumes knowledge the interface never gives
 you. Options that do what their name says, such as Theme or Font size, are not repeated here.
 
+Ctrl+, opens Settings from anywhere in the window, as clicking its tab does.
+
 Where an answer says a setting does not do something, that is a measured or code-verified
 statement, not a guess.
 
@@ -91,8 +93,9 @@ Settings that name a folder inside your user profile (tool paths, the log folder
 computer: Heimdall says how many there are and asks whether to include them.
 
 **Import settings...** reads a file written by Export. Any other file, or a version this Heimdall
-cannot read, is refused and nothing changes. Otherwise it lists the settings that would change
-and asks. Accepted, they are loaded as pending edits and checked like typed values: nothing is
+cannot read, is refused and nothing changes. Otherwise it lists the settings that would change,
+each under the label this screen gives it, with its tab and section and its current and new
+value (for example "Terminal > Terminal Appearance > Font size: 14 -> 18"), and asks. Accepted, they are loaded as pending edits and checked like typed values: nothing is
 written until you press Save settings, and Undo changes puts everything back. A secret added to
 the file by hand is ignored.
 

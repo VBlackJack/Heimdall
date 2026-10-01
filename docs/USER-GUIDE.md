@@ -256,6 +256,7 @@ Press **F1** at any time for the full list. The ones that pay for themselves imm
 | `Ctrl+E` | Edit the selected session |
 | `Ctrl+B` | Show or hide the left panel |
 | `Ctrl+F` | Jump to the sessions filter box; on the Settings tab, to the settings search |
+| `Ctrl+,` | Open the Settings tab |
 | `Ctrl+S` | On the Settings tab, save the settings when there are changes to save |
 | `F11` | Fullscreen, `Escape` to leave it |
 | `Ctrl+Shift+T` | Switch the left panel between Sessions and Tools |

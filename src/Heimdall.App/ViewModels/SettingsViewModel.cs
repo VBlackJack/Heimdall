@@ -2473,7 +2473,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
 
         AppSettings merged;
-        IReadOnlyList<string> changed;
+        IReadOnlyList<SettingsTransferChange> changed;
         try
         {
             string json = await File.ReadAllTextAsync(path, cancellationToken);
@@ -2496,13 +2496,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         bool confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["SettingsImportTitle"],
-            _localizer.Format(
-                "SettingsImportPreview",
-                changed.Count,
-                string.Join(Environment.NewLine, changed.Take(ImportPreviewMaxLines)))
-                + (changed.Count > ImportPreviewMaxLines
-                    ? Environment.NewLine + _localizer.Format("SettingsImportPreviewMore", changed.Count - ImportPreviewMaxLines)
-                    : string.Empty));
+            SettingsImportPreview.Compose(_localizer, changed));
         if (!confirmed)
         {
             return;
@@ -2533,9 +2527,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         ValidateAllProperties();
         RefreshValidationSummary();
     }
-
-    /// <summary>How many changed settings the import preview names before summing up the rest.</summary>
-    private const int ImportPreviewMaxLines = 20;
 
     private string? PickSettingsFile(bool save)
     {

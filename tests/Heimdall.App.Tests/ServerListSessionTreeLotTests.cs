@@ -237,8 +237,8 @@ public sealed partial class ServerListSelectionTests
         List<ServerItemViewModel> dragged = [fixture.ServerById("alpha"), fixture.ServerById("beta")];
         LocalizationManager localizer = await LoadEnglishLocalizerAsync();
 
-        string oneMoved = MainWindow.FormatMovedToGroupStatus(key => localizer[key], dragged, 1, "lab");
-        string twoMoved = MainWindow.FormatMovedToGroupStatus(key => localizer[key], dragged, 2, "lab");
+        string oneMoved = MainWindow.FormatMovedToGroupStatus(localizer, dragged, 1, "lab");
+        string twoMoved = MainWindow.FormatMovedToGroupStatus(localizer, dragged, 2, "lab");
 
         Assert.Equal("Moved 1 session to lab", oneMoved);
         Assert.Equal("Moved 2 sessions to lab", twoMoved);
@@ -251,9 +251,61 @@ public sealed partial class ServerListSelectionTests
     [InlineData(DropInsertion.Before, 2, "TreeUxDropBefore")]
     [InlineData(DropInsertion.After, 1, "TreeUxDropAfterOne")]
     [InlineData(DropInsertion.After, 2, "TreeUxDropAfter")]
-    public void DropFeedbackKey_FollowsTheDraggedCount(DropInsertion insertion, int count, string expected)
+    public async Task DropFeedbackKey_FollowsTheDraggedCount(DropInsertion insertion, int count, string expected)
     {
-        Assert.Equal(expected, MainWindow.ResolveServerDropFeedbackKey(insertion, count));
+        LocalizationManager localizer = await LoadEnglishLocalizerAsync();
+
+        Assert.Equal(expected, MainWindow.ResolveServerDropFeedbackKey(localizer, insertion, count));
+    }
+
+    [Theory]
+    [InlineData("fr", DropInsertion.None, "TreeUxDropFolderOne")]
+    [InlineData("fr", DropInsertion.Before, "TreeUxDropBeforeOne")]
+    [InlineData("fr", DropInsertion.After, "TreeUxDropAfterOne")]
+    [InlineData("en", DropInsertion.None, "TreeUxDropFolder")]
+    [InlineData("en", DropInsertion.Before, "TreeUxDropBefore")]
+    [InlineData("en", DropInsertion.After, "TreeUxDropAfter")]
+    public async Task DropFeedbackKey_ForZero_TakesTheLanguagesPluralRule(
+        string locale,
+        DropInsertion insertion,
+        string expected)
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync(locale);
+
+        Assert.Equal(expected, MainWindow.ResolveServerDropFeedbackKey(localizer, insertion, 0));
+    }
+
+    [Theory]
+    [InlineData("fr", "0 session d\u00E9plac\u00E9e vers lab")]
+    [InlineData("en", "Moved 0 sessions to lab")]
+    public async Task MovedStatus_ForZero_TakesTheLanguagesPluralRule(string locale, string expected)
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"));
+        List<ServerItemViewModel> dragged = [fixture.ServerById("alpha"), fixture.ServerById("beta")];
+        LocalizationManager localizer = await LoadLocalizerAsync(locale);
+
+        Assert.Equal(expected, MainWindow.FormatMovedToGroupStatus(localizer, dragged, 0, "lab"));
+    }
+
+    [Theory]
+    [InlineData("fr", "0 / 0 session")]
+    [InlineData("en", "0 / 0 sessions")]
+    public async Task FilterResultCount_ForAnEmptyInventory_TakesTheLanguagesPluralRule(string locale, string expected)
+    {
+        var timeProvider = new FakeTimeProvider();
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync(
+            timeProvider: timeProvider,
+            locale: locale);
+        fixture.LoadServers(fixture.ExpandGroups("ops"));
+
+        fixture.ViewModel.SearchText = "Alpha";
+        timeProvider.Advance(ServerListViewModel.SearchFilterDebounceDelay);
+
+        Assert.Equal(expected, fixture.ViewModel.FilterResultCountText);
     }
 
     [Fact]
@@ -484,10 +536,12 @@ public sealed partial class ServerListSelectionTests
         Assert.Equal(expected, server.SearchContextText);
     }
 
-    private static async Task<LocalizationManager> LoadEnglishLocalizerAsync()
+    private static Task<LocalizationManager> LoadEnglishLocalizerAsync() => LoadLocalizerAsync("en");
+
+    private static async Task<LocalizationManager> LoadLocalizerAsync(string locale)
     {
         var localizer = new LocalizationManager();
-        await localizer.LoadAsync(System.IO.Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        await localizer.LoadAsync(System.IO.Path.Combine(AppContext.BaseDirectory, "locales"), locale);
         return localizer;
     }
 }

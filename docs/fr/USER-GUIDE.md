@@ -274,6 +274,7 @@ Appuyez sur **F1** à tout moment pour la liste complète. Ceux qui se rentabili
 | `Ctrl+E` | Modifier la session sélectionnée |
 | `Ctrl+B` | Afficher ou masquer le panneau de gauche |
 | `Ctrl+F` | Aller au champ de filtre des sessions ; dans l'onglet Paramètres, à la recherche des paramètres |
+| `Ctrl+,` | Ouvrir l'onglet Paramètres |
 | `Ctrl+S` | Dans l'onglet Paramètres, enregistrer les paramètres quand il y a des modifications à enregistrer |
 | `F11` | Plein écran, `Echap` pour en sortir |
 | `Ctrl+Shift+T` | Basculer le panneau gauche entre Sessions et Outils |

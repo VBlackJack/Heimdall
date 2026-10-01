@@ -20,6 +20,12 @@ using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.ViewModels.Settings;
 
+/// <summary>A setting a settings file changes, with the value it has and the value it would take.</summary>
+/// <param name="Key">The <see cref="AppSettings"/> property name.</param>
+/// <param name="Before">The current value, as JSON.</param>
+/// <param name="After">The value from the file, as JSON.</param>
+internal sealed record SettingsTransferChange(string Key, JsonNode? Before, JsonNode? After);
+
 /// <summary>
 /// Builds and reads the portable settings file: the preferences the settings panel edits, and
 /// nothing that is a secret or belongs to this machine.
@@ -125,9 +131,9 @@ internal static class SettingsTransfer
     /// <summary>
     /// Lays the settings of a settings file over <paramref name="current"/>.
     /// </summary>
-    /// <returns>The merged settings, and the names of the settings whose value changed.</returns>
+    /// <returns>The merged settings, and the settings whose value changed with both values.</returns>
     /// <exception cref="FormatException">The document is not a settings file this build reads.</exception>
-    internal static (AppSettings Merged, IReadOnlyList<string> Changed) Import(AppSettings current, JsonNode? document)
+    internal static (AppSettings Merged, IReadOnlyList<SettingsTransferChange> Changed) Import(AppSettings current, JsonNode? document)
     {
         ArgumentNullException.ThrowIfNull(current);
 
@@ -142,7 +148,7 @@ internal static class SettingsTransfer
         }
 
         JsonObject merged = JsonSerializer.SerializeToNode(current)!.AsObject();
-        List<string> changed = [];
+        List<SettingsTransferChange> changed = [];
         foreach ((string key, JsonNode? value) in imported)
         {
             if (!TransferableKeys.Contains(key))
@@ -153,7 +159,7 @@ internal static class SettingsTransfer
             JsonNode? before = merged[key];
             if (!JsonNode.DeepEquals(before, value))
             {
-                changed.Add(key);
+                changed.Add(new SettingsTransferChange(key, before?.DeepClone(), value?.DeepClone()));
             }
 
             merged[key] = value?.DeepClone();

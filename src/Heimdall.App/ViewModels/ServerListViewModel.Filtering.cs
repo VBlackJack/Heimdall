@@ -81,8 +81,10 @@ public partial class ServerListViewModel
 
     /// <summary>"3 / 12 sessions": the noun agrees with the total it follows.</summary>
     public string FilterResultCountText =>
-        _localizer.Format(
-            _allServers.Count == 1 ? "FilterResultCountOne" : "FilterResultCount",
+        _localizer.FormatCount(
+            _allServers.Count,
+            "FilterResultCountOne",
+            "FilterResultCount",
             FilteredCount,
             _allServers.Count);
 

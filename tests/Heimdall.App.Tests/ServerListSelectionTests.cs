@@ -1094,14 +1094,15 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
             IEnumerable<IProtocolHandler>? protocolHandlers = null,
             bool withHealthMonitor = false,
             IConfigManager? configManager = null,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null,
+            string locale = "en")
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "heimdall-b65-selection", Guid.NewGuid().ToString("N"));
             IConfigManager actualConfigManager = configManager ?? new ConfigManager(rootPath);
             await actualConfigManager.InitializeAsync();
 
             var localizer = new LocalizationManager();
-            await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+            await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
 
             var stateMachine = new ConnectionStateMachine();
             var connectionService = new ConnectionService(
