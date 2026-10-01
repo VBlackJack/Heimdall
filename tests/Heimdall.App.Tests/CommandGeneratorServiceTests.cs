@@ -370,6 +370,50 @@ public sealed class CommandGeneratorServiceTests
         command.Should().NotContain("'''O", "InlineInQuotes must not add a second shell-quote wrapper");
     }
 
+    // PowerShell ends a single-quoted string on four typographic quotes as well as on the
+    // apostrophe, so a Windows value holding one is doubled like an apostrophe, quoted or inline.
+    [Theory]
+    [InlineData(0x2018)]
+    [InlineData(0x2019)]
+    [InlineData(0x201A)]
+    [InlineData(0x201B)]
+    public void GenerateCommand_WindowsStringWithTypographicQuote_DoublesIt(int codePoint)
+    {
+        string quote = ((char)codePoint).ToString();
+        CommandGeneratorService service = CreateService();
+        TemplateParameter inline = CommandLibraryTestHelpers.RequiredParameter("inner", "Inner");
+        inline.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = WindowsTemplate(
+            "Get-Item {outer} -Filter '{inner}'",
+            CommandLibraryTestHelpers.RequiredParameter("outer", "Outer"),
+            inline);
+        Dictionary<string, string> values = new(StringComparer.Ordinal)
+        {
+            ["outer"] = $"O{quote}Brien",
+            ["inner"] = $"a{quote}b",
+        };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be($"Get-Item 'O{quote}{quote}Brien' -Filter 'a{quote}{quote}b'");
+    }
+
+    // Bash has no typographic quote rule: a Linux value keeps its typographic quote as is.
+    [Fact]
+    public void GenerateCommand_LinuxStringWithTypographicQuote_LeavesItAlone()
+    {
+        string quote = ((char)0x2019).ToString();
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LinuxTemplate(
+            "echo {msg}",
+            CommandLibraryTestHelpers.RequiredParameter("msg", "Message"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["msg"] = $"it{quote}s" };
+
+        string command = service.GenerateCommand(template, values);
+
+        command.Should().Be($"echo 'it{quote}s'");
+    }
+
     // D2 Lot B: InlineInQuotes keeps platform-specific inner escaping but does not wrap.
     // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
     [Fact]

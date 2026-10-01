@@ -21,6 +21,7 @@ using TwinShell.Core.Constants;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Interfaces;
 using TwinShell.Core.Models;
+using PowerShellSingleQuotedString = Heimdall.Core.Security.PowerShellSingleQuotedString;
 
 namespace TwinShell.Infrastructure.Services;
 
@@ -348,13 +349,15 @@ public sealed class PowerShellGalleryService : IPowerShellGalleryService
     }
 
     /// <summary>
-    /// Escapes string for PowerShell execution
+    /// Escapes a string for use inside a PowerShell single-quoted literal.
     /// </summary>
+    /// <remarks>
+    /// ValidateModuleName already admits no quote of any kind; this stays so that a looser
+    /// validation later cannot open the literal.
+    /// </remarks>
     private static string EscapeForPowerShell(string input)
     {
-        // Escape single quotes by doubling them
-        // This is safe when the string is used within single quotes
-        return input.Replace("'", "''");
+        return PowerShellSingleQuotedString.EscapeContent(input);
     }
 
     /// <summary>

@@ -16,7 +16,7 @@
 
 using System.Text;
 
-namespace Heimdall.App.Services;
+namespace Heimdall.Core.Security;
 
 /// <summary>
 /// Writes a value into a PowerShell single-quoted string literal.
@@ -25,10 +25,14 @@ namespace Heimdall.App.Services;
 /// PowerShell ends a single-quoted string on the ASCII apostrophe and on four typographic single
 /// quotes alike, and reads any of them doubled as one literal character. Escaping only the
 /// apostrophe let a value holding a typographic quote close the literal and run the rest as code
-/// (measured on 2026-10-01 with powershell.exe 5.1: the apostrophe-only form exited 1, the
-/// doubled form kept the value intact).
+/// (measured on 2026-10-01 with powershell.exe 5.1 and pwsh 7: the apostrophe-only form did not
+/// parse, the doubled form kept the value intact).
+/// <para>
+/// The one implementation: every PowerShell single-quoted literal Heimdall and TwinShell write
+/// goes through it, so a fix here reaches all of them.
+/// </para>
 /// </remarks>
-internal static class PowerShellSingleQuotedString
+public static class PowerShellSingleQuotedString
 {
     private const char Apostrophe = '\'';
     private const char LeftSingleQuotationMark = (char)0x2018;
@@ -37,13 +41,13 @@ internal static class PowerShellSingleQuotedString
     private const char SingleHighReversed9QuotationMark = (char)0x201B;
 
     /// <summary>Returns <paramref name="value"/> as a complete single-quoted literal.</summary>
-    internal static string Quote(string value)
+    public static string Quote(string value)
     {
         return Apostrophe + EscapeContent(value) + Apostrophe;
     }
 
     /// <summary>Escapes <paramref name="value"/> for use between single quotes.</summary>
-    internal static string EscapeContent(string value)
+    public static string EscapeContent(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
         StringBuilder escaped = new(value.Length);

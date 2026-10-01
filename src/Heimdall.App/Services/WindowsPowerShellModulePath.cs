@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.IO;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 

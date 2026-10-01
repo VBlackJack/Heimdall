@@ -16,6 +16,7 @@
 
 using System.Globalization;
 using System.Text;
+using Heimdall.Core.Security;
 
 namespace Heimdall.Core.Updates;
 
@@ -100,13 +101,14 @@ public static class UpdateRelaunchScript
     public const string RelaunchOwnedVariable = "relaunchOwnedByScript";
 
     /// <summary>
-    /// Escapes a value for embedding inside a PowerShell single-quoted literal:
-    /// a single quote is escaped by doubling it.
+    /// Escapes a value for embedding inside a PowerShell single-quoted literal, through
+    /// <see cref="PowerShellSingleQuotedString.EscapeContent"/>: the apostrophe and the four
+    /// typographic single quotes are each doubled.
     /// </summary>
     public static string EscapeSingleQuoted(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return value.Replace("'", "''", StringComparison.Ordinal);
+        return PowerShellSingleQuotedString.EscapeContent(value);
     }
 
     /// <summary>Environment variable carrying the executable to the command processor.</summary>

@@ -106,7 +106,7 @@ internal static class TerminalCommandFormatter
         {
             LocalShellKind.Cmd => "\"" + clean.Replace("\"", string.Empty, StringComparison.Ordinal) + "\"",
             LocalShellKind.Posix => InputValidator.EscapeShellArg(clean),
-            _ => "'" + clean.Replace("'", "''", StringComparison.Ordinal) + "'"
+            _ => PowerShellSingleQuotedString.Quote(clean)
         };
     }
 

@@ -25,6 +25,7 @@ using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
 using TwinShell.Core.Models;
+using PowerShellSingleQuotedString = Heimdall.Core.Security.PowerShellSingleQuotedString;
 
 namespace TwinShell.Core.Services;
 
@@ -423,16 +424,16 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
     /// <summary>
     /// Quotes a value for safe shell execution based on the target platform.
-    /// Windows (PowerShell): Single quotes escaped by doubling ('')
+    /// Windows (PowerShell): every single quote PowerShell recognises, the apostrophe and four
+    /// typographic ones, is escaped by doubling ('')
     /// Linux/macOS (Bash): Single quotes escaped by closing, escaping, reopening ('\''')
     /// </summary>
     private static string QuoteForShell(string value, Platform platform)
     {
         if (platform == Platform.Windows)
         {
-            // PowerShell escaping: Single quotes are escaped by doubling them
             // Example: "It's cool" becomes "'It''s cool'"
-            return "'" + value.Replace("'", "''") + "'";
+            return PowerShellSingleQuotedString.Quote(value);
         }
         else
         {
@@ -447,7 +448,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     {
         if (platform == Platform.Windows)
         {
-            return value.Replace("'", "''");
+            return PowerShellSingleQuotedString.EscapeContent(value);
         }
 
         return value.Replace("'", "'\\''");

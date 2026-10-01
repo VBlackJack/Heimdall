@@ -53,6 +53,24 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Equal("''a''b''", UpdateRelaunchScript.EscapeSingleQuoted("'a'b'"));
     }
 
+    /// <summary>
+    /// PowerShell ends a single-quoted string on four typographic quotes too, so a profile
+    /// path typed with one ended the literal and broke the relauncher.
+    /// </summary>
+    [Theory]
+    [InlineData(0x2018)]
+    [InlineData(0x2019)]
+    [InlineData(0x201A)]
+    [InlineData(0x201B)]
+    public void EscapeSingleQuoted_DoublesTypographicQuotes(int codePoint)
+    {
+        string quote = ((char)codePoint).ToString();
+
+        string escaped = UpdateRelaunchScript.EscapeSingleQuoted($@"C:\Users\O{quote}Brien");
+
+        Assert.Equal($@"C:\Users\O{quote}{quote}Brien", escaped);
+    }
+
     [Fact]
     public void EscapeSingleQuoted_LeavesNormalPathUnchanged()
     {

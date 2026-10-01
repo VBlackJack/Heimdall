@@ -289,6 +289,20 @@ public sealed class WinRmPowerShellLaunchBuilderTests
         Assert.Equal("'srv''01'", literal);
     }
 
+    [Theory]
+    [InlineData(0x2018)]
+    [InlineData(0x2019)]
+    [InlineData(0x201A)]
+    [InlineData(0x201B)]
+    public void QuotePowerShellLiteral_DoublesTypographicQuotes(int codePoint)
+    {
+        string quote = ((char)codePoint).ToString();
+
+        string literal = WinRmPowerShellLaunchBuilder.QuotePowerShellLiteral($"o{quote}brien");
+
+        Assert.Equal($"'o{quote}{quote}brien'", literal);
+    }
+
     [Fact]
     public void Build_WithMissingPort_UsesSslAwareDefault()
     {

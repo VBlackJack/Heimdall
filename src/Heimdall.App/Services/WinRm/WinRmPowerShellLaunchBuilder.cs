@@ -216,7 +216,7 @@ internal sealed class WinRmPowerShellLaunchBuilder
     internal static string QuotePowerShellLiteral(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
+        return PowerShellSingleQuotedString.Quote(value);
     }
 
     internal static string QuoteCommandLineArgument(string value)
