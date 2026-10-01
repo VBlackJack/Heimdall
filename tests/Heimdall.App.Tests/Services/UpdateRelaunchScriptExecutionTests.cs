@@ -22,6 +22,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Heimdall.App.Services;
 using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.Core.Security;
 using Heimdall.Core.Updates;
@@ -114,6 +115,13 @@ public sealed class UpdateRelaunchScriptExecutionTests
     /// announces itself: the wait above ends at its ceiling and says what was actually said.
     /// </remarks>
     private const string StandInMarkerBusyNotice = "heimdall-stub: marker busy, retrying";
+
+    /// <summary>
+    /// What the script writes when it cannot obtain an Authenticode verdict. A copy of the
+    /// emitted text: the test that withholds the verdict is what keeps the two in step, since it
+    /// fails when this no longer appears.
+    /// </summary>
+    private const string UnavailableVerdictWarning = "Authenticode verdict unavailable";
 
     private const string InstallerRole = "installer";
 
@@ -244,6 +252,79 @@ public sealed class UpdateRelaunchScriptExecutionTests
         Assert.Equal(UpdateOutcomeStage.IntegrityRejected, record!.Stage);
 
         // The refusal must not cost the user their application.
+        await sandbox.WaitForRoleAsync(RelaunchRole);
+    }
+
+    /// <summary>
+    /// The application started from a PowerShell 7 session still gets an Authenticode verdict
+    /// from its relauncher.
+    /// </summary>
+    /// <remarks>
+    /// Measured on 2026-10-01 (CI run 36870815225, and on a developer machine): Windows
+    /// PowerShell 5.1 handed PowerShell 7's PSModulePath resolves Microsoft.PowerShell.Security
+    /// to PowerShell 7's manifest, cannot load it, and has no Get-AuthenticodeSignature. The
+    /// script then carries on without a verdict, as it is designed to - but for a reason that
+    /// has nothing to do with the package. Discriminating only where PowerShell 7 is installed,
+    /// since its home is what the inherited path names; the CI runner has it.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Execute_InheritedFromAPowerShell7Session_StillObtainsTheAuthenticodeVerdict(
+        string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+        sandbox.ExpectedSha256Override = new string('0', 64);
+        sandbox.InheritedModulePathOverride = PowerShell7SessionModulePath();
+
+        ScriptRun run = await sandbox.RunAsync(powerShellHost);
+
+        string transcript = sandbox.ReadTranscript();
+        Assert.DoesNotContain(UnavailableVerdictWarning, transcript, StringComparison.Ordinal);
+
+        // Reached the mandatory gate and refused there, so the absence above is a run that got
+        // past the signature line rather than one that never reached it.
+        UpdateFailureRecord? record = await sandbox.ReadFailureRecordAsync();
+        Assert.NotNull(record);
+        Assert.Equal(UpdateOutcomeStage.IntegrityRejected, record!.Stage);
+        Assert.True(run.ExitCode != 0, "a hash mismatch must not report success");
+        await sandbox.WaitForRoleAsync(RelaunchRole);
+    }
+
+    /// <summary>
+    /// No Authenticode verdict is not a pass: the mandatory hash gate still refuses, and the
+    /// missing verdict is said in the transcript rather than skipped in silence.
+    /// </summary>
+    /// <remarks>
+    /// The verdict is advisory by design (PR #247) and the SHA-256 comparison is the gate. Until
+    /// now this branch ran only by accident, on a CI runner, under one host; its tests read the
+    /// script's text. Run here on purpose under both hosts.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Execute_AuthenticodeVerdictUnavailable_StillRefusesAtTheHashGateAndSaysSo(
+        string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+        sandbox.ExpectedSha256Override = new string('0', 64);
+        sandbox.WithholdAuthenticodeVerdict = true;
+
+        ScriptRun run = await sandbox.RunAsync(powerShellHost);
+
+        Assert.True(run.ExitCode != 0, "a hash mismatch must not report success");
+        Assert.False(
+            sandbox.SequenceContainsRole(InstallerRole),
+            "an installer whose bytes are not the ones verified must never run, verdict or not");
+
+        UpdateFailureRecord? record = await sandbox.ReadFailureRecordAsync();
+        Assert.NotNull(record);
+        Assert.Equal(UpdateOutcomeStage.IntegrityRejected, record!.Stage);
+
+        string transcript = sandbox.ReadTranscript();
+        Assert.Contains(UnavailableVerdictWarning, transcript, StringComparison.Ordinal);
+        Assert.Contains(UpdateScriptSandbox.WithheldVerdictMessage, transcript, StringComparison.Ordinal);
+
         await sandbox.WaitForRoleAsync(RelaunchRole);
     }
 
@@ -855,6 +936,27 @@ public sealed class UpdateRelaunchScriptExecutionTests
             + string.Join(", ", offenders.Select(m => m.Value)));
     }
 
+    /// <summary>
+    /// The module path a PowerShell 7 session hands a child that is not Windows PowerShell, such
+    /// as the application: its personal, shared and home module directories first.
+    /// </summary>
+    private static string PowerShell7SessionModulePath()
+    {
+        PowerShellModuleRoots roots = PowerShellModuleRoots.ForCurrentUser();
+        List<string> entries = [.. roots.PowerShell7];
+        string? powerShell7 = ResolveHosts().FirstOrDefault(
+            host => !WindowsPowerShellModulePath.IsWindowsPowerShell(host));
+        if (powerShell7 is not null)
+        {
+            entries.Add(Path.Combine(
+                Path.GetDirectoryName(powerShell7)!,
+                WindowsPowerShellModulePath.ModulesDirectoryName));
+        }
+
+        entries.AddRange(roots.WindowsPowerShellDefaults);
+        return string.Join(';', entries);
+    }
+
     private static string StubPath()
     {
         string? path = typeof(UpdateRelaunchScriptExecutionTests).Assembly
@@ -921,15 +1023,10 @@ public sealed class UpdateRelaunchScriptExecutionTests
         string powerShellHost,
         string scriptPath,
         string? markerPath,
-        int installerExitCode = 0)
+        int installerExitCode = 0,
+        string? inheritedModulePath = null)
     {
-        var psi = new ProcessStartInfo(powerShellHost)
-        {
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-        };
+        ProcessStartInfo psi = ProductionStartInfo(powerShellHost, string.Empty, inheritedModulePath);
 
         // The production flags, read from the production constant, so a change there
         // reaches this harness instead of quietly diverging from it. -File rather than
@@ -958,18 +1055,41 @@ public sealed class UpdateRelaunchScriptExecutionTests
         string powerShellHost,
         string productionArguments,
         string? markerPath,
-        int installerExitCode)
+        int installerExitCode,
+        string? inheritedModulePath)
     {
-        var psi = new ProcessStartInfo(powerShellHost)
-        {
-            Arguments = productionArguments,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-        };
-
+        ProcessStartInfo psi = ProductionStartInfo(powerShellHost, productionArguments, inheritedModulePath);
         return RunHostAsync(psi, powerShellHost, markerPath, installerExitCode);
+    }
+
+    /// <summary>
+    /// The start info production builds for the relauncher, with both streams redirected so the
+    /// run can be read.
+    /// </summary>
+    /// <remarks>
+    /// Built by the production method rather than beside it. The harness used to start the host
+    /// with this process's environment as it stood, and on the CI runner that is a PowerShell 7
+    /// session's: every Windows PowerShell case ran without Microsoft.PowerShell.Security, so none
+    /// of them ever obtained the Authenticode verdict production obtains (CI run 36870815225).
+    /// </remarks>
+    /// <param name="inheritedModulePath">
+    /// The PSModulePath the application is taken to have inherited; null takes this process's own,
+    /// which is what production does.
+    /// </param>
+    private static ProcessStartInfo ProductionStartInfo(
+        string powerShellHost,
+        string arguments,
+        string? inheritedModulePath)
+    {
+        ProcessStartInfo psi = SystemUpdateInstallerHost.CreateDetachedStartInfo(
+            powerShellHost,
+            arguments,
+            inheritedModulePath ?? Environment.GetEnvironmentVariable(WindowsPowerShellModulePath.VariableName),
+            PowerShellModuleRoots.ForCurrentUser(),
+            File.Exists);
+        psi.RedirectStandardOutput = true;
+        psi.RedirectStandardError = true;
+        return psi;
     }
 
     private static async Task<ScriptRun> RunHostAsync(
@@ -986,12 +1106,13 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 installerExitCode.ToString(CultureInfo.InvariantCulture);
         }
 
+        Stopwatch sinceStart = Stopwatch.StartNew();
         using Process process = Process.Start(psi)
             ?? throw new InvalidOperationException($"failed to start {powerShellHost}");
 
         // Both streams drained before the wait, or a full pipe buffer deadlocks the run.
-        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
-        Task<string> stderr = process.StandardError.ReadToEndAsync();
+        Task<string> stdout = ReadTimedAsync(process.StandardOutput, () => sinceStart.Elapsed);
+        Task<string> stderr = ReadTimedAsync(process.StandardError, () => sinceStart.Elapsed);
         using var cts = new CancellationTokenSource(ScriptCeiling);
         try
         {
@@ -1047,6 +1168,30 @@ public sealed class UpdateRelaunchScriptExecutionTests
         {
             return $"<unreadable: {ex.GetType().Name}: {ex.Message}>";
         }
+    }
+
+    /// <summary>
+    /// Reads a stream to its end, each line prefixed with the time since the host started.
+    /// </summary>
+    /// <remarks>
+    /// CI run 36870815225 timed out after printing two lines, and nothing said whether the second
+    /// came at one second or at fifty-nine, so the stall could not be placed before it or after
+    /// it. Measured on 2026-10-01: both hosts flush each line to a redirected stream as it is
+    /// written (a line written before a three-second sleep arrives at 0.3 s, not at 3.3 s), so the
+    /// arrival time is a fair account of when the line was produced.
+    /// </remarks>
+    internal static async Task<string> ReadTimedAsync(StreamReader reader, Func<TimeSpan> elapsed)
+    {
+        StringBuilder read = new();
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            read.Append("[+")
+                .Append(elapsed().TotalSeconds.ToString("F1", CultureInfo.InvariantCulture))
+                .Append(" s] ")
+                .AppendLine(line);
+        }
+
+        return read.ToString();
     }
 
     private sealed record ScriptRun(int ExitCode, string StandardOutput, string StandardError);
@@ -1287,9 +1432,33 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 powerShellHost,
                 arguments,
                 SequencePath,
-                InstallerExitCode);
+                InstallerExitCode,
+                InheritedModulePathOverride);
             return _lastRun;
         }
+
+        /// <summary>
+        /// The PSModulePath the application is taken to have inherited. Null is this process's
+        /// own, as in production.
+        /// </summary>
+        internal string? InheritedModulePathOverride { get; set; }
+
+        /// <summary>
+        /// Runs the emitted script on a host where Get-AuthenticodeSignature cannot produce a
+        /// verdict, whichever host that is.
+        /// </summary>
+        /// <remarks>
+        /// The only way to reach the script's unavailable-verdict branch on purpose. The CI
+        /// runner used to reach it by accident, under Windows PowerShell 5.1 only, because the
+        /// host inherited PowerShell 7's module path; once the harness launches the host the way
+        /// production does, nothing reaches it any more. A function shadows the cmdlet - command
+        /// lookup prefers it - and fails the way an unloadable module does, from inside the
+        /// script's own try.
+        /// </remarks>
+        internal bool WithholdAuthenticodeVerdict { get; set; }
+
+        /// <summary>The message the withholding stand-in fails with.</summary>
+        internal const string WithheldVerdictMessage = "Get-AuthenticodeSignature withheld by the test harness.";
 
         internal async Task<UpdateFailureRecord?> ReadFailureRecordAsync()
         {
@@ -1330,15 +1499,34 @@ public sealed class UpdateRelaunchScriptExecutionTests
             AssertFenced(spec, Root);
             await File.WriteAllTextAsync(ScriptPath, UpdateRelaunchScript.Build(spec));
 
+            string entryPoint = ScriptPath;
+            if (WithholdAuthenticodeVerdict)
+            {
+                entryPoint = Path.Combine(Root, "withhold-verdict.ps1");
+                await File.WriteAllTextAsync(entryPoint, WithholdingEntryPoint(ScriptPath));
+            }
+
             // Both roles learn where to record through the environment: the script starts
             // the relaunch target with no arguments at all, and the installer takes the
             // same channel so no path has to survive -ArgumentList quoting.
             _lastRun = await RunHostAsync(
                 powerShellHost,
-                ScriptPath,
+                entryPoint,
                 SequencePath,
-                InstallerExitCode);
+                InstallerExitCode,
+                InheritedModulePathOverride);
             return _lastRun;
+        }
+
+        private static string WithholdingEntryPoint(string scriptPath)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("$ErrorActionPreference = 'Stop'");
+            sb.AppendLine("function Get-AuthenticodeSignature {");
+            sb.AppendLine($"    throw '{UpdateRelaunchScript.EscapeSingleQuoted(WithheldVerdictMessage)}'");
+            sb.AppendLine("}");
+            sb.AppendLine($"& '{UpdateRelaunchScript.EscapeSingleQuoted(scriptPath)}'");
+            return sb.ToString();
         }
 
         internal async Task WaitForRoleAsync(string role)

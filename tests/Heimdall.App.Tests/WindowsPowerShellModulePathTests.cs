@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-using Heimdall.App.Services.WinRm;
+using Heimdall.App.Services;
 
 namespace Heimdall.App.Tests;
 
