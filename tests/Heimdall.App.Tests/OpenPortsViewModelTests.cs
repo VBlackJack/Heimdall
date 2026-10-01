@@ -24,6 +24,31 @@ namespace Heimdall.App.Tests;
 
 public sealed class OpenPortsViewModelTests
 {
+    /// <summary>The status words the connection count by its number, French 0 in the singular.</summary>
+    [Theory]
+    [InlineData("en", 1, "1 connection at ")]
+    [InlineData("en", 2, "2 connections at ")]
+    [InlineData("fr", 0, "0 connexion \u00e0 ")]
+    [InlineData("fr", 2, "2 connexions \u00e0 ")]
+    [InlineData("es", 1, "1 conexi\u00f3n a las ")]
+    [InlineData("es", 0, "0 conexiones a las ")]
+    public async Task RefreshCommand_WordsTheConnectionCountByItsNumber(string locale, int count, string expectedStart)
+    {
+        var localizer = await CreateLocalizerAsync(locale);
+        var service = new FakeOpenPortsService
+        {
+            Entries = Enumerable.Range(0, count)
+                .Select(i => new PortEntry("TCP", "127.0.0.1", 1000 + i, "*", 0, "LISTENING", i, "proc"))
+                .ToList(),
+        };
+        var vm = new OpenPortsViewModel(service);
+        vm.Initialize(localizer);
+
+        vm.RefreshCommand.Execute(null);
+
+        Assert.StartsWith(expectedStart, vm.StatusText, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Initialize_PopulatesHelpText()
     {

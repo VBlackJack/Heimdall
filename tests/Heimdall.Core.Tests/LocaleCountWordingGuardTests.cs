@@ -32,15 +32,15 @@ namespace Heimdall.Core.Tests;
 /// "One" variant therefore carries the same placeholders as its plural.
 /// </para>
 /// <para>
-/// The "(s)" hacks ("13 session(s)", "servidor(es)", "reseau(x)") that remain sit in the
-/// baseline beside this file. It may only shrink: a new hack fails, and a hack that was fixed
-/// or deleted must leave the list, or the line would pardon the next key of that name.
+/// No value may word a count with a "(s)" hack ("13 session(s)", "servidor(es)", "reseau(x)").
+/// The baseline that listed the hacks left after the first sweep is gone: it reached zero. A
+/// sentence with several counts is composed from counted fragments, each a key pair of its own,
+/// rather than pardoned.
 /// </para>
 /// </remarks>
 public sealed class LocaleCountWordingGuardTests
 {
     private const string LocalesDirectoryName = "locales";
-    private const string BaselineFileName = "locale-count-hacks.baseline.txt";
     private const string OneSuffix = "One";
 
     /// <summary>Lower bound on the catalogues a healthy enumeration returns.</summary>
@@ -95,37 +95,40 @@ public sealed class LocaleCountWordingGuardTests
     }
 
     [Fact]
-    public void NoLocaleValueGainsACountHackOutsideTheBaseline()
+    public void NoLocaleValueWordsACountWithAParenthesisedPlural()
     {
-        HashSet<string> baseline = ReadBaseline();
-        List<string> unexpected = KeysWithCountHacks()
-            .Where(key => !baseline.Contains(key))
-            .OrderBy(key => key, StringComparer.Ordinal)
-            .ToList();
+        List<string> offenders = FindCountHacks(ReadCatalogues());
 
         Assert.True(
-            unexpected.Count == 0,
-            $"{unexpected.Count} key(s) word a count with a parenthesised plural. Give the key a "
-            + "\"One\" sibling and format it with LocalizationManager.FormatCount:"
+            offenders.Count == 0,
+            $"{offenders.Count} value(s) word a count with a parenthesised plural. Give the key a "
+            + "\"One\" sibling and format it with LocalizationManager.FormatCount; a sentence with "
+            + "several counts is composed from counted fragments:"
             + Environment.NewLine
-            + string.Join(Environment.NewLine, unexpected));
+            + string.Join(Environment.NewLine, offenders));
     }
 
+    /// <summary>
+    /// Positive control for the sweep: a hack planted in one catalogue of a healthy set is
+    /// reported with its catalogue and key, and a clean catalogue reports nothing.
+    /// </summary>
     [Fact]
-    public void TheBaselineHoldsNoKeyThatLostItsHack()
+    public void TheSweepReportsAHackPlantedInACatalogue()
     {
-        HashSet<string> current = KeysWithCountHacks();
-        List<string> stale = ReadBaseline()
-            .Where(key => !current.Contains(key))
-            .OrderBy(key => key, StringComparer.Ordinal)
-            .ToList();
+        Dictionary<string, Dictionary<string, string>> catalogues = new(StringComparer.Ordinal)
+        {
+            ["en.json"] = new(StringComparer.Ordinal) { ["Clean"] = "{0} sessions" },
+            ["fr.json"] = new(StringComparer.Ordinal)
+            {
+                ["Clean"] = "{0} sessions",
+                ["Planted"] = "{0} session(s) ouverte(s)",
+            },
+        };
 
-        Assert.True(
-            stale.Count == 0,
-            $"{stale.Count} baseline entries no longer carry a hack. Delete these lines from "
-            + BaselineFileName + ":"
-            + Environment.NewLine
-            + string.Join(Environment.NewLine, stale));
+        Assert.Equal("fr.json::Planted", Assert.Single(FindCountHacks(catalogues)));
+
+        catalogues["fr.json"].Remove("Planted");
+        Assert.Empty(FindCountHacks(catalogues));
     }
 
     /// <summary>
@@ -196,12 +199,13 @@ public sealed class LocaleCountWordingGuardTests
     private static SortedSet<string> Placeholders(string value) =>
         new(s_placeholder.Matches(value).Select(match => match.Groups[1].Value), StringComparer.Ordinal);
 
-    private static HashSet<string> KeysWithCountHacks() =>
-        ReadCatalogues()
-            .SelectMany(pair => pair.Value)
-            .Where(entry => s_countHack.IsMatch(entry.Value))
-            .Select(entry => entry.Key)
-            .ToHashSet(StringComparer.Ordinal);
+    private static List<string> FindCountHacks(Dictionary<string, Dictionary<string, string>> catalogues) =>
+        catalogues
+            .SelectMany(catalogue => catalogue.Value
+                .Where(entry => s_countHack.IsMatch(entry.Value))
+                .Select(entry => $"{catalogue.Key}::{entry.Key}"))
+            .OrderBy(offender => offender, StringComparer.Ordinal)
+            .ToList();
 
     private static Dictionary<string, Dictionary<string, string>> ReadCatalogues()
     {
@@ -223,12 +227,6 @@ public sealed class LocaleCountWordingGuardTests
 
         return catalogues;
     }
-
-    private static HashSet<string> ReadBaseline() =>
-        File.ReadAllLines(Path.Combine(FindRepoRoot(), "tests", "Heimdall.Core.Tests", BaselineFileName))
-            .Select(line => line.Trim())
-            .Where(line => line.Length > 0 && !line.StartsWith('#'))
-            .ToHashSet(StringComparer.Ordinal);
 
     private static string FindRepoRoot()
     {

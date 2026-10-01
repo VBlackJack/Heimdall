@@ -565,6 +565,11 @@ public partial class NotesToolView : UserControl, IToolView
 
     private string L(string key) => _localizer?[key] ?? key;
 
+    /// <summary>The status line after notes were imported from files.</summary>
+    internal static string DescribeImported(LocalizationManager? localizer, int count) =>
+        localizer?.FormatCount(count, "ToolNotesStatusImportedOne", "ToolNotesStatusImported", count)
+            ?? "ToolNotesStatusImported";
+
     private async Task CreateNoteAsync(NoteTemplateKind templateKind, NoteTreeNode? contextNode = null)
     {
         try
@@ -1185,7 +1190,7 @@ public partial class NotesToolView : UserControl, IToolView
         if (imported > 0)
         {
             await _vm.ReloadAsync().ConfigureAwait(true);
-            _vm.SetStatus(string.Format(L("ToolNotesStatusImported"), imported));
+            _vm.SetStatus(DescribeImported(_localizer, imported));
         }
     }
 

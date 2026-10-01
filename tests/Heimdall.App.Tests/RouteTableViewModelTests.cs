@@ -24,6 +24,31 @@ namespace Heimdall.App.Tests;
 
 public sealed class RouteTableViewModelTests
 {
+    /// <summary>The status words the route count by its number, French 0 in the singular.</summary>
+    [Theory]
+    [InlineData("en", 1, "1 route at ")]
+    [InlineData("en", 2, "2 routes at ")]
+    [InlineData("fr", 0, "0 route \u00e0 ")]
+    [InlineData("fr", 2, "2 routes \u00e0 ")]
+    [InlineData("es", 1, "1 ruta a las ")]
+    [InlineData("es", 0, "0 rutas a las ")]
+    public async Task RefreshCommand_WordsTheRouteCountByItsNumber(string locale, int count, string expectedStart)
+    {
+        var localizer = await CreateLocalizerAsync(locale);
+        var service = new FakeRouteTableService
+        {
+            Entries = Enumerable.Range(0, count)
+                .Select(i => new RouteEntry($"10.0.{i}.0", "255.255.255.0", "On-link", "10.0.0.1", "1"))
+                .ToList(),
+        };
+        var vm = new RouteTableViewModel(service);
+        vm.Initialize(localizer);
+
+        vm.RefreshCommand.Execute(null);
+
+        Assert.StartsWith(expectedStart, vm.StatusText, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Initialize_PopulatesHelpText()
     {

@@ -155,6 +155,31 @@ public sealed class SessionRestoreCoordinatorTests
         Assert.Single(dialogs.Warnings);
     }
 
+    /// <summary>The shortfall is counted by the sessions restored; "out of" needs no agreement.</summary>
+    [Theory]
+    [InlineData("en", false, "Restored 1 saved session out of 2.")]
+    [InlineData("en", true, "Restored 0 saved sessions out of 2.")]
+    [InlineData("fr", false, "1 session restaurée sur 2.")]
+    [InlineData("fr", true, "0 session restaurée sur 2.")]
+    [InlineData("es", false, "Se restauró 1 sesión guardada de 2.")]
+    [InlineData("es", true, "Se restauraron 0 sesiones guardadas de 2.")]
+    public async Task TheShortfall_WordsTheRestoredCountByItsNumber(string locale, bool noneRestored, string expected)
+    {
+        string first = noneRestored ? "srv-boom" : "srv-a";
+        RecordingSnapshotService snapshots = new(Snapshot(Entry(first, 0), Entry("srv-gone", 1)));
+        RecordingDialogService dialogs = new()
+        {
+            Result = new SnapshotRestoreDialogResult(
+                SnapshotRestoreDialogAction.RestoreSelected,
+                [Entry(first, 0), Entry("srv-gone", 1)]),
+        };
+        RecordingHost host = new() { UnknownServer = "srv-gone", ThrowFor = "srv-boom" };
+
+        await CreateCoordinator(snapshots, dialogs, locale).RestoreAsync(host, CancellationToken.None);
+
+        Assert.Equal(expected, Assert.Single(dialogs.Warnings));
+    }
+
     [Fact]
     public async Task AServerThatNoLongerExists_IsReportedAsAShortfallExactlyOnce()
     {
@@ -263,10 +288,11 @@ public sealed class SessionRestoreCoordinatorTests
 
     private static ISessionRestoreCoordinator CreateCoordinator(
         RecordingSnapshotService snapshots,
-        RecordingDialogService dialogs)
+        RecordingDialogService dialogs,
+        string locale = "en")
     {
         LocalizationManager localizer = new();
-        localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en")
+        localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale)
             .GetAwaiter()
             .GetResult();
         return new SessionRestoreCoordinator(snapshots, localizer, dialogs);

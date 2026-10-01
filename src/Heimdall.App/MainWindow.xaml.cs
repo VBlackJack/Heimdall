@@ -2233,7 +2233,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                     p.Done,
                     p.Total));
 
-            var result = await _networkScannerService.ScanAndPromptAsync(vm.Localize, progress);
+            var result = await _networkScannerService.ScanAndPromptAsync(vm.Localize, vm.GetLocalizer(), progress);
             await ApplyNetworkScanResultAsync(vm, result);
         }
         finally

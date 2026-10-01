@@ -22,6 +22,7 @@ using System.Security.Authentication;
 using System.Text;
 using System.Text.RegularExpressions;
 using Heimdall.Core.Discovery;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
 
@@ -53,14 +54,28 @@ public sealed class SecNumCloudAuditEngine
 
     private readonly Func<string, string> _l;
 
+    private readonly ICountLocalizer _countLocalizer;
+
     /// <summary>
     /// Initializes a new instance with an optional localization delegate.
     /// When omitted, keys are returned as-is (passthrough).
     /// </summary>
-    public SecNumCloudAuditEngine(Func<string, string>? localize = null)
+    /// <param name="localize">Maps a key to its text.</param>
+    /// <param name="countLocalizer">
+    /// Words the counts of the summaries and evidence in the language of <paramref name="localize"/>.
+    /// When omitted, counts are worded through <paramref name="localize"/> under the English rule.
+    /// </param>
+    public SecNumCloudAuditEngine(
+        Func<string, string>? localize = null,
+        ICountLocalizer? countLocalizer = null)
     {
         _l = localize ?? (key => key);
+        _countLocalizer = countLocalizer ?? DelegateCountLocalizer.English(_l);
     }
+
+    /// <summary>The counted host fragment the inventory summaries are composed from.</summary>
+    private string CountHosts(int count) =>
+        _countLocalizer.FormatCount(count, "AuditCountHostsOne", "AuditCountHosts", count);
 
     // ── Constants ────────────────────────────────────────────────────
 
@@ -430,7 +445,7 @@ public sealed class SecNumCloudAuditEngine
     //  Phase 2: Network Security (Chapter NET - 4 checks)
     // ═══════════════════════════════════════════════════════════════════
 
-    private AuditChapter BuildNetworkChapter() => new()
+    internal AuditChapter BuildNetworkChapter() => new()
     {
         Id = "NET",
         Name = _l("AuditChapterNetwork"),
@@ -444,7 +459,7 @@ public sealed class SecNumCloudAuditEngine
         ],
     };
 
-    private async Task RunNetworkChecksAsync(
+    internal async Task RunNetworkChecksAsync(
         AuditChapter chapter,
         List<HostScanResult> hosts,
         NetworkScanSnapshot? snapshot,
@@ -467,14 +482,20 @@ public sealed class SecNumCloudAuditEngine
                     net01.Evidence.Add(new AuditEvidence
                     {
                         Host = host.IpAddress,
-                        Detail = string.Format(_l("AuditEvidenceOpenPorts"),
+                        Detail = _countLocalizer.FormatCount(
+                            openPorts.Count,
+                            "AuditEvidenceOpenPortsOne",
+                            "AuditEvidenceOpenPorts",
                             openPorts.Count,
                             string.Join(", ", openPorts.Select(p => $"{p.Port}/{p.ServiceName ?? _l("AuditServiceUnknown")}"))),
                     });
                 }
             }
             net01.Status = AuditStatus.Pass;
-            net01.Summary = string.Format(_l("AuditCheckNet01Summary"), totalOpen, hosts.Count);
+            net01.Summary = string.Format(
+                _l("AuditCheckNet01Summary"),
+                _countLocalizer.FormatCount(totalOpen, "AuditCountOpenPortsOne", "AuditCountOpenPorts", totalOpen),
+                CountHosts(hosts.Count));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -502,7 +523,10 @@ public sealed class SecNumCloudAuditEngine
                     net02.Evidence.Add(new AuditEvidence
                     {
                         Host = host.IpAddress,
-                        Detail = string.Format(_l("AuditEvidenceNonStdPort"),
+                        Detail = _countLocalizer.FormatCount(
+                            nonStandard.Count,
+                            "AuditEvidenceNonStdPortOne",
+                            "AuditEvidenceNonStdPort",
                             string.Join(", ", nonStandard.Select(p =>
                                 $"{p.Port}/{p.ServiceName ?? _l("AuditServiceUnknown")}"))),
                     });
@@ -517,7 +541,7 @@ public sealed class SecNumCloudAuditEngine
             else
             {
                 net02.Status = AuditStatus.Warning;
-                net02.Summary = string.Format(_l("AuditCheckNet02SummaryWarn"), flaggedCount);
+                net02.Summary = _countLocalizer.FormatCount(flaggedCount, "AuditCheckNet02SummaryWarnOne", "AuditCheckNet02SummaryWarn", flaggedCount);
             }
         }
         catch (OperationCanceledException) { throw; }
@@ -563,16 +587,28 @@ public sealed class SecNumCloudAuditEngine
                     net04.Evidence.Add(new AuditEvidence
                     {
                         Host = vlan.Subnet,
-                        Detail = string.Format(_l("AuditEvidenceVlan"),
-                            vlan.VlanId?.ToString() ?? "N/A", vlan.Name, vlan.MemberIps.Count),
+                        Detail = _countLocalizer.FormatCount(
+                            vlan.MemberIps.Count,
+                            "AuditEvidenceVlanOne",
+                            "AuditEvidenceVlan",
+                            vlan.VlanId?.ToString() ?? "N/A",
+                            vlan.Name,
+                            vlan.MemberIps.Count),
                     });
                 }
             }
 
             net04.Status = subnets.Count > 1 ? AuditStatus.Pass : AuditStatus.Warning;
             net04.Summary = snapshot?.DetectedVlans is { Count: > 0 }
-                ? string.Format(_l("AuditCheckNet04SummaryVlan"), subnets.Count, snapshot.DetectedVlans.Count)
-                : string.Format(_l("AuditCheckNet04SummaryNoVlan"), subnets.Count);
+                ? string.Format(
+                    _l("AuditCheckNet04SummaryVlan"),
+                    _countLocalizer.FormatCount(subnets.Count, "AuditCountSubnetsOne", "AuditCountSubnets", subnets.Count),
+                    _countLocalizer.FormatCount(
+                        snapshot.DetectedVlans.Count,
+                        "AuditCountVlansOne",
+                        "AuditCountVlans",
+                        snapshot.DetectedVlans.Count))
+                : _countLocalizer.FormatCount(subnets.Count, "AuditCheckNet04SummaryNoVlanOne", "AuditCheckNet04SummaryNoVlan", subnets.Count);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -621,8 +657,12 @@ public sealed class SecNumCloudAuditEngine
                         check.Evidence.Add(new AuditEvidence
                         {
                             Host = host.IpAddress,
-                            Detail = string.Format(_l("AuditEvidenceMissingHeaders"),
-                                svc.Port, string.Join(", ", missing)),
+                            Detail = _countLocalizer.FormatCount(
+                                missing.Count,
+                                "AuditEvidenceMissingHeadersOne",
+                                "AuditEvidenceMissingHeaders",
+                                svc.Port,
+                                string.Join(", ", missing)),
                             RawData = string.Join("\n",
                                 headers.Select(kv => $"{kv.Key}: {kv.Value}")),
                         });
@@ -641,12 +681,12 @@ public sealed class SecNumCloudAuditEngine
         else if (missingCount == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckNet03SummaryPass"), checkedCount);
+            check.Summary = _countLocalizer.FormatCount(checkedCount, "AuditCheckNet03SummaryPassOne", "AuditCheckNet03SummaryPass", checkedCount);
         }
         else
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckNet03SummaryFail"), missingCount, checkedCount);
+            check.Summary = _countLocalizer.FormatCount(missingCount, "AuditCheckNet03SummaryFailOne", "AuditCheckNet03SummaryFail", missingCount, checkedCount);
         }
     }
 
@@ -774,8 +814,12 @@ public sealed class SecNumCloudAuditEngine
                     check.Evidence.Add(new AuditEvidence
                     {
                         Host = host.IpAddress,
-                        Detail = string.Format(_l("AuditEvidenceDeprecatedProto"),
-                            svc.Port, string.Join(", ", weakProtocols)),
+                        Detail = _countLocalizer.FormatCount(
+                            weakProtocols.Count,
+                            "AuditEvidenceDeprecatedProtoOne",
+                            "AuditEvidenceDeprecatedProto",
+                            svc.Port,
+                            string.Join(", ", weakProtocols)),
                     });
                 }
             }
@@ -789,12 +833,12 @@ public sealed class SecNumCloudAuditEngine
         else if (weakFound == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckCry01SummaryPass"), checkedEndpoints);
+            check.Summary = _countLocalizer.FormatCount(checkedEndpoints, "AuditCheckCry01SummaryPassOne", "AuditCheckCry01SummaryPass", checkedEndpoints);
         }
         else
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckCry01SummaryFail"), weakFound, checkedEndpoints);
+            check.Summary = _countLocalizer.FormatCount(weakFound, "AuditCheckCry01SummaryFailOne", "AuditCheckCry01SummaryFail", weakFound, checkedEndpoints);
         }
     }
 
@@ -849,12 +893,12 @@ public sealed class SecNumCloudAuditEngine
         else if (weakFound == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckCry02SummaryPass"), checkedEndpoints);
+            check.Summary = _countLocalizer.FormatCount(checkedEndpoints, "AuditCheckCry02SummaryPassOne", "AuditCheckCry02SummaryPass", checkedEndpoints);
         }
         else
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckCry02SummaryFail"), weakFound, checkedEndpoints);
+            check.Summary = _countLocalizer.FormatCount(weakFound, "AuditCheckCry02SummaryFailOne", "AuditCheckCry02SummaryFail", weakFound, checkedEndpoints);
         }
     }
 
@@ -862,7 +906,7 @@ public sealed class SecNumCloudAuditEngine
     /// Validates certificate expiry, chain trust, and hostname match using data
     /// from the discovery snapshot.
     /// </summary>
-    private void CheckCertificateValidity(AuditCheck check, List<HostScanResult> hosts)
+    internal void CheckCertificateValidity(AuditCheck check, List<HostScanResult> hosts)
     {
         var expiredCount = 0;
         var expiringSoonCount = 0;
@@ -917,18 +961,23 @@ public sealed class SecNumCloudAuditEngine
         else if (expiredCount > 0)
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckCry03SummaryFail"),
-                expiredCount, expiringSoonCount, checkedCount);
+            check.Summary = _countLocalizer.FormatCount(
+                expiredCount,
+                "AuditCheckCry03SummaryFailOne",
+                "AuditCheckCry03SummaryFail",
+                expiredCount,
+                expiringSoonCount,
+                checkedCount);
         }
         else if (expiringSoonCount > 0)
         {
             check.Status = AuditStatus.Warning;
-            check.Summary = string.Format(_l("AuditCheckCry03SummaryWarn"), expiringSoonCount, checkedCount);
+            check.Summary = _countLocalizer.FormatCount(expiringSoonCount, "AuditCheckCry03SummaryWarnOne", "AuditCheckCry03SummaryWarn", expiringSoonCount, checkedCount);
         }
         else
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckCry03SummaryPass"), checkedCount);
+            check.Summary = _countLocalizer.FormatCount(checkedCount, "AuditCheckCry03SummaryPassOne", "AuditCheckCry03SummaryPass", checkedCount);
         }
     }
 
@@ -999,12 +1048,12 @@ public sealed class SecNumCloudAuditEngine
         else if (weakCount > 0)
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckCry04SummaryFail"), weakCount, checkedCount);
+            check.Summary = _countLocalizer.FormatCount(weakCount, "AuditCheckCry04SummaryFailOne", "AuditCheckCry04SummaryFail", weakCount, checkedCount);
         }
         else
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckCry04SummaryPass"), checkedCount);
+            check.Summary = _countLocalizer.FormatCount(checkedCount, "AuditCheckCry04SummaryPassOne", "AuditCheckCry04SummaryPass", checkedCount);
         }
     }
 
@@ -1153,12 +1202,12 @@ public sealed class SecNumCloudAuditEngine
         else if (vulnerableCount == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckAcc01SummaryPass"), checkedCount);
+            check.Summary = _countLocalizer.FormatCount(checkedCount, "AuditCheckAcc01SummaryPassOne", "AuditCheckAcc01SummaryPass", checkedCount);
         }
         else
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckAcc01SummaryFail"), vulnerableCount);
+            check.Summary = _countLocalizer.FormatCount(vulnerableCount, "AuditCheckAcc01SummaryFailOne", "AuditCheckAcc01SummaryFail", vulnerableCount);
         }
     }
 
@@ -1221,12 +1270,12 @@ public sealed class SecNumCloudAuditEngine
         else if (notRequiredCount == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckAcc02SummaryPass"), checkedCount);
+            check.Summary = _countLocalizer.FormatCount(checkedCount, "AuditCheckAcc02SummaryPassOne", "AuditCheckAcc02SummaryPass", checkedCount);
         }
         else
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckAcc02SummaryFail"), notRequiredCount, checkedCount);
+            check.Summary = _countLocalizer.FormatCount(notRequiredCount, "AuditCheckAcc02SummaryFailOne", "AuditCheckAcc02SummaryFail", notRequiredCount, checkedCount);
         }
     }
 
@@ -1271,7 +1320,10 @@ public sealed class SecNumCloudAuditEngine
                 check.Evidence.Add(new AuditEvidence
                 {
                     Host = host.IpAddress,
-                    Detail = string.Format(_l("AuditEvidenceSnmpDefault"),
+                    Detail = _countLocalizer.FormatCount(
+                        foundCommunities.Count,
+                        "AuditEvidenceSnmpDefaultOne",
+                        "AuditEvidenceSnmpDefault",
                         string.Join(", ", foundCommunities.Select(c => $"\"{c}\""))),
                     RawData = host.SnmpInfo is not null
                         ? $"SysDescr: {host.SnmpInfo.SysDescr}, SysName: {host.SnmpInfo.SysName}"
@@ -1288,12 +1340,12 @@ public sealed class SecNumCloudAuditEngine
         else if (vulnerableCount == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckAcc03SummaryPass"), checkedCount);
+            check.Summary = _countLocalizer.FormatCount(checkedCount, "AuditCheckAcc03SummaryPassOne", "AuditCheckAcc03SummaryPass", checkedCount);
         }
         else
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckAcc03SummaryFail"), vulnerableCount, checkedCount);
+            check.Summary = _countLocalizer.FormatCount(vulnerableCount, "AuditCheckAcc03SummaryFailOne", "AuditCheckAcc03SummaryFail", vulnerableCount, checkedCount);
         }
     }
 
@@ -1430,7 +1482,11 @@ public sealed class SecNumCloudAuditEngine
                 check.Evidence.Add(new AuditEvidence
                 {
                     Host = domain,
-                    Detail = string.Format(_l("AuditEvidenceMissingEmailAuth"), string.Join(", ", missing)),
+                    Detail = _countLocalizer.FormatCount(
+                        missing.Count,
+                        "AuditEvidenceMissingEmailAuthOne",
+                        "AuditEvidenceMissingEmailAuth",
+                        string.Join(", ", missing)),
                 });
             }
         }
@@ -1438,12 +1494,12 @@ public sealed class SecNumCloudAuditEngine
         if (missingCount == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckOps01SummaryPass"), domains.Count);
+            check.Summary = _countLocalizer.FormatCount(domains.Count, "AuditCheckOps01SummaryPassOne", "AuditCheckOps01SummaryPass", domains.Count);
         }
         else
         {
             check.Status = AuditStatus.Warning;
-            check.Summary = string.Format(_l("AuditCheckOps01SummaryWarn"), missingCount, domains.Count);
+            check.Summary = _countLocalizer.FormatCount(missingCount, "AuditCheckOps01SummaryWarnOne", "AuditCheckOps01SummaryWarn", missingCount, domains.Count);
         }
     }
 
@@ -1483,12 +1539,12 @@ public sealed class SecNumCloudAuditEngine
         if (missingCount == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckOps02SummaryPass"), domains.Count);
+            check.Summary = _countLocalizer.FormatCount(domains.Count, "AuditCheckOps02SummaryPassOne", "AuditCheckOps02SummaryPass", domains.Count);
         }
         else
         {
             check.Status = AuditStatus.Warning;
-            check.Summary = string.Format(_l("AuditCheckOps02SummaryWarn"), missingCount, domains.Count);
+            check.Summary = _countLocalizer.FormatCount(missingCount, "AuditCheckOps02SummaryWarnOne", "AuditCheckOps02SummaryWarn", missingCount, domains.Count);
         }
     }
 
@@ -1539,12 +1595,12 @@ public sealed class SecNumCloudAuditEngine
         else if (cveCount == 0)
         {
             check.Status = AuditStatus.Pass;
-            check.Summary = string.Format(_l("AuditCheckOps03SummaryPass"), checkedServices);
+            check.Summary = _countLocalizer.FormatCount(checkedServices, "AuditCheckOps03SummaryPassOne", "AuditCheckOps03SummaryPass", checkedServices);
         }
         else
         {
             check.Status = AuditStatus.Fail;
-            check.Summary = string.Format(_l("AuditCheckOps03SummaryFail"), cveCount);
+            check.Summary = _countLocalizer.FormatCount(cveCount, "AuditCheckOps03SummaryFailOne", "AuditCheckOps03SummaryFail", cveCount);
         }
     }
 
@@ -1552,7 +1608,7 @@ public sealed class SecNumCloudAuditEngine
     /// Aggregates all discovered services, versions, and OS fingerprints into
     /// an informational inventory.
     /// </summary>
-    private void BuildServiceInventory(
+    internal void BuildServiceInventory(
         AuditCheck check, List<HostScanResult> hosts, NetworkScanSnapshot? snapshot)
     {
         var serviceMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -1584,7 +1640,12 @@ public sealed class SecNumCloudAuditEngine
             check.Evidence.Add(new AuditEvidence
             {
                 Host = "aggregate",
-                Detail = string.Format(_l("AuditEvidenceServiceCount"), service, count),
+                Detail = _countLocalizer.FormatCount(
+                    count,
+                    "AuditEvidenceServiceCountOne",
+                    "AuditEvidenceServiceCount",
+                    service,
+                    count),
             });
         }
 
@@ -1594,14 +1655,23 @@ public sealed class SecNumCloudAuditEngine
             check.Evidence.Add(new AuditEvidence
             {
                 Host = "aggregate",
-                Detail = string.Format(_l("AuditEvidenceOsCount"), os, count),
+                Detail = _countLocalizer.FormatCount(count, "AuditEvidenceOsCountOne", "AuditEvidenceOsCount", os, count),
             });
         }
 
         check.Status = AuditStatus.Pass;
+        string services = _countLocalizer.FormatCount(
+            serviceMap.Count,
+            "AuditCountUniqueServicesOne",
+            "AuditCountUniqueServices",
+            serviceMap.Count);
         check.Summary = osMap.Count > 0
-            ? string.Format(_l("AuditCheckOps04SummaryOs"), serviceMap.Count, hosts.Count, osMap.Count)
-            : string.Format(_l("AuditCheckOps04Summary"), serviceMap.Count, hosts.Count);
+            ? string.Format(
+                _l("AuditCheckOps04SummaryOs"),
+                services,
+                CountHosts(hosts.Count),
+                _countLocalizer.FormatCount(osMap.Count, "AuditCountOsVariantsOne", "AuditCountOsVariants", osMap.Count))
+            : string.Format(_l("AuditCheckOps04Summary"), services, CountHosts(hosts.Count));
     }
 
     // ═══════════════════════════════════════════════════════════════════

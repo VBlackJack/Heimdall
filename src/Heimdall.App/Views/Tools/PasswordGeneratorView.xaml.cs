@@ -581,6 +581,15 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
     private string L(string key) => _localizer?[key] ?? key;
 
+    /// <summary>The note under the preset list naming the presets saved in other modes.</summary>
+    internal static string DescribeSavedElsewhere(LocalizationManager? localizer, int count) =>
+        localizer?.FormatCount(
+            count,
+            "ToolPwdGenSavedPresetsElsewhereOne",
+            "ToolPwdGenSavedPresetsElsewhere",
+            count.ToString(CultureInfo.InvariantCulture))
+            ?? "ToolPwdGenSavedPresetsElsewhere";
+
     // ── Preset handlers ──────────────────────────────────────────────────────
 
     private void ApplyPresetAndUpdateView(Action applyAction)
@@ -1278,9 +1287,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         // all: the operator saved one, came back in a different mode, and found an empty row.
         int elsewhere = _vm.CustomPresetCount - _vm.GetCustomPresetsForCurrentMode().Count;
         SavedPresetsElsewhereText.Text = elsewhere > 0
-            ? string.Format(
-                L("ToolPwdGenSavedPresetsElsewhere"),
-                elsewhere.ToString(CultureInfo.InvariantCulture))
+            ? DescribeSavedElsewhere(_localizer, elsewhere)
             : string.Empty;
         SavedPresetsElsewhereText.Visibility = elsewhere > 0 ? Visibility.Visible : Visibility.Collapsed;
 

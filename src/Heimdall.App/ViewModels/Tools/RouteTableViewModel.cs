@@ -157,11 +157,13 @@ public sealed partial class RouteTableViewModel : ObservableObject, IDisposable
 
     private string BuildStatusText(int count, DateTime refreshedAt)
     {
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            L("ToolRouteTableStatus"),
+        return _localizer?.FormatCount(
             count,
-            refreshedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            "ToolRouteTableStatusOne",
+            "ToolRouteTableStatus",
+            count,
+            refreshedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture))
+            ?? "ToolRouteTableStatus";
     }
 
     private string BuildClipboardText()

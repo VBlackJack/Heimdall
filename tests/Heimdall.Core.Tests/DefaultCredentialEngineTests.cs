@@ -65,7 +65,7 @@ public class DefaultCredentialEngineTests
 
         var summary = DefaultCredentialEngine.BuildSummaryText(results, Localize);
 
-        Assert.Contains("2", summary);
+        Assert.Equal("2 defaults on 2 services", summary);
     }
 
     [Fact]
@@ -195,7 +195,11 @@ public class DefaultCredentialEngineTests
     {
         return key switch
         {
-            "ToolDefCredSummary" => "{0} defaults on {1} services",
+            "ToolDefCredSummary" => "{0} on {1}",
+            "ToolDefCredSummaryCredentials" => "{0} defaults",
+            "ToolDefCredSummaryCredentialsOne" => "{0} default",
+            "ToolDefCredSummaryServices" => "{0} services",
+            "ToolDefCredSummaryServicesOne" => "{0} service",
             "ToolDefCredNoDefaults" => "No defaults found",
             "ToolDefCredColService" => "Service",
             "ToolDefCredColPort" => "Port",

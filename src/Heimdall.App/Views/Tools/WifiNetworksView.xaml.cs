@@ -72,7 +72,7 @@ public partial class WifiNetworksView : UserControl, IToolView
 
     private void ApplyLocalization()
     {
-        TxtEmptyState.Text = L("ToolWifiStatus");
+        TxtEmptyState.Text = _vm.EmptyStateText;
         AutomationProperties.SetName(BtnScan, L("ToolWifiBtnScan"));
         AutomationProperties.SetName(BtnCopy, L("ToolBtnCopyToClipboard"));
         AutomationProperties.SetName(ResultsGrid, L("ToolWifiTitle"));

@@ -17,6 +17,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services.Import;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
 
@@ -62,19 +63,12 @@ public abstract partial class ImportSessionsPreviewDialogViewModel(LocalizationM
     {
         get
         {
-            var invalid = Items.Count(item => item.Status == ImportCandidateStatus.Invalid);
-            return invalid > 0
-                ? _localizer.Format(
-                    "LabelImportSessionsPreviewSummary",
-                    Items.Count,
-                    Items.Count(item => item.Status == ImportCandidateStatus.New),
-                    Items.Count(item => item.Status == ImportCandidateStatus.Duplicate),
-                    invalid)
-                : _localizer.Format(
-                    "LabelImportSessionsPreviewSummaryNoInvalid",
-                    Items.Count,
-                    Items.Count(item => item.Status == ImportCandidateStatus.New),
-                    Items.Count(item => item.Status == ImportCandidateStatus.Duplicate));
+            return ImportSummaryText.SessionPreview(
+                _localizer,
+                Items.Count,
+                Items.Count(item => item.Status == ImportCandidateStatus.New),
+                Items.Count(item => item.Status == ImportCandidateStatus.Duplicate),
+                Items.Count(item => item.Status == ImportCandidateStatus.Invalid));
         }
     }
 

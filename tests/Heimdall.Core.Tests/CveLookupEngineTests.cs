@@ -174,12 +174,13 @@ public sealed class CveLookupEngineTests
 
         var text = CveLookupEngine.BuildCopyText(result, key => key switch
         {
-            "ToolCveSummary" => "{0} CVE(s) found for {1}",
+            "ToolCveSummary" => "{0} CVEs found for {1}",
+            "ToolCveSummaryOne" => "{0} CVE found for {1}",
             "ToolCveColAffected" => "Affected Versions",
             _ => key,
         });
 
-        Assert.Contains("1 CVE(s) found for OpenSSH 8.9", text, StringComparison.Ordinal);
+        Assert.Contains("1 CVE found for OpenSSH 8.9", text, StringComparison.Ordinal);
         Assert.Contains(new string('=', 72), text, StringComparison.Ordinal);
         Assert.Contains("CVE-2024-6387  [High]  CVSS 8.1", text, StringComparison.Ordinal);
         Assert.Contains("  Sample summary", text, StringComparison.Ordinal);

@@ -133,16 +133,16 @@ public sealed partial class DefaultCredentialViewModel : ObservableObject, IDisp
             if (detectedServices.Count == 0)
             {
                 ScanResults = [];
-                SummaryText = DefaultCredentialEngine.BuildSummaryText(ScanResults, CreateLocalize());
+                SummaryText = DefaultCredentialEngine.BuildSummaryText(ScanResults, CreateLocalize(), _localizer);
                 return;
             }
 
             await ExecuteCredentialScanAsync(scanner, host, detectedServices, ct);
-            SummaryText = DefaultCredentialEngine.BuildSummaryText(ScanResults, CreateLocalize());
+            SummaryText = DefaultCredentialEngine.BuildSummaryText(ScanResults, CreateLocalize(), _localizer);
         }
         catch (OperationCanceledException)
         {
-            SummaryText = DefaultCredentialEngine.BuildSummaryText(ScanResults, CreateLocalize());
+            SummaryText = DefaultCredentialEngine.BuildSummaryText(ScanResults, CreateLocalize(), _localizer);
         }
         catch (Exception ex)
         {
@@ -260,7 +260,7 @@ public sealed partial class DefaultCredentialViewModel : ObservableObject, IDisp
             if (update.ResultsSnapshot is not null)
             {
                 ScanResults = update.ResultsSnapshot;
-                SummaryText = DefaultCredentialEngine.BuildSummaryText(ScanResults, CreateLocalize());
+                SummaryText = DefaultCredentialEngine.BuildSummaryText(ScanResults, CreateLocalize(), _localizer);
             }
         });
 

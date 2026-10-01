@@ -130,7 +130,9 @@ public sealed class SessionRestoreCoordinator : ISessionRestoreCoordinator
         {
             _dialogService.ShowWarning(
                 _localizer["DialogSnapshotRestoreTitle"],
-                _localizer.Format(
+                _localizer.FormatCount(
+                    restoredCount,
+                    "WarningSnapshotRestorePartialOne",
                     "WarningSnapshotRestorePartial",
                     restoredCount,
                     selectedSessions.Count));

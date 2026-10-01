@@ -684,8 +684,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         var servers = await _configManager.LoadServersAsync();
         LoadServers(servers, settings);
 
-        var summary = _localizer.Format(
-            "ToastImportOpenSshResult",
+        var summary = ImportSummaryText.OpenSsh(
+            _localizer,
             outcome.ImportedCount,
             outcome.SkippedDuplicates,
             outcome.WarningCount);
@@ -722,8 +722,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         var servers = await _configManager.LoadServersAsync();
         LoadServers(servers, settings);
 
-        var summary = _localizer.Format(
-            "ToastImportPuttyResult",
+        var summary = ImportSummaryText.Putty(
+            _localizer,
             outcome.ImportedCount,
             outcome.SkippedDuplicates,
             outcome.SkippedInvalid,
@@ -807,8 +807,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         var warningCount = preview.Diagnostics.Count(diagnostic => diagnostic.Level == KnownHostsDiagnosticLevel.Warning);
-        var summary = _localizer.Format(
-            "ToastImportKnownHostsResult",
+        var summary = ImportSummaryText.KnownHosts(
+            _localizer,
             outcome.Imported,
             outcome.SkippedExisting,
             outcome.SkippedConflict,

@@ -59,6 +59,25 @@ All notable changes to Heimdall are documented in this file.
   "is it one?", so French read "0 sessions" where zero takes the singular. They now follow each
   language's rule, as the status bar does.
 
+### Every count says its number in the right form
+
+- **No more "(s)" anywhere in the interface.** The last 81 texts that wrote a count as "1
+  certificate(s)", "2 correspondance(s)" or "1 servidor(es)" now take the singular or the plural
+  their number calls for, in each language: French also uses the singular for 0. This covers the
+  SecNumCloud audit summaries and evidence, the tool tabs (WiFi, routes, interfaces, open ports,
+  DNS batch, TCP ping, regex, notes, certificates, CVE lookup, default credentials, the command
+  library import), the import summaries and dialogs (profiles, RDP files, OpenSSH, PuTTY,
+  known_hosts, migration), the SFTP partial results and the session restore warning.
+- **A sentence with several counts words each one on its own.** "1 imported, 0 replaced, 2
+  skipped" agrees each participle with its own number in French and Spanish, where one shared
+  "(s)" used to cover them all. Partial results such as "1 item out of 3 could not be deleted" are
+  counted by the items they report.
+- **The WiFi tab no longer shows a template before the first scan.** Its empty panel read
+  "{0} network(s) at {1}"; it now invites you to scan.
+- **A bulk password edit that skipped every profile says only that.** When no selected WinRM
+  profile had a username, the status read "Password updated on 0 server(s)" before naming what
+  was skipped.
+
 ### Changelog
 
 - **Four old "Unreleased" blocks now name their release.** Entries from late March and April 2026

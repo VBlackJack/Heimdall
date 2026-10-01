@@ -261,7 +261,14 @@ public static class CloseGuardLocaleKeys
 
     public const string BatchBlockedTitle = "CloseGuardBatchBlockedTitle";
 
+    /// <summary>
+    /// "{0} sessions out of {1} could not be closed": a count, worded with
+    /// <see cref="BatchBlockedMessageOne"/> through LocalizationManager.FormatCount.
+    /// </summary>
     public const string BatchBlockedMessage = "CloseGuardBatchBlockedMessage";
+
+    /// <summary>The singular of <see cref="BatchBlockedMessage"/>; it names its number.</summary>
+    public const string BatchBlockedMessageOne = "CloseGuardBatchBlockedMessageOne";
 }
 
 /// <summary>

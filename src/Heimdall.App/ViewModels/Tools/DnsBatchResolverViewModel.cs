@@ -260,10 +260,13 @@ public sealed partial class DnsBatchResolverViewModel : ObservableObject, IDispo
 
     private string BuildStatusText(int resolvedCount, DateTime completedAt)
     {
-        return string.Format(
-            L("ToolDnsBatchStatus"),
+        return _localizer?.FormatCount(
             resolvedCount,
-            completedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            "ToolDnsBatchStatusOne",
+            "ToolDnsBatchStatus",
+            resolvedCount,
+            completedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture))
+            ?? "ToolDnsBatchStatus";
     }
 
     private string FormatError(string? key, string rawError)

@@ -36,10 +36,10 @@ namespace Heimdall.App.Tests;
 
 internal static class CommandLibraryTestHelpers
 {
-    public static async Task<LocalizationManager> CreateAppLocalizerAsync()
+    public static async Task<LocalizationManager> CreateAppLocalizerAsync(string locale = "en")
     {
         var manager = new LocalizationManager();
-        await manager.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        await manager.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
         return manager;
     }
 
@@ -272,6 +272,9 @@ internal sealed class SilentDialogService : AppDialogService
     /// <summary>Every confirmation body, in the order it was shown.</summary>
     public List<string> ConfirmMessages { get; } = [];
 
+    /// <summary>Every information body, in the order it was shown.</summary>
+    public List<string> InfoMessages { get; } = [];
+
     public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
     {
         Shown.Add($"confirm:{title}");
@@ -349,7 +352,11 @@ internal sealed class SilentDialogService : AppDialogService
 
     public void ShowError(string title, string message) => Shown.Add($"error:{title}");
 
-    public void ShowInfo(string title, string message) => Shown.Add($"info:{title}");
+    public void ShowInfo(string title, string message)
+    {
+        Shown.Add($"info:{title}");
+        InfoMessages.Add(message);
+    }
 
     public void ShowWarning(string title, string message) => Shown.Add($"warning:{title}");
 }

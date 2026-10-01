@@ -1780,7 +1780,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         Assert.Equal(1, fixture.DialogService.BulkEditPasswordCallCount);
         Assert.Equal(1, fixture.DialogService.LastBulkEditPasswordCount);
         Assert.Equal(
-            "Password updated on 1 server(s). Skipped 1 WinRM profile(s) because no username is configured.",
+            "Password updated on 1 server. Skipped 1 WinRM profile because no username is configured.",
             fixture.LastStatusMessage);
         Dictionary<string, ServerProfileDto> stored = (await fixture.ConfigManager.LoadServersAsync())
             .ToDictionary(server => server.Id, StringComparer.Ordinal);
@@ -1807,7 +1807,7 @@ public sealed class ServerListBulkActionTests : IDisposable
 
         Assert.Equal(0, fixture.DialogService.BulkEditPasswordCallCount);
         Assert.Equal(
-            "Password updated on 0 server(s). Skipped 2 WinRM profile(s) because no username is configured.",
+            "Skipped 2 WinRM profiles because no username is configured.",
             fixture.LastStatusMessage);
         ServerProfileDto[] stored = (await fixture.ConfigManager.LoadServersAsync())
             .OrderBy(server => server.Id, StringComparer.Ordinal)

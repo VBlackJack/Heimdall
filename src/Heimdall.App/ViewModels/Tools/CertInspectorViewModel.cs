@@ -342,7 +342,18 @@ public sealed partial class CertInspectorViewModel : ObservableObject, IDisposab
         else
         {
             ScanResults = sorted;
-            ScanSummaryText = string.Format(Lk("ToolCertScanFound"), sorted.Count, ports.Count);
+            ScanSummaryText = string.Format(
+                Lk("ToolCertScanFound"),
+                _localizer?.FormatCount(
+                    sorted.Count,
+                    "ToolCertScanFoundCertificatesOne",
+                    "ToolCertScanFoundCertificates",
+                    sorted.Count) ?? "ToolCertScanFoundCertificates",
+                _localizer?.FormatCount(
+                    ports.Count,
+                    "ToolCertScanFoundPortsOne",
+                    "ToolCertScanFoundPorts",
+                    ports.Count) ?? "ToolCertScanFoundPorts");
             ShowScanFooter = true;
         }
     }

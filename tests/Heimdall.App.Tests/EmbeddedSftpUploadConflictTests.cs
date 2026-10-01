@@ -163,7 +163,7 @@ public sealed class EmbeddedSftpUploadConflictTests
 
         Assert.Equal(2, browser.UploadCalls.Count);
         Assert.True(viewModel.IsErrorStatus);
-        Assert.StartsWith("1 of 2 files uploaded before the failure.", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.StartsWith("1 file out of 2 uploaded before the failure.", viewModel.StatusText, StringComparison.Ordinal);
     }
 
     /// <remarks>
@@ -364,7 +364,7 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Empty(browser.UploadCalls);
         Assert.Equal(0, presenter.CallCount);
         Assert.Equal(
-            "Skipped 1 upload(s): the destination already exists and is not a regular file. See the log for details.",
+            "Skipped 1 upload: the destination already exists and is not a regular file. See the log for details.",
             viewModel.StatusText);
     }
 
@@ -656,7 +656,7 @@ public sealed class EmbeddedSftpUploadConflictTests
             Assert.Empty(browser.UploadCalls);
             Assert.Empty(browser.CreateDirectoryCalls);
             Assert.Equal(
-                "Skipped 1 local link(s), selected as upload sources or found inside the selected tree. See the log for details.",
+                "Skipped 1 local link, selected as an upload source or found inside the selected tree. See the log for details.",
                 viewModel.StatusText);
         }
         finally
@@ -701,7 +701,7 @@ public sealed class EmbeddedSftpUploadConflictTests
                 call => call.RemotePath.StartsWith("/dst/source/directory-link", StringComparison.Ordinal));
             Assert.DoesNotContain("/dst/source/directory-link", browser.CreateDirectoryCalls);
             Assert.Equal(
-                "Skipped 1 local link(s), selected as upload sources or found inside the selected tree. See the log for details.",
+                "Skipped 1 local link, selected as an upload source or found inside the selected tree. See the log for details.",
                 viewModel.StatusText);
         }
         finally

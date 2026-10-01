@@ -133,7 +133,7 @@ public sealed partial class CveLookupViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanCopy))]
     private void Copy()
     {
-        var text = CveLookupEngine.BuildCopyText(_lastResult, L);
+        var text = CveLookupEngine.BuildCopyText(_lastResult, L, _localizer);
 
         try
         {
@@ -196,7 +196,12 @@ public sealed partial class CveLookupViewModel : ObservableObject, IDisposable
         }
 
         SummaryText = _lastResult.Matches.Count > 0
-            ? string.Format(L("ToolCveSummary"), _lastResult.Matches.Count, _lastResult.ResolvedQuery)
+            ? _localizer?.FormatCount(
+                _lastResult.Matches.Count,
+                "ToolCveSummaryOne",
+                "ToolCveSummary",
+                _lastResult.Matches.Count,
+                _lastResult.ResolvedQuery) ?? "ToolCveSummary"
             : string.Empty;
         CopyCommand.NotifyCanExecuteChanged();
     }

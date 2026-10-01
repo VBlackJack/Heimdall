@@ -26,6 +26,33 @@ namespace Heimdall.App.Tests;
 
 public sealed class TcpPingViewModelTests
 {
+    /// <summary>The status words the ping count by its number.</summary>
+    [Theory]
+    [InlineData("en", 1, "1 ping completed at ")]
+    [InlineData("en", 2, "2 pings completed at ")]
+    [InlineData("fr", 1, "1 ping termin\u00e9 \u00e0 ")]
+    [InlineData("fr", 2, "2 pings termin\u00e9s \u00e0 ")]
+    [InlineData("es", 1, "1 ping completado a las ")]
+    [InlineData("es", 2, "2 pings completados a las ")]
+    public async Task StartCommand_WordsThePingCountByItsNumber(string locale, int count, string expectedStart)
+    {
+        var localizer = await CreateLocalizerAsync(locale);
+        var service = new FakeTcpPingService
+        {
+            Default = request => TcpPingProbeResult.Ok(request.Seq, request.Host, request.Port, 12.5),
+        };
+        var vm = new TcpPingViewModel(service);
+        vm.UpdateLocalizer(localizer);
+        vm.Host = "example.com";
+        vm.Port = "443";
+        vm.Count = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        vm.StartCommand.Execute(null);
+        await WaitUntilAsync(() => !vm.IsBusy && vm.HasResults);
+
+        Assert.StartsWith(expectedStart, vm.StatusText, StringComparison.Ordinal);
+    }
+
     private const int DefaultWaitTimeoutMs = 10_000;
 
     [Fact]

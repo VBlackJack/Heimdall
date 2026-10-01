@@ -21,6 +21,21 @@ namespace Heimdall.App.Tests;
 
 public sealed class FileConflictDialogViewModelTests
 {
+    /// <summary>Without a localizer the summary is an English fallback, worded by its number too.</summary>
+    [Theory]
+    [InlineData(1, "1 conflicting destination")]
+    [InlineData(2, "2 conflicting destinations")]
+    public void SummaryText_WithoutALocalizer_WordsTheCountByItsNumber(int conflicts, string expected)
+    {
+        FileConflictAnalysisItem[] items = Enumerable.Range(0, conflicts)
+            .Select(i => new FileConflictAnalysisItem(i, $"src{i}", $"/dst/f{i}", HasConflict: true))
+            .ToArray();
+
+        FileConflictDialogViewModel viewModel = new(items, localizer: null);
+
+        Assert.Equal(expected, viewModel.SummaryText);
+    }
+
     [Fact]
     public void ApplyAllCommands_UpdateEveryRow_AndApplyReturnsEveryDecision()
     {

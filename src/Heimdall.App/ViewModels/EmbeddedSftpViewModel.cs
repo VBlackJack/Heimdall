@@ -1043,8 +1043,44 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         return SetErrorStatus(
-            _localizer?.Format("SftpErrorUploadFailedAfter", uploaded, total, reason)
-                ?? $"{uploaded} of {total} files uploaded before the failure. {reason}");
+            _localizer?.FormatCount(uploaded, "SftpErrorUploadFailedAfterOne", "SftpErrorUploadFailedAfter", uploaded, total, reason)
+                ?? PluralRules.SelectEnglish(
+                    uploaded,
+                    $"{uploaded} file out of {total} uploaded before the failure. {reason}",
+                    $"{uploaded} files out of {total} uploaded before the failure. {reason}"));
+    }
+
+    /// <summary>
+    /// The status after a download that skipped folders: the files and the folders are each worded
+    /// by their own number, in English when the view has no localizer.
+    /// </summary>
+    private string DescribeDownloadWithSkippedFolders(int downloadedFiles, int skippedDirectories)
+    {
+        if (_localizer is null)
+        {
+            string files = PluralRules.SelectEnglish(
+                downloadedFiles,
+                $"Downloaded {downloadedFiles} file",
+                $"Downloaded {downloadedFiles} files");
+            string folders = PluralRules.SelectEnglish(
+                skippedDirectories,
+                $"skipped {skippedDirectories} folder",
+                $"skipped {skippedDirectories} folders");
+            return $"{files}; {folders} (folders aren't supported).";
+        }
+
+        return _localizer.Format(
+            "SftpStatusDownloadCompleteWithSkipped",
+            _localizer.FormatCount(
+                downloadedFiles,
+                "SftpStatusDownloadCountFilesOne",
+                "SftpStatusDownloadCountFiles",
+                downloadedFiles),
+            _localizer.FormatCount(
+                skippedDirectories,
+                "SftpStatusDownloadCountSkippedFoldersOne",
+                "SftpStatusDownloadCountSkippedFolders",
+                skippedDirectories));
     }
 
     /// <summary>
@@ -1161,7 +1197,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     "WarnUploadTargetsSkippedUnsupportedOne",
                     "WarnUploadTargetsSkippedUnsupported",
                     outcome.SkippedUnsupportedTargets.Count)
-                    ?? $"Skipped {outcome.SkippedUnsupportedTargets.Count} upload(s): the destination already exists and is not a regular file. See the log for details.";
+                    ?? PluralRules.SelectEnglish(
+                        outcome.SkippedUnsupportedTargets.Count,
+                        $"Skipped {outcome.SkippedUnsupportedTargets.Count} upload: the destination already exists and is not a regular file. See the log for details.",
+                        $"Skipped {outcome.SkippedUnsupportedTargets.Count} uploads: the destination already exists and is not a regular file. See the log for details.");
                 pendingOperationWarnings.Add(warning);
             }
 
@@ -1172,7 +1211,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     "WarnUploadSourcesSkippedReparsePointsOne",
                     "WarnUploadSourcesSkippedReparsePoints",
                     outcome.SkippedLocalReparsePoints.Count)
-                    ?? $"Skipped {outcome.SkippedLocalReparsePoints.Count} local link(s), selected as upload sources or found inside the selected tree. See the log for details.";
+                    ?? PluralRules.SelectEnglish(
+                        outcome.SkippedLocalReparsePoints.Count,
+                        $"Skipped {outcome.SkippedLocalReparsePoints.Count} local link, selected as an upload source or found inside the selected tree. See the log for details.",
+                        $"Skipped {outcome.SkippedLocalReparsePoints.Count} local links, selected as upload sources or found inside the selected tree. See the log for details.");
                 pendingOperationWarnings.Add(warning);
             }
         }
@@ -1950,11 +1992,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             switch (ClassifyDownloadOutcome(downloadedFiles, skippedDirectories))
             {
                 case SftpDownloadOutcome.CompletedWithSkippedDirectories:
-                    UpdateStatus(_localizer?.Format(
-                        "SftpStatusDownloadCompleteWithSkipped",
-                        downloadedFiles,
-                        skippedDirectories)
-                        ?? $"Downloaded {downloadedFiles} file(s); skipped {skippedDirectories} folder(s) (folders aren't supported).");
+                    UpdateStatus(DescribeDownloadWithSkippedFolders(downloadedFiles, skippedDirectories));
                     break;
                 case SftpDownloadOutcome.OnlyDirectoriesSkipped:
                     UpdateStatus(_localizer?["SftpStatusDownloadNoFilesFoldersSkipped"]
@@ -3059,7 +3097,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             };
         }
 
-        return _localizer?.Format("SftpDeletePartialSummary", failures.Count, totalCount)
+        return _localizer?.FormatCount(
+                failures.Count,
+                "SftpDeletePartialSummaryOne",
+                "SftpDeletePartialSummary",
+                failures.Count,
+                totalCount)
             ?? "SftpDeletePartialSummary";
     }
 
@@ -3136,7 +3179,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 return;
             }
 
-            string summary = _localizer?.Format("SftpChmodPartialSummary", failedNames.Count, entries.Count)
+            string summary = _localizer?.FormatCount(
+                    failedNames.Count,
+                    "SftpChmodPartialSummaryOne",
+                    "SftpChmodPartialSummary",
+                    failedNames.Count,
+                    entries.Count)
                 ?? "SftpChmodPartialSummary";
             await Refresh().ConfigureAwait(false);
             await RunOnUiAsync(() => ShowOperationWarning(summary)).ConfigureAwait(false);

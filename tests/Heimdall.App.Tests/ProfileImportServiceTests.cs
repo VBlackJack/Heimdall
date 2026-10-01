@@ -260,7 +260,7 @@ public sealed class ProfileImportServiceTests
         SshGatewayDto gateway = Assert.Single(settings.SshGateways);
         Assert.Equal("gateway-v2", gateway.Id);
         Assert.Equal("bastion.example.com", gateway.Host);
-        Assert.Contains("SSH gateways: 1 created, 0 merged, 0 orphan reference(s).", Assert.Single(fixture.Dialog.InfoCalls).Message, StringComparison.Ordinal);
+        Assert.Contains("SSH gateways: 1 created, 0 merged, 0 orphan references.", Assert.Single(fixture.Dialog.InfoCalls).Message, StringComparison.Ordinal);
         Assert.Contains("Gateway passwords and key passphrases are not included", result.UserMessage, StringComparison.Ordinal);
     }
 
@@ -320,7 +320,7 @@ public sealed class ProfileImportServiceTests
         SshGatewayDto gateway = Assert.Single(reloadedSettings.SshGateways);
         Assert.Equal("existing-gateway", gateway.Id);
         Assert.Equal(@"C:\existing\id_ed25519", gateway.KeyPath);
-        Assert.Contains("SSH gateways: 0 created, 1 merged, 0 orphan reference(s).", result.UserMessage, StringComparison.Ordinal);
+        Assert.Contains("SSH gateways: 0 created, 1 merged, 0 orphan references.", result.UserMessage, StringComparison.Ordinal);
     }
 
     // BL-0095. The import took a settings snapshot, worked for a while - a whole server

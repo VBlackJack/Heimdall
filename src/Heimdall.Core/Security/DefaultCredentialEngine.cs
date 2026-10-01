@@ -15,6 +15,7 @@
  */
 
 using System.Text;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.Core.Security;
 
@@ -83,9 +84,16 @@ public static class DefaultCredentialEngine
     /// <summary>
     /// Builds a summary line for the current results.
     /// </summary>
+    /// <param name="results">The scan results.</param>
+    /// <param name="localize">Maps a key to its text; keys are returned as-is when omitted.</param>
+    /// <param name="countLocalizer">
+    /// Words the counts in the language of <paramref name="localize"/>; when omitted, through
+    /// <paramref name="localize"/> under the English rule.
+    /// </param>
     public static string BuildSummaryText(
         IReadOnlyList<CredTestResultDto> results,
-        Func<string, string>? localize = null)
+        Func<string, string>? localize = null,
+        ICountLocalizer? countLocalizer = null)
     {
         ArgumentNullException.ThrowIfNull(results);
 
@@ -96,9 +104,20 @@ public static class DefaultCredentialEngine
             .Distinct(StringComparer.Ordinal)
             .Count();
 
-        return defaultCount > 0
-            ? string.Format(L(localize, "ToolDefCredSummary"), defaultCount, serviceCount)
-            : L(localize, "ToolDefCredNoDefaults");
+        if (defaultCount == 0)
+        {
+            return L(localize, "ToolDefCredNoDefaults");
+        }
+
+        ICountLocalizer counts = countLocalizer ?? DelegateCountLocalizer.English(key => L(localize, key));
+        return string.Format(
+            L(localize, "ToolDefCredSummary"),
+            counts.FormatCount(
+                defaultCount,
+                "ToolDefCredSummaryCredentialsOne",
+                "ToolDefCredSummaryCredentials",
+                defaultCount),
+            counts.FormatCount(serviceCount, "ToolDefCredSummaryServicesOne", "ToolDefCredSummaryServices", serviceCount));
     }
 
     /// <summary>

@@ -183,10 +183,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
                 await Dispatcher.InvokeAsync(() =>
                 {
                     TxtScope.Text = subnets[0];
-                    TxtDetected.Text = string.Format(
-                        L("ToolSubnetDetected"),
-                        subnets.Count,
-                        gateway.Name);
+                    TxtDetected.Text = DescribeDetectedSubnets(_localizer, subnets.Count, gateway.Name);
                     if (subnets.Count > 1)
                     {
                         TxtScope.ToolTip = string.Join("\n", subnets);
@@ -227,7 +224,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         {
             var lines = text.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
             var count = lines.Count(l => !string.IsNullOrWhiteSpace(l));
-            TxtDetected.Text = string.Format(L("ToolAuditDetectedHosts"), count);
+            TxtDetected.Text = DescribeDetectedHosts(_localizer, count);
         }
     }
 
@@ -316,7 +313,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         _setBusy?.Invoke(true);
         SetUiAuditing(true);
 
-        _engine = new SecNumCloudAuditEngine(key => L(key));
+        _engine = new SecNumCloudAuditEngine(key => L(key), _localizer);
 
         _engine.PhaseProgress += (phaseName, completed, total) =>
         {
@@ -650,7 +647,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
             var evidenceHeader = new TextBlock
             {
-                Text = string.Format(L("ToolAuditEvidenceCount"), check.Evidence.Count),
+                Text = DescribeEvidenceCount(_localizer, check.Evidence.Count),
                 FontSize = (double)FindResource("FontSizeCaption"),
                 Foreground = (Brush)FindResource("TextSecondaryBrush"),
             };
@@ -865,6 +862,21 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
     }
 
     private string L(string key) => _localizer?[key] ?? key;
+
+    /// <summary>The line under the scope box once subnets were detected through a gateway.</summary>
+    internal static string DescribeDetectedSubnets(LocalizationManager? localizer, int count, string gatewayName) =>
+        localizer?.FormatCount(count, "ToolSubnetDetectedOne", "ToolSubnetDetected", count, gatewayName)
+            ?? "ToolSubnetDetected";
+
+    /// <summary>The line under the scope box when it holds a list of hosts.</summary>
+    internal static string DescribeDetectedHosts(LocalizationManager? localizer, int count) =>
+        localizer?.FormatCount(count, "ToolAuditDetectedHostsOne", "ToolAuditDetectedHosts", count)
+            ?? "ToolAuditDetectedHosts";
+
+    /// <summary>The header of a check's evidence expander.</summary>
+    internal static string DescribeEvidenceCount(LocalizationManager? localizer, int count) =>
+        localizer?.FormatCount(count, "ToolAuditEvidenceCountOne", "ToolAuditEvidenceCount", count)
+            ?? "ToolAuditEvidenceCount";
 
     public bool CanClose() => !_isAuditing;
 

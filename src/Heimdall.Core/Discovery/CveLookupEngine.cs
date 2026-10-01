@@ -17,6 +17,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.Core.Discovery;
 
@@ -400,10 +401,25 @@ public static class CveLookupEngine
     /// <summary>
     /// Builds the clipboard text report using the current search result.
     /// </summary>
-    public static string BuildCopyText(CveSearchResult result, Func<string, string> localize)
+    /// <param name="result">The search result to report.</param>
+    /// <param name="localize">Maps a key to its text.</param>
+    /// <param name="countLocalizer">
+    /// Words the match count in the language of <paramref name="localize"/>; when omitted, through
+    /// <paramref name="localize"/> under the English rule.
+    /// </param>
+    public static string BuildCopyText(
+        CveSearchResult result,
+        Func<string, string> localize,
+        ICountLocalizer? countLocalizer = null)
     {
         var sb = new StringBuilder();
-        sb.AppendLine(string.Format(localize("ToolCveSummary"), result.Matches.Count, result.ResolvedQuery));
+        ICountLocalizer counts = countLocalizer ?? DelegateCountLocalizer.English(localize);
+        sb.AppendLine(counts.FormatCount(
+            result.Matches.Count,
+            "ToolCveSummaryOne",
+            "ToolCveSummary",
+            result.Matches.Count,
+            result.ResolvedQuery));
         sb.AppendLine(new string('=', 72));
         sb.AppendLine();
 

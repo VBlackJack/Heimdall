@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Services.Import;
 using Heimdall.Core.Localization;
 
 namespace Heimdall.App.Services;
@@ -59,8 +60,8 @@ internal static class MigrationPresentationPolicy
 
         List<string> lines =
         [
-            localizer.Format(
-                "MigrationPartialSummary",
+            ImportSummaryText.MigrationPartial(
+                localizer,
                 result.ServersExamined,
                 result.ServersImported,
                 result.ServersSkipped)

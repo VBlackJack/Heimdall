@@ -24,6 +24,32 @@ namespace Heimdall.App.Tests;
 
 public class CertInspectorViewModelTests
 {
+    /// <summary>The scan footer words both counts by their number, each with its own noun.</summary>
+    [Theory]
+    [InlineData("en", "443", "1 certificate found on 1 port scanned")]
+    [InlineData("en", "443,8443", "2 certificates found on 2 ports scanned")]
+    [InlineData("fr", "443", "1 certificat trouvé sur 1 port scanné")]
+    [InlineData("fr", "443,8443", "2 certificats trouvés sur 2 ports scannés")]
+    [InlineData("es", "443", "1 certificado encontrado en 1 puerto escaneado")]
+    [InlineData("es", "443,8443", "2 certificados encontrados en 2 puertos escaneados")]
+    public async Task CheckAsync_ScanMode_WordsTheFooterByItsCounts(string locale, string ports, string expected)
+    {
+        using var cert = CreateTestCert();
+        var localizer = new Heimdall.Core.Localization.LocalizationManager();
+        await localizer.LoadAsync(System.IO.Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+        var vm = new CertInspectorViewModel();
+        vm.Initialize(localizer);
+        vm.SetProber(new FakeProber((_, _, _) => Task.FromResult<CertProbeResult?>(CreateProbeResult(cert))));
+        vm.Host = "test.example.com";
+        vm.Port = string.Empty;
+        vm.SelectedProfile = "custom";
+        vm.CustomPorts = ports;
+
+        await vm.CheckCommand.ExecuteAsync(null);
+
+        Assert.Equal(expected, vm.ScanSummaryText);
+    }
+
     [Fact]
     public async Task CheckAsync_EmptyHost_ShowsError()
     {
