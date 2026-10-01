@@ -85,7 +85,7 @@
                 Content="{loc:Translate SecurityPostureGoTo}"
                 Command="{Binding GoToCommand}"
                 Style="{DynamicResource GhostButtonStyle}"
-                MinHeight="0"
+                MinHeight="{DynamicResource TargetMinSize}"
                 Padding="6,1"
                 Margin="8,0,0,0"
                 VerticalAlignment="Center"

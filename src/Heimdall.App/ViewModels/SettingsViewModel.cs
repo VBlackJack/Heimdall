@@ -704,6 +704,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _syncingResolutionPresetsText;
 
     /// <summary>Prefix of the error <see cref="ValidateResolutionPresetsText"/> raises; the bad lines follow it.</summary>
+    /// <summary>The file name the settings export dialog proposes.</summary>
+    private const string SettingsExportDefaultFileName = "heimdall-settings.json";
+
+    /// <summary>The file name the server list export dialog proposes.</summary>
+    private const string ServersExportDefaultFileName = "servers.json";
+
+    /// <summary>The argument template a new external tool starts with: the host it is run against.</summary>
+    private const string NewExternalToolArguments = "{Host}";
+
     private const string ResolutionPresetsErrorPrefix = "RdpResolutionPresetsInvalid:";
 
     /// <summary>Separator between the bad lines quoted in the preset error.</summary>
@@ -2531,7 +2540,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string? PickSettingsFile(bool save)
     {
         Microsoft.Win32.FileDialog dialog = save
-            ? new Microsoft.Win32.SaveFileDialog { FileName = "heimdall-settings.json", DefaultExt = ".json" }
+            ? new Microsoft.Win32.SaveFileDialog { FileName = SettingsExportDefaultFileName, DefaultExt = ".json" }
             : new Microsoft.Win32.OpenFileDialog();
         dialog.Title = _localizer[save ? "SettingsExportTitle" : "SettingsImportTitle"];
         dialog.Filter = _localizer["SettingsFileDialogFilter"];
@@ -2605,7 +2614,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 Title = _localizer["ExportDialogTitle"],
                 Filter = _localizer["ExportDialogFilter"],
                 DefaultExt = ".json",
-                FileName = "servers.json"
+                FileName = ServersExportDefaultFileName
             };
 
             if (dialog.ShowDialog() != true)
@@ -3413,7 +3422,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         var newTool = new ExternalToolItemViewModel
         {
             Name = _localizer["ExternalToolDefaultName"],
-            Arguments = "{Host}"
+            Arguments = NewExternalToolArguments
         };
 
         ExternalTools.Add(newTool);
@@ -3423,14 +3432,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     }
 
     [RelayCommand]
-    private Task RemoveExternalToolAsync(CancellationToken cancellationToken)
+    private async Task RemoveExternalToolAsync(CancellationToken cancellationToken)
     {
-        if (SelectedExternalTool is null) return Task.CompletedTask;
+        ExternalToolItemViewModel? tool = SelectedExternalTool;
+        if (tool is null) return;
 
-        ExternalTools.Remove(SelectedExternalTool);
+        bool confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer["SettingsExtToolRemoveConfirmTitle"],
+            _localizer.Format("SettingsExtToolRemoveConfirmMessage", tool.Name),
+            "warning");
+        if (!confirmed) return;
+
+        ExternalTools.Remove(tool);
         SelectedExternalTool = null;
         MarkEditTheComparisonCannotSee();
-        return Task.CompletedTask;
     }
 
     [ObservableProperty]

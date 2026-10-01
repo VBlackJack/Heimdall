@@ -58,7 +58,7 @@
         <Button x:Name="Sdm_Reset"
                 Command="{Binding ResetCommand}"
                 Style="{DynamicResource GhostButtonStyle}"
-                MinHeight="0"
+                MinHeight="{DynamicResource TargetMinSize}"
                 Padding="6,1"
                 Margin="6,0,0,0"
                 VerticalAlignment="Center"
