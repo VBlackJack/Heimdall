@@ -21,7 +21,8 @@ All notable changes to Heimdall are documented in this file.
   cache) reloaded the whole panel from disk: a value typed a moment before came back to its saved
   value, a language or theme being previewed reverted, and the panel no longer counted as
   changed, without a word. An import now reloads the session list only. SSH gateways that a .json
-  import brings in still appear in the gateway list at once.
+  import brings in still appear in the gateway list at once. Sessions added by the network
+  scanner are listed the same way, without touching the Settings panel.
 
 ### The delete shortcut is named the same way everywhere
 

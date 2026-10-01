@@ -2150,21 +2150,29 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                     p.Total));
 
             var result = await _networkScannerService.ScanAndPromptAsync(vm.Localize, progress);
-
-            if (!string.IsNullOrWhiteSpace(result.StatusMessage))
-            {
-                vm.StatusText = result.StatusMessage;
-            }
-
-            if (result.AddedToInventory)
-            {
-                await vm.ReloadConfigurationAsync(await vm.ConfigManager.LoadSettingsAsync());
-            }
+            await ApplyNetworkScanResultAsync(vm, result);
         }
         finally
         {
             _networkScannerRunning = false;
         }
+    }
+
+    private static async Task ApplyNetworkScanResultAsync(MainViewModel vm, NetworkScanResult result)
+    {
+        if (!string.IsNullOrWhiteSpace(result.StatusMessage))
+        {
+            vm.StatusText = result.StatusMessage;
+        }
+
+        if (!result.AddedToInventory)
+        {
+            return;
+        }
+
+        // The scan adds sessions and nothing else; a full configuration reload would also
+        // reseed the Settings panel from disk and discard its unsaved edits.
+        await vm.ReloadServerInventoryAsync();
     }
 
     // ── Sidebar Tab Selector (Servers / Tools) ──────────────────────────
