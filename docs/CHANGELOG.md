@@ -22,7 +22,7 @@ All notable changes to Heimdall are documented in this file.
   combination neither PowerShell supports. The installer's signature and SHA-256 checks still ran,
   because the Security module is loaded from Windows PowerShell's own directory by path. It now
   gets the inherited module path without PowerShell 7's entries, every other entry kept, as the
-  WinRM tab already does.
+  WinRM tab already does. The Service Status Dashboard tool lists services with the same module path.
 
 ## 2026-10-01: settings show what you changed, and a security overview (v2026.100103)
 
