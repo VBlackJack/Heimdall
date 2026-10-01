@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.IO;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 
@@ -167,6 +168,32 @@ internal static class WindowsPowerShellModulePath
         }
 
         startInfo.Environment[VariableName] = modulePath;
+    }
+
+    /// <summary>
+    /// Returns the statement that gives a running Windows PowerShell the module path
+    /// <see cref="FromInherited"/> derives, for a launch that cannot carry an environment.
+    /// </summary>
+    /// <param name="inheritedModulePath">The PSModulePath the launching process inherited.</param>
+    /// <param name="roots">PowerShell 7's fixed module directories and Windows PowerShell's defaults.</param>
+    /// <param name="fileExists">Tells a PowerShell 7 home apart, as in <see cref="FromInherited"/>.</param>
+    /// <remarks>
+    /// An elevated launch goes through ShellExecute, which takes no environment. Set as the first
+    /// statement, the module path decides every module the script auto-loads afterwards: measured
+    /// on 2026-10-01, Get-Service and Start-Service then come from System32's
+    /// Microsoft.PowerShell.Management instead of PowerShell 7's. It cannot reach what the host
+    /// loads before the script runs. Nothing inherited writes Windows PowerShell's defaults, since
+    /// an elevated child may otherwise not start from the same environment.
+    /// </remarks>
+    internal static string ScriptAssignment(
+        string? inheritedModulePath,
+        PowerShellModuleRoots roots,
+        Func<string, bool> fileExists)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        string modulePath = FromInherited(inheritedModulePath, roots, fileExists)
+            ?? string.Join(EntrySeparator, roots.WindowsPowerShellDefaults);
+        return $"$env:{VariableName} = {PowerShellSingleQuotedString.Quote(modulePath)}";
     }
 
     private static bool IsPowerShell7Home(string entry, Func<string, bool> fileExists)

@@ -636,6 +636,95 @@ public sealed class UpdateRelaunchScriptExecutionTests
             $"the generated script does not parse with hostile paths.{Environment.NewLine}{run.StandardOutput}{Environment.NewLine}{run.StandardError}");
     }
 
+    /// <summary>
+    /// A user profile named with a typographic apostrophe keeps every path intact, in the
+    /// script and in the bootstrap, read the way production reads them.
+    /// </summary>
+    /// <remarks>
+    /// PowerShell ends a single-quoted string on U+2018 to U+201B as well as on the apostrophe.
+    /// Production hands both texts to the parser intact: the bootstrap travels as UTF-16 through
+    /// -EncodedCommand, and the bootstrap reads the script as UTF-8 before Invoke-Expression. So
+    /// this parses both from UTF-8 with ParseInput, never with ParseFile, which in Windows
+    /// PowerShell reads a file without a byte order mark as ANSI and turns U+2019 into three
+    /// harmless characters. The expected value comes from a file, never through the escaper
+    /// under test.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task GeneratedScript_WithTypographicApostropheInProfilePath_KeepsThePathIntact(
+        string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+
+        string profileDirectory = Path.Combine(sandbox.Root, "O" + (char)0x2019 + "Brien");
+        string targetExecutablePath = Path.Combine(profileDirectory, "Heimdall.exe");
+        UpdateRelaunchSpec spec = sandbox.CreateSpec() with
+        {
+            TargetExecutablePath = targetExecutablePath,
+            ScriptPath = Path.Combine(profileDirectory, "relaunch.ps1"),
+        };
+        UpdateScriptSandbox.AssertFenced(spec, sandbox.Root);
+
+        string arguments = UpdateRelaunchScript.BuildPowerShellArguments(
+            spec.ScriptPath,
+            new string('a', 64),
+            targetExecutablePath,
+            spec.FailureRecordPath);
+        const string encodedMarker = "-EncodedCommand ";
+        string bootstrap = Encoding.Unicode.GetString(Convert.FromBase64String(
+            arguments[(arguments.IndexOf(encodedMarker, StringComparison.Ordinal) + encodedMarker.Length)..]));
+
+        await File.WriteAllTextAsync(Path.Combine(sandbox.Root, "main.txt"), UpdateRelaunchScript.Build(spec));
+        await File.WriteAllTextAsync(Path.Combine(sandbox.Root, "bootstrap.txt"), bootstrap);
+        await File.WriteAllTextAsync(Path.Combine(sandbox.Root, "expected.txt"), targetExecutablePath);
+        string checkerPath = Path.Combine(sandbox.Root, "check-typographic.ps1");
+        await File.WriteAllTextAsync(checkerPath, TypographicPathCheckerScript);
+
+        ScriptRun run = await RunHostAsync(powerShellHost, checkerPath, markerPath: null);
+
+        Assert.True(
+            run.ExitCode == 0,
+            $"a typographic apostrophe in the profile path broke the relauncher.{Environment.NewLine}"
+            + $"{run.StandardOutput}{Environment.NewLine}{run.StandardError}");
+    }
+
+    /// <summary>
+    /// Parses main.txt and bootstrap.txt beside it as UTF-8 and requires each to parse and to
+    /// hold expected.txt as one whole single-quoted string.
+    /// </summary>
+    private const string TypographicPathCheckerScript = """
+        $failed = 0
+        $expected = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'expected.txt'), [System.Text.Encoding]::UTF8)
+        foreach ($name in 'main.txt', 'bootstrap.txt') {
+            $text = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot $name), [System.Text.Encoding]::UTF8)
+            $tokens = $null
+            $errors = $null
+            $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$tokens, [ref]$errors)
+            if ($errors -and $errors.Count -gt 0) {
+                $failed = 1
+                Write-Output "PARSE-ERROR $name"
+                foreach ($e in $errors) { Write-Output "  $($e.Message)" }
+                continue
+            }
+
+            $whole = $ast.FindAll({
+                param($node)
+                $node -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+                $node.StringConstantType -eq 'SingleQuoted' -and
+                [System.String]::Equals($node.Value, $expected, [System.StringComparison]::Ordinal)
+            }, $true)
+            if (@($whole).Count -eq 0) {
+                $failed = 1
+                Write-Output "PATH-ALTERED $name"
+            } else {
+                Write-Output "OK $name"
+            }
+        }
+
+        exit $failed
+        """;
+
     /// <remarks>
     /// The oracle for the whole detection change. Write-Error under ErrorActionPreference
     /// Stop is a TERMINATING error, so a record write placed after it is dead code that

@@ -51,6 +51,20 @@ public sealed class TerminalCommandFormatterTests
         Assert.Equal("cd 'C:\\Temp\\o''brien'\r", command);
     }
 
+    [Theory]
+    [InlineData(0x2018)]
+    [InlineData(0x2019)]
+    [InlineData(0x201A)]
+    [InlineData(0x201B)]
+    public void FormatCd_PowerShell_DoublesTypographicQuote(int codePoint)
+    {
+        string quote = ((char)codePoint).ToString();
+
+        string command = TerminalCommandFormatter.FormatCd("pwsh.exe", $@"C:\Users\O{quote}Brien");
+
+        Assert.Equal($"cd 'C:\\Users\\O{quote}{quote}Brien'\r", command);
+    }
+
     [Fact]
     public void FormatCd_PowerShell_NeutralizesDoubleQuoteInjection()
     {
