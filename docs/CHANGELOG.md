@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-10-01: settings show what you changed, and a security overview (v2026.100103)
 
 ### Settings: see what you changed, and put one setting back
 
