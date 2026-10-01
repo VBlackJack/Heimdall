@@ -12,6 +12,29 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### Settings: see what you changed, and put one setting back
+
+- **A changed setting says so.** A setting whose value differs from its factory default shows a
+  "Modified" badge after its field, which a screen reader reads with the default value, and a
+  Reset button that puts that one default back as a pending edit: nothing is written until Save,
+  and Undo changes takes it back. Language, theme and accent can be put back this way too, which
+  Reset defaults does not do. The credential provider unlock secret, the external tools list and
+  the settings saved immediately carry no badge.
+- **Find modified settings**, beside the search box, counts the settings that differ from their
+  default and walks through them with Enter.
+
+### Settings: a security overview
+
+- **The Security tab opens on a summary of the choices that affect security.** NLA and strict
+  server authentication, TFTP sharing, session transcripts, the PowerShell execution policy, the
+  master password, auto-lock, disconnect on lock, Credential Guard, Windows Hello, update checks
+  and the known_hosts import each get a line with their state. A documented insecure choice is
+  flagged with a warning icon, says why, and has a Go to setting link to it. The card follows
+  unsaved edits as you make them and marks them unsaved; the line counting what needs attention
+  is announced to screen readers when it changes.
+
 ## 2026-10-01: imports keep unsaved Settings, and WinRM from PowerShell 7 (v2026.100102)
 
 ### Settings: an import keeps the changes you have not saved yet
