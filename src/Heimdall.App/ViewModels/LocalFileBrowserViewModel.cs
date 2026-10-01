@@ -863,8 +863,8 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
 
     private void UpdateStatusText()
     {
-        var template = L10n("FileBrowserStatusItems");
-        StatusText = string.Format(template, Files.Count);
+        StatusText = _localizer?.FormatCount(Files.Count, "FileBrowserStatusItemsOne", "FileBrowserStatusItems", Files.Count)
+            ?? string.Format(L10n("FileBrowserStatusItems"), Files.Count);
     }
 
     private string BuildPropertiesText(LocalFileEntry entry)

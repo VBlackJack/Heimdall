@@ -928,7 +928,7 @@ public partial class MainWindow
         }
 
         // A single selection stays with the window-level shortcut, which owns the confirmation
-        // and the Ctrl+Del gesture the help documents.
+        // and the Delete gesture the help documents.
         return selectionCount > 1
             ? (true, true)
             : default;

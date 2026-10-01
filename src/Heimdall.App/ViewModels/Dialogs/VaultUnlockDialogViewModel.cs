@@ -306,9 +306,12 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
         {
             ErrorMessage = "";
             TimeSpan remaining = _lockout.LockoutRemaining;
-            LockoutMessage = _localizer.Format(
+            int minutes = (int)Math.Ceiling(remaining.TotalMinutes);
+            LockoutMessage = _localizer.FormatCount(
+                minutes,
+                "VaultUnlockLockedOutOne",
                 "VaultUnlockLockedOut",
-                (int)Math.Ceiling(remaining.TotalMinutes));
+                minutes);
             _lockoutRefreshTimer.Start();
             return;
         }

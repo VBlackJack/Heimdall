@@ -754,7 +754,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             .Where(f => !f.IsDirectory)
             .Sum(f => f.Size);
 
-        SelectionInfoText = _localizer?.Format("SftpSelectedCount", selectedFiles.Count.ToString())
+        SelectionInfoText = _localizer?.FormatCount(
+                selectedFiles.Count,
+                "SftpSelectedCountOne",
+                "SftpSelectedCount",
+                selectedFiles.Count.ToString())
             ?? $"{selectedFiles.Count} selected";
 
         if (totalSize > 0)
@@ -1152,7 +1156,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                         $"EmbeddedSFTP skipped upload to unsupported remote destination '{path}'.");
                 }
 
-                string warning = _localizer?.Format(
+                string warning = _localizer?.FormatCount(
+                    outcome.SkippedUnsupportedTargets.Count,
+                    "WarnUploadTargetsSkippedUnsupportedOne",
                     "WarnUploadTargetsSkippedUnsupported",
                     outcome.SkippedUnsupportedTargets.Count)
                     ?? $"Skipped {outcome.SkippedUnsupportedTargets.Count} upload(s): the destination already exists and is not a regular file. See the log for details.";
@@ -1161,7 +1167,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             if (outcome.Completed && outcome.SkippedLocalReparsePoints.Count > 0)
             {
-                string warning = _localizer?.Format(
+                string warning = _localizer?.FormatCount(
+                    outcome.SkippedLocalReparsePoints.Count,
+                    "WarnUploadSourcesSkippedReparsePointsOne",
                     "WarnUploadSourcesSkippedReparsePoints",
                     outcome.SkippedLocalReparsePoints.Count)
                     ?? $"Skipped {outcome.SkippedLocalReparsePoints.Count} local link(s), selected as upload sources or found inside the selected tree. See the log for details.";

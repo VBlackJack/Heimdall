@@ -41,7 +41,7 @@ public sealed class ServerBulkEditGatewayViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(availableGateways);
 
         Count = count;
-        Header = localizer.Format("BulkEditGatewayHeader", count);
+        Header = localizer.FormatCount(count, "BulkEditGatewayHeaderOne", "BulkEditGatewayHeader", count);
         AvailableGateways = new ObservableCollection<GatewayOption>(availableGateways);
         RefreshResolution();
     }

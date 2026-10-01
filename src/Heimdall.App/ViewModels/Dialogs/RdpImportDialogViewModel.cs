@@ -278,12 +278,20 @@ public partial class RdpImportDialogViewModel : ObservableObject
 
         if (preview.FilesNotFound.Count > 0)
         {
-            segments.Add(_localizer.Format("DialogImportRdpFilesNotFound", preview.FilesNotFound.Count));
+            segments.Add(_localizer.FormatCount(
+                preview.FilesNotFound.Count,
+                "DialogImportRdpFilesNotFoundOne",
+                "DialogImportRdpFilesNotFound",
+                preview.FilesNotFound.Count));
         }
 
         if (preview.FilesUnreadable.Count > 0)
         {
-            segments.Add(_localizer.Format("DialogImportRdpFilesUnreadable", preview.FilesUnreadable.Count));
+            segments.Add(_localizer.FormatCount(
+                preview.FilesUnreadable.Count,
+                "DialogImportRdpFilesUnreadableOne",
+                "DialogImportRdpFilesUnreadable",
+                preview.FilesUnreadable.Count));
         }
 
         return segments.Count == 0 ? null : string.Join(" ", segments);
@@ -358,7 +366,11 @@ public partial class RdpImportRowViewModel : ObservableObject
 
     public string ConflictText => _localizer.Format("DialogImportRdpStatusConflict", ConflictingExistingName ?? ProposedName);
 
-    public string UnknownKeysText => _localizer.Format("DialogImportRdpStatusUnknownKeys", UnknownKeyCount);
+    public string UnknownKeysText => _localizer.FormatCount(
+        UnknownKeyCount,
+        "DialogImportRdpStatusUnknownKeysOne",
+        "DialogImportRdpStatusUnknownKeys",
+        UnknownKeyCount);
 
     public string SkippedMappingsText => _localizer["DialogImportRdpStatusPartialMapping"];
 

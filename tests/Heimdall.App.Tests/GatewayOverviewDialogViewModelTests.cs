@@ -59,7 +59,7 @@ public sealed class GatewayOverviewDialogViewModelTests
         GatewayOverviewGatewayItemViewModel gateway = Assert.Single(viewModel.Gateways);
         GatewayOverviewSessionItemViewModel session = Assert.Single(gateway.Sessions);
         Assert.Equal("alpha", session.Id);
-        Assert.Equal("Reassigned 1 session(s).", viewModel.StatusMessage);
+        Assert.Equal("Reassigned 1 session.", viewModel.StatusMessage);
     }
 
     [Fact]
@@ -93,13 +93,47 @@ public sealed class GatewayOverviewDialogViewModelTests
         Assert.Equal(["alpha"], capturedRequest!.ServerIds);
         Assert.Null(capturedRequest.TargetGatewayId);
         Assert.Empty(viewModel.MissingReferences);
-        Assert.Equal("Cleared gateway reference on 1 session(s).", viewModel.StatusMessage);
+        Assert.Equal("Cleared gateway reference on 1 session.", viewModel.StatusMessage);
     }
 
-    private static async Task<LocalizationManager> CreateLocalizerAsync()
+    /// <summary>
+    /// The summary line words each count by its number, in the language's rule: one gateway, one
+    /// routed session and no unresolved reference, which French words in the singular too.
+    /// </summary>
+    [Theory]
+    [InlineData("en", "1 gateway", "1 routed session", "0 unresolved references")]
+    [InlineData("fr", "1 passerelle", "1 session rout\u00e9e", "0 r\u00e9f\u00e9rence introuvable")]
+    [InlineData("es", "1 pasarela", "1 sesi\u00f3n enrutada", "0 referencias sin resolver")]
+    public async Task Summary_WordsEachCountByItsNumber(
+        string locale,
+        string expectedGateways,
+        string expectedRoutedSessions,
+        string expectedMissingReferences)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync(locale);
+        GatewayOverview overview = GatewayOverviewBuilder.Build(
+            [CreateGateway("gw-target", "Bastion")],
+            [CreateServer("alpha", "Alpha", "gw-target")]);
+
+        var viewModel = new GatewayOverviewDialogViewModel(
+            overview,
+            localizer,
+            [],
+            (_, _) => Task.FromResult(0),
+            _ => Task.FromResult(overview));
+
+        Assert.Equal(expectedGateways, viewModel.GatewaySummary);
+        Assert.Equal(expectedRoutedSessions, viewModel.RoutedSessionSummary);
+        Assert.Equal(expectedMissingReferences, viewModel.MissingReferenceSummary);
+        Assert.Equal(
+            localizer.FormatCount(1, "GatewayOverviewSessionCountOne", "GatewayOverviewSessionCount", 1),
+            Assert.Single(viewModel.Gateways).SessionCountText);
+    }
+
+    private static async Task<LocalizationManager> CreateLocalizerAsync(string locale = "en")
     {
         var localizer = new LocalizationManager();
-        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
         return localizer;
     }
 

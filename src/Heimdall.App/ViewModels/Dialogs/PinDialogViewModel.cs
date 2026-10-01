@@ -92,7 +92,7 @@ public partial class PinDialogViewModel : ObservableObject
             }
             else
             {
-                ErrorMessage = _localizer.Format("PinInvalidRemaining", remaining);
+                ErrorMessage = _localizer.FormatCount(remaining, "PinInvalidRemainingOne", "PinInvalidRemaining", remaining);
             }
         }
     }
@@ -105,8 +105,8 @@ public partial class PinDialogViewModel : ObservableObject
         {
             ErrorMessage = "";
             TimeSpan remaining = _pinManager.LockoutRemaining;
-            LockoutMessage = _localizer.Format("PinLockedOut",
-                (int)Math.Ceiling(remaining.TotalMinutes));
+            int minutes = (int)Math.Ceiling(remaining.TotalMinutes);
+            LockoutMessage = _localizer.FormatCount(minutes, "PinLockedOutOne", "PinLockedOut", minutes);
             return;
         }
 

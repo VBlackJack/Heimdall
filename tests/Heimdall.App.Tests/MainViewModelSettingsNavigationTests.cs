@@ -470,6 +470,255 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
         Assert.Equal(1, harness.Main.ServerCount);
     }
 
+    /// <summary>
+    /// A profile import keeps every pending edit and still shows the gateway it brought in.
+    /// </summary>
+    /// <remarks>
+    /// The import raised the full configuration reload, which reseeds the panel from disk: a field
+    /// typed a moment before came back to its saved value and the dirty flag dropped, without a
+    /// word. The import writes the gateways it creates into the settings itself; the panel takes
+    /// them in through the settings-changed path, which adds what it has never seen and leaves
+    /// the pending edits alone.
+    /// </remarks>
+    [Fact]
+    public async Task ImportJsonProfiles_KeepsOtherPendingEditsAndShowsTheImportedGateway()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        int savedMaxSessions = await StartAPendingEditAsync(harness);
+        ProfileConfigDocument document = new()
+        {
+            Servers =
+            [
+                new ServerProfileDto
+                {
+                    Id = "json-import",
+                    DisplayName = "Json SSH",
+                    ConnectionType = "SSH",
+                    RemoteServer = "ssh.example.test",
+                    SshPort = 22,
+                    SshGatewayId = "gateway-import"
+                }
+            ],
+            Gateways =
+            [
+                new SshGatewayDto
+                {
+                    Id = "gateway-import",
+                    Name = "Bastion",
+                    Host = "bastion.example.test",
+                    Port = 22,
+                    User = "ops"
+                }
+            ]
+        };
+        string importPath = Path.Combine(harness.RootPath, "servers.json");
+        await File.WriteAllTextAsync(
+            importPath,
+            System.Text.Json.JsonSerializer.Serialize(
+                document,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                }));
+        harness.Dialog.SelectEveryImportCandidate = true;
+        harness.Main.Settings.ImportFilePathProvider = () => importPath;
+
+        await harness.Main.Settings.ImportConfigCommand.ExecuteAsync(null);
+
+        await AssertThePendingEditSurvivedAsync(harness, savedMaxSessions);
+        Assert.Equal("json-import", Assert.Single(await harness.Config.LoadServersAsync()).Id);
+        Assert.Equal(1, harness.Main.ServerCount);
+        Assert.Contains(
+            harness.Main.Settings.Gateways,
+            gateway => string.Equals(gateway.Id, "gateway-import", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A MobaXterm, RDCMan or mRemoteNG import keeps every pending edit.
+    /// </summary>
+    [Fact]
+    public async Task ImportLegacySessions_KeepsOtherPendingEdits()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        int savedMaxSessions = await StartAPendingEditAsync(harness);
+        string importPath = Path.Combine(harness.RootPath, "servers.rdg");
+        const string content = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <RDCMan programVersion="2.7" schemaVersion="3">
+              <file>
+                <name>Root</name>
+                <server>
+                  <name>rdp.example.test</name>
+                  <displayName>Imported RDP</displayName>
+                </server>
+              </file>
+            </RDCMan>
+            """;
+        await File.WriteAllTextAsync(importPath, content);
+        harness.Main.Settings.ImportFilePathProvider = () => importPath;
+
+        await harness.Main.Settings.ImportConfigCommand.ExecuteAsync(null);
+
+        await AssertThePendingEditSurvivedAsync(harness, savedMaxSessions);
+        Assert.Equal("Imported RDP", Assert.Single(await harness.Config.LoadServersAsync()).DisplayName);
+        Assert.Equal(1, harness.Main.ServerCount);
+    }
+
+    /// <summary>
+    /// A Citrix cache import keeps every pending edit.
+    /// </summary>
+    [Fact]
+    public async Task ImportCitrixApps_KeepsOtherPendingEdits()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        int savedMaxSessions = await StartAPendingEditAsync(harness);
+        CitrixScanResult scan = new();
+        scan.Resources.Add(new CitrixResource
+        {
+            FriendlyName = "Calculator",
+            LaunchCommandLine = "-qlaunch app=Calculator",
+            StoreFrontUrl = "https://citrix.example.test"
+        });
+        harness.Main.Settings.CitrixScanProvider = () => scan;
+
+        await harness.Main.Settings.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+        await AssertThePendingEditSurvivedAsync(harness, savedMaxSessions);
+        Assert.Single(await harness.Config.LoadServersAsync());
+        Assert.Equal(1, harness.Main.ServerCount);
+    }
+
+    /// <summary>
+    /// The detail pane tooltip, the hint line under its buttons and the F1 help name the delete
+    /// gesture with the same localized label as the context menus.
+    /// </summary>
+    /// <remarks>
+    /// The menus were corrected to plain Delete (Suppr, Supr) while these three surfaces went on
+    /// teaching Ctrl+Del, so one product named two gestures for one action.
+    /// </remarks>
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    public async Task DeleteGestureTexts_NameTheSameLabelAsTheMenus(string locale)
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        await harness.Localizer.SwitchLocaleAsync(locale);
+        string delete = harness.Localizer["TreeCtxGestureDelete"];
+        string edit = harness.Localizer["TreeCtxGestureEdit"];
+        string addServer = harness.Localizer["TreeCtxGestureAddServer"];
+
+        Assert.EndsWith("(" + delete + ")", harness.Main.DeleteSessionTooltip, StringComparison.Ordinal);
+        Assert.StartsWith(edit + " ", harness.Main.DetailActionHintsText, StringComparison.Ordinal);
+        Assert.Contains(" " + delete + " ", harness.Main.DetailActionHintsText, StringComparison.Ordinal);
+        Assert.Contains("  " + delete + "\t", harness.Main.HelpShortcutsText, StringComparison.Ordinal);
+        Assert.Contains("  " + edit + "\t", harness.Main.HelpShortcutsText, StringComparison.Ordinal);
+        Assert.Contains("  " + addServer + "\t", harness.Main.HelpShortcutsText, StringComparison.Ordinal);
+        foreach (string text in new[]
+        {
+            harness.Main.DeleteSessionTooltip,
+            harness.Main.DetailActionHintsText,
+            harness.Main.HelpShortcutsText,
+        })
+        {
+            Assert.DoesNotContain("Ctrl+" + delete, text, StringComparison.Ordinal);
+            Assert.DoesNotContain("{", text, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>The composed shortcut texts follow a language change made while the window is up.</summary>
+    [Fact]
+    public async Task DeleteGestureTexts_AreRaisedAgainWhenTheLanguageChanges()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        HashSet<string> raised = [];
+        harness.Main.PropertyChanged += (_, args) => raised.Add(args.PropertyName ?? string.Empty);
+
+        await harness.Localizer.SwitchLocaleAsync("fr");
+
+        Assert.Contains(nameof(MainViewModel.DeleteSessionTooltip), raised);
+        Assert.Contains(nameof(MainViewModel.DetailActionHintsText), raised);
+        Assert.Contains("(" + harness.Localizer["TreeCtxGestureDelete"] + ")", harness.Main.DeleteSessionTooltip, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The status bar words its two counts by their number, in the language's own rule.
+    /// </summary>
+    /// <remarks>
+    /// It used to print a number next to a fixed plural noun, "1 sessions | 1 tunnels". French
+    /// takes the singular for 0 as well, so the French zero is "0 session".
+    /// </remarks>
+    [Theory]
+    [InlineData("en", 0, "0 sessions", "0 tunnels")]
+    [InlineData("en", 1, "1 session", "1 tunnel")]
+    [InlineData("en", 2, "2 sessions", "2 tunnels")]
+    [InlineData("fr", 0, "0 session", "0 tunnel")]
+    [InlineData("fr", 1, "1 session", "1 tunnel")]
+    [InlineData("fr", 2, "2 sessions", "2 tunnels")]
+    [InlineData("es", 0, "0 sesiones", "0 t\u00faneles")]
+    [InlineData("es", 1, "1 sesi\u00f3n", "1 t\u00fanel")]
+    [InlineData("es", 2, "2 sesiones", "2 t\u00faneles")]
+    public async Task StatusBarCounts_AreWordedByTheirNumber(
+        string locale,
+        int count,
+        string expectedSessions,
+        string expectedTunnels)
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        await harness.Localizer.SwitchLocaleAsync(locale);
+
+        harness.Main.ServerCount = count;
+        harness.Main.Tunnels.Count = count;
+
+        Assert.Equal(expectedSessions, harness.Main.ServerCountText);
+        Assert.Equal(expectedTunnels, harness.Main.Tunnels.CountText);
+    }
+
+    /// <summary>Both counts are raised again when the number or the language changes.</summary>
+    [Fact]
+    public async Task StatusBarCounts_FollowTheNumberAndTheLanguage()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        HashSet<string> mainRaised = [];
+        HashSet<string> tunnelsRaised = [];
+        harness.Main.PropertyChanged += (_, args) => mainRaised.Add(args.PropertyName ?? string.Empty);
+        harness.Main.Tunnels.PropertyChanged += (_, args) => tunnelsRaised.Add(args.PropertyName ?? string.Empty);
+
+        harness.Main.ServerCount = 3;
+        harness.Main.Tunnels.Count = 3;
+
+        Assert.Contains(nameof(MainViewModel.ServerCountText), mainRaised);
+        Assert.Contains(nameof(TunnelsViewModel.CountText), tunnelsRaised);
+
+        mainRaised.Clear();
+        tunnelsRaised.Clear();
+        await harness.Localizer.SwitchLocaleAsync("fr");
+
+        Assert.Contains(nameof(MainViewModel.ServerCountText), mainRaised);
+        Assert.Contains(nameof(TunnelsViewModel.CountText), tunnelsRaised);
+    }
+
+    /// <summary>Loads the panel from disk and types one unsaved edit into it.</summary>
+    /// <returns>The saved value the edit replaced.</returns>
+    private static async Task<int> StartAPendingEditAsync(TestHarness harness)
+    {
+        harness.Main.Settings.LoadFromSettings(await harness.Config.LoadSettingsAsync());
+        int savedMaxSessions = harness.Main.Settings.MaxEmbeddedSessions;
+        harness.Main.Settings.MaxEmbeddedSessionsText = (savedMaxSessions + 1).ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(harness.Main.Settings.IsDirty);
+        return savedMaxSessions;
+    }
+
+    private static async Task AssertThePendingEditSurvivedAsync(TestHarness harness, int savedMaxSessions)
+    {
+        Assert.Equal(savedMaxSessions + 1, harness.Main.Settings.MaxEmbeddedSessions);
+        Assert.True(harness.Main.Settings.IsDirty);
+        Assert.Equal(
+            savedMaxSessions,
+            harness.Config.LoadSettingsAsync().GetAwaiter().GetResult().MaxEmbeddedSessions);
+    }
+
     private sealed class TestHarness : IDisposable
     {
         private readonly string _rootPath;
@@ -494,6 +743,9 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
         }
 
         public MainViewModel Main { get; }
+
+        /// <summary>A scratch directory removed with the harness, for files a test imports.</summary>
+        public string RootPath => _rootPath;
 
         public ControlledConfigManager Config { get; }
 
@@ -805,9 +1057,30 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
             SnapshotRestoreDialogViewModel viewModel) =>
             Task.FromResult<SnapshotRestoreDialogResult?>(null);
 
+        /// <summary>Whether the import preview answers with every candidate selected, or cancels.</summary>
+        public bool SelectEveryImportCandidate { get; set; }
+
         public Task<RdpImportSelection?> ShowRdpImportDialogAsync(
-            RdpImportDialogViewModel viewModel) =>
-            Task.FromResult<RdpImportSelection?>(null);
+            RdpImportDialogViewModel viewModel)
+        {
+            if (!SelectEveryImportCandidate)
+            {
+                return Task.FromResult<RdpImportSelection?>(null);
+            }
+
+            RdpImportSelection selection = new()
+            {
+                Entries = viewModel.Preview.Entries
+                    .Select(entry => new RdpImportSelectionEntry
+                    {
+                        SourceFilePath = entry.SourceFilePath,
+                        IsSelected = true,
+                        ConflictResolution = RdpConflictResolution.AutoRename
+                    })
+                    .ToList()
+            };
+            return Task.FromResult<RdpImportSelection?>(selection);
+        }
 
         public Task<ImportOutcome?> ShowImportOpenSshConfigAsync(
             OpenSshParseResult parseResult) =>

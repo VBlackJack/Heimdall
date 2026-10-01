@@ -114,7 +114,12 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ServerCountText))]
     private int _serverCount;
+
+    /// <summary>The session count on the status bar, worded by its number.</summary>
+    public string ServerCountText =>
+        _localizer.FormatCount(ServerCount, "StatusServerCountOne", "StatusServerCount", ServerCount);
 
     [ObservableProperty]
     private bool _isBusy;
@@ -442,13 +447,13 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         // Keep _currentSettings in sync when settings are saved elsewhere
         _configManager.SettingsChanged += OnSettingsChanged;
 
-        // Reload server list after a config import
+        // A settings save: nothing is pending any more, so the panel reloads with everything else.
         _onConfigurationChanged = async () =>
             await ReloadConfigurationAsync(await _configManager.LoadSettingsAsync());
         Settings.ConfigurationChanged += _onConfigurationChanged;
 
-        // Saved sessions rewritten from the settings panel: the list follows, the panel does not,
-        // because the panel is holding the user's pending edits.
+        // Saved sessions rewritten or imported from the settings panel: the list follows, the panel
+        // does not, because the panel is holding the user's pending edits.
         _onServerInventoryChanged = async () => await ReloadServerInventoryAsync();
         Settings.ServerInventoryChanged += _onServerInventoryChanged;
         Settings.GatewayReferenceMutationHandler = async (request, cancellationToken) =>
@@ -679,6 +684,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         }
 
         OnPropertyChanged(nameof(DropToMergeText));
+        OnPropertyChanged(nameof(ServerCountText));
+        OnPropertyChanged(nameof(DeleteSessionTooltip));
+        OnPropertyChanged(nameof(DetailActionHintsText));
     }
 
     /// <summary>
@@ -1132,6 +1140,32 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// Localized text for the drag-to-split drop zone.
     /// </summary>
     public string DropToMergeText => _localizer["SplitDropToMerge"];
+
+    /// <summary>
+    /// Tooltip of the detail pane's Delete button, naming the gesture with the context menus' label.
+    /// </summary>
+    /// <remarks>
+    /// The gesture texts below take their key labels as arguments instead of spelling them out:
+    /// the menus were corrected to plain Delete while these went on teaching Ctrl+Del, and one
+    /// label read in one place cannot disagree with itself.
+    /// </remarks>
+    public string DeleteSessionTooltip =>
+        _localizer.Format("TooltipDelete", _localizer["TreeCtxGestureDelete"]);
+
+    /// <summary>The hint line under the detail pane's buttons.</summary>
+    public string DetailActionHintsText =>
+        _localizer.Format(
+            "DetailActionHints",
+            _localizer["TreeCtxGestureEdit"],
+            _localizer["TreeCtxGestureDelete"]);
+
+    /// <summary>The body of the F1 keyboard shortcut help.</summary>
+    public string HelpShortcutsText =>
+        _localizer.Format(
+            "HelpShortcutsContent",
+            _localizer["TreeCtxGestureAddServer"],
+            _localizer["TreeCtxGestureEdit"],
+            _localizer["TreeCtxGestureDelete"]);
 
     /// <summary>
     /// Tracks a tool ID as recently used for the palette's "recent tools" section.

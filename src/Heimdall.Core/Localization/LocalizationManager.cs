@@ -88,6 +88,33 @@ public sealed class LocalizationManager
     }
 
     /// <summary>
+    /// Formats a count with the wording its number takes in the current language.
+    /// </summary>
+    /// <param name="count">The number the wording agrees with.</param>
+    /// <param name="oneKey">The key of the singular wording; it names its number with a placeholder.</param>
+    /// <param name="otherKey">The key of the plural wording.</param>
+    /// <param name="args">Format arguments, the count included where the wording places it.</param>
+    /// <returns>The formatted string from the key the language's plural rule picks.</returns>
+    /// <remarks>
+    /// The project words counts with a key pair, "X" and "XOne", instead of a "(s)" hack. Which of
+    /// the two a number takes is the language's decision, not the caller's: French uses the
+    /// singular for 0 as well as 1, so a caller testing <c>count == 1</c> wrote "0 sessions" in
+    /// French. Both keys are passed by name so a reader, and the dead-key guard, can find them.
+    /// </remarks>
+    public string FormatCount(long count, string oneKey, string otherKey, params object[] args)
+        => Format(SelectCountKey(count, oneKey, otherKey), args);
+
+    /// <summary>
+    /// The key of the wording <paramref name="count"/> takes in the current language, for a caller
+    /// that hands the key on to be formatted later.
+    /// </summary>
+    /// <param name="count">The number the wording agrees with.</param>
+    /// <param name="oneKey">The key of the singular wording.</param>
+    /// <param name="otherKey">The key of the plural wording.</param>
+    public string SelectCountKey(long count, string oneKey, string otherKey)
+        => PluralRules.IsOne(_currentLocale, count) ? oneKey : otherKey;
+
+    /// <summary>
     /// Loads locale strings from a JSON file in the specified locales directory.
     /// </summary>
     /// <param name="localesPath">Directory containing locale JSON files (e.g., "locales/").</param>

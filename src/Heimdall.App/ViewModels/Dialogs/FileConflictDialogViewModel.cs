@@ -56,7 +56,11 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
 
         DialogTitle = L("DialogFileConflictTitle");
         DialogHint = L("DialogFileConflictHint");
-        SummaryText = localizer?.Format("DialogFileConflictSummary", conflicts.Count)
+        SummaryText = localizer?.FormatCount(
+                conflicts.Count,
+                "DialogFileConflictSummaryOne",
+                "DialogFileConflictSummary",
+                conflicts.Count)
             ?? $"{conflicts.Count} conflict(s)";
         ApplyToAllText = L("DialogFileConflictApplyAll");
         ApplyAllSkipText = L("DialogFileConflictActionSkip");

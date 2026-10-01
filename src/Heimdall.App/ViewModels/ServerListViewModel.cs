@@ -408,7 +408,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        string body = _localizer.Format(
+        string body = _localizer.FormatCount(
+            commandCount,
+            "ConfirmPostConnectImportedBodyOne",
             "ConfirmPostConnectImportedBody",
             profile.DisplayName,
             commandCount);

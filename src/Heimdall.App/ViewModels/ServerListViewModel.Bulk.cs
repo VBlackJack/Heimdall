@@ -265,7 +265,7 @@ public partial class ServerListViewModel
         if (string.IsNullOrWhiteSpace(request.ProjectId))
         {
             StatusMessageRequested?.Invoke(
-                _localizer.Format("StatusBulkMovedToNoProject", movedCount));
+                _localizer.FormatCount(movedCount, "StatusBulkMovedToNoProjectOne", "StatusBulkMovedToNoProject", movedCount));
             return;
         }
 
@@ -274,7 +274,12 @@ public partial class ServerListViewModel
             ?.Name ?? request.ProjectId;
 
         StatusMessageRequested?.Invoke(
-            _localizer.Format("StatusBulkMovedToProject", movedCount, targetProjectName));
+            _localizer.FormatCount(
+                movedCount,
+                "StatusBulkMovedToProjectOne",
+                "StatusBulkMovedToProject",
+                movedCount,
+                targetProjectName));
     }
 
     [RelayCommand(CanExecute = nameof(CanDuplicateSelected))]
@@ -292,7 +297,8 @@ public partial class ServerListViewModel
             return;
         }
 
-        StatusMessageRequested?.Invoke(_localizer.Format("StatusBulkDuplicated", clones.Count));
+        StatusMessageRequested?.Invoke(
+            _localizer.FormatCount(clones.Count, "StatusBulkDuplicatedOne", "StatusBulkDuplicated", clones.Count));
     }
 
     [RelayCommand(CanExecute = nameof(CanBulkEditPort))]
@@ -674,7 +680,7 @@ public partial class ServerListViewModel
                 selectedIds,
                 primarySelectionId,
                 null,
-                "StatusBulkPortUpdated",
+                _localizer.SelectCountKey(updatedCount, "StatusBulkPortUpdatedOne", "StatusBulkPortUpdated"),
                 [updatedCount]);
         }
     }
@@ -769,7 +775,7 @@ public partial class ServerListViewModel
                 selectedIds,
                 primarySelectionId,
                 null,
-                "StatusBulkUsernameUpdated",
+                _localizer.SelectCountKey(updatedCount, "StatusBulkUsernameUpdatedOne", "StatusBulkUsernameUpdated"),
                 [updatedCount]);
         }
     }
@@ -872,7 +878,7 @@ public partial class ServerListViewModel
                 null,
                 skippedWinRmUsernameCount > 0
                     ? "StatusBulkPasswordUpdatedWithWinRmSkipped"
-                    : "StatusBulkPasswordUpdated",
+                    : _localizer.SelectCountKey(updatedCount, "StatusBulkPasswordUpdatedOne", "StatusBulkPasswordUpdated"),
                 skippedWinRmUsernameCount > 0
                     ? [updatedCount, skippedWinRmUsernameCount]
                     : [updatedCount]);
@@ -883,7 +889,11 @@ public partial class ServerListViewModel
     {
         if (selectedItems.Count > 10)
         {
-            return _localizer.Format("ConfirmDeleteSelectedItems", selectedItems.Count);
+            return _localizer.FormatCount(
+                selectedItems.Count,
+                "ConfirmDeleteSelectedItemsOne",
+                "ConfirmDeleteSelectedItems",
+                selectedItems.Count);
         }
 
         var bulletList = string.Join(
@@ -893,7 +903,9 @@ public partial class ServerListViewModel
                 .OrderBy(name => name, DisplayNameOrdering.Comparer)
                 .Select(name => $"- {name}"));
 
-        return _localizer.Format(
+        return _localizer.FormatCount(
+            selectedItems.Count,
+            "ConfirmDeleteSelectedItemsWithListOne",
             "ConfirmDeleteSelectedItemsWithList",
             selectedItems.Count,
             bulletList);
@@ -971,7 +983,12 @@ public partial class ServerListViewModel
             if (targetGateway is null)
             {
                 StatusMessageRequested?.Invoke(
-                    _localizer.Format("StatusBulkGatewayMissingTarget", ids.Length, targetGatewayId));
+                    _localizer.FormatCount(
+                        ids.Length,
+                        "StatusBulkGatewayMissingTargetOne",
+                        "StatusBulkGatewayMissingTarget",
+                        ids.Length,
+                        targetGatewayId));
                 Core.Logging.FileLogger.Warn(
                     $"UpdateGatewayReferencesAsync skipped {ids.Length} item(s) because gateway '{targetGatewayId}' no longer exists.");
                 return 0;
@@ -993,13 +1010,19 @@ public partial class ServerListViewModel
         if (unsupportedCount > 0)
         {
             StatusMessageRequested?.Invoke(
-                _localizer.Format("StatusBulkGatewayUnsupportedSkipped", unsupportedCount));
+                _localizer.FormatCount(
+                    unsupportedCount,
+                    "StatusBulkGatewayUnsupportedSkippedOne",
+                    "StatusBulkGatewayUnsupportedSkipped",
+                    unsupportedCount));
         }
 
         if (unsupportedWinRmHttpsCount > 0)
         {
             StatusMessageRequested?.Invoke(
-                _localizer.Format(
+                _localizer.FormatCount(
+                    unsupportedWinRmHttpsCount,
+                    "StatusBulkGatewayWinRmHttpsSkippedOne",
                     "StatusBulkGatewayWinRmHttpsSkipped",
                     unsupportedWinRmHttpsCount));
         }
@@ -1498,7 +1521,9 @@ public partial class ServerListViewModel
         // read as "connected 1, failed 0, skipped 0", which is false rather than terse.
         if (tally.NeedsCancellationNotice)
         {
-            summary += " " + _localizer.Format(
+            summary += " " + _localizer.FormatCount(
+                tally.NotAttempted,
+                "StatusBulkConnectCancelledSuffixOne",
                 "StatusBulkConnectCancelledSuffix",
                 tally.NotAttempted);
         }
@@ -1515,7 +1540,8 @@ public partial class ServerListViewModel
         int skippedCount = skips.Total;
         var key = BulkConnectSummary.NothingToConnectKey(skippedCount);
         return skippedCount > 0
-            ? _localizer.Format(key, skippedCount) + BulkConnectSummary.DescribeSkips(skips, _localizer)
+            ? _localizer.FormatCount(skippedCount, "StatusBulkConnectNothingToConnectSkippedOne", key, skippedCount)
+                + BulkConnectSummary.DescribeSkips(skips, _localizer)
             : _localizer[key];
     }
     private async Task<bool> MoveServersToGroupCoreAsync(

@@ -1787,12 +1787,12 @@
                                             CommandParameter="{Binding ServerList.SelectedServer}"
                                             Style="{DynamicResource SecondaryButtonStyle}"
                                             Foreground="{DynamicResource ErrorTextBrush}"
-                                            ToolTip="{loc:Translate TooltipDelete}"
+                                            ToolTip="{Binding DeleteSessionTooltip}"
                                             AutomationProperties.Name="{loc:Translate BtnDelete}"
                                             Padding="12,6"/>
                                 </StackPanel>
                                 <!-- Subtle shortcut hints for detail panel actions -->
-                                <TextBlock x:Name="Mw_DetailActionHints" Text="{loc:Translate DetailActionHints}"
+                                <TextBlock x:Name="Mw_DetailActionHints" Text="{Binding DetailActionHintsText}"
                                            FontSize="{StaticResource FontSizeSmallCaption}"
                                            Foreground="{DynamicResource TextDisabledBrush}"
                                            Margin="0,8,0,0"/>
@@ -4909,14 +4909,11 @@
                     <TextBlock FontSize="{StaticResource FontSizeCaption}"
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource TextSecondaryBrush}">
-                        <Run Text="{Binding ServerCount, Mode=OneWay}"/>
-                        <Run Text=" "/>
-                        <Run Text="{loc:Translate StatusBarSessions}"/>
-                        <Run Text=" "/>
-                        <Run Text="{loc:Translate StatusBarSeparator}"/>
-                        <Run Text="{Binding Tunnels.Count, Mode=OneWay}"/>
-                        <Run Text=" "/>
-                        <Run Text="{loc:Translate StatusBarTunnels}"/>
+                        <!-- The runs touch: whitespace between inline elements renders as a space,
+                             and the separator brings its own. -->
+                        <Run Text="{Binding ServerCountText, Mode=OneWay}"/><Run
+                            Text="{loc:Translate StatusBarSeparator}"/><Run
+                            Text="{Binding Tunnels.CountText, Mode=OneWay}"/>
                     </TextBlock>
                 </StackPanel>
             </DockPanel>

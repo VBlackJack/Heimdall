@@ -214,7 +214,6 @@ ConfirmCloseAllMessage
 ConfirmCloseAllTitle
 ConfirmDeleteFolderMessage
 ConfirmDeleteGatewayDetailMessage
-ConfirmDeleteGatewayInUse
 ConfirmDeleteGatewayMessage
 ConfirmDialogNo
 ConfirmDialogYes
@@ -410,8 +409,6 @@ EventLogEnabled
 ExportFormatCsv
 ExportFormatJson
 ExportRdpFolderDescription
-ExportRdpSkippedNonRdp
-ExportRdpSuccess
 ExternalToolDialogTitle
 ExternalToolPromptArguments
 ExternalToolPromptName
@@ -487,7 +484,6 @@ KeyboardShortcutSectionServer
 KeyboardShortcutSectionView
 KeyboardShortcutToggleSidebar
 KeyboardShortcutUndo
-LabelImportOpenSshConfigSummary
 LabelImportOpenSshDiagnosticLine
 LoadingConnecting
 LoadingEstablishingTunnel
@@ -499,12 +495,10 @@ LogConfigDirAclFailed
 LogConfigFallbackPath
 LogConfigFileAclFailed
 LogCredentialCleanupFailed
-LogCredentialCleanupScheduled
 LogCredentialDecryptFailed
 LogCredentialDecryptFailedRdp
 LogCredentialDecryptOk
 LogCredentialFallbackFailed
-LogCredentialInvalidCount
 LogCredentialStoreFailed
 LogCustomThemeError
 LogCustomThemeLoaded
@@ -564,7 +558,6 @@ LogEmergencyResetFailed
 LogEncryptedExportFailed
 LogEncryptedImportFailed
 LogErrorCallbackFailed
-LogFullImportWarnings
 LogFullscreenEnter
 LogFullscreenExit
 LogGatewayChainResolved
@@ -598,7 +591,6 @@ LogMigrationDefaultsFailed
 LogMultiExecSent
 LogNetworkLost
 LogNetworkRestored
-LogOrphanCleanup
 LogOrphanProcessFailed
 LogPasswordDecryptFailed
 LogPasswordEncryptFailed
@@ -644,7 +636,6 @@ LogServersLegacyFormat
 LogServersParseFailed
 LogServersSaveFailed
 LogServersSaveStack
-LogSessionClosedOthers
 LogSessionDuplicated
 LogSessionLogAclApplied
 LogSessionLogAclFailed
@@ -741,11 +732,9 @@ MoveToFieldGroup
 MoveToFieldProject
 MultiExecNoTargets
 MultiExecPlaceholder
-MultiExecProductionWarning
 MultiExecSelectAll
 MultiExecSend
 MultiExecSentFailed
-MultiExecSentSuccess
 MultiExecTitle
 NetworkScannerColHostname
 NetworkScannerColIp
@@ -1060,9 +1049,6 @@ StatusGatewayAdded
 StatusGatewayDeleted
 StatusGatewaySetDefault
 StatusGatewayUpdated
-StatusImportSuccess
-StatusMovedToProject
-StatusMultiSelection
 StatusNetworkLost
 StatusNetworkRestored
 StatusNoActiveTunnel
@@ -1073,20 +1059,16 @@ StatusPinChanged
 StatusPinRemoved
 StatusPinReset
 StatusPinSet
-StatusPortsReleased
 StatusProjectAdded
 StatusProjectDeleted
 StatusProjectUpdated
 StatusRecentCleared
 StatusRestartRequired
 StatusServerAdded
-StatusServerCount
-StatusServerCountFiltered
 StatusServerDeleted
 StatusServerDeletedUndo
 StatusServerMoved
 StatusServerMovedDragDrop
-StatusServerMovedDragDropMulti
 StatusServerRestored
 StatusServerUpdated
 StatusSessionDisconnected
@@ -1115,7 +1097,6 @@ StatusStepValidating
 StatusTagAdded
 StatusTagRemoved
 StatusTestingSsh
-StatusTunnelCount
 StatusTunnelReused
 TaskStatusDisabled
 TaskStatusEnabled
@@ -1138,7 +1119,6 @@ ToolAuditCheckOps01
 ToolAuditCheckOps02
 ToolAuditCheckOps03
 ToolAuditCheckOps04
-ToolAuditHostCount
 ToolAuditPhase1
 ToolAuditPhase2
 ToolAuditPhase3
@@ -1308,11 +1288,9 @@ TreeNoSearchResultsHint
 TreeSearchPlaceholder
 TreeTooltipDirect
 TreeTooltipGateway
-TreeTooltipGroupCount
 TreeTooltipHost
 TreeTooltipLocalPort
 TreeTooltipPort
-TreeTooltipServerCount
 TreeTooltipType
 UndoDeleteTooltip
 UnsavedChangesMessage
@@ -1343,10 +1321,8 @@ WolNoMac
 WorkspaceAutoRestore
 WorkspaceNoSessions
 WorkspaceRestore
-WorkspaceRestored
 WorkspaceRestoredPartial
 WorkspaceSave
-WorkspaceSaved
 _comment_dirty_guards
 _comment_external_tool_provider
 _comment_external_tools_category

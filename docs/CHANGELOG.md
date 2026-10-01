@@ -12,6 +12,45 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### Settings: an import keeps the changes you have not saved yet
+
+- **Importing sessions no longer throws away unsaved settings.** An import started from
+  Settings (a .json or .rdp profile file, a MobaXterm, RDCMan or mRemoteNG file, or the Citrix
+  cache) reloaded the whole panel from disk: a value typed a moment before came back to its saved
+  value, a language or theme being previewed reverted, and the panel no longer counted as
+  changed, without a word. An import now reloads the session list only. SSH gateways that a .json
+  import brings in still appear in the gateway list at once. Sessions added by the network
+  scanner are listed the same way, without touching the Settings panel.
+
+### The delete shortcut is named the same way everywhere
+
+- **The detail pane and the F1 help say Del, like the menus.** The tooltip of the detail pane's
+  Delete button, the hint line under its buttons and the F1 help still said Ctrl+Del (Ctrl+Suppr,
+  Ctrl+Supr) after the context menus had been corrected to plain Del (Suppr, Supr). All of them
+  now show the same label as the menus, in every language. Ctrl+Del keeps working.
+
+### Counts read "1 session", not "1 session(s)"
+
+- **The status bar words its counts by their number.** It read "1 sessions | 1 tunnels"; it now
+  reads "1 session | 1 tunnel", and "0 session" in French, where zero takes the singular.
+- **Session, import and transfer messages do the same.** Bulk edits and their results, delete
+  confirmations, imports and exports, the SSH gateway overview, PIN and vault lockouts, SFTP
+  copy, cut, selection and skipped uploads, and the local file browser no longer write "(s)":
+  "Duplicated 1 item", "Moved 2 items", "Try again in 1 minute". Messages that count several
+  things at once, and the network tools and the security audit, keep their current wording for
+  now.
+
+### WinRM: Windows PowerShell no longer stops on an "untrusted publisher" question
+
+- **A WinRM tab signs in when Heimdall was started from PowerShell 7.** Heimdall started from a
+  PowerShell 7 session handed PowerShell 7's module directories to the Windows PowerShell that a
+  WinRM tab runs. It then loaded PowerShell 7's modules, and under an AllSigned execution policy
+  stopped on "Do you want to run software from this untrusted publisher?" before signing in. It
+  now gets the inherited module path without PowerShell 7's entries, every other entry kept, the
+  way PowerShell 7 itself starts Windows PowerShell.
+
 ## 2026-10-01: new files upload again, and a WinRM tab that stays remote (v2026.100101)
 
 ### Session tree: a search that finds what you type, and a selection it gives back
