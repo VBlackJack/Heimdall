@@ -2498,6 +2498,7 @@
   "FileBrowserStatusItemsOne": "{0} \u00e9l\u00e9ment",
   "FileBrowserEmptyFolder": "Ce dossier est vide",
   "FileBrowserLoadError": "Impossible d'ouvrir ce dossier - acc\u00e8s refus\u00e9 ou indisponible.",
+  "FileBrowserOpenFailed": "Impossible d'ouvrir {0} : {1}",
   "FileBrowserDeleteError": "\u00c9chec de la suppression de \"{0}\" : {1}",
   "FileBrowserRenameError": "\u00c9chec du renommage de \"{0}\" : {1}",
   "FileBrowserRenameTargetExists": "Un \u00e9l\u00e9ment nomm\u00e9 \"{0}\" existe d\u00e9j\u00e0.",

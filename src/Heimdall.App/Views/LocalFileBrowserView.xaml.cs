@@ -37,6 +37,10 @@ public partial class LocalFileBrowserView : UserControl
     private const double FileListWidthPadding = 10;
     private const double MinimumNameColumnWidth = 200;
 
+    // The arrows appended to the header of the column the list is sorted by.
+    private const string SortArrowAscending = " \u25B2";
+    private const string SortArrowDescending = " \u25BC";
+
     /// <summary>Host of the shell "Open with" dialog.</summary>
     internal const string RunDllExecutableName = "rundll32.exe";
 
@@ -48,6 +52,8 @@ public partial class LocalFileBrowserView : UserControl
 
     private readonly LocalizationManager? _localizer;
     private readonly LocalFileBrowserViewModel _viewModel;
+    private readonly FileListDragSource? _dragSource;
+    private System.Windows.Controls.ListViewItem? _highlightedDropRow;
 
     /// <summary>
     /// Raised when the user requests navigation to a directory path in the terminal.
@@ -104,7 +110,13 @@ public partial class LocalFileBrowserView : UserControl
 
         InitializeComponent();
         DataContext = _viewModel;
+        _dragSource = new FileListDragSource(
+            FileListView,
+            point => HitTestRow(point),
+            () => true,
+            StartLocalDrag);
         ApplyLocalization();
+        UpdateColumnHeaders();
         Loaded += OnViewLoaded;
     }
 
@@ -167,44 +179,131 @@ public partial class LocalFileBrowserView : UserControl
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (!FileBrowserShortcutPolicy.ShouldHandleShortcut(
+        // The keys that act on the selection are honoured only while the focus is in the list. The
+        // handler listens in the tunnelling phase, so without that test Enter on the Back button
+        // opened the selected file before the button saw the key.
+        FileBrowserShortcut shortcut = FileBrowserShortcutPolicy.Resolve(
+            e.Key == Key.System ? e.SystemKey : e.Key,
+            Keyboard.Modifiers,
             inlineEditorOpen: false,
-            Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
+            Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase,
+            FileListView.IsKeyboardFocusWithin);
+
+        switch (shortcut)
+        {
+            case FileBrowserShortcut.Refresh:
+                _ = _viewModel.Refresh();
+                break;
+
+            case FileBrowserShortcut.FocusFilter:
+                FilterTextBox.Focus();
+                FilterTextBox.SelectAll();
+                break;
+
+            case FileBrowserShortcut.FocusPath:
+                PathTextBox.Focus();
+                PathTextBox.SelectAll();
+                break;
+
+            case FileBrowserShortcut.NavigateBack:
+                _ = _viewModel.NavigateBack();
+                break;
+
+            case FileBrowserShortcut.ParentFolder:
+                _ = _viewModel.NavigateUp();
+                break;
+
+            case FileBrowserShortcut.NewFolder:
+                OnCtxNewFolder(sender, e);
+                break;
+
+            case FileBrowserShortcut.Rename:
+                OnCtxRename(sender, e);
+                break;
+
+            case FileBrowserShortcut.Delete:
+                OnCtxDelete(sender, e);
+                break;
+
+            case FileBrowserShortcut.Open:
+                OpenSelectedEntry();
+                break;
+
+            case FileBrowserShortcut.Copy:
+                OnCtxCopy(sender, e);
+                break;
+
+            case FileBrowserShortcut.Paste:
+                OnCtxPaste(sender, e);
+                break;
+
+            default:
+                return;
+        }
+
+        e.Handled = true;
+    }
+
+    /// <summary>Escape in the filter box clears it; a second Escape hands the keyboard back to the list.</summary>
+    private void OnFilterKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape)
         {
             return;
         }
 
-        switch (e.Key)
+        if (FilterTextBox.Text.Length > 0)
         {
-            case Key.F5:
-                _ = _viewModel.Refresh();
-                e.Handled = true;
-                break;
+            _viewModel.FilterText = string.Empty;
+        }
+        else
+        {
+            FileListView.Focus();
+        }
 
-            case Key.F2:
-                OnCtxRename(sender, e);
-                e.Handled = true;
-                break;
+        e.Handled = true;
+    }
 
-            case Key.Delete:
-                OnCtxDelete(sender, e);
-                e.Handled = true;
-                break;
+    private void OnColumnHeaderClick(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is not GridViewColumnHeader header || header.Column is null)
+        {
+            return;
+        }
 
-            case Key.Enter:
-                OpenSelectedEntry();
-                e.Handled = true;
-                break;
+        string key = SftpColumn.GetKey(header.Column);
+        if (key.Length == 0)
+        {
+            return;
+        }
 
-            case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
-                OnCtxCopy(sender, e);
-                e.Handled = true;
-                break;
+        _viewModel.ToggleSortColumn(key);
+        UpdateColumnHeaders();
+    }
 
-            case Key.V when Keyboard.Modifiers == ModifierKeys.Control:
-                OnCtxPaste(sender, e);
-                e.Handled = true;
-                break;
+    private void UpdateColumnHeaders()
+    {
+        if (FileListView?.View is not GridView gridView)
+        {
+            return;
+        }
+
+        string arrow = _viewModel.SortDirection == System.ComponentModel.ListSortDirection.Ascending
+            ? SortArrowAscending
+            : SortArrowDescending;
+
+        foreach (GridViewColumn column in gridView.Columns)
+        {
+            string key = SftpColumn.GetKey(column);
+            if (key.Length == 0)
+            {
+                continue;
+            }
+
+            string baseName = L10n($"LocalFileBrowserCol{key}");
+            column.Header = string.Equals(key, _viewModel.SortColumn, StringComparison.Ordinal)
+                ? baseName + arrow
+                : baseName;
         }
     }
 
@@ -265,6 +364,7 @@ public partial class LocalFileBrowserView : UserControl
         catch (Exception ex)
         {
             Heimdall.Core.Logging.FileLogger.Warn($"[LocalFileBrowser] file open: {ex.Message}");
+            _viewModel.ReportOpenFailure(entry.Name, ex.Message);
         }
     }
 
@@ -495,6 +595,116 @@ public partial class LocalFileBrowserView : UserControl
 
     private void OnFileListPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         => ListViewContextMenuHelper.SelectRowOnRightClick(sender, e);
+
+    // ------------------------------------------------------------------
+    // Drag and drop between this list and a remote one
+    // ------------------------------------------------------------------
+
+    private void OnFileListPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => _dragSource?.OnPreviewMouseLeftButtonDown(e);
+
+    private void OnFileListPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => _dragSource?.OnPreviewMouseLeftButtonUp(e);
+
+    private void OnFileListPreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+        => _dragSource?.OnPreviewMouseMove(e);
+
+    /// <summary>Drags the selected files out as real files, so a remote list (or Explorer) can take them.</summary>
+    private void StartLocalDrag(IReadOnlyList<object> rows)
+    {
+        string[] paths = rows.OfType<LocalFileEntry>().Select(entry => entry.FullPath).ToArray();
+        if (paths.Length == 0)
+        {
+            return;
+        }
+
+        System.Windows.DataObject data = new();
+        data.SetData(System.Windows.DataFormats.FileDrop, paths);
+        try
+        {
+            System.Windows.DragDrop.DoDragDrop(FileListView, data, System.Windows.DragDropEffects.Copy);
+        }
+        finally
+        {
+            SetDropHighlight(null);
+        }
+    }
+
+    /// <summary>
+    /// Only entries dragged out of a remote list are accepted: they are downloaded into the folder
+    /// under the pointer, or into the one shown.
+    /// </summary>
+    private void OnDragOver(object sender, System.Windows.DragEventArgs e)
+    {
+        if (SftpRemoteDragPayload.From(e.Data) is null)
+        {
+            SetDropHighlight(null);
+            e.Effects = System.Windows.DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        LocalFileEntry? hovered = HitTestRow(e.GetPosition(FileListView));
+        SetDropHighlight(hovered is { IsDirectory: true } ? hovered : null);
+        e.Effects = System.Windows.DragDropEffects.Copy;
+        e.Handled = true;
+    }
+
+    private void OnDragLeave(object sender, System.Windows.DragEventArgs e) => SetDropHighlight(null);
+
+    private async void OnDrop(object sender, System.Windows.DragEventArgs e)
+    {
+        SetDropHighlight(null);
+        if (SftpRemoteDragPayload.From(e.Data) is not { } payload)
+        {
+            return;
+        }
+
+        LocalFileEntry? hovered = HitTestRow(e.GetPosition(FileListView));
+        string targetFolder = hovered is { IsDirectory: true } ? hovered.FullPath : _viewModel.CurrentPath;
+        try
+        {
+            await payload.Source.DownloadFilesAsync(payload.Entries, targetFolder);
+            await _viewModel.Refresh();
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[LocalFileBrowser] drop download failed: {ex.Message}");
+        }
+    }
+
+    private LocalFileEntry? HitTestRow(System.Windows.Point point)
+    {
+        if (FileListView.InputHitTest(point) is not System.Windows.DependencyObject hit)
+        {
+            return null;
+        }
+
+        System.Windows.DependencyObject? container = ItemsControl.ContainerFromElement(FileListView, hit);
+        return (container as System.Windows.Controls.ListViewItem)?.DataContext as LocalFileEntry;
+    }
+
+    private void SetDropHighlight(LocalFileEntry? folder)
+    {
+        System.Windows.Controls.ListViewItem? container = folder is null
+            ? null
+            : FileListView.ItemContainerGenerator.ContainerFromItem(folder) as System.Windows.Controls.ListViewItem;
+        if (ReferenceEquals(container, _highlightedDropRow))
+        {
+            return;
+        }
+
+        if (_highlightedDropRow is not null)
+        {
+            SftpDropTarget.SetIsDropTarget(_highlightedDropRow, false);
+        }
+
+        _highlightedDropRow = container;
+        if (container is not null)
+        {
+            SftpDropTarget.SetIsDropTarget(container, true);
+        }
+    }
 
     private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {

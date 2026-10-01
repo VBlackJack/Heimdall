@@ -1,15 +1,31 @@
 <UserControl x:Class="Heimdall.App.Views.LocalFileBrowserView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:conv="clr-namespace:Heimdall.App.Converters"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
+             xmlns:local="clr-namespace:Heimdall.App.Views"
              Background="{DynamicResource BackgroundBrush}"
+             AllowDrop="True"
+             DragOver="OnDragOver"
+             DragLeave="OnDragLeave"
+             Drop="OnDrop"
              PreviewKeyDown="OnPreviewKeyDown">
     <UserControl.Resources>
-        <conv:FileSizeConverter x:Key="FileSizeConverter"/>
-        <conv:FileIconConverter x:Key="FileIconConverter"/>
-        <conv:FileIconColorConverter x:Key="FileIconColorConverter"/>
-        <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Heimdall;component/Themes/FileBrowserStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <conv:FileSizeConverter x:Key="FileSizeConverter"/>
+            <conv:FileDateTimeConverter x:Key="FileDateTimeConverter"/>
+            <conv:FileIconConverter x:Key="FileIconConverter"/>
+            <conv:FileIconColorConverter x:Key="FileIconColorConverter"/>
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <sys:Double x:Key="LocalFilterBoxWidth">160</sys:Double>
+            <Style x:Key="LocalFileRowStyle" TargetType="ListViewItem" BasedOn="{StaticResource FileBrowserRowStyle}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
+            </Style>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -28,13 +44,14 @@
             <DockPanel LastChildFill="True">
             <TextBox x:Name="FilterTextBox"
                      DockPanel.Dock="Right"
-                     Width="160"
+                     Width="{StaticResource LocalFilterBoxWidth}"
                      Style="{DynamicResource SearchTextBoxStyle}"
                      Tag=""
                      FontSize="{StaticResource FontSizeCaption}"
                      VerticalContentAlignment="Center"
                      Margin="8,0,0,0"
-                     Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                     KeyDown="OnFilterKeyDown"
+                     Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay={x:Static local:SftpViewMetrics.FilterInputDelayMilliseconds}}"
                       AutomationProperties.Name="{loc:Translate A11yTxtSearchFiles}"/>
             <StackPanel Orientation="Horizontal">
                 <Button Content="&#xE72B;" FontFamily="Segoe MDL2 Assets"
@@ -87,16 +104,23 @@
                   Foreground="{DynamicResource TextPrimaryBrush}"
                   BorderThickness="0"
                   ItemsSource="{Binding Files}"
+                  ItemContainerStyle="{StaticResource LocalFileRowStyle}"
                   SelectionMode="Extended"
                   AlternationCount="2"
+                  TextSearch.TextPath="Name"
+                  IsTextSearchEnabled="True"
                   MouseDoubleClick="OnFileDoubleClick"
                   PreviewMouseRightButtonDown="OnFileListPreviewMouseRightButtonDown"
+                  PreviewMouseLeftButtonDown="OnFileListPreviewMouseLeftButtonDown"
+                  PreviewMouseLeftButtonUp="OnFileListPreviewMouseLeftButtonUp"
+                  PreviewMouseMove="OnFileListPreviewMouseMove"
+                  GridViewColumnHeader.Click="OnColumnHeaderClick"
                   SizeChanged="OnFileListSizeChanged"
                   AutomationProperties.Name="{loc:Translate A11yLstFiles}"
                   VirtualizingPanel.IsVirtualizing="True">
             <ListView.View>
-                <GridView>
-                    <GridViewColumn x:Name="ColName" Width="250" Header="{loc:Translate LocalFileBrowserColName}">
+                <GridView AllowsColumnReorder="False">
+                    <GridViewColumn x:Name="ColName" local:SftpColumn.Key="Name" Width="250" Header="{loc:Translate LocalFileBrowserColName}">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
@@ -116,7 +140,7 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn x:Name="ColSize" Width="80" Header="{loc:Translate LocalFileBrowserColSize}">
+                    <GridViewColumn x:Name="ColSize" local:SftpColumn.Key="Size" Width="80" Header="{loc:Translate LocalFileBrowserColSize}">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Size, Converter={StaticResource FileSizeConverter}, ConverterParameter=dir}"
@@ -124,42 +148,10 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn x:Name="ColDate" Width="130" Header="{loc:Translate LocalFileBrowserColModified}"
-                                    DisplayMemberBinding="{Binding LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"/>
+                    <GridViewColumn x:Name="ColDate" local:SftpColumn.Key="Modified" Width="130" Header="{loc:Translate LocalFileBrowserColModified}"
+                                    DisplayMemberBinding="{Binding LastModified, Converter={StaticResource FileDateTimeConverter}}"/>
                 </GridView>
             </ListView.View>
-
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                    <Setter Property="Padding" Value="3,3"/>
-                    <Setter Property="MinHeight" Value="26"/>
-                    <Setter Property="BorderBrush" Value="Transparent"/>
-                    <Setter Property="BorderThickness" Value="1"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                    <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
-                    <Style.Triggers>
-                        <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                                <Condition Property="IsMouseOver" Value="True"/>
-                                <Condition Property="IsSelected" Value="False"/>
-                            </MultiTrigger.Conditions>
-                            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                        </MultiTrigger>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                            <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                        </Trigger>
-                        <Trigger Property="IsFocused" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                            <Setter Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
-                            <Setter Property="BorderThickness" Value="1,1,1,1"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </ListView.ItemContainerStyle>
 
             <ListView.ContextMenu>
                 <ContextMenu Opened="OnContextMenuOpened">
@@ -242,8 +234,22 @@
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="StatusBarText"
                        Text="{Binding StatusText}"
+                       ToolTip="{Binding StatusText}"
                        FontSize="{StaticResource FontSizeCaption}"
-                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                       TextTrimming="CharacterEllipsis"
+                       AutomationProperties.LiveSetting="Polite">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsErrorStatus}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                <Setter Property="AutomationProperties.LiveSetting" Value="Assertive"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
         </Border>
     </Grid>
 </UserControl>

@@ -2498,6 +2498,7 @@
   "FileBrowserStatusItemsOne": "{0} item",
   "FileBrowserEmptyFolder": "This folder is empty",
   "FileBrowserLoadError": "Could not open this folder - access denied or unavailable.",
+  "FileBrowserOpenFailed": "Could not open {0}: {1}",
   "FileBrowserDeleteError": "Failed to delete \"{0}\": {1}",
   "FileBrowserRenameError": "Failed to rename \"{0}\": {1}",
   "FileBrowserRenameTargetExists": "An item named \"{0}\" already exists.",

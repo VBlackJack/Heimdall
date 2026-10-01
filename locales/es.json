@@ -2498,6 +2498,7 @@
   "FileBrowserStatusItemsOne": "{0} elemento",
   "FileBrowserEmptyFolder": "Esta carpeta está vacía",
   "FileBrowserLoadError": "No se pudo abrir esta carpeta: acceso denegado o no disponible.",
+  "FileBrowserOpenFailed": "No se pudo abrir {0}: {1}",
   "FileBrowserDeleteError": "No se pudo eliminar \"{0}\": {1}",
   "FileBrowserRenameError": "No se pudo renombrar \"{0}\": {1}",
   "FileBrowserRenameTargetExists": "Ya existe un elemento llamado \"{0}\".",
