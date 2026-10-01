@@ -122,7 +122,7 @@ public sealed class RegexTesterViewModelTests
         vm.FlushPendingMatch();
 
         Assert.True(vm.IsResultsPanelVisible);
-        Assert.Equal("0 match(es)", vm.MatchCountText);
+        Assert.Equal("0 matches", vm.MatchCountText);
         Assert.Empty(vm.HighlightSegments);
     }
 

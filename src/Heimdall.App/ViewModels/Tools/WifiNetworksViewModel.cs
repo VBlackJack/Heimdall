@@ -55,6 +55,9 @@ public sealed partial class WifiNetworksViewModel : ObservableObject, IDisposabl
 
     public ObservableCollection<WifiEntry> Networks { get; }
 
+    /// <summary>The sentence the empty results panel shows before a scan.</summary>
+    public string EmptyStateText => L("ToolWifiEmptyState");
+
     public event EventHandler<string>? CopyResultsRequested;
 
     public void Initialize(LocalizationManager? localizer) => UpdateLocalizer(localizer);
@@ -186,11 +189,13 @@ public sealed partial class WifiNetworksViewModel : ObservableObject, IDisposabl
 
     private string BuildStatusText(int count, DateTime completedAt)
     {
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            L("ToolWifiStatus"),
+        return _localizer?.FormatCount(
             count,
-            completedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            "ToolWifiStatusOne",
+            "ToolWifiStatus",
+            count,
+            completedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture))
+            ?? "ToolWifiStatus";
     }
 
     private string BuildClipboardText()

@@ -694,7 +694,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
             if (subnets.Count > 0)
             {
                 _vm.Subnet = subnets[0];
-                _vm.StatusText = string.Format(L("ToolNetMapSubnetDetected"), subnets.Count, gateway.Name);
+                _vm.StatusText = DescribeDetectedSubnets(_localizer, subnets.Count, gateway.Name);
                 TxtSubnet.ToolTip = subnets.Count > 1 ? string.Join("\n", subnets) : null;
             }
             else
@@ -801,6 +801,11 @@ public partial class NetworkCartographyView : UserControl, IToolView
     }
 
     private string L(string key) => _localizer?[key] ?? key;
+
+    /// <summary>The status line once subnets were detected through a gateway.</summary>
+    internal static string DescribeDetectedSubnets(LocalizationManager? localizer, int count, string gatewayName) =>
+        localizer?.FormatCount(count, "ToolNetMapSubnetDetectedOne", "ToolNetMapSubnetDetected", count, gatewayName)
+            ?? "ToolNetMapSubnetDetected";
 
     public bool CanClose() => !_vm.IsScanning;
 

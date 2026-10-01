@@ -157,11 +157,13 @@ public sealed partial class OpenPortsViewModel : ObservableObject, IDisposable
 
     private string BuildStatusText(int count, DateTime refreshedAt)
     {
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            L("ToolOpenPortsStatus"),
+        return _localizer?.FormatCount(
             count,
-            refreshedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            "ToolOpenPortsStatusOne",
+            "ToolOpenPortsStatus",
+            count,
+            refreshedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture))
+            ?? "ToolOpenPortsStatus";
     }
 
     private string BuildClipboardText()

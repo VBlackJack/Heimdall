@@ -24,6 +24,52 @@ namespace Heimdall.App.Tests;
 
 public sealed class WifiNetworksViewModelTests
 {
+    /// <summary>The status words the network count by its number, French 0 in the singular.</summary>
+    [Theory]
+    [InlineData("en", 1, "1 network at ")]
+    [InlineData("en", 2, "2 networks at ")]
+    [InlineData("fr", 0, "0 r\u00e9seau \u00e0 ")]
+    [InlineData("fr", 2, "2 r\u00e9seaux \u00e0 ")]
+    [InlineData("es", 1, "1 red a las ")]
+    [InlineData("es", 0, "0 redes a las ")]
+    public async Task ScanCommand_WordsTheNetworkCountByItsNumber(string locale, int count, string expectedStart)
+    {
+        var localizer = await CreateLocalizerAsync(locale);
+        var service = new FakeWifiScanService
+        {
+            Results = Enumerable.Range(0, count)
+                .Select(i => new WifiEntry($"Net{i}", $"aa:{i}", "70%", 70, "1", "WPA2", "CCMP", "ax"))
+                .ToList(),
+        };
+        var vm = new WifiNetworksViewModel(service);
+        vm.Initialize(localizer);
+
+        vm.ScanCommand.Execute(null);
+        await WaitUntilAsync(() => !vm.IsBusy && service.Calls > 0);
+
+        Assert.StartsWith(expectedStart, vm.StatusText, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Before any scan the empty panel shows a sentence. It used to show the status template
+    /// itself, placeholders and all: "{0} network(s) at {1}".
+    /// </summary>
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    public async Task EmptyStateText_IsASentenceWithoutPlaceholders(string locale)
+    {
+        var localizer = await CreateLocalizerAsync(locale);
+        var vm = new WifiNetworksViewModel(new FakeWifiScanService());
+
+        vm.Initialize(localizer);
+
+        Assert.False(string.IsNullOrWhiteSpace(vm.EmptyStateText));
+        Assert.DoesNotContain("{", vm.EmptyStateText, StringComparison.Ordinal);
+        Assert.Equal(localizer["ToolWifiEmptyState"], vm.EmptyStateText);
+    }
+
     [Fact]
     public async Task Initialize_PopulatesHelpText()
     {

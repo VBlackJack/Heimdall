@@ -16,6 +16,7 @@
 
 using System.Globalization;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
 
@@ -45,8 +46,16 @@ public sealed class NetworkScannerService(
     /// Scans a subnet for live hosts and optionally adds them to the server inventory.
     /// Progress is reported through the standard <see cref="IProgress{T}"/> pattern.
     /// </summary>
+    /// <param name="localize">Maps a key to its text.</param>
+    /// <param name="countLocalizer">
+    /// Words the host count in the language of <paramref name="localize"/>; when omitted, through
+    /// <paramref name="localize"/> under the English rule.
+    /// </param>
+    /// <param name="progress">Receives the scan progress.</param>
+    /// <param name="ct">Cancels the scan.</param>
     public async Task<NetworkScanResult> ScanAndPromptAsync(
         Func<string, string> localize,
+        ICountLocalizer? countLocalizer = null,
         IProgress<(int Done, int Total, string Cidr)>? progress = null,
         CancellationToken ct = default)
     {
@@ -86,7 +95,7 @@ public sealed class NetworkScannerService(
             }));
 
             var addServers = await _dialogService.ShowConfirmAsync(
-                string.Format(CultureInfo.CurrentCulture, localize("NetworkScannerComplete"), results.Count),
+                DescribeCompletion(localize, countLocalizer, results.Count),
                 summary + "\n\n" + localize("NetworkScannerAddServer"),
                 "info");
 
@@ -125,7 +134,7 @@ public sealed class NetworkScannerService(
             return new NetworkScanResult(
                 results.Count,
                 addServers,
-                string.Format(CultureInfo.CurrentCulture, localize("NetworkScannerComplete"), results.Count));
+                DescribeCompletion(localize, countLocalizer, results.Count));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -138,5 +147,15 @@ public sealed class NetworkScannerService(
                 false,
                 string.Format(CultureInfo.CurrentCulture, localize("NetworkScannerError"), ex.Message));
         }
+    }
+
+    /// <summary>The line that closes a scan which found hosts.</summary>
+    internal static string DescribeCompletion(
+        Func<string, string> localize,
+        ICountLocalizer? countLocalizer,
+        int hostCount)
+    {
+        ICountLocalizer counts = countLocalizer ?? DelegateCountLocalizer.English(localize);
+        return counts.FormatCount(hostCount, "NetworkScannerCompleteOne", "NetworkScannerComplete", hostCount);
     }
 }

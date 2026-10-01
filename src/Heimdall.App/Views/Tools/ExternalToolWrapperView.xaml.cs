@@ -285,8 +285,7 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
             ResultsGrid.Visibility = Visibility.Visible;
             TxtOutput.Visibility = Visibility.Collapsed;
 
-            TxtStatus.Text = string.Format(CultureInfo.InvariantCulture,
-                L("ExtToolStatusRows"), table.Rows.Count);
+            TxtStatus.Text = DescribeRowCount(_localizer, table.Rows.Count);
         }
         catch
         {
@@ -366,8 +365,7 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
             ResultsGrid.Visibility = Visibility.Visible;
             TxtOutput.Visibility = Visibility.Collapsed;
 
-            TxtStatus.Text = string.Format(CultureInfo.InvariantCulture,
-                L("ExtToolStatusRows"), table.Rows.Count);
+            TxtStatus.Text = DescribeRowCount(_localizer, table.Rows.Count);
         }
         catch
         {
@@ -563,6 +561,10 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
     }
 
     private string L(string key) => _localizer?[key] ?? key;
+
+    /// <summary>The status line once the tool's output was read as a table.</summary>
+    internal static string DescribeRowCount(LocalizationManager? localizer, int count) =>
+        localizer?.FormatCount(count, "ExtToolStatusRowsOne", "ExtToolStatusRows", count) ?? "ExtToolStatusRows";
 
     private int GetConfiguredTimeoutMs()
     {

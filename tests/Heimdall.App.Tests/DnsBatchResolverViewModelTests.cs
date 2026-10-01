@@ -24,6 +24,27 @@ namespace Heimdall.App.Tests;
 
 public sealed class DnsBatchResolverViewModelTests
 {
+    /// <summary>The status words the resolved-host count by its number.</summary>
+    [Theory]
+    [InlineData("en", 1, "1 host resolved at ")]
+    [InlineData("en", 2, "2 hosts resolved at ")]
+    [InlineData("fr", 1, "1 h\u00f4te r\u00e9solu \u00e0 ")]
+    [InlineData("fr", 2, "2 h\u00f4tes r\u00e9solus \u00e0 ")]
+    [InlineData("es", 1, "1 host resuelto a las ")]
+    [InlineData("es", 2, "2 hosts resueltos a las ")]
+    public async Task ResolveCommand_WordsTheResolvedCountByItsNumber(string locale, int count, string expectedStart)
+    {
+        var localizer = await CreateLocalizerAsync(locale);
+        var vm = new DnsBatchResolverViewModel(new FakeDnsBatchResolverService());
+        vm.Initialize(localizer);
+        vm.HostnamesInput = string.Join("\r\n", Enumerable.Range(0, count).Select(i => $"host{i}.example.com"));
+
+        vm.ResolveCommand.Execute(null);
+        await WaitUntilAsync(() => !vm.IsBusy && vm.HasResults);
+
+        Assert.StartsWith(expectedStart, vm.StatusText, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ResolveCommand_EmptyInput_ShowsRequiredError()
     {

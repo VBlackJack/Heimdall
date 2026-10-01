@@ -460,7 +460,21 @@ public sealed partial class CommandLibraryViewModel
                             LocalizeKey("ToolCmdLibImportResultTitle"),
                             string.Format(
                                 LocalizeKey("ToolCmdLibImportResultMessage"),
-                                result.Imported, result.Updated, result.Skipped));
+                                _localizer.FormatCount(
+                                    result.Imported,
+                                    "ToolCmdLibImportCountImportedOne",
+                                    "ToolCmdLibImportCountImported",
+                                    result.Imported),
+                                _localizer.FormatCount(
+                                    result.Updated,
+                                    "ToolCmdLibImportCountUpdatedOne",
+                                    "ToolCmdLibImportCountUpdated",
+                                    result.Updated),
+                                _localizer.FormatCount(
+                                    result.Skipped,
+                                    "ToolCmdLibImportCountSkippedOne",
+                                    "ToolCmdLibImportCountSkipped",
+                                    result.Skipped)));
                         return;
                 }
             },

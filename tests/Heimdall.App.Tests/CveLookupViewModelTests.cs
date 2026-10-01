@@ -80,7 +80,8 @@ public sealed class CveLookupViewModelTests
         Assert.Equal(CveSearchState.HasResults, vm.State);
         Assert.NotEmpty(vm.Results);
         Assert.True(vm.CopyCommand.CanExecute(null));
-        Assert.Contains("CVE(s) found", vm.SummaryText, StringComparison.Ordinal);
+        Assert.True(vm.Results.Count > 1, "the fixture must match several CVEs to pin the plural");
+        Assert.StartsWith($"{vm.Results.Count} CVEs found for ", vm.SummaryText, StringComparison.Ordinal);
         Assert.Equal("Critical", vm.Results[0].SeverityLabel);
     }
 

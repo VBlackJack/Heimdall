@@ -174,11 +174,13 @@ public sealed partial class NetworkInterfacesViewModel : ObservableObject, IDisp
 
     private string BuildStatusText(int count, DateTime refreshedAt)
     {
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            L("ToolNetIfStatus"),
+        return _localizer?.FormatCount(
             count,
-            refreshedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            "ToolNetIfStatusOne",
+            "ToolNetIfStatus",
+            count,
+            refreshedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture))
+            ?? "ToolNetIfStatus";
     }
 
     private string BuildClipboardText()

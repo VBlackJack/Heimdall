@@ -207,7 +207,7 @@ public sealed partial class RegexTesterViewModel : ObservableObject, IDisposable
     private void ApplySuccessfulMatch(RegexTestResult result)
     {
         _lastTotalMatchCount = result.TotalMatchCount;
-        MatchCountText = string.Format(CultureInfo.CurrentCulture, L("ToolRegexMatchCount"), result.TotalMatchCount);
+        MatchCountText = FormatMatchCount(result.TotalMatchCount);
         IsEmptyStateVisible = false;
         IsResultsPanelVisible = true;
 
@@ -303,7 +303,7 @@ public sealed partial class RegexTesterViewModel : ObservableObject, IDisposable
         RefreshStatusText();
         if (IsResultsPanelVisible)
         {
-            MatchCountText = string.Format(CultureInfo.CurrentCulture, L("ToolRegexMatchCount"), _lastTotalMatchCount);
+            MatchCountText = FormatMatchCount(_lastTotalMatchCount);
         }
 
         if (IsTruncatedNoticeVisible)
@@ -351,6 +351,9 @@ public sealed partial class RegexTesterViewModel : ObservableObject, IDisposable
     private void OnLocaleChanged(string _) => RefreshLocalizedState();
 
     private string L(string key) => _localizer?[key] ?? key;
+
+    private string FormatMatchCount(int count) =>
+        _localizer?.FormatCount(count, "ToolRegexMatchCountOne", "ToolRegexMatchCount", count) ?? "ToolRegexMatchCount";
 
     private enum RegexStatusKind
     {

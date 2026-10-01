@@ -76,7 +76,7 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         _uiDispatcher = uiDispatcher;
         SelectedNoteTitle = L("ToolNotesNoSelection");
         SelectedNotePathDisplay = storage.NotesRootPath;
-        ListFooterText = string.Format(L("ToolNotesCount"), 0);
+        ListFooterText = FormatNoteCount(0);
         StatusMessage = L("ToolNotesStatusReady");
     }
 
@@ -514,7 +514,7 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         await RunOnUiAsync(() =>
         {
             ReplaceCollection(Notes, tree);
-            ListFooterText = string.Format(L("ToolNotesCount"), visibleNotes.Count);
+            ListFooterText = FormatNoteCount(visibleNotes.Count);
             SelectedNote = FindNodeByPath(Notes, preferredPath ?? CurrentNotePath);
         });
 
@@ -775,6 +775,9 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     }
 
     private string L(string key) => _localizer[key];
+
+    private string FormatNoteCount(int count) =>
+        _localizer.FormatCount(count, "ToolNotesCountOne", "ToolNotesCount", count);
 }
 
 internal sealed record NoteTagFilterChip(string? Value, string DisplayLabel, bool IsSelected);

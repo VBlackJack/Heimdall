@@ -24,6 +24,31 @@ namespace Heimdall.App.Tests;
 
 public sealed class NetworkInterfacesViewModelTests
 {
+    /// <summary>The status words the interface count by its number, French 0 in the singular.</summary>
+    [Theory]
+    [InlineData("en", 1, "1 interface at ")]
+    [InlineData("en", 2, "2 interfaces at ")]
+    [InlineData("fr", 0, "0 interface \u00e0 ")]
+    [InlineData("fr", 2, "2 interfaces \u00e0 ")]
+    [InlineData("es", 1, "1 interfaz a las ")]
+    [InlineData("es", 0, "0 interfaces a las ")]
+    public async Task RefreshCommand_WordsTheInterfaceCountByItsNumber(string locale, int count, string expectedStart)
+    {
+        var localizer = await CreateLocalizerAsync(locale);
+        var service = new FakeNetworkInterfacesService
+        {
+            Snapshots = Enumerable.Range(0, count)
+                .Select(i => new NicSnapshot($"nic{i}", "Ethernet", "Up", "1 Gbps", "", "", "", "", "DHCP"))
+                .ToList(),
+        };
+        var vm = new NetworkInterfacesViewModel(service);
+        vm.Initialize(localizer);
+
+        vm.RefreshCommand.Execute(null);
+
+        Assert.StartsWith(expectedStart, vm.StatusText, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Initialize_PopulatesHelpText()
     {

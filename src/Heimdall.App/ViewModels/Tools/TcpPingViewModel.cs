@@ -327,11 +327,13 @@ public sealed partial class TcpPingViewModel : ObservableObject, IDisposable
             return string.Empty;
         }
 
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            L("ToolTcpPingStatus"),
+        return _localizer?.FormatCount(
             probes.Count,
-            _lastCompletedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            "ToolTcpPingStatusOne",
+            "ToolTcpPingStatus",
+            probes.Count,
+            _lastCompletedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture))
+            ?? "ToolTcpPingStatus";
     }
 
     private static string FormatProbeLine(TcpPingProbeResult probe, int totalCount)
