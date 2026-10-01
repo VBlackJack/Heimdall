@@ -113,6 +113,7 @@
   "DialogSftpPasswordPromptNoCredential": "El explorador de archivos no pudo autenticarse en {0}. Introduce la contraseña SSH.",
   "DialogSftpPasswordPromptRefused": "Se rechazó la autenticación en {0}. Introduce la contraseña SSH para volver a intentarlo.",
   "ErrorSshCancelled": "Se canceló la conexión.",
+  "ErrorSshHostKeyRejected": "La clave de host presentada por {0}:{1} no fue de confianza, por lo que no se abrió la conexión.",
   "ErrorSshChainDepthExceeded": "Se superó la profundidad máxima de la cadena de pasarelas. Reduce el número de pasarelas encadenadas.",
   "ErrorSshCircularChainDependency": "Se detectó una dependencia circular en la configuración de la cadena de pasarelas.",
   "ErrorSshHostKeyMismatch": "La clave de host del servidor ha cambiado. Esto podría indicar un problema de seguridad (ataque de intermediario). Verifícalo con tu administrador.",

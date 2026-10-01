@@ -113,6 +113,7 @@
   "DialogSftpPasswordPromptNoCredential": "The file browser could not authenticate to {0}. Enter the SSH password.",
   "DialogSftpPasswordPromptRefused": "Authentication to {0} was refused. Enter the SSH password to try again.",
   "ErrorSshCancelled": "Connection was cancelled.",
+  "ErrorSshHostKeyRejected": "The host key presented by {0}:{1} was not trusted, so the connection was not opened.",
   "ErrorSshChainDepthExceeded": "Maximum gateway chain depth exceeded. Reduce the number of chained gateways.",
   "ErrorSshCircularChainDependency": "Circular dependency detected in the gateway chain configuration.",
   "ErrorSshHostKeyMismatch": "Server host key has changed. This could indicate a security issue (man-in-the-middle). Verify with your administrator.",

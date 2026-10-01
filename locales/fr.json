@@ -113,6 +113,7 @@
   "DialogSftpPasswordPromptNoCredential": "L'explorateur de fichiers n'a pas pu s'authentifier auprès de {0}. Saisissez le mot de passe SSH.",
   "DialogSftpPasswordPromptRefused": "L'authentification auprès de {0} a été refusée. Saisissez le mot de passe SSH pour réessayer.",
   "ErrorSshCancelled": "La connexion a \u00e9t\u00e9 annul\u00e9e.",
+  "ErrorSshHostKeyRejected": "La cl\u00e9 d'h\u00f4te pr\u00e9sent\u00e9e par {0}:{1} n'a pas \u00e9t\u00e9 approuv\u00e9e, la connexion n'a donc pas \u00e9t\u00e9 ouverte.",
   "ErrorSshChainDepthExceeded": "Profondeur maximale de la cha\u00eene de passerelles d\u00e9pass\u00e9e. R\u00e9duisez le nombre de passerelles cha\u00een\u00e9es.",
   "ErrorSshCircularChainDependency": "D\u00e9pendance circulaire d\u00e9tect\u00e9e dans la configuration de la cha\u00eene de passerelles.",
   "ErrorSshHostKeyMismatch": "La cl\u00e9 d'h\u00f4te du serveur a chang\u00e9. Ceci pourrait indiquer un probl\u00e8me de s\u00e9curit\u00e9. V\u00e9rifiez avec votre administrateur.",
