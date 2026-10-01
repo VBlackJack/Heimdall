@@ -26,7 +26,9 @@ statement, not a guess.
 **Nothing you change is written until you press Save settings**, with the exceptions each card
 states. **Save settings** is enabled only while edits are pending, and Ctrl+S on the Settings tab
 does the same. After a save, "Settings saved" shows beside the buttons until your next edit.
-**Undo changes** returns every pending edit to the saved value.
+**Undo changes** returns every pending edit to the saved value. Pending means different from what
+is saved: change a value and change it back, and nothing is pending any more. Edits to the SSH
+gateways and the external tools stay pending until you save or undo them.
 
 A card whose settings do not simply wait for Save says so under its title:
 
@@ -62,6 +64,22 @@ Diagnostics, keeps its value.
 ignoring case and accents. It counts only what is on screen for you ("Result 2 of 5"); Enter
 jumps to the next match, Shift+Enter to the previous one, opening the tab and any collapsed
 section on the way. Ctrl+F on the Settings tab puts the cursor in it.
+
+**Modified** - a setting whose value differs from its factory default shows a small "Modified"
+badge after its field, with a **Reset** button beside it. A screen reader reads the badge as
+"Modified from default:" followed by the default value, and the button as "Reset to the default
+value:" with the same value. Reset puts that one default back as a pending edit, like a typed
+change: nothing is written until you press Save settings, and Undo changes takes it back. The
+markers compare what the screen holds now, unsaved edits included, with the same factory file
+Reset defaults loads. Language, theme and accent are marked too, and Reset is the only way to put
+their default back, since Reset defaults keeps them. The resolution presets are marked as a whole
+list. Three things carry no marker: the credential provider unlock secret (a secret), the list of
+external tools (your own entries, which a reset would delete), and anything saved immediately
+(PIN, master password, Windows Hello, trust lists).
+
+**Find modified settings**, beside the search box, searches for that badge: the count is the
+number of settings you changed from their default, and Enter walks through them. It is not a
+filter: the other settings stay on screen.
 
 ## Settings file: export and import
 
@@ -110,6 +128,19 @@ nothing to lock the workspace behind, so both stay greyed out, with a line sayin
 master password is on. 0 turns auto-lock off.
 
 ## Security
+
+**Security overview** - the first card of the Security tab lists, one line each, the choices on
+this screen that affect security: RDP NLA and strict server authentication, TFTP sharing, session
+transcripts, the PowerShell execution policy, the master password, auto-lock, disconnect on lock,
+Credential Guard, Windows Hello before connecting, automatic update checks and the known_hosts
+import at startup. It shows what the screen holds now, unsaved edits included, and tags a line
+"Unsaved" while it differs from what is saved. A line marked with a warning icon is a documented
+insecure choice: NLA off, TFTP on, transcripts on, the Bypass or Unrestricted execution policy, no
+auto-lock with the master password on, update checks off, or the known_hosts import on. It says
+why, and **Go to setting** opens the tab, scrolls to the setting and puts the focus on it. The line
+above the list says how many need attention, and a screen reader announces it when it changes.
+Strict server authentication off is reported but not flagged: it is the Windows default, which
+warns and asks.
 
 **Network Level Authentication (NLA)** and **Strict server authentication** are on the RDP tab,
 under Certificates, in the Connection security card.

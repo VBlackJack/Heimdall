@@ -129,6 +129,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private Action<bool>? _fileShareTftpSavedHandler;
     private Action? _settingsLoadedHandler;
     private Action<string>? _invalidFieldFocusHandler;
+    private Action<string>? _settingNavigationHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _selectedExternalToolPropertyChangedHandler;
     private Action? _externalToolsChangedHandler;
     private Action<string>? _localeChangedHandler;
@@ -253,6 +254,13 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             DispatcherPriority.Background,
             new Action(() => FocusSettingsField(property)));
         viewModel.Settings.InvalidFieldFocusRequested += _invalidFieldFocusHandler;
+
+        // "Go to setting" on the security posture card: the same reveal, scroll and highlight as a
+        // search match, then focus on the control itself.
+        _settingNavigationHandler = elementName => Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() => NavigateToSettingsElement(elementName)));
+        viewModel.Settings.SettingNavigationRequested += _settingNavigationHandler;
 
         // The sync service lives in the TwinShell container; the panel tests typed values through it.
         viewModel.Settings.GitConnectionTester = (remoteUrl, branch) =>
@@ -1633,6 +1641,36 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     }
 
     /// <summary>
+    /// Shows the settings control named <paramref name="elementName"/>: opens every tab and expander
+    /// it sits in, scrolls it into view, highlights it like a search match and gives it focus.
+    /// </summary>
+    /// <remarks>
+    /// The posture card names its targets by x:Name, which a guard checks against this markup. A
+    /// target that cannot take focus - disabled, or a text line - is still revealed and highlighted.
+    /// </remarks>
+    private void NavigateToSettingsElement(string elementName)
+    {
+        if (FindName(elementName) is not FrameworkElement target)
+        {
+            return;
+        }
+
+        RevealSettingsElement(target);
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                target.BringIntoView();
+                HighlightSettingsSearchTarget(target);
+                if (target.Focusable && target.IsEnabled)
+                {
+                    target.Focus();
+                    Keyboard.Focus(target);
+                }
+            }));
+    }
+
+    /// <summary>
     /// Finds the settings text box whose Text is bound to <c>Settings.</c><paramref name="property"/>.
     /// </summary>
     /// <remarks>
@@ -1688,6 +1726,28 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private void OnSettingsSearchClearClick(object sender, RoutedEventArgs e)
     {
         Mw_SettingsSearchBox.Text = string.Empty;
+        Mw_SettingsSearchBox.Focus();
+    }
+
+    /// <summary>
+    /// Searches the settings for the "Modified" marker, so the search counts and walks the settings
+    /// that differ from their factory default.
+    /// </summary>
+    /// <remarks>
+    /// The search is a walk, not a filter: nothing on the panel hides a non-matching row, and a
+    /// second visibility mechanism over every row of six tabs was not worth what it would cost.
+    /// The markers are what makes this exact: a marker is collapsed while its value is the default,
+    /// and the search skips anything collapsed, so the count is the number of modified settings.
+    /// </remarks>
+    private void OnSettingsFindModifiedClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        Mw_SettingsSearchBox.Text = vm.Localize("SettingsModifiedBadge");
+        Mw_SettingsSearchBox.CaretIndex = Mw_SettingsSearchBox.Text.Length;
         Mw_SettingsSearchBox.Focus();
     }
 
@@ -4101,6 +4161,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 vm.Settings.SettingsLoaded -= _settingsLoadedHandler;
             if (_invalidFieldFocusHandler is not null)
                 vm.Settings.InvalidFieldFocusRequested -= _invalidFieldFocusHandler;
+            if (_settingNavigationHandler is not null)
+                vm.Settings.SettingNavigationRequested -= _settingNavigationHandler;
             if (_trackedExternalToolForPreview is not null
                 && _selectedExternalToolPropertyChangedHandler is not null)
             {

@@ -28,7 +28,10 @@ vérifiée dans le code, pas une supposition.
 que chaque carte indique. **Enregistrer** n'est actif que tant que des modifications attendent,
 et Ctrl+S dans l'onglet Paramètres fait de même. Après un enregistrement, "Paramètres enregistrés"
 s'affiche à côté des boutons jusqu'à votre modification suivante. **Annuler les modifications**
-rend à chaque modification en attente sa valeur enregistrée.
+rend à chaque modification en attente sa valeur enregistrée. En attente veut dire différent de ce
+qui est enregistré : changez une valeur puis remettez-la, et plus rien n'attend. Les modifications
+des passerelles SSH et des outils externes restent en attente jusqu'à l'enregistrement ou
+l'annulation.
 
 Une carte dont les réglages n'attendent pas simplement l'enregistrement le dit sous son titre :
 
@@ -68,6 +71,24 @@ infobulles comprises, sans tenir compte de la casse ni des accents. Il ne compte
 affiché pour vous ("Résultat 2 sur 5") ; Entrée passe au résultat suivant, Maj+Entrée au
 précédent, en ouvrant au passage l'onglet et toute section repliée. Ctrl+F dans l'onglet
 Paramètres y place le curseur.
+
+**Modifié** - un réglage dont la valeur diffère de sa valeur d'usine affiche un petit badge
+"Modifié" après son champ, avec un bouton **Rétablir** à côté. Un lecteur d'écran lit le badge
+"Modifié, valeur par défaut :" suivi de la valeur par défaut, et le bouton "Rétablir la valeur par
+défaut :" avec la même valeur. Rétablir remet cette seule valeur par défaut, comme une
+modification en attente tapée à la main : rien n'est écrit avant Enregistrer, et Annuler les
+modifications la reprend. Les marques comparent ce que l'écran contient maintenant, modifications
+non enregistrées comprises, au même fichier d'usine que celui de Valeurs par défaut. La langue, le
+thème et l'accent sont marqués aussi, et Rétablir est le seul moyen de remettre leur valeur par
+défaut, puisque Valeurs par défaut les garde. Les résolutions prédéfinies sont marquées comme une
+liste entière. Trois choses n'ont pas de marque : le secret de déverrouillage du fournisseur
+d'identifiants (un secret), la liste des outils externes (vos propres entrées, qu'une
+réinitialisation supprimerait) et tout ce qui est enregistré aussitôt (PIN, mot de passe maître,
+Windows Hello, listes d'approbation).
+
+**Trouver les paramètres modifiés**, à côté du champ de recherche, recherche ce badge : le compte
+est le nombre de réglages que vous avez changés par rapport à leur valeur par défaut, et Entrée
+les parcourt. Ce n'est pas un filtre : les autres réglages restent affichés.
 
 ## Fichier de paramètres : exporter et importer
 
@@ -122,6 +143,22 @@ grisés, avec une ligne qui dit pourquoi, tant que le mot de passe maître n'est
 désactive le verrouillage automatique.
 
 ## Sécurité
+
+**Vue d'ensemble de la sécurité** - la première carte de l'onglet Sécurité liste, une ligne
+chacun, les choix de cet écran qui touchent à la sécurité : NLA et authentification stricte du
+serveur en RDP, partage TFTP, transcription des sessions, politique d'exécution PowerShell, mot de
+passe maître, verrouillage automatique, déconnexion au verrouillage, Credential Guard, Windows
+Hello avant la connexion, vérification automatique des mises à jour et import de known_hosts au
+démarrage. Elle montre ce que l'écran contient maintenant, modifications non enregistrées
+comprises, et marque une ligne "Non enregistré" tant qu'elle diffère de ce qui est enregistré.
+Une ligne précédée d'une icône d'avertissement est un choix documenté comme non sûr : NLA
+désactivée, TFTP activé, transcription activée, politique d'exécution Bypass ou Unrestricted,
+pas de verrouillage automatique avec le mot de passe maître actif, vérification des mises à jour
+désactivée, ou import de known_hosts activé. Elle dit pourquoi, et **Aller au paramètre** ouvre
+l'onglet, fait défiler jusqu'au réglage et y place le focus. La ligne au-dessus de la liste dit
+combien demandent attention, et un lecteur d'écran l'annonce quand elle change. L'authentification
+stricte du serveur désactivée est signalée sans être marquée : c'est le réglage par défaut de
+Windows, qui avertit et demande.
 
 **Network Level Authentication (NLA)** et **Authentification stricte du serveur** se trouvent dans
 l'onglet RDP, sous Certificats, dans la carte Sécurité de la connexion.

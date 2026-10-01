@@ -35,6 +35,22 @@ Out of scope: multi-user shared installations, secure boot chain, and supply
 chain attacks on SSH.NET or WebView2. Track dependency exposure with
 `dotnet list package --vulnerable`.
 
+## Security overview in Settings
+
+The first card of `Settings > Security` lists the security-relevant choices of
+the Settings screen, one line each, with their state, and flags the documented
+insecure ones: NLA off, TFTP sharing on, session transcripts on, the `Bypass` or
+`Unrestricted` PowerShell execution policy, the master password on with no idle
+auto-lock, update checks off, and the `known_hosts` import at startup on (it
+trusts, without a prompt, keys any other program wrote to that file). Strict
+server authentication off is reported but not flagged, because it is the
+Windows default, which warns and asks. The card reads the pending values and
+tags a line that differs from disk as unsaved, so it describes what Save would
+keep, not what is running. The rule is one pure type, `SecurityPosture`, under
+test; the card does not decide anything itself. It covers settings only: there
+is no global WinRM skip-certificate default (that choice is per session) and no
+SSH host key policy to report (an unknown or changed key always asks).
+
 ## Known limitations
 
 ### Credential lifetime in managed memory
@@ -997,7 +1013,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 6,581
+  parity (every catalogue holds exactly the English key set, currently 6,629
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on

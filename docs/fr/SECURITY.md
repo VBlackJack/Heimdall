@@ -38,6 +38,25 @@ démarrage sécurisé et les attaques sur la chaîne d'approvisionnement visant
 SSH.NET ou WebView2. Suivez l'exposition des dépendances avec
 `dotnet list package --vulnerable`.
 
+## Vue d'ensemble de la sécurité dans les paramètres
+
+La première carte de `Paramètres > Sécurité` liste les choix de l'écran
+Paramètres qui touchent à la sécurité, une ligne chacun, avec leur état, et
+marque ceux documentés comme non sûrs : NLA désactivée, partage TFTP activé,
+transcription des sessions activée, politique d'exécution PowerShell `Bypass` ou
+`Unrestricted`, mot de passe maître actif sans verrouillage automatique,
+vérification des mises à jour désactivée, et import de `known_hosts` au
+démarrage activé (il approuve, sans question, les clés que n'importe quel autre
+programme a écrites dans ce fichier). L'authentification stricte du serveur
+désactivée est signalée sans être marquée, car c'est le réglage par défaut de
+Windows, qui avertit et demande. La carte lit les valeurs en attente et marque
+non enregistrée une ligne qui diffère du disque : elle décrit ce que
+l'enregistrement garderait, pas ce qui tourne. La règle est un seul type pur,
+`SecurityPosture`, sous test ; la carte ne décide rien elle-même. Elle ne couvre
+que des réglages : il n'existe pas de valeur globale WinRM pour ignorer le
+certificat (ce choix se fait par session), ni de politique de clé d'hôte SSH à
+signaler (une clé inconnue ou changée demande toujours).
+
 ## Limitations connues
 
 ### Durée de vie des identifiants en mémoire managée
@@ -1104,7 +1123,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 6 581 clés) et une analyse informative
+  le jeu de clés anglais, actuellement 6 629 clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais
