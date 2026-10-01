@@ -24,6 +24,16 @@ All notable changes to Heimdall are documented in this file.
   gets the inherited module path without PowerShell 7's entries, every other entry kept, as the
   WinRM tab already does. The Service Status Dashboard tool lists services with the same module path.
 
+### Services: Start, Stop and Restart run on Windows PowerShell's own modules
+
+- **A service action started from a PowerShell 7 session no longer loads PowerShell 7's modules.**
+  Start, Stop and Restart in the Service Status Dashboard run an elevated Windows PowerShell,
+  which cannot be given an environment, so it inherited PowerShell 7's module directories and
+  loaded PowerShell 7's Management module for the service cmdlet. Its script now sets the same
+  module path as the listing before anything else runs. A module path or a service name holding
+  a typographic single quote is now escaped like an apostrophe: PowerShell ends a quoted string
+  on either, and the script used to stop there.
+
 ## 2026-10-01: settings show what you changed, and a security overview (v2026.100103)
 
 ### Settings: see what you changed, and put one setting back
