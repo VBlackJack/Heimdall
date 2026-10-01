@@ -477,7 +477,7 @@ public partial class ServerListViewModel
 
         var confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["ConfirmConnectAllTitle"],
-            _localizer.Format("ConfirmConnectAllMessage", plan.ConnectableCount));
+            ComposeConnectAllMessage(plan.ConnectableCount));
         if (!confirmed)
         {
             return;
@@ -1533,6 +1533,16 @@ public partial class ServerListViewModel
 
     /// <summary>The message shown when a bulk connect finds nothing it can attempt.</summary>
     /// <param name="skips">Selected servers skipped before any attempt, by reason.</param>
+    /// <summary>
+    /// The connect-all confirmation, worded by the number of sessions it will open.
+    /// </summary>
+    internal string ComposeConnectAllMessage(int connectableCount) =>
+        _localizer.FormatCount(
+            connectableCount,
+            "ConfirmConnectAllMessageOne",
+            "ConfirmConnectAllMessage",
+            connectableCount);
+
     internal string ComposeNothingToConnectStatus(BulkConnectSkipTally skips)
     {
         ArgumentNullException.ThrowIfNull(skips);

@@ -1714,6 +1714,7 @@
   "TreeCtxConnectAllCount": "Tout connecter ({0})",
   "ConfirmConnectAllTitle": "Tout connecter",
   "ConfirmConnectAllMessage": "Se connecter aux {0} sessions de ce dossier ?",
+  "ConfirmConnectAllMessageOne": "Se connecter à {0} session de ce dossier ?",
   "StatusConnectAllProgress": "Connexion {0}/{1} : {2}...",
   "StatusConnectedAllCount": "{0} sessions connect\u00e9es.",
   "StatusBulkConnectCancelledSuffix": "Annul\u00e9 : {0} non tent\u00e9s.",

@@ -2451,6 +2451,26 @@ public sealed class ServerListBulkActionTests : IDisposable
                 .Single());
     }
 
+    /// <summary>
+    /// The connect-all confirmation said "Connect to all 1 sessions" when a single session could
+    /// connect. It is worded by the number it announces.
+    /// </summary>
+    [Theory]
+    [InlineData(1, "ConfirmConnectAllMessageOne")]
+    [InlineData(2, "ConfirmConnectAllMessage")]
+    public async Task ComposeConnectAllMessage_IsWordedByTheNumberItAnnounces(int count, string expectedKey)
+    {
+        await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: false);
+        LocalizationManager localizer = await CreateLocalizerAsync();
+
+        string message = fixture.ViewModel.ComposeConnectAllMessage(count);
+
+        Assert.NotEqual(
+            localizer.Format("ConfirmConnectAllMessageOne", 1),
+            localizer.Format("ConfirmConnectAllMessage", 1));
+        Assert.Equal(localizer.Format(expectedKey, count), message);
+    }
+
     private static async Task<LocalizationManager> CreateLocalizerAsync()
     {
         LocalizationManager localizer = new();

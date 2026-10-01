@@ -543,7 +543,7 @@ public sealed class ContextMenuFactory
 
             var confirmed = await vm.DialogService.ShowConfirmAsync(
                 vm.Localize("ConfirmConnectAllTitle"),
-                string.Format(vm.Localize("ConfirmConnectAllMessage"), plan.ConnectableCount));
+                vm.ServerList.ComposeConnectAllMessage(plan.ConnectableCount));
 
             if (!confirmed) return;
 
