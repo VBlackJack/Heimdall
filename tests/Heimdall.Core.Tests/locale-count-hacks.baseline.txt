@@ -1,3 +1,0 @@
-# Locale keys whose value still words a count with a parenthesised plural, "session(s)".
-# This list may only SHRINK: see LocaleCountWordingGuardTests. Fixing a key (an "X" / "XOne"
-# pair formatted with LocalizationManager.FormatCount) or deleting it means deleting its line.
