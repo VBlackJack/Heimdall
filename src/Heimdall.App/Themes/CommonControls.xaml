@@ -134,10 +134,19 @@
     <!-- Hover delays, in milliseconds: the row's summary, then the status dot's own verdict. -->
     <sys:Int32 x:Key="SessionTreeRowToolTipDelay">150</sys:Int32>
     <sys:Int32 x:Key="SessionTreeStatusToolTipDelay">200</sys:Int32>
-    <!-- Row outline: transparent at rest, the focus ring when focused, a thick edge for an insertion. -->
-    <Thickness x:Key="SessionTreeRowOutlineThickness">1</Thickness>
-    <Thickness x:Key="SessionTreeInsertBeforeThickness">1,3,1,1</Thickness>
-    <Thickness x:Key="SessionTreeInsertAfterThickness">1,1,1,3</Thickness>
+    <!-- Row outline: transparent at rest, the focus ring when focused, a thick edge for an insertion.
+         The ring is 2 px so it keeps 3:1 against the row on every theme (WCAG 1.4.11, 2.4.11). -->
+    <Thickness x:Key="SessionTreeRowOutlineThickness">2</Thickness>
+    <Thickness x:Key="SessionTreeInsertBeforeThickness">2,4,2,2</Thickness>
+    <Thickness x:Key="SessionTreeInsertAfterThickness">2,2,2,4</Thickness>
+    <!-- Row heights and the folder icon, so the two row kinds are sized in one place. -->
+    <sys:Double x:Key="SessionTreeFolderRowMinHeight">26</sys:Double>
+    <sys:Double x:Key="SessionTreeServerRowMinHeight">24</sys:Double>
+    <sys:Double x:Key="SessionTreeFolderIconSize">13</sys:Double>
+    <!-- Transparent frame around the status dot: the hover target is the dot plus this on each side. -->
+    <Thickness x:Key="SessionTreeStatusHitPadding">3</Thickness>
+    <!-- The multiplication sign that closes a filter chip. -->
+    <sys:String x:Key="SessionTreeFilterChipRemoveGlyph">&#x00D7;</sys:String>
     <!-- Expander: a 12 px glyph box whose click target reaches 24 px (WCAG 2.5.8) without widening
          the indent; the overhang is the difference split on each side. -->
     <sys:Double x:Key="TreeExpanderGlyphBoxSize">12</sys:Double>

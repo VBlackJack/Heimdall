@@ -33,6 +33,8 @@ public partial class MainWindow
     private static readonly TimeSpan TreeDragTickInterval = TimeSpan.FromMilliseconds(100);
     internal static readonly TimeSpan TreeDragExpandDelay = TimeSpan.FromMilliseconds(700);
     internal const double TreeDragEdgeSize = 28;
+    internal const int TreeDragMaxExtraLines = 3;
+    private readonly TreeTypeAhead _treeTypeAhead = new();
 
     private void OnTreeBulkMoreClick(object sender, RoutedEventArgs e)
     {
@@ -231,9 +233,12 @@ public partial class MainWindow
     private void OnTreeDragNavigationTick(object? sender, EventArgs e)
     {
         ScrollViewer? scroll = FindVisualDescendant<ScrollViewer>(SessionTreeView, _ => true);
-        int direction = ResolveTreeDragScroll(_treeDragPoint.Y, SessionTreeView.ActualHeight);
-        if (direction < 0) scroll?.LineUp();
-        if (direction > 0) scroll?.LineDown();
+        int lines = ResolveTreeDragScrollLines(_treeDragPoint.Y, SessionTreeView.ActualHeight);
+        for (int step = 0; step < Math.Abs(lines); step++)
+        {
+            if (lines < 0) scroll?.LineUp();
+            else scroll?.LineDown();
+        }
         if (_treeHoverFolder is { IsExpanded: false } folder
             && Environment.TickCount64 - _treeHoverStarted >= TreeDragExpandDelay.TotalMilliseconds)
         {
@@ -247,6 +252,60 @@ public partial class MainWindow
         height <= 0 || y < 0 || y > height ? 0
         : y < Math.Min(TreeDragEdgeSize, height / 2) ? -1
         : y > height - Math.Min(TreeDragEdgeSize, height / 2) ? 1 : 0;
+
+    /// <summary>
+    /// How many rows one drag tick scrolls: one at the inner edge of the band, more the closer the
+    /// pointer gets to the border, so a long tree is crossed in a drag rather than a crawl.
+    /// </summary>
+    /// <param name="y">The pointer's vertical position in the tree.</param>
+    /// <param name="height">The tree's height.</param>
+    /// <returns>Rows to scroll, negative to scroll up, zero outside the band.</returns>
+    internal static int ResolveTreeDragScrollLines(double y, double height)
+    {
+        int direction = ResolveTreeDragScroll(y, height);
+        if (direction == 0) return 0;
+        double edge = Math.Min(TreeDragEdgeSize, height / 2);
+        double depth = direction < 0 ? (edge - y) / edge : (y - (height - edge)) / edge;
+        int extra = Math.Min(TreeDragMaxExtraLines, (int)Math.Floor(depth * (TreeDragMaxExtraLines + 1)));
+        return direction * (1 + extra);
+    }
+
+    private void OnSessionTreeViewPreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm
+            || string.IsNullOrEmpty(e.Text)
+            || IsInlineRenameEditorSource(e.OriginalSource as DependencyObject)
+            || Keyboard.Modifiers is ModifierKeys.Control or ModifierKeys.Alt)
+        {
+            return;
+        }
+
+        string prefix = _treeTypeAhead.Append(e.Text[0], Environment.TickCount64);
+        if (prefix.Length == 0)
+        {
+            return;
+        }
+
+        List<object> nodes = SelectionHelpers.EnumerateVisibleNodes(vm.ServerList.GroupedServers).ToList();
+        object? focused = FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext;
+        int match = TreeTypeAhead.FindMatch(
+            nodes.Select(TreeNodeName).ToList(),
+            focused is null ? -1 : nodes.IndexOf(focused),
+            prefix);
+        e.Handled = true;
+        if (match >= 0 && GetOrRealizeSessionTreeItem(nodes[match]) is { } container)
+        {
+            container.BringIntoView();
+            container.Focus();
+        }
+    }
+
+    private static string TreeNodeName(object node) => node switch
+    {
+        FolderViewModel folder => folder.Name,
+        ServerItemViewModel server => server.DisplayName,
+        _ => "",
+    };
 
     private void StopTreeDragNavigation()
     {
