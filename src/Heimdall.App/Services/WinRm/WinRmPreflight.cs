@@ -114,11 +114,11 @@ internal sealed class WinRmPreflight
         }
         catch (AuthenticationException ex)
         {
-            throw BuildException("TLS", host, port, "ErrorWinRmPreflightTlsFailed", [host, port], ex);
+            throw BuildException("TLS", host, port, TlsFailureKey(skipCertValidation), [host, port], ex);
         }
         catch (IOException ex)
         {
-            throw BuildException("TLS", host, port, "ErrorWinRmPreflightTlsFailed", [host, port], ex);
+            throw BuildException("TLS", host, port, TlsFailureKey(skipCertValidation), [host, port], ex);
         }
         catch (SocketException ex)
         {
@@ -129,6 +129,15 @@ internal sealed class WinRmPreflight
             throw BuildException("TLS", host, port, "ErrorWinRmPreflightUnreachable", [host, port], ex);
         }
     }
+
+    /// <summary>
+    /// With certificate validation skipped, a failed handshake cannot be a certificate problem:
+    /// the listener on this port is probably not an HTTPS WinRM listener at all.
+    /// </summary>
+    private static string TlsFailureKey(bool skipCertValidation)
+        => skipCertValidation
+            ? "ErrorWinRmPreflightTlsFailedNoVerify"
+            : "ErrorWinRmPreflightTlsFailed";
 
     private static bool IsDnsFailure(SocketError socketError) =>
         socketError is SocketError.HostNotFound or SocketError.NoData or SocketError.TryAgain;

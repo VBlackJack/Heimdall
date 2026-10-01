@@ -44,6 +44,18 @@ internal static class TerminalReconnectPolicy
     }
 
     /// <summary>
+    /// Locale key of the generic explanation shown when a WinRM tab's PowerShell host ends
+    /// without the remote session ever having been entered, or null for any other exit.
+    /// Whatever PowerShell printed above is untranslated and unstructured, so this is the
+    /// one actionable line every such failure gets, specific diagnostics aside.
+    /// </summary>
+    public static string? ResolveWinRmNotEnteredMessageKey(string? connectionType, int exitCode)
+        => string.Equals(connectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
+            && exitCode == Heimdall.App.Services.WinRm.WinRmPowerShellLaunchBuilder.RemoteSessionNotEnteredExitCode
+                ? "ErrorWinRmSessionNotEntered"
+                : null;
+
+    /// <summary>
     /// Classifies a terminal process exit into a disconnect info: exit code 0 is a clean
     /// end; a non-zero exit is auto-reconnect-eligible only when the session is
     /// connection-backed, otherwise it is surfaced but not reconnected.

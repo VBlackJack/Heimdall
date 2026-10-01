@@ -281,7 +281,12 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
         DeleteBootstrap(bootstrap, bootstrapScriptPath);
         session?.Dispose();
 
-        string message = _localizer[localizationKey];
+        // The message names the short cause (the offending parameter, or the exception type)
+        // so the user is not left with a bare "failed"; the full detail stays in the log.
+        string cause = exception is ArgumentException { ParamName: { Length: > 0 } paramName }
+            ? paramName
+            : exception.GetType().Name;
+        string message = _localizer.Format(localizationKey, cause);
 
         Core.Logging.FileLogger.Warn(
             $"WinRM connection failed for host '{server.RemoteServer}': {exception.Message}");

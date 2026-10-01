@@ -28,6 +28,27 @@ internal sealed class WinRmEarlyOutputDiagnostic
     private const string NtlmLoopbackCode = "0x8009030e";
     private const string WsManInvalidResponseCode = "12152";
 
+    private const string TrustedHostsSettingName = "TrustedHosts";
+    private const string TrustedHostsErrorCode = "0x803381a1";
+    private const string WrongPrincipalCode = "0x80090322";
+    private const string AccessDeniedCode = "0x80070005";
+    private const string LogonFailureCode = "0x8009030c";
+    private const string BadCredentialsCode = "0x8007052e";
+
+    /// <summary>
+    /// Untranslated tokens of authentication failures and the locale key that explains each.
+    /// Order matters: the TrustedHosts refusal also mentions Kerberos, so it is tested first.
+    /// </summary>
+    private static readonly (string Token, string Key)[] AuthenticationDiagnosticTokens =
+    [
+        (TrustedHostsSettingName, "ErrorWinRmTrustedHosts"),
+        (TrustedHostsErrorCode, "ErrorWinRmTrustedHosts"),
+        (WrongPrincipalCode, "ErrorWinRmKerberosPrincipal"),
+        (AccessDeniedCode, "ErrorWinRmAccessDenied"),
+        (LogonFailureCode, "ErrorWinRmLogonFailed"),
+        (BadCredentialsCode, "ErrorWinRmLogonFailed")
+    ];
+
     /// <summary>
     /// Help topic every execution-policy refusal names, untranslated in every host language.
     /// </summary>
@@ -118,13 +139,28 @@ internal sealed class WinRmEarlyOutputDiagnostic
             return "ErrorWinRmWsmanInvalidResponse";
         }
 
+        // The remaining authentication failures are recognised by an untranslated token (a
+        // hexadecimal code or the TrustedHosts setting name), never by localized prose, and
+        // only next to a WinRM context so an unrelated tool output cannot trigger them.
+        foreach ((string token, string key) in AuthenticationDiagnosticTokens)
+        {
+            int tokenIndex = output.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+            if (tokenIndex >= 0 && ContainsWinRmContextNear(output, tokenIndex, token.Length))
+            {
+                return key;
+            }
+        }
+
         return null;
     }
 
     private static bool ContainsWinRmContextNear(string output, int diagnosticIndex)
+        => ContainsWinRmContextNear(output, diagnosticIndex, NtlmLoopbackCode.Length);
+
+    private static bool ContainsWinRmContextNear(string output, int diagnosticIndex, int tokenLength)
     {
         int start = Math.Max(0, diagnosticIndex - DiagnosticContextRadius);
-        int end = Math.Min(output.Length, diagnosticIndex + NtlmLoopbackCode.Length + DiagnosticContextRadius);
+        int end = Math.Min(output.Length, diagnosticIndex + tokenLength + DiagnosticContextRadius);
         string context = output[start..end];
 
         return ContainsWsManContext(context)

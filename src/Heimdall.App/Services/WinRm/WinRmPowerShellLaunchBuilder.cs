@@ -53,6 +53,12 @@ internal sealed class WinRmPowerShellLaunchBuilder
     internal const int RemoteSessionNotEnteredExitCode = 1;
 
     /// <summary>
+    /// Authentication mechanism passed to Enter-PSSession: SPNEGO picks Kerberos when the host is
+    /// addressed by its DNS name and falls back to NTLM otherwise.
+    /// </summary>
+    internal const string AuthenticationMechanismNegotiate = "Negotiate";
+
+    /// <summary>
     /// Global PowerShell variable set once Enter-PSSession has returned without error.
     /// </summary>
     internal const string RemoteSessionEnteredVariable = "$global:HeimdallWinRmEntered";
@@ -190,7 +196,7 @@ internal sealed class WinRmPowerShellLaunchBuilder
             "-Port",
             port.ToString(CultureInfo.InvariantCulture),
             "-Authentication",
-            "Negotiate"
+            AuthenticationMechanismNegotiate
         ];
 
         if (server.WinRmUseSsl)

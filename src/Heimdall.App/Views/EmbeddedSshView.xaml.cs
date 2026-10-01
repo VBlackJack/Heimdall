@@ -1683,6 +1683,15 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             runtime,
             TerminalReconnectPolicy.ResolveConnectTimeExitWindow(
                 TerminalSettings?.SshConnectTimeExitWindowSeconds));
+        string? notEnteredKey = TerminalReconnectPolicy.ResolveWinRmNotEnteredMessageKey(
+            _sessionTab?.ConnectionType,
+            exitCode);
+        if (notEnteredKey is not null)
+        {
+            string notEnteredText = $"\r\n\x1b[91m{L(notEnteredKey)}\x1b[0m\r\n";
+            QueueOutput(Encoding.UTF8.GetBytes(notEnteredText));
+        }
+
         SshSessionDisconnectInfo disconnectInfo =
             TerminalReconnectPolicy.ClassifyProcessExit(
                 exitCode,

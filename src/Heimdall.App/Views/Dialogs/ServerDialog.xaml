@@ -674,7 +674,7 @@
                                                           TabIndex="5"
                                                           Content="{loc:Translate ServerDialogWinRmSkipCertCheck}"
                                                           AutomationProperties.Name="{loc:Translate ServerDialogWinRmSkipCertCheck}"
-                                                          AutomationProperties.HelpText="{loc:Translate ServerDialogWinRmSkipCertCheckHint}"
+                                                          AutomationProperties.HelpText="{Binding WinRmSkipCertificateHintText}"
                                                           IsChecked="{Binding WinRmSkipCertificateCheck}"
                                                           IsEnabled="{Binding CanSkipWinRmCertificate}"
                                                           Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -707,18 +707,37 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
+                                        <!-- The two hints below repeat the HelpText of their check box. They carry
+                                             no automation Name of their own: their visible text is already
+                                             their name, and a second copy would be read under another label. -->
                                         <TextBlock Text="{Binding WinRmUseSslHelpText}"
-                                                   AutomationProperties.Name="{Binding WinRmUseSslHelpText}"
                                                    Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                   Style="{StaticResource DialogHintTextStyle}"
                                                    Margin="0,4,0,0"
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock Text="{loc:Translate ServerDialogWinRmSkipCertCheckHint}"
-                                                   AutomationProperties.Name="{loc:Translate ServerDialogWinRmSkipCertCheckHint}"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DialogHintTextStyle}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding WinRmSslDisabledByGateway}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding WinRmSkipCertificateHintText}"
                                                    Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                   Style="{StaticResource DialogHintTextStyle}"
                                                    Margin="0,4,0,0"
-                                                   TextWrapping="Wrap"/>
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DialogHintTextStyle}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsWinRmCertificateCheckSkipped}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <!-- One test, beside the two fields it measures. It used to be two
                                              buttons with two labels, both inside a credentials card, which is
                                              why a first-time user read "Test connection" as validating his
@@ -885,6 +904,16 @@
                                                           Content="{loc:Translate ServerDialogWinRmIdentityCredential}"
                                                           Tag="{x:Static config:WinRmIdentityMode.Credential}"/>
                                         </ComboBox>
+                                        <TextBlock Text="{loc:Translate ServerDialogWinRmIdentityHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Margin="0,4,0,0"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding WinRmTrustedHostsHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Foreground="{DynamicResource WarningTextBrush}"
+                                                   Margin="0,4,0,0"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="{Binding WinRmTrustedHostsHint, Converter={StaticResource NullToVisibilityConverter}}"/>
                                         <StackPanel Visibility="{Binding IsWinRmCredentialIdentity, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <TextBlock x:Name="DlgSrv_BasicWinRmUsernameLabel"
                                                        Text="{loc:Translate ServerDialogLabelUsername}"
@@ -907,6 +936,9 @@
                                                          AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicWinRmPasswordLabel}"
                                                          PasswordChanged="OnCredentialPasswordChanged"
                                                          Style="{StaticResource DialogFormPasswordBoxStyle}"/>
+                                            <TextBlock Text="{Binding WinRmPasswordError}"
+                                                       Style="{StaticResource FieldValidationErrorStyle}"
+                                                       Visibility="{Binding WinRmPasswordError, Converter={StaticResource NullToVisibilityConverter}}"/>
                                             <StackPanel Orientation="Horizontal"
                                                         Margin="0,8,0,0"
                                                         Visibility="{Binding HasStoredWinRmPassword, Converter={StaticResource BoolToVisibilityConverter}}">
