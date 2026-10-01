@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+using System.IO;
+using System.Text;
+
 namespace Heimdall.App.Tests.Services;
 
 /// <summary>
@@ -83,5 +86,28 @@ public sealed class UpdateRelaunchTimeoutReportTests
 
         Assert.Contains("unreadable", captured, StringComparison.Ordinal);
         Assert.Contains("pipe already closed", captured, StringComparison.Ordinal);
+    }
+    /// <summary>
+    /// Each line says when it arrived, so a timed-out run says where its time went.
+    /// </summary>
+    /// <remarks>
+    /// CI run 36870815225 timed out after printing two lines, and nothing said whether the second
+    /// came at one second or at fifty-nine: the stall could have been before it, in a module load,
+    /// or after it, anywhere up to the relaunch. Those are different causes, and the report could
+    /// not tell them apart.
+    /// </remarks>
+    [Fact]
+    public async Task TimedRead_StampsEachLineWithTheClockWhenItArrived()
+    {
+        using StreamReader reader = new(new MemoryStream(
+            Encoding.UTF8.GetBytes("Transcript started\nWARNING: verdict unavailable\n")));
+        Queue<TimeSpan> clock = new([TimeSpan.FromMilliseconds(400), TimeSpan.FromSeconds(58.9)]);
+
+        string read = await UpdateRelaunchScriptExecutionTests.ReadTimedAsync(reader, clock.Dequeue);
+
+        Assert.Equal(
+            "[+0.4 s] Transcript started" + Environment.NewLine
+                + "[+58.9 s] WARNING: verdict unavailable" + Environment.NewLine,
+            read);
     }
 }

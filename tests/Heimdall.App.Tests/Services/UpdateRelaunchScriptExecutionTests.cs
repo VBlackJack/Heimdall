@@ -1106,12 +1106,13 @@ public sealed class UpdateRelaunchScriptExecutionTests
                 installerExitCode.ToString(CultureInfo.InvariantCulture);
         }
 
+        Stopwatch sinceStart = Stopwatch.StartNew();
         using Process process = Process.Start(psi)
             ?? throw new InvalidOperationException($"failed to start {powerShellHost}");
 
         // Both streams drained before the wait, or a full pipe buffer deadlocks the run.
-        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
-        Task<string> stderr = process.StandardError.ReadToEndAsync();
+        Task<string> stdout = ReadTimedAsync(process.StandardOutput, () => sinceStart.Elapsed);
+        Task<string> stderr = ReadTimedAsync(process.StandardError, () => sinceStart.Elapsed);
         using var cts = new CancellationTokenSource(ScriptCeiling);
         try
         {
@@ -1167,6 +1168,30 @@ public sealed class UpdateRelaunchScriptExecutionTests
         {
             return $"<unreadable: {ex.GetType().Name}: {ex.Message}>";
         }
+    }
+
+    /// <summary>
+    /// Reads a stream to its end, each line prefixed with the time since the host started.
+    /// </summary>
+    /// <remarks>
+    /// CI run 36870815225 timed out after printing two lines, and nothing said whether the second
+    /// came at one second or at fifty-nine, so the stall could not be placed before it or after
+    /// it. Measured on 2026-10-01: both hosts flush each line to a redirected stream as it is
+    /// written (a line written before a three-second sleep arrives at 0.3 s, not at 3.3 s), so the
+    /// arrival time is a fair account of when the line was produced.
+    /// </remarks>
+    internal static async Task<string> ReadTimedAsync(StreamReader reader, Func<TimeSpan> elapsed)
+    {
+        StringBuilder read = new();
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            read.Append("[+")
+                .Append(elapsed().TotalSeconds.ToString("F1", CultureInfo.InvariantCulture))
+                .Append(" s] ")
+                .AppendLine(line);
+        }
+
+        return read.ToString();
     }
 
     private sealed record ScriptRun(int ExitCode, string StandardOutput, string StandardError);
