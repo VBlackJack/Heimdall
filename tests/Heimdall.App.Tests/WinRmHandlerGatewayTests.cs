@@ -560,13 +560,47 @@ public sealed class WinRmHandlerGatewayTests
         Assert.Null(terminalSession.Arguments);
     }
 
+    [Fact]
+    public async Task ConnectAsync_LaunchSpecEnvironment_ReachesTheTerminalSession()
+    {
+        CapturingTerminalSession terminalSession = new CapturingTerminalSession();
+        WinRmHandler handler = CreateHandler(
+            new FakeTunnelService
+            {
+                UsesTunnel = true,
+                TargetHost = "127.0.0.1",
+                TargetPort = 55985
+            },
+            new CountingWinRmPreflight(),
+            terminalSession,
+            launchBuilder: new WinRmPowerShellLaunchBuilder(
+                _ => "powershell.exe",
+                variableName => variableName == "PSModulePath"
+                    ? @"C:\Program Files\PowerShell\Modules;D:\Corp\Modules"
+                    : null,
+                _ => false,
+                new PowerShellModuleRoots([@"C:\Program Files\PowerShell\Modules"], [])));
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateGatewayServer(),
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(terminalSession.EnvironmentVariables);
+        KeyValuePair<string, string> variable = Assert.Single(terminalSession.EnvironmentVariables);
+        Assert.Equal("PSModulePath", variable.Key);
+        Assert.Equal(@"D:\Corp\Modules", variable.Value);
+    }
+
     private static WinRmHandler CreateHandler(
         FakeTunnelService tunnelService,
         CountingWinRmPreflight preflight,
         CapturingTerminalSession terminalSession,
         Func<WinRmCredentialBootstrap>? credentialBootstrapFactory = null,
         ConnectionStateMachine? stateMachine = null,
-        WinRmBootstrapJanitor? bootstrapJanitor = null)
+        WinRmBootstrapJanitor? bootstrapJanitor = null,
+        WinRmPowerShellLaunchBuilder? launchBuilder = null)
     {
         return new WinRmHandler(
             tunnelService,
@@ -574,7 +608,7 @@ public sealed class WinRmHandlerGatewayTests
             new LocalizationManager(),
             preflight.Create(),
             () => terminalSession,
-            new WinRmPowerShellLaunchBuilder(_ => "powershell.exe"),
+            launchBuilder ?? new WinRmPowerShellLaunchBuilder(_ => "powershell.exe"),
             credentialBootstrapFactory,
             bootstrapJanitor ?? CreateNoOpJanitor());
     }
