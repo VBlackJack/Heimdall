@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-10-01: imports keep unsaved Settings, and WinRM from PowerShell 7 (v2026.100102)
 
 ### Settings: an import keeps the changes you have not saved yet
 
