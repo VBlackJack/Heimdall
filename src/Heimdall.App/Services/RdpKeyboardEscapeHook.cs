@@ -216,6 +216,13 @@ internal static class RdpKeyboardEscapeHook
                         return CallNextHookEx(_hookHandle, code, wParam, lParam);
                     }
 
+                    // Consume the key only when it will be acted on: with the header hidden
+                    // (fullscreen) or empty, release-focus belongs to the remote session.
+                    if (!RdpKeyboardHookShortcutRouter.ShouldConsume(action, view.CanReleaseFocusToToolbar()))
+                    {
+                        return CallNextHookEx(_hookHandle, code, wParam, lParam);
+                    }
+
                     switch (action)
                     {
                         case RdpKeyboardHookAction.ReleaseFocus:
@@ -452,6 +459,17 @@ internal static class RdpKeyboardHookShortcutRouter
 
         return RdpKeyboardHookAction.None;
     }
+
+    /// <summary>
+    /// Whether the hook swallows the keystroke. A shortcut that cannot act (release-focus with no
+    /// header control to land on) is handed on to the remote session instead of being lost.
+    /// </summary>
+    public static bool ShouldConsume(RdpKeyboardHookAction action, bool canReleaseFocus) => action switch
+    {
+        RdpKeyboardHookAction.ReleaseFocus => canReleaseFocus,
+        RdpKeyboardHookAction.ToggleFullscreen => true,
+        _ => false,
+    };
 
     private static bool MatchesShortcut(Key key, ModifierKeys modifiers, RdpShortcut shortcut)
     {

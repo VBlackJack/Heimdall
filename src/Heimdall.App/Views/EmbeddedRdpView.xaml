@@ -24,6 +24,18 @@
                 KeyboardNavigation.TabNavigation="Local"
                 KeyboardNavigation.ControlTabNavigation="Local">
             <DockPanel LastChildFill="True">
+                <Button x:Name="ReconnectButton"
+                        DockPanel.Dock="Right"
+                        TabIndex="0"
+                        Content="{loc:Translate BtnReconnectSession}"
+                        Click="OnHeaderReconnectClick"
+                        ToolTip="{loc:Translate TooltipReconnectSession}"
+                        AutomationProperties.Name="{loc:Translate A11yReconnectSession}"
+                        Visibility="Collapsed"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Padding="8,2"
+                        FontSize="{StaticResource FontSizeCaption}"
+                        Margin="8,0,0,0"/>
                 <Button x:Name="DisconnectButton"
                         DockPanel.Dock="Right"
                         TabIndex="0"
@@ -75,6 +87,9 @@
                                 <DataTrigger Binding="{Binding Visibility, ElementName=CancelConnectButton}" Value="Visible">
                                     <Setter Property="Visibility" Value="Visible"/>
                                 </DataTrigger>
+                                <DataTrigger Binding="{Binding Visibility, ElementName=ReconnectButton}" Value="Visible">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
@@ -111,7 +126,7 @@
                         ToolTip="{loc:Translate TooltipFullscreenToggle}"
                         AutomationProperties.Name="{loc:Translate A11yFullscreenToggle}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2"
+                        Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
                         FontSize="{StaticResource FontSizeBody}"
                         Margin="4,0"/>
                 <Button x:Name="SendKeysButton"
@@ -123,7 +138,7 @@
                         ToolTip="{loc:Translate TooltipSendKeysMenu}"
                         AutomationProperties.Name="{loc:Translate A11ySendKeysMenu}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2"
+                        Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
                         FontSize="{StaticResource FontSizeBody}"
                         Margin="4,0">
                     <Button.ContextMenu>
@@ -177,7 +192,7 @@
                         ToolTip="{loc:Translate TooltipSplitSession}"
                         AutomationProperties.Name="{loc:Translate A11ySplitSession}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+                        Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
                 <Border Style="{StaticResource ToolbarVerticalSeparatorStyle}"
                         AutomationProperties.AutomationId="Toolbar.SeparatorB-C"
                         DockPanel.Dock="Right"/>
@@ -188,7 +203,7 @@
                         FontFamily="Segoe MDL2 Assets"
                         Style="{DynamicResource GhostButtonStyle}"
                         AutomationProperties.Name="{loc:Translate A11yChangeResolution}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
+                        Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
                         Click="OnResolutionButtonClick">
                     <Button.ContextMenu>
                         <ContextMenu x:Name="ResolutionMenu" FontFamily="Segoe UI">
@@ -227,12 +242,16 @@
                                FontSize="{StaticResource FontSizeBody}"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
-                               VerticalAlignment="Center"/>
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="{StaticResource SessionHeaderTitleMaxWidth}"/>
                     <TextBlock x:Name="EndpointTextBlock"
                                Margin="8,0,0,0"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Center"/>
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="{StaticResource SessionHeaderEndpointMaxWidth}"/>
                     <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
                     <!-- No AutomationProperties.Name: a name wins over the element's own text,
@@ -243,6 +262,8 @@
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="{StaticResource SessionHeaderStatusMaxWidth}"
                                AutomationProperties.HelpText="{loc:Translate A11yConnectionStatus}"
                                AutomationProperties.LiveSetting="Polite"/>
                     <TextBlock x:Name="AutofillSeparator"
@@ -277,7 +298,7 @@
                             AutomationProperties.Name="{loc:Translate RdpAutofillDismissAction}"
                             Style="{DynamicResource GhostButtonStyle}"
                             Margin="2,0,0,0"
-                            Padding="6,2"
+                            Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
                             FontSize="{StaticResource FontSizeCaption}"
                             Visibility="Collapsed"/>
                     <TextBlock x:Name="StabilizingSeparator"
@@ -332,27 +353,27 @@
                                 AutomationProperties.Name="{loc:Translate A11yConnectionPhaseStepper}"
                                 AutomationProperties.LiveSetting="Polite">
                         <Border x:Name="PhaseSegmentPreparing"
-                                Width="14"
-                                Height="3"
+                                Width="{StaticResource SessionPhaseSegmentWidth}"
+                                Height="{StaticResource SessionPhaseSegmentHeight}"
                                 Margin="0,0,3,0"
-                                CornerRadius="1.5"
+                                CornerRadius="{StaticResource CornerRadiusXs}"
                                 Background="{DynamicResource TextDisabledBrush}"/>
                         <Border x:Name="PhaseSegmentConnecting"
-                                Width="14"
-                                Height="3"
+                                Width="{StaticResource SessionPhaseSegmentWidth}"
+                                Height="{StaticResource SessionPhaseSegmentHeight}"
                                 Margin="0,0,3,0"
-                                CornerRadius="1.5"
+                                CornerRadius="{StaticResource CornerRadiusXs}"
                                 Background="{DynamicResource TextDisabledBrush}"/>
                         <Border x:Name="PhaseSegmentLoading"
-                                Width="14"
-                                Height="3"
+                                Width="{StaticResource SessionPhaseSegmentWidth}"
+                                Height="{StaticResource SessionPhaseSegmentHeight}"
                                 Margin="0,0,3,0"
-                                CornerRadius="1.5"
+                                CornerRadius="{StaticResource CornerRadiusXs}"
                                 Background="{DynamicResource TextDisabledBrush}"/>
                         <Border x:Name="PhaseSegmentConnected"
-                                Width="14"
-                                Height="3"
-                                CornerRadius="1.5"
+                                Width="{StaticResource SessionPhaseSegmentWidth}"
+                                Height="{StaticResource SessionPhaseSegmentHeight}"
+                                CornerRadius="{StaticResource CornerRadiusXs}"
                                 Background="{DynamicResource TextDisabledBrush}"/>
                     </rdp:AutomationStackPanel>
                     <Button x:Name="AntiIdleBadge"
@@ -362,7 +383,7 @@
                             AutomationProperties.Name="{loc:Translate A11yAntiIdleActive}"
                             Visibility="Collapsed"
                             Margin="8,0,0,0"
-                            Padding="4,1"
+                            Padding="4,1" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
                             VerticalAlignment="Center"
                             Style="{DynamicResource GhostButtonStyle}"
                             Cursor="Hand">
@@ -443,7 +464,7 @@
                             <Button x:Name="RedirExpandBadge"
                                     Visibility="Collapsed"
                                     Margin="6,0,0,0"
-                                    Padding="4,0"
+                                    Padding="4,0" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
                                     FontSize="{StaticResource FontSizeCaption}"
                                     Foreground="{DynamicResource TextSecondaryBrush}"
                                     Style="{DynamicResource GhostButtonStyle}"
@@ -566,7 +587,7 @@
                                Margin="0,6,0,0"
                                FontSize="{StaticResource FontSizeCaption}"
                                TextAlignment="Center"
-                               Foreground="{DynamicResource TextDisabledBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Visibility="Collapsed" />
                     </StackPanel>
                     <!-- Button row: WrapPanel so localized labels wrap to a second line instead of clipping. -->
@@ -839,6 +860,7 @@
 
             <!-- Connection progress indicator -->
             <ProgressBar x:Name="RdpLoadingBar"
+                         AutomationProperties.Name="{loc:Translate A11yRdpConnectionProgress}"
                          VerticalAlignment="Top"
                          Height="2"
                          Margin="16,0,16,0"

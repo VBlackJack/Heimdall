@@ -47,4 +47,17 @@ internal static class RdpConnectionPhasePolicy
             RdpConnectionPhase.Connected => (false, true),
             _ => (false, false)
         };
+
+    /// <summary>
+    /// Whether the header offers a way back in: the session ended in an error or a plain
+    /// disconnect and no overlay is already carrying the Reconnect action.
+    /// </summary>
+    /// <remarks>
+    /// Several endings (refused certificate, locked vault, startup failure, clean-exit codes)
+    /// write only a status line and show no overlay; without this the only way back was the tab
+    /// context menu.
+    /// </remarks>
+    public static bool IsReconnectActionVisible(RdpSessionStatus status, bool overlayVisible)
+        => !overlayVisible
+            && status is RdpSessionStatus.Error or RdpSessionStatus.Disconnected;
 }

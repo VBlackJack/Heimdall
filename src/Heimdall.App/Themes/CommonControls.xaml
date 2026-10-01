@@ -111,6 +111,14 @@
     <!-- Session header strip padding (horizontal=8, vertical=4) -->
     <Thickness x:Key="SessionHeaderPadding">8,4</Thickness>
 
+    <!-- Session header: minimum pointer target (WCAG 2.5.8), text caps before trimming, phase stepper segment size -->
+    <sys:Double x:Key="SessionHeaderMinTarget">24</sys:Double>
+    <sys:Double x:Key="SessionHeaderTitleMaxWidth">300</sys:Double>
+    <sys:Double x:Key="SessionHeaderEndpointMaxWidth">250</sys:Double>
+    <sys:Double x:Key="SessionHeaderStatusMaxWidth">480</sys:Double>
+    <sys:Double x:Key="SessionPhaseSegmentWidth">14</sys:Double>
+    <sys:Double x:Key="SessionPhaseSegmentHeight">6</sys:Double>
+
     <!-- Design Tokens: Font Family                                -->
     <FontFamily x:Key="FontFamilyMonospace">Consolas, Courier New, monospace</FontFamily>
 

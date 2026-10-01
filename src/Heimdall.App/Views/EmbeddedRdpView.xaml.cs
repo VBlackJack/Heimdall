@@ -538,7 +538,9 @@ public partial class EmbeddedRdpView
         _initialized = true;
 
         SessionTitleText.Text = server.DisplayName;
+        SessionTitleText.ToolTip = SessionTitleText.Text;
         EndpointTextBlock.Text = BuildEndpointText(server);
+        EndpointTextBlock.ToolTip = EndpointTextBlock.Text;
 
         if (_localizer is not null)
         {
@@ -787,6 +789,9 @@ public partial class EmbeddedRdpView
             : IntPtr.Zero;
     }
 
+    /// <summary>Whether the release-focus shortcut has a header control to land on.</summary>
+    internal bool CanReleaseFocusToToolbar() => !_disposed && ResolveToolbarFocusTarget() is not null;
+
     internal void FocusRdpToolbarFromEscapeHook()
     {
         if (_disposed)
@@ -802,8 +807,44 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        _ = DisconnectButton.Focus();
-        _ = Keyboard.Focus(DisconnectButton);
+        var target = ResolveToolbarFocusTarget();
+        if (target is null)
+        {
+            return;
+        }
+
+        _ = target.Focus();
+        _ = Keyboard.Focus(target);
+    }
+
+    /// <summary>
+    /// The first header control that can take focus in the current phase: the action that fits
+    /// the state, then the always-present buttons. Null when the header is hidden (fullscreen).
+    /// </summary>
+    private Button? ResolveToolbarFocusTarget()
+    {
+        if (SessionHeaderBar.Visibility != Visibility.Visible)
+        {
+            return null;
+        }
+
+        Button[] candidates =
+        [
+            DisconnectButton,
+            CancelReconnectButton,
+            CancelConnectButton,
+            ReconnectButton,
+            FullscreenButton,
+        ];
+        foreach (var candidate in candidates)
+        {
+            if (candidate.IsVisible && candidate.IsEnabled)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     private void FocusRdpSurfaceIfAppropriate()
@@ -1245,7 +1286,7 @@ public partial class EmbeddedRdpView
             var hwnd = _rdpHost.HostHandle;
             if (hwnd == IntPtr.Zero)
             {
-                ShowTransientToast(_localizer?["RdpSendKeysSentFailedToast"] ?? string.Empty);
+                ShowTransientToast(L("RdpSendKeysSentFailedToast"));
                 return;
             }
 
@@ -1278,7 +1319,7 @@ public partial class EmbeddedRdpView
         }
         catch (Exception ex)
         {
-            ShowTransientToast(_localizer?["RdpSendKeysSentFailedToast"] ?? string.Empty);
+            ShowTransientToast(L("RdpSendKeysSentFailedToast"));
             Core.Logging.FileLogger.Error("Send keys to the remote session failed.", ex);
         }
     }
@@ -1681,6 +1722,7 @@ public partial class EmbeddedRdpView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"RDP display update ({reason}): {ex.Message}");
+            ShowTransientToast(L("RdpResolutionUpdateFailedToast"));
         }
     }
 
@@ -2525,7 +2567,7 @@ public partial class EmbeddedRdpView
             // user was left holding a session they thought they had given up on.
             if (cancelLostTheRace)
             {
-                ShowTransientToast(_localizer?[LocaleKeys.ReconnectSucceededAfterCancel] ?? string.Empty);
+                ShowTransientToast(L(LocaleKeys.ReconnectSucceededAfterCancel));
             }
 
             if (ShouldUseDynamicResolutionUpdates())
@@ -3094,6 +3136,7 @@ public partial class EmbeddedRdpView
             isActive ? "RdpRedirectionStatusOnFormat" : "RdpRedirectionStatusOffFormat",
             label);
         AutomationProperties.SetHelpText(icon, helpText);
+        icon.ToolTip = helpText;
     }
 
     private void UpdateRedirectionExpandBadge(bool alwaysExpanded)
@@ -3223,7 +3266,7 @@ public partial class EmbeddedRdpView
 
         SetStatusText(FormatConnectionStateStatus(metadata.DisplayKey));
         RdpLoadingBar.Visibility = metadata.IsProgress ? Visibility.Visible : Visibility.Collapsed;
-        StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush", Brushes.White);
+        StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush");
     }
 
 
@@ -3235,7 +3278,7 @@ public partial class EmbeddedRdpView
         }
 
         SetStatusText(L(_connectStatusOverrideKey));
-        StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush", Brushes.White);
+        StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush");
     }
     private string FormatConnectionStateStatus(string statusKey)
     {
@@ -3338,9 +3381,33 @@ public partial class EmbeddedRdpView
             ? Visibility.Visible
             : Visibility.Collapsed;
         StatusTextBlock.Foreground = GetBrush(
-            status is RdpSessionStatus.Error ? "ErrorBrush" : "TextPrimaryBrush",
-            status is RdpSessionStatus.Error ? Brushes.IndianRed : Brushes.White);
+            status is RdpSessionStatus.Error ? "ErrorBrush" : "TextPrimaryBrush");
+        UpdateReconnectButtonVisibility();
         UpdateHealthDot();
+    }
+
+    /// <summary>
+    /// Shows the header Reconnect button for the endings that leave no overlay behind.
+    /// </summary>
+    private void UpdateReconnectButtonVisibility()
+    {
+        var visible = !_disposed
+            && RdpConnectionPhasePolicy.IsReconnectActionVisible(
+                _sessionStatus,
+                ReconnectOverlay.Visibility == Visibility.Visible);
+        ReconnectButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        ReconnectButton.IsEnabled = visible;
+    }
+
+    private void OnHeaderReconnectClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        ReconnectButton.Visibility = Visibility.Collapsed;
+        ReconnectRequested?.Invoke();
     }
 
     /// <summary>
@@ -3872,8 +3939,9 @@ public partial class EmbeddedRdpView
         TransitionPhase(RdpConnectionPhase.None);
         HideRedirectionIndicators();
         UpdateSessionStatus(RdpSessionStatus.Error);
-        SetStatusText(_localizer?.Format("RdpStatusErrorDetail", message, ex.Message)
-            ?? $"{message} {ex.Message}");
+        var detail = _localizer?.Format("RdpStatusErrorDetail", message, ex.Message)
+            ?? $"{message} {ex.Message}";
+        SetStatusTextWithDetail(message, detail);
     }
 
     private void HandleGatewayAttestationFailure(RdpGatewayAttestationException ex)
@@ -4204,12 +4272,25 @@ public partial class EmbeddedRdpView
     {
         StatusTextBlock.Text = text;
 
+        // The line is trimmed in a narrow pane; the tooltip carries the whole sentence.
+        StatusTextBlock.ToolTip = text;
+
         // Announced only when the line moved: the handlers on a transition rewrite it several
         // times with the same words, and a screen reader hears each rewrite as news.
         if (_statusAnnouncements.ShouldAnnounce(text))
         {
             _ = RdpLiveRegion.Announce(StatusTextBlock);
         }
+    }
+
+    /// <summary>
+    /// Writes a short localized status and keeps the technical detail for the tooltip, so the
+    /// line stays readable and the detail stays reachable.
+    /// </summary>
+    private void SetStatusTextWithDetail(string text, string detail)
+    {
+        SetStatusText(text);
+        StatusTextBlock.ToolTip = detail;
     }
 
     private void RequestSkipStabilization()
@@ -4220,7 +4301,7 @@ public partial class EmbeddedRdpView
         }
 
         _stabilizationCts.Cancel();
-        ShowTransientToast(_localizer?["RdpStabilizationSkippedToast"] ?? string.Empty);
+        ShowTransientToast(L("RdpStabilizationSkippedToast"));
     }
 
     private void StartStabilizationCountdown(TimeSpan delay)
@@ -4486,6 +4567,7 @@ public partial class EmbeddedRdpView
         // the native host so the reconnect diagnostics are actually visible.
         FormsHost.Visibility = System.Windows.Visibility.Collapsed;
         ReconnectOverlay.Visibility = System.Windows.Visibility.Visible;
+        UpdateReconnectButtonVisibility();
 
         _ = Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
         {
@@ -4575,7 +4657,7 @@ public partial class EmbeddedRdpView
 
         if (e.Key == Key.Escape)
         {
-            OnOverlayCloseClick(sender, e);
+            DismissReconnectOverlay();
             e.Handled = true;
             return;
         }
@@ -4588,6 +4670,21 @@ public partial class EmbeddedRdpView
                 System.Windows.Controls.Primitives.ButtonBase.ClickEvent,
                 focusedButton));
             e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Escape closes the overlay and nothing else: a reflex Escape meant for the dialog must not
+    /// destroy the pane. The header Reconnect button takes over, and the explicit Close button
+    /// remains the only way to close the pane from the overlay.
+    /// </summary>
+    private void DismissReconnectOverlay()
+    {
+        ReconnectOverlay.Visibility = System.Windows.Visibility.Collapsed;
+        UpdateReconnectButtonVisibility();
+        if (ReconnectButton.IsVisible)
+        {
+            _ = ReconnectButton.Focus();
         }
     }
 
@@ -5407,9 +5504,15 @@ public partial class EmbeddedRdpView
         };
     }
 
-    private Brush GetBrush(string resourceKey, Brush fallback)
+    /// <summary>
+    /// Resolves a theme brush. The fallback is the control's own inherited foreground rather than
+    /// a literal colour, so a missing key stays legible on both light and dark themes.
+    /// </summary>
+    private Brush GetBrush(string resourceKey)
     {
-        return TryFindResource(resourceKey) as Brush ?? fallback;
+        return TryFindResource(resourceKey) as Brush
+            ?? TryFindResource("TextPrimaryBrush") as Brush
+            ?? System.Windows.SystemColors.ControlTextBrush;
     }
 
     [SupportedOSPlatform("windows")]
