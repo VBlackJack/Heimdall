@@ -69,6 +69,22 @@ public partial class EmbeddedRdpView
     private static readonly TimeSpan TransientToastDuration = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan LetterboxHintDisplayDuration = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan LetterboxHintFadeDuration = TimeSpan.FromMilliseconds(600);
+    /// <summary>Size change, in pixels, below which a resize is churn rather than a user action.</summary>
+    private const double SignificantResizeDeltaPixels = 50;
+
+    // Disconnect reason codes the view reasons about (MsTscAx DisconnectReason values).
+    private const int DisconnectReasonNoInformation = 0;
+    private const int DisconnectReasonLocalUser = 1;
+    private const int DisconnectReasonRemoteUserLogoff = 2;
+    private const int DisconnectReasonSocketClosed = 2308;
+    private const int DisconnectReasonSocketConnectFailed = 516;
+    private const int DisconnectReasonConnectionTimeout = 264;
+    private const int DisconnectReasonNetworkError = 772;
+
+    private static readonly TimeSpan CountdownTickInterval = TimeSpan.FromSeconds(1);
+    private const string ShortcutKeySeparator = "+";
+    private const string HealthTooltipFormat = "{0} - {1}";
+    private const string HiddenRedirectionCountFormat = "+{0}";
     private const string EnterFullscreenGlyph = "\uE1D9";
     private const string ExitFullscreenGlyph = "\uE799";
     private const string RedirectionClipboardGlyph = "\uE16D";
@@ -448,42 +464,42 @@ public partial class EmbeddedRdpView
         _transientToastTimer = null;
     }
 
-    private static string FormatShortcutForDisplay(RdpShortcut shortcut)
+    private string FormatShortcutForDisplay(RdpShortcut shortcut)
     {
         var parts = new List<string>();
 
         if (shortcut.Modifiers.HasFlag(ModifierKeys.Control))
         {
-            parts.Add("Ctrl");
+            parts.Add(L("RdpKeyNameCtrl"));
         }
 
         if (shortcut.Modifiers.HasFlag(ModifierKeys.Alt))
         {
-            parts.Add("Alt");
+            parts.Add(L("RdpKeyNameAlt"));
         }
 
         if (shortcut.Modifiers.HasFlag(ModifierKeys.Shift))
         {
-            parts.Add("Shift");
+            parts.Add(L("RdpKeyNameShift"));
         }
 
         if (shortcut.Modifiers.HasFlag(ModifierKeys.Windows))
         {
-            parts.Add("Windows");
+            parts.Add(L("RdpKeyNameWindows"));
         }
 
         parts.Add(FormatKeyForDisplay(shortcut.Key));
-        return string.Join("+", parts);
+        return string.Join(ShortcutKeySeparator, parts);
     }
 
-    private static string FormatKeyForDisplay(Key key)
+    private string FormatKeyForDisplay(Key key)
     {
         return key switch
         {
-            Key.Escape => "Esc",
-            Key.Return => "Enter",
-            Key.Back => "Backspace",
-            Key.Space => "Space",
+            Key.Escape => L("RdpKeyNameEscape"),
+            Key.Return => L("RdpKeyNameEnter"),
+            Key.Back => L("RdpKeyNameBackspace"),
+            Key.Space => L("RdpKeyNameSpace"),
             _ => key.ToString()
         };
     }
@@ -538,7 +554,9 @@ public partial class EmbeddedRdpView
         _initialized = true;
 
         SessionTitleText.Text = server.DisplayName;
+        SessionTitleText.ToolTip = SessionTitleText.Text;
         EndpointTextBlock.Text = BuildEndpointText(server);
+        EndpointTextBlock.ToolTip = EndpointTextBlock.Text;
 
         if (_localizer is not null)
         {
@@ -787,6 +805,9 @@ public partial class EmbeddedRdpView
             : IntPtr.Zero;
     }
 
+    /// <summary>Whether the release-focus shortcut has a header control to land on.</summary>
+    internal bool CanReleaseFocusToToolbar() => !_disposed && ResolveToolbarFocusTarget() is not null;
+
     internal void FocusRdpToolbarFromEscapeHook()
     {
         if (_disposed)
@@ -802,8 +823,44 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        _ = DisconnectButton.Focus();
-        _ = Keyboard.Focus(DisconnectButton);
+        var target = ResolveToolbarFocusTarget();
+        if (target is null)
+        {
+            return;
+        }
+
+        _ = target.Focus();
+        _ = Keyboard.Focus(target);
+    }
+
+    /// <summary>
+    /// The first header control that can take focus in the current phase: the action that fits
+    /// the state, then the always-present buttons. Null when the header is hidden (fullscreen).
+    /// </summary>
+    private Button? ResolveToolbarFocusTarget()
+    {
+        if (SessionHeaderBar.Visibility != Visibility.Visible)
+        {
+            return null;
+        }
+
+        Button[] candidates =
+        [
+            DisconnectButton,
+            CancelReconnectButton,
+            CancelConnectButton,
+            ReconnectButton,
+            FullscreenButton,
+        ];
+        foreach (var candidate in candidates)
+        {
+            if (candidate.IsVisible && candidate.IsEnabled)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     private void FocusRdpSurfaceIfAppropriate()
@@ -1245,7 +1302,7 @@ public partial class EmbeddedRdpView
             var hwnd = _rdpHost.HostHandle;
             if (hwnd == IntPtr.Zero)
             {
-                ShowTransientToast(_localizer?["RdpSendKeysSentFailedToast"] ?? string.Empty);
+                ShowTransientToast(L("RdpSendKeysSentFailedToast"));
                 return;
             }
 
@@ -1278,7 +1335,7 @@ public partial class EmbeddedRdpView
         }
         catch (Exception ex)
         {
-            ShowTransientToast(_localizer?["RdpSendKeysSentFailedToast"] ?? string.Empty);
+            ShowTransientToast(L("RdpSendKeysSentFailedToast"));
             Core.Logging.FileLogger.Error("Send keys to the remote session failed.", ex);
         }
     }
@@ -1363,7 +1420,7 @@ public partial class EmbeddedRdpView
         // Only log significant size changes to avoid polluting logs
         double dw = Math.Abs(e.NewSize.Width - e.PreviousSize.Width);
         double dh = Math.Abs(e.NewSize.Height - e.PreviousSize.Height);
-        if (dw > 50 || dh > 50)
+        if (dw > SignificantResizeDeltaPixels || dh > SignificantResizeDeltaPixels)
         {
             Core.Logging.FileLogger.Info(
                 $"EmbeddedRDP SizeChanged: {e.PreviousSize.Width:0}x{e.PreviousSize.Height:0} -> {e.NewSize.Width:0}x{e.NewSize.Height:0}");
@@ -1624,7 +1681,7 @@ public partial class EmbeddedRdpView
             // Skip small resizes caused by tab hover, panel toggles, and scrollbar churn.
             int deltaW = Math.Abs(width - _lastAppliedWidth);
             int deltaH = Math.Abs(height - _lastAppliedHeight);
-            if (deltaW < 50 && deltaH < 50)
+            if (deltaW < SignificantResizeDeltaPixels && deltaH < SignificantResizeDeltaPixels)
             {
                 return;
             }
@@ -1681,6 +1738,7 @@ public partial class EmbeddedRdpView
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"RDP display update ({reason}): {ex.Message}");
+            ShowTransientToast(L("RdpResolutionUpdateFailedToast"));
         }
     }
 
@@ -2525,7 +2583,7 @@ public partial class EmbeddedRdpView
             // user was left holding a session they thought they had given up on.
             if (cancelLostTheRace)
             {
-                ShowTransientToast(_localizer?[LocaleKeys.ReconnectSucceededAfterCancel] ?? string.Empty);
+                ShowTransientToast(L(LocaleKeys.ReconnectSucceededAfterCancel));
             }
 
             if (ShouldUseDynamicResolutionUpdates())
@@ -2912,7 +2970,6 @@ public partial class EmbeddedRdpView
             return;
         }
 
-        const int totalSegments = 4;
         var phaseLabel = _localizer[statusKey];
         AutomationProperties.SetName(
             ConnectionPhaseStepper,
@@ -2920,7 +2977,7 @@ public partial class EmbeddedRdpView
                 "A11yRdpPhaseAnnouncementFormat",
                 phaseLabel,
                 litSegments,
-                totalSegments));
+                RdpConnectionPhasePolicy.SegmentCount));
         _ = RdpLiveRegion.Announce(ConnectionPhaseStepper);
     }
 
@@ -2966,7 +3023,7 @@ public partial class EmbeddedRdpView
         var endpoint = _server is null ? string.Empty : BuildEndpointText(_server);
         HealthDot.ToolTip = string.IsNullOrWhiteSpace(endpoint)
             ? label
-            : string.Format(CultureInfo.CurrentCulture, "{0} - {1}", label, endpoint);
+            : string.Format(CultureInfo.CurrentCulture, HealthTooltipFormat, label, endpoint);
     }
 
     private static string ResolveHealthDotBrushKey(RdpHealthDotState state) => state switch
@@ -3094,6 +3151,7 @@ public partial class EmbeddedRdpView
             isActive ? "RdpRedirectionStatusOnFormat" : "RdpRedirectionStatusOffFormat",
             label);
         AutomationProperties.SetHelpText(icon, helpText);
+        icon.ToolTip = helpText;
     }
 
     private void UpdateRedirectionExpandBadge(bool alwaysExpanded)
@@ -3129,7 +3187,7 @@ public partial class EmbeddedRdpView
         {
             RedirExpandBadge.Content = string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
-                "+{0}",
+                HiddenRedirectionCountFormat,
                 disabledCount);
             RedirExpandBadge.Visibility = Visibility.Visible;
         }
@@ -3223,7 +3281,7 @@ public partial class EmbeddedRdpView
 
         SetStatusText(FormatConnectionStateStatus(metadata.DisplayKey));
         RdpLoadingBar.Visibility = metadata.IsProgress ? Visibility.Visible : Visibility.Collapsed;
-        StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush", Brushes.White);
+        StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush");
     }
 
 
@@ -3235,7 +3293,7 @@ public partial class EmbeddedRdpView
         }
 
         SetStatusText(L(_connectStatusOverrideKey));
-        StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush", Brushes.White);
+        StatusTextBlock.Foreground = GetBrush("TextPrimaryBrush");
     }
     private string FormatConnectionStateStatus(string statusKey)
     {
@@ -3338,9 +3396,33 @@ public partial class EmbeddedRdpView
             ? Visibility.Visible
             : Visibility.Collapsed;
         StatusTextBlock.Foreground = GetBrush(
-            status is RdpSessionStatus.Error ? "ErrorBrush" : "TextPrimaryBrush",
-            status is RdpSessionStatus.Error ? Brushes.IndianRed : Brushes.White);
+            status is RdpSessionStatus.Error ? "ErrorBrush" : "TextPrimaryBrush");
+        UpdateReconnectButtonVisibility();
         UpdateHealthDot();
+    }
+
+    /// <summary>
+    /// Shows the header Reconnect button for the endings that leave no overlay behind.
+    /// </summary>
+    private void UpdateReconnectButtonVisibility()
+    {
+        var visible = !_disposed
+            && RdpConnectionPhasePolicy.IsReconnectActionVisible(
+                _sessionStatus,
+                ReconnectOverlay.Visibility == Visibility.Visible);
+        ReconnectButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        ReconnectButton.IsEnabled = visible;
+    }
+
+    private void OnHeaderReconnectClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        ReconnectButton.Visibility = Visibility.Collapsed;
+        ReconnectRequested?.Invoke();
     }
 
     /// <summary>
@@ -3872,8 +3954,9 @@ public partial class EmbeddedRdpView
         TransitionPhase(RdpConnectionPhase.None);
         HideRedirectionIndicators();
         UpdateSessionStatus(RdpSessionStatus.Error);
-        SetStatusText(_localizer?.Format("RdpStatusErrorDetail", message, ex.Message)
-            ?? $"{message} {ex.Message}");
+        var detail = _localizer?.Format("RdpStatusErrorDetail", message, ex.Message)
+            ?? $"{message} {ex.Message}";
+        SetStatusTextWithDetail(message, detail);
     }
 
     private void HandleGatewayAttestationFailure(RdpGatewayAttestationException ex)
@@ -3920,7 +4003,10 @@ public partial class EmbeddedRdpView
     /// gateway-to-target reachability failure can plausibly explain.
     /// </summary>
     internal static bool IsTunnelAttributableDisconnect(int reason)
-        => reason is 2308 or 516 or 264 or 772;
+        => reason is DisconnectReasonSocketClosed
+            or DisconnectReasonSocketConnectFailed
+            or DisconnectReasonConnectionTimeout
+            or DisconnectReasonNetworkError;
 
     private void ClearPaneDiagnostic()
     {
@@ -4024,16 +4110,15 @@ public partial class EmbeddedRdpView
     /// <summary>
     /// Populates the resolution context menu from AppSettings.RdpResolutionPresets,
     /// with a built-in fallback when the setting is missing or empty.
-    /// Items 0-5 are static (mode header, separator, skip-stab, skip-stab-sep, fit, separator);
-    /// presets are appended starting at index 6.
+    /// Everything up to and including ResMenuPresetsSeparator is static; presets follow it.
     /// </summary>
     private void PopulateResolutionMenu()
     {
-        const int StaticItemCount = 6;
+        int staticItemCount = ResolutionMenu.Items.IndexOf(ResMenuPresetsSeparator) + 1;
 
-        while (ResolutionMenu.Items.Count > StaticItemCount)
+        while (ResolutionMenu.Items.Count > staticItemCount)
         {
-            ResolutionMenu.Items.RemoveAt(StaticItemCount);
+            ResolutionMenu.Items.RemoveAt(staticItemCount);
         }
 
         foreach (var preset in ResolutionPresetCatalog.GetPresets(_settings))
@@ -4204,12 +4289,25 @@ public partial class EmbeddedRdpView
     {
         StatusTextBlock.Text = text;
 
+        // The line is trimmed in a narrow pane; the tooltip carries the whole sentence.
+        StatusTextBlock.ToolTip = text;
+
         // Announced only when the line moved: the handlers on a transition rewrite it several
         // times with the same words, and a screen reader hears each rewrite as news.
         if (_statusAnnouncements.ShouldAnnounce(text))
         {
             _ = RdpLiveRegion.Announce(StatusTextBlock);
         }
+    }
+
+    /// <summary>
+    /// Writes a short localized status and keeps the technical detail for the tooltip, so the
+    /// line stays readable and the detail stays reachable.
+    /// </summary>
+    private void SetStatusTextWithDetail(string text, string detail)
+    {
+        SetStatusText(text);
+        StatusTextBlock.ToolTip = detail;
     }
 
     private void RequestSkipStabilization()
@@ -4220,7 +4318,7 @@ public partial class EmbeddedRdpView
         }
 
         _stabilizationCts.Cancel();
-        ShowTransientToast(_localizer?["RdpStabilizationSkippedToast"] ?? string.Empty);
+        ShowTransientToast(L("RdpStabilizationSkippedToast"));
     }
 
     private void StartStabilizationCountdown(TimeSpan delay)
@@ -4234,7 +4332,7 @@ public partial class EmbeddedRdpView
 
         _stabilizationDeadlineUtc = DateTime.UtcNow + delay;
         _stabilizationTimer = new DispatcherTimer(
-            TimeSpan.FromSeconds(1),
+            CountdownTickInterval,
             DispatcherPriority.Background,
             OnStabilizationTimerTick,
             Dispatcher);
@@ -4301,7 +4399,7 @@ public partial class EmbeddedRdpView
         {
             _reconnectStartUtc = DateTime.UtcNow;
             _reconnectElapsedTimer = new DispatcherTimer(
-                TimeSpan.FromSeconds(1),
+                CountdownTickInterval,
                 DispatcherPriority.Background,
                 OnReconnectElapsedTick,
                 Dispatcher);
@@ -4486,6 +4584,7 @@ public partial class EmbeddedRdpView
         // the native host so the reconnect diagnostics are actually visible.
         FormsHost.Visibility = System.Windows.Visibility.Collapsed;
         ReconnectOverlay.Visibility = System.Windows.Visibility.Visible;
+        UpdateReconnectButtonVisibility();
 
         _ = Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
         {
@@ -4575,7 +4674,7 @@ public partial class EmbeddedRdpView
 
         if (e.Key == Key.Escape)
         {
-            OnOverlayCloseClick(sender, e);
+            DismissReconnectOverlay();
             e.Handled = true;
             return;
         }
@@ -4588,6 +4687,21 @@ public partial class EmbeddedRdpView
                 System.Windows.Controls.Primitives.ButtonBase.ClickEvent,
                 focusedButton));
             e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Escape closes the overlay and nothing else: a reflex Escape meant for the dialog must not
+    /// destroy the pane. The header Reconnect button takes over, and the explicit Close button
+    /// remains the only way to close the pane from the overlay.
+    /// </summary>
+    private void DismissReconnectOverlay()
+    {
+        ReconnectOverlay.Visibility = System.Windows.Visibility.Collapsed;
+        UpdateReconnectButtonVisibility();
+        if (ReconnectButton.IsVisible)
+        {
+            _ = ReconnectButton.Focus();
         }
     }
 
@@ -4843,7 +4957,7 @@ public partial class EmbeddedRdpView
             : string.Format(CultureInfo.InvariantCulture, "{0} v{1}", appName, version);
     }
 
-    private static string FormatSessionDuration(TimeSpan duration)
+    private string FormatSessionDuration(TimeSpan duration)
     {
         if (duration < TimeSpan.Zero)
         {
@@ -4852,7 +4966,7 @@ public partial class EmbeddedRdpView
 
         return string.Format(
             CultureInfo.InvariantCulture,
-            "{0}m {1:00}s",
+            L("RdpSessionDurationFormat"),
             (int)duration.TotalMinutes,
             duration.Seconds);
     }
@@ -5377,7 +5491,10 @@ public partial class EmbeddedRdpView
     /// Suppresses the reconnect overlay for explicit user disconnects and clean-exit COM codes.
     /// </summary>
     internal static bool ShouldSuppressReconnectOverlay(bool userInitiated, int reason)
-        => userInitiated || reason is 0 or 1 or 2;
+        => userInitiated
+            || reason is DisconnectReasonNoInformation
+                or DisconnectReasonLocalUser
+                or DisconnectReasonRemoteUserLogoff;
 
     internal static bool ShouldHandleStateChange(
         string serverId,
@@ -5407,9 +5524,15 @@ public partial class EmbeddedRdpView
         };
     }
 
-    private Brush GetBrush(string resourceKey, Brush fallback)
+    /// <summary>
+    /// Resolves a theme brush. The fallback is the control's own inherited foreground rather than
+    /// a literal colour, so a missing key stays legible on both light and dark themes.
+    /// </summary>
+    private Brush GetBrush(string resourceKey)
     {
-        return TryFindResource(resourceKey) as Brush ?? fallback;
+        return TryFindResource(resourceKey) as Brush
+            ?? TryFindResource("TextPrimaryBrush") as Brush
+            ?? System.Windows.SystemColors.ControlTextBrush;
     }
 
     [SupportedOSPlatform("windows")]
