@@ -3023,8 +3023,15 @@ public sealed class SettingsViewModelTests : IDisposable
         Assert.False(fullReload);
     }
 
-    [Fact]
-    public async Task ImportConfigCommand_RdpDelegatesToProfileImportService()
+    // An import changes saved sessions, not the values this panel holds as pending edits, so it
+    // asks for the session list to reload and never for the full reload that reseeds the panel.
+    // Both branches that hand the file to the profile import service are covered: .rdp/.json,
+    // and every extension the legacy parsers do not claim.
+    [Theory]
+    [InlineData("profile.rdp")]
+    [InlineData("profile.json")]
+    [InlineData("profile.other")]
+    public async Task ImportConfigCommand_DelegatedImport_ReloadsTheSessionListOnly(string fileName)
     {
         var config = new FakeConfigManager();
         var profileImport = new FakeProfileImportService
@@ -3032,15 +3039,18 @@ public sealed class SettingsViewModelTests : IDisposable
             Result = new ProfileImportResult { HasChanges = true }
         };
         var viewModel = CreateViewModel(config, profileImportService: profileImport);
-        var importPath = Path.Combine(Path.GetTempPath(), "profile.rdp");
+        var importPath = Path.Combine(Path.GetTempPath(), fileName);
         viewModel.ImportFilePathProvider = () => importPath;
-        var configurationChanged = false;
-        viewModel.ConfigurationChanged += () => configurationChanged = true;
+        int fullReloadCount = 0;
+        int inventoryReloadCount = 0;
+        viewModel.ConfigurationChanged += () => fullReloadCount++;
+        viewModel.ServerInventoryChanged += () => inventoryReloadCount++;
 
         await viewModel.ImportConfigCommand.ExecuteAsync(null);
 
         Assert.Equal(importPath, Assert.Single(profileImport.ImportedPaths));
-        Assert.True(configurationChanged);
+        Assert.Equal(0, fullReloadCount);
+        Assert.Equal(1, inventoryReloadCount);
     }
 
     [Fact]

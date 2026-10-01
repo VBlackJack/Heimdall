@@ -470,6 +470,145 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
         Assert.Equal(1, harness.Main.ServerCount);
     }
 
+    /// <summary>
+    /// A profile import keeps every pending edit and still shows the gateway it brought in.
+    /// </summary>
+    /// <remarks>
+    /// The import raised the full configuration reload, which reseeds the panel from disk: a field
+    /// typed a moment before came back to its saved value and the dirty flag dropped, without a
+    /// word. The import writes the gateways it creates into the settings itself; the panel takes
+    /// them in through the settings-changed path, which adds what it has never seen and leaves
+    /// the pending edits alone.
+    /// </remarks>
+    [Fact]
+    public async Task ImportJsonProfiles_KeepsOtherPendingEditsAndShowsTheImportedGateway()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        int savedMaxSessions = await StartAPendingEditAsync(harness);
+        ProfileConfigDocument document = new()
+        {
+            Servers =
+            [
+                new ServerProfileDto
+                {
+                    Id = "json-import",
+                    DisplayName = "Json SSH",
+                    ConnectionType = "SSH",
+                    RemoteServer = "ssh.example.test",
+                    SshPort = 22,
+                    SshGatewayId = "gateway-import"
+                }
+            ],
+            Gateways =
+            [
+                new SshGatewayDto
+                {
+                    Id = "gateway-import",
+                    Name = "Bastion",
+                    Host = "bastion.example.test",
+                    Port = 22,
+                    User = "ops"
+                }
+            ]
+        };
+        string importPath = Path.Combine(harness.RootPath, "servers.json");
+        await File.WriteAllTextAsync(
+            importPath,
+            System.Text.Json.JsonSerializer.Serialize(
+                document,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                }));
+        harness.Dialog.SelectEveryImportCandidate = true;
+        harness.Main.Settings.ImportFilePathProvider = () => importPath;
+
+        await harness.Main.Settings.ImportConfigCommand.ExecuteAsync(null);
+
+        await AssertThePendingEditSurvivedAsync(harness, savedMaxSessions);
+        Assert.Equal("json-import", Assert.Single(await harness.Config.LoadServersAsync()).Id);
+        Assert.Equal(1, harness.Main.ServerCount);
+        Assert.Contains(
+            harness.Main.Settings.Gateways,
+            gateway => string.Equals(gateway.Id, "gateway-import", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A MobaXterm, RDCMan or mRemoteNG import keeps every pending edit.
+    /// </summary>
+    [Fact]
+    public async Task ImportLegacySessions_KeepsOtherPendingEdits()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        int savedMaxSessions = await StartAPendingEditAsync(harness);
+        string importPath = Path.Combine(harness.RootPath, "servers.rdg");
+        const string content = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <RDCMan programVersion="2.7" schemaVersion="3">
+              <file>
+                <name>Root</name>
+                <server>
+                  <name>rdp.example.test</name>
+                  <displayName>Imported RDP</displayName>
+                </server>
+              </file>
+            </RDCMan>
+            """;
+        await File.WriteAllTextAsync(importPath, content);
+        harness.Main.Settings.ImportFilePathProvider = () => importPath;
+
+        await harness.Main.Settings.ImportConfigCommand.ExecuteAsync(null);
+
+        await AssertThePendingEditSurvivedAsync(harness, savedMaxSessions);
+        Assert.Equal("Imported RDP", Assert.Single(await harness.Config.LoadServersAsync()).DisplayName);
+        Assert.Equal(1, harness.Main.ServerCount);
+    }
+
+    /// <summary>
+    /// A Citrix cache import keeps every pending edit.
+    /// </summary>
+    [Fact]
+    public async Task ImportCitrixApps_KeepsOtherPendingEdits()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+        int savedMaxSessions = await StartAPendingEditAsync(harness);
+        CitrixScanResult scan = new();
+        scan.Resources.Add(new CitrixResource
+        {
+            FriendlyName = "Calculator",
+            LaunchCommandLine = "-qlaunch app=Calculator",
+            StoreFrontUrl = "https://citrix.example.test"
+        });
+        harness.Main.Settings.CitrixScanProvider = () => scan;
+
+        await harness.Main.Settings.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+        await AssertThePendingEditSurvivedAsync(harness, savedMaxSessions);
+        Assert.Single(await harness.Config.LoadServersAsync());
+        Assert.Equal(1, harness.Main.ServerCount);
+    }
+
+    /// <summary>Loads the panel from disk and types one unsaved edit into it.</summary>
+    /// <returns>The saved value the edit replaced.</returns>
+    private static async Task<int> StartAPendingEditAsync(TestHarness harness)
+    {
+        harness.Main.Settings.LoadFromSettings(await harness.Config.LoadSettingsAsync());
+        int savedMaxSessions = harness.Main.Settings.MaxEmbeddedSessions;
+        harness.Main.Settings.MaxEmbeddedSessionsText = (savedMaxSessions + 1).ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(harness.Main.Settings.IsDirty);
+        return savedMaxSessions;
+    }
+
+    private static async Task AssertThePendingEditSurvivedAsync(TestHarness harness, int savedMaxSessions)
+    {
+        Assert.Equal(savedMaxSessions + 1, harness.Main.Settings.MaxEmbeddedSessions);
+        Assert.True(harness.Main.Settings.IsDirty);
+        Assert.Equal(
+            savedMaxSessions,
+            harness.Config.LoadSettingsAsync().GetAwaiter().GetResult().MaxEmbeddedSessions);
+    }
+
     private sealed class TestHarness : IDisposable
     {
         private readonly string _rootPath;
@@ -494,6 +633,9 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
         }
 
         public MainViewModel Main { get; }
+
+        /// <summary>A scratch directory removed with the harness, for files a test imports.</summary>
+        public string RootPath => _rootPath;
 
         public ControlledConfigManager Config { get; }
 
@@ -805,9 +947,30 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
             SnapshotRestoreDialogViewModel viewModel) =>
             Task.FromResult<SnapshotRestoreDialogResult?>(null);
 
+        /// <summary>Whether the import preview answers with every candidate selected, or cancels.</summary>
+        public bool SelectEveryImportCandidate { get; set; }
+
         public Task<RdpImportSelection?> ShowRdpImportDialogAsync(
-            RdpImportDialogViewModel viewModel) =>
-            Task.FromResult<RdpImportSelection?>(null);
+            RdpImportDialogViewModel viewModel)
+        {
+            if (!SelectEveryImportCandidate)
+            {
+                return Task.FromResult<RdpImportSelection?>(null);
+            }
+
+            RdpImportSelection selection = new()
+            {
+                Entries = viewModel.Preview.Entries
+                    .Select(entry => new RdpImportSelectionEntry
+                    {
+                        SourceFilePath = entry.SourceFilePath,
+                        IsSelected = true,
+                        ConflictResolution = RdpConflictResolution.AutoRename
+                    })
+                    .ToList()
+            };
+            return Task.FromResult<RdpImportSelection?>(selection);
+        }
 
         public Task<ImportOutcome?> ShowImportOpenSshConfigAsync(
             OpenSshParseResult parseResult) =>

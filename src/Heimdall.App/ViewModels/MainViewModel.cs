@@ -442,13 +442,13 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         // Keep _currentSettings in sync when settings are saved elsewhere
         _configManager.SettingsChanged += OnSettingsChanged;
 
-        // Reload server list after a config import
+        // A settings save: nothing is pending any more, so the panel reloads with everything else.
         _onConfigurationChanged = async () =>
             await ReloadConfigurationAsync(await _configManager.LoadSettingsAsync());
         Settings.ConfigurationChanged += _onConfigurationChanged;
 
-        // Saved sessions rewritten from the settings panel: the list follows, the panel does not,
-        // because the panel is holding the user's pending edits.
+        // Saved sessions rewritten or imported from the settings panel: the list follows, the panel
+        // does not, because the panel is holding the user's pending edits.
         _onServerInventoryChanged = async () => await ReloadServerInventoryAsync();
         Settings.ServerInventoryChanged += _onServerInventoryChanged;
         Settings.GatewayReferenceMutationHandler = async (request, cancellationToken) =>

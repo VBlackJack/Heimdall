@@ -1279,9 +1279,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private GatewayItemViewModel? _selectedGateway;
 
     /// <summary>
-    /// Raised after a server import completes so the main shell can reload
-    /// the server list and related UI state.
+    /// Raised after this panel saved its pending values, so the shell reloads the settings, the
+    /// session list and the panel itself from disk.
     /// </summary>
+    /// <remarks>
+    /// Only a save may raise it: the reload reseeds this panel, which is right when nothing is
+    /// pending and destroys every unsaved edit otherwise. A write that changed saved sessions
+    /// raises <see cref="ServerInventoryChanged"/> instead.
+    /// </remarks>
     public event Action? ConfigurationChanged;
 
     /// <summary>
@@ -1546,13 +1551,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     /// <summary>
     /// Raised after a write that changed saved sessions but none of the settings this panel edits
-    /// as pending values.
+    /// as pending values: the "apply to all" buttons and every import.
     /// </summary>
     /// <remarks>
-    /// <see cref="ConfigurationChanged"/> reloads this panel from disk, which is right after an
-    /// import and wrong here: the "apply to all" buttons sit in the middle of an editing visit, and a
-    /// reload threw away every other pending edit, dropped the dirty flag, and put back a language
-    /// or theme the user was still previewing.
+    /// <see cref="ConfigurationChanged"/> reloads this panel from disk, which is wrong here: these
+    /// commands sit in the middle of an editing visit, and a reload threw away every other pending
+    /// edit, dropped the dirty flag, and put back a language or theme the user was still
+    /// previewing. A setting such a command does write is merged field by field, and a gateway an
+    /// import creates reaches the panel through <see cref="AbsorbExternallyCreatedGateways"/>.
     /// </remarks>
     public event Action? ServerInventoryChanged;
 
@@ -2693,7 +2699,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
                 if (result.HasChanges)
                 {
-                    ConfigurationChanged?.Invoke();
+                    ServerInventoryChanged?.Invoke();
                 }
 
                 return;
@@ -2713,7 +2719,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
                 if (result.HasChanges)
                 {
-                    ConfigurationChanged?.Invoke();
+                    ServerInventoryChanged?.Invoke();
                 }
 
                 return;
@@ -2841,7 +2847,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 _dialogService.ShowInfo(_localizer["ImportDialogTitle"], statusMessage);
             }
 
-            ConfigurationChanged?.Invoke();
+            ServerInventoryChanged?.Invoke();
         }
         catch (JsonException ex)
         {
@@ -2963,7 +2969,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             _dialogService.ShowInfo(_localizer["CitrixScanTitle"], statusMsg);
             FileLogger.Info($"Imported {newCount} Citrix app(s) from local cache");
-            ConfigurationChanged?.Invoke();
+            ServerInventoryChanged?.Invoke();
         }
         catch (VaultLockedException)
         {
