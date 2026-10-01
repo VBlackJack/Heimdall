@@ -1800,6 +1800,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         });
 
         // ── Settings panel ───────────────────────────────────────────
+        // Ctrl+,: open the Settings tab. Checking the nav rail button is what a click does: it
+        // runs OnSettingsTabChecked, so the tab switch and its bookkeeping are the click's own.
+        // Not terminal-gated, like Ctrl+K: reaching Settings from inside a session is the point.
+        RegisterOpenSettingsShortcut(_keyboardShortcutService, () => TabSettings.IsChecked = true);
+
         // Ctrl+S: save the settings panel (terminal-gated, Settings tab only)
         RegisterSaveSettingsShortcut(
             _keyboardShortcutService,
@@ -1948,6 +1953,25 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             ModifierKeys.Control,
             save,
             canExecute: () => !isTerminalFocused() && isSettingsTabSelected());
+    }
+
+    /// <summary>
+    /// Registers Ctrl+, on opening the Settings tab.
+    /// </summary>
+    /// <param name="service">Dispatcher the binding is added to.</param>
+    /// <param name="openSettingsTab">Opens the Settings tab the way its nav rail button does.</param>
+    /// <remarks>
+    /// The exact Control mask keeps a bare comma typed into a field, and Ctrl+Shift+comma, with
+    /// whatever has focus. Parameters, not window state, so the gesture can be exercised without one.
+    /// </remarks>
+    internal static void RegisterOpenSettingsShortcut(
+        KeyboardShortcutService service,
+        Action openSettingsTab)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(openSettingsTab);
+
+        service.Register(Key.OemComma, ModifierKeys.Control, openSettingsTab);
     }
 
     /// <summary>
