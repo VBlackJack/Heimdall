@@ -14,15 +14,27 @@
  * limitations under the License.
  */
 
+using System.Text;
+
 namespace Heimdall.App.Services;
 
 /// <summary>
 /// Writes a value into a PowerShell single-quoted string literal.
 /// </summary>
+/// <remarks>
+/// PowerShell ends a single-quoted string on the ASCII apostrophe and on four typographic single
+/// quotes alike, and reads any of them doubled as one literal character. Escaping only the
+/// apostrophe let a value holding a typographic quote close the literal and run the rest as code
+/// (measured on 2026-10-01 with powershell.exe 5.1: the apostrophe-only form exited 1, the
+/// doubled form kept the value intact).
+/// </remarks>
 internal static class PowerShellSingleQuotedString
 {
-    private const string Apostrophe = "'";
-    private const string EscapedApostrophe = "''";
+    private const char Apostrophe = '\'';
+    private const char LeftSingleQuotationMark = (char)0x2018;
+    private const char RightSingleQuotationMark = (char)0x2019;
+    private const char SingleLow9QuotationMark = (char)0x201A;
+    private const char SingleHighReversed9QuotationMark = (char)0x201B;
 
     /// <summary>Returns <paramref name="value"/> as a complete single-quoted literal.</summary>
     internal static string Quote(string value)
@@ -34,6 +46,25 @@ internal static class PowerShellSingleQuotedString
     internal static string EscapeContent(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return value.Replace(Apostrophe, EscapedApostrophe, StringComparison.Ordinal);
+        StringBuilder escaped = new(value.Length);
+        foreach (char c in value)
+        {
+            escaped.Append(c);
+            if (IsSingleQuote(c))
+            {
+                escaped.Append(c);
+            }
+        }
+
+        return escaped.ToString();
+    }
+
+    private static bool IsSingleQuote(char c)
+    {
+        return c is Apostrophe
+            or LeftSingleQuotationMark
+            or RightSingleQuotationMark
+            or SingleLow9QuotationMark
+            or SingleHighReversed9QuotationMark;
     }
 }

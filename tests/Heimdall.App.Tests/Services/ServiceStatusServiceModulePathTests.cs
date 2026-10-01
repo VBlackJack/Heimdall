@@ -100,6 +100,32 @@ public sealed class ServiceStatusServiceModulePathTests
         Assert.Equal(@"$env:PSModulePath = 'D:\O''Brien''s\Modules'; Stop-Service 'O''Brien'", script);
     }
 
+    /// <summary>
+    /// PowerShell closes a single-quoted string on any of four typographic quotes as well as the
+    /// ASCII one; escaping only the apostrophe let such a path end the literal early.
+    /// </summary>
+    [Theory]
+    [InlineData(0x2018)]
+    [InlineData(0x2019)]
+    [InlineData(0x201A)]
+    [InlineData(0x201B)]
+    public void ServiceAction_TypographicQuote_IsDoubledInBothLiterals(int codePoint)
+    {
+        string quote = ((char)codePoint).ToString();
+        string inherited = string.Join(';', SharedPowerShell7, $@"D:\O{quote}Brien\Modules");
+
+        string script = ServiceStatusService.BuildServiceActionScript(
+            "Start-Service",
+            $"a{quote}b",
+            inherited,
+            Roots,
+            _ => false);
+
+        Assert.Equal(
+            $@"$env:PSModulePath = 'D:\O{quote}{quote}Brien\Modules'; Start-Service 'a{quote}{quote}b'",
+            script);
+    }
+
     [Fact]
     public void ServiceAction_NothingInherited_SetsWindowsPowerShellDefaults()
     {
