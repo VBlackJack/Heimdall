@@ -26,10 +26,23 @@ namespace Heimdall.Core.Localization;
 /// </remarks>
 public static class PluralRules
 {
+    /// <summary>The language of the code fallbacks and of a delegate that cannot name its own.</summary>
+    public const string EnglishLocale = "en";
+
     private const string FrenchLanguage = "fr";
 
     /// <summary>The separator between a language and its region in a locale identifier.</summary>
     private const char RegionSeparator = '-';
+
+    /// <summary>
+    /// Picks the English wording of a count, for the code literals shown when no localizer is
+    /// available.
+    /// </summary>
+    /// <param name="count">The number the wording agrees with.</param>
+    /// <param name="one">The singular wording, already formatted.</param>
+    /// <param name="other">The plural wording, already formatted.</param>
+    public static string SelectEnglish(long count, string one, string other) =>
+        IsOne(EnglishLocale, count) ? one : other;
 
     /// <summary>
     /// Whether <paramref name="count"/> takes the singular wording in <paramref name="locale"/>.
