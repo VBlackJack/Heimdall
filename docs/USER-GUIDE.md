@@ -184,18 +184,24 @@ Heimdall shows the reason in plain language wherever it can. The common ones:
 | The connection times out | The machine is off, or a firewall is in the way. Check the address. An SSH host that does not answer is reported after 15 seconds. |
 | The host key changed | See the warning above. Do not accept it without asking. |
 | The server asks a question this client cannot answer | The server wants a verification code or another second factor, and this connection cannot ask you: the file browser, gateways and the route test only answer password prompts, and never with your password when the question names a one-time code. The SSH terminal asks you instead. |
-| A WinRM session ends as soon as it opens | The sign-in failed, and the error above the end marker says why (access denied, Kerberos, TrustedHosts, a host unreachable behind a gateway). Heimdall ends PowerShell rather than leave you at a prompt on your own machine in that tab. If the message says the execution policy refused the sign-in script, use the current Windows identity for that host, or ask your administrator. |
+| A WinRM session ends as soon as it opens | The sign-in failed. When Heimdall recognizes the cause (credentials rejected, access denied, Kerberos, TrustedHosts, a host unreachable behind a gateway), the status line at the top of the tab says so in red, and the PowerShell error above the end marker gives the detail. Heimdall ends PowerShell rather than leave you at a prompt on your own machine in that tab. If the message says the execution policy refused the sign-in script, use the current Windows identity for that host, or ask your administrator. |
 | A message about WebView2 | The machine has no Microsoft Edge. See [Installing](#installing). |
 | "SSH gateway not found" | The session points at a gateway that no longer exists. Edit the session and choose one, or recreate it in Settings. |
 
 An RDP session that disconnects on its own will try to reconnect by itself, and shows you what it
-is doing. You can cancel that from the toolbar.
+is doing. You can cancel that from the toolbar. **Escape** closes a disconnect message without
+closing the tab, and **Reconnect** in the session header then tries again.
 
 If the reason on screen is not enough, the log will have more.
 
 For a disconnected SSH or SFTP session, choose **Edit profile** to correct its saved settings,
 then reconnect. The session stays open while you edit. In a split view, this edits the profile
 of the pane where you clicked, rather than the first pane.
+
+In the SSH terminal, **Cancel** stops a connection that is still opening, and **View output**
+hides the end message so you can read what the server printed. **Ctrl+Shift+F** searches the
+output (**Enter** for the next match, **Shift+Enter** for the previous one), and **Ctrl+click**
+opens a link.
 
 For RDP, **Copy anonymized report** copies the UTC time, Heimdall version and available RDP
 codes without server addresses, accounts or error message text. The existing **Copy error**
