@@ -687,6 +687,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         OnPropertyChanged(nameof(ServerCountText));
         OnPropertyChanged(nameof(DeleteSessionTooltip));
         OnPropertyChanged(nameof(DetailActionHintsText));
+        Session.RefreshLocalizedText();
     }
 
     /// <summary>
