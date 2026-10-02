@@ -27,6 +27,11 @@ All notable changes to Heimdall are documented in this file.
   snapshot and then trims the history to its 20 most recent files, and the history directory
   defaulted to the user's own. Each run of these tests added two snapshots there and deleted the
   two oldest. The directory is now a required parameter, and the tests use a temporary one.
+- **The test that launches the real executable is opt-in.** `ShellLaunchTests` starts
+  `Heimdall.exe`, which cannot be pointed at another data directory, so every local run wrote to
+  the developer's log and started the scheduled task engine for a few seconds. It is now skipped
+  unless `HEIMDALL_UITESTS_LAUNCH_PRODUCT` is `1`. The CI desktop lane sets it, and a guard fails
+  any test file that launches the product with a plain fact.
 
 ## 2026-10-01: updates no longer stay closed over an apostrophe (v2026.100104)
 

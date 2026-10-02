@@ -316,6 +316,19 @@ dotnet test Heimdall.slnx --filter "Category=CIUnstable"
 dotnet test Heimdall.slnx --filter "Category=RequiresDesktop"
 ```
 
+Tests that launch the real `Heimdall.exe` (`[ProductLaunchFact]`, today
+`E2E/ShellLaunchTests`) are skipped unless `HEIMDALL_UITESTS_LAUNCH_PRODUCT`
+is `1`. The executable has no way to use another data directory, so on a
+developer machine it runs against the developer's own profile: it writes its
+log there and starts the scheduled task engine, which runs any overdue task on
+its first tick. The CI `RequiresDesktop` step sets the variable, the runner's
+profile being disposable. To run them locally anyway:
+
+```powershell
+$env:HEIMDALL_UITESTS_LAUNCH_PRODUCT = "1"
+dotnet test tests/Heimdall.App.UiTests --filter "FullyQualifiedName~E2E"
+```
+
 ## When to remove a tag
 
 Lift the `CIUnstable` trait once one of the following is true:
