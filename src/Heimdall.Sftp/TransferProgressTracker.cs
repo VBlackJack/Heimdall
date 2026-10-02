@@ -103,11 +103,16 @@ public sealed class TransferProgressTracker
     }
 
     /// <summary>Marks the file in flight as finished.</summary>
+    /// <remarks>
+    /// The file counts for its planned size, or for the bytes it reported when it sent more than
+    /// the listing said (a file still being written, a pseudo-file listed as empty): counting only
+    /// the planned size would take those bytes back and step the bar backward.
+    /// </remarks>
     public void CompleteFile()
     {
         lock (_gate)
         {
-            _completedBytes += _currentFileSize;
+            _completedBytes += Math.Max(_currentFileSize, _currentFileBytes);
             _completedFiles++;
             _currentFileBytes = 0;
             Sample(_completedBytes);

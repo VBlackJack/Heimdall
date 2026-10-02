@@ -516,6 +516,46 @@ public sealed class EmbeddedSftpTransferQueueTests
         Assert.Equal(["/srv/f.txt"], browser.Uploads.Select(call => call.Remote));
     }
 
+    /// <summary>
+    /// A batch handed in while the queue winds down, after it found itself empty but before it
+    /// released the transfer slot, is the queue's own: it runs, and the call that handed it in
+    /// waits for it like any other instead of returning at once as if parked behind a paste.
+    /// </summary>
+    [Fact]
+    public async Task Queue_ABatchHandedInWhileTheQueueWindsDownRunsAndIsAwaited()
+    {
+        using SftpTestKit.ScratchFolder scratch = new();
+        string file = Path.Combine(scratch.Path, "f.txt");
+        await File.WriteAllTextAsync(file, "x");
+        TaskCompletionSource releaseLate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        ScriptedRemoteBrowser browser = new();
+        browser.UploadHandler = async (_, remote, ct) =>
+        {
+            if (remote == "/late/f.txt")
+            {
+                await releaseLate.Task.WaitAsync(ct);
+            }
+        };
+        EmbeddedSftpViewModel viewModel = SftpTestKit.CreateViewModel(browser);
+        Task? late = null;
+        bool lateEndedAtOnce = false;
+        viewModel.QueueDrainedProbe = () =>
+        {
+            viewModel.QueueDrainedProbe = null;
+            late = viewModel.UploadEntriesAsync([file], "/late");
+            lateEndedAtOnce = late.IsCompleted;
+        };
+
+        await viewModel.UploadEntriesAsync([file], "/first").WaitAsync(Patience);
+
+        Assert.NotNull(late);
+        Assert.False(lateEndedAtOnce, "the late batch was reported parked and its call returned before it ran");
+        releaseLate.SetResult();
+        await late!.WaitAsync(Patience);
+        Assert.Equal(["/first/f.txt", "/late/f.txt"], browser.Uploads.Select(call => call.Remote));
+        Assert.False(viewModel.IsTransferInProgress);
+    }
+
     [Fact]
     public async Task Queue_DisposingThePaneCancelsWhatWaits()
     {
