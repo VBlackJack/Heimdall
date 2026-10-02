@@ -250,7 +250,20 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// Rewords the coordinator's localized lines after an interface language switch. Called by the
     /// shell's own language refresh, on the UI thread.
     /// </summary>
-    internal void RefreshLocalizedText() => OnPropertyChanged(nameof(BroadcastScopeLabel));
+    internal void RefreshLocalizedText()
+    {
+        OnPropertyChanged(nameof(BroadcastScopeLabel));
+
+        // A forced RDP mode is stored on its tab as worded text, so it is re-worded rather than
+        // re-announced; setting it raises the tab's title and tooltip.
+        foreach (SessionTabViewModel tab in _main.Connection.ActiveSessions)
+        {
+            if (tab.RdpModeOverride != RdpModeOverride.UseProfile)
+            {
+                tab.RdpModeOverrideSuffix = RdpModeOverrideSuffixFor(tab.RdpModeOverride);
+            }
+        }
+    }
 
     /// <summary>
     /// Keeps <see cref="BroadcastToggleTooltip"/> in step with <see cref="BroadcastScopeLabel"/>,
@@ -961,13 +974,16 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
 
         tab.RdpModeOverride = rdpModeOverride;
-        tab.RdpModeOverrideSuffix = rdpModeOverride switch
-        {
-            RdpModeOverride.ForceEmbedded => _localizer["SessionTitleSuffixForcedEmbedded"],
-            RdpModeOverride.ForceExternal => _localizer["SessionTitleSuffixForcedExternal"],
-            _ => string.Empty
-        };
+        tab.RdpModeOverrideSuffix = RdpModeOverrideSuffixFor(rdpModeOverride);
     }
+
+    /// <summary>The worded title suffix of a forced RDP mode, in the current language.</summary>
+    private string RdpModeOverrideSuffixFor(RdpModeOverride rdpModeOverride) => rdpModeOverride switch
+    {
+        RdpModeOverride.ForceEmbedded => _localizer["SessionTitleSuffixForcedEmbedded"],
+        RdpModeOverride.ForceExternal => _localizer["SessionTitleSuffixForcedExternal"],
+        _ => string.Empty
+    };
 
     /// <summary>
     /// Creates a failed session tab so diagnostics can be inspected after the connection flow aborts.
