@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Session;
 using Heimdall.Core.Models;
 
@@ -43,6 +44,36 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         session.BroadcastScope = BroadcastScope.SelectedPanes;
 
+        Assert.Contains(nameof(SessionCoordinator.BroadcastScopeLabel), raised);
+        Assert.Contains(nameof(SessionCoordinator.BroadcastToggleTooltip), raised);
+    }
+
+    /// <summary>
+    /// The targeted-pane count is announced again when a tab comes or goes.
+    /// </summary>
+    /// <remarks>
+    /// The count is read across every open tab, and five paths remove a tab from the open list
+    /// (closing, reconnecting, tearing down a failed start, moving a tab into its own window).
+    /// None of them said so, so closing a targeted tab left "Selected panes (N)" on the old N.
+    /// The coordinator now follows the list itself rather than asking each path to remember.
+    /// </remarks>
+    [Fact]
+    public void BroadcastScopeLabel_IsNotifiedWhenATabIsAddedOrRemoved()
+    {
+        using TestHarness harness = TestHarness.Create();
+        SessionCoordinator session = harness.Main.Session;
+        session.IsBroadcastMode = true;
+        session.BroadcastScope = BroadcastScope.SelectedPanes;
+        SessionTabViewModel tab = new();
+
+        var raised = new List<string?>();
+        session.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        harness.Main.Connection.ActiveSessions.Add(tab);
+        Assert.Contains(nameof(SessionCoordinator.BroadcastScopeLabel), raised);
+
+        raised.Clear();
+        harness.Main.Connection.ActiveSessions.Remove(tab);
         Assert.Contains(nameof(SessionCoordinator.BroadcastScopeLabel), raised);
         Assert.Contains(nameof(SessionCoordinator.BroadcastToggleTooltip), raised);
     }
