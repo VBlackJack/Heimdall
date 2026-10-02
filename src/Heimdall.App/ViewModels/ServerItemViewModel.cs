@@ -563,6 +563,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         OnPropertyChanged(nameof(IsActiveSession));
         OnPropertyChanged(nameof(ConnectionStateDisplayName));
         OnPropertyChanged(nameof(ConnectionStateTooltip));
+        OnPropertyChanged(nameof(StatusShowsConnectionState));
         OnPropertyChanged(nameof(StatusTooltipText));
         OnPropertyChanged(nameof(AccessibleName));
     }

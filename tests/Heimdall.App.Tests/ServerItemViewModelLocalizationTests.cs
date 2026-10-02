@@ -338,6 +338,35 @@ public sealed class ServerItemViewModelLocalizationTests
         Assert.DoesNotContain("Reachable", viewModel.StatusTooltipText, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The dot fills when a session connects and empties when it ends.
+    /// </summary>
+    /// <remarks>
+    /// The fill is a DataTrigger on <see cref="ServerItemViewModel.StatusShowsConnectionState"/>,
+    /// which re-reads it only when it is announced. The test above asserts the value, which was
+    /// right while nothing announced it: a row that connected kept a hollow ring under a tooltip
+    /// saying Connected, and a row that disconnected kept a full dot, until a filter or a scroll
+    /// rebuilt its container.
+    /// </remarks>
+    [Fact]
+    public async Task StatusDotFill_IsAnnouncedWhenTheSessionStateChanges()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
+            CreateSshServer(),
+            connectionState: "Disconnected",
+            localizer: localizer);
+        List<string?> changed = [];
+        viewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        viewModel.ConnectionState = "Connected";
+        Assert.Contains(nameof(ServerItemViewModel.StatusShowsConnectionState), changed);
+
+        changed.Clear();
+        viewModel.ConnectionState = "Disconnected";
+        Assert.Contains(nameof(ServerItemViewModel.StatusShowsConnectionState), changed);
+    }
+
     [Fact]
     public async Task StatusTooltip_StillReportsHealthWhileTheHostIsUnreachableAndIdle()
     {
