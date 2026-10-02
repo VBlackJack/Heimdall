@@ -247,6 +247,12 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     };
 
     /// <summary>
+    /// Rewords the coordinator's localized lines after an interface language switch. Called by the
+    /// shell's own language refresh, on the UI thread.
+    /// </summary>
+    internal void RefreshLocalizedText() => OnPropertyChanged(nameof(BroadcastScopeLabel));
+
+    /// <summary>
     /// Keeps <see cref="BroadcastToggleTooltip"/> in step with <see cref="BroadcastScopeLabel"/>,
     /// which it embeds while broadcast is on.
     /// </summary>
