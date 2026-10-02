@@ -16,6 +16,8 @@
 
 using System.IO;
 using System.Xml.Linq;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
+using Heimdall.App.ViewModels.Shell;
 
 namespace Heimdall.App.Tests;
 
@@ -59,6 +61,52 @@ public sealed class SettingsUxAuditGuardTests
 
         Assert.DoesNotContain("TrySaveTokenAsync", changed, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// A token typed and then left by a gesture that moves no focus is still committed: Ctrl+S is
+    /// a keystroke, leaving the Settings tab by shortcut keeps the field focused, and WPF raises no
+    /// LostFocus when the window itself is closed. Each of them commits the pending edit, so the
+    /// field never keeps a token the vault does not have.
+    /// </summary>
+    [Fact]
+    public void EveryWayOutOfTheTokenFieldCommitsThePendingToken()
+    {
+        string code = ViewSource.WithoutCommentsAndLiterals(File.ReadAllText(AppFile("MainWindow.xaml.cs")));
+
+        // One call per constant: the source-assertion guard ties each read to the anchor it names.
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(ViewSource.HandlerBody(code, TokenLostFocusMember), TokenLostFocusCommit),
+            "leaving the token field does not commit it");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(ViewSource.HandlerBody(code, SaveShortcutMember), SaveShortcutCommit),
+            "Ctrl+S does not commit the pending token");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(ViewSource.HandlerBody(code, SwitchTabMember), SwitchTabCommit),
+            "a tab switch does not commit the pending token");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(ViewSource.HandlerBody(code, WindowClosingMember), WindowClosingCommit),
+            "closing the window does not commit the pending token");
+    }
+
+    /// <summary>Only a switch away from the Settings tab commits the token.</summary>
+    [Theory]
+    [InlineData(ShellTab.Settings, ShellTab.Sessions, true)]
+    [InlineData(ShellTab.Settings, ShellTab.Settings, false)]
+    [InlineData(ShellTab.Sessions, ShellTab.Settings, false)]
+    [InlineData(ShellTab.Sessions, ShellTab.Tunnels, false)]
+    public void OnlyLeavingTheSettingsTabCommitsTheToken(string current, string target, bool expected)
+    {
+        Assert.Equal(expected, MainWindow.LeavesSettingsTab(current, target));
+    }
+
+    private const string TokenLostFocusMember = "private async void OnCmdLibSyncTokenLostFocus(object sender, RoutedEventArgs e)";
+    private const string TokenLostFocusCommit = "await CommitPendingCmdLibTokenAsync().ConfigureAwait(true);";
+    private const string SaveShortcutMember = "private void SaveSettingsFromShortcut()";
+    private const string SaveShortcutCommit = "_ = CommitPendingCmdLibTokenAsync();";
+    private const string SwitchTabMember = "private void SwitchToTab(string tabName)";
+    private const string SwitchTabCommit = "_ = CommitPendingCmdLibTokenOnTabSwitchAsync(vm.SelectedTab, tabName);";
+    private const string WindowClosingMember = "protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)";
+    private const string WindowClosingCommit = "await CommitPendingCmdLibTokenAsync().ConfigureAwait(true);";
 
     /// <summary>
     /// P2-2 and P2-4: every card has a title, and Credential Guard and the Windows Hello

@@ -946,6 +946,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             SaveTreeViewScrollPosition();
         }
 
+        // A tab switched by shortcut leaves the Git token field focused, so no LostFocus commits it.
+        _ = CommitPendingCmdLibTokenOnTabSwitchAsync(vm.SelectedTab, tabName);
+
         Heimdall.Core.Logging.FileLogger.Info(
             $"Navigation request: tab={tabName}, current={vm.SelectedTab}, hasSessions={vm.Connection.HasActiveSessions}");
 
@@ -1881,12 +1884,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             _keyboardShortcutService,
             IsTerminalFocusedContext,
             () => GetMainVm()?.IsSettingsTabSelected == true,
-            () =>
-            {
-                CommitPendingEdit(Keyboard.FocusedElement);
-                if (GetMainVm() is { } vm)
-                    TryExecute(vm.Settings.SaveCommand);
-            });
+            SaveSettingsFromShortcut);
 
         // ── Ctrl+Shift combos (NOT terminal-gated) ───────────────────
         // Ctrl+Shift+S: screenshot active session
@@ -2069,6 +2067,21 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             ModifierKeys.Control,
             focusSearch,
             canExecute: () => !isTerminalFocused() && isSettingsTabSelected());
+    }
+
+    /// <summary>
+    /// What Ctrl+S does on the Settings tab: commits the field being typed into, then saves.
+    /// </summary>
+    /// <remarks>
+    /// The Git token is not a buffered setting and Save does not write it, but the keystroke leaves
+    /// its field focused all the same, so its pending edit is committed here as LostFocus would.
+    /// </remarks>
+    private void SaveSettingsFromShortcut()
+    {
+        CommitPendingEdit(Keyboard.FocusedElement);
+        _ = CommitPendingCmdLibTokenAsync();
+        if (GetMainVm() is { } vm)
+            TryExecute(vm.Settings.SaveCommand);
     }
 
     /// <summary>
@@ -2755,10 +2768,19 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     }
 
     // The Git token is a secret stored in the credential vault, not a buffered setting: it is
-    // committed once, when the field loses focus, never on each keystroke. Writes are serialised
+    // committed once, when the field is left, never on each keystroke. Writes are serialised
     // so a slow earlier write can never land after a later one.
     private bool _cmdLibTokenEdited;
     private readonly SemaphoreSlim _cmdLibTokenWriteGate = new(1, 1);
+
+    /// <summary>Commits the pending Git token when a tab switch leaves the Settings tab.</summary>
+    private Task CommitPendingCmdLibTokenOnTabSwitchAsync(string currentTab, string targetTab)
+        => LeavesSettingsTab(currentTab, targetTab) ? CommitPendingCmdLibTokenAsync() : Task.CompletedTask;
+
+    /// <summary>Whether switching from <paramref name="currentTab"/> to <paramref name="targetTab"/> leaves the Settings tab.</summary>
+    internal static bool LeavesSettingsTab(string? currentTab, string? targetTab)
+        => string.Equals(currentTab, ShellTab.Settings, StringComparison.Ordinal)
+            && !string.Equals(targetTab, ShellTab.Settings, StringComparison.Ordinal);
 
     private void OnCmdLibSyncTokenChanged(object sender, RoutedEventArgs e)
     {
@@ -2766,6 +2788,22 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     }
 
     private async void OnCmdLibSyncTokenLostFocus(object sender, RoutedEventArgs e)
+    {
+        await CommitPendingCmdLibTokenAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Writes the token typed into the field to the vault, when it was edited since the last write.
+    /// </summary>
+    /// <remarks>
+    /// LostFocus is only one way out of the field. Ctrl+S is a keystroke and moves no focus,
+    /// leaving the Settings tab by shortcut keeps the field focused, and WPF raises no LostFocus
+    /// when the window itself is closed: each of those calls this too, or the field would show a
+    /// token the vault never received.
+    /// <para>Never throws: the window close awaits it before its own error handling, and a throw
+    /// there would leave the close flagged as in progress for good.</para>
+    /// </remarks>
+    private async Task CommitPendingCmdLibTokenAsync()
     {
         if (!_cmdLibTokenEdited)
         {
@@ -2791,6 +2829,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             {
                 ApplyCommandLibraryTokenSaveError();
             }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Command library token commit failed [{ex.GetType().Name}]: {ex.Message}");
+            ApplyCommandLibraryTokenSaveError();
         }
         finally
         {
@@ -4098,6 +4141,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         int connectedSessionCount = CountConnectedSessionsForClose(vm);
 
         _closeInProgress = true;
+
+        // Closing the window raises no LostFocus on the Git token field: the pending token is
+        // written before anything else, while the window still exists to report a failure. Taken
+        // after the in-progress flag, so a second close request cannot start a second flow while
+        // it is written; it never throws, so the flag is always cleared below.
+        await CommitPendingCmdLibTokenAsync().ConfigureAwait(true);
         try
         {
             string warningTitle = vm.Localize("SettingsCloseSaveFailedTitle");
