@@ -592,6 +592,31 @@ public sealed class ServerDialogWinRmTests
         Assert.True(vm.IsWinRmCertificateCheckSkipped);
     }
 
+    /// <summary>
+    /// Ticking or clearing the skip box repaints its warning at once.
+    /// </summary>
+    /// <remarks>
+    /// The hint turns to the warning colour through a DataTrigger on
+    /// <see cref="ServerDialogViewModel.IsWinRmCertificateCheckSkipped"/>, which re-reads the value
+    /// only when it is notified. The neighbour above asserts the getter, which was right while the
+    /// box itself announced nothing: the warning appeared only on a profile reopened with the box
+    /// already ticked, or after an unrelated edit, and stayed after the box was cleared.
+    /// </remarks>
+    [Fact]
+    public void SkipCertificateBox_NotifiesTheWarningEachWayItIsToggled()
+    {
+        ServerDialogViewModel vm = new ServerDialogViewModel { ConnectionType = "WINRM", WinRmUseSsl = true };
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.WinRmSkipCertificateCheck = true;
+        Assert.Contains(nameof(ServerDialogViewModel.IsWinRmCertificateCheckSkipped), raised);
+
+        raised.Clear();
+        vm.WinRmSkipCertificateCheck = false;
+        Assert.Contains(nameof(ServerDialogViewModel.IsWinRmCertificateCheckSkipped), raised);
+    }
+
     private static ServerDialogViewModel CredentialProfile(string username) =>
         new()
         {
