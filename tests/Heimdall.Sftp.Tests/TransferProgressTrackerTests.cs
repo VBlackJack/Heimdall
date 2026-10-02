@@ -81,6 +81,26 @@ public sealed class TransferProgressTrackerTests
         Assert.Equal(100, tracker.DoneBytes);
     }
 
+    /// <summary>
+    /// A file the listing gave as empty but that streamed bytes (a file still being written, a
+    /// pseudo-file) keeps those bytes when it completes: the bar does not step back.
+    /// </summary>
+    [Fact]
+    public void CompleteFile_AFileListedSmallerThanItsBytes_KeepsTheBytesItReported()
+    {
+        TransferProgressTracker tracker = new(new ManualTimeProvider());
+        tracker.Begin(totalBytes: 1000, totalFiles: 2);
+        tracker.BeginFile("growing.log", 0);
+        tracker.Report(300);
+        long beforeCompletion = tracker.DoneBytes;
+
+        tracker.CompleteFile();
+
+        Assert.Equal(300, beforeCompletion);
+        Assert.Equal(300, tracker.DoneBytes);
+        Assert.Equal(0.3, tracker.Fraction!.Value, precision: 6);
+    }
+
     [Fact]
     public void Throughput_FromEvenlySpacedSamples_MatchesTheRateAndGivesTheRemainingTime()
     {
