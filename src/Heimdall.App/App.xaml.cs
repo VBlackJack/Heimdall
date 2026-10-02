@@ -82,9 +82,35 @@ public partial class App : System.Windows.Application
     private const int VaultUnlockMaxAttempts = 5;
     private static readonly TimeSpan VaultUnlockLockoutDuration = TimeSpan.FromMinutes(5);
 
-    public IServiceProvider? Services => _serviceProvider;
+    /// <summary>
+    /// The product container once startup has built it; otherwise the one an in-process
+    /// host supplied through <see cref="HostServices"/>.
+    /// </summary>
+    public IServiceProvider? Services => _serviceProvider ?? HostServices;
+
+    /// <summary>
+    /// The container of a host that set <see cref="SuppressProductLifecycle"/>: views resolve
+    /// their services from <see cref="Services"/>, and such a host never builds the product
+    /// one. Never consulted once the product container exists.
+    /// </summary>
+    internal IServiceProvider? HostServices { get; set; }
 
     public bool IsShuttingDown { get; internal set; }
+
+    /// <summary>
+    /// Set by an in-process host that builds this application only for its resources and
+    /// dispatcher, such as the UI test host, before the application is constructed.
+    /// </summary>
+    /// <remarks>
+    /// WPF queues the startup event from the Application constructor, so a host that
+    /// constructs the application and pumps its dispatcher runs <see cref="OnStartup"/>
+    /// without ever calling Run. That startup resolves the real data root, which cannot be
+    /// redirected, and from there starts the scheduled task engine, the health monitor and
+    /// every writer of the user's profile: an overdue task opened an RDP session from inside
+    /// a test run. A static property rather than an environment variable on purpose: a
+    /// variable would be inherited by the real executable an end-to-end test launches.
+    /// </remarks>
+    internal static bool SuppressProductLifecycle { get; set; }
 
     /// <summary>How long exit waits for the session snapshot to reach disk.</summary>
     private static readonly TimeSpan ExitSnapshotSaveBudget = TimeSpan.FromSeconds(2);
@@ -114,6 +140,11 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        if (SuppressProductLifecycle)
+        {
+            return;
+        }
 
         // Headless privilege launch mode: the app was re-launched elevated
         // via UAC to perform token-based process creation (SYSTEM / TrustedInstaller).
@@ -1411,6 +1442,12 @@ public partial class App : System.Windows.Application
         // closing has completed. Keep the shutdown guard armed for those
         // late Unloaded broadcasts as well.
         IsShuttingDown = true;
+
+        if (SuppressProductLifecycle)
+        {
+            base.OnExit(e);
+            return;
+        }
 
         _singleInstanceGuard?.Dispose();
         _singleInstanceGuard = null;

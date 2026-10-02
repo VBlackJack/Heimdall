@@ -17,10 +17,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Windows;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using Heimdall.App.Localization;
+using Heimdall.App.Services;
 using Heimdall.Core.Localization;
+using Microsoft.Extensions.DependencyInjection;
 using WpfApplication = System.Windows.Application;
 
 namespace Heimdall.App.UiTests.Infrastructure;
@@ -31,6 +34,9 @@ namespace Heimdall.App.UiTests.Infrastructure;
 /// </summary>
 public static class WpfTestHost
 {
+    private const double HostMainWindowSize = 1;
+    private const double HostMainWindowOffscreenPosition = -10_000;
+
     private static readonly object Sync = new();
     private static Dispatcher? _dispatcher;
     private static Thread? _thread;
@@ -38,6 +44,15 @@ public static class WpfTestHost
     private static LocalizationManager? _localizer;
     private static Exception? _startupException;
     private static string? _repoRoot;
+
+    /// <summary>
+    /// What the views find in <c>App.Services</c> under this host. Only services that hold
+    /// no state and reach neither the user's profile nor the network belong here: the
+    /// product container they used to get was built over the developer's own data root.
+    /// </summary>
+    public static IServiceProvider HostServices { get; } = new ServiceCollection()
+        .AddSingleton<IUiDispatcher, WpfUiDispatcher>()
+        .BuildServiceProvider();
 
     public static Dispatcher Dispatcher
     {
@@ -111,11 +126,16 @@ public static class WpfTestHost
                 return;
             }
 
-            // This host builds the real application, so its startup takes the
-            // single-instance guard on the developer's own data root. Left engaged, the
-            // test process owns the directory and the end-to-end test that launches the
-            // product finds it taken and exits at once. Set before the App is built, and
-            // inherited by every process the tests launch.
+            // This host builds the real application for its resources and dispatcher only.
+            // WPF queues the startup event from the App constructor, so without this switch
+            // the first dispatcher pump runs the product startup in the test process,
+            // against the developer's own data root: the scheduled task engine, the health
+            // monitor and every writer of the profile. Set before the App is built.
+            Heimdall.App.App.SuppressProductLifecycle = true;
+
+            // Inherited by every process the tests launch: the end-to-end test starts the
+            // real executable, which would otherwise hand over to a Heimdall the developer
+            // already has open on the same data root and exit at once.
             Environment.SetEnvironmentVariable(
                 Heimdall.App.Services.SingleInstanceGuard.DisableEnvironmentVariable, "0");
 
@@ -132,9 +152,11 @@ public static class WpfTestHost
                     if (_application is Heimdall.App.App app)
                     {
                         app.InitializeComponent();
+                        app.HostServices = HostServices;
                     }
 
                     _application.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
+                    _application.MainWindow = CreateHostMainWindow();
 
                     _localizer = new LocalizationManager();
                     _localizer.LoadAsync(Path.Combine(_repoRoot, "locales"), "en").GetAwaiter().GetResult();
@@ -242,6 +264,33 @@ public static class WpfTestHost
         {
             // Process is exiting; ignore teardown failures.
         }
+    }
+
+    /// <summary>
+    /// The window the dialog service takes as owner, for the whole run. WPF otherwise makes
+    /// the first window ever created the main window, which is a test's own window, closed
+    /// when that test ends; every dialog shown later then failed to take a closed window as
+    /// its owner. The product startup used to provide the real main window, which is what
+    /// the suite relied on without saying so.
+    /// </summary>
+    private static Window CreateHostMainWindow()
+    {
+        Window window = new()
+        {
+            Title = nameof(WpfTestHost),
+            Width = HostMainWindowSize,
+            Height = HostMainWindowSize,
+            Left = HostMainWindowOffscreenPosition,
+            Top = HostMainWindowOffscreenPosition,
+            WindowStyle = WindowStyle.None,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            ShowInTaskbar = false,
+            ShowActivated = false
+        };
+
+        // An owner must have been shown once.
+        window.Show();
+        return window;
     }
 
     private static HashSet<string> ResolveAppTargetFrameworks()
