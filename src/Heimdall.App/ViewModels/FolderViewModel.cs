@@ -72,6 +72,18 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     [ObservableProperty]
     private bool _isExpanded;
 
+    /// <summary>
+    /// Whether the sessions tree's keyboard cursor last rested on this folder.
+    /// </summary>
+    /// <remarks>
+    /// A folder is never selected, so this is what marks the folder Enter, F2 and Delete act on
+    /// once keyboard focus has moved to a menu or the filter box. It lives here rather than on the
+    /// row container because the tree recycles containers. Set by
+    /// <see cref="Services.TreeInteractionState.MoveFolderCursor"/>.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _isTreeCursor;
+
     [ObservableProperty]
     private bool _isEditing;
 

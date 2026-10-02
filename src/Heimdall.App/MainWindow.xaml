@@ -709,6 +709,7 @@
                                   Padding="8,4,0,0"
                                   AllowDrop="True"
                                   SelectedItemChanged="OnTreeViewSelectedItemChanged"
+                                  GotKeyboardFocus="OnSessionTreeViewGotKeyboardFocus"
                                   MouseDoubleClick="OnTreeViewDoubleClick"
                                   PreviewMouseLeftButtonDown="OnTreeViewDragStart"
                                   PreviewMouseLeftButtonUp="OnSessionTreeViewPreviewMouseLeftButtonUp"
@@ -794,12 +795,13 @@
                                         </Grid>
                                     </Border>
                                     <HierarchicalDataTemplate.Triggers>
-                                        <!-- A folder is not part of the session multi-selection, so the row template never
-                                             paints it; the native selection is all that marks it, and it must stay visible
-                                             when the focus moves to a menu or the filter box. -->
-                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type TreeViewItem}}}" Value="True">
-                                            <Setter TargetName="FolderSelectionChrome" Property="Background" Value="{DynamicResource TreeRowSelectedBrush}"/>
-                                            <Setter TargetName="FolderSelectionChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                        <!-- A folder is never selected: OnTreeViewSelectedItemChanged clears its native flag.
+                                             The cursor mark is what keeps it visible once focus moves to a menu or the filter
+                                             box. It takes the focus colour, not the selection's accent, so it never reads as
+                                             a second selected row beside the selected session. -->
+                                        <DataTrigger Binding="{Binding IsTreeCursor}" Value="True">
+                                            <Setter TargetName="FolderSelectionChrome" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                                            <Setter TargetName="FolderSelectionChrome" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
                                         </DataTrigger>
                                     </HierarchicalDataTemplate.Triggers>
                                 </HierarchicalDataTemplate>

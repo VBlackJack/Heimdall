@@ -108,14 +108,80 @@ public sealed class SessionTreeUxAuditTests
     }
 
     [Fact]
-    public void TheFolderRowPaintsItsOwnSelection()
+    public void FolderCursor_MarksTheFolderThatTakesFocus()
+    {
+        TreeInteractionState state = new();
+        FolderViewModel folder = new() { Name = "Test" };
+
+        state.MoveFolderCursor(folder);
+
+        Assert.True(folder.IsTreeCursor);
+        Assert.Same(folder, state.CursorFolder);
+    }
+
+    [Fact]
+    public void FolderCursor_StaysWhenFocusLandsOutsideAnyRow()
+    {
+        TreeInteractionState state = new();
+        FolderViewModel folder = new() { Name = "Test" };
+        state.MoveFolderCursor(folder);
+
+        state.MoveFolderCursor(null);
+
+        Assert.True(folder.IsTreeCursor);
+        Assert.Same(folder, state.CursorFolder);
+    }
+
+    [Fact]
+    public void FolderCursor_MovesFromOneFolderToTheNext()
+    {
+        TreeInteractionState state = new();
+        FolderViewModel first = new() { Name = "First" };
+        FolderViewModel second = new() { Name = "Second" };
+        state.MoveFolderCursor(first);
+
+        state.MoveFolderCursor(second);
+
+        Assert.False(first.IsTreeCursor);
+        Assert.True(second.IsTreeCursor);
+        Assert.Same(second, state.CursorFolder);
+    }
+
+    [Fact]
+    public void FolderCursor_LeavesWhenASessionRowTakesFocus()
+    {
+        TreeInteractionState state = new();
+        FolderViewModel folder = new() { Name = "Test" };
+        state.MoveFolderCursor(folder);
+
+        state.MoveFolderCursor(new ServerItemViewModel());
+
+        Assert.False(folder.IsTreeCursor);
+        Assert.Null(state.CursorFolder);
+    }
+
+    /// <summary>
+    /// The folder row used to paint itself from its container's native selection, which
+    /// OnTreeViewSelectedItemChanged always clears for a folder: the trigger could never fire.
+    /// </summary>
+    [Fact]
+    public void TheFolderRowPaintsTheCursorMarkFromTheViewModel()
     {
         string folder = MainWindowMarkup.Block(
             "<HierarchicalDataTemplate DataType=\"{x:Type vm:FolderViewModel}\"",
             "</HierarchicalDataTemplate>");
 
+        Assert.Contains("<DataTrigger Binding=\"{Binding IsTreeCursor}\" Value=\"True\">", folder, StringComparison.Ordinal);
         Assert.Contains("TargetName=\"FolderSelectionChrome\"", folder, StringComparison.Ordinal);
-        Assert.Contains("TreeRowSelectedBrush", folder, StringComparison.Ordinal);
+        Assert.DoesNotContain("AncestorType={x:Type TreeViewItem}", folder, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheTreeMovesTheFolderCursorOnEveryFocusChange()
+    {
+        string tree = MainWindowMarkup.Block("<controls:SessionTreeView x:Name=\"SessionTreeView\"", ">");
+
+        Assert.Contains("GotKeyboardFocus=\"OnSessionTreeViewGotKeyboardFocus\"", tree, StringComparison.Ordinal);
     }
 
     [Fact]

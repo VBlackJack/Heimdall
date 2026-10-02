@@ -134,6 +134,16 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// Moves the folder cursor mark to the row that has just taken keyboard focus, so the folder
+    /// stays marked after focus leaves the tree.
+    /// </summary>
+    private void OnSessionTreeViewGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        _treeState.MoveFolderCursor(
+            FindAncestor<TreeViewItem>(e.NewFocus as DependencyObject)?.DataContext);
+    }
+
+    /// <summary>
     /// Decides whether the row WPF has just selected must have its native flag cleared.
     /// </summary>
     /// <remarks>
