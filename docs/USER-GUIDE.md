@@ -98,6 +98,7 @@ directly such as `admin@192.168.1.10`. It is the fastest way to reach something 
 
 - Type in the filter box above the tree to search. Every word you type has to appear somewhere in a session's name, address, folder, username, protocol, environment, tags or project, in any order, and accents are ignored: `web prod` finds web01 in the Prod folder.
 - In the filter box, **Escape** clears the search, **Down** moves to the first session in the list, and **Enter** opens the session when exactly one matches. With two matches or more, Enter does nothing.
+- In the tree itself, type the first letters of a name to move to the next session or folder that starts with them. Typing the same letter again steps through the rows that start with it, and a pause of one second starts a new search. The folder you moved to stays marked when the focus goes to a menu or the filter box.
 - Active filters appear below the search controls. Remove one with its cross, or use **Reset all filters** to clear the search and all filters. Display preferences are preserved. While a filter is on, a folder's count reads visible/total, such as `2/40`.
 - Search results include the folder path and host address. Hover over that line to read the full values. If nothing matches, use **Clear search**.
 - A selection that a search or a closed folder hides is given back once its rows are visible again, unless you selected something else in the meantime.
@@ -144,6 +145,18 @@ Open an **SFTP** session (or FTP) to get a two-panel file browser: your machine 
 remote machine on the other.
 
 - **Drag and drop** between the panels to copy, in either direction, including whole folders.
+- **Download** (toolbar button, right-click menu, or **Ctrl+Shift+D**) saves the selected files
+  and folders into a folder you choose. A folder comes with everything it contains; links, pipes
+  and devices are left out, and the pane says how many were skipped.
+- **Drag remote entries onto a folder row** to move them into that folder on the same server. A
+  name already in use there is given a new name; nothing is replaced.
+- **One transfer runs at a time.** A batch started while another one runs waits in the
+  **Transfer queue** below the list. Each batch there can be stopped with **Cancel this
+  transfer**; one that failed or was cancelled stays listed with its reason and runs again with
+  **Retry**, and **Clear finished** removes those. The bar measures the whole batch, and shows the
+  rate and the time left once there is enough to measure.
+- When a file is already there, the conflict dialog shows the size and date of both copies and
+  which one is newer, and can replace only the newer ones. Cancel stops the whole batch.
 - **Double-click a remote text file** to edit it. Heimdall downloads it, opens it, and uploads it
   again each time you save. Close the editor when you are done.
 - **F2** renames, **F5** refreshes the listing. Neither fires while you are typing in the filter
