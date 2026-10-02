@@ -42,14 +42,21 @@ internal sealed class TreeTypeAhead
     /// <returns>The prefix to search for, or an empty string when the character is not searchable.</returns>
     internal string Append(char typed, long nowMs)
     {
-        if (char.IsControl(typed) || (char.IsWhiteSpace(typed) && _buffer.Length == 0))
+        if (char.IsControl(typed))
         {
             return "";
         }
 
+        // The stale prefix goes first: a space after a pause starts a new prefix, where it is not
+        // searchable, and the tree must get the key rather than a search for a space.
         if (nowMs - _lastTickMs > ResetDelay.TotalMilliseconds)
         {
             _buffer.Clear();
+        }
+
+        if (char.IsWhiteSpace(typed) && _buffer.Length == 0)
+        {
+            return "";
         }
 
         _lastTickMs = nowMs;

@@ -69,6 +69,20 @@ public sealed class SessionTreeUxAuditTests
     }
 
     [Fact]
+    public void TypeAhead_ASpaceAfterAPauseIsLeftToTheTree()
+    {
+        // The pause ends the old prefix first, so the space would lead a new one: it is not
+        // searchable there, and the tree gets the key instead.
+        TreeTypeAhead state = new();
+        state.Append('w', 0);
+        Assert.Equal("we", state.Append('e', 100));
+        long afterPause = 100 + (long)TreeTypeAhead.ResetDelay.TotalMilliseconds + 1;
+
+        Assert.Equal("", state.Append(' ', afterPause));
+        Assert.Equal("a", state.Append('a', afterPause + 10));
+    }
+
+    [Fact]
     public void TypeAhead_IgnoresControlCharactersAndALeadingSpace()
     {
         TreeTypeAhead state = new();
