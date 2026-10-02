@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -195,7 +196,14 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _main.ServerList.SessionStartFailed += OnSessionStartFailed;
         _main.ServerList.SessionReady += OnSessionReady;
         _main.ServerList.SessionFailed += OnSessionFailed;
+
+        // The targeted-pane count spans every open tab, and several paths outside this class
+        // close one; follow the list rather than ask each of them to announce it.
+        _main.Connection.ActiveSessions.CollectionChanged += OnActiveSessionsChanged;
     }
+
+    private void OnActiveSessionsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => OnPropertyChanged(nameof(BroadcastScopeLabel));
 
     // ── Broadcast mode ───────────────────────────────────────────────
 
@@ -1983,6 +1991,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _main.ServerList.SessionStartFailed -= OnSessionStartFailed;
         _main.ServerList.SessionReady -= OnSessionReady;
         _main.ServerList.SessionFailed -= OnSessionFailed;
+        _main.Connection.ActiveSessions.CollectionChanged -= OnActiveSessionsChanged;
 
         foreach (var cancellation in _connectingCancellations.Values)
         {
