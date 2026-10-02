@@ -560,6 +560,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         OnPropertyChanged(nameof(SelectionCountText));
         OnPropertyChanged(nameof(BulkConnectText));
         OnPropertyChanged(nameof(FilterResultCountText));
+        OnPropertyChanged(nameof(UndoTreeOrganizationText));
         NotifyToolDetailChanged();
     }
 

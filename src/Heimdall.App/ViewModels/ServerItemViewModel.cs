@@ -584,6 +584,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         OnPropertyChanged(nameof(StatusTooltipText));
         OnPropertyChanged(nameof(AccessibleName));
         OnPropertyChanged(nameof(RowTooltipText));
+        OnPropertyChanged(nameof(SearchContextText));
     }
 
     /// <summary>

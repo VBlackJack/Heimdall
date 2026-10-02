@@ -58,6 +58,22 @@ public sealed class ServerItemViewModelAccessibleHelpTests
     }
 
     [Fact]
+    public async Task SearchContextText_IsRefreshedOnLocaleChange()
+    {
+        // Its separator comes from the locale. Every locale uses the same one today, so nothing
+        // shows yet; the first translation that differs would have stayed stale after a switch.
+        LocalizationManager localizer = await CreateLocalizerAsync("en");
+        ServerItemViewModel server = CreateServer(localizer);
+        List<string?> changed = [];
+        server.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        await localizer.SwitchLocaleAsync("fr");
+        server.RefreshLocalizedState();
+
+        Assert.Contains(nameof(ServerItemViewModel.SearchContextText), changed);
+    }
+
+    [Fact]
     public async Task AccessibleHelpText_IsRefreshedOnLocaleChange()
     {
         LocalizationManager localizer = await CreateLocalizerAsync("en");
