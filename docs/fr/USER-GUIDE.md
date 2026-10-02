@@ -88,7 +88,7 @@ machine que vous vous attendez à joindre ; Heimdall s'en souvient ensuite.
 
 Si cette même demande réapparaît plus tard pour une machine déjà acceptée, **arrêtez-vous et
 demandez conseil.** Cela peut signifier que la machine a été réinstallée, ou que quelque chose se
-fait passer pour elle. Sur cette demande, le bouton mis en avant est **Refuser** : appuyer sur
+fait passer pour elle. Sur cette demande, le bouton mis en avant est **Rejeter** : appuyer sur
 Entrée refuse la connexion. Accepter la nouvelle clé, ou ne lui faire confiance que pour cette
 session, demande un clic délibéré.
 
@@ -197,18 +197,25 @@ Heimdall affiche la raison en clair partout où il le peut. Les cas courants :
 | La connexion expire | La machine est éteinte, ou un pare-feu bloque. Vérifiez l'adresse. Un hôte SSH qui ne répond pas est signalé au bout de 15 secondes. |
 | La clé d'hôte a changé | Voir l'avertissement plus haut. N'acceptez pas sans demander. |
 | Le serveur pose une question à laquelle ce client ne peut pas répondre | Le serveur veut un code de vérification ou un autre second facteur, et cette connexion ne peut pas vous le demander : l'explorateur de fichiers, les passerelles et le test de parcours ne répondent qu'aux demandes de mot de passe, et jamais avec votre mot de passe quand la question nomme un code à usage unique. Le terminal SSH, lui, vous pose la question. |
-| Une session WinRM se termine dès son ouverture | La connexion a été refusée, et l'erreur au-dessus du marqueur de fin dit pourquoi (accès refusé, Kerberos, TrustedHosts, hôte injoignable derrière une passerelle). Heimdall met fin à PowerShell plutôt que de vous laisser dans cet onglet devant une invite de votre propre machine. Si le message dit que la stratégie d'exécution a refusé le script de connexion, utilisez l'identité Windows actuelle pour cet hôte, ou contactez votre administrateur. |
+| Une session WinRM se termine dès son ouverture | La connexion a été refusée. Quand Heimdall en reconnaît la cause (identifiants rejetés, accès refusé, Kerberos, TrustedHosts, hôte injoignable derrière une passerelle), la ligne d'état en haut de l'onglet l'indique en rouge, et l'erreur PowerShell au-dessus du marqueur de fin donne le détail. Heimdall met fin à PowerShell plutôt que de vous laisser dans cet onglet devant une invite de votre propre machine. Si le message dit que la stratégie d'exécution a refusé le script de connexion, utilisez l'identité Windows actuelle pour cet hôte, ou contactez votre administrateur. |
 | Un message parlant de WebView2 | La machine n'a pas Microsoft Edge. Voir [Installation](#installation). |
 | "Passerelle SSH introuvable" | La session pointe vers une passerelle qui n'existe plus. Modifiez la session pour en choisir une, ou recréez-la dans les réglages. |
 
 Une session RDP qui se déconnecte toute seule tentera de se reconnecter d'elle-même, en vous
-montrant ce qu'elle fait. Vous pouvez annuler depuis la barre d'outils.
+montrant ce qu'elle fait. Vous pouvez annuler depuis la barre d'outils. **Echap** ferme un message
+de déconnexion sans fermer l'onglet, et **Reconnecter** dans l'en-tête de la session réessaie
+ensuite.
 
 Si la raison affichée ne suffit pas, le journal en dira davantage.
 
 Dans une session SSH ou SFTP déconnectée, choisissez **Modifier le profil** pour corriger les
 paramètres enregistrés, puis reconnectez-vous. La session reste ouverte pendant la modification.
 Dans une vue partagée, le bouton ouvre le profil du volet concerné.
+
+Dans le terminal SSH, **Annuler** arrête une connexion encore en cours d'ouverture, et **Voir la
+sortie** masque le message de fin pour lire ce que le serveur a affiché. **Ctrl+Shift+F** cherche
+dans la sortie (**Entrée** pour l'occurrence suivante, **Shift+Entrée** pour la précédente), et
+**Ctrl+clic** ouvre un lien.
 
 Pour RDP, **Copier le rapport anonymisé** fournit la date UTC, la version de Heimdall et les codes
 RDP disponibles, sans adresses, comptes ni texte des erreurs. **Copier l'erreur** conserve le
