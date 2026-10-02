@@ -36,6 +36,7 @@ public sealed partial class NetworkCartographyViewModel : ObservableObject, IDis
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _subnetDetectCts;
     private readonly INetworkKnowledgeBaseStore _store;
+    private readonly string _scanHistoryDirectory;
     private ICartographyScanner? _scanner;
     private NetworkKnowledgeBase? _knowledgeBase;
     private SshGatewayDto? _selectedGateway;
@@ -71,9 +72,18 @@ public sealed partial class NetworkCartographyViewModel : ObservableObject, IDis
         UpdateLargeSubnetHostCount(value);
     }
 
-    public NetworkCartographyViewModel(INetworkKnowledgeBaseStore? store = null)
+    /// <param name="store">Where the knowledge base is read and written.</param>
+    /// <param name="scanHistoryDirectory">
+    /// Where scan snapshots are saved and listed. Required, with no default: a test that
+    /// relied on one wrote its scans into the developer's own history.
+    /// </param>
+    public NetworkCartographyViewModel(INetworkKnowledgeBaseStore store, string scanHistoryDirectory)
     {
-        _store = store ?? new FileNetworkKnowledgeBaseStore();
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentException.ThrowIfNullOrWhiteSpace(scanHistoryDirectory);
+
+        _store = store;
+        _scanHistoryDirectory = scanHistoryDirectory;
     }
 
     public void Initialize(LocalizationManager? localizer)
@@ -106,7 +116,7 @@ public sealed partial class NetworkCartographyViewModel : ObservableObject, IDis
     }
 
     public List<(string FileName, DateTime Timestamp, string Subnet)> GetHistoryList()
-        => ScanHistoryManager.ListSnapshots();
+        => ScanHistoryManager.ListSnapshots(_scanHistoryDirectory);
 
     public async Task<List<string>> DetectRemoteSubnetsAsync()
     {
@@ -168,7 +178,7 @@ public sealed partial class NetworkCartographyViewModel : ObservableObject, IDis
             return;
         }
 
-        var oldSnapshot = ScanHistoryManager.LoadSnapshot(fileName);
+        var oldSnapshot = ScanHistoryManager.LoadSnapshot(_scanHistoryDirectory, fileName);
         if (oldSnapshot is null)
         {
             DiffText = string.Empty;
@@ -282,7 +292,7 @@ public sealed partial class NetworkCartographyViewModel : ObservableObject, IDis
 
             try
             {
-                await ScanHistoryManager.SaveSnapshotAsync(snapshot);
+                await ScanHistoryManager.SaveSnapshotAsync(_scanHistoryDirectory, snapshot);
             }
             catch (Exception ex)
             {

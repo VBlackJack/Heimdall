@@ -53,7 +53,9 @@ public partial class NetworkCartographyView : UserControl, IToolView
 
     public NetworkCartographyView()
     {
-        _vm = new NetworkCartographyViewModel();
+        _vm = new NetworkCartographyViewModel(
+            new FileNetworkKnowledgeBaseStore(),
+            ScanHistoryManager.ResolveDefaultDirectory());
         InitializeComponent();
         _vm.PropertyChanged += OnVmPropertyChanged;
         DataContext = _vm;

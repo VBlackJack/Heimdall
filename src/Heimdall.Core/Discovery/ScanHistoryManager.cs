@@ -40,7 +40,12 @@ public static class ScanHistoryManager
     /// <summary>Maximum number of scan snapshots to retain on disk.</summary>
     internal const int MaxRetainedSnapshots = 20;
 
-    private static string GetScanDir() =>
+    /// <summary>
+    /// The history directory of the current user's profile. Every operation takes its
+    /// directory from the caller: a default here let a test write into the developer's own
+    /// history, where the retention policy then deleted the oldest snapshots.
+    /// </summary>
+    public static string ResolveDefaultDirectory() =>
         ApplicationDataPathResolver.GetNetworkScansDirectory(
             ApplicationDataPathResolver.Resolve());
 
@@ -49,9 +54,9 @@ public static class ScanHistoryManager
     /// Uses atomic temp-file-then-rename to prevent corruption on crash.
     /// On Windows, applies restrictive ACL via <see cref="Security.SecureFileWriter"/>.
     /// </summary>
-    public static async Task SaveSnapshotAsync(NetworkScanSnapshot snapshot)
+    public static async Task SaveSnapshotAsync(string dir, NetworkScanSnapshot snapshot)
     {
-        var dir = GetScanDir();
+        ArgumentException.ThrowIfNullOrWhiteSpace(dir);
         Directory.CreateDirectory(dir);
         var fileName = $"scan_{snapshot.Timestamp:yyyyMMdd_HHmmss}_{snapshot.Profile.Subnet.Replace('/', '-')}.json";
         var targetPath = Path.Combine(dir, fileName);
@@ -85,9 +90,9 @@ public static class ScanHistoryManager
     /// <summary>
     /// Lists all saved scan snapshots ordered by most recent first.
     /// </summary>
-    public static List<(string FileName, DateTime Timestamp, string Subnet)> ListSnapshots()
+    public static List<(string FileName, DateTime Timestamp, string Subnet)> ListSnapshots(string dir)
     {
-        var dir = GetScanDir();
+        ArgumentException.ThrowIfNullOrWhiteSpace(dir);
         if (!Directory.Exists(dir)) return [];
 
         return Directory.GetFiles(dir, "scan_*.json")
@@ -120,15 +125,17 @@ public static class ScanHistoryManager
     /// <summary>
     /// Loads a specific scan snapshot from a history file.
     /// </summary>
-    public static NetworkScanSnapshot? LoadSnapshot(string fileName)
+    public static NetworkScanSnapshot? LoadSnapshot(string dir, string fileName)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dir);
+
         // Path traversal prevention (CWE-22) + filename whitelist
         if (string.IsNullOrWhiteSpace(fileName)) return null;
         var sanitized = Path.GetFileName(fileName);
         if (sanitized != fileName || fileName.Contains("..")) return null;
         if (!sanitized.StartsWith("scan_", StringComparison.Ordinal)) return null;
 
-        var path = Path.Combine(GetScanDir(), sanitized);
+        var path = Path.Combine(dir, sanitized);
         if (!File.Exists(path)) return null;
         var json = File.ReadAllText(path);
         return JsonSerializer.Deserialize<NetworkScanSnapshot>(json, DeserializeOptions);

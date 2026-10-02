@@ -20,6 +20,11 @@ namespace Heimdall.Core.Tests;
 
 public class ScanHistoryManagerTests
 {
+    // A directory of this test run that is never created: these tests only read, and a
+    // default directory would be the developer's own scan history.
+    private static readonly string HistoryDir =
+        Path.Combine(Path.GetTempPath(), "heimdall-scan-history-tests", Guid.NewGuid().ToString("N"));
+
     // ── LoadSnapshot path validation ────────────────────────────────
 
     [Theory]
@@ -29,7 +34,7 @@ public class ScanHistoryManagerTests
     [InlineData("subdir\\file.json")]
     public void LoadSnapshot_PathTraversal_ReturnsNull(string maliciousName)
     {
-        var result = ScanHistoryManager.LoadSnapshot(maliciousName);
+        var result = ScanHistoryManager.LoadSnapshot(HistoryDir, maliciousName);
         Assert.Null(result);
     }
 
@@ -39,25 +44,25 @@ public class ScanHistoryManagerTests
     [InlineData("settings.json")]
     public void LoadSnapshot_NonScanPrefix_ReturnsNull(string fileName)
     {
-        Assert.Null(ScanHistoryManager.LoadSnapshot(fileName));
+        Assert.Null(ScanHistoryManager.LoadSnapshot(HistoryDir, fileName));
     }
 
     [Fact]
     public void LoadSnapshot_EmptyFileName_ReturnsNull()
     {
-        Assert.Null(ScanHistoryManager.LoadSnapshot(""));
+        Assert.Null(ScanHistoryManager.LoadSnapshot(HistoryDir, ""));
     }
 
     [Fact]
     public void LoadSnapshot_WhitespaceFileName_ReturnsNull()
     {
-        Assert.Null(ScanHistoryManager.LoadSnapshot("   "));
+        Assert.Null(ScanHistoryManager.LoadSnapshot(HistoryDir, "   "));
     }
 
     [Fact]
     public void LoadSnapshot_NonExistentFile_ReturnsNull()
     {
-        Assert.Null(ScanHistoryManager.LoadSnapshot("nonexistent_scan.json"));
+        Assert.Null(ScanHistoryManager.LoadSnapshot(HistoryDir, "nonexistent_scan.json"));
     }
 
     // ── ComputeDiff edge cases ──────────────────────────────────────

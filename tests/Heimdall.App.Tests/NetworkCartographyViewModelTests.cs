@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.Tests.Fakes;
 using Heimdall.App.ViewModels.Tools;
@@ -21,8 +22,22 @@ using Heimdall.Core.Discovery;
 
 namespace Heimdall.App.Tests;
 
-public sealed class NetworkCartographyViewModelTests
+public sealed class NetworkCartographyViewModelTests : IDisposable
 {
+    // Every scan saves a snapshot and then enforces the retention limit on the directory it
+    // saved into. Before the directory was injected, each run of this class added two
+    // snapshots to the developer's own history and deleted the oldest real ones.
+    private readonly string _scanHistoryDirectory =
+        Path.Combine(Path.GetTempPath(), "heimdall-cartography-tests", Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_scanHistoryDirectory))
+        {
+            Directory.Delete(_scanHistoryDirectory, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task Scan_EmptySubnet_SetsError()
     {
@@ -53,6 +68,25 @@ public sealed class NetworkCartographyViewModelTests
 
         Assert.Equal(1, scanner.ScanCallCount);
         Assert.Equal("10.0.0.0/30", scanner.LastProfile?.Subnet);
+    }
+
+    [Fact]
+    public async Task Scan_SavesItsSnapshotIntoTheInjectedHistoryDirectory()
+    {
+        var scanner = new FakeScanner
+        {
+            ScanResult = CreateSnapshot("10.0.0.0/30", "10.0.0.1")
+        };
+        var vm = CreateViewModel();
+        vm.Initialize(null);
+        vm.SetScanner(scanner);
+        vm.Subnet = "10.0.0.0/30";
+
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        string saved = Assert.Single(Directory.GetFiles(_scanHistoryDirectory, "scan_*.json"));
+        Assert.EndsWith("_10.0.0.0-30.json", saved, StringComparison.Ordinal);
+        Assert.Equal(Path.GetFileName(saved), Assert.Single(vm.GetHistoryList()).FileName);
     }
 
     [Fact]
@@ -216,8 +250,8 @@ public sealed class NetworkCartographyViewModelTests
         Assert.Same(expected, actual);
     }
 
-    private static NetworkCartographyViewModel CreateViewModel(InMemoryNetworkKnowledgeBaseStore? store = null)
-        => new(store ?? new InMemoryNetworkKnowledgeBaseStore());
+    private NetworkCartographyViewModel CreateViewModel(InMemoryNetworkKnowledgeBaseStore? store = null)
+        => new(store ?? new InMemoryNetworkKnowledgeBaseStore(), _scanHistoryDirectory);
 
     private static NetworkKnowledgeBase CreateNonEmptyKnowledgeBase() => new(
         1,
