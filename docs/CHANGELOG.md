@@ -12,6 +12,22 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### Tests: the suites no longer touch the developer's own profile
+
+- **The UI test host no longer runs Heimdall's startup.** WPF queues the startup event from the
+  application's constructor, so the host that builds the application for the UI tests ran the
+  whole product startup in the test process, against the developer's own data directory: the
+  scheduled task engine, the health monitor and every writer of the profile. One run executed an
+  overdue scheduled task and opened an RDP session to a host on the network. The host now
+  switches the startup and exit sequences off, provides its own main window and a container
+  holding only the UI dispatcher, and a test fails if the product container is ever built in it.
+- **The cartography tests no longer write into the user's scan history.** Every scan saves a
+  snapshot and then trims the history to its 20 most recent files, and the history directory
+  defaulted to the user's own. Each run of these tests added two snapshots there and deleted the
+  two oldest. The directory is now a required parameter, and the tests use a temporary one.
+
 ## 2026-10-01: updates no longer stay closed over an apostrophe (v2026.100104)
 
 ### Updates: the installer host runs on Windows PowerShell's own modules
