@@ -446,6 +446,30 @@ public sealed partial class ServerListSelectionTests
         Assert.False(fixture.ViewModel.CanUndoTreeOrganization);
     }
 
+    /// <summary>
+    /// The undo bar is reworded when the interface language changes while it is offered.
+    /// </summary>
+    /// <remarks>
+    /// Its sentence is read from the localizer and was announced only when a change was recorded,
+    /// so a language switch inside the 30 seconds left it in the old language. The list's language
+    /// refresh is what the window calls on a switch.
+    /// </remarks>
+    [Fact]
+    public async Task UndoBar_IsRewordedByTheLanguageRefresh()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        await fixture.LoadServersAsync(fixture.ExpandGroups("ops"),
+            CreateServer("a", "A", "ops"), CreateServer("b", "B", "ops"));
+        Assert.True(await fixture.ViewModel.ReorderServersAsync(
+            [fixture.ServerById("a")], fixture.ServerById("b"), true));
+        List<string?> changed = [];
+        fixture.ViewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        fixture.ViewModel.RefreshLocalizedState();
+
+        Assert.Contains(nameof(ServerListViewModel.UndoTreeOrganizationText), changed);
+    }
+
     [Fact]
     public async Task ClearOrganizationUndo_WithdrawsTheOffer()
     {
