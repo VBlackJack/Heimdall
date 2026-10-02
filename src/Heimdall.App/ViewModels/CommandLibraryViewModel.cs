@@ -20,6 +20,7 @@ using System.Net;
 using System.Windows.Data;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Heimdall.App.Services;
 using Heimdall.App.Services.Import;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Configuration;
@@ -124,7 +125,8 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         LocalizationManager localizer,
         IDialogService dialogService,
         IGitSyncService gitSyncService,
-        ICommandLibraryTransferService transferService)
+        ICommandLibraryTransferService transferService,
+        IUiDispatcher? uiDispatcher = null)
     {
         _serviceProvider = serviceProvider;
         _configManager = configManager;
@@ -132,6 +134,70 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         _dialogService = dialogService;
         _gitSyncService = gitSyncService;
         _transferService = transferService;
+        _uiDispatcher = uiDispatcher;
+
+        // Several tests build the library with no localizer at all.
+        if (localizer is not null)
+        {
+            localizer.LocaleChanged += OnLocaleChanged;
+        }
+    }
+
+    private readonly IUiDispatcher? _uiDispatcher;
+
+    /// <summary>
+    /// Rewords the library after an interface language switch.
+    /// </summary>
+    /// <remarks>
+    /// The switch can complete off the UI thread, and the refresh rebuilds bound collections and
+    /// refreshes a collection view, both of which belong to the UI thread; it is sent there. With
+    /// no dispatcher it runs where it is raised.
+    /// </remarks>
+    private void OnLocaleChanged(string locale)
+    {
+        if (_uiDispatcher is null || _uiDispatcher.CheckAccess())
+        {
+            RefreshLocalizedText();
+            return;
+        }
+
+        _ = _uiDispatcher.InvokeAsync(RefreshLocalizedText);
+    }
+
+    /// <summary>
+    /// Re-reads every worded line of the library from the localizer: the filter combos (keeping
+    /// their selection), the help and empty-state text, the counters and tooltips, and the rows.
+    /// </summary>
+    internal void RefreshLocalizedText()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        PopulateStaticFilterItems();
+        PopulateCategoryFilterItems();
+        PopulateTagFilterItems();
+
+        if (!string.IsNullOrEmpty(HelpContentText))
+        {
+            HelpContentText = LocalizeKey("ToolHelpCMDLIB").Replace("\\n", "\n");
+        }
+
+        if (IsReady)
+        {
+            EmptyStateMessage = _allEntries.Count == 0
+                ? LocalizeKey("ToolCmdLibEmptyLibrary")
+                : string.Empty;
+        }
+
+        OnPropertyChanged(nameof(ResultCountText));
+        OnPropertyChanged(nameof(SendTooltip));
+        OnPropertyChanged(nameof(CopyTooltip));
+        OnPropertyChanged(nameof(BroadcastButtonText));
+
+        // The rows read their labels through LocalizeKey when bound; a reset re-binds them.
+        _actionsView?.Refresh();
     }
 
     // ── Observable UI state ───────────────────────────────────────
@@ -1224,6 +1290,11 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     {
         if (_disposed) return;
         _disposed = true;
+
+        if (_localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+        }
 
         _searchCts?.Cancel();
         _searchCts?.Dispose();
