@@ -23,7 +23,7 @@ namespace Heimdall.App.UiTests.E2E;
 [Collection(DesktopUiCollection.Name)]
 public sealed class ShellLaunchTests
 {
-    [StaFact]
+    [ProductLaunchFact]
     [Trait("Category", "RequiresDesktop")]
     public void MainWindow_Launches_AndTitleContainsHeimdall()
     {

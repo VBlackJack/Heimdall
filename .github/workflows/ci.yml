@@ -151,10 +151,15 @@ jobs:
       # Informational pass for desktop UIAutomation smoke tests. These need a
       # real interactive desktop to be deterministic and can hang on GitHub
       # Actions Windows runners. Keep the signal visible without blocking CI.
+      # The tests that launch the real executable are opt-in: on a developer
+      # machine they run against the developer's own profile. The runner's
+      # profile is thrown away with it, so this lane opts in.
       - name: Test RequiresDesktop (informational, non-blocking)
         if: always()
         continue-on-error: true
         timeout-minutes: 15
+        env:
+          HEIMDALL_UITESTS_LAUNCH_PRODUCT: "1"
         run: >
           dotnet test Heimdall.slnx --no-build -c Release
           --filter "Category=RequiresDesktop"
