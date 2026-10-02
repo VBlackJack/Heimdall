@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Xml.Linq;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.App.ViewModels;
 using Heimdall.Sftp;
 
@@ -202,13 +203,13 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
     /// </summary>
     [Theory]
     [InlineData(RemoteEntryKind.File, true)]
-    [InlineData(RemoteEntryKind.Directory, false)]
+    [InlineData(RemoteEntryKind.Directory, true)]
     [InlineData(RemoteEntryKind.SymbolicLink, false)]
     [InlineData(RemoteEntryKind.Fifo, false)]
     [InlineData(RemoteEntryKind.Socket, false)]
     [InlineData(RemoteEntryKind.Device, false)]
     [InlineData(RemoteEntryKind.Unknown, false)]
-    public void SftpDownload_OnlyARegularFileIsDownloadable(RemoteEntryKind kind, bool downloadable)
+    public void SftpDownload_OnlyAFileOrAFolderIsDownloadable(RemoteEntryKind kind, bool downloadable)
     {
         Assert.Equal(downloadable, EmbeddedSftpViewModel.IsDownloadable(Entry("payload", kind)));
     }
@@ -226,23 +227,21 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
     {
         Assert.False(EmbeddedSftpViewModel.CanDownloadSelection([]));
         Assert.False(EmbeddedSftpViewModel.CanDownloadSelection(
-            [Entry("logs", RemoteEntryKind.Directory)]));
-        Assert.False(EmbeddedSftpViewModel.CanDownloadSelection(
-            [Entry("logs", RemoteEntryKind.Directory), Entry("etc", RemoteEntryKind.Directory)]));
-        Assert.False(EmbeddedSftpViewModel.CanDownloadSelection(
             [Entry("pipe", RemoteEntryKind.Fifo), Entry("link", RemoteEntryKind.SymbolicLink)]));
     }
 
     [Fact]
-    public void SftpDownload_IsOfferedWhenTheSelectionHoldsAtLeastOneFile()
+    public void SftpDownload_IsOfferedWhenTheSelectionHoldsAtLeastOneFileOrFolder()
     {
         Assert.True(EmbeddedSftpViewModel.CanDownloadSelection(
             [Entry("notes.txt", RemoteEntryKind.File)]));
 
-        // A mixed selection still transfers the file, so hiding the action there would remove a
-        // download that works. The end-of-transfer message reports what was skipped.
+        // A folder is downloaded with its content, alone or mixed with files and with entries
+        // that cannot be downloaded (those are reported at the end of the transfer).
         Assert.True(EmbeddedSftpViewModel.CanDownloadSelection(
-            [Entry("logs", RemoteEntryKind.Directory), Entry("notes.txt", RemoteEntryKind.File)]));
+            [Entry("logs", RemoteEntryKind.Directory)]));
+        Assert.True(EmbeddedSftpViewModel.CanDownloadSelection(
+            [Entry("link", RemoteEntryKind.SymbolicLink), Entry("logs", RemoteEntryKind.Directory)]));
     }
 
     /// <summary>
@@ -256,31 +255,45 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
     [Fact]
     public void SftpDownload_TheMenuAndThePlannerAskTheSamePredicate()
     {
-        string viewSource = ReadRepoFile(
-            "src",
-            "Heimdall.App",
-            "Views",
-            "EmbeddedSftpView.xaml.cs");
-        string contextMenu = ExtractMethodBody(
-            viewSource,
+        string menuLogic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(ReadRepoFile(
+                "src",
+                "Heimdall.App",
+                "Views",
+                "EmbeddedSftpView.xaml.cs")),
             "private void OnContextMenuOpened(object sender, RoutedEventArgs e)");
-        string viewModelSource = ReadRepoFile(
-            "src",
-            "Heimdall.App",
-            "ViewModels",
-            "EmbeddedSftpViewModel.cs");
-        string download = ExtractMethodBody(
-            viewModelSource,
-            "public async Task DownloadFilesAsync(IReadOnlyList<SftpFileInfo> files, string targetFolder)");
+        string modelLogic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(ReadRepoFile(
+                "src",
+                "Heimdall.App",
+                "ViewModels",
+                "EmbeddedSftpViewModel.Transfers.cs")),
+            "public static bool IsDownloadable(SftpFileInfo entry)");
+        string plannerLogic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(ReadRepoFile(
+                "src",
+                "Heimdall.Sftp",
+                "RemoteDownloadTreePlanner.cs")),
+            "private static async Task AppendEntryAsync(");
 
-        Assert.Contains(
-            "CtxDownload.Visibility = EmbeddedSftpViewModel.CanDownloadSelection(",
-            contextMenu,
-            StringComparison.Ordinal);
-        Assert.Contains("if (!IsDownloadable(file))", download, StringComparison.Ordinal);
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                menuLogic,
+                "bool canDownload = EmbeddedSftpViewModel.CanDownloadSelection(FileListView.SelectedItems.OfType<SftpFileInfo>());"),
+            "the menu does not ask the shared predicate");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(menuLogic, "CtxDownload.IsEnabled = canDownload;"),
+            "the answer of the shared predicate does not decide whether the menu entry is enabled");
 
-        // The menu must not re-derive the answer from the kind on its own.
-        Assert.DoesNotContain("CtxDownload.Visibility = hasSelection", contextMenu, StringComparison.Ordinal);
+        // The view model answers with the planner's own predicate, and the planner walks with it.
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                modelLogic,
+                "return RemoteDownloadTreePlanner.IsDownloadable(entry);"),
+            "the view model answers with a predicate of its own");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(plannerLogic, "if (!IsDownloadable(entry))"),
+            "the planner does not walk with the shared predicate");
     }
 
     private static SftpFileInfo Entry(string name, RemoteEntryKind kind) => new(

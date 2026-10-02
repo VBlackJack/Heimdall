@@ -674,7 +674,7 @@
                                                           TabIndex="5"
                                                           Content="{loc:Translate ServerDialogWinRmSkipCertCheck}"
                                                           AutomationProperties.Name="{loc:Translate ServerDialogWinRmSkipCertCheck}"
-                                                          AutomationProperties.HelpText="{loc:Translate ServerDialogWinRmSkipCertCheckHint}"
+                                                          AutomationProperties.HelpText="{Binding WinRmSkipCertificateHintText}"
                                                           IsChecked="{Binding WinRmSkipCertificateCheck}"
                                                           IsEnabled="{Binding CanSkipWinRmCertificate}"
                                                           Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -707,18 +707,37 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
+                                        <!-- The two hints below repeat the HelpText of their check box. They carry
+                                             no automation Name of their own: their visible text is already
+                                             their name, and a second copy would be read under another label. -->
                                         <TextBlock Text="{Binding WinRmUseSslHelpText}"
-                                                   AutomationProperties.Name="{Binding WinRmUseSslHelpText}"
                                                    Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                   Style="{StaticResource DialogHintTextStyle}"
                                                    Margin="0,4,0,0"
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock Text="{loc:Translate ServerDialogWinRmSkipCertCheckHint}"
-                                                   AutomationProperties.Name="{loc:Translate ServerDialogWinRmSkipCertCheckHint}"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DialogHintTextStyle}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding WinRmSslDisabledByGateway}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding WinRmSkipCertificateHintText}"
                                                    Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                   Style="{StaticResource DialogHintTextStyle}"
                                                    Margin="0,4,0,0"
-                                                   TextWrapping="Wrap"/>
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DialogHintTextStyle}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsWinRmCertificateCheckSkipped}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <!-- One test, beside the two fields it measures. It used to be two
                                              buttons with two labels, both inside a credentials card, which is
                                              why a first-time user read "Test connection" as validating his
@@ -885,6 +904,16 @@
                                                           Content="{loc:Translate ServerDialogWinRmIdentityCredential}"
                                                           Tag="{x:Static config:WinRmIdentityMode.Credential}"/>
                                         </ComboBox>
+                                        <TextBlock Text="{loc:Translate ServerDialogWinRmIdentityHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Margin="0,4,0,0"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding WinRmTrustedHostsHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Foreground="{DynamicResource WarningTextBrush}"
+                                                   Margin="0,4,0,0"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="{Binding WinRmTrustedHostsHint, Converter={StaticResource NullToVisibilityConverter}}"/>
                                         <StackPanel Visibility="{Binding IsWinRmCredentialIdentity, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <TextBlock x:Name="DlgSrv_BasicWinRmUsernameLabel"
                                                        Text="{loc:Translate ServerDialogLabelUsername}"
@@ -907,6 +936,9 @@
                                                          AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicWinRmPasswordLabel}"
                                                          PasswordChanged="OnCredentialPasswordChanged"
                                                          Style="{StaticResource DialogFormPasswordBoxStyle}"/>
+                                            <TextBlock Text="{Binding WinRmPasswordError}"
+                                                       Style="{StaticResource FieldValidationErrorStyle}"
+                                                       Visibility="{Binding WinRmPasswordError, Converter={StaticResource NullToVisibilityConverter}}"/>
                                             <StackPanel Orientation="Horizontal"
                                                         Margin="0,8,0,0"
                                                         Visibility="{Binding HasStoredWinRmPassword, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -1017,23 +1049,34 @@
                                                 Padding="8,4"
                                                 BorderThickness="1"
                                                 HorizontalAlignment="Left"
-                                                Cursor="Hand"
-                                                ToolTip="{loc:Translate ServerDialogAgentChipTooltipRefresh}"
                                                 Style="{StaticResource SshAgentChipBorderStyle}">
-                                            <Border.InputBindings>
-                                                <MouseBinding MouseAction="LeftClick"
-                                                              Command="{Binding RefreshAgentChipCommand}"/>
-                                            </Border.InputBindings>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource SshAgentChipIconStyle}"
-                                                           FontSize="{StaticResource FontSizeBodyLarge}"
-                                                           Margin="0,0,6,0"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding AgentChipText}"
-                                                           FontSize="{StaticResource FontSizeCaption}"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            </StackPanel>
+                                            <!-- A real button: focusable, announced, and Invoke-able, so the agent
+                                                 state refresh is reachable without a mouse. -->
+                                            <Button x:Name="DlgSrv_SshAgentChipButton"
+                                                    Command="{Binding RefreshAgentChipCommand}"
+                                                    Cursor="Hand"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    ToolTip="{loc:Translate ServerDialogAgentChipTooltipRefresh}"
+                                                    AutomationProperties.Name="{Binding AgentChipText}"
+                                                    AutomationProperties.HelpText="{loc:Translate ServerDialogAgentChipTooltipRefresh}">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <ContentPresenter/>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Style="{StaticResource SshAgentChipIconStyle}"
+                                                               FontSize="{StaticResource FontSizeBodyLarge}"
+                                                               Margin="0,0,6,0"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding AgentChipText}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                </StackPanel>
+                                            </Button>
                                         </Border>
                                         <StackPanel Visibility="{Binding HasSshKeyPath, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <TextBlock x:Name="DlgSrv_BasicSshKeyPassphraseLabel"
@@ -1657,11 +1700,11 @@
                                                      AutomationProperties.Name="{loc:Translate ServerDialogRdpSubTabDevices}"
                                                      Style="{DynamicResource SegmentedTabItemStyle}">
                                                 <StackPanel Margin="0,12,0,0">
-                                                    <CheckBox x:Name="DlgSrv_RedirClipboardCb" TabIndex="68" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RedirectClipboard}" Style="{StaticResource DialogFormCheckBoxStyle}"/>
-                                                    <CheckBox x:Name="DlgSrv_RedirDrivesCb" TabIndex="69" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RedirectDrives}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
-                                                    <CheckBox x:Name="DlgSrv_RedirPrintersCb" TabIndex="70" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RedirectPrinters}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
-                                                    <CheckBox x:Name="DlgSrv_RedirComPortsCb" TabIndex="71" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RdpRedirectComPorts}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
-                                                    <CheckBox x:Name="DlgSrv_RedirSmartCardsCb" TabIndex="72" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RdpRedirectSmartCards}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
+                                                    <CheckBox x:Name="DlgSrv_RedirClipboardCb" TabIndex="68" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RedirectClipboard}" ToolTip="{loc:Translate RdpRedirectClipboardHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectClipboardHint}" Style="{StaticResource DialogFormCheckBoxStyle}"/>
+                                                    <CheckBox x:Name="DlgSrv_RedirDrivesCb" TabIndex="69" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RedirectDrives}" ToolTip="{loc:Translate RdpRedirectDrivesHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectDrivesHint}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
+                                                    <CheckBox x:Name="DlgSrv_RedirPrintersCb" TabIndex="70" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RedirectPrinters}" ToolTip="{loc:Translate RdpRedirectPrintersHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectPrintersHint}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
+                                                    <CheckBox x:Name="DlgSrv_RedirComPortsCb" TabIndex="71" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RdpRedirectComPorts}" ToolTip="{loc:Translate RdpRedirectComPortsHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectComPortsHint}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
+                                                    <CheckBox x:Name="DlgSrv_RedirSmartCardsCb" TabIndex="72" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RdpRedirectSmartCards}" ToolTip="{loc:Translate RdpRedirectSmartCardsHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectSmartCardsHint}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
                                                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                                         <CheckBox x:Name="DlgSrv_RedirWebcamCb"
                                                                   TabIndex="73"
@@ -1697,7 +1740,7 @@
                                                             </TextBlock.Style>
                                                         </TextBlock>
                                                     </StackPanel>
-                                                    <CheckBox x:Name="DlgSrv_RedirUsbCb" TabIndex="74" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RdpRedirectUsb}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
+                                                    <CheckBox x:Name="DlgSrv_RedirUsbCb" TabIndex="74" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RdpRedirectUsb}" ToolTip="{loc:Translate RdpRedirectUsbHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectUsbHint}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>
                                                 </StackPanel>
                                             </TabItem>
                                             <TabItem Header="{loc:Translate ServerDialogRdpSubTabPerformance}"

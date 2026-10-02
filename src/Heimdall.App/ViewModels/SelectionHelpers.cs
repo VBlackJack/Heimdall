@@ -40,4 +40,36 @@ public static class SelectionHelpers
             }
         }
     }
+
+    /// <summary>
+    /// Every row the tree shows, folders included, in display order: a folder, then its children
+    /// when it is expanded.
+    /// </summary>
+    /// <param name="folders">The root folders.</param>
+    public static IEnumerable<object> EnumerateVisibleNodes(IEnumerable<FolderViewModel> folders)
+    {
+        foreach (FolderViewModel folder in folders)
+        {
+            yield return folder;
+            if (!folder.IsExpanded)
+            {
+                continue;
+            }
+
+            foreach (object child in folder.Children)
+            {
+                if (child is FolderViewModel subFolder)
+                {
+                    foreach (object node in EnumerateVisibleNodes([subFolder]))
+                    {
+                        yield return node;
+                    }
+                }
+                else
+                {
+                    yield return child;
+                }
+            }
+        }
+    }
 }

@@ -51,19 +51,52 @@ public static class ListViewContextMenuHelper
         if (row is not null)
         {
             SelectForContextMenu(listView, row.Content);
+            return;
         }
+
+        // The empty part of the list: the menu is about the folder, not about the row that happened
+        // to be selected before. A header or a scrollbar is not the body and leaves the selection.
+        if (IsListBody(hit.VisualHit))
+        {
+            SelectForContextMenu(listView, null);
+        }
+    }
+
+    /// <summary>Whether a hit lands on the body of the list rather than on its headers or scrollbars.</summary>
+    internal static bool IsListBody(DependencyObject hit)
+    {
+        DependencyObject? current = hit;
+        while (current is not null)
+        {
+            if (current is System.Windows.Controls.GridViewColumnHeader
+                or System.Windows.Controls.Primitives.ScrollBar)
+            {
+                return false;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return true;
     }
 
     /// <summary>
     /// The selection rule, without the hit test. A right-click on a row that is already part of
     /// the selection keeps the multi-selection, so a batch command still applies to the batch;
-    /// a right-click elsewhere selects that row alone.
+    /// a right-click elsewhere selects that row alone, and a right-click on no row at all empties
+    /// the selection.
     /// </summary>
     internal static void SelectForContextMenu(System.Windows.Controls.ListView listView, object? item)
     {
         ArgumentNullException.ThrowIfNull(listView);
 
-        if (item is null || listView.SelectedItems.Contains(item))
+        if (item is null)
+        {
+            listView.SelectedItems.Clear();
+            return;
+        }
+
+        if (listView.SelectedItems.Contains(item))
         {
             return;
         }

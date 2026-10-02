@@ -2409,6 +2409,27 @@ public sealed partial class SettingsViewModelTests : IDisposable
         Assert.Equal(0, viewModel.GeneralTabErrorCount);
     }
 
+    // P3-3: removing an external tool is as final as removing a gateway until the whole visit is
+    // undone, so it asks first, and declining leaves the list as it was.
+    [Theory]
+    [InlineData(true, 0)]
+    [InlineData(false, 1)]
+    public async Task RemoveExternalTool_AsksFirstAndOnlyRemovesWhenConfirmed(bool confirm, int remaining)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeDialogService dialog = new() { ConfirmResult = confirm };
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager(), dialog, localizer: localizer);
+        ExternalToolItemViewModel tool = new() { Name = "Notepad", ExecutablePath = "notepad.exe" };
+        viewModel.ExternalTools.Add(tool);
+        viewModel.SelectedExternalTool = tool;
+
+        await viewModel.RemoveExternalToolCommand.ExecuteAsync(null);
+
+        Assert.Single(dialog.ConfirmCalls);
+        Assert.Contains("Notepad", dialog.ConfirmCalls[0].Message, StringComparison.Ordinal);
+        Assert.Equal(remaining, viewModel.ExternalTools.Count);
+    }
+
     // A live refresh rebuilds the summary from the annotation error set, which the external-tool
     // verdict is not part of: without carrying it, the first keystroke in an unrelated field would
     // wipe a message about a tool that is still incomplete.

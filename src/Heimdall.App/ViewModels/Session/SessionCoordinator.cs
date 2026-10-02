@@ -681,6 +681,22 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             tab, displayName, server, settings);
         tab.HostControl = connectingView;
         _connectingSshViews[sessionId] = connectingView;
+
+        // The view's Cancel button ends the attempt through the same token a tab close would.
+        if (connectingView is not null)
+        {
+            connectingView.CancelConnectRequested += () =>
+            {
+                try
+                {
+                    cancellationSource.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // The attempt already finished and released its token.
+                }
+            };
+        }
     }
 
     /// <summary>

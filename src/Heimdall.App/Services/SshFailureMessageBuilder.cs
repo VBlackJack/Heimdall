@@ -41,6 +41,15 @@ internal static class SshFailureMessageBuilder
         return message;
     }
 
+    /// <summary>
+    /// A host key the user declined (or a prompt that was closed) is not a cancelled
+    /// connection: the message names the host whose key was refused.
+    /// </summary>
+    public static string HostKeyRejected(LocalizationManager localizer, string host, int port)
+    {
+        return localizer.Format(SshLocalizationKeys.ErrorSshHostKeyRejected, host, port);
+    }
+
     public static string Cancelled(LocalizationManager localizer)
     {
         string message = localizer[SshLocalizationKeys.ErrorSshCancelled];

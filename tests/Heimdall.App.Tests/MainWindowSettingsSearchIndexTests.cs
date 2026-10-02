@@ -57,6 +57,25 @@ public sealed class MainWindowSettingsSearchIndexTests
         });
     }
 
+    // P3-6: the header of "Advanced timeouts" is the only label of what it folds away; typing
+    // that name found nothing because an Expander header is neither a TextBlock nor Content.
+    [Fact]
+    public void ExpanderHeader_IsIndexedAndJumpsToTheExpander()
+    {
+        RunOnStaThread(() =>
+        {
+            Expander timeouts = new() { Header = "Advanced timeouts", Content = new StackPanel() };
+            StackPanel panel = new();
+            panel.Children.Add(timeouts);
+
+            List<MainWindow.SettingsSearchEntry> entries = Index(panel);
+
+            MainWindow.SettingsSearchEntry entry = Assert.Single(entries);
+            Assert.Same(timeouts, entry.Target);
+            Assert.Equal("Advanced timeouts", MainWindow.GetSettingsSearchEntryText(entry));
+        });
+    }
+
     [Fact]
     public void RadioChoices_AreIndexed()
     {

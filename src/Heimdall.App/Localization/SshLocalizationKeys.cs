@@ -48,6 +48,7 @@ internal static class SshLocalizationKeys
     public const string ErrorPreflightFailed = "ErrorPreflightFailed";
     public const string ErrorPuttyNotConfigured = "ErrorPuttyNotConfigured";
     public const string ErrorSshCancelled = "ErrorSshCancelled";
+    public const string ErrorSshHostKeyRejected = "ErrorSshHostKeyRejected";
 
     /// <summary>Title of the password prompt the SFTP handler raises after a refused connection.</summary>
     public const string DialogSftpPasswordPromptTitle = "DialogSftpPasswordPromptTitle";

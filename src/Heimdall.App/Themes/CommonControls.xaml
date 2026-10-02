@@ -29,6 +29,10 @@
     <Thickness x:Key="ContentAreaMargin">16,0,16,16</Thickness>
     <!-- Settings sub-tab content margin (trimmed top; the tab strip and card padding already provide spacing) -->
     <Thickness x:Key="SettingsTabContentMargin">20,4,20,20</Thickness>
+    <!-- Widest a settings tab grows, the width of a one-number field, and the gap above a field row. -->
+    <sys:Double x:Key="SettingsContentMaxWidth">900</sys:Double>
+    <sys:Double x:Key="SettingsNumericFieldWidth">100</sys:Double>
+    <Thickness x:Key="SettingsFieldGap">0,12,0,0</Thickness>
 
     <!-- Max width for single-column tool content panels -->
     <sys:Double x:Key="ToolContentMaxWidth">700</sys:Double>
@@ -111,8 +115,17 @@
     <!-- Session header strip padding (horizontal=8, vertical=4) -->
     <Thickness x:Key="SessionHeaderPadding">8,4</Thickness>
 
+    <!-- Session header: minimum pointer target (WCAG 2.5.8), text caps before trimming, phase stepper segment size -->
+    <sys:Double x:Key="SessionHeaderMinTarget">24</sys:Double>
+    <sys:Double x:Key="SessionHeaderTitleMaxWidth">300</sys:Double>
+    <sys:Double x:Key="SessionHeaderEndpointMaxWidth">250</sys:Double>
+    <sys:Double x:Key="SessionHeaderStatusMaxWidth">480</sys:Double>
+    <sys:Double x:Key="SessionPhaseSegmentWidth">14</sys:Double>
+    <sys:Double x:Key="SessionPhaseSegmentHeight">6</sys:Double>
+
     <!-- Design Tokens: Font Family                                -->
     <FontFamily x:Key="FontFamilyMonospace">Consolas, Courier New, monospace</FontFamily>
+    <FontFamily x:Key="FontFamilyIcons">Segoe MDL2 Assets</FontFamily>
 
     <!-- Design Tokens: Corner Radius                              -->
     <CornerRadius x:Key="CornerRadiusXs">2</CornerRadius>
@@ -134,10 +147,19 @@
     <!-- Hover delays, in milliseconds: the row's summary, then the status dot's own verdict. -->
     <sys:Int32 x:Key="SessionTreeRowToolTipDelay">150</sys:Int32>
     <sys:Int32 x:Key="SessionTreeStatusToolTipDelay">200</sys:Int32>
-    <!-- Row outline: transparent at rest, the focus ring when focused, a thick edge for an insertion. -->
-    <Thickness x:Key="SessionTreeRowOutlineThickness">1</Thickness>
-    <Thickness x:Key="SessionTreeInsertBeforeThickness">1,3,1,1</Thickness>
-    <Thickness x:Key="SessionTreeInsertAfterThickness">1,1,1,3</Thickness>
+    <!-- Row outline: transparent at rest, the focus ring when focused, a thick edge for an insertion.
+         The ring is 2 px so it keeps 3:1 against the row on every theme (WCAG 1.4.11, 2.4.11). -->
+    <Thickness x:Key="SessionTreeRowOutlineThickness">2</Thickness>
+    <Thickness x:Key="SessionTreeInsertBeforeThickness">2,4,2,2</Thickness>
+    <Thickness x:Key="SessionTreeInsertAfterThickness">2,2,2,4</Thickness>
+    <!-- Row heights and the folder icon, so the two row kinds are sized in one place. -->
+    <sys:Double x:Key="SessionTreeFolderRowMinHeight">26</sys:Double>
+    <sys:Double x:Key="SessionTreeServerRowMinHeight">24</sys:Double>
+    <sys:Double x:Key="SessionTreeFolderIconSize">13</sys:Double>
+    <!-- Transparent frame around the status dot: the hover target is the dot plus this on each side. -->
+    <Thickness x:Key="SessionTreeStatusHitPadding">3</Thickness>
+    <!-- The multiplication sign that closes a filter chip. -->
+    <sys:String x:Key="SessionTreeFilterChipRemoveGlyph">&#x00D7;</sys:String>
     <!-- Expander: a 12 px glyph box whose click target reaches 24 px (WCAG 2.5.8) without widening
          the indent; the overhang is the difference split on each side. -->
     <sys:Double x:Key="TreeExpanderGlyphBoxSize">12</sys:Double>
@@ -153,6 +175,9 @@
 
     <!-- Height, and minimum width, of a round count badge (the Settings tab error badges). -->
     <sys:Double x:Key="BadgeHeight">18</sys:Double>
+
+    <!-- Smallest pointer target of an interactive control (WCAG 2.5.8). -->
+    <sys:Double x:Key="TargetMinSize">24</sys:Double>
 
     <!-- Design Tokens: Icon Sizes                                 -->
     <sys:Double x:Key="IconSizeSmall">12</sys:Double>
@@ -466,8 +491,20 @@
     <!-- ========================================================= -->
     <!-- Validation Error Template                                -->
     <!-- ========================================================= -->
+    <!-- A field in error is marked by colour AND a glyph (WCAG 1.4.1). The glyph is drawn in the
+         adorner layer, so it takes no room and moves nothing around the field. -->
     <ControlTemplate x:Key="ValidationErrorTemplate">
-        <AdornedElementPlaceholder/>
+        <Grid>
+            <AdornedElementPlaceholder/>
+            <TextBlock Text="&#xE783;"
+                       FontFamily="{StaticResource FontFamilyIcons}"
+                       FontSize="{StaticResource IconSizeSmall}"
+                       Foreground="{DynamicResource ErrorTextBrush}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0"
+                       IsHitTestVisible="False"/>
+        </Grid>
     </ControlTemplate>
 
     <!-- ========================================================= -->
@@ -513,7 +550,6 @@
                         </Trigger>
                         <Trigger Property="Validation.HasError" Value="True">
                             <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
-                            <Setter TargetName="TextBoxBorder" Property="BorderThickness" Value="2"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

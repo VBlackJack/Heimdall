@@ -21,11 +21,11 @@ namespace Heimdall.App.Tests;
 
 public sealed class FileConflictDialogViewModelTests
 {
-    /// <summary>Without a localizer the summary is an English fallback, worded by its number too.</summary>
+    /// <summary>Without a localizer the summary degrades to its catalogue key, never to prose.</summary>
     [Theory]
-    [InlineData(1, "1 conflicting destination")]
-    [InlineData(2, "2 conflicting destinations")]
-    public void SummaryText_WithoutALocalizer_WordsTheCountByItsNumber(int conflicts, string expected)
+    [InlineData(1, "DialogFileConflictSummary")]
+    [InlineData(2, "DialogFileConflictSummary")]
+    public void SummaryText_WithoutALocalizer_ShowsTheCatalogueKey(int conflicts, string expected)
     {
         FileConflictAnalysisItem[] items = Enumerable.Range(0, conflicts)
             .Select(i => new FileConflictAnalysisItem(i, $"src{i}", $"/dst/f{i}", HasConflict: true))

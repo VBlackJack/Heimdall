@@ -95,6 +95,7 @@ public sealed class SessionTreeVocabularyTests
         "ToolHelpCHMOD",        // "owner, group, and others"
         "ToolHelpREGEX",        // "capture group details"
         "ToolRegexGroupEntry",  // "Group {0}: ..." in the regex tester's match list
+        "ErrorWinRmAccessDenied", // the Windows local group "Remote Management Users"
     };
 
     /// <summary>

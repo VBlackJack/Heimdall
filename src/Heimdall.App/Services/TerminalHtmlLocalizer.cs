@@ -27,14 +27,29 @@ internal static class TerminalHtmlLocalizer
     internal const string FallbackLoadingLabel = "Initializing terminal\u2026";
     internal const string FallbackSearchPlaceholder = "Search...";
     internal const string FallbackSessionEnded = "--- Session ended ---";
+    internal const string FallbackSearchPrevious = "Previous match";
+    internal const string FallbackSearchNext = "Next match";
+    internal const string FallbackSearchClose = "Close search";
+    internal const string FallbackSearchNoResults = "No results";
+    internal const string FallbackSearchCountFormat = "{0} / {1}";
 
     internal const string KeyLoadingLabel = "TerminalLoadingLabel";
     internal const string KeySearchPlaceholder = "TerminalSearchPlaceholder";
     internal const string KeySessionEnded = "TerminalSessionEnded";
+    internal const string KeySearchPrevious = "TerminalSearchPrevious";
+    internal const string KeySearchNext = "TerminalSearchNext";
+    internal const string KeySearchClose = "TerminalSearchClose";
+    internal const string KeySearchNoResults = "TerminalSearchNoResults";
+    internal const string KeySearchCountFormat = "TerminalSearchCount";
 
     internal const string MarkerLoadingLabel = "Initializing terminal&#x2026;";
     internal const string MarkerSearchPlaceholder = "Search...";
     internal const string MarkerSessionEndedLiteral = "/*{{TERMINAL_SESSION_ENDED_LITERAL}}*/";
+    internal const string MarkerSearchPrevious = "{{TERMINAL_SEARCH_PREVIOUS_LABEL}}";
+    internal const string MarkerSearchNext = "{{TERMINAL_SEARCH_NEXT_LABEL}}";
+    internal const string MarkerSearchClose = "{{TERMINAL_SEARCH_CLOSE_LABEL}}";
+    internal const string MarkerSearchNoResultsLiteral = "/*{{TERMINAL_SEARCH_NO_RESULTS_LITERAL}}*/";
+    internal const string MarkerSearchCountFormatLiteral = "/*{{TERMINAL_SEARCH_COUNT_FORMAT_LITERAL}}*/";
 
     public static string Localize(string html, Func<string, string?> localize)
     {
@@ -58,7 +73,48 @@ internal static class TerminalHtmlLocalizer
             JsonSerializer.Serialize(sessionEnded),
             StringComparison.Ordinal);
 
+        localizedHtml = localizedHtml.Replace(
+            MarkerSearchPrevious,
+            WebUtility.HtmlEncode(ResolveOrFallback(localize, KeySearchPrevious, FallbackSearchPrevious)),
+            StringComparison.Ordinal);
+        localizedHtml = localizedHtml.Replace(
+            MarkerSearchNext,
+            WebUtility.HtmlEncode(ResolveOrFallback(localize, KeySearchNext, FallbackSearchNext)),
+            StringComparison.Ordinal);
+        localizedHtml = localizedHtml.Replace(
+            MarkerSearchClose,
+            WebUtility.HtmlEncode(ResolveOrFallback(localize, KeySearchClose, FallbackSearchClose)),
+            StringComparison.Ordinal);
+        localizedHtml = localizedHtml.Replace(
+            MarkerSearchNoResultsLiteral,
+            JsonSerializer.Serialize(ResolveOrFallback(localize, KeySearchNoResults, FallbackSearchNoResults)),
+            StringComparison.Ordinal);
+        localizedHtml = localizedHtml.Replace(
+            MarkerSearchCountFormatLiteral,
+            JsonSerializer.Serialize(ResolveOrFallback(localize, KeySearchCountFormat, FallbackSearchCountFormat)),
+            StringComparison.Ordinal);
+
         return localizedHtml;
+    }
+
+    /// <summary>
+    /// The page's localized texts as one JSON object, for the <c>set-labels:</c> message sent
+    /// when the interface language changes after the page was built.
+    /// </summary>
+    public static string BuildLabelsJson(Func<string, string?> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+
+        return JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["placeholder"] = ResolveOrFallback(localize, KeySearchPlaceholder, FallbackSearchPlaceholder),
+            ["previous"] = ResolveOrFallback(localize, KeySearchPrevious, FallbackSearchPrevious),
+            ["next"] = ResolveOrFallback(localize, KeySearchNext, FallbackSearchNext),
+            ["close"] = ResolveOrFallback(localize, KeySearchClose, FallbackSearchClose),
+            ["noResults"] = ResolveOrFallback(localize, KeySearchNoResults, FallbackSearchNoResults),
+            ["countFormat"] = ResolveOrFallback(localize, KeySearchCountFormat, FallbackSearchCountFormat),
+            ["sessionEnded"] = ResolveOrFallback(localize, KeySessionEnded, FallbackSessionEnded),
+        });
     }
 
     private static string ResolveOrFallback(

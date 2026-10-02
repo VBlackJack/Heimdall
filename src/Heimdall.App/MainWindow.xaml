@@ -577,7 +577,7 @@
                                                         AutomationProperties.Name="{Binding RemoveAccessibilityName}">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="{Binding Label}" MaxWidth="{StaticResource SessionTreeFilterChipMaxWidth}" TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Text="&#x00D7;" Margin="6,0,0,0"/>
+                                                        <TextBlock Text="{StaticResource SessionTreeFilterChipRemoveGlyph}" Margin="6,0,0,0"/>
                                                     </StackPanel>
                                                 </Button>
                                             </DataTemplate>
@@ -612,7 +612,8 @@
                                                 Visibility="{Binding ServerList.ShowSearchContext, Converter={StaticResource BoolToVisibilityConverter}}"
                                                 Style="{DynamicResource GhostButtonStyle}" AutomationProperties.Name="{loc:Translate TreeUxClearSearch}"/>
                                     </StackPanel>
-                                    <Popup x:Name="TreeDropHint" PlacementTarget="{Binding ElementName=SessionTreeView}" Placement="Bottom"
+                                    <!-- Above the tree: below it the hint sat on the no-group drop zone and the bars it must not cover. -->
+                                    <Popup x:Name="TreeDropHint" PlacementTarget="{Binding ElementName=SessionTreeView}" Placement="Top"
                                            AllowsTransparency="True" IsHitTestVisible="False" StaysOpen="True">
                                         <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}"
                                                 BorderThickness="1" Padding="8" MaxWidth="{StaticResource SessionTreeDropHintMaxWidth}">
@@ -708,6 +709,7 @@
                                   Padding="8,4,0,0"
                                   AllowDrop="True"
                                   SelectedItemChanged="OnTreeViewSelectedItemChanged"
+                                  GotKeyboardFocus="OnSessionTreeViewGotKeyboardFocus"
                                   MouseDoubleClick="OnTreeViewDoubleClick"
                                   PreviewMouseLeftButtonDown="OnTreeViewDragStart"
                                   PreviewMouseLeftButtonUp="OnSessionTreeViewPreviewMouseLeftButtonUp"
@@ -717,6 +719,7 @@
                                   Drop="OnTreeViewDrop"
                                   PreviewMouseRightButtonDown="OnTreeViewPreviewMouseRightButtonDown"
                                   PreviewKeyDown="OnSessionTreeViewPreviewKeyDown"
+                                  PreviewTextInput="OnSessionTreeViewPreviewTextInput"
                                   ContextMenuOpening="OnTreeViewContextMenuOpening"
                                   AutomationProperties.Name="{loc:Translate SessionTreeAccessibleName}"
                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -732,11 +735,15 @@
                                 <!-- Folder node template (recursive - unlimited nesting) -->
                                 <HierarchicalDataTemplate DataType="{x:Type vm:FolderViewModel}"
                                                           ItemsSource="{Binding Children}">
-                                    <Border Margin="0,3,4,1"
-                                            Padding="4,3,6,3"
-                                            MinHeight="26"
+                                    <Border x:Name="FolderSelectionChrome"
+                                            Margin="0,3,4,1"
+                                            Padding="1,3,6,3"
+                                            MinHeight="{StaticResource SessionTreeFolderRowMinHeight}"
+                                            BorderThickness="3,0,0,0"
+                                            BorderBrush="Transparent"
                                             Background="Transparent"
-                                            ToolTip="{Binding TooltipText}">
+                                            ToolTip="{Binding TooltipText}"
+                                            ToolTipService.InitialShowDelay="{StaticResource SessionTreeRowToolTipDelay}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -745,7 +752,8 @@
                                             </Grid.ColumnDefinitions>
                                             <Path Grid.Column="0"
                                                   Data="{StaticResource Geo.Tree.Group}"
-                                                  Width="13" Height="13"
+                                                  Width="{StaticResource SessionTreeFolderIconSize}"
+                                                  Height="{StaticResource SessionTreeFolderIconSize}"
                                                   Stretch="Uniform"
                                                   VerticalAlignment="Center" Margin="0,0,7,0">
                                                 <!-- A folder given a colour paints its icon with it; the rest keep the theme's. -->
@@ -762,7 +770,7 @@
                                             </Path>
                                             <Grid Grid.Column="1">
                                                 <TextBlock Text="{Binding Name}"
-                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           FontSize="{StaticResource FontSizeBody}"
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                                            VerticalAlignment="Center"
@@ -786,6 +794,16 @@
                                                        Margin="8,0,2,0"/>
                                         </Grid>
                                     </Border>
+                                    <HierarchicalDataTemplate.Triggers>
+                                        <!-- A folder is never selected: OnTreeViewSelectedItemChanged clears its native flag.
+                                             The cursor mark is what keeps it visible once focus moves to a menu or the filter
+                                             box. It takes the focus colour, not the selection's accent, so it never reads as
+                                             a second selected row beside the selected session. -->
+                                        <DataTrigger Binding="{Binding IsTreeCursor}" Value="True">
+                                            <Setter TargetName="FolderSelectionChrome" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                                            <Setter TargetName="FolderSelectionChrome" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
+                                        </DataTrigger>
+                                    </HierarchicalDataTemplate.Triggers>
                                 </HierarchicalDataTemplate>
 
                                 <!-- Server leaf node template -->
@@ -793,7 +811,7 @@
                                     <Border x:Name="ServerSelectionChrome"
                                             Margin="0,0,4,0"
                                             HorizontalAlignment="Stretch"
-                                            MinHeight="24"
+                                            MinHeight="{StaticResource SessionTreeServerRowMinHeight}"
                                             Padding="3,2,4,2"
                                             CornerRadius="0"
                                             BorderThickness="3,0,0,0"
@@ -825,14 +843,18 @@
                                                  for a reachability verdict. An open session and a reachable host are both
                                                  green, so colour alone told them apart for nobody who cannot see it (WCAG
                                                  1.4.1); the shape does, and the spoken name says the state in words. -->
-                                            <Ellipse Grid.Column="1"
-                                                     Width="{StaticResource SessionTreeStatusDotSize}"
+                                            <!-- The dot is 7 px: the tooltip hangs on a padded transparent frame so the
+                                                 verdict is reachable without aiming at the dot itself. -->
+                                            <Border Grid.Column="1"
+                                                    Background="Transparent"
+                                                    Padding="{StaticResource SessionTreeStatusHitPadding}"
+                                                    Margin="0,0,4,0"
+                                                    VerticalAlignment="Center"
+                                                    ToolTip="{Binding StatusTooltipText}"
+                                                    ToolTipService.InitialShowDelay="{StaticResource SessionTreeStatusToolTipDelay}">
+                                            <Ellipse Width="{StaticResource SessionTreeStatusDotSize}"
                                                      Height="{StaticResource SessionTreeStatusDotSize}"
-                                                     Margin="2,0,8,0"
-                                                     VerticalAlignment="Center"
-                                                     StrokeThickness="{StaticResource SessionTreeStatusRingThickness}"
-                                                     ToolTip="{Binding StatusTooltipText}"
-                                                     ToolTipService.InitialShowDelay="{StaticResource SessionTreeStatusToolTipDelay}">
+                                                     StrokeThickness="{StaticResource SessionTreeStatusRingThickness}">
                                                 <Ellipse.Stroke>
                                                     <MultiBinding Converter="{StaticResource ServerStatusToColorConverter}">
                                                         <Binding Path="ConnectionType"/>
@@ -861,6 +883,7 @@
                                                     </Style>
                                                 </Ellipse.Style>
                                             </Ellipse>
+                                            </Border>
                                             <!-- Server name -->
                                             <Grid Grid.Column="2">
                                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -1011,7 +1034,7 @@
                                                     <Border x:Name="SelectionBorder"
                                                             Grid.Row="0"
                                                             Grid.Column="1"
-                                                            Margin="0,1,0,1"
+                                                            Margin="0"
                                                             Padding="{TemplateBinding Padding}"
                                                             Background="Transparent"
                                                             BorderBrush="Transparent"
@@ -1021,7 +1044,8 @@
                                                                           ContentSource="Header"
                                                                           HorizontalAlignment="Stretch"/>
                                                     </Border>
-                                                    <Grid Grid.Row="1"
+                                                    <Grid x:Name="ChildrenHost"
+                                                          Grid.Row="1"
                                                           Grid.Column="1"
                                                           Margin="0,1,0,0">
                                                         <Border x:Name="IndentGuide"
@@ -1037,6 +1061,8 @@
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="HasItems" Value="False">
                                                         <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
+                                                        <!-- A leaf keeps the row height the old leaf-only template gave it. -->
+                                                        <Setter TargetName="ChildrenHost" Property="Margin" Value="0"/>
                                                         <Setter TargetName="IndentGuide" Property="Visibility" Value="Collapsed"/>
                                                     </Trigger>
                                                     <Trigger Property="IsExpanded" Value="False">
@@ -1085,89 +1111,6 @@
                                     </Setter>
                                     <EventSetter Event="PreviewMouseLeftButtonDown"
                                                  Handler="OnSessionTreeViewItemPreviewMouseLeftButtonDown"/>
-                                    <Style.Triggers>
-                                        <Trigger Property="HasItems" Value="False">
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="{x:Type TreeViewItem}">
-                                                        <Grid SnapsToDevicePixels="True">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <ToggleButton x:Name="Expander"
-                                                                          Grid.Row="0"
-                                                                          Grid.Column="0"
-                                                                          Margin="0,2,2,0"
-                                                                          Panel.ZIndex="1"
-                                                                          Style="{StaticResource TreeViewExpanderToggleButtonStyle}"
-                                                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
-                                                                          ClickMode="Press"/>
-                                                            <Border x:Name="SelectionBorder"
-                                                                    Grid.Row="0"
-                                                                    Grid.Column="1"
-                                                                    Margin="0,1,0,1"
-                                                                    Padding="{TemplateBinding Padding}"
-                                                                    Background="Transparent"
-                                                                    BorderBrush="Transparent"
-                                                                    BorderThickness="{StaticResource SessionTreeRowOutlineThickness}"
-                                                                    CornerRadius="0">
-                                                                <ContentPresenter x:Name="HeaderHost"
-                                                                                  ContentSource="Header"
-                                                                                  HorizontalAlignment="Stretch"/>
-                                                            </Border>
-                                                            <ItemsPresenter x:Name="ItemsHost"
-                                                                            Grid.Row="1"
-                                                                            Grid.Column="1"
-                                                                            Grid.ColumnSpan="2"
-                                                                            Margin="2,1,0,0"/>
-                                                        </Grid>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="HasItems" Value="False">
-                                                                <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
-                                                            </Trigger>
-                                                            <Trigger Property="IsExpanded" Value="False">
-                                                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
-                                                            </Trigger>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
-                                                            </Trigger>
-                                                            <!-- The selection itself is drawn by the row template from the view model, which
-                                                                 knows the whole multi-selection; painting WPF's single selected row here as well
-                                                                 drew a second accent bar beside the first. -->
-                                                            <Trigger Property="IsSelected" Value="True">
-                                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                                                            </Trigger>
-                                                            <!-- Keyboard focus is an outline of its own, never the selection's bar: a focused row
-                                                                 that is not selected must not look selected, and one that is must show both. -->
-                                                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
-                                                            </Trigger>
-                                                            <Trigger Property="theming:DropTargetVisualState.Insertion" Value="Before">
-                                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="{StaticResource SessionTreeInsertBeforeThickness}"/>
-                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                                            </Trigger>
-                                                            <Trigger Property="theming:DropTargetVisualState.Insertion" Value="After">
-                                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="{StaticResource SessionTreeInsertAfterThickness}"/>
-                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                                            </Trigger>
-                                                            <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
-                                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource TreeRowDropTargetBrush}"/>
-                                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                                            </Trigger>
-                                                            <Trigger Property="IsEnabled" Value="False">
-                                                                <Setter TargetName="SelectionBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Trigger>
-                                    </Style.Triggers>
                                 </Style>
                             </TreeView.ItemContainerStyle>
 
@@ -2028,20 +1971,26 @@
                                         <DataGridTemplateColumn Header="" Width="24">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Ellipse Width="7" Height="7"
+                                                    <TextBlock FontSize="{StaticResource FontSizeCaption}"
                                                              HorizontalAlignment="Center"
                                                              VerticalAlignment="Center">
-                                                        <Ellipse.Style>
-                                                            <Style TargetType="Ellipse">
-                                                                <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="&#x25CF;"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                                <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusActive}"/>
+                                                                <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusActive}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsAlive}" Value="False">
-                                                                        <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
+                                                                        <Setter Property="Text" Value="&#x2716;"/>
+                                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                        <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusInterrupted}"/>
+                                                                        <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusInterrupted}"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
-                                                        </Ellipse.Style>
-                                                    </Ellipse>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
@@ -2152,20 +2101,26 @@
                             <DataGridTemplateColumn Header="" Width="28">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Ellipse Width="8" Height="8"
+                                        <TextBlock FontSize="{StaticResource FontSizeCaption}"
                                                  HorizontalAlignment="Center"
                                                  VerticalAlignment="Center">
-                                            <Ellipse.Style>
-                                                <Style TargetType="Ellipse">
-                                                    <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="&#x25CF;"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                    <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusActive}"/>
+                                                    <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusActive}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsAlive}" Value="False">
-                                                            <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
+                                                            <Setter Property="Text" Value="&#x2716;"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                            <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusInterrupted}"/>
+                                                            <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusInterrupted}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </Ellipse.Style>
-                                        </Ellipse>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
@@ -2409,13 +2364,15 @@
                                      Tag="{loc:Translate SettingsSearchPlaceholder}" Padding="10,5,28,5"
                                      TextChanged="OnSettingsSearchTextChanged"
                                      KeyDown="OnSettingsSearchKeyDown"
+                                     ToolTip="{loc:Translate SettingsSearchTooltip}"
+                                     AutomationProperties.AcceleratorKey="{loc:Translate SettingsShortcutSearch}"
                                      AutomationProperties.Name="{loc:Translate A11ySettingsSearch}"/>
                             <Button x:Name="Mw_SettingsSearchClear"
-                                    Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                    Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                                     FontSize="{StaticResource FontSizeSmallCaption}"
                                     HorizontalAlignment="Right" VerticalAlignment="Center"
                                     Margin="0,0,4,0" Padding="4"
-                                    Style="{DynamicResource GhostButtonStyle}" MinHeight="0"
+                                    Style="{DynamicResource GhostButtonStyle}" MinHeight="{StaticResource TargetMinSize}"
                                     Click="OnSettingsSearchClearClick"
                                     Visibility="Collapsed"
                                     AutomationProperties.Name="{loc:Translate A11yClearSearchFilter}"/>
@@ -2436,6 +2393,8 @@
                         <WrapPanel Orientation="Horizontal">
                             <Button x:Name="Mw_SettingsSaveBtn" Content="{loc:Translate SettingsBtnSaveSettings}" Command="{Binding Settings.SaveCommand}"
                                     Style="{DynamicResource PrimaryButtonStyle}" MinWidth="130" Margin="0,0,8,4"
+                                    ToolTip="{loc:Translate SettingsSaveTooltip}"
+                                    AutomationProperties.AcceleratorKey="{loc:Translate SettingsShortcutSave}"
                                     AutomationProperties.Name="{loc:Translate AccessSettingsSave}"/>
                             <!-- Grouped with Save because it acts on the same pending edits, and given a
                                  quieter style than Reset Defaults: the two must never read as the same
@@ -2472,7 +2431,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="&#xE783;"
-                                               FontFamily="Segoe MDL2 Assets"
+                                               FontFamily="{StaticResource FontFamilyIcons}"
                                                FontSize="{StaticResource FontSizeCaption}"
                                                Foreground="{DynamicResource ErrorTextBrush}"
                                                VerticalAlignment="Center"
@@ -2531,7 +2490,7 @@
                             </StackPanel>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsAppearanceTitle" Text="{loc:Translate SettingsSectionAppearance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -2606,19 +2565,24 @@
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[AccentTint]}"/>
                                             </StackPanel>
                                         </Grid>
-                                        <StackPanel Margin="0,12,0,0">
+                                    </StackPanel>
+                                </Border>
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsBehaviorTitle" Text="{loc:Translate SettingsSectionBehavior}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <StackPanel>
                                             <TextBlock x:Name="Mw_SettingsMaxSessionsLabel" Text="{loc:Translate SettingsLabelMaxEmbeddedSessions}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                            <TextBox Text="{Binding Settings.MaxEmbeddedSessionsText, UpdateSourceTrigger=PropertyChanged}" Width="100" HorizontalAlignment="Left"
+                                            <TextBox Text="{Binding Settings.MaxEmbeddedSessionsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" HorizontalAlignment="Left"
                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsMaxSessionsLabel}"/>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[MaxEmbeddedSessions]}"/>
                                         </StackPanel>
-                                        <CheckBox x:Name="Mw_SettingsPreventSleep" Content="{loc:Translate SettingsLabelPreventSleep}" IsChecked="{Binding Settings.PreventSleepDuringSession}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"/>
+                                        <CheckBox x:Name="Mw_SettingsPreventSleep" Content="{loc:Translate SettingsLabelPreventSleep}" IsChecked="{Binding Settings.PreventSleepDuringSession}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="{StaticResource SettingsFieldGap}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[PreventSleepDuringSession]}"/>
                                         <CheckBox x:Name="Mw_SettingsCollapseTunnelsPanelByDefault"
                                                   Content="{loc:Translate SettingsLabelCollapseTunnelsPanelByDefault}"
                                                   IsChecked="{Binding Settings.CollapseTunnelsPanelByDefault}"
                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                  Margin="0,12,0,0"
+                                                  Margin="{StaticResource SettingsFieldGap}"
                                                   ToolTip="{loc:Translate SettingsTooltipCollapseTunnelsPanelByDefault}"
                                                   AutomationProperties.Name="{loc:Translate SettingsLabelCollapseTunnelsPanelByDefault}"
                                                   AutomationProperties.HelpText="{loc:Translate SettingsTooltipCollapseTunnelsPanelByDefault}"/>
@@ -2631,22 +2595,22 @@
                                         <TextBlock x:Name="Mw_SettingsUpdatesTitle" Text="{loc:Translate SettingsSectionUpdates}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
                                         <CheckBox x:Name="Mw_SettingsUpdateCheckEnabled" Content="{loc:Translate SettingsLabelUpdateCheckEnabled}" IsChecked="{Binding Settings.UpdateCheckEnabled}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[UpdateCheckEnabled]}"/>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UpdateCheckEnabled}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UpdateCheckEnabled}">
                                             <TextBlock x:Name="Mw_SettingsUpdateIntervalLabel" Text="{loc:Translate SettingsLabelUpdateInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBox Text="{Binding Settings.UpdateCheckIntervalHoursText, UpdateSourceTrigger=PropertyChanged}" Width="100" HorizontalAlignment="Left"
+                                                <TextBox Text="{Binding Settings.UpdateCheckIntervalHoursText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" HorizontalAlignment="Left"
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsUpdateIntervalLabel}"/>
                                                 <TextBlock Text="{loc:Translate SettingsUnitHours}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[UpdateCheckIntervalHours]}"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsCurrentVersionLabel" Text="{loc:Translate SettingsLabelCurrentVersion}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <TextBlock Text="{Binding Settings.CurrentVersionText}" Foreground="{DynamicResource TextPrimaryBrush}"
                                                        AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCurrentVersionLabel}"/>
                                         </StackPanel>
                                         <Button x:Name="Mw_SettingsCheckNowButton" Content="{loc:Translate SettingsBtnCheckNow}" Command="{Binding Settings.CheckNowCommand}"
-                                                Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="{StaticResource SettingsFieldGap}"
                                                 AutomationProperties.Name="{loc:Translate SettingsBtnCheckNow}"/>
                                         <TextBlock x:Name="Mw_SettingsUpdateStatus" Text="{Binding Settings.UpdateStatusText, NotifyOnTargetUpdated=True}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
                                                    AutomationProperties.LiveSetting="Polite"
@@ -2661,11 +2625,11 @@
                                                     AutomationProperties.Name="{loc:Translate SettingsBtnClearSkippedVersion}"/>
                                         </StackPanel>
                                         <Button x:Name="Mw_SettingsViewReleaseButton" Content="{loc:Translate UpdateBannerViewReleaseBtn}" Command="{Binding Settings.OpenUpdateReleaseCommand}"
-                                                Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="{StaticResource SettingsFieldGap}"
                                                 AutomationProperties.Name="{loc:Translate UpdateBannerViewReleaseBtn}"
                                                 Visibility="{Binding Settings.IsUpdateReleaseAvailable, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <Button x:Name="Mw_SettingsDownloadInstallButton" Content="{loc:Translate SettingsBtnDownloadInstall}" Command="{Binding Settings.DownloadAndInstallCommand}"
-                                                Style="{DynamicResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                Style="{DynamicResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="{StaticResource SettingsFieldGap}"
                                                 AutomationProperties.Name="{loc:Translate SettingsBtnDownloadInstall}"
                                                 Visibility="{Binding Settings.IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <ProgressBar x:Name="Mw_SettingsDownloadProgress" Minimum="0" Maximum="1" Value="{Binding Settings.DownloadProgress, Mode=OneWay}"
@@ -2806,7 +2770,7 @@
                             </StackPanel>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsTerminalTitle" Text="{loc:Translate SettingsSectionTerminal}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -2839,7 +2803,7 @@
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalFontSize]}"/>
                                             </StackPanel>
                                         </Grid>
-                                        <StackPanel Margin="0,12,0,0">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsTerminalColorSchemeLabel" Text="{loc:Translate SettingsLabelTerminalColorScheme}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox x:Name="Mw_ColorSchemeCombo" SelectedValue="{Binding Settings.TerminalColorScheme}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left"
                                                       AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTerminalColorSchemeLabel}">
@@ -2851,7 +2815,7 @@
                                             </ComboBox>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalColorScheme]}"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsPsPolicyLabel" Text="{loc:Translate SettingsPsExecutionPolicy}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox x:Name="Mw_SettingsPsExecutionPolicy" SelectedValue="{Binding Settings.PowerShellExecutionPolicy}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left"
                                                       AutomationProperties.LabeledBy="{x:Reference Mw_SettingsPsPolicyLabel}"
@@ -2898,7 +2862,7 @@
                                      Header="{loc:Translate SettingsSshSubTabConnection}"
                                      Style="{StaticResource SegmentedTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsSshTitle" Text="{loc:Translate SettingsSectionSshDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -2919,7 +2883,7 @@
                                                     FontSize="{StaticResource FontSizeCaption}"
                                                     AutomationProperties.Name="{loc:Translate A11yBrowsePlinkPath}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2941,7 +2905,7 @@
                                                     FontSize="{StaticResource FontSizeCaption}"
                                                     AutomationProperties.Name="{loc:Translate A11yBrowsePuttyPath}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2949,7 +2913,7 @@
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[PuttyPath]}"/>
                                         <TextBlock x:Name="Mw_SettingsPuttyPathMissing" Text="{loc:Translate SettingsFileNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsPuttyPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <TextBlock x:Name="Mw_SettingsPuttyPathHint" Text="{loc:Translate SettingsPuttyPathHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                        <StackPanel Margin="0,12,0,0">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshModeLabel" Text="{loc:Translate SettingsLabelSshMode}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
                                                 <ComboBox SelectedValue="{Binding Settings.SshDefaultMode}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshModeLabel}"
@@ -2969,7 +2933,7 @@
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshDefaultMode]}"/>
                                             <TextBlock x:Name="Mw_SettingsSshModeHint" Text="{loc:Translate SettingsSshModeHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshAgentPreferenceLabel" Text="{loc:Translate SettingsSshAgentPreferenceLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox SelectedValue="{Binding Settings.SshAgentPreference}" SelectedValuePath="Tag" Width="260" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshAgentPreferenceLabel}"
                                                       AutomationProperties.HelpText="{loc:Translate SettingsSshAgentPreferenceHint}">
@@ -2990,10 +2954,11 @@
                                      Header="{loc:Translate SettingsSshSubTabSession}"
                                      Style="{StaticResource SegmentedTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
-                                        <Grid Margin="0,12,0,0">
+                                        <TextBlock x:Name="Mw_SettingsSshSessionTitle" Text="{loc:Translate SettingsSectionSshSession}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
@@ -3001,7 +2966,7 @@
                                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                                 <TextBlock x:Name="Mw_SettingsAntiIdleLabel" Text="{loc:Translate SettingsLabelAntiIdleInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.AntiIdleIntervalText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsAntiIdleLabel}"/>
+                                                    <TextBox Text="{Binding Settings.AntiIdleIntervalText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsAntiIdleLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[AntiIdleInterval]}"/>
@@ -3009,22 +2974,22 @@
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock x:Name="Mw_SettingsSshTmoutLabel" Text="{loc:Translate SettingsLabelSshTmoutReset}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.SshTmoutResetIntervalText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshTmoutLabel}"/>
+                                                    <TextBox Text="{Binding Settings.SshTmoutResetIntervalText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshTmoutLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshTmoutResetInterval]}"/>
                                             </StackPanel>
                                         </Grid>
-                                        <StackPanel Margin="0,12,0,0">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshKeepAliveLabel" Text="{loc:Translate SettingsLabelSshKeepAliveInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBox Text="{Binding Settings.SshKeepAliveIntervalSecondsText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshKeepAliveLabel}"/>
+                                                <TextBox Text="{Binding Settings.SshKeepAliveIntervalSecondsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshKeepAliveLabel}"/>
                                                 <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshKeepAliveIntervalSeconds]}"/>
                                             <TextBlock x:Name="Mw_SettingsSshKeepAliveHint" Text="{loc:Translate SettingsSshKeepAliveIntervalHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshAutoReconnectTitle" Text="{loc:Translate SettingsSshAutoReconnect}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <TextBlock Text="{loc:Translate SettingsSshAutoReconnectDesc}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,6" TextWrapping="Wrap"/>
                                             <CheckBox x:Name="Mw_SettingsSshAutoReconnect"
@@ -3058,16 +3023,22 @@
                                      Header="{loc:Translate SettingsSshSubTabSftpX11}"
                                      Style="{StaticResource SegmentedTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
-                                        <CheckBox x:Name="Mw_SettingsSftpBrowserEnabled" Content="{loc:Translate SettingsLabelSftpBrowserEnabled}" IsChecked="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"/>
+                                        <TextBlock x:Name="Mw_SettingsSftpTitle" Text="{loc:Translate SettingsSectionSftp}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <CheckBox x:Name="Mw_SettingsSftpBrowserEnabled" Content="{loc:Translate SettingsLabelSftpBrowserEnabled}" IsChecked="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpBrowserEnabled]}"/>
                                         <CheckBox x:Name="Mw_SettingsAutoOpenSftp" Content="{loc:Translate SettingsLabelAutoOpenSftp}" IsChecked="{Binding Settings.SftpAutoOpenOnSsh}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpAutoOpenOnSsh]}"/>
                                         <CheckBox x:Name="Mw_SettingsSftpFollowSshDirectory" Content="{loc:Translate SettingsLabelSftpFollowSshDirectory}" IsChecked="{Binding Settings.SftpFollowSshDirectory}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0" AutomationProperties.Name="{loc:Translate SettingsLabelSftpFollowSshDirectory}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpFollowSshDirectory]}"/>
-                                        <StackPanel Margin="0,12,0,0">
+                                    </StackPanel>
+                                </Border>
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsX11Title" Text="{loc:Translate SettingsSectionX11}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <StackPanel>
                                             <TextBlock x:Name="Mw_SettingsX11PathLabel" Text="{loc:Translate SettingsLabelX11ServerPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -3081,14 +3052,14 @@
                                                         FontSize="{StaticResource FontSizeCaption}"
                                                         AutomationProperties.Name="{loc:Translate A11yBrowseX11Path}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
                                             </Grid>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[X11ServerPath]}"/>
                                         </StackPanel>
-                                        <CheckBox x:Name="Mw_SettingsX11AutoStart" Content="{loc:Translate SettingsLabelX11AutoStart}" IsChecked="{Binding Settings.X11AutoStart}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"/>
+                                        <CheckBox x:Name="Mw_SettingsX11AutoStart" Content="{loc:Translate SettingsLabelX11AutoStart}" IsChecked="{Binding Settings.X11AutoStart}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="{StaticResource SettingsFieldGap}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[X11AutoStart]}"/>
                                             </StackPanel>
                                         </Border>
@@ -3099,7 +3070,7 @@
                                      Header="{loc:Translate SettingsSshSubTabHostKeys}"
                                      Style="{StaticResource SegmentedTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
@@ -3118,7 +3089,7 @@
                                                         Margin="0,0,4,0"
                                                         AutomationProperties.Name="{loc:Translate BtnImportKnownHosts}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B5;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE8B5;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Translate BtnImportKnownHosts}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -3129,7 +3100,7 @@
                                                         Margin="0,0,4,0"
                                                         AutomationProperties.Name="{loc:Translate BtnExportKnownHosts}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE8A5;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Translate BtnExportKnownHosts}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -3139,7 +3110,7 @@
                                                         FontSize="{StaticResource FontSizeCaption}"
                                                         AutomationProperties.Name="{loc:Translate BtnRefreshTrustedHostKeys}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72C;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE72C;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Translate BtnRefreshTrustedHostKeys}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -3218,7 +3189,7 @@
                                                                             Margin="0,0,4,0"
                                                                             ToolTip="{loc:Translate BtnTrustedHostKeyCopyFingerprint}"
                                                                             AutomationProperties.Name="{loc:Translate BtnTrustedHostKeyCopyFingerprint}">
-                                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C8;" FontSize="12"/>
+                                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE8C8;" FontSize="{StaticResource IconSizeSmall}"/>
                                                                     </Button>
                                                                     <Button Command="{Binding DataContext.Settings.TrustedHostKeys.ShowDetailsCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                                             CommandParameter="{Binding}"
@@ -3227,7 +3198,7 @@
                                                                             Margin="0,0,4,0"
                                                                             ToolTip="{loc:Translate BtnTrustedHostKeyDetails}"
                                                                             AutomationProperties.Name="{loc:Translate BtnTrustedHostKeyDetails}">
-                                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE946;" FontSize="12"/>
+                                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE946;" FontSize="{StaticResource IconSizeSmall}"/>
                                                                     </Button>
                                                                     <Button Command="{Binding DataContext.Settings.TrustedHostKeys.RemoveCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                                             CommandParameter="{Binding}"
@@ -3235,7 +3206,7 @@
                                                                             Padding="5,2"
                                                                             ToolTip="{loc:Translate BtnTrustedHostKeyRemove}"
                                                                             AutomationProperties.Name="{loc:Translate BtnTrustedHostKeyRemove}">
-                                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12"/>
+                                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE74D;" FontSize="{StaticResource IconSizeSmall}"/>
                                                                     </Button>
                                                                 </StackPanel>
                                                             </DataTemplate>
@@ -3282,7 +3253,7 @@
                                      Header="{loc:Translate SettingsSshSubTabGateways}"
                                      Style="{StaticResource SegmentedTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
@@ -3296,6 +3267,16 @@
                                         </DockPanel>
                                         <Grid>
                                             <ListBox ItemsSource="{Binding Settings.Gateways}" SelectedItem="{Binding Settings.SelectedGateway}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsGatewaysTitle}" MinHeight="80" MaxHeight="200" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                            <ListBox.InputBindings>
+                                                <KeyBinding Key="Enter" Command="{Binding Settings.EditGatewayCommand}"/>
+                                                <KeyBinding Key="Delete" Command="{Binding Settings.DeleteGatewayCommand}"/>
+                                                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding Settings.EditGatewayCommand}"/>
+                                            </ListBox.InputBindings>
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource ThemedListBoxItemStyle}">
+                                                    <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" Margin="4,2">
@@ -3303,7 +3284,7 @@
                                                         <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
                                                             <Run Text="{Binding User, Mode=OneWay}"/><Run Text="@"/><Run Text="{Binding Host, Mode=OneWay}"/><Run Text=":"/><Run Text="{Binding Port, Mode=OneWay}"/>
                                                         </TextBlock>
-                                                        <TextBlock Text=" &#xE8D7;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource SshBadgeBrush}" VerticalAlignment="Center" Visibility="{Binding HasKey, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                        <TextBlock Text=" &#xE8D7;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource SshBadgeBrush}" VerticalAlignment="Center" Visibility="{Binding HasKey, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                     </StackPanel>
                                                 </DataTemplate>
                                             </ListBox.ItemTemplate>
@@ -3365,7 +3346,7 @@
                                          Header="{loc:Translate SettingsRdpSubTabDisplayAudio}"
                                          Style="{StaticResource SegmentedTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRdpDefaultsTitle" Text="{loc:Translate SettingsSectionRdpDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3400,7 +3381,7 @@
                                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                                 <TextBlock x:Name="Mw_SettingsRdpWidthLabel" Text="{loc:Translate SettingsLabelRdpWidth}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.DefaultResolutionWidthText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpWidthLabel}"/>
+                                                    <TextBox Text="{Binding Settings.DefaultResolutionWidthText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpWidthLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitPixels}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[DefaultResolutionWidth]}"/>
@@ -3408,7 +3389,7 @@
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock x:Name="Mw_SettingsRdpHeightLabel" Text="{loc:Translate SettingsLabelRdpHeight}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.DefaultResolutionHeightText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpHeightLabel}"/>
+                                                    <TextBox Text="{Binding Settings.DefaultResolutionHeightText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpHeightLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitPixels}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[DefaultResolutionHeight]}"/>
@@ -3454,7 +3435,7 @@
                                             </ComboBox>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RdpDefaultAudioMode]}"/>
                                         </StackPanel>
-                                        <CheckBox x:Name="Mw_SettingsRdpAudioCapture" Content="{loc:Translate RdpAudioCapture}" IsChecked="{Binding Settings.RdpDefaultAudioCapture}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0" ToolTip="{loc:Translate RdpAudioCaptureHint}" AutomationProperties.HelpText="{loc:Translate RdpAudioCaptureHint}"/>
+                                        <CheckBox x:Name="Mw_SettingsRdpAudioCapture" Content="{loc:Translate RdpAudioCapture}" IsChecked="{Binding Settings.RdpDefaultAudioCapture}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="{StaticResource SettingsFieldGap}" ToolTip="{loc:Translate RdpAudioCaptureHint}" AutomationProperties.HelpText="{loc:Translate RdpAudioCaptureHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RdpDefaultAudioCapture]}"/>
                                     </StackPanel>
                                 </Border>
@@ -3466,7 +3447,7 @@
                                          Header="{loc:Translate SettingsRdpSubTabDevices}"
                                          Style="{StaticResource SegmentedTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRdpDevicesTitle" Text="{loc:Translate SettingsSectionRdpDevices}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3497,7 +3478,7 @@
                                          Header="{loc:Translate SettingsRdpSubTabPerformance}"
                                          Style="{StaticResource SegmentedTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
@@ -3549,7 +3530,7 @@
                                          Header="{loc:Translate SettingsRdpSubTabBehavior}"
                                          Style="{StaticResource SegmentedTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <Expander x:Name="Mw_SettingsRdpAdvancedTimeoutsExpander"
@@ -3671,7 +3652,7 @@
                                          Header="{loc:Translate SettingsRdpSubTabCertificates}"
                                          Style="{StaticResource SegmentedTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Connection security sits with the certificate trust it governs, not under
                                      Performance, where NLA and strict server authentication used to be. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
@@ -3711,7 +3692,7 @@
                                                         FontSize="{StaticResource FontSizeCaption}"
                                                         AutomationProperties.Name="{loc:Translate BtnRefreshTrustedRdpCertificates}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72C;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE72C;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Translate BtnRefreshTrustedRdpCertificates}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -3824,7 +3805,7 @@
                                                                         HorizontalAlignment="Right"
                                                                         ToolTip="{loc:Translate BtnTrustedRdpCertificateForget}"
                                                                         AutomationProperties.Name="{loc:Translate BtnTrustedRdpCertificateForget}">
-                                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12"/>
+                                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE74D;" FontSize="{StaticResource IconSizeSmall}"/>
                                                                 </Button>
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
@@ -3904,7 +3885,7 @@
                             </StackPanel>
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Security posture: the security-relevant choices of the whole panel, one
                                      line each, as they stand now including unsaved edits. Which state is
                                      risky is decided in SecurityPosture, not here. One row per line rather
@@ -3915,7 +3896,7 @@
                                         <TextBlock x:Name="Mw_SettingsSecurityPostureTitle" Text="{loc:Translate SecurityPostureTitle}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
                                         <TextBlock Text="{loc:Translate SecurityPostureDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center" Margin="0,0,8,0">
+                                            <TextBlock FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center" Margin="0,0,8,0">
                                                 <TextBlock.Style>
                                                     <Style TargetType="{x:Type TextBlock}">
                                                         <Setter Property="Text" Value="&#xE73E;"/>
@@ -4067,7 +4048,7 @@
                                             </StackPanel>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[AutoLockIdleMinutes]}"/>
                                             <TextBlock Text="{loc:Translate SettingsAutoLockHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                            <CheckBox x:Name="Mw_SettingsDisconnectOnLock" Content="{loc:Translate SettingsDisconnectOnLock}" IsChecked="{Binding Settings.DisconnectOnLock}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,12,0,0"
+                                            <CheckBox x:Name="Mw_SettingsDisconnectOnLock" Content="{loc:Translate SettingsDisconnectOnLock}" IsChecked="{Binding Settings.DisconnectOnLock}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="{StaticResource SettingsFieldGap}"
                                                       AutomationProperties.HelpText="{loc:Translate SettingsDisconnectOnLockHint}"/>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[DisconnectOnLock]}"/>
                                             <TextBlock Text="{loc:Translate SettingsDisconnectOnLockHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
@@ -4080,7 +4061,7 @@
                                         <TextBlock x:Name="Mw_SettingsCredProviderTitle" Text="{loc:Translate SettingsSectionCredentialProvider}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
                                         <CheckBox x:Name="Mw_SettingsCredProviderEnabled" Content="{loc:Translate SettingsLabelCredProviderEnabled}" IsChecked="{Binding Settings.UseExternalCredentialProvider}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[UseExternalCredentialProvider]}"/>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}">
                                             <TextBlock x:Name="Mw_SettingsCredProviderTypeLabel" Text="{loc:Translate SettingsLabelCredProviderType}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <RadioButton x:Name="Mw_SettingsCredProviderTypeCommand" GroupName="CredProviderType" Content="{loc:Translate SettingsCredProviderTypeCommand}" IsChecked="{Binding Settings.IsCommandProvider, Mode=TwoWay}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <RadioButton x:Name="Mw_SettingsCredProviderTypeCredMan" GroupName="CredProviderType" Content="{loc:Translate SettingsCredProviderTypeCredMan}" IsChecked="{Binding Settings.IsWindowsCredentialManagerProvider, Mode=TwoWay}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,4,0,0"/>
@@ -4088,33 +4069,33 @@
                                             <TextBlock x:Name="Mw_SettingsCredProviderTypeCredManHelp" Text="{loc:Translate SettingsCredProviderTypeCredManHelp}" Visibility="{Binding Settings.IsWindowsCredentialManagerProvider, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
                                         <StackPanel x:Name="Mw_SettingsCommandProviderFields" Visibility="{Binding Settings.IsCommandProvider, Converter={StaticResource BoolToVisibilityConverter}}">
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProvPresetLabel" Text="{loc:Translate CredProvPresetLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox x:Name="Mw_SettingsCredProvPreset" SelectionChanged="OnCredProvPresetChanged" FontSize="{StaticResource FontSizeBody}" Margin="0,0,0,12"
                                                       AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvPresetLabel}"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProviderCmdLabel" Text="{loc:Translate SettingsLabelCredProviderCommand}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <TextBox x:Name="Mw_SettingsCredProvCmd" Text="{Binding Settings.CredentialProviderCommand}" Tag="{loc:Translate SettingsCredProvCmdPlaceholder}"
                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderCmdLabel}"
                                                      AutomationProperties.HelpText="{loc:Translate CredProvCmdHint}"/>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderCommand]}"/>
-                                            <TextBlock x:Name="Mw_SettingsCredProvCmdHint" Text="{loc:Translate CredProvCmdHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" FontFamily="Consolas" Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="Mw_SettingsCredProvCmdHint" Text="{loc:Translate CredProvCmdHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" FontFamily="{StaticResource FontFamilyMonospace}" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProvUsernameCmdLabel" Text="{loc:Translate SettingsLabelCredProviderUsernameCmd}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <TextBox x:Name="Mw_SettingsCredProvUsernameCmd" Text="{Binding Settings.CredentialProviderUsernameCommand}" Tag="{loc:Translate SettingsCredProviderUsernameCmdPlaceholder}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvUsernameCmdLabel}"
                                                      AutomationProperties.HelpText="{loc:Translate SettingsCredProviderUsernameCmdHelp}"/>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderUsernameCommand]}"/>
                                             <TextBlock x:Name="Mw_SettingsCredProvUsernameCmdHint" Text="{loc:Translate SettingsCredProviderUsernameCmdHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProvUnlockLabel" Text="{loc:Translate SettingsLabelCredProviderUnlock}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <PasswordBox x:Name="Mw_SettingsCredProvUnlock" FontSize="{StaticResource FontSizeBody}" PasswordChanged="OnCredProvUnlockChanged" ToolTip="{loc:Translate SettingsCredProviderUnlockPlaceholder}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvUnlockLabel}"
                                                          AutomationProperties.HelpText="{loc:Translate SettingsCredProviderUnlockHelp}"/>
                                             <TextBlock x:Name="Mw_SettingsCredProvUnlockHint" Text="{loc:Translate SettingsCredProviderUnlockHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProviderDbLabel" Text="{loc:Translate SettingsLabelCredProviderDatabase}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -4124,14 +4105,14 @@
                                                 <TextBox Grid.Column="0" Text="{Binding Settings.CredentialProviderDatabase}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderDbLabel}"/>
                                                 <Button Grid.Column="1" x:Name="Mw_SettingsCredProvDbBrowseBtn" Padding="6,2" Margin="4,0,0,0" Click="OnCredProvDbBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate A11yBrowseDatabase}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
                                             </Grid>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderDatabase]}"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProviderKeyFileLabel" Text="{loc:Translate SettingsLabelCredProviderKeyFile}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -4142,7 +4123,7 @@
                                                          AutomationProperties.HelpText="{loc:Translate SettingsCredProviderKeyFileHint}"/>
                                                 <Button Grid.Column="1" x:Name="Mw_SettingsCredProvKeyFileBrowseBtn" Padding="6,2" Margin="4,0,0,0" Click="OnCredProvKeyFileBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate A11yBrowseKeyFile}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -4150,10 +4131,10 @@
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderKeyFile]}"/>
                                             <TextBlock x:Name="Mw_SettingsCredProvKeyFileHint" Text="{loc:Translate SettingsCredProviderKeyFileHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}">
                                             <TextBlock x:Name="Mw_SettingsCredProvTimeoutLabel" Text="{loc:Translate SettingsLabelCredProviderTimeout}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBox Text="{Binding Settings.CredentialProviderTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvTimeoutLabel}"/>
+                                                <TextBox Text="{Binding Settings.CredentialProviderTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvTimeoutLabel}"/>
                                                 <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderTimeoutMs]}"/>
@@ -4171,7 +4152,12 @@
                                         <TextBlock x:Name="Mw_SettingsCredProvFirstLineOnlyHint" Text="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         <TextBlock x:Name="Mw_SettingsCredProvKeePass2Hint" Text="{loc:Translate SettingsCredProviderKeePass2Hint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                         </StackPanel>
-                                        <DockPanel Margin="0,16,0,0">
+                                    </StackPanel>
+                                </Border>
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsConnectionChecksTitle" Text="{loc:Translate SettingsSectionConnectionChecks}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <DockPanel>
                                             <TextBlock Text="{Binding Settings.CredentialGuardStatusText}"
                                                        Visibility="{Binding Settings.RequireCredentialGuard, Converter={StaticResource BoolToVisibilityConverter}}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
@@ -4191,7 +4177,7 @@
                                         <StackPanel Margin="0,8,0,0" IsEnabled="{Binding Settings.RequireWindowsHelloOnConnect}">
                                             <TextBlock x:Name="Mw_SettingsWindowsHelloGraceLabel" Text="{loc:Translate SettingsLabelWindowsHelloGrace}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBox Text="{Binding Settings.WindowsHelloGraceMinutesText, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsWindowsHelloGraceLabel}"/>
+                                                <TextBox Text="{Binding Settings.WindowsHelloGraceMinutesText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsWindowsHelloGraceLabel}"/>
                                                 <TextBlock Text="{loc:Translate SettingsUnitMinutes}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[WindowsHelloGraceMinutes]}"/>
@@ -4248,7 +4234,7 @@
                                      Header="{loc:Translate SettingsAdvancedSubTabDiagnostics}"
                                      Style="{StaticResource SegmentedTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Logging -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -4266,7 +4252,7 @@
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    Foreground="{DynamicResource WarningTextBrush}"
                                                    TextWrapping="Wrap"/>
-                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding Settings.SessionLoggingEnabled}">
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.SessionLoggingEnabled}">
                                             <TextBlock x:Name="Mw_SettingsSessionLogDirLabel" Text="{loc:Translate SettingsLabelSessionLogDirectory}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -4281,7 +4267,7 @@
                                                         FontSize="{StaticResource FontSizeCaption}"
                                                         AutomationProperties.Name="{loc:Translate A11yBrowseSessionLogDir}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -4307,7 +4293,7 @@
                                             <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,0">
                                                 <TextBlock x:Name="Mw_SettingsTunnelDelayLabel" Text="{loc:Translate SettingsLabelTunnelDelay}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.TunnelEstablishmentDelayMsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
+                                                    <TextBox Text="{Binding Settings.TunnelEstablishmentDelayMsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTunnelDelayLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
@@ -4316,16 +4302,16 @@
                                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock x:Name="Mw_SettingsRdpTimeoutLabel" Text="{loc:Translate SettingsLabelRdpTimeout}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.RdpConnectWatchdogTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
+                                                    <TextBox Text="{Binding Settings.RdpConnectWatchdogTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpTimeoutLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RdpConnectWatchdogTimeoutMs]}"/>
                                             </StackPanel>
-                                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,0,0">
+                                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="{StaticResource SettingsFieldGap}">
                                                 <TextBlock x:Name="Mw_SettingsExtToolTimeoutLabel" Text="{loc:Translate SettingsLabelExtToolTimeout}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.ExternalToolTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
+                                                    <TextBox Text="{Binding Settings.ExternalToolTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsExtToolTimeoutLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
@@ -4358,7 +4344,7 @@
                                             <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,0">
                                                 <TextBlock x:Name="Mw_SettingsHealthIntervalLabel" Text="{loc:Translate SettingsLabelSessionHealthCheckInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.SessionHealthCheckIntervalSecondsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
+                                                    <TextBox Text="{Binding Settings.SessionHealthCheckIntervalSecondsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsHealthIntervalLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
@@ -4367,7 +4353,7 @@
                                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock x:Name="Mw_SettingsHealthTimeoutLabel" Text="{loc:Translate SettingsLabelSessionHealthProbeTimeout}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBox Text="{Binding Settings.SessionHealthProbeTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="100"
+                                                    <TextBox Text="{Binding Settings.SessionHealthProbeTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}"
                                                              AutomationProperties.LabeledBy="{x:Reference Mw_SettingsHealthTimeoutLabel}"/>
                                                     <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                                 </StackPanel>
@@ -4375,7 +4361,7 @@
                                             </StackPanel>
                                             <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,8,0">
                                                 <TextBlock x:Name="Mw_SettingsHealthMaxConcurrentLabel" Text="{loc:Translate SettingsLabelSessionHealthMaxConcurrent}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                                <TextBox Text="{Binding Settings.SessionHealthMaxConcurrentText, UpdateSourceTrigger=PropertyChanged}" Width="100" HorizontalAlignment="Left"
+                                                <TextBox Text="{Binding Settings.SessionHealthMaxConcurrentText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" HorizontalAlignment="Left"
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsHealthMaxConcurrentLabel}"/>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SessionHealthMaxConcurrent]}"/>
                                             </StackPanel>
@@ -4390,7 +4376,7 @@
                                      Header="{loc:Translate SettingsAdvancedSubTabTools}"
                                      Style="{StaticResource SegmentedTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="900">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
                                 <!-- External Editor -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -4410,7 +4396,7 @@
                                                     FontSize="{StaticResource FontSizeCaption}"
                                                     AutomationProperties.Name="{loc:Translate A11yBrowseEditorPath}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -4447,7 +4433,7 @@
                                             </StackPanel>
                                             <Button x:Name="Mw_SettingsBtnSysintBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseSysinternalsPath}" Grid.Row="0" Grid.Column="2" Padding="6,2" Margin="4,0,0,8" Click="OnSysinternalsPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -4459,7 +4445,7 @@
                                             </StackPanel>
                                             <Button x:Name="Mw_SettingsBtnNirSoftBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNirSoftPath}" Grid.Row="2" Grid.Column="2" Padding="6,2" Margin="4,0,0,8" Click="OnNirSoftPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -4471,7 +4457,7 @@
                                             </StackPanel>
                                             <Button x:Name="Mw_SettingsBtnNanaRunBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNanaRunPath}" Grid.Row="4" Grid.Column="2" Padding="6,2" Margin="4,0,0,0" Click="OnNanaRunPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -4491,66 +4477,58 @@
                                         <TextBlock x:Name="Mw_SettingsCmdLibSyncTitle" Text="{loc:Translate SettingsCmdLibSyncTitle}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
                                         <CheckBox x:Name="Mw_SettingsCmdLibSyncEnable" Content="{loc:Translate SettingsCmdLibSyncEnable}" IsChecked="{Binding Settings.CmdLibGitSyncEnabled}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CmdLibGitSyncEnabled]}"/>
-                                        <Grid Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <TextBlock x:Name="Mw_SettingsCmdLibSyncLblUrl" Grid.Row="0" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsCmdLibSyncUrl}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <StackPanel Grid.Row="0" Grid.Column="1">
-                                                <TextBox AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCmdLibSyncLblUrl}" Text="{Binding Settings.CmdLibGitSyncUrl, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}"/>
+                                        <StackPanel IsEnabled="{Binding Settings.CmdLibGitSyncEnabled}" Margin="0,4,0,0">
+                                            <StackPanel Margin="0,0,0,8">
+                                                <TextBlock x:Name="Mw_SettingsCmdLibSyncLblUrl" Text="{loc:Translate SettingsCmdLibSyncUrl}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                                <TextBox AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCmdLibSyncLblUrl}" Text="{Binding Settings.CmdLibGitSyncUrl, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}"/>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CmdLibGitSyncUrl]}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="Mw_SettingsCmdLibSyncLblBranch" Grid.Row="1" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsCmdLibSyncBranch}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <StackPanel Grid.Row="1" Grid.Column="1">
-                                                <TextBox AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCmdLibSyncLblBranch}" Text="{Binding Settings.CmdLibGitSyncBranch, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}"/>
+                                            <StackPanel Margin="0,0,0,8">
+                                                <TextBlock x:Name="Mw_SettingsCmdLibSyncLblBranch" Text="{loc:Translate SettingsCmdLibSyncBranch}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                                <TextBox AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCmdLibSyncLblBranch}" Text="{Binding Settings.CmdLibGitSyncBranch, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}"/>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CmdLibGitSyncBranch]}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="Mw_SettingsCmdLibSyncLblToken" Grid.Row="2" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsCmdLibSyncToken}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,8">
+                                            <StackPanel Margin="0,0,0,8">
+                                                <TextBlock x:Name="Mw_SettingsCmdLibSyncLblToken" Text="{loc:Translate SettingsCmdLibSyncToken}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <PasswordBox x:Name="Mw_SettingsCmdLibSyncToken" Grid.Column="0" FontSize="{StaticResource FontSizeBody}" PasswordChanged="OnCmdLibSyncTokenChanged" LostFocus="OnCmdLibSyncTokenLostFocus"
+                                                                 AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCmdLibSyncLblToken}"/>
+                                                    <TextBlock x:Name="Mw_SettingsCmdLibSyncTokenStatus" Grid.Column="1" VerticalAlignment="Center" FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource SuccessTextBrush}" Margin="8,0,0,0"/>
+                                                    <Button x:Name="Mw_SettingsCmdLibSyncTokenClear" Grid.Column="2" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}" Click="OnCmdLibSyncTokenClear" Style="{DynamicResource GhostButtonStyle}" FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="{loc:Translate SettingsCmdLibSyncTokenClear}" AutomationProperties.Name="{loc:Translate SettingsCmdLibSyncTokenClear}"/>
+                                                </Grid>
+                                                <TextBlock x:Name="Mw_SettingsCmdLibSyncTokenSavedImmediately"
+                                                           Text="{loc:Translate SettingsCmdLibSyncTokenSavedImmediately}"
+                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                            <Grid Margin="0,0,0,8">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <PasswordBox x:Name="Mw_SettingsCmdLibSyncToken" Grid.Column="0" FontSize="{StaticResource FontSizeBody}" PasswordChanged="OnCmdLibSyncTokenChanged"
-                                                             AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCmdLibSyncLblToken}"/>
-                                                <TextBlock x:Name="Mw_SettingsCmdLibSyncTokenStatus" Grid.Column="1" VerticalAlignment="Center" FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource SuccessTextBrush}" Margin="8,0,0,0"/>
-                                                <Button x:Name="Mw_SettingsCmdLibSyncTokenClear" Grid.Column="2" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" Click="OnCmdLibSyncTokenClear" Style="{DynamicResource GhostButtonStyle}" FontSize="12" Width="24" Height="24" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="{loc:Translate SettingsCmdLibSyncTokenClear}" AutomationProperties.Name="{loc:Translate SettingsCmdLibSyncTokenClear}"/>
-                                            </Grid>
-                                            <TextBlock x:Name="Mw_SettingsCmdLibSyncLblAuthor" Grid.Row="3" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsCmdLibSyncAuthor}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <Grid Grid.Row="3" Grid.Column="1" Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel Grid.Column="0">
-                                                    <TextBox Text="{Binding Settings.CmdLibGitSyncAuthorName, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="{loc:Translate A11ySettingsCmdLibSyncAuthorName}" Margin="0,0,8,0" FontSize="{StaticResource FontSizeBody}"/>
+                                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                    <TextBlock x:Name="Mw_SettingsCmdLibSyncLblAuthorName" Text="{loc:Translate A11ySettingsCmdLibSyncAuthorName}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                                    <TextBox Text="{Binding Settings.CmdLibGitSyncAuthorName, UpdateSourceTrigger=LostFocus}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCmdLibSyncLblAuthorName}" FontSize="{StaticResource FontSizeBody}"/>
                                                     <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CmdLibGitSyncAuthorName]}"/>
                                                 </StackPanel>
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBox Text="{Binding Settings.CmdLibGitSyncAuthorEmail, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="{loc:Translate A11ySettingsCmdLibSyncAuthorEmail}" FontSize="{StaticResource FontSizeBody}"/>
+                                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                    <TextBlock x:Name="Mw_SettingsCmdLibSyncLblAuthorEmail" Text="{loc:Translate A11ySettingsCmdLibSyncAuthorEmail}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                                    <TextBox Text="{Binding Settings.CmdLibGitSyncAuthorEmail, UpdateSourceTrigger=LostFocus}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCmdLibSyncLblAuthorEmail}" FontSize="{StaticResource FontSizeBody}"/>
                                                     <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CmdLibGitSyncAuthorEmail]}"/>
                                                 </StackPanel>
                                             </Grid>
-                                        </Grid>
-                                        <TextBlock x:Name="Mw_SettingsCmdLibSyncTokenSavedImmediately"
-                                                   Text="{loc:Translate SettingsCmdLibSyncTokenSavedImmediately}"
-                                                   Foreground="{DynamicResource TextTertiaryBrush}"
-                                                   FontSize="{StaticResource FontSizeCaption}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,0,0,8"/>
                                         <CheckBox x:Name="Mw_SettingsCmdLibSyncOnStartup" Content="{loc:Translate SettingsCmdLibSyncOnStartup}" IsChecked="{Binding Settings.CmdLibGitSyncOnStartup}" Margin="0,4,0,4" FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CmdLibGitSyncOnStartup]}"/>
                                         <CheckBox x:Name="Mw_SettingsCmdLibSyncAutoPush" Content="{loc:Translate SettingsCmdLibSyncAutoPush}" IsChecked="{Binding Settings.CmdLibGitSyncAutoPush}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CmdLibGitSyncAutoPush]}"/>
+                                        </StackPanel>
                                         <Button x:Name="Mw_SettingsCmdLibSyncTestBtn" Content="{loc:Translate SettingsCmdLibSyncTestConnection}" Command="{Binding Settings.TestGitSyncConnectionCommand}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" HorizontalAlignment="Left"
                                                 AutomationProperties.Name="{loc:Translate SettingsCmdLibSyncTestConnection}"/>
                                         <TextBlock x:Name="Mw_SettingsCmdLibSyncTestStatus"
@@ -4574,6 +4552,14 @@
                                             </StackPanel>
                                         </DockPanel>
                                         <ListBox ItemsSource="{Binding Settings.ExternalTools}" SelectedItem="{Binding Settings.SelectedExternalTool}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsExtToolsTitle}" MinHeight="60" MaxHeight="120" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                            <ListBox.InputBindings>
+                                                <KeyBinding Key="Delete" Command="{Binding Settings.RemoveExternalToolCommand}"/>
+                                            </ListBox.InputBindings>
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource ThemedListBoxItemStyle}">
+                                                    <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" Margin="4,2">
@@ -4585,7 +4571,7 @@
                                         </ListBox>
 
                                         <!-- Inline edit panel for selected tool -->
-                                        <Border Margin="0,12,0,0" Padding="{StaticResource SpacingMd}" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusMd}"
+                                        <Border Margin="{StaticResource SettingsFieldGap}" Padding="{StaticResource SpacingMd}" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusMd}"
                                                 DataContext="{Binding Settings.SelectedExternalTool}"
                                                 Visibility="{Binding DataContext.Settings.SelectedExternalTool, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource NullToVisibilityConverter}}">
                                             <Grid>
@@ -4620,14 +4606,14 @@
                                                             FontSize="{StaticResource FontSizeCaption}"
                                                             AutomationProperties.Name="{loc:Translate A11yBrowseExecutable}">
                                                         <StackPanel Orientation="Horizontal">
-                                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE838;" FontSize="12" VerticalAlignment="Center"/>
+                                                            <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                             <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                         </StackPanel>
                                                     </Button>
                                                 </Grid>
 
                                                 <TextBlock x:Name="Mw_ExtToolLblArgs" Grid.Row="2" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate ExternalToolLabelArguments}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                                <TextBox Grid.Row="2" Grid.Column="1" AutomationProperties.LabeledBy="{x:Reference Mw_ExtToolLblArgs}" Text="{Binding Arguments, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,6" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"/>
+                                                <TextBox Grid.Row="2" Grid.Column="1" AutomationProperties.LabeledBy="{x:Reference Mw_ExtToolLblArgs}" Text="{Binding Arguments, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,6" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"/>
 
                                                 <TextBlock x:Name="Mw_ExtToolLblWorkDir" Grid.Row="3" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate ExternalToolLabelWorkDir}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
                                                 <Grid Grid.Row="3" Grid.Column="1" Margin="0,0,0,6">
@@ -4643,7 +4629,7 @@
                                                             FontSize="{StaticResource FontSizeCaption}"
                                                             AutomationProperties.Name="{loc:Translate A11yBrowseWorkDir}">
                                                         <StackPanel Orientation="Horizontal">
-                                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED25;" FontSize="12" VerticalAlignment="Center"/>
+                                                            <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xED25;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
                                                             <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                         </StackPanel>
                                                     </Button>
@@ -4665,7 +4651,7 @@
                                                 <!-- Preview + Test -->
                                                 <DockPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,8,0,0">
                                                     <Button x:Name="Mw_ExtToolTestBtn" DockPanel.Dock="Right" Content="{loc:Translate ExtToolBtnTest}" Click="OnExtToolTestClick" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="4,0,0,0"/>
-                                                    <TextBlock x:Name="Mw_ExtToolPreview" Text="" FontFamily="Consolas" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                    <TextBlock x:Name="Mw_ExtToolPreview" Text="" FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                                AutomationProperties.Name="{Binding Text, RelativeSource={RelativeSource Self}}"
                                                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                                                 </DockPanel>

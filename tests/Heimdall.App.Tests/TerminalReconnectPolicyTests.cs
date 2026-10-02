@@ -24,6 +24,23 @@ namespace Heimdall.App.Tests;
 
 public sealed class TerminalReconnectPolicyTests
 {
+    [Theory]
+    [InlineData("WINRM", 1, "ErrorWinRmSessionNotEntered")]
+    [InlineData("winrm", 1, "ErrorWinRmSessionNotEntered")]
+    [InlineData("WINRM", 0, null)]
+    [InlineData("WINRM", 2, null)]
+    [InlineData("SSH", 1, null)]
+    [InlineData(null, 1, null)]
+    public void ResolveWinRmNotEnteredMessageKey_OnlyForWinRmSessionNeverEntered(
+        string? connectionType,
+        int exitCode,
+        string? expected)
+    {
+        Assert.Equal(
+            expected,
+            TerminalReconnectPolicy.ResolveWinRmNotEnteredMessageKey(connectionType, exitCode));
+    }
+
     [Fact]
     public void ClassifyProcessExit_ZeroExit_ReturnsCleanDisconnect()
     {

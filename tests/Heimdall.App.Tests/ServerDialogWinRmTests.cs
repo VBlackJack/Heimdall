@@ -468,6 +468,130 @@ public sealed class ServerDialogWinRmTests
         Assert.Equal("encrypted-password", dto.WinRmPasswordEncrypted);
     }
 
+    [Fact]
+    public void Validate_CredentialModeWithoutAnyPassword_NamesThePasswordField()
+    {
+        ServerDialogViewModel vm = CredentialProfile("operator");
+        vm.WinRmPassword = "";
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.NotNull(vm.WinRmPasswordError);
+        Assert.NotNull(vm.ValidationError);
+        Assert.Equal("WinRmPassword", vm.FirstInvalidField);
+
+        vm.WinRmPassword = "typed-later";
+
+        Assert.Null(vm.WinRmPasswordError);
+        Assert.Null(vm.ValidationError);
+    }
+
+    [Fact]
+    public void Validate_CredentialModeWithStoredPasswordAndEmptyBox_KeepsTheStoredPassword()
+    {
+        ServerDialogViewModel vm = CredentialProfile("operator");
+        vm.WinRmPassword = "";
+        vm.ExistingWinRmPasswordEncrypted = "encrypted-password";
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.Null(vm.WinRmPasswordError);
+        Assert.Null(vm.ValidationError);
+    }
+
+    [Fact]
+    public void Validate_CurrentUserModeWithoutPassword_RaisesNoPasswordError()
+    {
+        ServerDialogViewModel vm = CredentialProfile("operator");
+        vm.WinRmPassword = "";
+        vm.WinRmIdentityMode = WinRmIdentityMode.CurrentUser;
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.Null(vm.WinRmPasswordError);
+    }
+
+    [Fact]
+    public void GatewaySelected_WithSsl_ExplainsTheSwitchAndRestoresItWhenTheGatewayIsRemoved()
+    {
+        ServerDialogViewModel vm = new ServerDialogViewModel { ConnectionType = "WINRM" };
+        vm.WinRmUseSsl = true;
+        vm.WinRmSkipCertificateCheck = true;
+        Assert.False(vm.WinRmSslDisabledByGateway);
+
+        vm.SelectedGatewayId = "gateway-01";
+
+        Assert.False(vm.WinRmUseSsl);
+        Assert.True(vm.WinRmSslDisabledByGateway);
+        Assert.Equal(DefaultPorts.WinRmHttp, vm.WinRmPort);
+
+        vm.SelectedGatewayId = "";
+
+        Assert.False(vm.WinRmSslDisabledByGateway);
+        Assert.True(vm.WinRmUseSsl);
+        Assert.True(vm.WinRmSkipCertificateCheck);
+        Assert.Equal(DefaultPorts.WinRmHttps, vm.WinRmPort);
+    }
+
+    [Fact]
+    public async Task GatewaySelected_WithSsl_ShowsTheDedicatedNoticeInsteadOfTheGenericHint()
+    {
+        ServerDialogViewModel vm = new ServerDialogViewModel { ConnectionType = "WINRM" };
+        vm.Localizer = await CreateLocalizerAsync("en");
+        vm.WinRmUseSsl = true;
+        string genericGatewayHint = vm.Localizer["ServerDialogWinRmUseSslGatewayHint"];
+
+        vm.SelectedGatewayId = "gateway-01";
+
+        Assert.Equal(vm.Localizer["ServerDialogWinRmUseSslGatewayDisabledNotice"], vm.WinRmUseSslHelpText);
+        Assert.NotEqual(genericGatewayHint, vm.WinRmUseSslHelpText);
+    }
+
+    [Fact]
+    public void GatewaySelected_WithoutSsl_RaisesNoNotice()
+    {
+        ServerDialogViewModel vm = new ServerDialogViewModel { ConnectionType = "WINRM" };
+
+        vm.SelectedGatewayId = "gateway-01";
+
+        Assert.False(vm.WinRmSslDisabledByGateway);
+    }
+
+    [Theory]
+    [InlineData("10.0.0.5", false, false, true, true)]
+    [InlineData("10.0.0.5", true, false, true, false)]
+    [InlineData("server01", false, true, true, true)]
+    [InlineData("server01", false, false, true, false)]
+    [InlineData("server01.contoso.test", false, true, true, false)]
+    [InlineData("10.0.0.5", false, false, false, false)]
+    [InlineData("", false, true, true, false)]
+    public void ShouldShowWinRmTrustedHostsHint_CoversTheOffDomainHttpCases(
+        string host,
+        bool useSsl,
+        bool storedCredential,
+        bool applicable,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            ServerDialogViewModel.ShouldShowWinRmTrustedHostsHint(host, useSsl, storedCredential, applicable));
+    }
+
+    [Fact]
+    public void SkipCertificateHint_SaysWhatEnablesTheBoxAndWarnsOnceActive()
+    {
+        ServerDialogViewModel vm = new ServerDialogViewModel { ConnectionType = "WINRM" };
+        string withoutSsl = vm.WinRmSkipCertificateHintText;
+        Assert.False(vm.IsWinRmCertificateCheckSkipped);
+
+        vm.WinRmUseSsl = true;
+        Assert.NotEqual(withoutSsl, vm.WinRmSkipCertificateHintText);
+        Assert.False(vm.IsWinRmCertificateCheckSkipped);
+
+        vm.WinRmSkipCertificateCheck = true;
+        Assert.True(vm.IsWinRmCertificateCheckSkipped);
+    }
+
     private static ServerDialogViewModel CredentialProfile(string username) =>
         new()
         {
@@ -475,7 +599,8 @@ public sealed class ServerDialogWinRmTests
             RemoteServer = "server01.contoso.test",
             ConnectionType = "WINRM",
             WinRmIdentityMode = WinRmIdentityMode.Credential,
-            WinRmUsername = username
+            WinRmUsername = username,
+            WinRmPassword = "test-password"
         };
 
     private static async Task<LocalizationManager> CreateLocalizerAsync(string locale)

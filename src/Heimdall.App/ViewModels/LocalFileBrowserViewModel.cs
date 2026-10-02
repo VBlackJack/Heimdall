@@ -15,6 +15,7 @@
  */
 
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -48,6 +49,12 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         ".toml", ".properties", ".service", ".timer", ".socket", ".gitignore", ".editorconfig"
     };
 
+    /// <summary>Identity of the column the listing is sorted by until the user picks another.</summary>
+    internal const string SortColumnName = "Name";
+
+    private const string SortColumnSize = "Size";
+    private const string SortColumnModified = "Modified";
+
     private readonly Stack<string> _history = new();
     private readonly List<LocalFileEntry> _allFiles = [];
     private readonly LocalizationManager? _localizer;
@@ -75,6 +82,18 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _showEmptyFolder;
+
+    /// <summary>Whether the current status reports a failure, so the view can colour it.</summary>
+    [ObservableProperty]
+    private bool _isErrorStatus;
+
+    /// <summary>The identity of the column the listing is sorted by.</summary>
+    [ObservableProperty]
+    private string _sortColumn = SortColumnName;
+
+    /// <summary>The direction of the sort.</summary>
+    [ObservableProperty]
+    private ListSortDirection _sortDirection = ListSortDirection.Ascending;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalFileBrowserViewModel"/> class.
@@ -104,7 +123,7 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
     /// <summary>
     /// Gets the currently displayed files and directories after filtering.
     /// </summary>
-    public ObservableCollection<LocalFileEntry> Files { get; }
+    public BulkObservableCollection<LocalFileEntry> Files { get; }
 
     /// <summary>
     /// Gets the root directory associated with the local shell session.
@@ -842,20 +861,66 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
             .ToList();
     }
 
+    /// <summary>Sorts by a column, or reverses the order when it already is the sort column.</summary>
+    public void ToggleSortColumn(string column)
+    {
+        if (string.Equals(SortColumn, column, StringComparison.Ordinal))
+        {
+            SortDirection = SortDirection == ListSortDirection.Ascending
+                ? ListSortDirection.Descending
+                : ListSortDirection.Ascending;
+        }
+        else
+        {
+            SortColumn = column;
+            SortDirection = ListSortDirection.Ascending;
+        }
+
+        ApplyFilter();
+    }
+
+    /// <summary>
+    /// Shows that opening an entry failed. The failure used to be written to the log alone, so a
+    /// double-click that did nothing gave no hint why.
+    /// </summary>
+    public void ReportOpenFailure(string name, string reason)
+    {
+        StatusText = _localizer?.Format("FileBrowserOpenFailed", name, reason) ?? L10n("FileBrowserOpenFailed");
+        IsErrorStatus = true;
+    }
+
+    /// <summary>Orders entries: folders first, then by the column, in the given direction.</summary>
+    internal static IEnumerable<LocalFileEntry> OrderEntries(
+        IEnumerable<LocalFileEntry> entries,
+        string column,
+        ListSortDirection direction)
+    {
+        IOrderedEnumerable<LocalFileEntry> folderFirst = entries.OrderByDescending(entry => entry.IsDirectory);
+        bool ascending = direction == ListSortDirection.Ascending;
+
+        return column switch
+        {
+            SortColumnSize => ascending
+                ? folderFirst.ThenBy(entry => entry.Size).ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+                : folderFirst.ThenByDescending(entry => entry.Size).ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
+            SortColumnModified => ascending
+                ? folderFirst.ThenBy(entry => entry.LastModified).ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+                : folderFirst.ThenByDescending(entry => entry.LastModified).ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
+            _ => ascending
+                ? folderFirst.ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+                : folderFirst.ThenByDescending(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
+        };
+    }
+
     private void ApplyFilter()
     {
         var filter = FilterText.Trim();
-
-        Files.Clear();
 
         var source = string.IsNullOrEmpty(filter)
             ? _allFiles
             : _allFiles.Where(entry => entry.Name.Contains(filter, StringComparison.OrdinalIgnoreCase));
 
-        foreach (var entry in source)
-        {
-            Files.Add(entry);
-        }
+        Files.ReplaceAll(OrderEntries(source, SortColumn, SortDirection).ToList());
 
         ShowEmptyFolder = Files.Count == 0;
         EmptyFolderText = ShowEmptyFolder ? L10n("FileBrowserEmptyFolder") : string.Empty;
@@ -863,6 +928,7 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
 
     private void UpdateStatusText()
     {
+        IsErrorStatus = false;
         StatusText = _localizer?.FormatCount(Files.Count, "FileBrowserStatusItemsOne", "FileBrowserStatusItems", Files.Count)
             ?? string.Format(L10n("FileBrowserStatusItems"), Files.Count);
     }

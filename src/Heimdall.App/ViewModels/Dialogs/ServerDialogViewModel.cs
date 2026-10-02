@@ -65,6 +65,7 @@ public enum SessionLoggingOverrideSelection
 public partial class ServerDialogViewModel : ObservableValidator
 {
     private const int AgentIdentityProbeTimeoutMs = 750;
+    private const int ReachabilityProbeTimeoutMs = 5000;
     private const int DefaultRdpFixedWidth = 1920;
     private const int DefaultRdpFixedHeight = 1080;
     private LocalizationManager? _localizer;
@@ -105,6 +106,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             OnPropertyChanged(nameof(GatewayToServerLabel));
             OnPropertyChanged(nameof(WinRmUseSslHelpText));
             OnPropertyChanged(nameof(CanSkipWinRmCertificate));
+            RaiseWinRmHintsChanged();
             OnPropertyChanged(nameof(RdpResizeEnableDelayPlaceholder));
             RefreshAvailableMonitors();
             RefreshAgentChipIfNeeded();
@@ -528,6 +530,12 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
         _ = value;
         OnPropertyChanged(nameof(IsWinRmCredentialIdentity));
+        OnPropertyChanged(nameof(WinRmTrustedHostsHint));
+        if (WinRmPasswordError is not null)
+        {
+            WinRmPasswordError = GetWinRmPasswordError();
+        }
+
         RefreshWinRmUsernameErrorIfShown(WinRmUsername);
     }
 
@@ -586,15 +594,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         }
 
         OnPropertyChanged(nameof(CanSkipWinRmCertificate));
+        RaiseWinRmHintsChanged();
         RaisePortDerivedStateChanged();
-    }
-
-    private void CoerceWinRmSslForGateway()
-    {
-        if (IsWinRmConnection && UsesGateway && WinRmUseSsl)
-        {
-            WinRmUseSsl = false;
-        }
     }
 
     /// <summary>
@@ -636,7 +637,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             RdpConnectivityTestResult result = await tester.TestAsync(
                     RemoteServer,
                     EndpointPort,
-                    TimeSpan.FromSeconds(5),
+                    TimeSpan.FromMilliseconds(ReachabilityProbeTimeoutMs),
                     ct)
                 .ConfigureAwait(true);
 
@@ -648,7 +649,7 @@ public partial class ServerDialogViewModel : ObservableValidator
                 SshConnectionProbe.ProbeResult probe = await SshConnectionProbe.ProbeAsync(
                         RemoteServer,
                         EndpointPort,
-                        timeoutMs: 5000,
+                        timeoutMs: ReachabilityProbeTimeoutMs,
                         ct)
                     .ConfigureAwait(true);
 
@@ -1299,6 +1300,11 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(CanUseWinRmSsl),
         nameof(CanSkipWinRmCertificate),
         nameof(WinRmUseSslHelpText),
+        nameof(WinRmSslDisabledByGateway),
+        nameof(IsWinRmCertificateCheckSkipped),
+        nameof(WinRmSkipCertificateHintText),
+        nameof(WinRmTrustedHostsHint),
+        nameof(WinRmPasswordError),
         nameof(SessionKindLabel),
         nameof(GatewayToServerLabel),
         nameof(SelectedPostConnectStep),
@@ -1502,7 +1508,9 @@ public partial class ServerDialogViewModel : ObservableValidator
     public bool CanSkipWinRmCertificate => IsWinRmConnection && WinRmUseSsl;
 
     public string WinRmUseSslHelpText => IsWinRmConnection && UsesGateway
-        ? L("ServerDialogWinRmUseSslGatewayHint")
+        ? L(_winRmSslSuppressedByGateway
+            ? "ServerDialogWinRmUseSslGatewayDisabledNotice"
+            : "ServerDialogWinRmUseSslGatewayHint")
         : L("ServerDialogWinRmUseSslHint");
 
     public bool IsSshFamilyConnection => IsSshConnection || IsSftpConnection;
@@ -1692,6 +1700,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         RemoteServerError = null;
         SshUsernameError = null;
         WinRmUsernameError = null;
+        WinRmPasswordError = null;
         EndpointPortError = null;
         LocalPortError = null;
         AudioModeError = null;
@@ -1709,13 +1718,14 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     private void RefreshValidationSummary()
     {
-        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? EndpointPortError
+        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? WinRmPasswordError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
             ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
             + (WinRmUsernameError is not null ? 1 : 0)
+            + (WinRmPasswordError is not null ? 1 : 0)
             + (EndpointPortError is not null ? 1 : 0);
         NetworkTabErrorCount = (LocalPortError is not null ? 1 : 0)
             + (RdpGatewayError is not null ? 1 : 0);
@@ -1771,6 +1781,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             ? L("ValidationInlineSshUserRequired")
             : null;
         WinRmUsernameError = GetWinRmUsernameError(WinRmUsername);
+        WinRmPasswordError = GetWinRmPasswordError();
         EndpointPortError = RequiresNetworkEndpoint ? GetEndpointPortError() : null;
         LocalPortError = UsesGateway ? GetLocalizedFieldError(nameof(LocalPort)) : null;
 
@@ -1801,6 +1812,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
             + (WinRmUsernameError is not null ? 1 : 0)
+            + (WinRmPasswordError is not null ? 1 : 0)
             + (EndpointPortError is not null ? 1 : 0);
         NetworkTabErrorCount = (LocalPortError is not null ? 1 : 0)
             + (RdpGatewayError is not null ? 1 : 0);
@@ -1818,6 +1830,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             : RemoteServerError is not null ? nameof(RemoteServer)
             : SshUsernameError is not null ? nameof(SshUsername)
             : WinRmUsernameError is not null ? nameof(WinRmUsername)
+            : WinRmPasswordError is not null ? nameof(WinRmPassword)
             : EndpointPortError is not null ? "EndpointPort"
             : LocalPortError is not null ? nameof(LocalPort)
             : RdpGatewayError is not null ? nameof(RdpGateway)
@@ -1829,7 +1842,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             : null;
 
         // Aggregate summary
-        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? EndpointPortError
+        ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? WinRmPasswordError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
             ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
     }
@@ -2731,6 +2744,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         OnPropertyChanged(nameof(CanUseWinRmSsl));
         OnPropertyChanged(nameof(CanSkipWinRmCertificate));
         OnPropertyChanged(nameof(WinRmUseSslHelpText));
+        RaiseWinRmHintsChanged();
         OnPropertyChanged(nameof(IsLocalConnection));
         OnPropertyChanged(nameof(IsSshFamilyConnection));
         OnPropertyChanged(nameof(RequiresSshUsername));

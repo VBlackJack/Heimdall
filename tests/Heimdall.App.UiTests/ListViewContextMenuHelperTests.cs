@@ -42,6 +42,73 @@ public sealed class ListViewContextMenuHelperTests
     }
 
     [Fact]
+    public async Task SelectForContextMenu_NoRow_EmptiesTheSelectionSoTheMenuIsAboutTheFolder()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(() =>
+        {
+            ListView listView = new() { SelectionMode = SelectionMode.Extended, ItemsSource = new[] { "a", "b", "c" } };
+            listView.SelectedItems.Add("a");
+            listView.SelectedItems.Add("c");
+
+            ListViewContextMenuHelper.SelectForContextMenu(listView, null);
+
+            Assert.Empty(listView.SelectedItems);
+        }).Task;
+    }
+
+    [Fact]
+    public async Task IsListBody_AHeaderIsNotTheBody_ButTheListItselfIs()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(() =>
+        {
+            ListView listView = new()
+            {
+                ItemsSource = new[] { "a" },
+                Width = 300,
+                Height = 300,
+                View = new GridView { Columns = { new GridViewColumn { Header = "Name", Width = 100 } } },
+            };
+            System.Windows.Window window = new() { Content = listView, Width = 320, Height = 340, ShowActivated = false };
+            window.Show();
+            try
+            {
+                listView.UpdateLayout();
+                GridViewColumnHeader? header = FindDescendant<GridViewColumnHeader>(listView);
+
+                Assert.NotNull(header);
+                Assert.False(ListViewContextMenuHelper.IsListBody(header!));
+                Assert.True(ListViewContextMenuHelper.IsListBody(listView));
+            }
+            finally
+            {
+                window.Close();
+            }
+        }).Task;
+    }
+
+    private static T? FindDescendant<T>(System.Windows.DependencyObject root)
+        where T : System.Windows.DependencyObject
+    {
+        int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int index = 0; index < count; index++)
+        {
+            System.Windows.DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            T? nested = FindDescendant<T>(child);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    [Fact]
     public async Task SelectForContextMenu_RowAlreadySelected_KeepsTheMultiSelection()
     {
         await WpfTestHost.Dispatcher.InvokeAsync(() =>

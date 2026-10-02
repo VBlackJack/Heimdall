@@ -80,7 +80,7 @@ public sealed class EmbeddedSftpDownloadConflictTests
 
         Assert.Equal(1, presenter.CallCount);
         Assert.Empty(browser.DownloadCalls);
-        Assert.Equal("Transfer cancelled", viewModel.StatusText);
+        Assert.Equal("SftpStatusTransferCancelled", viewModel.StatusText);
     }
 
     [Fact]

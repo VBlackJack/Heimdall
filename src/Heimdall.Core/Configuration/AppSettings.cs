@@ -200,10 +200,13 @@ public sealed class AppSettings
     public bool RequireCredentialGuard { get; set; }
 
     // Terminal appearance
-    public string TerminalFontFamily { get; set; } = "Consolas";
+    public const string DefaultTerminalFontFamily = "Consolas";
+    public const int DefaultTerminalFontSize = 14;
+    public const string DefaultTerminalColorScheme = "Dracula";
+    public string TerminalFontFamily { get; set; } = DefaultTerminalFontFamily;
     [SettingRange(8, 72)]
-    public int TerminalFontSize { get; set; } = 14;
-    public string TerminalColorScheme { get; set; } = "Dracula";
+    public int TerminalFontSize { get; set; } = DefaultTerminalFontSize;
+    public string TerminalColorScheme { get; set; } = DefaultTerminalColorScheme;
     public string PowerShellExecutionPolicy { get; set; } = "Default";
 
     // SSH defaults
@@ -216,15 +219,21 @@ public sealed class AppSettings
     public const int DefaultSshTmoutResetIntervalSeconds = 240;
     [SettingRange(0, 3600)]
     public int SshTmoutResetIntervalSeconds { get; set; } = DefaultSshTmoutResetIntervalSeconds;
+    public const int DefaultSshAutoReconnectAttempts = 3;
+    public const int MinSshAutoReconnectAttempts = 1;
+    public const int MaxSshAutoReconnectAttempts = 10;
+    public const int DefaultSshAutoReconnectFirstDelaySeconds = 2;
+    public const int DefaultSshAutoReconnectSecondDelaySeconds = 5;
+    public const int DefaultSshAutoReconnectSubsequentDelaySeconds = 15;
     public bool SshAutoReconnect { get; set; }
-    [SettingRange(1, 10)]
-    public int SshAutoReconnectAttempts { get; set; } = 3;
+    [SettingRange(MinSshAutoReconnectAttempts, MaxSshAutoReconnectAttempts)]
+    public int SshAutoReconnectAttempts { get; set; } = DefaultSshAutoReconnectAttempts;
     [SettingRange(1, 600)]
-    public int SshAutoReconnectFirstDelaySeconds { get; set; } = 2;
+    public int SshAutoReconnectFirstDelaySeconds { get; set; } = DefaultSshAutoReconnectFirstDelaySeconds;
     [SettingRange(1, 600)]
-    public int SshAutoReconnectSecondDelaySeconds { get; set; } = 5;
+    public int SshAutoReconnectSecondDelaySeconds { get; set; } = DefaultSshAutoReconnectSecondDelaySeconds;
     [SettingRange(1, 600)]
-    public int SshAutoReconnectSubsequentDelaySeconds { get; set; } = 15;
+    public int SshAutoReconnectSubsequentDelaySeconds { get; set; } = DefaultSshAutoReconnectSubsequentDelaySeconds;
     [SettingRange(0, 600)]
     public int SshConnectTimeExitWindowSeconds { get; set; } = 15;
 

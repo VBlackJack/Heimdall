@@ -3,8 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:conv="clr-namespace:Heimdall.App.Converters"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
+             xmlns:local="clr-namespace:Heimdall.App.Views"
              mc:Ignorable="d"
              d:DesignHeight="540"
              d:DesignWidth="900"
@@ -15,9 +17,70 @@
              DragLeave="OnDragLeave"
              KeyDown="OnViewKeyDown">
     <UserControl.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="/Heimdall;component/Themes/FileBrowserStyles.xaml"/>
+        </ResourceDictionary.MergedDictionaries>
         <conv:FileSizeConverter x:Key="FileSizeConverter"/>
+        <conv:FileDateTimeConverter x:Key="FileDateTimeConverter"/>
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <conv:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
         <conv:RemoteEntryKindToDisplayNameConverter x:Key="RemoteEntryKindToDisplayNameConverter"/>
+
+        <!-- Layout tokens. Named once here so no size is a bare number in the markup below. -->
+        <sys:Double x:Key="SftpFilterBoxWidth">160</sys:Double>
+        <sys:Double x:Key="SftpFilterClearSize">24</sys:Double>
+        <sys:Double x:Key="SftpHeaderTitleMaxWidth">300</sys:Double>
+        <sys:Double x:Key="SftpHeaderEndpointMaxWidth">250</sys:Double>
+        <sys:Double x:Key="SftpSecurityBadgeMaxWidth">240</sys:Double>
+        <!-- WCAG 2.5.8 sets the floor of a pointer target at 24 px; 28 keeps the toolbar compact. -->
+        <sys:Double x:Key="SftpToolbarButtonMinHeight">28</sys:Double>
+        <sys:Double x:Key="SftpColumnWidthName">320</sys:Double>
+        <sys:Double x:Key="SftpColumnWidthSize">80</sys:Double>
+        <sys:Double x:Key="SftpColumnWidthModified">140</sys:Double>
+        <sys:Double x:Key="SftpColumnWidthPermissions">80</sys:Double>
+        <sys:Double x:Key="SftpColumnWidthOwner">90</sys:Double>
+        <sys:Double x:Key="SftpHealthDotSize">8</sys:Double>
+        <sys:Double x:Key="SftpLoadingBarHeight">2</sys:Double>
+        <sys:Double x:Key="SftpTransferBarHeight">6</sys:Double>
+        <sys:Double x:Key="SftpEmptyStateMaxWidth">420</sys:Double>
+        <sys:Double x:Key="SftpJobListMaxHeight">120</sys:Double>
+        <sys:Double x:Key="SftpOverlayScrimOpacity">0.85</sys:Double>
+        <Thickness x:Key="SftpButtonPadding">8,2</Thickness>
+        <Thickness x:Key="SftpIconButtonPadding">6,2</Thickness>
+        <Thickness x:Key="SftpPanelPadding">8,4</Thickness>
+        <Thickness x:Key="SftpDropBadgePadding">16,8</Thickness>
+
+        <!-- A row of the remote list: the shared row look, plus what is specific to a remote entry. -->
+        <Style x:Key="SftpRowStyle" TargetType="ListViewItem" BasedOn="{StaticResource FileBrowserRowStyle}">
+            <Setter Property="AutomationProperties.Name">
+                <Setter.Value>
+                    <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                        <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySftpFileRow]"/>
+                        <Binding Path="Name"/>
+                        <Binding Path="Kind" Converter="{StaticResource RemoteEntryKindToDisplayNameConverter}"/>
+                    </MultiBinding>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ToolTip">
+                <Setter.Value>
+                    <ToolTip>
+                        <StackPanel>
+                            <TextBlock Text="{Binding FullPath}" FontWeight="SemiBold"/>
+                            <TextBlock>
+                                <Run Text="{loc:Translate SftpPropertiesType}"/>
+                                <Run Text=" "/>
+                                <Run Text="{Binding Kind, Converter={StaticResource RemoteEntryKindToDisplayNameConverter}}"/>
+                            </TextBlock>
+                            <TextBlock Text="{Binding Size, Converter={StaticResource FileSizeConverter}}"/>
+                            <TextBlock Text="{Binding LastModified, Converter={StaticResource FileDateTimeConverter}, ConverterParameter=long}"/>
+                            <TextBlock Text="{Binding Permissions}"/>
+                        </StackPanel>
+                    </ToolTip>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -45,7 +108,8 @@
                         ToolTip="{loc:Translate TooltipDisconnectSession}"
                         Click="OnDisconnectClick"
                         Style="{DynamicResource SecondaryButtonStyle}"
-                        Padding="8,2"
+                        Padding="{StaticResource SftpButtonPadding}"
+                        MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"
                         Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -56,7 +120,8 @@
                         ToolTip="{loc:Translate TooltipCloseSessionTab}"
                         Click="OnCloseTabClick"
                         Style="{DynamicResource SecondaryButtonStyle}"
-                        Padding="8,2"
+                        Padding="{StaticResource SftpButtonPadding}"
+                        MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"
                         Visibility="{Binding IsDisconnected, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -67,7 +132,8 @@
                         ToolTip="{loc:Translate TooltipReconnectSession}"
                         Click="OnReconnectClick"
                         Style="{DynamicResource PrimaryButtonStyle}"
-                        Padding="8,2"
+                        Padding="{StaticResource SftpButtonPadding}"
+                        MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"
                         Visibility="{Binding IsDisconnected, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -77,7 +143,8 @@
                         Content="{loc:Translate BtnEditProfileOverlay}"
                         Click="OnEditProfileClick"
                         Style="{DynamicResource SecondaryButtonStyle}"
-                        Padding="8,2"
+                        Padding="{StaticResource SftpButtonPadding}"
+                        MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
                         Margin="8,0,0,0"
                         Visibility="{Binding IsDisconnected, Converter={StaticResource BoolToVisibilityConverter}}"
                         AutomationProperties.Name="{loc:Translate A11yEditProfileOverlay}"/>
@@ -88,7 +155,7 @@
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding RequestSplitCommand}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
+                        Padding="{StaticResource SftpIconButtonPadding}" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
                         AutomationProperties.Name="{loc:Translate A11ySplitSession}"/>
 
                 <Border x:Name="SecurityNoticeBadge"
@@ -114,7 +181,7 @@
                                    Foreground="{DynamicResource WarningTextBrush}"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
-                                   MaxWidth="240"/>
+                                   MaxWidth="{StaticResource SftpSecurityBadgeMaxWidth}"/>
                     </StackPanel>
                 </Border>
 
@@ -125,31 +192,14 @@
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
-                               MaxWidth="300"/>
+                               MaxWidth="{StaticResource SftpHeaderTitleMaxWidth}"/>
                     <TextBlock x:Name="EndpointTextBlock"
                                Margin="8,0,0,0"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
-                               MaxWidth="250"/>
-                    <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
-                               FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="StatusTextBlock"
-                               Text="{Binding StatusText}"
-                               FontSize="{StaticResource FontSizeCaption}"
-                               VerticalAlignment="Center">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsErrorHighlighted}" Value="True">
-                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                               MaxWidth="{StaticResource SftpHeaderEndpointMaxWidth}"/>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -157,7 +207,7 @@
         <!-- Row 1: Toolbar -->
         <Border x:Name="ToolbarBar"
                 Grid.Row="1"
-                Padding="8,4"
+                Padding="{StaticResource SftpPanelPadding}"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,0,1"
@@ -165,15 +215,31 @@
             <DockPanel LastChildFill="True">
                 <!-- Right side: filter + hidden toggle -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <TextBox x:Name="FilterTextBox"
-                             Width="160"
-                             Style="{DynamicResource SearchTextBoxStyle}"
-                             Tag="{loc:Translate SftpFilterPlaceholder}"
-                             FontSize="{StaticResource FontSizeCaption}"
-                             VerticalContentAlignment="Center"
-                             Margin="8,0,0,0"
-                             Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                             AutomationProperties.Name="{loc:Translate A11yTxtSearchFiles}"/>
+                    <Grid Width="{StaticResource SftpFilterBoxWidth}" Margin="8,0,0,0">
+                        <TextBox x:Name="FilterTextBox"
+                                 Style="{DynamicResource SearchTextBoxStyle}"
+                                 Tag="{loc:Translate SftpFilterPlaceholder}"
+                                 FontSize="{StaticResource FontSizeCaption}"
+                                 VerticalContentAlignment="Center"
+                                 Padding="6,2,28,2"
+                                 KeyDown="OnFilterKeyDown"
+                                 Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay={x:Static local:SftpViewMetrics.FilterInputDelayMilliseconds}}"
+                                 AutomationProperties.Name="{loc:Translate A11yTxtSearchFiles}"/>
+                        <Button x:Name="FilterClearButton"
+                                Content="&#xE711;"
+                                FontFamily="Segoe MDL2 Assets"
+                                FontSize="{StaticResource FontSizeSmallCaption}"
+                                Style="{DynamicResource GhostButtonStyle}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                MinWidth="{StaticResource SftpFilterClearSize}"
+                                MinHeight="{StaticResource SftpFilterClearSize}"
+                                Padding="0"
+                                Command="{Binding ClearFilterCommand}"
+                                ToolTip="{loc:Translate SftpEmptyClearFilter}"
+                                AutomationProperties.Name="{loc:Translate SftpEmptyClearFilter}"
+                                Visibility="{Binding Text, ElementName=FilterTextBox, Converter={StaticResource NullToVisibilityConverter}}"/>
+                    </Grid>
                     <CheckBox x:Name="ToggleHiddenCheckBox"
                               Content="{loc:Translate SftpToggleHiddenLabel}"
                               VerticalAlignment="Center"
@@ -194,7 +260,7 @@
                             FontFamily="Segoe MDL2 Assets"
                             Command="{Binding NavigateBackCommand}"
                             Style="{DynamicResource GhostButtonStyle}"
-                            Padding="8,2" FontSize="{StaticResource FontSizeBody}"
+                            Padding="{StaticResource SftpButtonPadding}" FontSize="{StaticResource FontSizeBody}"
                             IsEnabled="{Binding CanNavigateBack}"
                             AutomationProperties.Name="{loc:Translate A11yNavigateBack}"/>
                     <Button x:Name="BtnUp"
@@ -203,7 +269,7 @@
                             FontFamily="Segoe MDL2 Assets"
                             Command="{Binding NavigateUpCommand}"
                             Style="{DynamicResource GhostButtonStyle}"
-                            Padding="8,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
+                            Padding="{StaticResource SftpButtonPadding}" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate A11yNavigateUp}"/>
                     <Button x:Name="BtnHome"
@@ -212,7 +278,7 @@
                             FontFamily="Segoe MDL2 Assets"
                             Command="{Binding NavigateHomeCommand}"
                             Style="{DynamicResource GhostButtonStyle}"
-                            Padding="8,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
+                            Padding="{StaticResource SftpButtonPadding}" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate A11yNavigateHome}"/>
                     <Button x:Name="BtnRefresh"
@@ -221,7 +287,7 @@
                             FontFamily="Segoe MDL2 Assets"
                             Command="{Binding RefreshCommand}"
                             Style="{DynamicResource GhostButtonStyle}"
-                            Padding="8,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
+                            Padding="{StaticResource SftpButtonPadding}" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate A11yRefreshDirectory}"/>
 
@@ -232,7 +298,9 @@
                             Click="OnUploadClick"
                             ToolTip="{loc:Translate TooltipUploadFiles}"
                             Style="{DynamicResource SecondaryButtonStyle}"
-                            Padding="8,2" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,4,0"
+                            Padding="{StaticResource SftpButtonPadding}"
+                            MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
+                            FontSize="{StaticResource FontSizeCaption}" Margin="0,0,4,0"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate A11yUploadFiles}">
                         <StackPanel Orientation="Horizontal">
@@ -241,11 +309,28 @@
                             <TextBlock x:Name="BtnUploadText" Text="{loc:Translate SftpBtnUpload}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
                     </Button>
+                    <Button x:Name="BtnDownload"
+                            Click="OnDownloadClick"
+                            ToolTip="{loc:Translate TooltipDownloadFiles}"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Padding="{StaticResource SftpButtonPadding}"
+                            MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
+                            FontSize="{StaticResource FontSizeCaption}" Margin="0,0,4,0"
+                            IsEnabled="{Binding CanDownloadSelected}"
+                            AutomationProperties.Name="{loc:Translate A11yDownloadFiles}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                                       VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <TextBlock x:Name="BtnDownloadText" Text="{loc:Translate SftpBtnDownload}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Button>
                     <Button x:Name="BtnNewFolder"
                             Command="{Binding CreateFolderCommand}"
                             ToolTip="{loc:Translate TooltipCreateFolder}"
                             Style="{DynamicResource SecondaryButtonStyle}"
-                            Padding="8,2" FontSize="{StaticResource FontSizeCaption}"
+                            Padding="{StaticResource SftpButtonPadding}"
+                            MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
+                            FontSize="{StaticResource FontSizeCaption}"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate A11yCreateFolder}">
                         <StackPanel Orientation="Horizontal">
@@ -264,6 +349,7 @@
                                   IsChecked="{Binding SudoMode, Mode=OneWay}"
                                   ToolTip="{loc:Translate SftpSudoModeTooltip}"
                                   Style="{DynamicResource ToolbarToggleButtonStyle}"
+                                  MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
                                   FontSize="{StaticResource FontSizeCaption}"
                                   AutomationProperties.Name="{loc:Translate SftpSudoModeTooltip}">
                         <StackPanel Orientation="Horizontal">
@@ -290,6 +376,7 @@
                                   Unchecked="OnFollowSshDirectoryToggled"
                                   ToolTip="{loc:Translate SftpFollowSshDirectoryTooltip}"
                                   Style="{DynamicResource ToolbarToggleButtonStyle}"
+                                  MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
                                   FontSize="{StaticResource FontSizeCaption}"
                                   IsEnabled="{Binding IsToolbarEnabled}"
                                   AutomationProperties.Name="{loc:Translate SftpFollowSshDirectoryTooltip}">
@@ -311,13 +398,12 @@
                             ToolTip="{loc:Translate SftpBtnBookmark}"
                             FontFamily="Segoe MDL2 Assets"
                             Style="{DynamicResource GhostButtonStyle}"
-                            Padding="8,2" FontSize="{StaticResource FontSizeBody}"
+                            Padding="{StaticResource SftpButtonPadding}" FontSize="{StaticResource FontSizeBody}"
                             Click="OnToolbarMenuButtonClick"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate SftpBtnBookmark}">
                         <Button.ContextMenu>
                             <ContextMenu x:Name="BookmarkContextMenu"
-                                         FontFamily="Segoe UI"
                                          DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                                 <MenuItem x:Name="MnuBookmarkAdd"
                                           Header="{loc:Translate SftpBtnBookmark}"
@@ -338,17 +424,21 @@
                             ToolTip="{loc:Translate SftpBtnMoreActions}"
                             FontFamily="Segoe MDL2 Assets"
                             Style="{DynamicResource GhostButtonStyle}"
-                            Padding="8,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
+                            Padding="{StaticResource SftpButtonPadding}" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,0"
                             Visibility="Collapsed"
                             Click="OnToolbarMenuButtonClick"
                             IsEnabled="{Binding IsToolbarEnabled}"
                             AutomationProperties.Name="{loc:Translate SftpBtnMoreActions}">
                         <Button.ContextMenu>
                             <ContextMenu x:Name="OverflowContextMenu"
-                                         FontFamily="Segoe UI"
                                          DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                                 <MenuItem Header="{loc:Translate SftpBtnUpload}"
                                           Click="OnUploadClick"
+                                          AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
+                                </MenuItem>
+                                <MenuItem Header="{loc:Translate SftpBtnDownload}"
+                                          Click="OnDownloadClick"
+                                          IsEnabled="{Binding CanDownloadSelected}"
                                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                                 </MenuItem>
                                 <MenuItem Header="{loc:Translate SftpBtnNewFolder}"
@@ -373,7 +463,7 @@
 
         <!-- Row 2: Path bar -->
         <Border Grid.Row="2"
-                Padding="8,4"
+                Padding="{StaticResource SftpPanelPadding}"
                 Background="{DynamicResource BackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,0,1">
@@ -385,22 +475,82 @@
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding GoToPathCommand}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        Padding="8,2" FontSize="{StaticResource FontSizeBody}"
+                        Padding="{StaticResource SftpButtonPadding}" FontSize="{StaticResource FontSizeBody}"
                         Margin="4,0,0,0"
                         IsEnabled="{Binding IsToolbarEnabled}"
                         AutomationProperties.Name="{loc:Translate SftpBtnGoPath}"/>
-                <TextBox x:Name="PathTextBox"
-                         Style="{DynamicResource ThemedTextBoxStyle}"
-                         FontSize="{StaticResource FontSizeBody}"
-                         FontFamily="{StaticResource FontFamilyMonospace}"
-                         VerticalContentAlignment="Center"
-                         Text="{Binding PathBarText, UpdateSourceTrigger=PropertyChanged}"
-                         IsEnabled="{Binding IsToolbarEnabled}"
-                         AutomationProperties.Name="{loc:Translate A11yTxtPath}">
-                    <TextBox.InputBindings>
-                        <KeyBinding Key="Enter" Command="{Binding GoToPathCommand}"/>
-                    </TextBox.InputBindings>
-                </TextBox>
+                <!-- Enabled with the connection, not with the listing: a control that turns disabled
+                     loses the keyboard focus for good, and every Enter used to do exactly that. -->
+                <Grid>
+                    <TextBox x:Name="PathTextBox"
+                             Style="{DynamicResource ThemedTextBoxStyle}"
+                             FontSize="{StaticResource FontSizeBody}"
+                             FontFamily="{StaticResource FontFamilyMonospace}"
+                             VerticalContentAlignment="Center"
+                             Text="{Binding PathBarText, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding IsToolbarEnabled}"
+                             KeyDown="OnPathKeyDown"
+                             AutomationProperties.Name="{loc:Translate A11yTxtPath}"/>
+                    <!-- The breadcrumb covers the path box until the box takes the keyboard (F4, Alt+D, or a
+                         click on the empty part of the bar): each folder is a button that goes there. -->
+                    <Border x:Name="PathBreadcrumb"
+                            Background="{Binding Background, ElementName=PathTextBox}"
+                            BorderBrush="{Binding BorderBrush, ElementName=PathTextBox}"
+                            BorderThickness="{Binding BorderThickness, ElementName=PathTextBox}"
+                            CornerRadius="{StaticResource CornerRadiusMd}"
+                            MouseLeftButtonDown="OnPathBreadcrumbMouseDown">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsKeyboardFocusWithin, ElementName=PathTextBox}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <ScrollViewer x:Name="PathBreadcrumbScroll"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Disabled"
+                                      SizeChanged="OnPathBreadcrumbSizeChanged">
+                            <ItemsControl ItemsSource="{Binding PathSegments}"
+                                          AutomationProperties.Name="{loc:Translate A11yBreadcrumb}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="Chevron"
+                                                       Text="&#xE76C;"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <Button Content="{Binding Name}"
+                                                    Click="OnPathSegmentClick"
+                                                    Style="{DynamicResource GhostButtonStyle}"
+                                                    FontFamily="{StaticResource FontFamilyMonospace}"
+                                                    FontSize="{StaticResource FontSizeBody}"
+                                                    MinWidth="0"
+                                                    MinHeight="{StaticResource SftpFilterClearSize}"
+                                                    Padding="{StaticResource SftpIconButtonPadding}"
+                                                    ToolTip="{Binding FullPath}"
+                                                    AutomationProperties.Name="{Binding FullPath}"/>
+                                        </StackPanel>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding FullPath}" Value="/">
+                                                <Setter TargetName="Chevron" Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
             </DockPanel>
         </Border>
 
@@ -412,19 +562,27 @@
                   Foreground="{DynamicResource TextPrimaryBrush}"
                   BorderThickness="0"
                   ItemsSource="{Binding Files}"
+                  ItemContainerStyle="{StaticResource SftpRowStyle}"
                   SelectionMode="Extended"
                   AlternationCount="2"
+                  TextSearch.TextPath="Name"
+                  IsTextSearchEnabled="True"
                   MouseDoubleClick="OnFileDoubleClick"
                   PreviewMouseRightButtonDown="OnFileListPreviewMouseRightButtonDown"
+                  PreviewMouseLeftButtonDown="OnFileListPreviewMouseLeftButtonDown"
+                  PreviewMouseLeftButtonUp="OnFileListPreviewMouseLeftButtonUp"
+                  PreviewMouseMove="OnFileListPreviewMouseMove"
+                  ContextMenuOpening="OnFileContextMenuOpening"
                   SelectionChanged="OnSelectionChanged"
                   GridViewColumnHeader.Click="OnColumnHeaderClick"
                   SizeChanged="OnFileListSizeChanged"
                   AutomationProperties.Name="{loc:Translate A11yLstFiles}"
+                  AutomationProperties.ItemStatus="{Binding SortDescription}"
                   VirtualizingPanel.IsVirtualizing="True"
                   VirtualizingPanel.VirtualizationMode="Recycling">
             <ListView.View>
-                <GridView>
-                    <GridViewColumn x:Name="ColName" Width="320" Header="{loc:Translate SftpColName}">
+                <GridView AllowsColumnReorder="False">
+                    <GridViewColumn x:Name="ColName" local:SftpColumn.Key="Name" Width="{StaticResource SftpColumnWidthName}" Header="{loc:Translate SftpColName}">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
@@ -466,7 +624,7 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn x:Name="ColSize" Width="80" Header="{loc:Translate SftpColSize}">
+                    <GridViewColumn x:Name="ColSize" local:SftpColumn.Key="Size" Width="{StaticResource SftpColumnWidthSize}" Header="{loc:Translate SftpColSize}">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Size, Converter={StaticResource FileSizeConverter}, ConverterParameter=dir}"
@@ -474,66 +632,19 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn x:Name="ColDate" Width="140" Header="{loc:Translate SftpColModified}"
-                                    DisplayMemberBinding="{Binding LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"/>
-                    <GridViewColumn x:Name="ColPermissions" Width="80" Header="{loc:Translate SftpColPermissions}"
+                    <GridViewColumn x:Name="ColDate" local:SftpColumn.Key="Modified" Width="{StaticResource SftpColumnWidthModified}" Header="{loc:Translate SftpColModified}"
+                                    DisplayMemberBinding="{Binding LastModified, Converter={StaticResource FileDateTimeConverter}}"/>
+                    <GridViewColumn x:Name="ColPermissions" local:SftpColumn.Key="Permissions" Width="{StaticResource SftpColumnWidthPermissions}" Header="{loc:Translate SftpColPermissions}"
                                     DisplayMemberBinding="{Binding Permissions}"/>
-                    <GridViewColumn x:Name="ColOwner" Width="55" Header="{loc:Translate SftpColOwner}"
-                                    DisplayMemberBinding="{Binding Owner}"/>
+                    <GridViewColumn x:Name="ColOwner" local:SftpColumn.Key="Owner" Width="{StaticResource SftpColumnWidthOwner}" Header="{loc:Translate SftpColOwner}">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Owner}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Owner}"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
                 </GridView>
             </ListView.View>
-
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                    <Setter Property="Padding" Value="4,4"/>
-                    <Setter Property="MinHeight" Value="26"/>
-                    <Setter Property="BorderBrush" Value="Transparent"/>
-                    <Setter Property="BorderThickness" Value="1"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                    <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
-                    <Setter Property="ToolTip">
-                        <Setter.Value>
-                            <ToolTip>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding FullPath}" FontWeight="SemiBold"/>
-                                    <TextBlock>
-                                        <Run Text="{loc:Translate SftpPropertiesType}"/>
-                                        <Run Text=" "/>
-                                        <Run Text="{Binding Kind, Converter={StaticResource RemoteEntryKindToDisplayNameConverter}}"/>
-                                    </TextBlock>
-                                    <TextBlock Text="{Binding Size, Converter={StaticResource FileSizeConverter}}"/>
-                                    <TextBlock Text="{Binding LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"/>
-                                    <TextBlock Text="{Binding Permissions}"/>
-                                </StackPanel>
-                            </ToolTip>
-                        </Setter.Value>
-                    </Setter>
-                    <Style.Triggers>
-                        <!-- Hover: flat Dracula Current Line -->
-                        <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                                <Condition Property="IsMouseOver" Value="True"/>
-                                <Condition Property="IsSelected" Value="False"/>
-                            </MultiTrigger.Conditions>
-                            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                        </MultiTrigger>
-                        <!-- Selected: Current Line + left accent border (VS Code style) -->
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                            <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                        </Trigger>
-                        <!-- Keyboard focus: dotted border to distinguish from selected -->
-                        <Trigger Property="IsFocused" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                            <Setter Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
-                            <Setter Property="BorderThickness" Value="1,1,1,1"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </ListView.ItemContainerStyle>
 
             <ListView.ContextMenu>
                 <ContextMenu x:Name="FileContextMenu"
@@ -548,7 +659,7 @@
                     <MenuItem x:Name="CtxEditExternal" Header="{loc:Translate SftpCtxEditExternal}" Click="OnCtxEditExternalClick"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
-                    <MenuItem x:Name="CtxDownload" Header="{loc:Translate SftpBtnDownload}" Click="OnCtxDownloadClick"
+                    <MenuItem x:Name="CtxDownload" Header="{loc:Translate SftpBtnDownload}" Click="OnCtxDownloadClick" InputGestureText="Ctrl+Shift+D"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
                     <Separator/>
@@ -562,13 +673,13 @@
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
                     <Separator/>
-                    <MenuItem x:Name="CtxCut" Header="{loc:Translate SftpCtxCut}" Command="{Binding CutSelectedCommand}"
+                    <MenuItem x:Name="CtxCut" Header="{loc:Translate SftpCtxCut}" Command="{Binding CutSelectedCommand}" InputGestureText="Ctrl+X"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
-                    <MenuItem x:Name="CtxCopy" Header="{loc:Translate SftpCtxCopy}" Command="{Binding CopySelectedCommand}"
+                    <MenuItem x:Name="CtxCopy" Header="{loc:Translate SftpCtxCopy}" Command="{Binding CopySelectedCommand}" InputGestureText="Ctrl+C"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
-                    <MenuItem x:Name="CtxPaste" Header="{loc:Translate SftpCtxPaste}" Command="{Binding PasteCommand}"
+                    <MenuItem x:Name="CtxPaste" Header="{loc:Translate SftpCtxPaste}" Command="{Binding PasteCommand}" InputGestureText="Ctrl+V"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
                     <MenuItem x:Name="CtxPasteFromExplorer" Header="{loc:Translate SftpCtxPasteFromExplorer}" Click="OnCtxPasteFromExplorerClick"
@@ -578,14 +689,17 @@
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
                     <Separator/>
-                    <MenuItem x:Name="CtxCopyPath" Header="{loc:Translate SftpCopyPath}" Click="OnCtxCopyPathClick" InputGestureText="Ctrl+C"
+                    <MenuItem x:Name="CtxCopyPath" Header="{loc:Translate SftpCopyPath}" Click="OnCtxCopyPathClick" InputGestureText="Ctrl+Shift+C"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
                     <MenuItem x:Name="CtxProperties" Header="{loc:Translate SftpCtxProperties}" Command="{Binding ShowSelectedPropertiesCommand}"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
                     <Separator/>
-                    <MenuItem x:Name="CtxUploadHere" Header="{loc:Translate SftpCtxUploadHere}" Click="OnUploadClick"
+                    <MenuItem x:Name="CtxNewFolder" Header="{loc:Translate SftpBtnNewFolder}" Command="{Binding CreateFolderCommand}" InputGestureText="F7"
+                              AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
+                    </MenuItem>
+                    <MenuItem x:Name="CtxUploadHere" Header="{loc:Translate SftpCtxUploadHere}" Click="OnUploadClick" InputGestureText="Ctrl+Shift+U"
                               AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource Self}}">
                     </MenuItem>
                     <MenuItem x:Name="CtxOpenInTerminal" Header="{loc:Translate SftpCtxOpenInTerminal}" Command="{Binding OpenSelectedInTerminalCommand}"
@@ -599,7 +713,7 @@
         <ProgressBar x:Name="LoadingBar"
                      Grid.Row="3"
                      VerticalAlignment="Top"
-                     Height="2"
+                     Height="{StaticResource SftpLoadingBarHeight}"
                      IsIndeterminate="True"
                      Foreground="{DynamicResource AccentBrush}"
                      Background="Transparent"
@@ -607,16 +721,61 @@
                      IsHitTestVisible="False"
                      Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-        <!-- Row 3 overlay: Empty directory message -->
-        <TextBlock x:Name="EmptyDirectoryText"
-                   Grid.Row="3"
-                   Text="{loc:Translate SftpEmptyDirectory}"
-                   VerticalAlignment="Center"
-                   HorizontalAlignment="Center"
-                   FontSize="{StaticResource FontSizeBodyLarge}"
-                   Foreground="{DynamicResource TextSecondaryBrush}"
-                   IsHitTestVisible="False"
-                   Visibility="{Binding ShowEmptyDirectory, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        <!-- Row 3 overlay: why the list is empty (nothing here, a filter hides all, only hidden entries) -->
+        <StackPanel x:Name="EmptyStatePanel"
+                    Grid.Row="3"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    MaxWidth="{StaticResource SftpEmptyStateMaxWidth}"
+                    Visibility="{Binding ShowEmptyDirectory, Converter={StaticResource BoolToVisibilityConverter}}">
+            <TextBlock x:Name="EmptyDirectoryText"
+                       Text="{Binding EmptyStateText}"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       FontSize="{StaticResource FontSizeBodyLarge}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       AutomationProperties.LiveSetting="Polite"/>
+            <Button x:Name="EmptyStateActionButton"
+                    Content="{Binding EmptyStateActionText}"
+                    Command="{Binding RunEmptyStateActionCommand}"
+                    Style="{DynamicResource SecondaryButtonStyle}"
+                    MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
+                    HorizontalAlignment="Center"
+                    Margin="0,8,0,0"
+                    Visibility="{Binding HasEmptyStateAction, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        </StackPanel>
+
+        <!-- Row 3 overlay: the session is gone; the list below is the last one received -->
+        <Grid x:Name="DisconnectedOverlay"
+              Grid.Row="3"
+              Visibility="{Binding IsDisconnected, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Rectangle Fill="{DynamicResource BackgroundBrush}" Opacity="{StaticResource SftpOverlayScrimOpacity}"/>
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        MaxWidth="{StaticResource SftpEmptyStateMaxWidth}">
+                <TextBlock Text="{loc:Translate SftpStatusDisconnected}"
+                           HorizontalAlignment="Center"
+                           FontSize="{StaticResource FontSizeBodyLarge}"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource ErrorBrush}"/>
+                <TextBlock Text="{loc:Translate SftpDisconnectedOverlayMessage}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,0"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                <Button x:Name="OverlayReconnectButton"
+                        Content="{loc:Translate SftpBtnReconnect}"
+                        Click="OnReconnectClick"
+                        Style="{DynamicResource PrimaryButtonStyle}"
+                        MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
+                        HorizontalAlignment="Center"
+                        Margin="0,8,0,0"
+                        AutomationProperties.Name="{loc:Translate A11yReconnectSession}"/>
+            </StackPanel>
+        </Grid>
 
         <!-- Row 3 overlay: Drag-drop feedback -->
         <Border x:Name="DragOverlay"
@@ -627,49 +786,149 @@
                 CornerRadius="{StaticResource CornerRadiusSm}"
                 IsHitTestVisible="False"
                 Visibility="Collapsed">
-            <TextBlock x:Name="DragDropOverlayText"
-                       Text="{loc:Translate SftpDragDropOverlay}"
-                       FontSize="{StaticResource FontSizeLarge}" FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextPrimaryBrush}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="{StaticResource SftpDropBadgePadding}"
+                    Background="{DynamicResource SurfaceBrush}"
+                    CornerRadius="{StaticResource CornerRadiusSm}">
+                <TextBlock x:Name="DragDropOverlayText"
+                           Text="{loc:Translate SftpDragDropOverlay}"
+                           FontSize="{StaticResource FontSizeLarge}" FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+            </Border>
         </Border>
 
-        <!-- Row 4: Transfer progress bar -->
+        <!-- Row 4: Transfer progress and queue -->
         <Border x:Name="TransferPanel"
                 Grid.Row="4"
-                Padding="8,4"
+                Padding="{StaticResource SftpPanelPadding}"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,1,0,0"
-                Visibility="{Binding IsTransferInProgress, Converter={StaticResource BoolToVisibilityConverter}}">
-            <DockPanel>
-                <Button x:Name="BtnCancelTransfer"
-                        DockPanel.Dock="Right"
-                        Content="&#xE711;"
-                        ToolTip="{loc:Translate TooltipCancelTransfer}"
-                        FontFamily="Segoe MDL2 Assets"
-                        Command="{Binding CancelTransferCommand}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}"
-                        Margin="8,0,0,0"
-                        AutomationProperties.Name="{loc:Translate A11yCancelTransfer}"/>
-                <StackPanel>
-                    <TextBlock x:Name="TransferText"
-                               Text="{Binding TransferStatusText}"
-                               FontSize="{StaticResource FontSizeCaption}"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    <ProgressBar x:Name="TransferProgressBar"
-                                 Value="{Binding TransferProgressValue}"
-                                 Height="6" Margin="0,4,0,0"
-                                 Minimum="0" Maximum="100"
-                                  Foreground="{DynamicResource AccentBrush}"
-                                  Background="{DynamicResource HighlightBrush}"
-                                  AutomationProperties.Name="{loc:Translate A11yPrgTransfer}"/>
-                </StackPanel>
-            </DockPanel>
+                Visibility="{Binding ShowTransferPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel>
+                <DockPanel Visibility="{Binding IsTransferInProgress, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Button x:Name="BtnCancelTransfer"
+                            DockPanel.Dock="Right"
+                            Content="&#xE711;"
+                            ToolTip="{loc:Translate TooltipCancelTransfer}"
+                            FontFamily="Segoe MDL2 Assets"
+                            Command="{Binding CancelTransferCommand}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="{StaticResource SftpIconButtonPadding}" FontSize="{StaticResource FontSizeBody}"
+                            Margin="8,0,0,0"
+                            AutomationProperties.Name="{loc:Translate A11yCancelTransfer}"/>
+                    <StackPanel>
+                        <TextBlock x:Name="TransferText"
+                                   Text="{Binding TransferStatusText}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   AutomationProperties.LiveSetting="Polite"/>
+                        <ProgressBar x:Name="TransferProgressBar"
+                                     Value="{Binding TransferProgressValue}"
+                                     IsIndeterminate="{Binding IsTransferIndeterminate}"
+                                     Height="{StaticResource SftpTransferBarHeight}" Margin="0,4,0,0"
+                                     Minimum="0" Maximum="100"
+                                     Foreground="{DynamicResource AccentBrush}"
+                                     Background="{DynamicResource HighlightBrush}"
+                                     AutomationProperties.Name="{loc:Translate A11yPrgTransfer}"/>
+                    </StackPanel>
+                </DockPanel>
+                <!-- The queue: batches waiting, running, failed or cancelled. A finished batch leaves
+                     by itself; one that did not complete stays until it is retried or cleared. -->
+                <ScrollViewer x:Name="TransferJobScroll"
+                              MaxHeight="{StaticResource SftpJobListMaxHeight}"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding HasTransferJobs, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ItemsControl x:Name="TransferJobList"
+                                  ItemsSource="{Binding TransferJobs}"
+                                  AutomationProperties.Name="{loc:Translate SftpTransferQueueLabel}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,4,0,0"
+                                           AutomationProperties.Name="{Binding Title}">
+                                    <Button DockPanel.Dock="Right"
+                                            Content="&#xE711;"
+                                            FontFamily="Segoe MDL2 Assets"
+                                            Style="{DynamicResource GhostButtonStyle}"
+                                            MinWidth="{StaticResource SftpFilterClearSize}"
+                                            MinHeight="{StaticResource SftpFilterClearSize}"
+                                            Padding="{StaticResource SftpIconButtonPadding}"
+                                            ToolTip="{loc:Translate SftpTransferCancelJob}"
+                                            AutomationProperties.Name="{loc:Translate SftpTransferCancelJob}"
+                                            Command="{Binding DataContext.CancelJobCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Visibility="{Binding CanCancel, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <Button DockPanel.Dock="Right"
+                                            Content="&#xE72C;"
+                                            FontFamily="Segoe MDL2 Assets"
+                                            Style="{DynamicResource GhostButtonStyle}"
+                                            MinWidth="{StaticResource SftpFilterClearSize}"
+                                            MinHeight="{StaticResource SftpFilterClearSize}"
+                                            Padding="{StaticResource SftpIconButtonPadding}"
+                                            ToolTip="{loc:Translate SftpTransferRetry}"
+                                            AutomationProperties.Name="{loc:Translate SftpTransferRetry}"
+                                            Command="{Binding DataContext.RetryJobCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <TextBlock x:Name="JobGlyph"
+                                               Text="&#xE823;"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="{StaticResource FontSizeCaption}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,6,0"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="JobDetail"
+                                                   Text="{Binding Detail}"
+                                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </DockPanel>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Status}" Value="Running">
+                                        <Setter TargetName="JobGlyph" Property="Text" Value="&#xE895;"/>
+                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                        <Setter TargetName="JobGlyph" Property="Text" Value="&#xE783;"/>
+                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                        <Setter TargetName="JobDetail" Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="Cancelled">
+                                        <Setter TargetName="JobGlyph" Property="Text" Value="&#xE711;"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="Completed">
+                                        <Setter TargetName="JobGlyph" Property="Text" Value="&#xE73E;"/>
+                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <Button x:Name="BtnClearFinishedJobs"
+                        Content="{loc:Translate SftpTransferClearFinished}"
+                        Command="{Binding ClearFinishedJobsCommand}"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
+                        Padding="{StaticResource SftpButtonPadding}"
+                        FontSize="{StaticResource FontSizeCaption}"
+                        HorizontalAlignment="Left"
+                        Margin="0,4,0,0"
+                        Visibility="{Binding HasFinishedTransferJobs, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </StackPanel>
         </Border>
 
-        <!-- Row 5: Status bar -->
+        <!-- Row 5: Status bar. The one place the status is shown: an error gets an icon and its colour
+             here, and stays until the next status replaces it. -->
         <Border Grid.Row="5"
                 Padding="{StaticResource SessionHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
@@ -689,7 +948,7 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                 <!-- Connection health dot -->
                 <Ellipse x:Name="HealthDot"
-                         Width="8" Height="8"
+                         Width="{StaticResource SftpHealthDotSize}" Height="{StaticResource SftpHealthDotSize}"
                          Margin="0,0,6,0"
                          VerticalAlignment="Center">
                     <Ellipse.Style>
@@ -703,11 +962,32 @@
                         </Style>
                     </Ellipse.Style>
                 </Ellipse>
+                <TextBlock x:Name="StatusErrorIcon"
+                           Text="&#xE783;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource ErrorBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,4,0"
+                           Visibility="{Binding IsErrorStatus, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <TextBlock x:Name="StatusBarText"
                            Text="{Binding StatusText}"
+                           ToolTip="{Binding StatusText}"
                            FontSize="{StaticResource FontSizeCaption}"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           TextTrimming="CharacterEllipsis"/>
+                           TextTrimming="CharacterEllipsis"
+                           AutomationProperties.LiveSetting="Polite">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsErrorStatus}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                    <Setter Property="AutomationProperties.LiveSetting" Value="Assertive"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </DockPanel>
         </Border>
         </Grid>

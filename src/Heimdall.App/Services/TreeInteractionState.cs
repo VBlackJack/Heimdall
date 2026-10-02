@@ -221,6 +221,49 @@ public sealed class TreeInteractionState
     public TreeViewItem? LastDropHighlight { get; set; }
 
     /// <summary>
+    /// The folder carrying the tree cursor mark, or <see langword="null"/> once a session row
+    /// has taken keyboard focus.
+    /// </summary>
+    public FolderViewModel? CursorFolder { get; private set; }
+
+    /// <summary>
+    /// Moves the folder cursor mark to the row that has just taken keyboard focus in the tree.
+    /// </summary>
+    /// <remarks>
+    /// <c>OnTreeViewSelectedItemChanged</c> clears a folder's native selection, so the focus ring
+    /// was the only sign of the folder under the cursor and it disappeared as soon as focus left
+    /// the tree. A session row takes the mark away, since its own selection already shows where
+    /// the cursor is. Focus landing on the tree outside any row leaves the mark in place.
+    /// </remarks>
+    /// <param name="focusedNode">The data context of the row that took keyboard focus, or
+    /// <see langword="null"/> when focus is outside any row.</param>
+    public void MoveFolderCursor(object? focusedNode)
+    {
+        if (focusedNode is null)
+        {
+            return;
+        }
+
+        FolderViewModel? next = focusedNode as FolderViewModel;
+        if (ReferenceEquals(CursorFolder, next))
+        {
+            return;
+        }
+
+        if (CursorFolder is not null)
+        {
+            CursorFolder.IsTreeCursor = false;
+        }
+
+        if (next is not null)
+        {
+            next.IsTreeCursor = true;
+        }
+
+        CursorFolder = next;
+    }
+
+    /// <summary>
     /// True when the upcoming <see cref="ContextMenu"/> opening was triggered
     /// by a right-click (preview mouse down captured a target). False when the
     /// menu is opening for some other reason - e.g. a keyboard shortcut.

@@ -15,9 +15,11 @@
  */
 
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Utilities;
 using Heimdall.Sftp;
 
 namespace Heimdall.App.ViewModels.Dialogs;
@@ -39,12 +41,36 @@ public sealed record FileConflictResolutionOption(
     FileConflictResolutionChoice Value,
     string Label);
 
+/// <summary>What is known of one side of a collision.</summary>
+/// <param name="Size">The size in bytes.</param>
+/// <param name="ModifiedUtc">The modification time, in UTC.</param>
+public readonly record struct FileConflictSideInfo(long Size, DateTime ModifiedUtc);
+
+/// <summary>The incoming file set against the file it would replace.</summary>
+/// <param name="Incoming">The file being transferred.</param>
+/// <param name="Existing">The file already at the destination.</param>
+public sealed record FileConflictComparison(FileConflictSideInfo Incoming, FileConflictSideInfo Existing);
+
 /// <summary>ViewModel for resolving every collision in one pre-transfer batch.</summary>
 public sealed partial class FileConflictDialogViewModel : ObservableObject
 {
+    /// <summary>
+    /// How much newer the incoming file must be to count as newer. Remote servers round their
+    /// modification times (FTP listings to the minute, some file systems to two seconds), so a
+    /// smaller difference is rounding, not a newer file.
+    /// </summary>
+    internal static readonly TimeSpan NewerTolerance = TimeSpan.FromSeconds(2);
+
+    /// <param name="conflicts">The colliding items, each of which needs a decision.</param>
+    /// <param name="localizer">The localizer for the dialog text.</param>
+    /// <param name="compare">
+    /// Optional: the size and date of both sides of an item, when the caller knows them. With it the
+    /// rows say which file is newer, and the dialog offers to replace only what is newer.
+    /// </param>
     public FileConflictDialogViewModel(
         IReadOnlyList<FileConflictAnalysisItem> conflicts,
-        LocalizationManager? localizer)
+        LocalizationManager? localizer,
+        Func<FileConflictAnalysisItem, FileConflictComparison?>? compare = null)
     {
         ArgumentNullException.ThrowIfNull(conflicts);
         if (conflicts.Any(item => !item.HasConflict))
@@ -61,14 +87,13 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
                 "DialogFileConflictSummaryOne",
                 "DialogFileConflictSummary",
                 conflicts.Count)
-            ?? PluralRules.SelectEnglish(
-                conflicts.Count,
-                $"{conflicts.Count} conflicting destination",
-                $"{conflicts.Count} conflicting destinations");
+            ?? "DialogFileConflictSummary";
         ApplyToAllText = L("DialogFileConflictApplyAll");
         ApplyAllSkipText = L("DialogFileConflictActionSkip");
         ApplyAllReplaceText = L("DialogFileConflictActionReplace");
         ApplyAllAutoRenameText = L("DialogFileConflictActionAutoRename");
+        ApplyAllReplaceIfNewerText = L("DialogFileConflictActionReplaceIfNewer");
+        CancelHintText = L("DialogFileConflictCancelHint");
         TargetColumnHeader = L("DialogFileConflictColTarget");
         ActionColumnHeader = L("DialogFileConflictColAction");
         ApplyText = L("DialogFileConflictApply");
@@ -92,7 +117,10 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
             conflicts.Select(item => new FileConflictRowViewModel(
                 item,
                 ConflictOptions,
-                DirectorySkipDetailText)));
+                DirectorySkipDetailText,
+                compare?.Invoke(item),
+                localizer)));
+        HasComparison = Rows.Any(row => row.HasComparison);
     }
 
     public event Action<bool>? CloseRequested;
@@ -110,6 +138,14 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
     public string ApplyAllReplaceText { get; }
 
     public string ApplyAllAutoRenameText { get; }
+
+    public string ApplyAllReplaceIfNewerText { get; }
+
+    /// <summary>The line that says what Cancel does: it stops the whole batch, not one row.</summary>
+    public string CancelHintText { get; }
+
+    /// <summary>Whether the rows carry sizes and dates, so replacing only what is newer makes sense.</summary>
+    public bool HasComparison { get; }
 
     public string TargetColumnHeader { get; }
 
@@ -135,6 +171,30 @@ public sealed partial class FileConflictDialogViewModel : ObservableObject
 
     [RelayCommand]
     private void ApplyAllAutoRename() => ApplyResolutionToAll(FileConflictResolutionChoice.AutoRename);
+
+    /// <summary>
+    /// Replaces the destinations the incoming file is newer than and skips the rest. A row with no
+    /// dates to compare keeps the choice it had.
+    /// </summary>
+    [RelayCommand]
+    private void ApplyAllReplaceIfNewer()
+    {
+        foreach (FileConflictRowViewModel row in Rows)
+        {
+            if (!row.HasComparison)
+            {
+                continue;
+            }
+
+            FileConflictResolutionChoice choice = row.IsIncomingNewer
+                ? FileConflictResolutionChoice.Replace
+                : FileConflictResolutionChoice.Skip;
+            if (row.Allows(choice))
+            {
+                row.Resolution = choice;
+            }
+        }
+    }
 
     [RelayCommand]
     private void Apply()
@@ -174,7 +234,9 @@ public sealed partial class FileConflictRowViewModel : ObservableObject
     internal FileConflictRowViewModel(
         FileConflictAnalysisItem item,
         IReadOnlyList<FileConflictResolutionOption> allOptions,
-        string directorySkipDetailText)
+        string directorySkipDetailText,
+        FileConflictComparison? comparison = null,
+        LocalizationManager? localizer = null)
     {
         ItemIndex = item.Index;
         SourceIdentity = item.SourceIdentity;
@@ -197,7 +259,43 @@ public sealed partial class FileConflictRowViewModel : ObservableObject
             && item.AllowedActions == FileConflictResolutionActions.Skip
                 ? directorySkipDetailText
                 : string.Empty;
+
+        if (comparison is not null)
+        {
+            HasComparison = true;
+            IsIncomingNewer = comparison.Incoming.ModifiedUtc - comparison.Existing.ModifiedUtc
+                > FileConflictDialogViewModel.NewerTolerance;
+            string Key(string key) => localizer?[key] ?? key;
+            string Describe(string key, FileConflictSideInfo side)
+                => localizer?.Format(key, FileSize.Format(side.Size), FormatTime(side.ModifiedUtc)) ?? key;
+
+            IncomingSummary = Describe("DialogFileConflictIncomingInfo", comparison.Incoming);
+            ExistingSummary = Describe("DialogFileConflictExistingInfo", comparison.Existing);
+            ComparisonNote = IsIncomingNewer
+                ? Key("DialogFileConflictIncomingNewer")
+                : comparison.Existing.ModifiedUtc - comparison.Incoming.ModifiedUtc > FileConflictDialogViewModel.NewerTolerance
+                    ? Key("DialogFileConflictIncomingOlder")
+                    : Key("DialogFileConflictSameTime");
+        }
     }
+
+    /// <summary>Whether the sizes and dates of both sides are known.</summary>
+    public bool HasComparison { get; }
+
+    /// <summary>Whether the incoming file is newer than the one it would replace, beyond rounding.</summary>
+    public bool IsIncomingNewer { get; }
+
+    /// <summary>The incoming file's size and date, in words.</summary>
+    public string IncomingSummary { get; } = string.Empty;
+
+    /// <summary>The existing file's size and date, in words.</summary>
+    public string ExistingSummary { get; } = string.Empty;
+
+    /// <summary>Which of the two is newer, in words.</summary>
+    public string ComparisonNote { get; } = string.Empty;
+
+    private static string FormatTime(DateTime utc)
+        => utc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
 
     public int ItemIndex { get; }
 

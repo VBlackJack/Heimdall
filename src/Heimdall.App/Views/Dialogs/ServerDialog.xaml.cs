@@ -142,6 +142,14 @@ public partial class ServerDialog : Window
             && DataContext is ServerDialogViewModel vm)
         {
             vm.IsDirty = true;
+
+            // The password box is copied into the view model at Save only; an inline error
+            // raised by that Save has to go as soon as the user starts typing the missing value.
+            if (vm.WinRmPasswordError is not null
+                && ReferenceEquals(sender, WinRmPasswordBox))
+            {
+                vm.WinRmPassword = WinRmPasswordBox.Password;
+            }
         }
     }
 
@@ -270,6 +278,10 @@ public partial class ServerDialog : Window
             case nameof(ServerDialogViewModel.WinRmUsername):
                 MainTabControl.SelectedItem = DlgSrv_TabGeneral;
                 target = DlgSrv_WinRmUsernameBox;
+                break;
+            case nameof(ServerDialogViewModel.WinRmPassword):
+                MainTabControl.SelectedItem = DlgSrv_TabGeneral;
+                target = WinRmPasswordBox;
                 break;
             case "EndpointPort":
                 MainTabControl.SelectedItem = DlgSrv_TabGeneral;

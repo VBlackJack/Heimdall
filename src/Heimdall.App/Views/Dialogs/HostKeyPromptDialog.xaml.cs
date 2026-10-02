@@ -27,6 +27,10 @@ namespace Heimdall.App.Views.Dialogs;
 /// </summary>
 public partial class HostKeyPromptDialog : Window
 {
+    private const string CopyFingerprintKey = "HostKeyCopyFingerprintButton";
+    private const string PresentedFingerprintKey = "HostKeyPresentedFingerprintLabel";
+    private const string StoredFingerprintKey = "HostKeyStoredFingerprintLabel";
+
     private readonly LocalizationManager? _localizer;
     private HostKeyPromptDialogViewModel? _viewModel;
 
@@ -98,16 +102,16 @@ public partial class HostKeyPromptDialog : Window
             vm.AcceptButtonText);
         AutomationProperties.SetName(
             CopyFingerprintButton,
-            localizer?["HostKeyCopyFingerprintButton"] ?? "Copy");
+            localizer?[CopyFingerprintKey] ?? CopyFingerprintKey);
         AutomationProperties.SetName(
             PresentedFingerprintBox,
-            localizer?["HostKeyPresentedFingerprintLabel"] ?? "Presented fingerprint");
+            localizer?[PresentedFingerprintKey] ?? PresentedFingerprintKey);
 
         if (StoredFingerprintBox is not null)
         {
             AutomationProperties.SetName(
                 StoredFingerprintBox,
-                localizer?["HostKeyStoredFingerprintLabel"] ?? "Stored fingerprint");
+                localizer?[StoredFingerprintKey] ?? StoredFingerprintKey);
         }
     }
 

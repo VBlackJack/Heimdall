@@ -87,6 +87,22 @@
             border-color: #BD93F9;
         }
 
+        #search-input.no-match {
+            border-color: #FF5555;
+        }
+
+        #search-status {
+            color: #F8F8F2;
+            font-size: 11px;
+            min-width: 48px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        #search-status.no-match {
+            color: #FF8080;
+        }
+
         .search-btn {
             background: #44475A;
             color: #F8F8F2;
@@ -134,11 +150,12 @@
 </head>
 <body>
     <div id="loading">Initializing terminal&#x2026;</div>
-    <div id="search-bar">
-        <input id="search-input" type="text" placeholder="Search..." />
-        <button class="search-btn" id="search-prev">&#x25B2;</button>
-        <button class="search-btn" id="search-next">&#x25BC;</button>
-        <button class="search-btn" id="search-close">&#x2715;</button>
+    <div id="search-bar" role="search">
+        <input id="search-input" type="text" placeholder="Search..." aria-label="Search..." />
+        <span id="search-status" role="status" aria-live="polite"></span>
+        <button class="search-btn" id="search-prev" title="{{TERMINAL_SEARCH_PREVIOUS_LABEL}}" aria-label="{{TERMINAL_SEARCH_PREVIOUS_LABEL}}">&#x25B2;</button>
+        <button class="search-btn" id="search-next" title="{{TERMINAL_SEARCH_NEXT_LABEL}}" aria-label="{{TERMINAL_SEARCH_NEXT_LABEL}}">&#x25BC;</button>
+        <button class="search-btn" id="search-close" title="{{TERMINAL_SEARCH_CLOSE_LABEL}}" aria-label="{{TERMINAL_SEARCH_CLOSE_LABEL}}">&#x2715;</button>
     </div>
     <div id="terminal"></div>
     <script>
@@ -151,12 +168,29 @@
             var searchInput = document.getElementById('search-input');
             var term = null;
             var fitAddon = null;
-            var searchAddon = null;
             var ready = false;
             var pendingHostMessages = [];
             var pendingResizeHandle = 0;
             var baseFontSize = /*{{TERMINAL_FONT_SIZE}}*/;
+            var fontSizeMin = /*{{TERMINAL_FONT_MIN}}*/;
+            var fontSizeMax = /*{{TERMINAL_FONT_MAX}}*/;
             var currentFontSize = baseFontSize;
+            var resizeDebounceMilliseconds = 60;
+            var scrollbackLines = 10000;
+            var searchContextRows = 5;
+            var searchStatusElement = document.getElementById('search-status');
+            var searchNoResultsText = /*{{TERMINAL_SEARCH_NO_RESULTS_LITERAL}}*/;
+            var searchCountFormat = /*{{TERMINAL_SEARCH_COUNT_FORMAT_LITERAL}}*/;
+            var suppressSelectionCopy = false;
+            var sessionEndedMarked = 'marked';
+            var sessionEndedText = /*{{TERMINAL_SESSION_ENDED_LITERAL}}*/;
+            var sessionEndedColor = '\x1b[33m';
+            var searchMatches = [];
+            var searchMatchIndex = -1;
+            var searchSnapshotQuery = '';
+            var searchSnapshotLength = -1;
+            var urlPattern = /https?:\/\/[^\s<>"'`]+/g;
+            var urlTrailingPunctuation = /[.,;:!?)\]}]+$/;
 
             function postMessage(message) {
                 if (window.chrome && window.chrome.webview) {
@@ -214,12 +248,13 @@
                 if (!fitAddon || !term) {
                     return;
                 }
+                // The new size reaches the host through term.onResize; posting it here as
+                // well would send two messages for every change of size.
                 fitAddon.fit();
-                postMessage('resize:' + term.cols + ',' + term.rows);
             }
 
             function setFontSize(size) {
-                size = Math.max(8, Math.min(28, size));
+                size = Math.max(fontSizeMin, Math.min(fontSizeMax, size));
                 currentFontSize = size;
                 term.options.fontSize = size;
                 fitTerminal();
@@ -238,33 +273,161 @@
 
             function closeSearch() {
                 searchBar.classList.remove('visible');
-                if (searchAddon) {
-                    searchAddon.clearDecorations();
+                resetSearchState();
+                if (term) {
+                    term.clearSelection();
+                    term.focus();
                 }
-                term.focus();
+            }
+
+            function resetSearchState() {
+                searchMatches = [];
+                searchMatchIndex = -1;
+                searchSnapshotQuery = '';
+                searchSnapshotLength = -1;
+                setSearchStatus('', false);
+            }
+
+            function setSearchStatus(text, noMatch) {
+                searchStatusElement.textContent = text;
+                searchStatusElement.classList.toggle('no-match', noMatch);
+                searchInput.classList.toggle('no-match', noMatch);
+            }
+
+            // Collects every case-insensitive occurrence of the query in the whole buffer,
+            // wrapped lines included, so the same list serves next and previous.
+            function collectSearchMatches(query) {
+                var buffer = term.buffer.active;
+                var needle = query.toLowerCase();
+                var matches = [];
+                for (var row = 0; row < buffer.length; row++) {
+                    var line = buffer.getLine(row);
+                    if (!line) {
+                        continue;
+                    }
+                    var text = line.translateToString(true).toLowerCase();
+                    var column = text.indexOf(needle);
+                    while (column >= 0) {
+                        matches.push({ row: row, column: column, length: needle.length });
+                        column = text.indexOf(needle, column + needle.length);
+                    }
+                }
+                return matches;
             }
 
             function doSearch(direction) {
-                if (!term || !searchInput.value) return;
-                // Use the browser's built-in find for scrollback search
-                // xterm.js exposes buffer contents that we can search through
-                var query = searchInput.value.toLowerCase();
-                var buffer = term.buffer.active;
-                var found = false;
-                var startLine = direction === 'prev' ? buffer.viewportY - 1 : buffer.viewportY + 1;
-                var step = direction === 'prev' ? -1 : 1;
-                for (var i = startLine; i >= 0 && i < buffer.length; i += step) {
-                    var line = buffer.getLine(i);
-                    if (line && line.translateToString().toLowerCase().indexOf(query) >= 0) {
-                        term.scrollToLine(Math.max(0, i - 5));
-                        found = true;
-                        break;
+                if (!term || !searchInput.value) {
+                    resetSearchState();
+                    return;
+                }
+
+                var query = searchInput.value;
+                var bufferLength = term.buffer.active.length;
+                if (query !== searchSnapshotQuery || bufferLength !== searchSnapshotLength) {
+                    searchMatches = collectSearchMatches(query);
+                    searchSnapshotQuery = query;
+                    searchSnapshotLength = bufferLength;
+                    searchMatchIndex = -1;
+                }
+
+                if (searchMatches.length === 0) {
+                    term.clearSelection();
+                    setSearchStatus(searchNoResultsText, true);
+                    return;
+                }
+
+                // The first press lands on the first match at or after the viewport top
+                // (last one before it for 'prev'); later presses step and wrap around.
+                if (searchMatchIndex < 0) {
+                    var top = term.buffer.active.viewportY;
+                    var start = 0;
+                    if (direction === 'prev') {
+                        start = searchMatches.length - 1;
+                        for (var back = searchMatches.length - 1; back >= 0; back--) {
+                            if (searchMatches[back].row < top) {
+                                start = back;
+                                break;
+                            }
+                        }
                     }
+                    else {
+                        for (var forward = 0; forward < searchMatches.length; forward++) {
+                            if (searchMatches[forward].row >= top) {
+                                start = forward;
+                                break;
+                            }
+                        }
+                    }
+                    searchMatchIndex = start;
                 }
-                if (!found) {
-                    searchInput.style.borderColor = '#FF5555';
-                    setTimeout(function() { searchInput.style.borderColor = '#6272A4'; }, 1000);
+                else {
+                    var delta = direction === 'prev' ? -1 : 1;
+                    searchMatchIndex = (searchMatchIndex + delta + searchMatches.length) % searchMatches.length;
                 }
+
+                var match = searchMatches[searchMatchIndex];
+                suppressSelectionCopy = true;
+                term.select(match.column, match.row, match.length);
+                suppressSelectionCopy = false;
+                term.scrollToLine(Math.max(0, match.row - searchContextRows));
+                setSearchStatus(
+                    searchCountFormat
+                        .replace('{0}', String(searchMatchIndex + 1))
+                        .replace('{1}', String(searchMatches.length)),
+                    false);
+            }
+
+            // Plain URLs printed by git, curl, kubectl and the like. A Ctrl+click opens them
+            // through the host, which applies its own external URL policy.
+            function registerUrlLinkProvider() {
+                term.registerLinkProvider({
+                    provideLinks: function (lineNumber, callback) {
+                        var line = term.buffer.active.getLine(lineNumber - 1);
+                        if (!line) {
+                            callback(undefined);
+                            return;
+                        }
+                        var text = line.translateToString(true);
+                        var links = [];
+                        urlPattern.lastIndex = 0;
+                        var found;
+                        while ((found = urlPattern.exec(text)) !== null) {
+                            var uri = found[0].replace(urlTrailingPunctuation, '');
+                            if (!uri) {
+                                continue;
+                            }
+                            links.push({
+                                range: {
+                                    start: { x: found.index + 1, y: lineNumber },
+                                    end: { x: found.index + uri.length, y: lineNumber }
+                                },
+                                text: uri,
+                                activate: function (event, linkText) {
+                                    if (event.ctrlKey || event.metaKey) {
+                                        postMessage('open-url:' + linkText);
+                                    }
+                                }
+                            });
+                        }
+                        callback(links.length > 0 ? links : undefined);
+                    }
+                });
+            }
+
+            // Re-applies the localized texts after a language change; the page itself is built
+            // once, so the host sends the new labels instead of rebuilding it.
+            function applyLabels(labels) {
+                searchInput.placeholder = labels.placeholder;
+                searchInput.setAttribute('aria-label', labels.placeholder);
+                [['search-prev', labels.previous], ['search-next', labels.next], ['search-close', labels.close]]
+                    .forEach(function (pair) {
+                        var button = document.getElementById(pair[0]);
+                        button.title = pair[1];
+                        button.setAttribute('aria-label', pair[1]);
+                    });
+                searchNoResultsText = labels.noResults;
+                searchCountFormat = labels.countFormat;
+                sessionEndedText = labels.sessionEnded;
             }
 
             // ── Host message handling ────────────────────────────────
@@ -297,8 +460,17 @@
                 }
 
                 if (message.indexOf('session-ended:') === 0) {
-                    term.write('\r\n\x1b[90m' + /*{{TERMINAL_SESSION_ENDED_LITERAL}}*/ + '\x1b[0m\r\n');
+                    // The host writes its own marker, with the reason, when it has one; the
+                    // page adds the generic line only when the host has not.
+                    if (message.substring('session-ended:'.length) !== sessionEndedMarked) {
+                        term.write('\r\n' + sessionEndedColor + sessionEndedText + '\x1b[0m\r\n');
+                    }
                     term.options.disableStdin = true;
+                    return;
+                }
+
+                if (message.indexOf('set-labels:') === 0) {
+                    applyLabels(JSON.parse(message.substring('set-labels:'.length)));
                     return;
                 }
 
@@ -321,11 +493,11 @@
                 term = new Terminal({
                     allowProposedApi: true,
                     convertEol: /*{{TERMINAL_CONVERT_EOL}}*/,
-                    cursorBlink: true,
+                    cursorBlink: !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches),
                     cursorStyle: 'block',
                     fontFamily: '/*{{TERMINAL_FONT_FAMILY}}*/, "Courier New", monospace',
                     fontSize: baseFontSize,
-                    scrollback: 10000,
+                    scrollback: scrollbackLines,
                     linkHandler: {
                         activate: function (event, uri) {
                             postMessage('open-url:' + uri);
@@ -336,9 +508,6 @@
 
                 fitAddon = new FitAddon.FitAddon();
                 term.loadAddon(fitAddon);
-
-                // Search: use xterm.js built-in findNext/findPrevious if available
-                searchAddon = term;
 
                 try {
                     var webglAddon = new WebglAddon.WebglAddon();
@@ -376,6 +545,9 @@
 
                 // ── Selection auto-copy (via C# host for clipboard access) ──
                 term.onSelectionChange(function () {
+                    if (suppressSelectionCopy) {
+                        return;
+                    }
                     var selection = term.getSelection();
                     if (selection && selection.length > 0) {
                         postMessage('clipboard-write:' + stringToBase64(selection));
@@ -457,9 +629,8 @@
                     postMessage('clipboard-read:');
                 });
 
-                // ── URL detection (basic regex) ─────────────────────
-                // xterm.js 5.x has built-in link detection via registerLinkProvider
-                // but we also handle via the linkHandler in options above
+                // ── URL detection ───────────────────────────────────
+                registerUrlLinkProvider();
 
                 window.writeTerminal = function (base64data) {
                     if (!term || !base64data) {
@@ -479,7 +650,7 @@
                     }
                     pendingResizeHandle = window.setTimeout(function () {
                         fitTerminal();
-                    }, 60);
+                    }, resizeDebounceMilliseconds);
                 }).observe(terminalElement);
             }
 
