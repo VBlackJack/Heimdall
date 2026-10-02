@@ -18,6 +18,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -180,6 +181,36 @@ public sealed class UpdateRelaunchScriptExecutionTests
         Assert.True(
             status is "NotSigned" or "Valid",
             $"the stand-in would be refused by the script's own signature gate: {status}");
+    }
+
+    /// <summary>
+    /// The stand-in starts without a console, as the two executables it stands for do.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The application and the Inno Setup installer are both GUI-subsystem executables. A
+    /// console-subsystem stand-in is not: Windows must create a console for it before its first
+    /// line runs, because the script starts it with Start-Process and no -NoNewWindow. That
+    /// creation fails when many consoles are being created at once, and the process dies in its
+    /// loader with 0xc0000142 (STATUS_DLL_INIT_FAILED) and a modal "Application Popup" in the
+    /// System log, having recorded nothing.
+    /// </para>
+    /// <para>
+    /// Measured on 2026-10-02: four instances of this class run side by side failed in 3 of 5
+    /// rounds, 17 cases in all, under both hosts and across eight cases, with exactly one
+    /// popup per failed case. Three red full-solution runs that day carried one such popup
+    /// each. Pure CPU load and a concurrent rebuild did not reproduce it. With the stand-in
+    /// built as a GUI executable, and nothing else changed, the same experiment passed 5
+    /// rounds of 5 with no popup.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Fixture_StandInExecutable_NeedsNoConsole()
+    {
+        using FileStream image = File.OpenRead(StubPath());
+        PEHeaders headers = new(image);
+
+        Assert.Equal(Subsystem.WindowsGui, headers.PEHeader!.Subsystem);
     }
 
     [Theory]
