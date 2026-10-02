@@ -1378,6 +1378,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         RefreshAllDefaultMarkers();
         RefreshSecurityPosture();
+
+        // Worded from the localizer and otherwise raised only when their own state moves.
+        OnPropertyChanged(nameof(SkippedVersionText));
+        OnPropertyChanged(nameof(CredProvHelpText));
+        OnPropertyChanged(nameof(PinStatusText));
+        OnPropertyChanged(nameof(VaultStatusText));
+        OnPropertyChanged(nameof(AutoLockAvailabilityHint));
     }
 
     /// <summary>
