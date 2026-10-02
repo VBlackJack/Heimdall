@@ -85,6 +85,12 @@ public sealed partial class EmbeddedSftpViewModel
     /// <summary>The clock the batch progress reads; settable so a test can drive the rate and the estimate.</summary>
     internal TimeProvider ProgressClock { get; set; } = TimeProvider.System;
 
+    /// <summary>
+    /// Runs when the queue has been found empty and before the transfer slot is released; settable
+    /// so a test can hand in a batch at the exact moment the queue is winding down.
+    /// </summary>
+    internal Action? QueueDrainedProbe { get; set; }
+
     private void EnsureJobsObserver()
     {
         if (_jobsObserverAttached)
@@ -301,9 +307,11 @@ public sealed partial class EmbeddedSftpViewModel
                 SftpTransferJob? job;
                 lock (_jobsGate)
                 {
+                    // The pump stays the queue's owner until the slot is released below: a batch
+                    // handed in meanwhile must find it running, not take it for a foreign
+                    // operation holding the slot.
                     if (_jobQueue.Count == 0)
                     {
-                        _pumpRunning = false;
                         break;
                     }
 
@@ -324,15 +332,30 @@ public sealed partial class EmbeddedSftpViewModel
 
                 finished.Add(job);
             }
+
+            QueueDrainedProbe?.Invoke();
         }
         finally
         {
+            // Released while the pump still owns the queue, so the resume CompleteTransfer asks
+            // for starts nothing; then one decision under the gate: a batch handed in during the
+            // release runs on, anything else ends the pump.
+            CompleteTransfer(transferCts);
+            bool runOn;
             lock (_jobsGate)
             {
-                _pumpRunning = false;
+                runOn = !_disposed && _jobQueue.Count > 0;
+                if (!runOn)
+                {
+                    _pumpRunning = false;
+                }
             }
 
-            CompleteTransfer(transferCts);
+            if (runOn)
+            {
+                _ = PumpTransferQueueAsync();
+            }
+
             await RunOnUiAsync(() => RemoveCompletedJobs(finished));
             foreach (SftpTransferJob job in finished)
             {
