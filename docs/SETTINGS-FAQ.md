@@ -41,8 +41,9 @@ A card whose settings do not simply wait for Save says so under its title:
 - **Saved immediately, not by Save** (Application PIN, Master password, trusted host keys, trusted
   RDP certificates): these write on the spot, so Undo changes cannot take them back.
 
-The Git sync access token is also saved as soon as it is entered; the other Git sync fields wait
-for Save.
+The Git sync access token is written when you leave its field: clicking elsewhere, pressing
+Ctrl+S, switching to another tab or closing Heimdall all write it. It is not written on each
+keystroke, and Undo changes cannot take it back. The other Git sync fields wait for Save.
 
 **Two settings ask before they are turned on.** Enable TFTP sharing and Record session
 transcripts each ask for a confirmation when you press Save settings. Declining writes nothing

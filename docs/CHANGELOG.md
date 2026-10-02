@@ -14,6 +14,88 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased
 
+### SFTP and FTP: folder download, a transfer queue and progress for the whole batch
+
+- **A folder can be downloaded with everything it contains.** Download (toolbar, right-click menu,
+  Ctrl+Shift+D) now takes folders. Links are never followed, and links, pipes and devices are
+  left out and counted, as are names that cannot be saved safely in the destination folder. Entries can also be
+  dragged from the remote list into the local browser to download them.
+- **Transfers queue instead of being refused.** A batch started while another runs waits in a
+  transfer queue below the list, with its own cancel action. A batch that failed or was cancelled
+  stays listed with its reason and can be run again; the retry plans again from the original
+  request, and the conflict dialog then lets you skip what already arrived. A batch handed in at
+  the moment the queue empties is run, not reported as waiting behind another operation.
+- **The bar measures the whole batch.** It used to run from zero to a hundred percent once per
+  file. It now adds up the bytes of the whole batch, shows a smoothed rate and the time left, and
+  never steps back, even for a file that sends more than its listed size. While a download is
+  being planned, the bar runs indeterminate and says so.
+- **The conflict dialog compares the two copies.** Each collision shows the size and date of the
+  incoming and the existing file and which one is newer, a bulk action replaces only what is
+  newer, and a line explains that Cancel stops the whole batch.
+- **Moving by drag.** Entries dragged onto a folder row of the same server are moved there; a
+  name already in use gets a new name, and nothing is replaced.
+- **Clearer errors and states.** A failed batch says how many files had arrived, and a lost
+  connection is named as such; a navigation error names the path and the cause; an empty list says
+  why it is empty; a disconnected session shows an overlay; a deletion shows its progress and can
+  be cancelled; a binary file opened by double click offers a download instead of the editor.
+- **Lists that keep their place.** The list keeps its selection and scroll position across a
+  refresh, the path bar is a breadcrumb, bookmarks are kept per server, and columns sort. Keyboard
+  shortcuts act only while the focus is in the list, in the local browser as in the remote one,
+  where Backspace goes to the parent folder.
+
+### Sessions tree: type-ahead and a folder that stays marked
+
+- **Typing the first letters of a name moves to the next row that starts with them.** The same
+  letter typed again steps through those rows, and a one-second pause starts a new search. A space
+  typed after a pause reaches the tree instead of starting a search.
+- **The folder under the keyboard cursor stays marked** when the focus moves to a menu or the
+  filter box, with the hover fill rather than the selection accent.
+- **Easier to see and to aim.** The focus ring is 2 px wide, folder names use the same size as
+  their sessions, the status dot has a larger hover target, the drop hint sits above the tree
+  instead of covering the zone that takes an item out of its folder, and drag scrolling speeds up
+  toward the edge.
+
+### Settings: the Git token is written when its field is left
+
+- **The Git sync access token is no longer written on each keystroke.** It is written when its
+  field is left: by clicking elsewhere, pressing Ctrl+S, switching to another tab, or closing
+  Heimdall. Writes are serialised, so a slow earlier write cannot land after a later one.
+- **Cards and lists.** Credential Guard and the Windows Hello requirement have their own card,
+  behaviour settings are out of Appearance, and SFTP and X11 have titled cards. The Git sync
+  fields are disabled while sync is off. A field in error shows a glyph. The gateway and tool
+  lists answer Enter, Delete and double click, and removing an external tool asks first. The
+  settings search also finds section headers and keeps the match highlighted longer.
+
+### SSH: terminal search, the connecting overlay and clearer endings
+
+- **Search in the terminal works again.** It steps through the matches with a counter, and plain
+  URLs open with Ctrl+click.
+- **The connecting overlay stays until the session is attached and offers Cancel.** A clean exit
+  and a real failure each have their own message, and the overlay can be dismissed to read the
+  output. The header shows the gateway route and the full title of a truncated session.
+- **Smaller fixes.** A rejected host key is named, the agent indicator is a button, long
+  authentication prompts scroll, and the tunnel status and the authentication timeout read more
+  clearly.
+
+### RDP: a reconnect button and disconnect messages with a next step
+
+- **A Reconnect button in the header** for endings that leave no overlay. Six disconnect messages
+  that ended there now say what to do next, and the technical detail moves to the tooltip.
+- **Smaller fixes.** The status line is trimmed with the full text in its tooltip, Escape on the
+  overlay no longer ends anything, Ctrl+Alt+Home reaches any visible header control, the
+  redirection icons have tooltips, the shortcut help names keys in the interface language, and the
+  stabilization countdown explains itself.
+
+### WinRM: authentication failures say what to do
+
+- **An authentication failure is explained by its cause:** a refused password, access denied, a
+  TrustedHosts refusal or a Kerberos principal problem, each with the step that fixes it. A
+  refused password is never reported as a TrustedHosts problem, although its message lists
+  TrustedHosts among the possible remedies.
+- **The session editor warns before connecting** when a gateway downgrades HTTPS, when the
+  certificate check is skipped, when an off-domain host over HTTP needs TrustedHosts, and when no
+  password is stored.
+
 ### Tests: the suites no longer touch the developer's own profile
 
 - **The UI test host no longer runs Heimdall's startup.** WPF queues the startup event from the
@@ -32,6 +114,10 @@ All notable changes to Heimdall are documented in this file.
   the developer's log and started the scheduled task engine for a few seconds. It is now skipped
   unless `HEIMDALL_UITESTS_LAUNCH_PRODUCT` is `1`. The CI desktop lane sets it, and a guard fails
   any test file that launches the product with a plain fact.
+- **The update relauncher tests no longer delete a stand-in that is still starting.** One case
+  returned before its relaunched stand-in had started, and the sandbox was deleted under it, which
+  left a .NET Runtime error in the event log on every run. The case now waits for the relaunch,
+  and the sandbox deletes the stand-in executables first and retries while one is still in use.
 
 ## 2026-10-01: updates no longer stay closed over an apostrophe (v2026.100104)
 

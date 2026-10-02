@@ -104,6 +104,7 @@ que vous utilisez souvent.
 
 - Tapez dans le champ de filtre au-dessus de l'arbre pour chercher. Chaque mot tapé doit figurer quelque part dans le nom, l'adresse, le dossier, le nom d'utilisateur, le protocole, l'environnement, les étiquettes ou le projet d'une session, dans n'importe quel ordre, et les accents sont ignorés : `web prod` trouve web01 rangée dans le dossier Prod.
 - Dans le champ de filtre, **Echap** efface la recherche, **Bas** passe à la première session de la liste, et **Entrée** ouvre la session quand une seule correspond. Avec deux résultats ou plus, Entrée ne fait rien.
+- Dans l'arbre lui-même, tapez les premières lettres d'un nom pour aller à la prochaine session ou au prochain dossier qui commence par elles. Retaper la même lettre passe d'une ligne à l'autre parmi celles qui commencent par elle, et une pause d'une seconde lance une nouvelle recherche. Le dossier atteint reste marqué quand le focus passe à un menu ou au champ de filtre.
 - Les filtres actifs apparaissent sous la recherche. Retirez-en un avec sa croix, ou utilisez **Réinitialiser les filtres** pour effacer la recherche et tous les filtres. Les préférences d'affichage sont conservées. Tant qu'un filtre est actif, le compteur d'un dossier se lit visibles/total, par exemple `2/40`.
 - Les résultats de recherche affichent le chemin du dossier et l'adresse de l'hôte. Survolez cette ligne pour lire les valeurs complètes. Sans résultat, utilisez **Effacer la recherche**.
 - Une sélection masquée par une recherche ou par un dossier fermé revient dès que ses lignes sont de nouveau visibles, sauf si vous avez sélectionné autre chose entre-temps.
@@ -152,6 +153,20 @@ Ouvrez une session **SFTP** (ou FTP) pour obtenir un navigateur de fichiers à d
 machine d'un côté, la machine distante de l'autre.
 
 - **Glissez-déposez** entre les panneaux pour copier, dans les deux sens, dossiers entiers compris.
+- **Télécharger** (bouton de la barre d'outils, menu du clic droit, ou **Ctrl+Shift+D**) enregistre
+  les fichiers et dossiers sélectionnés dans un dossier de votre choix. Un dossier vient avec tout
+  ce qu'il contient ; les liens, tubes et périphériques sont laissés de côté, et le panneau dit
+  combien l'ont été.
+- **Glissez des éléments distants sur la ligne d'un dossier** pour les y déplacer, sur le même
+  serveur. Un nom déjà pris reçoit un nouveau nom ; rien n'est remplacé.
+- **Un seul transfert à la fois.** Un lot lancé pendant qu'un autre tourne attend dans la **File
+  d'attente des transferts** sous la liste. Chaque lot peut y être arrêté avec **Annuler ce
+  transfert** ; un lot en échec ou annulé reste listé avec sa raison et repart avec **Réessayer**,
+  et **Effacer les terminés** les retire. La barre mesure le lot entier, et affiche le débit et le
+  temps restant dès qu'il y a de quoi les mesurer.
+- Quand un fichier existe déjà, la fenêtre de conflit montre la taille et la date des deux copies
+  et laquelle est la plus récente, et peut ne remplacer que les plus récentes. Annuler arrête le
+  lot entier.
 - **Double-cliquez sur un fichier texte distant** pour l'éditer. Heimdall le télécharge, l'ouvre,
   et le renvoie à chaque enregistrement. Fermez l'éditeur quand vous avez fini.
 - **F2** renomme, **F5** rafraîchit la liste. Ni l'un ni l'autre ne se déclenche pendant que vous

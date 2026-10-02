@@ -46,8 +46,10 @@ Une carte dont les réglages n'attendent pas simplement l'enregistrement le dit 
   clés d'hôtes de confiance, certificats RDP de confiance) : ils s'écrivent sur-le-champ, et
   Annuler les modifications ne peut pas les reprendre.
 
-Le jeton d'accès de la synchronisation Git est lui aussi enregistré dès sa saisie ; les autres
-champs de la synchronisation Git attendent l'enregistrement.
+Le jeton d'accès de la synchronisation Git est écrit quand vous quittez son champ : cliquer
+ailleurs, appuyer sur Ctrl+S, passer à un autre onglet ou fermer Heimdall l'écrivent. Il n'est pas
+écrit à chaque frappe, et Annuler les modifications ne peut pas le reprendre. Les autres champs de
+la synchronisation Git attendent l'enregistrement.
 
 **Deux réglages demandent confirmation avant de s'activer.** Activer le partage TFTP et
 Enregistrer la transcription des sessions demandent chacun une confirmation quand vous appuyez sur
