@@ -82,6 +82,18 @@ public sealed class UpdateRelaunchScriptExecutionTests
     private static readonly TimeSpan MarkerGrace = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// How long a sandbox waits, when it is disposed, for a stand-in still running from it.
+    /// </summary>
+    /// <remarks>
+    /// Not a timing assumption: the wait ends as soon as the stand-in exits, which takes
+    /// milliseconds once it has recorded its marker. The bound only stops a stand-in that
+    /// never exits, such as one held by a hard-error dialog, from hanging the lane.
+    /// </remarks>
+    private static readonly TimeSpan StandInExitDeadline = TimeSpan.FromSeconds(20);
+
+    private static readonly TimeSpan StandInExitPollInterval = TimeSpan.FromMilliseconds(25);
+
+    /// <summary>
     /// Wait applied to the script's own <c>Wait-Process</c>. Deliberately not the
     /// production default of two minutes: a recycled process id must bound the test
     /// rather than stall it.
@@ -769,6 +781,14 @@ public sealed class UpdateRelaunchScriptExecutionTests
         Assert.True(run.ExitCode != 0, "a failing installer must not report success");
     }
 
+    /// <remarks>
+    /// Waits for the relaunch as well as the installer. It used to stop at the installer, so
+    /// both of its cases returned while the relaunched stand-in was still starting, and the
+    /// sandbox was deleted under it: on 2026-10-02, 20 runs of 20 left a ".NET Runtime" event
+    /// saying the stand-in's own assembly did not exist (exit 0x8000809A), and one lane run left
+    /// a modal "0xc0000142" dialog for relaunch-target.exe on the desktop at the second case's
+    /// slot. Nothing observed either: the test had already passed.
+    /// </remarks>
     [Trait("Category", "CIUnstable")]
     [Theory]
     [MemberData(nameof(PowerShellHosts))]
@@ -785,6 +805,11 @@ public sealed class UpdateRelaunchScriptExecutionTests
         Assert.False(
             File.Exists(sandbox.FailureRecordPath),
             "a successful install must leave no failure record");
+
+        // The relaunch is part of a successful update, and its marker is the only proof that
+        // the relaunched process reached its own code: the transcript says a process was
+        // created, not that it started.
+        await sandbox.WaitForRoleAsync(RelaunchRole);
     }
 
     /// <summary>
@@ -929,6 +954,44 @@ public sealed class UpdateRelaunchScriptExecutionTests
         {
             await release.CancelAsync();
             File.Delete(marker);
+        }
+    }
+
+    /// <summary>
+    /// A sandbox disposed while a stand-in is still starting from it lets that stand-in run.
+    /// </summary>
+    /// <remarks>
+    /// Deterministic without a clock: the stand-in is started and the sandbox disposed at once,
+    /// with nothing between them. A delete that does not wait reaches the companions well before
+    /// the stand-in resolves its assembly (measured 2026-10-02: every one of 52 launches, deleted
+    /// from 0 to 200 ms after the start, exited 0x8000809A, "the application to execute does not
+    /// exist"). So the exit code below is the verdict, and the mutant that drops the wait fails it.
+    /// </remarks>
+    [Fact]
+    public void Dispose_StandInStillStarting_IsLetRunBeforeTheSandboxIsDeleted()
+    {
+        Process standIn;
+        using (var sandbox = new UpdateScriptSandbox())
+        {
+            var psi = new ProcessStartInfo(sandbox.TargetExecutablePath)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.Environment.Remove(MarkerEnvironmentVariable);
+            psi.Environment.Remove(ExitCodeEnvironmentVariable);
+            standIn = Process.Start(psi)
+                ?? throw new InvalidOperationException("the stand-in did not start");
+        }
+
+        using (standIn)
+        {
+            Assert.True(
+                standIn.WaitForExit(StandInExitDeadline),
+                "the stand-in did not exit after the sandbox was disposed");
+            Assert.True(
+                standIn.ExitCode == 0,
+                $"the stand-in died under the sandbox's disposal (exit 0x{standIn.ExitCode:X8})");
         }
     }
 
@@ -1787,6 +1850,8 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         public void Dispose()
         {
+            WaitForStandInsToExit();
+
             try
             {
                 if (Directory.Exists(Root))
@@ -1796,11 +1861,54 @@ public sealed class UpdateRelaunchScriptExecutionTests
             }
             catch (IOException)
             {
-                // A relaunched stand-in may still hold a handle; the root is disposable.
+                // A stand-in that outlived the bound above still holds its image; the root is
+                // disposable.
             }
             catch (UnauthorizedAccessException)
             {
                 // Same.
+            }
+        }
+
+        /// <summary>
+        /// Deletes the stand-in executables first, retrying while a process still runs from one.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A recursive delete removes a running stand-in's companions and fails only on the
+        /// executable itself, because Windows refuses to delete a mapped image. A stand-in still
+        /// starting at that moment loses its own assembly and dies before its first line, with
+        /// nobody watching. So the image goes first: its deletion succeeds exactly when no
+        /// process is running from it, which needs no process id, and nothing else is touched
+        /// until then.
+        /// </para>
+        /// <para>
+        /// Never throws. This runs in the disposal of a test that may already have failed, and a
+        /// second exception would replace the first one's diagnostics. Whether the relaunch
+        /// started is the marker's question, asked by <see cref="WaitForRoleAsync"/>.
+        /// </para>
+        /// </remarks>
+        private void WaitForStandInsToExit()
+        {
+            DateTime deadline = DateTime.UtcNow + StandInExitDeadline;
+            foreach (string image in new[] { TargetExecutablePath, InstallerPath })
+            {
+                while (File.Exists(image))
+                {
+                    try
+                    {
+                        File.Delete(image);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        if (DateTime.UtcNow >= deadline)
+                        {
+                            return;
+                        }
+
+                        Thread.Sleep(StandInExitPollInterval);
+                    }
+                }
             }
         }
 
