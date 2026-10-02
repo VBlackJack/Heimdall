@@ -37,16 +37,21 @@ internal sealed class WinRmEarlyOutputDiagnostic
 
     /// <summary>
     /// Untranslated tokens of authentication failures and the locale key that explains each.
-    /// Order matters: the TrustedHosts refusal also mentions Kerberos, so it is tested first.
     /// </summary>
+    /// <remarks>
+    /// Order matters. A refused credential is tested first: the Negotiate logon failure lists
+    /// TrustedHosts among its possible remedies, and a mistyped password must not be reported as
+    /// a TrustedHosts problem. The TrustedHosts tokens come next, before the Kerberos principal
+    /// code, because a TrustedHosts refusal also mentions Kerberos.
+    /// </remarks>
     private static readonly (string Token, string Key)[] AuthenticationDiagnosticTokens =
     [
+        (LogonFailureCode, "ErrorWinRmLogonFailed"),
+        (BadCredentialsCode, "ErrorWinRmLogonFailed"),
+        (AccessDeniedCode, "ErrorWinRmAccessDenied"),
         (TrustedHostsSettingName, "ErrorWinRmTrustedHosts"),
         (TrustedHostsErrorCode, "ErrorWinRmTrustedHosts"),
-        (WrongPrincipalCode, "ErrorWinRmKerberosPrincipal"),
-        (AccessDeniedCode, "ErrorWinRmAccessDenied"),
-        (LogonFailureCode, "ErrorWinRmLogonFailed"),
-        (BadCredentialsCode, "ErrorWinRmLogonFailed")
+        (WrongPrincipalCode, "ErrorWinRmKerberosPrincipal")
     ];
 
     /// <summary>

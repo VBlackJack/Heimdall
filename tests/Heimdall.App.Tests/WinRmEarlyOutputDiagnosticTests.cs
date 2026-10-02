@@ -224,5 +224,31 @@ public sealed class WinRmEarlyOutputDiagnosticTests
         Assert.Equal("ErrorWinRmTrustedHosts", result);
     }
 
+    /// <summary>
+    /// A refused password lists TrustedHosts among its possible remedies, as the Negotiate logon
+    /// failure does: the credential code must win, or a typo is reported as a TrustedHosts problem.
+    /// </summary>
+    [Theory]
+    [InlineData("Enter-PSSession : WinRM cannot process the request. The following error with errorcode 0x8009030c occurred while using Negotiate authentication: A logon attempt failed. Possible causes are: -The user name or password specified are invalid. Change the authentication method; add the destination computer to the WinRM TrustedHosts configuration setting or use HTTPS transport.")]
+    [InlineData("Enter-PSSession : WinRM error 0x8007052e: the user name or password is incorrect. Check the TrustedHosts configuration setting.")]
+    public void Observe_LogonFailureMentioningTrustedHosts_PrefersLogonFailedKey(string output)
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        Assert.Equal("ErrorWinRmLogonFailed", diagnostic.Observe(Bytes(output)));
+    }
+
+    /// <summary>An access refusal that mentions TrustedHosts is still an access refusal.</summary>
+    [Fact]
+    public void Observe_AccessDeniedMentioningTrustedHosts_PrefersAccessDeniedKey()
+    {
+        WinRmEarlyOutputDiagnostic diagnostic = new();
+
+        string? result = diagnostic.Observe(Bytes(
+            "Enter-PSSession : WinRM error 0x80070005 Access is denied. See the TrustedHosts configuration setting."));
+
+        Assert.Equal("ErrorWinRmAccessDenied", result);
+    }
+
     private static byte[] Bytes(string value) => Encoding.UTF8.GetBytes(value);
 }
