@@ -11,9 +11,14 @@
     malicious. And a catalog-signed copy reports an Authenticode status of Valid,
     which sends the script's signature gate into certificate chain building and its
     network timeouts. An unsigned apphost avoids both.
+
+    A GUI-subsystem executable, like the installer and the application it stands for. As a
+    console executable it needed a console created before its first line ran, and under many
+    concurrent console creations that failed with 0xc0000142: the relaunched stand-in died in
+    its loader without recording anything. Its stderr still reaches a parent that redirects it.
   -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
