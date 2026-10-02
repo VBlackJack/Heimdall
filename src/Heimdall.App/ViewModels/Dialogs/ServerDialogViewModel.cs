@@ -333,6 +333,7 @@ public partial class ServerDialogViewModel : ObservableValidator
     private bool _winRmUseSsl;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsWinRmCertificateCheckSkipped))]
     private bool _winRmSkipCertificateCheck;
 
     [ObservableProperty]
