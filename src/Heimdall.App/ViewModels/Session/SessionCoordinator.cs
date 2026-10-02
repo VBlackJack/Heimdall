@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -238,6 +239,23 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     };
 
     /// <summary>
+    /// Keeps <see cref="BroadcastToggleTooltip"/> in step with <see cref="BroadcastScopeLabel"/>,
+    /// which it embeds while broadcast is on.
+    /// </summary>
+    /// <remarks>
+    /// One rule here rather than a second notification beside every raise of the label: a pane or
+    /// tab selection raised the label alone, so the tooltip kept the target count from before.
+    /// </remarks>
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName == nameof(BroadcastScopeLabel))
+        {
+            base.OnPropertyChanged(new PropertyChangedEventArgs(nameof(BroadcastToggleTooltip)));
+        }
+    }
+
+    /// <summary>
     /// Generated partial: updates the per-view broadcast indicators and
     /// refreshes the tooltip whenever <see cref="IsBroadcastMode"/> flips.
     /// </summary>
@@ -318,7 +336,6 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         RefreshBroadcastTabMarkers();
         OnPropertyChanged(nameof(BroadcastScopeLabel));
-        OnPropertyChanged(nameof(BroadcastToggleTooltip));
 
         // While broadcast is on, the status reflects the active scope; otherwise it
         // just reports the new default scope.
