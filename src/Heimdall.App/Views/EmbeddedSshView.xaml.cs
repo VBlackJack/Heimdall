@@ -405,6 +405,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 System.Drawing.Color.FromArgb(themeColor.A, themeColor.R, themeColor.G, themeColor.B);
         }
 
+        // The view starts under its connecting veil, so the surface starts out of its way.
+        SyncTerminalSurfaceVisibility();
+
         Loaded += OnLoaded;
         IsVisibleChanged += OnVisibilityChanged;
     }
@@ -1030,15 +1033,55 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private void OnAutoReconnectCancelClick(object sender, RoutedEventArgs e)
     {
         StopAutoReconnectTimer();
-        AutoReconnectOverlay.Visibility = Visibility.Collapsed;
+        SetOverlayVisibility(AutoReconnectOverlay, Visibility.Collapsed);
         Core.Logging.FileLogger.Info("EmbeddedSSH auto-reconnect cancelled by user");
         ShowReconnectOverlay();
     }
 
+    /// <summary>
+    /// What the terminal surface does while the view is in a given state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The terminal is a WebView2, a native window hosted in WPF, and a native window covers
+    /// every WPF sibling drawn over it whatever their order: the end-of-session message, the
+    /// reconnect countdown and the connecting veil were all set visible and none of them was
+    /// ever seen (measured on v2026.100201: a clean exit and a server-side kill both showed
+    /// the bare terminal). The surface steps aside while any of them is up, as the VNC view's
+    /// does.
+    /// </para>
+    /// <para>
+    /// Hidden rather than collapsed: a hidden surface keeps its layout size, so the terminal
+    /// does not refit to nothing and send the server a resize while a veil is shown.
+    /// Collapsed is kept for the fallback panel, where the surface is gone for good.
+    /// </para>
+    /// </remarks>
+    internal static Visibility ResolveTerminalSurfaceVisibility(bool webViewUnavailable, bool overlayShown)
+        => webViewUnavailable ? Visibility.Collapsed
+            : overlayShown ? Visibility.Hidden
+            : Visibility.Visible;
+
+    /// <summary>
+    /// Shows or hides one of the three veils, and moves the terminal surface out of their way.
+    /// </summary>
+    private void SetOverlayVisibility(UIElement overlay, Visibility visibility)
+    {
+        overlay.Visibility = visibility;
+        SyncTerminalSurfaceVisibility();
+    }
+
+    private void SyncTerminalSurfaceVisibility()
+    {
+        bool overlayShown = ReconnectOverlay.Visibility == Visibility.Visible
+            || AutoReconnectOverlay.Visibility == Visibility.Visible
+            || ConnectingOverlay.Visibility == Visibility.Visible;
+        TerminalWebView.Visibility = ResolveTerminalSurfaceVisibility(_webViewUnavailable, overlayShown);
+    }
+
     private void ShowReconnectOverlay()
     {
-        AutoReconnectOverlay.Visibility = Visibility.Collapsed;
-        ReconnectOverlay.Visibility = Visibility.Visible;
+        SetOverlayVisibility(AutoReconnectOverlay, Visibility.Collapsed);
+        SetOverlayVisibility(ReconnectOverlay, Visibility.Visible);
         BeginInvokeIfAvailable(
             () =>
             {
@@ -1056,7 +1099,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     private void HideReconnectOverlay()
     {
-        ReconnectOverlay.Visibility = Visibility.Collapsed;
+        SetOverlayVisibility(ReconnectOverlay, Visibility.Collapsed);
     }
 
     private void SetReconnectDetail(string? detail)
@@ -1129,7 +1172,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             attempt,
             maxAttempts);
         UpdateAutoReconnectCountdownText();
-        AutoReconnectOverlay.Visibility = Visibility.Visible;
+        SetOverlayVisibility(AutoReconnectOverlay, Visibility.Visible);
         BeginInvokeIfAvailable(
             () =>
             {
@@ -1165,7 +1208,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (_autoReconnectSecondsRemaining <= 0)
         {
             StopAutoReconnectTimer();
-            AutoReconnectOverlay.Visibility = Visibility.Collapsed;
+            SetOverlayVisibility(AutoReconnectOverlay, Visibility.Collapsed);
             Core.Logging.FileLogger.Info(
                 $"EmbeddedSSH auto-reconnect attempt {_autoReconnectAttempt} firing");
             RaiseReconnectRequested(ReconnectRequestContext.Automatic(
@@ -1227,7 +1270,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
-        ConnectingOverlay.Visibility = Visibility.Collapsed;
+        SetOverlayVisibility(ConnectingOverlay, Visibility.Collapsed);
     }
 
     private void UpdateConnectingOverlay(string displayName, string? endpoint)
@@ -2722,13 +2765,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         HideConnectingOverlay();
         StopAutoReconnectTimer();
-        AutoReconnectOverlay.Visibility = Visibility.Collapsed;
         _webViewUnavailable = true;
+        SetOverlayVisibility(AutoReconnectOverlay, Visibility.Collapsed);
         _terminalReady = false;
 
         _pendingTerminalMessages.Clear();
-
-        TerminalWebView.Visibility = System.Windows.Visibility.Collapsed;
         FallbackPanel.Visibility = System.Windows.Visibility.Visible;
         FallbackMessageText.Text = message;
         UpdateStatus(SessionStatusTokens.Error);
