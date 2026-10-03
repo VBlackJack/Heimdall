@@ -202,8 +202,39 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _main.Connection.ActiveSessions.CollectionChanged += OnActiveSessionsChanged;
     }
 
+    /// <summary>The open tabs whose split layout this coordinator follows.</summary>
+    private readonly HashSet<SessionTabViewModel> _observedTabs = [];
+
     private void OnActiveSessionsChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        => OnPropertyChanged(nameof(BroadcastScopeLabel));
+    {
+        // Resynchronised from the list itself rather than from the event's item lists: a Reset
+        // carries no old items, and a tab missed here would be listened to forever.
+        var current = new HashSet<SessionTabViewModel>(_main.Connection.ActiveSessions);
+        foreach (SessionTabViewModel gone in _observedTabs.Where(tab => !current.Contains(tab)).ToList())
+        {
+            gone.PropertyChanged -= OnObservedTabPropertyChanged;
+            _observedTabs.Remove(gone);
+        }
+
+        foreach (SessionTabViewModel added in current.Where(_observedTabs.Add))
+        {
+            added.PropertyChanged += OnObservedTabPropertyChanged;
+        }
+
+        OnPropertyChanged(nameof(BroadcastScopeLabel));
+    }
+
+    /// <summary>
+    /// A targeted pane can close inside a split without the tab list changing; every split
+    /// operation replaces the tab's root, so that is what is followed.
+    /// </summary>
+    private void OnObservedTabPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SessionTabViewModel.RootContent))
+        {
+            OnPropertyChanged(nameof(BroadcastScopeLabel));
+        }
+    }
 
     // ── Broadcast mode ───────────────────────────────────────────────
 
@@ -2014,6 +2045,12 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _main.ServerList.SessionReady -= OnSessionReady;
         _main.ServerList.SessionFailed -= OnSessionFailed;
         _main.Connection.ActiveSessions.CollectionChanged -= OnActiveSessionsChanged;
+        foreach (SessionTabViewModel tab in _observedTabs)
+        {
+            tab.PropertyChanged -= OnObservedTabPropertyChanged;
+        }
+
+        _observedTabs.Clear();
 
         foreach (var cancellation in _connectingCancellations.Values)
         {
