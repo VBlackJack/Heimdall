@@ -475,6 +475,56 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Equal(expectedSnapshotId, snapshot.Id);
     }
 
+    /// <summary>
+    /// The Reconnect button of a quick-connect session reconnects it, like the tab menu does.
+    /// </summary>
+    /// <remarks>
+    /// The tab menu routed an ad hoc tab to its snapshot; the button inside the session and in its
+    /// header goes through the reconnect callback instead, which looked the identifier up in the
+    /// inventory, found nothing and closed the tab: "Session not found in the inventory", measured
+    /// on v2026.100201 against the lab gateway.
+    /// </remarks>
+    [Theory]
+    [InlineData("SSH")]
+    [InlineData("RDP")]
+    public async Task ReconnectButton_AdHoc_UsesSnapshotWithoutInventoryLookup(string protocol)
+    {
+        using TestHarness harness = TestHarness.Create();
+        ControlledProtocolHandler protocolHandler = harness.GetHandler(protocol);
+        ServerProfileDto snapshot = harness.CreateServer(protocol);
+        snapshot.Id = $"adhoc-{protocol.ToLowerInvariant()}-demo.example.com";
+        SessionTabViewModel source = harness.Main.Connection.AddSession(
+            snapshot.Id,
+            snapshot.DisplayName,
+            snapshot.ConnectionType);
+        source.MarkAsAdHoc(snapshot);
+
+        TaskCompletionSource<bool> serverNotFound = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Main.PropertyChanged += (_, args) =>
+        {
+            if (string.Equals(args.PropertyName, nameof(MainViewModel.StatusText), StringComparison.Ordinal)
+                && string.Equals(
+                    harness.Main.StatusText,
+                    harness.Main.GetLocalizer()["ErrorServerNotFound"],
+                    StringComparison.Ordinal))
+            {
+                serverNotFound.TrySetResult(true);
+            }
+        };
+
+        Action<SessionTabViewModel, string, string> callback = Assert.IsType<Action<SessionTabViewModel, string, string>>(
+            harness.EmbeddedSessionManager.ReconnectRequestedCallback);
+        EmbeddedSessionManager.ForwardReconnectRequest(source, ReconnectRequestContext.Manual, callback);
+
+        Task firstOutcome = await Task.WhenAny(protocolHandler.Started.Task, serverNotFound.Task)
+            .WaitAsync(TestTimeout);
+        Assert.Same(protocolHandler.Started.Task, firstOutcome);
+        Assert.DoesNotContain(source, harness.Main.Connection.ActiveSessions);
+
+        protocolHandler.Result.SetResult(SuccessWithTerminalSession());
+    }
+
     [Fact]
     public async Task SftpPaneReconnectCallback_ReconnectsPaneWithoutClosingSshTab()
     {

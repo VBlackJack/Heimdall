@@ -1286,6 +1286,15 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
+        // A quick-connect tab is not in the inventory: it reconnects from its own snapshot, as the
+        // tab menu already did. The session's Reconnect button lands here instead, and used to
+        // close the tab and report "not found".
+        if (tab.IsAdHoc && tab.AdHocProfileSnapshot is ServerProfileDto snapshot)
+        {
+            await OnReconnectAdHocRequestedAsync(tab, snapshot, CloneAdHocProfileForConnection(snapshot));
+            return;
+        }
+
         ReconnectChainState? reconnectChain = null;
         if (context.IsAutomatic)
         {
