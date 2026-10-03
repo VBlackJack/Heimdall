@@ -77,4 +77,33 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Contains(nameof(SessionCoordinator.BroadcastScopeLabel), raised);
         Assert.Contains(nameof(SessionCoordinator.BroadcastToggleTooltip), raised);
     }
+
+    /// <summary>
+    /// The targeted-pane count is announced again when a tab's split layout changes, and no
+    /// longer once the tab has left the list.
+    /// </summary>
+    /// <remarks>
+    /// Closing a targeted pane inside a split leaves the tab list unchanged: what changes is the
+    /// tab's <see cref="SessionTabViewModel.RootContent"/>, which every split operation replaces.
+    /// </remarks>
+    [Fact]
+    public void BroadcastScopeLabel_IsNotifiedWhenATabsSplitLayoutChanges()
+    {
+        using TestHarness harness = TestHarness.Create();
+        SessionCoordinator session = harness.Main.Session;
+        SessionTabViewModel tab = new();
+        harness.Main.Connection.ActiveSessions.Add(tab);
+
+        var raised = new List<string?>();
+        session.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        tab.RootContent = new SessionPaneModel();
+        Assert.Contains(nameof(SessionCoordinator.BroadcastScopeLabel), raised);
+
+        // A tab that has left the list no longer counts, and is no longer listened to.
+        harness.Main.Connection.ActiveSessions.Remove(tab);
+        raised.Clear();
+        tab.RootContent = new SessionPaneModel();
+        Assert.DoesNotContain(nameof(SessionCoordinator.BroadcastScopeLabel), raised);
+    }
 }
