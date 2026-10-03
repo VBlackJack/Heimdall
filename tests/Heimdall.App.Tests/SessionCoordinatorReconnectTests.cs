@@ -16,6 +16,7 @@
 
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -523,6 +524,42 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.DoesNotContain(source, harness.Main.Connection.ActiveSessions);
 
         protocolHandler.Result.SetResult(SuccessWithTerminalSession());
+    }
+
+    /// <summary>
+    /// Edit profile on a quick-connect session opens the session dialog on what was typed, ready
+    /// to be saved as a profile.
+    /// </summary>
+    /// <remarks>
+    /// A quick-connect session has no saved profile to edit. The button sent its identifier to the
+    /// inventory edit, which found nothing and reported "Session not found in the inventory"
+    /// (seen on v2026.100201 against the lab gateway). It now opens the dialog the tab menu's
+    /// Save as profile opens, filled from the session's own snapshot.
+    /// </remarks>
+    [Theory]
+    [InlineData("SSH")]
+    [InlineData("RDP")]
+    public async Task EditProfileButton_AdHoc_OpensTheSessionDialogOnTheSnapshot(string protocol)
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto snapshot = harness.CreateServer(protocol);
+        snapshot.Id = $"adhoc-{protocol.ToLowerInvariant()}-demo.example.com";
+        snapshot.RemoteServer = "demo.example.com";
+        SessionTabViewModel source = harness.Main.Connection.AddSession(
+            snapshot.Id,
+            snapshot.DisplayName,
+            snapshot.ConnectionType);
+        source.MarkAsAdHoc(snapshot);
+
+        Action<string> callback = Assert.IsType<Action<string>>(
+            harness.EmbeddedSessionManager.EditServerRequestedCallback);
+        callback(source.ProfileLookupServerId);
+
+        ServerDialogViewModel? dialog = await harness.DialogService.ServerDialogShown.Task.WaitAsync(TestTimeout);
+        Assert.NotNull(dialog);
+        Assert.Equal("demo.example.com", dialog!.RemoteServer);
+        Assert.False(dialog.IsEditMode);
+        Assert.NotEqual(harness.Main.GetLocalizer()["ErrorServerNotFound"], harness.Main.StatusText);
     }
 
     [Fact]

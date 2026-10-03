@@ -196,7 +196,9 @@ If the reason on screen is not enough, the log will have more.
 
 For a disconnected SSH or SFTP session, choose **Edit profile** to correct its saved settings,
 then reconnect. The session stays open while you edit. In a split view, this edits the profile
-of the pane where you clicked, rather than the first pane.
+of the pane where you clicked, rather than the first pane. A session opened with **Ctrl+K** has
+no saved profile: **Edit profile** opens the session dialog on what you typed, so you can correct
+it and save it as a profile.
 
 In the SSH terminal, **Cancel** stops a connection that is still opening, and **View output**
 hides the end message so you can read what the server printed. **Ctrl+Shift+F** searches the
