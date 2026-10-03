@@ -798,8 +798,13 @@ public sealed partial class SessionCoordinatorPreMountTests
             return Task.FromResult<string?>(null);
         }
 
+        /// <summary>The session dialog last opened, completed when it is, for tests that wait on it.</summary>
+        public TaskCompletionSource<ServerDialogViewModel?> ServerDialogShown { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public Task<ServerDialogResult?> ShowServerDialogAsync(ServerDialogViewModel? editVm = null)
         {
+            ServerDialogShown.TrySetResult(editVm);
             return Task.FromResult<ServerDialogResult?>(null);
         }
 

@@ -1261,6 +1261,19 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
+        // A quick-connect session has no saved profile to edit: its Edit profile opens the session
+        // dialog on what was typed, the dialog the tab menu's Save as profile opens. Resolved by the
+        // open tab rather than by the identifier's prefix, which a saved profile may share.
+        ServerProfileDto? adHocSnapshot = _main.Connection.ActiveSessions
+            .FirstOrDefault(tab => tab.IsAdHoc
+                && string.Equals(tab.ProfileLookupServerId, serverId, StringComparison.Ordinal))
+            ?.AdHocProfileSnapshot;
+        if (adHocSnapshot is not null)
+        {
+            await _main.ServerList.SaveAdHocAsProfileCommand.ExecuteAsync(adHocSnapshot);
+            return;
+        }
+
         try
         {
             if (!await _main.ServerList.EditServerByIdAsync(serverId, CancellationToken.None))

@@ -210,7 +210,9 @@ Si la raison affichée ne suffit pas, le journal en dira davantage.
 
 Dans une session SSH ou SFTP déconnectée, choisissez **Modifier le profil** pour corriger les
 paramètres enregistrés, puis reconnectez-vous. La session reste ouverte pendant la modification.
-Dans une vue partagée, le bouton ouvre le profil du volet concerné.
+Dans une vue partagée, le bouton ouvre le profil du volet concerné. Une session ouverte avec
+**Ctrl+K** n'a pas de profil enregistré : **Modifier le profil** ouvre la fenêtre de session sur ce
+que vous avez tapé, pour le corriger et l'enregistrer comme profil.
 
 Dans le terminal SSH, **Annuler** arrête une connexion encore en cours d'ouverture, et **Voir la
 sortie** masque le message de fin pour lire ce que le serveur a affiché. **Ctrl+Shift+F** cherche
