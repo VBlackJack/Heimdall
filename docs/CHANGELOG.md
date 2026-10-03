@@ -12,6 +12,25 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-03: the SSH end-of-session message shows again (v2026.100301)
+
+### SSH: the veils are no longer drawn under the terminal
+
+- **The end-of-session message is visible.** The terminal is a WebView2, a native window
+  that covers every WPF element drawn over it, and the end-of-session message (Reconnect,
+  Edit profile, View output, Close), the reconnect countdown and the connecting veil were
+  all drawn under it: measured on v2026.100201, a clean exit and a server-side kill both
+  showed the bare terminal. The terminal surface is now hidden while any of them is up,
+  and kept at its size so the terminal sends the server no resize; View output brings it
+  back.
+
+### Quick connect: Reconnect from the session works
+
+- **Reconnect in the session and in its header reconnects a Ctrl+K session.** Such a
+  session is not in the inventory. The tab menu reconnected it from its own snapshot, but
+  the button went through the inventory, found nothing, closed the tab and reported
+  "Session not found in the inventory." Both now use the snapshot.
+
 ## 2026-10-03: folders download over SFTP, and the session tree answers to typing (v2026.100201)
 
 ### SFTP and FTP: folder download, a transfer queue and progress for the whole batch
