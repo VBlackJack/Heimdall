@@ -12,6 +12,17 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-03: Edit profile works on a quick connection (v2026.100302)
+
+### Quick connect: Edit profile opens the session dialog
+
+- **Edit profile on a Ctrl+K session opens the session dialog on what was typed.** Such a
+  session has no saved profile, and the button sent its identifier to the inventory edit,
+  which reported "Session not found in the inventory." It now opens the dialog the tab
+  menu's Save as profile opens, filled from the session's own snapshot. The tab is found
+  among the open sessions rather than by the identifier's prefix, which a saved profile may
+  share.
+
 ## 2026-10-03: the SSH end-of-session message shows again (v2026.100301)
 
 ### SSH: the veils are no longer drawn under the terminal
