@@ -12,7 +12,7 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-10-03: folders download over SFTP, and the session tree answers to typing (v2026.100201)
 
 ### SFTP and FTP: folder download, a transfer queue and progress for the whole batch
 
@@ -54,6 +54,9 @@ All notable changes to Heimdall are documented in this file.
   their sessions, the status dot has a larger hover target, the drop hint sits above the tree
   instead of covering the zone that takes an item out of its folder, and drag scrolling speeds up
   toward the edge.
+- **The status dot fills when a session connects** and empties when it ends. Its fill follows a
+  value that was never announced when the session state changed, so the dot kept its previous
+  shape, under a tooltip already giving the new state, until the list was scrolled or filtered.
 
 ### Settings: the Git token is written when its field is left
 
@@ -94,7 +97,25 @@ All notable changes to Heimdall are documented in this file.
   TrustedHosts among the possible remedies.
 - **The session editor warns before connecting** when a gateway downgrades HTTPS, when the
   certificate check is skipped, when an off-domain host over HTTP needs TrustedHosts, and when no
-  password is stored.
+  password is stored. The skipped-certificate warning takes its warning colour as soon as the box
+  is ticked, and loses it when the box is cleared.
+
+### Broadcast: the count of targeted panes follows every change
+
+- **In Selected panes mode, "Selected panes (N)" and the broadcast button's tooltip follow the
+  selection.** Selecting a pane or a tab, closing a tab by any of the five paths that remove one,
+  and closing a pane inside a split now update both. The tooltip used to keep the count from
+  before, and the chip kept it after a tab or a pane closed.
+
+### Interface language: more text follows a switch without a restart
+
+- **Text worded once and never re-read now follows a language switch:** the status lines in
+  Settings (PIN, master password, auto-lock, credential provider, skipped update), the broadcast
+  scope and its tooltip, the undo bar under the session tree, the suffix of an RDP tab opened in a
+  forced mode, and the window title.
+- **The Command Library follows a switch.** It was the one tool tab with no language path: its
+  result counter, Send and Copy tooltips, broadcast button, filters, help text and command badges
+  stayed in the opening language. The filters keep their selection when they are reworded.
 
 ### Tests: the suites no longer touch the developer's own profile
 
@@ -118,6 +139,11 @@ All notable changes to Heimdall are documented in this file.
   returned before its relaunched stand-in had started, and the sandbox was deleted under it, which
   left a .NET Runtime error in the event log on every run. The case now waits for the relaunch,
   and the sandbox deletes the stand-in executables first and retries while one is still in use.
+- **The update relauncher tests no longer fail when test runs overlap.** The stand-in for the
+  relaunched application was a console executable, so Windows had to create a console for it
+  before its first line; under many concurrent console creations that failed with 0xc0000142 and
+  the stand-in died without recording its marker. It is now a GUI executable, like the
+  application and the installer it stands for, and a test checks its subsystem.
 
 ## 2026-10-01: updates no longer stay closed over an apostrophe (v2026.100104)
 
