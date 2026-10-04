@@ -360,6 +360,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             MergeExtensionData(currentSettings.ExtensionData, settingsToSave.ExtensionData);
             settingsToSave.SchemaVersion = AppSettings.CurrentSchemaVersion;
             NormalizeTrustedHostKeys(settingsToSave);
+            NormalizeGatewayList(settingsToSave);
             ValidateSettingsWriteInvariants(settingsToSave);
             var json = JsonSerializer.Serialize(settingsToSave, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
@@ -513,6 +514,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             requireSupportedSchemaForWrite);
         MigrateLegacyRdpTimeoutKey(json, settings);
         NormalizeTrustedHostKeys(settings);
+        NormalizeGatewayList(settings);
         List<ValidationDiagnostic> diagnostics = [.. SchemaValidator.DiagnoseSettingsLoad(settings).Diagnostics];
         for (int index = 0; index < settings.SshGateways.Count; index++)
         {
@@ -892,6 +894,20 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
                 foundVersion,
                 supportedVersion);
         }
+    }
+
+    /// <summary>
+    /// Replaces a null gateway list with an empty one and drops null entries.
+    /// </summary>
+    /// <remarks>
+    /// The server list was guarded and the gateway list was not: a settings file holding
+    /// <c>"sshGateways": null</c>, or a null inside the array, threw on load and stopped the
+    /// application at startup. Neither carries a gateway, so nothing a user wrote is lost.
+    /// </remarks>
+    private static void NormalizeGatewayList(AppSettings settings)
+    {
+        settings.SshGateways ??= [];
+        settings.SshGateways.RemoveAll(gateway => gateway is null);
     }
 
     private static void NormalizeTrustedHostKeys(AppSettings settings)
