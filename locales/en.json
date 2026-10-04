@@ -2087,6 +2087,8 @@
   "A11yDismissError": "Dismiss error",
   "GatewayPasswordSaved": "Password saved",
   "GatewayPasswordClear": "Clear",
+  "GatewayDialogClearStoredPassword": "Remove the password saved for this gateway",
+  "GatewayDialogClearStoredKeyPassphrase": "Remove the passphrase saved for this gateway",
 
   "SmartPasteTitle": "Paste confirmation",
   "SmartPasteMultiLine": "You are about to paste {0} lines. This may execute commands immediately.",

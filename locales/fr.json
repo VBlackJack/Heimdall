@@ -2087,6 +2087,8 @@
   "A11yDismissError": "Fermer l'erreur",
   "GatewayPasswordSaved": "Mot de passe enregistr\u00e9",
   "GatewayPasswordClear": "Effacer",
+  "GatewayDialogClearStoredPassword": "Supprimer le mot de passe enregistré pour cette passerelle",
+  "GatewayDialogClearStoredKeyPassphrase": "Supprimer la passphrase enregistrée pour cette passerelle",
 
   "SmartPasteTitle": "Confirmation de collage",
   "SmartPasteMultiLine": "Vous \u00eates sur le point de coller {0} lignes. Cela peut ex\u00e9cuter des commandes imm\u00e9diatement.",

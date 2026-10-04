@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 
 namespace Heimdall.App.Tests;
 
@@ -110,6 +112,73 @@ public sealed class GatewayDialogSshCredentialTests
 
         Assert.True(dto.HasSshKeyPassphraseEncryptedField);
         Assert.False(dto.UsesLegacySshCredentialMapping);
+    }
+
+    // An empty box keeps what is stored, so a gateway moved to a key or an agent had no way to
+    // stop sending its old password.
+    [Fact]
+    public void ClearStoredPassword_DropsTheStoredPasswordOnSave()
+    {
+        SshGatewayDto stored = LegacyGateway();
+        stored.SshKeyPassphraseEncrypted = string.Empty;
+        GatewayDialogViewModel vm = GatewayDialogViewModel.FromDto(stored);
+        Assert.True(vm.HasStoredPassword);
+
+        vm.ClearStoredPasswordCommand.Execute(null);
+
+        Assert.False(vm.HasStoredPassword);
+        Assert.True(vm.IsDirty);
+        Assert.Null(vm.ToDto().SshPasswordEncrypted);
+    }
+
+    // Forgetting the passphrase declares the field empty: the key has no passphrase, and the
+    // login password is not offered in its place.
+    [Fact]
+    public void ClearStoredKeyPassphrase_SavesAnExplicitlyEmptyPassphrase()
+    {
+        SshGatewayDto stored = LegacyGateway();
+        stored.SshKeyPassphraseEncrypted = "stored-passphrase";
+        GatewayDialogViewModel vm = GatewayDialogViewModel.FromDto(stored);
+        Assert.True(vm.HasStoredKeyPassphrase);
+
+        vm.ClearStoredKeyPassphraseCommand.Execute(null);
+
+        SshGatewayDto dto = vm.ToDto();
+        Assert.False(vm.HasStoredKeyPassphrase);
+        Assert.Equal(string.Empty, dto.SshKeyPassphraseEncrypted);
+        Assert.False(dto.UsesLegacySshCredentialMapping);
+    }
+
+    // The window title was bound to a property no caller assigned.
+    [Theory]
+    [InlineData(false, "GatewayDialogTitleAdd")]
+    [InlineData(true, "GatewayDialogTitleEdit")]
+    public async Task EnsureDialogTitle_NamesTheWindowFromTheMode(bool isEditMode, string key)
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        GatewayDialogViewModel vm = isEditMode ? GatewayDialogViewModel.FromDto(LegacyGateway()) : new();
+        vm.Localizer = localizer;
+
+        vm.EnsureDialogTitle();
+
+        Assert.Equal(localizer[key], vm.DialogTitle);
+        Assert.False(string.IsNullOrWhiteSpace(vm.DialogTitle));
+    }
+
+    // Text the port box cannot convert never reaches the view model, so validation saw the
+    // previous port and Save stored it.
+    [Fact]
+    public void ReportUnreadablePort_BlocksTheSave()
+    {
+        GatewayDialogViewModel vm = GatewayDialogViewModel.FromDto(LegacyGateway());
+        vm.ValidateCommand.Execute(null);
+        Assert.Null(vm.ValidationError);
+
+        vm.ReportUnreadablePort();
+
+        Assert.NotNull(vm.PortError);
+        Assert.Equal(vm.PortError, vm.ValidationError);
     }
 
     private static SshGatewayDto LegacyGateway() => new()
