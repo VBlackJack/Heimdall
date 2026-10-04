@@ -3431,8 +3431,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         foreach (SshGatewayDto buffered in pendingList)
         {
-            if (!string.IsNullOrWhiteSpace(buffered.Id)
-                && (takenFromPending.Contains(buffered.Id) || deletedGatewayIds.Contains(buffered.Id)))
+            // A gateway without an id can only have come from disk, where the loop above already
+            // kept it: the panel gives every gateway it adds an id. Appending its copy as well
+            // wrote it twice on every save, and two blank ids made every chain lookup throw.
+            if (string.IsNullOrWhiteSpace(buffered.Id)
+                || takenFromPending.Contains(buffered.Id)
+                || deletedGatewayIds.Contains(buffered.Id))
             {
                 continue;
             }

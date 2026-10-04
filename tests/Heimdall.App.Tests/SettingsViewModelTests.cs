@@ -468,6 +468,22 @@ public sealed partial class SettingsViewModelTests : IDisposable
         Assert.Equal("Renamed in the panel", reconciled[0].Name);
     }
 
+    // A gateway without an id is kept from disk, and its copy in the buffer used to be appended
+    // as well, so every save wrote it once more and two blank ids broke every chain lookup.
+    [Fact]
+    public void ReconcileGateways_WritesAGatewayWithoutAnIdOnlyOnce()
+    {
+        SshGatewayDto stored = CreateGateway(string.Empty, "Hand-edited, no id");
+
+        List<SshGatewayDto> reconciled = SettingsViewModel.ReconcileGateways(
+            [stored],
+            [stored.CloneFaithfully()],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.Same(stored, Assert.Single(reconciled));
+    }
+
     // The buffer holds a copy of every gateway taken when the panel loaded, edited or not. Letting
     // every copy win wrote that snapshot back over an edit the server dialog had persisted since,
     // so a rename and a new password made there came undone at the next unrelated Save.

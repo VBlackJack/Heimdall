@@ -85,6 +85,21 @@ public sealed class ConfigManagerSchemaResilienceTests : IDisposable
         Assert.Contains(nameof(SshGatewayDto.ParentGatewayId), logContent, StringComparison.Ordinal);
     }
 
+    // The server list was guarded and the gateway list was not, so either shape threw on load
+    // and stopped the application at startup.
+    [Theory]
+    [InlineData("""{ "sshGateways": null }""")]
+    [InlineData("""{ "sshGateways": [ null ] }""")]
+    public async Task LoadSettingsAsync_NullGatewayListOrEntry_LoadsAnEmptyList(string json)
+    {
+        await WriteUtf8Async(_manager.SettingsPath, json);
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        Assert.Empty(settings.SshGateways);
+        await _manager.MergeSettingAsync(_ => { });
+    }
+
     [Fact]
     public async Task LoadSettingsAsync_FutureValues_ArePreservedAndLoggedAsWarnings()
     {

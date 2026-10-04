@@ -41,6 +41,36 @@ public class GatewayChainResolverTests
         Assert.Equal("admin", chain[0].Username);
     }
 
+    // A gateway without an id cannot be referenced. Two of them made the lookup table throw,
+    // which broke every route, not only theirs.
+    [Fact]
+    public void ResolveChainDtos_GatewaysWithoutAnId_DoNotBreakOtherRoutes()
+    {
+        var gateways = new List<SshGatewayDto>
+        {
+            new() { Id = "", Host = "blank1.example.com", User = "admin" },
+            new() { Id = "", Host = "blank2.example.com", User = "admin" },
+            new() { Id = "gw1", Host = "bastion.example.com", User = "admin" }
+        };
+
+        var chain = GatewayChainResolver.ResolveChainDtos("gw1", gateways);
+
+        Assert.Equal("bastion.example.com", Assert.Single(chain).Host);
+    }
+
+    // Two gateways sharing a real id stay refused: which one a reference means is undecidable.
+    [Fact]
+    public void ResolveChainDtos_TwoGatewaysSharingAnId_StillThrows()
+    {
+        var gateways = new List<SshGatewayDto>
+        {
+            new() { Id = "dup", Host = "a.example.com", User = "admin" },
+            new() { Id = "DUP", Host = "b.example.com", User = "admin" }
+        };
+
+        Assert.Throws<ArgumentException>(() => GatewayChainResolver.ResolveChainDtos("dup", gateways));
+    }
+
     // ── Multi-hop chain ─────────────────────────────────────────────────
 
     [Fact]
