@@ -329,6 +329,11 @@ public static class FailureClassifier
             SocketError.HostUnreachable or SocketError.NetworkUnreachable =>
                 new SshFailureInfo(SshFailureCode.NetworkUnreachable, "Host unreachable.", true, ex),
 
+            // A name that does not resolve is the commonest gateway typo, and it read as an
+            // unknown failure. The unreachable code is the one whose message names DNS.
+            SocketError.HostNotFound or SocketError.TryAgain or SocketError.NoData =>
+                new SshFailureInfo(SshFailureCode.NetworkUnreachable, "Host name could not be resolved.", true, ex),
+
             _ => new SshFailureInfo(SshFailureCode.Unknown, ex.Message, true, ex)
         };
     }
