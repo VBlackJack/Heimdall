@@ -67,6 +67,25 @@ public class HostKeyStoreTests
         Assert.Null(_store.GetFingerprint("host3.example.com", 22));
     }
 
+    // Gateway fingerprints are inventory, which a profile import writes; the trusted entries are
+    // what the user accepted. Seeding from the first used to overwrite the second, so a shared
+    // file could replace the pinned key of a host this machine already trusted.
+    [Fact]
+    public void LoadFromConfig_DoesNotReplaceAKeyAlreadyTrusted()
+    {
+        var accepted = new HostKeyEntry(
+            "SHA256:accepted",
+            DateTimeOffset.Parse("2026-04-24T10:15:00Z"),
+            DateTimeOffset.Parse("2026-04-24T10:16:00Z"),
+            "ssh-ed25519",
+            HostKeySource.ImportedKnownHosts);
+        _store.LoadEntriesFromConfig([("bastion.example.com", 22, accepted)]);
+
+        _store.LoadFromConfig([("bastion.example.com", 22, "SHA256:from-a-shared-file")]);
+
+        Assert.Equal(accepted, _store.GetEntry("bastion.example.com", 22));
+    }
+
     [Fact]
     public void LoadFromConfig_SkipsWhitespaceFingerprints()
     {

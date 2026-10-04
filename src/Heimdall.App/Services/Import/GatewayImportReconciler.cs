@@ -99,6 +99,11 @@ internal static class GatewayImportReconciler
         {
             SshGatewayDto gateway = CloneGatewayWithoutSecrets(assignment.Gateway);
             gateway.Id = assignment.FinalId;
+
+            // The fingerprint seeds the host key store at startup, so a shared file that carried
+            // one decided which key this machine would accept for that host. Trust is earned on
+            // the first connection here, never inherited from someone else's file.
+            gateway.HostKeyFingerprint = null;
             gateway.ParentGatewayId = ResolveGatewayId(gateway.ParentGatewayId, gatewayIdMap, resolvableIds);
             if (!string.IsNullOrWhiteSpace(assignment.Gateway.ParentGatewayId) &&
                 string.IsNullOrWhiteSpace(gateway.ParentGatewayId))
