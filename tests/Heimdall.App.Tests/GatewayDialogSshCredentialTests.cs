@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
 
@@ -60,4 +61,64 @@ public sealed class GatewayDialogSshCredentialTests
         Assert.False(dto.UsesLegacySshCredentialMapping);
         Assert.NotNull(dto.SshPasswordEncrypted);
     }
+
+    // A gateway written before the passphrase field existed offers its stored password as the
+    // key passphrase, and that mapping is read off the field being absent. Saving it back with an
+    // empty field declared switched the mapping off, so renaming such a gateway was enough to
+    // make its encrypted key fail to load at the next connection.
+    [Fact]
+    public void FromDtoToDto_LegacyGatewayEditedWithoutPassphrase_KeepsLegacyMapping()
+    {
+        SshGatewayDto legacy = LegacyGateway();
+        Assert.True(legacy.UsesLegacySshCredentialMapping);
+
+        GatewayDialogViewModel vm = GatewayDialogViewModel.FromDto(legacy);
+        vm.Name = "Renamed";
+
+        SshGatewayDto dto = vm.ToDto();
+
+        Assert.Equal("Renamed", dto.Name);
+        Assert.Equal("legacy-password", dto.SshPasswordEncrypted);
+        Assert.False(dto.HasSshKeyPassphraseEncryptedField);
+        Assert.True(dto.UsesLegacySshCredentialMapping);
+    }
+
+    // Typing a passphrase is the user moving the gateway to the explicit field.
+    [Fact]
+    public void FromDtoToDto_LegacyGatewayGivenAPassphrase_DeclaresTheField()
+    {
+        GatewayDialogViewModel vm = GatewayDialogViewModel.FromDto(LegacyGateway());
+        vm.KeyPassphrase = "typed-passphrase";
+
+        SshGatewayDto dto = vm.ToDto();
+
+        Assert.True(dto.HasSshKeyPassphraseEncryptedField);
+        Assert.False(string.IsNullOrEmpty(dto.SshKeyPassphraseEncrypted));
+        Assert.False(dto.UsesLegacySshCredentialMapping);
+    }
+
+    // The other direction: a gateway that declared an empty passphrase must not be turned into
+    // a legacy one by an edit, or its login password would start being offered to the key.
+    [Fact]
+    public void FromDtoToDto_GatewayDeclaringAnEmptyPassphrase_StaysDeclared()
+    {
+        SshGatewayDto declared = LegacyGateway();
+        declared.SshKeyPassphraseEncrypted = string.Empty;
+        Assert.False(declared.UsesLegacySshCredentialMapping);
+
+        SshGatewayDto dto = GatewayDialogViewModel.FromDto(declared).ToDto();
+
+        Assert.True(dto.HasSshKeyPassphraseEncryptedField);
+        Assert.False(dto.UsesLegacySshCredentialMapping);
+    }
+
+    private static SshGatewayDto LegacyGateway() => new()
+    {
+        Id = "gw-legacy",
+        Name = "Legacy",
+        Host = "gateway.example.com",
+        User = "user",
+        KeyPath = @"C:\keys\gw.ppk",
+        SshPasswordEncrypted = "legacy-password"
+    };
 }

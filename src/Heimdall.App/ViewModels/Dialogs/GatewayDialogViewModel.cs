@@ -80,6 +80,11 @@ public partial class GatewayDialogViewModel : ObservableValidator
     public string? ExistingSshPasswordEncrypted { get; set; }
     public string? ExistingSshKeyPassphraseEncrypted { get; set; }
 
+    // Whether the gateway loaded for edit relied on the legacy mapping, where the stored password
+    // doubles as the key passphrase. The mapping is derived from the passphrase field being absent,
+    // so writing an empty one on save switched it off and broke an encrypted key on a mere rename.
+    private bool _sourceUsesLegacySshCredentialMapping;
+
     /// <summary>
     /// Returns the label for the SSH password field.
     /// </summary>
@@ -270,7 +275,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
     {
         var keyPath = string.IsNullOrWhiteSpace(KeyPath) ? null : KeyPath;
 
-        return new SshGatewayDto
+        var dto = new SshGatewayDto
         {
             Name = Name,
             Host = Host,
@@ -280,11 +285,6 @@ public partial class GatewayDialogViewModel : ObservableValidator
             SshPasswordEncrypted = string.IsNullOrEmpty(Password)
                 ? ExistingSshPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(Password),
-            SshKeyPassphraseEncrypted = keyPath is null
-                ? null
-                : string.IsNullOrEmpty(KeyPassphrase)
-                    ? ExistingSshKeyPassphraseEncrypted ?? string.Empty
-                    : Heimdall.Core.Security.CredentialProtector.Protect(KeyPassphrase),
             ParentGatewayId = string.IsNullOrWhiteSpace(SelectedParentGatewayId)
                 ? null
                 : SelectedParentGatewayId,
@@ -292,7 +292,26 @@ public partial class GatewayDialogViewModel : ObservableValidator
                 ? null
                 : HostKeyFingerprint
         };
+
+        // The passphrase setter declares the field even when it assigns null, so it is only
+        // called when the field has to be declared.
+        if (!KeepsLegacySshCredentialMapping(keyPath))
+        {
+            dto.SshKeyPassphraseEncrypted = keyPath is null
+                ? null
+                : string.IsNullOrEmpty(KeyPassphrase)
+                    ? ExistingSshKeyPassphraseEncrypted ?? string.Empty
+                    : Heimdall.Core.Security.CredentialProtector.Protect(KeyPassphrase);
+        }
+
+        return dto;
     }
+
+    private bool KeepsLegacySshCredentialMapping(string? keyPath) =>
+        _sourceUsesLegacySshCredentialMapping
+        && keyPath is not null
+        && string.IsNullOrEmpty(KeyPassphrase)
+        && ExistingSshKeyPassphraseEncrypted is null;
 
     /// <summary>
     /// Creates a ViewModel pre-populated from an existing DTO (for edit mode).
@@ -315,6 +334,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
         vm.HostKeyFingerprint = dto.HostKeyFingerprint ?? "";
         vm.ExistingSshPasswordEncrypted = dto.SshPasswordEncrypted;
         vm.ExistingSshKeyPassphraseEncrypted = dto.SshKeyPassphraseEncrypted;
+        vm._sourceUsesLegacySshCredentialMapping = dto.UsesLegacySshCredentialMapping;
         vm._isInitializing = false;
         return vm;
     }
