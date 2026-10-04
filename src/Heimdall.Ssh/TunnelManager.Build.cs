@@ -276,10 +276,30 @@ public sealed partial class TunnelManager
         return new TunnelResult(true, info, null, null);
     }
 
+    /// <summary>
+    /// Runs the cleanup and turns the exception that ended a tunnel opening into a result.
+    /// </summary>
+    /// <remarks>
+    /// Only what is specific to opening a tunnel is decided here: a cancellation, a host key
+    /// refusal, a local port already taken, and a refused sign-in, which stays
+    /// <see cref="SshFailureCode.AuthRejected"/> because the caller's agent context and Plink
+    /// fallback are keyed on it. Everything else goes to <see cref="FailureClassifier"/>. This
+    /// switch used to keep its own, shorter table, so a connect or banner timeout, a proxy
+    /// error, a missing or wrong key passphrase and a socket error wrapped in an
+    /// <see cref="IOException"/> all reached the user as an unknown failure.
+    /// </remarks>
+    /// <param name="ex">The exception that ended the opening.</param>
+    /// <param name="cleanup">Releases what the opening had acquired.</param>
+    /// <param name="isChained">Whether the tunnel went through more than one gateway.</param>
+    /// <param name="connectionParams">
+    /// The gateway that was dialled, when there was only one; it tells a wrong passphrase
+    /// apart from an unreadable key file.
+    /// </param>
     internal static TunnelResult ClassifyAndBuildFailureResult(
         Exception ex,
         Action cleanup,
-        bool isChained)
+        bool isChained,
+        SshConnectionParams? connectionParams = null)
     {
         cleanup();
 
@@ -314,17 +334,12 @@ public sealed partial class TunnelManager
                 null,
                 authEx.Message,
                 SshFailureCode.AuthRejected),
-            SocketException socketEx => new TunnelResult(
+            SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse } socketEx => new TunnelResult(
                 false,
                 null,
                 socketEx.Message,
-                ClassifySocketException(socketEx)),
-            SshConnectionException connectionEx => new TunnelResult(
-                false,
-                null,
-                connectionEx.Message,
-                FailureClassifier.Classify(connectionEx).Code),
-            _ => new TunnelResult(false, null, ex.Message, SshFailureCode.Unknown)
+                SshFailureCode.PortInUse),
+            _ => new TunnelResult(false, null, ex.Message, FailureClassifier.Classify(ex, connectionParams).Code)
         };
     }
 
@@ -399,19 +414,6 @@ public sealed partial class TunnelManager
     private static bool IsLocalBindAlreadyInUse(SocketException ex)
     {
         return ex.SocketErrorCode == SocketError.AddressAlreadyInUse;
-    }
-
-    /// <summary>Classifies a SocketException into a structured failure code.</summary>
-    private static SshFailureCode ClassifySocketException(SocketException ex)
-    {
-        return ex.SocketErrorCode switch
-        {
-            SocketError.ConnectionRefused => SshFailureCode.NetworkRefused,
-            SocketError.TimedOut => SshFailureCode.NetworkTimedOut,
-            SocketError.HostNotFound or SocketError.HostUnreachable => SshFailureCode.NetworkUnreachable,
-            SocketError.AddressAlreadyInUse => SshFailureCode.PortInUse,
-            _ => SshFailureCode.Unknown
-        };
     }
 
     private static void SafeDispose(IDisposable? resource, string logMessage)

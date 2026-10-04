@@ -264,7 +264,7 @@ public sealed partial class TunnelManager : IDisposable
         catch (Exception ex)
         {
             ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
-            return ClassifyAndBuildFailureResult(ex, context.Cleanup, isChained: false);
+            return ClassifyAndBuildFailureResult(ex, context.Cleanup, isChained: false, gatewayParams);
         }
     }
 
