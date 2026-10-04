@@ -72,6 +72,12 @@ public sealed class HostKeyStore
     /// Populate the store from persisted gateway/server configurations.
     /// Called at startup before any connections are made.
     /// </summary>
+    /// <remarks>
+    /// Seeds only hosts the store does not already trust. A gateway fingerprint is a field of
+    /// the inventory, which a profile import writes, while the trusted key list is what the user
+    /// accepted: letting the first overwrite the second replaced a pinned key with whatever a
+    /// shared file declared for the same host and port.
+    /// </remarks>
     /// <param name="entries">Tuples of (host, port, fingerprint) from config.</param>
     public void LoadFromConfig(IEnumerable<(string host, int port, string? fingerprint)> entries)
     {
@@ -81,7 +87,7 @@ public sealed class HostKeyStore
         {
             if (!string.IsNullOrWhiteSpace(fingerprint))
             {
-                _trustedKeys[HostKeyFormats.MakeKey(host, port)] = CreateLegacyEntry(fingerprint);
+                _trustedKeys.TryAdd(HostKeyFormats.MakeKey(host, port), CreateLegacyEntry(fingerprint));
             }
         }
     }

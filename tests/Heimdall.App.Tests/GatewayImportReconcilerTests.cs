@@ -21,6 +21,25 @@ namespace Heimdall.App.Tests;
 
 public sealed class GatewayImportReconcilerTests
 {
+    // A gateway fingerprint seeds the host key store at startup, and that seeding used to replace
+    // the key the user had accepted for the same host and port. A shared profile carrying its own
+    // fingerprint for bastion.corp:22 therefore decided which key this machine trusted there.
+    [Fact]
+    public void Reconcile_DropsTheImportedHostKeyFingerprint()
+    {
+        SshGatewayDto imported = Gateway("imported-gateway", "bastion.example.com", "ops");
+        imported.HostKeyFingerprint = "SHA256:fingerprint-from-a-shared-file";
+
+        GatewayImportReconciliationResult result = GatewayImportReconciler.Reconcile(
+            [],
+            [imported],
+            [],
+            NewIdFactory("unused"));
+
+        Assert.Null(Assert.Single(result.GatewaysToAdd).HostKeyFingerprint);
+        Assert.Equal("SHA256:fingerprint-from-a-shared-file", imported.HostKeyFingerprint);
+    }
+
     [Fact]
     public void Reconcile_PreservesImportedGatewayId_WhenIdentityIsNewAndIdUnused()
     {
