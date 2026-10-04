@@ -107,7 +107,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
     public string GatewayChainSummary => string.IsNullOrWhiteSpace(SelectedParentGatewayId)
         ? ""
         : Localizer?["GatewayChainLabel"] is string label
-            ? $"{label}: {AvailableParents.FirstOrDefault(p => p.Id == SelectedParentGatewayId)?.DisplayText ?? SelectedParentGatewayId} \u2192 {Name}"
+            ? $"{label}: {AvailableParents.FirstOrDefault(p => string.Equals(p.Id, SelectedParentGatewayId, StringComparison.OrdinalIgnoreCase))?.DisplayText ?? SelectedParentGatewayId} \u2192 {Name}"
             : "";
 
     /// <summary>
@@ -124,10 +124,24 @@ public partial class GatewayDialogViewModel : ObservableValidator
     private string _hostKeyFingerprint = "";
 
     /// <summary>
-    /// Available parent gateways for chaining. Excludes the current gateway to prevent cycles.
+    /// Available parent gateways for chaining. The caller builds it with
+    /// <see cref="Services.GatewayParentEligibility"/>, which leaves out every parent that
+    /// would close a loop or make a chain longer than a connection follows.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ParentChoices))]
     private ObservableCollection<GatewayOption> _availableParents = [];
+
+    /// <summary>
+    /// What the parent picker lists: no parent first, then <see cref="AvailableParents"/>.
+    /// </summary>
+    /// <remarks>
+    /// The picker had no way back to a direct connection, so a parent once chosen could only
+    /// be swapped for another. A loop already on disk could not be broken at all when every
+    /// other gateway sat inside it.
+    /// </remarks>
+    public IReadOnlyList<GatewayOption> ParentChoices =>
+        [new GatewayOption(string.Empty, Localizer?["GatewayDialogNoParent"] ?? "None"), .. AvailableParents];
 
     // --- Dirty state tracking ---
 
@@ -213,6 +227,19 @@ public partial class GatewayDialogViewModel : ObservableValidator
 
     partial void OnAvailableParentsChanged(ObservableCollection<GatewayOption> value)
     {
+        // Ids match without regard to case everywhere but in the picker, which compares them
+        // exactly: a parent stored as "A" for the option "a" read as no selection, and the
+        // picker cleared it. Adopting the option's spelling is not an edit.
+        GatewayOption? match = value.FirstOrDefault(option => string.Equals(
+            option.Id, SelectedParentGatewayId, StringComparison.OrdinalIgnoreCase));
+        if (match is not null && !string.Equals(match.Id, SelectedParentGatewayId, StringComparison.Ordinal))
+        {
+            bool wasInitializing = _isInitializing;
+            _isInitializing = true;
+            SelectedParentGatewayId = match.Id;
+            _isInitializing = wasInitializing;
+        }
+
         OnPropertyChanged(nameof(GatewayChainSummary));
     }
 

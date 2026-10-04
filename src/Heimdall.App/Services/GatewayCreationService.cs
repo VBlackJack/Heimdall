@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Collections.ObjectModel;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
 
@@ -67,9 +66,7 @@ public sealed class GatewayCreationService : IGatewayCreationService
 
         GatewayDialogViewModel dialogViewModel = new()
         {
-            AvailableParents = new ObservableCollection<GatewayOption>(
-                persisted.SshGateways.Select(
-                    gateway => new GatewayOption(gateway.Id, $"{gateway.Name} ({gateway.Host})")))
+            AvailableParents = GatewayParentEligibility.BuildOptions(persisted.SshGateways, gatewayId: null)
         };
 
         GatewayDialogResult? result = await _dialogService.ShowGatewayDialogAsync(dialogViewModel);

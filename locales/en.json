@@ -3682,6 +3682,7 @@
   "GatewayAuthHintKey": "Passphrase that decrypts your private key. Leave blank if the key has no passphrase.",
   "GatewayChainLabel": "Chain",
   "GatewayDialogLabelParentGateway": "Parent Gateway",
+  "GatewayDialogNoParent": "None (direct connection)",
   "GatewayDialogLabelHostKeyFingerprint": "Host Key Fingerprint",
   "GatewayHostKeyFingerprintHint": "Auto-populated after the first connection. Used to verify server identity and prevent host key spoofing.",
   "GatewayDialogBtnBrowse": "Browse",

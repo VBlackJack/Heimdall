@@ -455,10 +455,7 @@ public partial class ServerDialog : Window
 
         var gwVm = GatewayDialogViewModel.FromDto(gwDto);
         gwVm.Localizer = _localizer;
-        gwVm.AvailableParents = new System.Collections.ObjectModel.ObservableCollection<GatewayOption>(
-            settings.SshGateways
-                .Where(g => g.Id != gwDto.Id)
-                .Select(g => new GatewayOption(g.Id, $"{g.Name} ({g.Host})")));
+        gwVm.AvailableParents = GatewayParentEligibility.BuildOptions(settings.SshGateways, gwDto.Id);
 
         var gwDialog = new GatewayDialog
         {

@@ -3682,6 +3682,7 @@
   "GatewayAuthHintKey": "Frase de contraseña que descifra tu clave privada. Déjala en blanco si la clave no tiene contraseña.",
   "GatewayChainLabel": "Cadena",
   "GatewayDialogLabelParentGateway": "Pasarela principal",
+  "GatewayDialogNoParent": "Ninguna (conexión directa)",
   "GatewayDialogLabelHostKeyFingerprint": "Huella de la clave de host",
   "GatewayHostKeyFingerprintHint": "Se rellena automáticamente tras la primera conexión. Se usa para verificar la identidad del servidor y evitar la suplantación de clave de host.",
   "GatewayDialogBtnBrowse": "Examinar",

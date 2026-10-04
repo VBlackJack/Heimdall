@@ -3075,8 +3075,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private async Task AddGatewayAsync(CancellationToken cancellationToken)
     {
         var vm = new GatewayDialogViewModel();
-        vm.AvailableParents = new ObservableCollection<GatewayOption>(
-            _pendingGateways.Select(g => new GatewayOption(g.Id, $"{g.Name} ({g.Host})")));
+        vm.AvailableParents = GatewayParentEligibility.BuildOptions(_pendingGateways, gatewayId: null);
 
         var result = await _dialogService.ShowGatewayDialogAsync(vm);
         if (result?.Saved == true)
@@ -3232,10 +3231,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         if (gwDto == null) return;
 
         var vm = GatewayDialogViewModel.FromDto(gwDto);
-        vm.AvailableParents = new ObservableCollection<GatewayOption>(
-            _pendingGateways
-                .Where(g => g.Id != gwDto.Id)
-                .Select(g => new GatewayOption(g.Id, $"{g.Name} ({g.Host})")));
+        vm.AvailableParents = GatewayParentEligibility.BuildOptions(_pendingGateways, gwDto.Id);
 
         var result = await _dialogService.ShowGatewayDialogAsync(vm);
         if (result?.Saved == true)
