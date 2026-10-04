@@ -34,11 +34,16 @@ namespace Heimdall.App.Services;
 /// edited gateway resolvable: it is not the gateway or one of its descendants, its own route
 /// up to the root resolves, and that route plus the longest chain hanging below the edited
 /// gateway stays within <see cref="GatewayChainResolver.DefaultMaxDepth"/>.
+///
+/// The options always keep the parent the gateway already has, eligible or not. A picker
+/// whose items do not hold its selected value clears it, and the cleared value flows back
+/// through the binding: leaving the current parent out turned a rename into a silent switch
+/// to a direct connection that skipped the bastion.
 /// </remarks>
 public static class GatewayParentEligibility
 {
     /// <summary>
-    /// Builds the parent options for a gateway, in inventory order.
+    /// Builds the parent options for a gateway, in inventory order, keeping its current parent.
     /// </summary>
     /// <param name="gateways">Every known gateway, the edited one included when it exists.</param>
     /// <param name="gatewayId">The edited gateway, or <see langword="null"/> for a new one.</param>
@@ -50,8 +55,23 @@ public static class GatewayParentEligibility
     {
         ArgumentNullException.ThrowIfNull(gateways);
 
+        HashSet<SshGatewayDto> offered = [.. EligibleParents(gateways, gatewayId, maxDepth)];
+        string? currentParentId = string.IsNullOrWhiteSpace(gatewayId)
+            ? null
+            : gateways.FirstOrDefault(gateway =>
+                string.Equals(gateway.Id, gatewayId, StringComparison.OrdinalIgnoreCase))?.ParentGatewayId;
+        SshGatewayDto? currentParent = string.IsNullOrWhiteSpace(currentParentId)
+            ? null
+            : gateways.FirstOrDefault(gateway =>
+                string.Equals(gateway.Id, currentParentId, StringComparison.OrdinalIgnoreCase));
+        if (currentParent is not null)
+        {
+            offered.Add(currentParent);
+        }
+
         return new ObservableCollection<GatewayOption>(
-            EligibleParents(gateways, gatewayId, maxDepth)
+            gateways
+                .Where(offered.Contains)
                 .Select(gateway => new GatewayOption(gateway.Id, $"{gateway.Name} ({gateway.Host})")));
     }
 
@@ -65,14 +85,16 @@ public static class GatewayParentEligibility
     {
         ArgumentNullException.ThrowIfNull(gateways);
 
-        // First entry wins on a duplicated id, the same way a lookup by id finds it elsewhere,
-        // instead of throwing on an inventory a hand edit left inconsistent.
+        // A hand edit can leave two gateways under one id. The resolver refuses such an
+        // inventory outright, so neither of them is offered; the first one still stands in for
+        // the id when the routes of the others are walked, instead of throwing here.
         Dictionary<string, SshGatewayDto> byId = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> duplicatedIds = new(StringComparer.OrdinalIgnoreCase);
         foreach (SshGatewayDto gateway in gateways)
         {
-            if (!string.IsNullOrWhiteSpace(gateway.Id))
+            if (!string.IsNullOrWhiteSpace(gateway.Id) && !byId.TryAdd(gateway.Id, gateway))
             {
-                byId.TryAdd(gateway.Id, gateway);
+                duplicatedIds.Add(gateway.Id);
             }
         }
 
@@ -109,7 +131,7 @@ public static class GatewayParentEligibility
         {
             if (string.IsNullOrWhiteSpace(candidate.Id)
                 || excluded.Contains(candidate.Id)
-                || !ReferenceEquals(byId[candidate.Id], candidate))
+                || duplicatedIds.Contains(candidate.Id))
             {
                 continue;
             }

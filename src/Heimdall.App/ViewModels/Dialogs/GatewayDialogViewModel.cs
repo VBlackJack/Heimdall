@@ -107,7 +107,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
     public string GatewayChainSummary => string.IsNullOrWhiteSpace(SelectedParentGatewayId)
         ? ""
         : Localizer?["GatewayChainLabel"] is string label
-            ? $"{label}: {AvailableParents.FirstOrDefault(p => p.Id == SelectedParentGatewayId)?.DisplayText ?? SelectedParentGatewayId} \u2192 {Name}"
+            ? $"{label}: {AvailableParents.FirstOrDefault(p => string.Equals(p.Id, SelectedParentGatewayId, StringComparison.OrdinalIgnoreCase))?.DisplayText ?? SelectedParentGatewayId} \u2192 {Name}"
             : "";
 
     /// <summary>
@@ -227,6 +227,19 @@ public partial class GatewayDialogViewModel : ObservableValidator
 
     partial void OnAvailableParentsChanged(ObservableCollection<GatewayOption> value)
     {
+        // Ids match without regard to case everywhere but in the picker, which compares them
+        // exactly: a parent stored as "A" for the option "a" read as no selection, and the
+        // picker cleared it. Adopting the option's spelling is not an edit.
+        GatewayOption? match = value.FirstOrDefault(option => string.Equals(
+            option.Id, SelectedParentGatewayId, StringComparison.OrdinalIgnoreCase));
+        if (match is not null && !string.Equals(match.Id, SelectedParentGatewayId, StringComparison.Ordinal))
+        {
+            bool wasInitializing = _isInitializing;
+            _isInitializing = true;
+            SelectedParentGatewayId = match.Id;
+            _isInitializing = wasInitializing;
+        }
+
         OnPropertyChanged(nameof(GatewayChainSummary));
     }
 

@@ -98,13 +98,70 @@ public sealed class GatewayParentEligibilityTests
         Assert.Equal(["outside"], Ids(GatewayParentEligibility.EligibleParents(gateways, "a")));
     }
 
-    // A hand edit can leave two gateways under one id; a dictionary built from them threw.
+    // A hand edit can leave two gateways under one id. The resolver refuses that inventory, so
+    // neither is a parent anything could connect through, and building the list must not throw.
     [Fact]
-    public void EligibleParents_ToleratesADuplicatedId()
+    public void EligibleParents_LeavesOutADuplicatedId()
     {
         List<SshGatewayDto> gateways = [Gateway("dup"), Gateway("DUP"), Gateway("fine")];
 
-        Assert.Equal(["dup", "fine"], Ids(GatewayParentEligibility.EligibleParents(gateways, gatewayId: null)));
+        Assert.Equal(["fine"], Ids(GatewayParentEligibility.EligibleParents(gateways, gatewayId: null)));
+    }
+
+    // The rule is only worth what the resolver agrees with. On seeded random inventories, loops
+    // included, a candidate is offered exactly when choosing it lets every chain through the
+    // edited gateway resolve: the gateway itself and everything below it.
+    [Fact]
+    public void EligibleParents_AgreesWithTheResolverOnRandomInventories()
+    {
+        Random random = new(20261004);
+        for (int round = 0; round < 300; round++)
+        {
+            List<SshGatewayDto> gateways = RandomInventory(random);
+            foreach (SshGatewayDto edited in gateways)
+            {
+                HashSet<string> eligible = [.. Ids(GatewayParentEligibility.EligibleParents(gateways, edited.Id))];
+                foreach (SshGatewayDto candidate in gateways.Where(gateway => gateway != edited))
+                {
+                    bool resolves = AllChainsResolve(gateways, edited.Id, candidate.Id);
+                    Assert.True(
+                        resolves == eligible.Contains(candidate.Id),
+                        $"Round {round}: parent {candidate.Id} for {edited.Id} resolves={resolves}.");
+                }
+            }
+        }
+    }
+
+    // A parent the rule would refuse today is still the parent the gateway has. Leaving it out
+    // made the picker clear it, and a rename saved the gateway as a direct connection.
+    [Fact]
+    public void BuildOptions_KeepsTheCurrentParentEvenWhenTheRuleWouldRefuseIt()
+    {
+        List<SshGatewayDto> gateways =
+        [
+            Gateway("broken-parent", parent: "deleted"),
+            Gateway("edited", parent: "BROKEN-PARENT"),
+            Gateway("fine")
+        ];
+
+        Assert.Equal(
+            ["broken-parent", "fine"],
+            GatewayParentEligibility.BuildOptions(gateways, "edited").Select(option => option.Id));
+    }
+
+    // The picker compares ids exactly while the rest of the product ignores case, so a parent
+    // stored in another case read as no selection and was cleared.
+    [Fact]
+    public void AvailableParents_AdoptsTheOptionSpellingOfTheCurrentParentWithoutMarkingAnEdit()
+    {
+        GatewayDialogViewModel vm = GatewayDialogViewModel.FromDto(Gateway("edited", parent: "BASTION"));
+
+        vm.AvailableParents = GatewayParentEligibility.BuildOptions(
+            [Gateway("bastion"), Gateway("edited", parent: "BASTION")],
+            "edited");
+
+        Assert.Equal("bastion", vm.SelectedParentGatewayId);
+        Assert.False(vm.IsDirty);
     }
 
     [Fact]
@@ -128,6 +185,63 @@ public sealed class GatewayParentEligibilityTests
         };
 
         Assert.Equal([string.Empty, "bastion"], vm.ParentChoices.Select(choice => choice.Id));
+    }
+
+    private static List<SshGatewayDto> RandomInventory(Random random)
+    {
+        int count = random.Next(1, 9);
+        List<SshGatewayDto> gateways = [];
+        for (int index = 0; index < count; index++)
+        {
+            int parent = random.Next(-2, count);
+            gateways.Add(Gateway(
+                $"g{index}",
+                parent switch
+                {
+                    -2 => "missing",
+                    -1 => null,
+                    _ when parent == index => null,
+                    _ => $"g{parent}"
+                }));
+        }
+
+        return gateways;
+    }
+
+    private static bool AllChainsResolve(List<SshGatewayDto> gateways, string editedId, string parentId)
+    {
+        List<SshGatewayDto> changed = gateways.Select(gateway => gateway.CloneFaithfully()).ToList();
+        changed.Single(gateway => gateway.Id == editedId).ParentGatewayId = parentId;
+
+        HashSet<string> affected = [editedId];
+        bool grew = true;
+        while (grew)
+        {
+            grew = false;
+            foreach (SshGatewayDto gateway in changed)
+            {
+                if (gateway.ParentGatewayId is not null
+                    && affected.Contains(gateway.ParentGatewayId)
+                    && affected.Add(gateway.Id))
+                {
+                    grew = true;
+                }
+            }
+        }
+
+        try
+        {
+            foreach (string id in affected)
+            {
+                GatewayChainResolver.ResolveChainDtos(id, changed);
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or GatewayChainException)
+        {
+            return false;
+        }
     }
 
     private static List<SshGatewayDto> Chain(int length)

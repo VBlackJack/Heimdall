@@ -328,8 +328,7 @@ public static partial class SchemaValidator
             errors.Add($"{nameof(gateway.User)}: required.");
         }
 
-        if (!string.IsNullOrEmpty(gateway.Id)
-            && string.Equals(gateway.ParentGatewayId, gateway.Id, StringComparison.OrdinalIgnoreCase))
+        if (gateway.ParentGatewayId == gateway.Id && !string.IsNullOrEmpty(gateway.Id))
         {
             errors.Add($"{nameof(gateway.ParentGatewayId)}: gateway cannot be its own parent.");
         }
@@ -391,8 +390,7 @@ public static partial class SchemaValidator
         List<string> errors,
         SshGatewayDto gateway)
     {
-        if (!string.IsNullOrEmpty(gateway.Id)
-            && string.Equals(gateway.ParentGatewayId, gateway.Id, StringComparison.OrdinalIgnoreCase))
+        if (gateway.ParentGatewayId == gateway.Id && !string.IsNullOrEmpty(gateway.Id))
         {
             errors.Add($"{nameof(gateway.ParentGatewayId)}: gateway cannot be its own parent.");
         }
