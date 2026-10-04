@@ -78,7 +78,12 @@ public static class GatewayChainResolver
         ArgumentException.ThrowIfNullOrWhiteSpace(targetGatewayId);
         ArgumentNullException.ThrowIfNull(allGateways);
 
-        var gatewayMap = allGateways.ToDictionary(g => g.Id, StringComparer.OrdinalIgnoreCase);
+        // A gateway without an id cannot be referenced by anything, so it is left out instead
+        // of making every lookup throw when there are two of them. Two gateways sharing a real
+        // id still throw: which one a reference means cannot be decided.
+        var gatewayMap = allGateways
+            .Where(g => !string.IsNullOrWhiteSpace(g.Id))
+            .ToDictionary(g => g.Id, StringComparer.OrdinalIgnoreCase);
 
         if (!gatewayMap.TryGetValue(targetGatewayId, out var targetGateway))
         {
