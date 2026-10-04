@@ -1432,6 +1432,21 @@ public class SchemaValidatorTests
         Assert.Contains(result.Errors, e => e.Contains("ParentGatewayId") && e.Contains("own parent"));
     }
 
+    // Gateway ids are matched without regard to case everywhere else, the chain resolver
+    // included, so "GW-1" names the gateway "gw-1" and the loop is the same one.
+    [Fact]
+    public void ValidateGatewayWriteInvariants_SelfParentInAnotherCase_ReturnsError()
+    {
+        var gateway = CreateValidGateway();
+        gateway.Id = "gw-1";
+        gateway.ParentGatewayId = "GW-1";
+
+        var result = SchemaValidator.ValidateGatewayWriteInvariants(gateway);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("ParentGatewayId") && e.Contains("own parent"));
+    }
+
     [Fact]
     public void ValidateGateway_DifferentParent_IsValid()
     {

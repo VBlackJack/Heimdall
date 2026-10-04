@@ -124,10 +124,24 @@ public partial class GatewayDialogViewModel : ObservableValidator
     private string _hostKeyFingerprint = "";
 
     /// <summary>
-    /// Available parent gateways for chaining. Excludes the current gateway to prevent cycles.
+    /// Available parent gateways for chaining. The caller builds it with
+    /// <see cref="Services.GatewayParentEligibility"/>, which leaves out every parent that
+    /// would close a loop or make a chain longer than a connection follows.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ParentChoices))]
     private ObservableCollection<GatewayOption> _availableParents = [];
+
+    /// <summary>
+    /// What the parent picker lists: no parent first, then <see cref="AvailableParents"/>.
+    /// </summary>
+    /// <remarks>
+    /// The picker had no way back to a direct connection, so a parent once chosen could only
+    /// be swapped for another. A loop already on disk could not be broken at all when every
+    /// other gateway sat inside it.
+    /// </remarks>
+    public IReadOnlyList<GatewayOption> ParentChoices =>
+        [new GatewayOption(string.Empty, Localizer?["GatewayDialogNoParent"] ?? "None"), .. AvailableParents];
 
     // --- Dirty state tracking ---
 

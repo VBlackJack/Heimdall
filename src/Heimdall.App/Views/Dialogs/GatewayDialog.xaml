@@ -120,7 +120,7 @@
                 </StackPanel>
 
                 <TextBlock x:Name="LblParentGateway" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
-                <ComboBox ItemsSource="{Binding AvailableParents}"
+                <ComboBox ItemsSource="{Binding ParentChoices}"
                           AutomationProperties.Name="{Binding Text, ElementName=LblParentGateway}"
                           SelectedValue="{Binding SelectedParentGatewayId}"
                           SelectedValuePath="Id"

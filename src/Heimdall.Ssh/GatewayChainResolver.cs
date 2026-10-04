@@ -27,6 +27,13 @@ namespace Heimdall.Ssh;
 public static class GatewayChainResolver
 {
     /// <summary>
+    /// The longest chain a connection follows, counting every gateway from the root to the one
+    /// the session uses. The pickers that offer a parent gateway read it too, so that they only
+    /// offer a parent the connection will accept.
+    /// </summary>
+    public const int DefaultMaxDepth = 5;
+
+    /// <summary>
     /// Builds an ordered list of <see cref="SshConnectionParams"/> from the root gateway
     /// to the target gateway by following ParentGatewayId references.
     /// </summary>
@@ -44,7 +51,7 @@ public static class GatewayChainResolver
         string targetGatewayId,
         IReadOnlyList<SshGatewayDto> allGateways,
         Func<string, string?> decryptPassword,
-        int maxDepth = 5,
+        int maxDepth = DefaultMaxDepth,
         SshAgentPreference sshAgentPreference = SshAgentPreference.AutoOpenSshFirst)
     {
         ArgumentNullException.ThrowIfNull(decryptPassword);
@@ -66,7 +73,7 @@ public static class GatewayChainResolver
     public static List<SshGatewayDto> ResolveChainDtos(
         string targetGatewayId,
         IReadOnlyList<SshGatewayDto> allGateways,
-        int maxDepth = 5)
+        int maxDepth = DefaultMaxDepth)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetGatewayId);
         ArgumentNullException.ThrowIfNull(allGateways);
