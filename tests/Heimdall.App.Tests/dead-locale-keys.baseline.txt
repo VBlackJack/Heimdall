@@ -431,8 +431,6 @@ GatewayChainDisplay
 GatewayDefault
 GatewayDefaultIndicator
 GatewayDialogDescription
-GatewayDialogTitleAdd
-GatewayDialogTitleEdit
 GatewayFieldHost
 GatewayFieldHostHint
 GatewayFieldHostKeyFingerprint
