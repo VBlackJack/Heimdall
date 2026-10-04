@@ -459,12 +459,106 @@ public sealed partial class SettingsViewModelTests : IDisposable
         List<SshGatewayDto> reconciled = SettingsViewModel.ReconcileGateways(
             [storedShared, storedElsewhere],
             [editedShared, createdInPanel],
+            new HashSet<string>(["gw-shared", "gw-new"], StringComparer.OrdinalIgnoreCase),
             new HashSet<string>(StringComparer.OrdinalIgnoreCase));
 
         Assert.Equal(
             ["GW-SHARED", "gw-outside", "gw-new"],
             reconciled.Select(gateway => gateway.Id));
         Assert.Equal("Renamed in the panel", reconciled[0].Name);
+    }
+
+    // The buffer holds a copy of every gateway taken when the panel loaded, edited or not. Letting
+    // every copy win wrote that snapshot back over an edit the server dialog had persisted since,
+    // so a rename and a new password made there came undone at the next unrelated Save.
+    [Fact]
+    public void ReconcileGateways_KeepsTheDiskVersionOfAGatewayThePanelNeverEdited()
+    {
+        SshGatewayDto editedElsewhere = CreateGateway("gw-shared", "Renamed in the server dialog");
+        SshGatewayDto staleSnapshot = CreateGateway("gw-shared", "Name when the panel loaded");
+
+        List<SshGatewayDto> reconciled = SettingsViewModel.ReconcileGateways(
+            [editedElsewhere],
+            [staleSnapshot],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.Equal("Renamed in the server dialog", Assert.Single(reconciled).Name);
+    }
+
+    // The same defect end to end, through the write the server dialog's Edit gateway makes.
+    // Proved against the mutant that lets the buffer win for every id it holds: this goes red.
+    [Fact]
+    public async Task Save_KeepsAGatewayEditedFromTheServerDialogWhilePanelWasOpen()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                SshGateways = [CreateGateway("gw-shared", "Name when the panel loaded")]
+            }
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        SshGatewayDto editedInServerDialog = CreateGateway("unused", "Renamed in the server dialog");
+        editedInServerDialog.SshPasswordEncrypted = "new-secret";
+        await config.MergeSettingAsync(settings =>
+            Assert.True(GatewayEditCommit.Apply(settings, "gw-shared", editedInServerDialog)));
+
+        viewModel.PreventSleepDuringSession = !viewModel.PreventSleepDuringSession;
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.True(saved);
+        SshGatewayDto persisted = Assert.Single(config.Settings.SshGateways);
+        Assert.Equal("Renamed in the server dialog", persisted.Name);
+        Assert.Equal("new-secret", persisted.SshPasswordEncrypted);
+    }
+
+    // The panel buffered on purpose and still does, but a gateway it never edited is not a draft:
+    // left on the old copy, its row kept the old name and the next edit here started from it.
+    [Fact]
+    public void AbsorbExternallyCreatedGateways_RefreshesAGatewayThePanelNeverEdited()
+    {
+        FakeConfigManager config = new();
+        config.Settings.SshGateways.Add(Gateway("gw-known", "test01"));
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        GatewayItemViewModel row = Assert.Single(viewModel.Gateways);
+
+        AppSettings external = new();
+        external.SshGateways.Add(Gateway("gw-known", "renamed elsewhere"));
+
+        viewModel.AbsorbExternallyCreatedGateways(external);
+
+        Assert.Same(row, Assert.Single(viewModel.Gateways));
+        Assert.Equal("renamed elsewhere", row.Name);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    // A gateway edited in the panel is a draft, and a write elsewhere must not take it away.
+    [Fact]
+    public async Task AbsorbExternallyCreatedGateways_LeavesAGatewayEditedInThePanelAlone()
+    {
+        FakeConfigManager config = new();
+        config.Settings.SshGateways.Add(Gateway("gw-known", "test01"));
+        SshGatewayDto editedInPanel = Gateway("ignored", "edited in the panel");
+        FakeDialogService dialog = new()
+        {
+            GatewayDialogResultToReturn = new GatewayDialogResult(editedInPanel, true)
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SelectedGateway = Assert.Single(viewModel.Gateways);
+        await viewModel.EditGatewayCommand.ExecuteAsync(null);
+
+        AppSettings external = new();
+        external.SshGateways.Add(Gateway("gw-known", "renamed elsewhere"));
+
+        viewModel.AbsorbExternallyCreatedGateways(external);
+
+        Assert.Equal("edited in the panel", Assert.Single(viewModel.Gateways).Name);
     }
 
     // The parent fixup runs on the reconciled list, not on the panel buffer: before A2 of
@@ -480,6 +574,7 @@ public sealed partial class SettingsViewModelTests : IDisposable
         List<SshGatewayDto> reconciled = SettingsViewModel.ReconcileGateways(
             [storedParent, addedElsewhere],
             [],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             new HashSet<string>(["gw-parent"], StringComparer.OrdinalIgnoreCase));
 
         SshGatewayDto survivor = Assert.Single(reconciled);

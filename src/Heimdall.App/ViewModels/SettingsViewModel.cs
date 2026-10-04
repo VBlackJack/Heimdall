@@ -177,6 +177,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     // Gateways removed before Save - all reverse references are cleared on flush
     private readonly HashSet<string> _deletedGatewayIds = new(StringComparer.OrdinalIgnoreCase);
 
+    // Gateways added or edited in this panel before Save. Only these may replace what disk
+    // holds: the rest of the buffer is a snapshot, and writing it back undid an edit made
+    // meanwhile from the server dialog, password included.
+    private readonly HashSet<string> _editedGatewayIds = new(StringComparer.OrdinalIgnoreCase);
+
     // --- General ---
 
     [ObservableProperty]
@@ -1867,6 +1872,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Seed working buffers from loaded settings
         _pendingGateways = settings.SshGateways.Select(CloneGateway).ToList();
         _deletedGatewayIds.Clear();
+        _editedGatewayIds.Clear();
 
         SyncNumericTexts();
 
@@ -2202,6 +2208,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         List<SshGatewayDto> sshGateways = _pendingGateways.Select(CloneGateway).ToList();
         HashSet<string> deletedGatewayIds = new(_deletedGatewayIds, StringComparer.OrdinalIgnoreCase);
+        HashSet<string> editedGatewayIds = new(_editedGatewayIds, StringComparer.OrdinalIgnoreCase);
 
         // Clear inventory references first. If the following settings commit is interrupted,
         // the gateway still exists and can be reassigned; the inverse order leaves dangling IDs.
@@ -2249,10 +2256,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             settings.SshGateways = ReconcileGateways(
                 settings.SshGateways,
                 sshGateways,
+                editedGatewayIds,
                 deletedGatewayIds);
         });
 
         _deletedGatewayIds.Clear();
+        _editedGatewayIds.Clear();
 
         _originalTheme = DefaultTheme;
         _originalAccentTint = AccentTint;
@@ -2327,6 +2336,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // them on disk as they are.
         List<SshGatewayDto> keptGateways = _pendingGateways.Select(CloneGateway).ToList();
         List<string> keptDeletedGatewayIds = _deletedGatewayIds.ToList();
+        List<string> keptEditedGatewayIds = _editedGatewayIds.ToList();
 
         // The language the user can still get back to. LoadFromSettings reseeds the restore
         // point from whatever is on screen, and by this point that may be a language the user
@@ -2366,6 +2376,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         foreach (string gatewayId in keptDeletedGatewayIds)
         {
             _deletedGatewayIds.Add(gatewayId);
+        }
+
+        foreach (string gatewayId in keptEditedGatewayIds)
+        {
+            _editedGatewayIds.Add(gatewayId);
         }
 
         IsDirty = true;
@@ -2520,6 +2535,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         List<SshGatewayDto> keptGateways = _pendingGateways.Select(CloneGateway).ToList();
         List<string> keptDeletedGatewayIds = _deletedGatewayIds.ToList();
+        List<string> keptEditedGatewayIds = _editedGatewayIds.ToList();
         string localeToReturnTo = _originalLocale;
         string themeToReturnTo = _originalTheme;
         string accentToReturnTo = _originalAccentTint;
@@ -2536,6 +2552,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         foreach (string gatewayId in keptDeletedGatewayIds)
         {
             _deletedGatewayIds.Add(gatewayId);
+        }
+
+        foreach (string gatewayId in keptEditedGatewayIds)
+        {
+            _editedGatewayIds.Add(gatewayId);
         }
 
         await RefreshVaultStatusAsync();
@@ -3062,6 +3083,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         {
             result.Gateway.Id = Guid.NewGuid().ToString();
             _pendingGateways.Add(result.Gateway);
+            _editedGatewayIds.Add(result.Gateway.Id);
             Gateways.Add(CreateGatewayItem(result.Gateway));
 
             MarkEditTheComparisonCannotSee();
@@ -3114,8 +3136,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// Reseeding wholesale would be the obvious fix and it would be wrong: this panel buffers on
     /// purpose, because its Save button is the contract and Cancel must still discard. Throwing
     /// the buffer away on an unrelated external write would silently destroy edits in progress -
-    /// a worse defect than the one being fixed. So this only ADDS ids the buffer has never seen,
-    /// never touches an entry already held, and skips anything staged for deletion.
+    /// a worse defect than the one being fixed. So this ADDS ids the buffer has never seen,
+    /// never touches an entry added or edited here, and skips anything staged for deletion.
+    ///
+    /// An entry the panel holds but never edited is refreshed from disk: the server dialog edits
+    /// gateways in place, and a buffer left on the old copy showed the old name and handed the
+    /// old one to the next edit made here. Its row only changes when what it shows changed, so a
+    /// write elsewhere does not disturb a row that reads the same.
     ///
     /// It deliberately leaves <see cref="IsDirty"/> alone: absorbing someone else's write is not
     /// a user edit, and arming Save here would invite the user to write the buffer back.
@@ -3128,15 +3155,58 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         {
             if (string.IsNullOrWhiteSpace(gateway.Id)
                 || _deletedGatewayIds.Contains(gateway.Id)
-                || _pendingGateways.Any(pending => string.Equals(
-                    pending.Id, gateway.Id, StringComparison.OrdinalIgnoreCase)))
+                || _editedGatewayIds.Contains(gateway.Id))
             {
                 continue;
             }
 
-            _pendingGateways.Add(CloneGateway(gateway));
-            Gateways.Add(CreateGatewayItem(gateway));
+            // A parent staged for deletion is still on disk until Save, and so is the reference
+            // to it; the buffer already dropped that reference and must not take it back.
+            SshGatewayDto fromDisk = CloneGateway(gateway);
+            if (fromDisk.ParentGatewayId is not null && _deletedGatewayIds.Contains(fromDisk.ParentGatewayId))
+            {
+                fromDisk.ParentGatewayId = null;
+            }
+
+            int index = _pendingGateways.FindIndex(pending => string.Equals(
+                pending.Id, gateway.Id, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+            {
+                _pendingGateways.Add(fromDisk);
+                Gateways.Add(CreateGatewayItem(fromDisk));
+                continue;
+            }
+
+            GatewayItemViewModel shownBefore = CreateGatewayItem(_pendingGateways[index]);
+            _pendingGateways[index] = fromDisk;
+            GatewayItemViewModel shownNow = CreateGatewayItem(fromDisk);
+            GatewayItemViewModel? row = Gateways.FirstOrDefault(item => string.Equals(
+                item.Id, gateway.Id, StringComparison.OrdinalIgnoreCase));
+            if (row is not null && !ShowsTheSame(shownBefore, shownNow))
+            {
+                CopyShownFields(shownNow, row);
+            }
         }
+    }
+
+    private static bool ShowsTheSame(GatewayItemViewModel first, GatewayItemViewModel second) =>
+        string.Equals(first.Name, second.Name, StringComparison.Ordinal)
+        && string.Equals(first.Host, second.Host, StringComparison.Ordinal)
+        && first.Port == second.Port
+        && string.Equals(first.User, second.User, StringComparison.Ordinal)
+        && first.HasKey == second.HasKey
+        && first.HasPassword == second.HasPassword
+        && string.Equals(first.ParentGatewayId, second.ParentGatewayId, StringComparison.OrdinalIgnoreCase);
+
+    private static void CopyShownFields(GatewayItemViewModel source, GatewayItemViewModel target)
+    {
+        target.Name = source.Name;
+        target.Host = source.Host;
+        target.Port = source.Port;
+        target.User = source.User;
+        target.HasKey = source.HasKey;
+        target.HasPassword = source.HasPassword;
+        target.ParentGatewayId = source.ParentGatewayId;
     }
 
     private static GatewayItemViewModel CreateGatewayItem(SshGatewayDto gateway) =>
@@ -3175,6 +3245,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             {
                 result.Gateway.Id = gwDto.Id;
                 _pendingGateways[idx] = result.Gateway;
+                _editedGatewayIds.Add(gwDto.Id);
 
                 gateway.Name = result.Gateway.Name;
                 gateway.Host = result.Gateway.Host;
@@ -3182,6 +3253,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 gateway.User = result.Gateway.User;
                 gateway.HasKey = !string.IsNullOrEmpty(result.Gateway.KeyPath);
                 gateway.HasPassword = !string.IsNullOrEmpty(result.Gateway.SshPasswordEncrypted);
+                gateway.ParentGatewayId = result.Gateway.ParentGatewayId;
             }
 
             MarkEditTheComparisonCannotSee();
@@ -3308,21 +3380,25 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// Merges the panel's gateway buffer into the list just read from disk.
     /// </summary>
     /// <remarks>
-    /// Entries the panel knows about are replaced by its own version: it carries the edit
-    /// the user just typed. Entries it never saw - persisted by the Add menu, the tree
-    /// context menu, or a profile import while the panel was open - are preserved, and
-    /// entries the panel deleted are dropped wherever they appear. Deleting a gateway also
-    /// clears the parent reference of anything that pointed at it, on the reconciled list
-    /// rather than on the buffer, so a gateway added elsewhere cannot keep a dangling
-    /// parent.
+    /// Entries the panel added or edited (<paramref name="editedGatewayIds"/>) are replaced by
+    /// its own version: it carries the edit the user just typed. Every other entry keeps what
+    /// disk holds, because the panel's copy of it is a snapshot from when the panel loaded and
+    /// the server dialog may have edited that gateway since. Entries it never saw - persisted
+    /// by the Add menu, the tree context menu, or a profile import while the panel was open -
+    /// are preserved, and entries the panel deleted are dropped wherever they appear.
+    /// Deleting a gateway also clears the parent reference of anything that pointed at it, on
+    /// the reconciled list rather than on the buffer, so a gateway added elsewhere cannot keep
+    /// a dangling parent.
     /// </remarks>
     internal static List<SshGatewayDto> ReconcileGateways(
         IEnumerable<SshGatewayDto> persisted,
         IEnumerable<SshGatewayDto> pending,
+        IReadOnlySet<string> editedGatewayIds,
         IReadOnlySet<string> deletedGatewayIds)
     {
         ArgumentNullException.ThrowIfNull(persisted);
         ArgumentNullException.ThrowIfNull(pending);
+        ArgumentNullException.ThrowIfNull(editedGatewayIds);
         ArgumentNullException.ThrowIfNull(deletedGatewayIds);
 
         List<SshGatewayDto> pendingList = pending.ToList();
@@ -3349,7 +3425,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             if (pendingById.TryGetValue(stored.Id, out SshGatewayDto? edited))
             {
-                reconciled.Add(edited);
+                reconciled.Add(editedGatewayIds.Contains(stored.Id) ? edited : stored);
                 takenFromPending.Add(stored.Id);
                 continue;
             }
