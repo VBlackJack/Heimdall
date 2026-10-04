@@ -118,6 +118,8 @@ internal static class GatewayImportReconciler
             gatewaysToAdd.Add(gateway);
         }
 
+        BreakParentLoops(gatewaysToAdd, assignments, orphanReferences);
+
         foreach (ServerProfileDto server in importedServers)
         {
             if (string.IsNullOrWhiteSpace(server.SshGatewayId))
@@ -141,6 +143,49 @@ internal static class GatewayImportReconciler
             gatewayIdMap,
             orphanReferences,
             mergedCount);
+    }
+
+    // A file can carry a gateway that is its own parent, or two that point at each other. The
+    // id remapping keeps such a loop intact, and the settings write that follows refuses a
+    // self-parent after the servers referring to these gateways were already committed, which
+    // left them pointing at gateways that were never saved. The first gateway found on each
+    // loop loses its parent and is reported like any other parent the import could not keep.
+    // Existing gateways never point at imported ones, so a loop can only run through the batch.
+    private static void BreakParentLoops(
+        List<SshGatewayDto> gatewaysToAdd,
+        List<GatewayAssignment> assignments,
+        List<GatewayImportOrphanReference> orphanReferences)
+    {
+        Dictionary<string, SshGatewayDto> addedById = gatewaysToAdd.ToDictionary(
+            gateway => gateway.Id,
+            StringComparer.OrdinalIgnoreCase);
+
+        for (int index = 0; index < gatewaysToAdd.Count; index++)
+        {
+            SshGatewayDto gateway = gatewaysToAdd[index];
+            HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase) { gateway.Id };
+            string? parentId = gateway.ParentGatewayId;
+            while (parentId is not null && addedById.TryGetValue(parentId, out SshGatewayDto? parent))
+            {
+                if (string.Equals(parent.Id, gateway.Id, StringComparison.OrdinalIgnoreCase))
+                {
+                    gateway.ParentGatewayId = null;
+                    orphanReferences.Add(new GatewayImportOrphanReference(
+                        GatewayImportReferenceKind.GatewayParent,
+                        gateway.Id,
+                        assignments[index].Gateway.Name,
+                        assignments[index].Gateway.ParentGatewayId ?? string.Empty));
+                    break;
+                }
+
+                if (!visited.Add(parent.Id))
+                {
+                    break;
+                }
+
+                parentId = parent.ParentGatewayId;
+            }
+        }
     }
 
     private static bool HasUsableIdentity(SshGatewayDto gateway) =>

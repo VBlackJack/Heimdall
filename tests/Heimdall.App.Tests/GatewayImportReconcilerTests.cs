@@ -153,6 +153,49 @@ public sealed class GatewayImportReconcilerTests
         Assert.Null(gateway.SshKeyPassphraseEncrypted);
     }
 
+    // A file carrying a gateway that is its own parent kept the loop through the id remapping.
+    // The settings write then refused it after the servers had been committed, and they were
+    // left pointing at gateways that were never saved.
+    [Fact]
+    public void Reconcile_SelfParentedGateway_LosesTheParentAndReportsIt()
+    {
+        SshGatewayDto imported = Gateway("loop", "bastion.example.com", "ops");
+        imported.ParentGatewayId = "LOOP";
+
+        GatewayImportReconciliationResult result = GatewayImportReconciler.Reconcile(
+            [],
+            [imported],
+            [],
+            NewIdFactory("unused"));
+
+        Assert.Null(Assert.Single(result.GatewaysToAdd).ParentGatewayId);
+        GatewayImportOrphanReference orphan = Assert.Single(result.OrphanReferences);
+        Assert.Equal(GatewayImportReferenceKind.GatewayParent, orphan.Kind);
+        Assert.Equal("LOOP", orphan.GatewayId);
+    }
+
+    // Two gateways that point at each other: one link is enough to break, and the other keeps
+    // the route the file described.
+    [Fact]
+    public void Reconcile_TwoGatewaysPointingAtEachOther_BreaksOneLinkOnly()
+    {
+        SshGatewayDto first = Gateway("first", "first.example.com", "ops");
+        first.ParentGatewayId = "second";
+        SshGatewayDto second = Gateway("second", "second.example.com", "ops");
+        second.ParentGatewayId = "first";
+
+        GatewayImportReconciliationResult result = GatewayImportReconciler.Reconcile(
+            [],
+            [first, second],
+            [],
+            NewIdFactory("unused"));
+
+        Assert.Null(result.GatewaysToAdd[0].ParentGatewayId);
+        Assert.Equal("first", result.GatewaysToAdd[1].ParentGatewayId);
+        Assert.Single(result.OrphanReferences);
+        Assert.Equal(2, Heimdall.Ssh.GatewayChainResolver.ResolveChainDtos("second", result.GatewaysToAdd).Count);
+    }
+
     private static SshGatewayDto Gateway(string id, string host, string user) => new()
     {
         Id = id,
