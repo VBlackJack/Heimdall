@@ -80,6 +80,66 @@ public partial class GatewayDialogViewModel : ObservableValidator
     public string? ExistingSshPasswordEncrypted { get; set; }
     public string? ExistingSshKeyPassphraseEncrypted { get; set; }
 
+    /// <summary>Whether a password is stored for this gateway.</summary>
+    public bool HasStoredPassword => !string.IsNullOrEmpty(ExistingSshPasswordEncrypted);
+
+    /// <summary>Whether a key passphrase is stored for this gateway.</summary>
+    public bool HasStoredKeyPassphrase => !string.IsNullOrEmpty(ExistingSshKeyPassphraseEncrypted);
+
+    /// <summary>Forgets the stored password.</summary>
+    /// <remarks>
+    /// An empty box means "keep what is stored", while the hint invites the user to leave it
+    /// blank for key-only sign-in: the one gesture that looks like a removal kept the secret, and
+    /// a gateway moved to a key or an agent went on sending its old password. The server dialog
+    /// has carried these two commands for the same reason.
+    /// </remarks>
+    [RelayCommand]
+    private void ClearStoredPassword()
+    {
+        ExistingSshPasswordEncrypted = null;
+        Password = "";
+        OnPropertyChanged(nameof(HasStoredPassword));
+        IsDirty = true;
+    }
+
+    /// <summary>Forgets the stored key passphrase.</summary>
+    [RelayCommand]
+    private void ClearStoredKeyPassphrase()
+    {
+        ExistingSshKeyPassphraseEncrypted = null;
+        KeyPassphrase = "";
+        OnPropertyChanged(nameof(HasStoredKeyPassphrase));
+        IsDirty = true;
+    }
+
+    /// <summary>
+    /// Gives the window its title when the caller did not, from whether a gateway is being edited.
+    /// </summary>
+    /// <remarks>
+    /// The title is bound to <see cref="DialogTitle"/>, which no caller ever assigned, so the
+    /// window, its taskbar entry and screen readers had no name for it.
+    /// </remarks>
+    public void EnsureDialogTitle()
+    {
+        if (string.IsNullOrEmpty(DialogTitle) && Localizer is not null)
+        {
+            DialogTitle = Localizer[IsEditMode ? "GatewayDialogTitleEdit" : "GatewayDialogTitleAdd"];
+        }
+    }
+
+    /// <summary>
+    /// Reports a port the box could not turn into a number.
+    /// </summary>
+    /// <remarks>
+    /// The box converts its text to a number on the way to <see cref="Port"/>; text that does not
+    /// convert never arrives, so validation saw the previous port and Save stored it.
+    /// </remarks>
+    public void ReportUnreadablePort()
+    {
+        PortError = Localizer?["ValidationGatewayPortRange"] ?? "Port must be between 1 and 65535.";
+        RefreshValidationSummary();
+    }
+
     // Whether the gateway loaded for edit relied on the legacy mapping, where the stored password
     // doubles as the key passphrase. The mapping is derived from the passphrase field being absent,
     // so writing an empty one on save switched it off and broke an encrypted key on a mere rename.
@@ -217,6 +277,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
         {
             KeyPassphrase = "";
             ExistingSshKeyPassphraseEncrypted = null;
+            OnPropertyChanged(nameof(HasStoredKeyPassphrase));
         }
     }
 

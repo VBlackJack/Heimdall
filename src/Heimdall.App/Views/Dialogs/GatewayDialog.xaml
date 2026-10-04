@@ -57,7 +57,7 @@
                            Visibility="{Binding HostError, Converter={StaticResource NullToVisibilityConverter}}"/>
 
                 <TextBlock x:Name="LblPort" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
-                <TextBox Text="{Binding Port}"
+                <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblPort}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
                          Width="100" HorizontalAlignment="Left"
@@ -87,7 +87,7 @@
                             ToolTip=""
                             TabIndex="5"
                             Click="OnBrowseKeyClick"/>
-                    <TextBox Text="{Binding KeyPath}"
+                    <TextBox Text="{Binding KeyPath, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="{Binding Text, ElementName=LblKeyPath}"
                              Style="{StaticResource DialogFormTextBoxStyle}"
                              x:Name="TxtKeyPath" TabIndex="4"/>
@@ -99,6 +99,28 @@
                              Style="{StaticResource DialogFormPasswordBoxStyle}"
                              PasswordChanged="OnCredentialPasswordChanged"
                              TabIndex="6"/>
+                <!-- An empty box keeps what is stored, so emptying it cannot be the gesture that
+                     forgets the password. -->
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,8,0,0"
+                            Visibility="{Binding HasStoredPassword, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="{loc:Translate GatewayPasswordSaved}"
+                               Style="{StaticResource DialogHintTextStyle}"
+                               VerticalAlignment="Center"/>
+                    <Button Content="{loc:Translate GatewayPasswordClear}"
+                            Command="{Binding ClearStoredPasswordCommand}"
+                            x:Name="ClearStoredPasswordBtn"
+                            Click="OnClearStoredCredentialClick"
+                            Tag="PasswordBox"
+                            ToolTip="{loc:Translate GatewayDialogClearStoredPassword}"
+                            AutomationProperties.Name="{loc:Translate GatewayDialogClearStoredPassword}"
+                            Style="{StaticResource GhostButtonStyle}"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Padding="8,2"
+                            MinHeight="0"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center"/>
+                </StackPanel>
                 <TextBlock Text="{Binding GatewayAuthHint}"
                            Style="{StaticResource DialogHintTextStyle}" Margin="0,4,0,0"
                            TextWrapping="Wrap"
@@ -112,6 +134,26 @@
                                  Style="{StaticResource DialogFormPasswordBoxStyle}"
                                  PasswordChanged="OnCredentialPasswordChanged"
                                  TabIndex="7"/>
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,8,0,0"
+                                Visibility="{Binding HasStoredKeyPassphrase, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{loc:Translate ServerDialogKeyPassphraseSaved}"
+                                   Style="{StaticResource DialogHintTextStyle}"
+                                   VerticalAlignment="Center"/>
+                        <Button Content="{loc:Translate GatewayPasswordClear}"
+                                Command="{Binding ClearStoredKeyPassphraseCommand}"
+                                x:Name="ClearStoredKeyPassphraseBtn"
+                                Click="OnClearStoredCredentialClick"
+                                Tag="KeyPassphraseBox"
+                                ToolTip="{loc:Translate GatewayDialogClearStoredKeyPassphrase}"
+                                AutomationProperties.Name="{loc:Translate GatewayDialogClearStoredKeyPassphrase}"
+                                Style="{StaticResource GhostButtonStyle}"
+                                FontSize="{StaticResource FontSizeCaption}"
+                                Padding="8,2"
+                                MinHeight="0"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"/>
+                    </StackPanel>
                     <TextBlock Text="{Binding GatewayKeyPassphraseHint}"
                                Style="{StaticResource DialogHintTextStyle}"
                                Margin="0,4,0,0"

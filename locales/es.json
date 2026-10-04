@@ -2087,6 +2087,8 @@
   "A11yDismissError": "Descartar error",
   "GatewayPasswordSaved": "Contraseña guardada",
   "GatewayPasswordClear": "Borrar",
+  "GatewayDialogClearStoredPassword": "Eliminar la contraseña guardada para esta pasarela",
+  "GatewayDialogClearStoredKeyPassphrase": "Eliminar la frase de contraseña guardada para esta pasarela",
 
   "SmartPasteTitle": "Confirmación de pegado",
   "SmartPasteMultiLine": "Estás a punto de pegar {0} líneas. Esto podría ejecutar comandos de inmediato.",

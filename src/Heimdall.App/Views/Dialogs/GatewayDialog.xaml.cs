@@ -45,6 +45,7 @@ public partial class GatewayDialog : Window
         {
             if (DataContext is GatewayDialogViewModel { Localizer: not null } vm)
             {
+                vm.EnsureDialogTitle();
                 CancelBtn.Content = vm.Localizer["BtnCancel"];
                 SaveBtn.Content = vm.Localizer["BtnSave"];
                 System.Windows.Automation.AutomationProperties.SetName(CancelBtn, vm.Localizer["BtnCancel"]);
@@ -139,6 +140,15 @@ public partial class GatewayDialog : Window
         });
     }
 
+    private void OnClearStoredCredentialClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string boxName }
+            && FindName(boxName) is System.Windows.Controls.PasswordBox box)
+        {
+            RunWithoutCredentialDirtyTracking(box.Clear);
+        }
+    }
+
     private void ClearKeyPassphraseInput()
         => RunWithoutCredentialDirtyTracking(KeyPassphraseBox.Clear);
 
@@ -167,7 +177,19 @@ public partial class GatewayDialog : Window
         vm.Password = PasswordBox.Password;
         vm.KeyPassphrase = vm.HasKeyPath ? KeyPassphraseBox.Password : "";
 
+        // Save is the default button, so Enter reaches here with the focus still in a box. The
+        // port is pushed again here, and text it could not convert blocks the save instead of
+        // leaving the previous port to be stored.
+        System.Windows.Data.BindingExpression? portBinding =
+            TxtPort.GetBindingExpression(System.Windows.Controls.TextBox.TextProperty);
+        portBinding?.UpdateSource();
+        TxtKeyPath.GetBindingExpression(System.Windows.Controls.TextBox.TextProperty)?.UpdateSource();
+
         vm.ValidateCommand.Execute(null);
+        if (portBinding?.HasError == true)
+        {
+            vm.ReportUnreadablePort();
+        }
 
         if (vm.ValidationError is null)
         {
