@@ -733,10 +733,19 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CountText));
     }
 
+    /// <summary>
+    /// Re-resolves the panel only when its default changed. Every settings write raises the
+    /// change, and each re-resolution read the server inventory from disk to settle a state
+    /// that could not have moved.
+    /// </summary>
     private void OnSettingsChanged(AppSettings settings)
     {
+        AppSettings? previous = _settingsSnapshot;
         _settingsSnapshot = settings;
-        QueueResolveAndApplyPanelState();
+        if (previous is null || previous.CollapseTunnelsPanelByDefault != settings.CollapseTunnelsPanelByDefault)
+        {
+            QueueResolveAndApplyPanelState();
+        }
     }
 
     private void OnConnectionPropertyChanged(object? sender, PropertyChangedEventArgs e)

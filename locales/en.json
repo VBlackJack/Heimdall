@@ -3950,6 +3950,8 @@
   "ErrorPreflightTitle": "Preflight Error",
   "MigrationDetectedPrompt": "A legacy Heimdall installation was detected. Would you like to import your servers and settings?",
   "MigrationTitle": "Legacy Migration",
+  "ConfigRecoveredFromBackupTitle": "Configuration restored",
+  "ConfigRecoveredFromBackupMessage": "{0} could not be read and was loaded from its last good copy. Changes saved after that copy was made may be missing.",
   "MigrationSuccess": "{0} servers imported successfully.",
   "MigrationSuccessOne": "{0} server imported successfully.",
   "MigrationFailed": "Migration failed: {0}",

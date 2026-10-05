@@ -259,6 +259,25 @@ public sealed class TunnelsViewModelTests
     }
 
     [Fact]
+    public async Task SettingsChanged_LeavingThePanelDefaultAlone_DoesNotResolveAgain()
+    {
+        var settings = new AppSettings { CollapseTunnelsPanelByDefault = true };
+        var host = new TestTunnelsHost(settings);
+        var config = new FakeConfigManager(settings);
+        host.Connection.ActiveSession = CreateSavedTab("profile-1");
+        config.Servers = [CreateServer("profile-1", tunnelsPanelExpanded: null)];
+        using var vm = CreateViewModel(host, config);
+        await vm.ResolveAndApplyPanelStateAsync();
+        int loadsBefore = config.LoadServersCallCount;
+
+        config.RaiseSettingsChanged(new AppSettings { CollapseTunnelsPanelByDefault = true, DefaultTheme = "Light" });
+        await vm.ResolveAndApplyPanelStateAsync();
+
+        // One load: the explicit resolution above, none queued by the unrelated change.
+        Assert.Equal(loadsBefore + 1, config.LoadServersCallCount);
+    }
+
+    [Fact]
     public void TunnelOpened_PanelClosed_DoesNotOpenPanelAndRefreshesList()
     {
         var settings = new AppSettings { CollapseTunnelsPanelByDefault = true };

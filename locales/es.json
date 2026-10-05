@@ -3950,6 +3950,8 @@
   "ErrorPreflightTitle": "Error de comprobación previa",
   "MigrationDetectedPrompt": "Se detectó una instalación anterior de Heimdall. ¿Quieres importar tus servidores y ajustes?",
   "MigrationTitle": "Migración desde versión anterior",
+  "ConfigRecoveredFromBackupTitle": "Configuración restaurada",
+  "ConfigRecoveredFromBackupMessage": "No se pudo leer {0} y se cargó desde su última copia válida. Pueden faltar los cambios guardados después de esa copia.",
   "MigrationSuccess": "{0} servidores importados correctamente.",
   "MigrationSuccessOne": "{0} servidor importado correctamente.",
   "MigrationFailed": "Falló la migración: {0}",
