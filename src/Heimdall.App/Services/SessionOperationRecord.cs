@@ -93,7 +93,7 @@ public sealed record SessionOperationRecord
         TimestampUtc = timestampUtc;
         Protocol = protocol;
         Op = op;
-        Host = StripUserPrefix(host);
+        Host = GraphicalSessionEventHelpers.StripUserPrefix(host);
         RemotePath = remotePath;
         RemotePathTo = remotePathTo;
         LocalPath = localPath;
@@ -416,18 +416,5 @@ public sealed record SessionOperationRecord
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(errorCategory);
         return errorCategory;
-    }
-
-    // Strips a leading "user@" so a "user@host" endpoint cannot leak an identity into the log.
-    // Splits on the first '@'; values without one pass through.
-    private static string StripUserPrefix(string host)
-    {
-        if (string.IsNullOrEmpty(host))
-        {
-            return host;
-        }
-
-        int at = host.IndexOf('@', StringComparison.Ordinal);
-        return at >= 0 ? host[(at + 1)..] : host;
     }
 }

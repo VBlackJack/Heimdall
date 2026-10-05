@@ -157,6 +157,30 @@ public sealed class SessionEventLogTests : IDisposable
     }
 
     [Fact]
+    public void LogEvent_UserNameContainingAnAt_StripsTheWholeIdentity()
+    {
+        string root = NewTempDirectory();
+        SessionEventLog log = new SessionEventLog(root, LargeCap, FlushIntervalMs);
+
+        // A UPN user name: splitting on the first '@' logged "corp.example@10.0.0.5".
+        log.LogEvent(SessionEventRecord.Connected("VNC", "alice@corp.example@10.0.0.5", title: null));
+        log.Dispose();
+
+        using JsonDocument doc = JsonDocument.Parse(ReadLines(EventLogPath(root)).Single());
+        doc.RootElement.GetProperty("host").GetString().Should().Be("10.0.0.5");
+    }
+
+    [Fact]
+    public void VncSessionResult_ToString_NeverPrintsThePassword()
+    {
+        VncSessionResult withPassword = new VncSessionResult("srv", "10.0.0.5", 5900, "s3cr3t-vnc");
+        VncSessionResult withoutPassword = new VncSessionResult("srv", "10.0.0.5", 5900);
+
+        withPassword.ToString().Should().NotContain("s3cr3t-vnc").And.Contain("Password = ***");
+        withoutPassword.ToString().Should().Contain("Password = null").And.Contain("Port = 5900");
+    }
+
+    [Fact]
     public void LogEvent_CitrixConnectAndDisconnect_NeverPersistStoreFrontSecrets()
     {
         const string rawUrl = "https://store.example:8443/path/?access_token=secret#fragment";

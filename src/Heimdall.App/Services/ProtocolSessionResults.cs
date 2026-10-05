@@ -112,7 +112,23 @@ public sealed record VncSessionResult(
     int Port,
     string? Password = null,
     bool ViewOnly = false,
-    bool? SessionLoggingOverride = null) : ISessionResult;
+    bool? SessionLoggingOverride = null) : ISessionResult
+{
+    /// <summary>
+    /// Lists every member but the password, which is only said to be present. The compiler's
+    /// version printed it, so any log line or exception message formatting the result leaked it.
+    /// </summary>
+    private bool PrintMembers(System.Text.StringBuilder builder)
+    {
+        builder.Append("ServerId = ").Append(ServerId)
+            .Append(", Host = ").Append(Host)
+            .Append(", Port = ").Append(Port)
+            .Append(", Password = ").Append(Password is null ? "null" : "***")
+            .Append(", ViewOnly = ").Append(ViewOnly)
+            .Append(", SessionLoggingOverride = ").Append(SessionLoggingOverride);
+        return true;
+    }
+}
 
 /// <summary>
 /// Bundles an FTP browser session for use by the embedded SFTP/FTP view.

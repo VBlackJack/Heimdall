@@ -84,7 +84,7 @@ public sealed class SessionEventLog : NdjsonAppendLog<SessionEventRecord>, ISess
             writer.WriteString("ts", FormatTimestamp(record.TimestampUtc));
             writer.WriteString("protocol", record.Protocol);
             writer.WriteString("event", record.Kind.ToString());
-            writer.WriteString("host", StripUserPrefix(record.Host));
+            writer.WriteString("host", GraphicalSessionEventHelpers.StripUserPrefix(record.Host));
 
             if (record.Title is not null)
             {
@@ -121,18 +121,5 @@ public sealed class SessionEventLog : NdjsonAppendLog<SessionEventRecord>, ISess
     {
         DateTime asUtc = utc.Kind == DateTimeKind.Utc ? utc : utc.ToUniversalTime();
         return asUtc.ToString("o", CultureInfo.InvariantCulture);
-    }
-
-    // Strips a leading "user@" so a "user@host" endpoint (VNC display / Citrix StoreFront) cannot
-    // leak an identity into the event log. Splits on the first '@'; values without one pass through.
-    private static string StripUserPrefix(string host)
-    {
-        if (string.IsNullOrEmpty(host))
-        {
-            return host;
-        }
-
-        int at = host.IndexOf('@', StringComparison.Ordinal);
-        return at >= 0 ? host[(at + 1)..] : host;
     }
 }
