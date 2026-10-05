@@ -1738,6 +1738,7 @@
   "StatusBulkConnectSkipReasonProfileMissing": "perfil no encontrado",
   "StatusBulkConnectSkipReasonCredentialGuard": "bloqueado por Credential Guard",
   "StatusBulkConnectSkipReasonCredentialsUnresolved": "credenciales no resueltas",
+  "StatusBulkConnectSkipReasonCancelledByUser": "cancelado",
   "StatusBulkConnectNothingToConnect": "Nada que conectar.",
   "StatusBulkDuplicated": "Se duplicaron {0} elementos.",
   "StatusBulkDuplicatedOne": "Se duplicó {0} elemento.",

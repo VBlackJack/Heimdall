@@ -893,11 +893,32 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 existingTab.FailureDetails = null;
                 ReleaseConnectingCancellation(sessionId);
                 _connectingSshViews.TryRemove(sessionId, out _);
-                _embeddedSessionManager.AttachSshSession(existingTab, session, _main.CurrentSettings);
+                try
+                {
+                    _embeddedSessionManager.AttachSshSession(existingTab, session, _main.CurrentSettings);
+                }
+                catch
+                {
+                    // The view never took the session: close it here and drop the placeholder, so
+                    // neither a live connection nor a tab stuck in Connecting is left behind.
+                    SafeDisposeSessionResult(session);
+                    _main.Connection.CloseFailedMaterialization(existingTab);
+                    throw;
+                }
+
                 existingTab.Status = SessionStatusTokens.Connected;
                 CompleteReadySession(existingTab, sessionId, originalServerId, displayName, connectionType, session);
                 CompleteReconnectChainForSession(sessionId);
                 return;
+            }
+
+            if (_connectingCancellations.ContainsKey(sessionId))
+            {
+                // A placeholder was mounted for this attempt and has been closed since: the user
+                // walked away from it, so the late session is closed instead of reopening a tab.
+                FileLogger.Info($"SessionReady for SSH sessionId={sessionId} arrived after its tab was closed; discarding it.");
+                SafeDisposeSessionResult(session);
+                throw new OperationCanceledException();
             }
 
             FileLogger.Warn(
@@ -1113,9 +1134,16 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return;
         }
 
-        var pending = _deferredReconnects.ToList();
+        // A tab or pane closed while the vault was locked was given up by the user: replaying its
+        // reconnect would bring it back.
+        var openTabs = _main.Connection.ActiveSessions;
+        var pending = _deferredReconnects
+            .Where(d => openTabs.Contains(d.Tab))
+            .ToList();
         _deferredReconnects.Clear();
-        var pendingPanes = _deferredPaneReconnects.ToList();
+        var pendingPanes = _deferredPaneReconnects
+            .Where(d => openTabs.Contains(d.Tab) && SplitTreeHelper.FindPane(d.Tab.RootContent, d.PaneId) is not null)
+            .ToList();
         _deferredPaneReconnects.Clear();
         foreach ((
             SessionTabViewModel tab,
@@ -1427,7 +1455,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             restored = await _main.ServerList.RestoreServerAsync(
                 reconnectChain.ServerId,
                 reconnectChain.CancellationSource.Token,
-                reconnectChain.SourceTab.RdpModeOverride);
+                reconnectChain.SourceTab.RdpModeOverride,
+                ReportFor(reconnectChain));
         }
         catch (OperationCanceledException) when (reconnectChain.CancellationSource.IsCancellationRequested)
         {
@@ -1463,6 +1492,16 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         await ContinueReconnectChainAfterFailureAsync(reconnectChain);
     }
+
+    /// <summary>
+    /// Only the last attempt of an automatic chain reports its failure, and never with a modal:
+    /// the user did not ask for these attempts and would otherwise get one dialog per retry.
+    /// </summary>
+    private static ConnectFailureReport ReportFor(ReconnectChainState reconnectChain)
+        => ReportForAttempt(reconnectChain.Attempt, reconnectChain.MaxAttempts);
+
+    internal static ConnectFailureReport ReportForAttempt(int attempt, int maxAttempts)
+        => attempt >= maxAttempts ? ConnectFailureReport.FailedTabOnly : ConnectFailureReport.Silent;
 
     private async Task ContinueReconnectChainAfterFailureAsync(ReconnectChainState reconnectChain)
     {
@@ -1573,12 +1612,24 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             }
 
             tab.MarkAsAdHoc(snapshot);
-            tab.HostControl = _embeddedSessionManager.CreateHostControl(
-                tab,
-                runtimeProfile.DisplayName,
-                connectionType,
-                result.Session,
-                settings);
+            try
+            {
+                tab.HostControl = _embeddedSessionManager.CreateHostControl(
+                    tab,
+                    runtimeProfile.DisplayName,
+                    connectionType,
+                    result.Session,
+                    settings);
+            }
+            catch
+            {
+                // No host took the session: close it and drop the tab rather than leave one
+                // showing Connecting forever over a connection nobody can reach.
+                SafeDisposeSessionResult(result.Session);
+                _main.Connection.CloseFailedMaterialization(tab);
+                throw;
+            }
+
             if (tab.HostControl is EmbeddedRdpView rdpView)
             {
                 rdpView.SetOwningPane(tab.PrimaryPane);
