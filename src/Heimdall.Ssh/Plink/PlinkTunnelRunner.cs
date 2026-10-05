@@ -147,9 +147,10 @@ public sealed class PlinkTunnelRunner : IDisposable
     private Task? _drainTask;
 
     // The last lines plink wrote to stderr, sanitized; what it said before it exited is the
-    // only account of why.
+    // only account of why. Room for its longest message, the host key warning, whose telling
+    // lines come first.
     private readonly ConcurrentQueue<string> _recentStderr = new();
-    private const int RecentStderrCapacity = 5;
+    private const int RecentStderrCapacity = 20;
     private CancellationTokenSource? _drainCts;
     private bool _disposed;
 
@@ -401,7 +402,9 @@ public sealed class PlinkTunnelRunner : IDisposable
 
                 Stop();
 
-                if (exited)
+                // A port another process holds is the clearer account, and plink exiting is then
+                // its consequence; the ownership failure below says so.
+                if (exited && ownership != TcpListenerOwnership.OwnedByDifferentProcess)
                 {
                     return BuildExitedEarlyResult(exitCode!.Value);
                 }
