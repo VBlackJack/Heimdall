@@ -656,6 +656,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     {
         _currentSettings = settings;
         SleepPrevention.Enabled = settings.PreventSleepDuringSession;
+        SleepPrevention.IntervalSeconds =
+            SettingRanges.Of(nameof(AppSettings.SleepPreventionIntervalSeconds)).Clamp(settings.SleepPreventionIntervalSeconds);
 
         // The settings panel seeds its gateway buffer once and nothing reseeds it on the way in,
         // so a gateway created from a session dialog was on disk and in the tree while the panel

@@ -22,77 +22,129 @@ namespace Heimdall.App.Services;
 /// <summary>
 /// Prevents Windows from entering sleep/standby while embedded sessions are active.
 /// Uses <c>SetThreadExecutionState</c> with a reference-counted session model and
-/// a 60-second heartbeat to reset the OS idle timer - required for VMs and RDP hosts
+/// a periodic heartbeat to reset the OS idle timer - required for VMs and RDP hosts
 /// where a single <c>ES_CONTINUOUS</c> flag is insufficient.
 /// </summary>
+/// <remarks>
+/// <para>Sessions are counted whether or not the setting is on, so turning it back on while
+/// sessions are open resumes the prevention instead of waiting for the next session.</para>
+/// <para>Windows ties an <c>ES_CONTINUOUS</c> request to the thread that made it, and only that
+/// thread can clear it. The setting is changed from whichever thread saved the settings, so every
+/// continuous request goes through <see cref="ContinuousStateThread"/>, which the application
+/// points at the UI thread.</para>
+/// </remarks>
 [SupportedOSPlatform("windows")]
 public static class SleepPrevention
 {
-    private const uint ES_CONTINUOUS = 0x80000000;
-    private const uint ES_SYSTEM_REQUIRED = 0x00000001;
-    private const uint ES_DISPLAY_REQUIRED = 0x00000002;
+    internal const uint ES_CONTINUOUS = 0x80000000;
+    internal const uint ES_SYSTEM_REQUIRED = 0x00000001;
+    internal const uint ES_DISPLAY_REQUIRED = 0x00000002;
 
+    private const int DefaultIntervalSeconds = 60;
+
+    private static readonly object Gate = new();
     private static int _activeSessionCount;
     private static System.Threading.Timer? _keepAliveTimer;
     private static bool _enabled = true;
-    private static int _intervalSeconds = 60;
+    private static bool _holding;
+    private static int _intervalSeconds = DefaultIntervalSeconds;
 
     /// <summary>
-    /// Heartbeat interval in seconds. Set before the first session starts.
+    /// Runs a continuous execution-state request on the thread that owns it. Runs inline until
+    /// the application sets it; it must not wait for that thread, since it is called under a lock.
     /// </summary>
-    public static int IntervalSeconds
+    public static Action<Action> ContinuousStateThread { get; set; } = action => action();
+
+    /// <summary>Where execution-state requests go; replaced by tests.</summary>
+    internal static Action<uint> ExecutionStateSink { get; set; } = flags => SetThreadExecutionState(flags);
+
+    /// <summary>The sessions currently registered, whether or not the prevention is on.</summary>
+    public static int ActiveSessionCount
     {
-        get => _intervalSeconds;
-        set => _intervalSeconds = value > 0 ? value : 60;
+        get
+        {
+            lock (Gate)
+            {
+                return _activeSessionCount;
+            }
+        }
     }
 
-    /// <summary>
-    /// Controls whether sleep prevention is active. When false,
-    /// SessionStarted/SessionEnded calls are no-ops.
-    /// Reflects the <c>PreventSleepDuringSession</c> setting.
-    /// </summary>
-    public static bool Enabled
+    /// <summary>Whether the system is currently kept awake.</summary>
+    public static bool IsHolding
     {
-        get => _enabled;
-        set
+        get
         {
-            _enabled = value;
-            if (!value && _activeSessionCount > 0)
+            lock (Gate)
             {
-                // Setting turned off while sessions are active - release immediately
-                Interlocked.Exchange(ref _activeSessionCount, 0);
-                _keepAliveTimer?.Dispose();
-                _keepAliveTimer = null;
-                SetThreadExecutionState(ES_CONTINUOUS);
-                Core.Logging.FileLogger.Info("Sleep prevention disabled by user setting");
+                return _holding;
             }
         }
     }
 
     /// <summary>
-    /// Signals that an embedded session has started. When the first session is
-    /// registered, sleep prevention is enabled with a periodic heartbeat.
+    /// Heartbeat interval in seconds. A change restarts a running heartbeat.
+    /// </summary>
+    public static int IntervalSeconds
+    {
+        get
+        {
+            lock (Gate)
+            {
+                return _intervalSeconds;
+            }
+        }
+        set
+        {
+            lock (Gate)
+            {
+                int interval = value > 0 ? value : DefaultIntervalSeconds;
+                if (interval == _intervalSeconds)
+                {
+                    return;
+                }
+
+                _intervalSeconds = interval;
+                if (_holding)
+                {
+                    StartHeartbeat();
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Controls whether sleep prevention is active. Reflects the
+    /// <c>PreventSleepDuringSession</c> setting.
+    /// </summary>
+    public static bool Enabled
+    {
+        get
+        {
+            lock (Gate)
+            {
+                return _enabled;
+            }
+        }
+        set
+        {
+            lock (Gate)
+            {
+                _enabled = value;
+                Apply();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Signals that an embedded session has started.
     /// </summary>
     public static void SessionStarted()
     {
-        if (!_enabled) return;
-
-        if (Interlocked.Increment(ref _activeSessionCount) == 1)
+        lock (Gate)
         {
-            // Set the continuous flag on the UI thread
-            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
-
-            // Start a heartbeat that resets the OS idle timer every 60 seconds.
-            // Without ES_CONTINUOUS, the call acts as a one-shot "mouse move" equivalent,
-            // which overrides VM/group-policy idle timeouts that ignore ES_CONTINUOUS.
-            var interval = TimeSpan.FromSeconds(_intervalSeconds);
-            _keepAliveTimer = new System.Threading.Timer(
-                _ => SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED),
-                null,
-                interval,
-                interval);
-
-            Core.Logging.FileLogger.Info("Sleep prevention enabled (sessions active, heartbeat started)");
+            _activeSessionCount++;
+            Apply();
         }
     }
 
@@ -102,15 +154,14 @@ public static class SleepPrevention
     /// </summary>
     public static void SessionEnded()
     {
-        if (Interlocked.Decrement(ref _activeSessionCount) <= 0)
+        lock (Gate)
         {
-            Interlocked.Exchange(ref _activeSessionCount, 0);
+            if (_activeSessionCount > 0)
+            {
+                _activeSessionCount--;
+            }
 
-            _keepAliveTimer?.Dispose();
-            _keepAliveTimer = null;
-
-            SetThreadExecutionState(ES_CONTINUOUS);
-            Core.Logging.FileLogger.Info("Sleep prevention cleared (no sessions)");
+            Apply();
         }
     }
 
@@ -120,12 +171,67 @@ public static class SleepPrevention
     /// </summary>
     public static void ForceRelease()
     {
-        Interlocked.Exchange(ref _activeSessionCount, 0);
+        lock (Gate)
+        {
+            _activeSessionCount = 0;
+            Apply();
+        }
+    }
 
+    /// <summary>Restores the initial state; for tests.</summary>
+    internal static void ResetForTests()
+    {
+        lock (Gate)
+        {
+            StopHeartbeat();
+            _activeSessionCount = 0;
+            _enabled = true;
+            _holding = false;
+            _intervalSeconds = DefaultIntervalSeconds;
+        }
+    }
+
+    private static void Apply()
+    {
+        bool shouldHold = _enabled && _activeSessionCount > 0;
+        if (shouldHold == _holding)
+        {
+            return;
+        }
+
+        _holding = shouldHold;
+        if (shouldHold)
+        {
+            ContinuousStateThread(() => ExecutionStateSink(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED));
+            StartHeartbeat();
+            Core.Logging.FileLogger.Info("Sleep prevention enabled (sessions active, heartbeat started)");
+        }
+        else
+        {
+            StopHeartbeat();
+            ContinuousStateThread(() => ExecutionStateSink(ES_CONTINUOUS));
+            Core.Logging.FileLogger.Info("Sleep prevention cleared");
+        }
+    }
+
+    private static void StartHeartbeat()
+    {
+        StopHeartbeat();
+
+        // Without ES_CONTINUOUS, the call acts as a one-shot "mouse move" equivalent,
+        // which overrides VM/group-policy idle timeouts that ignore ES_CONTINUOUS.
+        TimeSpan interval = TimeSpan.FromSeconds(_intervalSeconds);
+        _keepAliveTimer = new System.Threading.Timer(
+            _ => ExecutionStateSink(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED),
+            null,
+            interval,
+            interval);
+    }
+
+    private static void StopHeartbeat()
+    {
         _keepAliveTimer?.Dispose();
         _keepAliveTimer = null;
-
-        SetThreadExecutionState(ES_CONTINUOUS);
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]

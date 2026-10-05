@@ -283,6 +283,16 @@ public partial class UpdateBannerViewModel : ObservableObject
         IsBannerVisible = true;
     }
 
+    /// <summary>
+    /// The same throttled check, repeated while the application runs. Does nothing while the
+    /// banner is showing or an install is running, so a periodic pass never replaces what the
+    /// user is looking at.
+    /// </summary>
+    public Task RecheckAsync(CancellationToken cancellationToken)
+        => IsBannerVisible || IsInstalling
+            ? Task.CompletedTask
+            : CheckOnStartupAsync(cancellationToken);
+
     private bool CanDownloadAndInstall() => !IsInstalling && _availableUpdate is not null;
 
     /// <summary>

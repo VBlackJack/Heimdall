@@ -299,6 +299,61 @@ internal static class TwinShellBootstrapper
     }
 
     /// <summary>
+    /// Whether the command library is synchronised with its Git repository once the
+    /// workspace is open.
+    /// </summary>
+    internal static bool ShouldSyncOnStartup(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return settings.CmdLibGitSyncOnStartup
+            && settings.CmdLibGitSyncEnabled
+            && !string.IsNullOrWhiteSpace(settings.CmdLibGitSyncUrl);
+    }
+
+    /// <summary>
+    /// Runs the full Git sync of the command library when the settings ask for it at startup.
+    /// </summary>
+    /// <remarks>
+    /// <para>The option was offered in Settings and read by nothing. Call it after the vault
+    /// unlock gate: the settings bridge first cached the settings before the gate, when a token
+    /// held by the vault could not be read yet, so it is refreshed here before the sync.</para>
+    /// <para>Nothing is shown: a startup sync the user did not start does not open a dialog.
+    /// The outcome is logged, and a failure never stops the application.</para>
+    /// </remarks>
+    internal static async Task SyncOnStartupAsync(
+        AppSettings settings,
+        ISettingsService settingsBridge,
+        IGitSyncService gitSync)
+    {
+        ArgumentNullException.ThrowIfNull(settingsBridge);
+        ArgumentNullException.ThrowIfNull(gitSync);
+        if (!ShouldSyncOnStartup(settings))
+        {
+            return;
+        }
+
+        try
+        {
+            await settingsBridge.LoadSettingsAsync();
+            GitOperationResult result = await gitSync.FullSyncAsync();
+            if (result.Success)
+            {
+                Heimdall.Core.Logging.FileLogger.Info(
+                    $"[TwinShell] Startup Git sync done: {result.ItemsImported} imported, {result.ItemsExported} exported");
+            }
+            else
+            {
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"[TwinShell] Startup Git sync failed ({result.ErrorCode}): {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[TwinShell] Startup Git sync failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Drops command-history entries older than
     /// <see cref="AppConstants.CommandHistoryRetentionDays"/>, once per run.
     /// </summary>
