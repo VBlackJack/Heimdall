@@ -1686,6 +1686,170 @@ public class TunnelManagerTests : IDisposable
         Assert.Equal(0, closedCount);
     }
 
+    // ── OpenChainedTunnelAsync through every hop ─────────────────────
+    //
+    // A local forward only starts on a connected SSH session, so these used to stop at the first
+    // hop. The harness stands in for the dial and for starting the forwards, and records what the
+    // chain did, which is what a real server could not show: the order of the dials, the host
+    // each hop's key was pinned to, and what was released when a hop failed.
+
+    [Fact]
+    public async Task OpenChainedTunnelAsync_ThreeHops_DialsEachHopThroughThePreviousOne()
+    {
+        ChainHarness harness = new();
+        using TunnelManager manager = harness.CreateManager();
+
+        TunnelResult result = await manager.OpenChainedTunnelAsync(
+            ThreeHops(),
+            "db.internal",
+            5432,
+            0,
+            TestHostKeyStore(),
+            TestHostKeyVerifier());
+
+        Assert.True(result.Success, result.ErrorMessage);
+
+        // The root is dialled directly; each later hop through the forward the previous hop opened.
+        Assert.Equal(
+            new (string, int)[] { ("bastion1.example", 22), ("127.0.0.1", 50000), ("127.0.0.1", 50001) },
+            harness.Dials.Select(dial => (dial.Host, dial.Port)));
+
+        // Every hop's key is pinned to the gateway it belongs to, never to the loopback forward it
+        // is reached through: pinning 127.0.0.1 would accept any server behind any forward.
+        Assert.Equal(
+            new (string, int)[] { ("bastion1.example", 22), ("bastion2.example", 2222), ("bastion3.example", 22) },
+            harness.Pins);
+        Assert.Equal<(string, int)>(harness.Pins, harness.Dials.Select(dial => (dial.VerifyHost, dial.VerifyPort)));
+
+        // Each forward is opened on the client of the hop before it, and the last one on the final hop.
+        Assert.Equal(new[] { 0, 1, 2 }, harness.Forwards.Select(forward => harness.Clients.FindIndex(client => ReferenceEquals(client, forward.Client))));
+        Assert.Equal(50002, result.Tunnel!.LocalPort);
+
+        manager.Dispose();
+        Assert.All(harness.Clients, client => Assert.Equal(1, client.DisposeCount));
+    }
+
+    [Fact]
+    public async Task OpenChainedTunnelAsync_ThirdHopRefused_ReleasesEveryHopAndRegistersNothing()
+    {
+        ChainHarness harness = new() { FailingDial = 2 };
+        using TunnelManager manager = harness.CreateManager();
+
+        TunnelResult result = await manager.OpenChainedTunnelAsync(
+            ThreeHops(),
+            "db.internal",
+            5432,
+            0,
+            TestHostKeyStore(),
+            TestHostKeyVerifier());
+
+        Assert.False(result.Success);
+        Assert.Equal(SshFailureCode.NetworkRefused, result.FailureCode);
+        Assert.Equal(3, harness.Clients.Count);
+        Assert.All(harness.Clients, client => Assert.Equal(1, client.DisposeCount));
+        Assert.Equal((0, 0, 0, 0), manager.GetRegistryCounts());
+    }
+
+    [Fact]
+    public async Task OpenChainedTunnelAsync_CancelledBetweenHops_StopsDiallingAndReleasesWhatWasOpened()
+    {
+        using CancellationTokenSource cancellation = new();
+        ChainHarness harness = new() { AfterDial = index => { if (index == 1) cancellation.Cancel(); } };
+        using TunnelManager manager = harness.CreateManager();
+
+        TunnelResult result = await manager.OpenChainedTunnelAsync(
+            ThreeHops(),
+            "db.internal",
+            5432,
+            0,
+            TestHostKeyStore(),
+            TestHostKeyVerifier(),
+            cancellation.Token);
+
+        Assert.False(result.Success);
+        Assert.Equal(SshFailureCode.Cancelled, result.FailureCode);
+        Assert.Equal(2, harness.Dials.Count);
+        Assert.All(harness.Clients, client => Assert.Equal(1, client.DisposeCount));
+        Assert.Equal((0, 0, 0, 0), manager.GetRegistryCounts());
+    }
+
+    private static List<SshConnectionParams> ThreeHops() =>
+    [
+        MakeSshParams("bastion1.example", 22),
+        MakeSshParams("bastion2.example", 2222),
+        MakeSshParams("bastion3.example", 22),
+    ];
+
+    private sealed class ChainHarness
+    {
+        private int _nextBoundPort = 50000;
+
+        public int? FailingDial { get; init; }
+
+        public Action<int>? AfterDial { get; init; }
+
+        public List<RecordingSshClient> Clients { get; } = [];
+
+        public List<(string Host, int Port)> Pins { get; } = [];
+
+        public List<(string Host, int Port, string VerifyHost, int VerifyPort)> Dials { get; } = [];
+
+        public List<(SshClient Client, int RequestedPort)> Forwards { get; } = [];
+
+        private readonly Dictionary<SshClient, SshConnectionParams> _paramsByClient = [];
+
+        public TunnelManager CreateManager() => new(Resolve, Create, Connect, StartForward);
+
+        private Task<PinnedFingerprintVerifier> Resolve(
+            SshConnectionParams connectionParams,
+            string verificationHost,
+            int verificationPort,
+            HostKeyStore hostKeyStore,
+            IHostKeyVerifier verifier,
+            CancellationToken cancellationToken)
+        {
+            Pins.Add((verificationHost, verificationPort));
+            return Task.FromResult(new PinnedFingerprintVerifier(
+                verificationHost,
+                verificationPort,
+                "SHA256:" + verificationHost));
+        }
+
+        private SshClient Create(SshConnectionParams connectionParams)
+        {
+            RecordingSshClient client = new();
+            Clients.Add(client);
+            _paramsByClient[client] = connectionParams;
+            return client;
+        }
+
+        private Task Connect(
+            SshClient client,
+            string verificationHost,
+            int verificationPort,
+            PinnedFingerprintVerifier pinnedVerifier,
+            CancellationToken cancellationToken,
+            string cancelLogMessage)
+        {
+            SshConnectionParams dialled = _paramsByClient[client];
+            int index = Dials.Count;
+            Dials.Add((dialled.Host, dialled.Port, verificationHost, verificationPort));
+            if (index == FailingDial)
+            {
+                throw new SshConnectionException("Connection refused by remote host");
+            }
+
+            AfterDial?.Invoke(index);
+            return Task.CompletedTask;
+        }
+
+        private int StartForward(SshClient client, ForwardedPortLocal port, int requestedLocalPort, string logContext)
+        {
+            Forwards.Add((client, requestedLocalPort));
+            return requestedLocalPort > 0 ? requestedLocalPort : _nextBoundPort++;
+        }
+    }
+
     // ── TunnelSession.Dispose ─────────────────────────────────────────
 
     [Fact]

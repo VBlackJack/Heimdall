@@ -45,6 +45,16 @@ public sealed partial class TunnelManager : IDisposable
         CancellationToken cancellationToken,
         string cancelLogMessage);
 
+    /// <summary>
+    /// Adds <paramref name="port"/> to <paramref name="client"/>, starts it, and returns the local
+    /// port it is bound to.
+    /// </summary>
+    internal delegate int StartLocalForward(
+        SshClient client,
+        ForwardedPortLocal port,
+        int requestedLocalPort,
+        string logContext);
+
     private readonly ConcurrentDictionary<int, TunnelSession> _activeTunnels = new();
     private readonly ConcurrentDictionary<int, ExternalTunnelSession> _externalTunnels = new();
     private readonly ConcurrentDictionary<int, int> _refCounts = new();
@@ -54,6 +64,7 @@ public sealed partial class TunnelManager : IDisposable
     private readonly ResolvePinnedVerifier _resolvePinnedVerifier;
     private readonly Func<SshConnectionParams, SshClient> _createSshClient;
     private readonly ConnectSshClient _connectSshClient;
+    private readonly StartLocalForward _startLocalForward;
     private volatile bool _disposed;
 
     public TunnelManager()
@@ -68,6 +79,23 @@ public sealed partial class TunnelManager : IDisposable
         ResolvePinnedVerifier resolvePinnedVerifier,
         Func<SshConnectionParams, SshClient> createSshClient,
         ConnectSshClient connectSshClient)
+        : this(resolvePinnedVerifier, createSshClient, connectSshClient, StartLocalForwardOnClient)
+    {
+    }
+
+    /// <summary>
+    /// Initialises a manager whose local port forwards are started by <paramref name="startLocalForward"/>.
+    /// </summary>
+    /// <remarks>
+    /// A forward only starts on a connected SSH session, so without this seam a chain could not
+    /// be followed past its first hop without a real SSH server, and the order of the dials, the
+    /// host each hop's key is pinned to and the clean-up after a failed hop went untested.
+    /// </remarks>
+    internal TunnelManager(
+        ResolvePinnedVerifier resolvePinnedVerifier,
+        Func<SshConnectionParams, SshClient> createSshClient,
+        ConnectSshClient connectSshClient,
+        StartLocalForward startLocalForward)
     {
         _resolvePinnedVerifier = resolvePinnedVerifier
             ?? throw new ArgumentNullException(nameof(resolvePinnedVerifier));
@@ -75,6 +103,8 @@ public sealed partial class TunnelManager : IDisposable
             ?? throw new ArgumentNullException(nameof(createSshClient));
         _connectSshClient = connectSshClient
             ?? throw new ArgumentNullException(nameof(connectSshClient));
+        _startLocalForward = startLocalForward
+            ?? throw new ArgumentNullException(nameof(startLocalForward));
     }
 
     /// <summary>Raised when a tunnel is successfully opened.</summary>
@@ -394,9 +424,11 @@ public sealed partial class TunnelManager : IDisposable
                     nextGateway.Host,
                     (uint)nextGateway.Port);
                 context.IntermediatePorts.Add(intermediatePort);
-                currentClient.AddForwardedPort(intermediatePort);
-                StartForwardedPortWithRetry(intermediatePort, "OS-assigned intermediate chain port");
-                int intermediateLocalPort = ResolveStartedLocalPort(intermediatePort, 0);
+                int intermediateLocalPort = _startLocalForward(
+                    currentClient,
+                    intermediatePort,
+                    0,
+                    "OS-assigned intermediate chain port");
 
                 // Connect to the next gateway through the forwarded port
                 var hopParams = CreateLoopbackHopParams(nextGateway, intermediateLocalPort);
