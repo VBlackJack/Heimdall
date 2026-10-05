@@ -21,6 +21,7 @@ using System.Windows.Controls;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 using Microsoft.Web.WebView2.Core;
 
 namespace Heimdall.App.Views;
@@ -29,7 +30,7 @@ namespace Heimdall.App.Views;
 /// WPF host for an embedded VNC session rendered through WebView2 + noVNC.
 /// A local WebSocket proxy bridges the noVNC client to the VNC server's TCP socket.
 /// </summary>
-public partial class EmbeddedVncView : UserControl, IDisposable
+public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwner
 {
     private static readonly WebViewDocumentPolicy VncDocumentPolicy =
         new("https://heimdall-vnc.local/vnc.html");
@@ -56,6 +57,26 @@ public partial class EmbeddedVncView : UserControl, IDisposable
 
     /// <summary>Raised when the VNC session encounters an error. Parameters: ServerId, error message.</summary>
     public event Action<string, string>? SessionError;
+
+    /// <summary>
+    /// Raised when the session ends cleanly, by the user or by the server. Parameter: ServerId.
+    /// </summary>
+    /// <remarks>
+    /// Only the pane text changed before, so the tab and the connection state kept reading
+    /// Connected for a session that had ended.
+    /// </remarks>
+    public event Action<string>? SessionDisconnected;
+
+    private SessionPaneModel? _ownerPane;
+
+    /// <summary>The pane this view lives in, wherever a split, a merge or a detach moved it.</summary>
+    internal SessionPaneModel? OwningPane => _ownerPane;
+
+    public void SetOwningPane(SessionPaneModel pane)
+    {
+        ArgumentNullException.ThrowIfNull(pane);
+        _ownerPane = pane;
+    }
 
     /// <summary>
     /// Shared sink for graphical-protocol connect/disconnect events. Injected by
@@ -270,6 +291,11 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         if (message.StartsWith("disconnected:", StringComparison.Ordinal))
         {
             EmitDisconnect("remote");
+            if (_session?.ServerId is not null)
+            {
+                SessionDisconnected?.Invoke(_session.ServerId);
+            }
+
             Dispatcher.Invoke(() =>
             {
                 StatusTextBlock.Text = _localizer?["StatusVncDisconnected"] ?? "Disconnected";
@@ -481,6 +507,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         Core.Logging.FileLogger.Info("EmbeddedVNC Disconnect requested by user");
         EmitDisconnect("user");
         PostWebMessage("disconnect:");
+        SessionDisconnected?.Invoke(_session?.ServerId ?? string.Empty);
 
         // Mirror the SSH disconnect contract: the view stays alive in the
         // Disconnected state so the overlay's Reconnect/Close actions keep
