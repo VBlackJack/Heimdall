@@ -390,8 +390,9 @@ public sealed class SessionWindowService : ISessionWindowService
         string title,
         MainViewModel vm)
     {
-        var tab = vm.Connection.AddSession(pane.ServerId, title, pane.ConnectionType);
-        tab.SetRootContent(pane);
+        // The pane is complete before it becomes the root, so the root change announces its host
+        // and title: set afterwards on the pane, the tab never raised them, and the loading overlay
+        // bound to the tab's host could stay over a live session.
         pane.Title = title;
         pane.HostControl = hostControl;
         if (string.IsNullOrEmpty(pane.Status))
@@ -399,6 +400,8 @@ public sealed class SessionWindowService : ISessionWindowService
             pane.Status = SessionStatusTokens.Connected;
         }
 
+        var tab = vm.Connection.AddSession(pane.ServerId, title, pane.ConnectionType);
+        tab.SetRootContent(pane);
         return tab;
     }
 }

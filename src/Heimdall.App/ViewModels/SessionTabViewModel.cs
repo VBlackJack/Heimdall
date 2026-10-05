@@ -39,6 +39,11 @@ public partial class SessionTabViewModel : ObservableObject
     [ObservableProperty]
     private ISplitContent _rootContent = new SessionPaneModel();
 
+    public SessionTabViewModel()
+    {
+        WatchPrimaryPaneStatus();
+    }
+
     /// <summary>
     /// Indicates the session is performing a long-running operation
     /// (scan, export, etc.). Drives the tab header busy indicator.
@@ -550,7 +555,7 @@ public partial class SessionTabViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Follows the status of whichever pane is primary now.
+    /// Follows the status, host, title and failure of whichever pane is primary now.
     /// </summary>
     /// <remarks>
     /// A host writes its own pane's status once that pane has been moved, and a pane detached into
@@ -576,9 +581,23 @@ public partial class SessionTabViewModel : ObservableObject
 
     private void OnWatchedPrimaryPanePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (string.Equals(e.PropertyName, nameof(SessionPaneModel.Status), StringComparison.Ordinal))
+        switch (e.PropertyName)
         {
-            OnPropertyChanged(nameof(Status));
+            case nameof(SessionPaneModel.Status):
+                OnPropertyChanged(nameof(Status));
+                break;
+            case nameof(SessionPaneModel.HostControl):
+                OnPropertyChanged(nameof(HostControl));
+                break;
+            case nameof(SessionPaneModel.Title):
+                OnPropertyChanged(nameof(Title));
+                OnPropertyChanged(nameof(DisplayTitle));
+                OnPropertyChanged(nameof(HeaderToolTip));
+                break;
+            case nameof(SessionPaneModel.FailureDetails):
+                OnPropertyChanged(nameof(FailureDetails));
+                OnPropertyChanged(nameof(HasFailureDetails));
+                break;
         }
     }
 
