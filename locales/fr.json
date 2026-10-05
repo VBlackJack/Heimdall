@@ -1652,7 +1652,7 @@
   "LogSessionDuplicated": "Session dupliqu\u00e9e : {0}",
   "LogSessionRenamed": "Onglet renomm\u00e9 : {0} \u2192 {1}",
   "LogSessionDetached": "Session d\u00e9tach\u00e9e : {0}",
-  "StatusDetachSplitTabRefused": "Un onglet divis\u00e9 ne peut pas \u00eatre d\u00e9plac\u00e9 dans sa propre fen\u00eatre. Annulez d\u2019abord la division.",
+  "StatusDetachSplitTabRefused": "Un onglet divis\u00e9 ne peut pas \u00eatre d\u00e9plac\u00e9 dans sa propre fen\u00eatre. Annulez d'abord la division.",
   "SessionCtxReattach": "R\u00e9attacher \u00e0 la fen\u00eatre principale",
   "SessionCtxReattachHint": "Ramener cette session dans la fen\u00eatre principale en tant qu'onglet",
   "LogSessionReattached": "Session r\u00e9attach\u00e9e \u00e0 la fen\u00eatre principale : {0}",
