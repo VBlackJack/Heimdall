@@ -3979,6 +3979,8 @@
   "ErrorGatewayNotFoundForEdit": "La pasarela {0} ya no existe. Elige otra pasarela para esta sesión.",
   "ErrorGatewayDeletedWhileEditing": "La pasarela \"{0}\" se eliminó mientras se editaba, así que tus cambios no se guardaron.",
   "ErrorGatewayEditFailed": "No se pudo guardar la pasarela: {0}",
+  "GatewayParentChangeRefusedTitle": "Pasarela padre sin cambiar",
+  "GatewayParentChangeRefusedMessage": "No se cambió la pasarela padre de {0}: las pasarelas se modificaron mientras tanto en otra ventana, y la nueva pasarela padre crearía ahora un bucle o una cadena demasiado larga para conectarse. Tus demás cambios se guardaron.",
   "PinLockedOut": "Demasiados intentos incorrectos. Inténtalo de nuevo en {0} minutos.",
   "PinLockedOutOne": "Demasiados intentos incorrectos. Inténtalo de nuevo en {0} minuto.",
   "PinInvalidRemaining": "PIN incorrecto. Quedan {0} intentos.",

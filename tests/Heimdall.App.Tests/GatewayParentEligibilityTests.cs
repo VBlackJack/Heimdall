@@ -187,6 +187,135 @@ public sealed class GatewayParentEligibilityTests
         Assert.Equal([string.Empty, "bastion"], vm.ParentChoices.Select(choice => choice.Id));
     }
 
+    // Two windows each checked their own snapshot: one made B a child of A, the other then made
+    // A a child of B. Checked again against disk on save, the second parent change is refused.
+    [Fact]
+    public void RevertIneligibleParentChanges_PutsBackAParentThatNowClosesALoop()
+    {
+        List<SshGatewayDto> persisted = [Gateway("a"), Gateway("b", parent: "a")];
+        List<SshGatewayDto> merged = [Gateway("a", parent: "b"), Gateway("b", parent: "a")];
+
+        IReadOnlyList<SshGatewayDto> reverted =
+            GatewayParentEligibility.RevertIneligibleParentChanges(merged, persisted, ["a"]);
+
+        Assert.Equal(["a"], Ids(reverted));
+        Assert.Null(merged[0].ParentGatewayId);
+        Assert.Equal("a", merged[1].ParentGatewayId);
+    }
+
+    [Fact]
+    public void RevertIneligibleParentChanges_KeepsAParentTheInventoryStillAllows()
+    {
+        List<SshGatewayDto> persisted = [Gateway("a"), Gateway("b")];
+        List<SshGatewayDto> merged = [Gateway("a", parent: "b"), Gateway("b")];
+
+        Assert.Empty(GatewayParentEligibility.RevertIneligibleParentChanges(merged, persisted, ["a"]));
+        Assert.Equal("b", merged[0].ParentGatewayId);
+    }
+
+    // A loop already on disk must not cost the user an unrelated rename: a parent the save did
+    // not change is left alone, broken or not.
+    [Fact]
+    public void RevertIneligibleParentChanges_LeavesAnUnchangedParentAloneEvenInsideALoop()
+    {
+        List<SshGatewayDto> persisted = [Gateway("x", parent: "y"), Gateway("y", parent: "x")];
+        List<SshGatewayDto> merged = [Gateway("x", parent: "Y"), Gateway("y", parent: "x")];
+
+        Assert.Empty(GatewayParentEligibility.RevertIneligibleParentChanges(merged, persisted, ["x"]));
+        Assert.Equal("Y", merged[0].ParentGatewayId);
+    }
+
+    // Several changes saved at once can close a loop between them; whichever is put back, every
+    // chain written must resolve.
+    [Fact]
+    public void RevertIneligibleParentChanges_BreaksALoopMadeOfSeveralChanges()
+    {
+        List<SshGatewayDto> persisted =
+        [
+            Gateway("y"),
+            Gateway("p", parent: "y"),
+            Gateway("x", parent: "p"),
+            Gateway("z")
+        ];
+        List<SshGatewayDto> merged =
+        [
+            Gateway("y", parent: "x"),
+            Gateway("p", parent: "y"),
+            Gateway("x", parent: "z"),
+            Gateway("z", parent: "y")
+        ];
+
+        IReadOnlyList<SshGatewayDto> reverted =
+            GatewayParentEligibility.RevertIneligibleParentChanges(merged, persisted, ["y", "x", "z"]);
+
+        Assert.All(
+            merged,
+            gateway => GatewayChainResolver.ResolveChainDtos(gateway.Id, merged));
+        Assert.NotEmpty(reverted);
+    }
+
+    // On seeded random inventories and random sets of parent changes, every change that survives
+    // the check leaves each chain through its gateway resolvable, and every other one is back on
+    // its stored parent.
+    [Fact]
+    public void RevertIneligibleParentChanges_LeavesOnlyChangesTheResolverAccepts()
+    {
+        Random random = new(20261005);
+        for (int round = 0; round < 300; round++)
+        {
+            List<SshGatewayDto> persisted = RandomInventory(random);
+            List<SshGatewayDto> merged = persisted.Select(gateway => gateway.CloneFaithfully()).ToList();
+            List<string> changedIds = [];
+            foreach (SshGatewayDto gateway in merged.Where(_ => random.Next(2) == 0))
+            {
+                int parent = random.Next(-1, merged.Count);
+                gateway.ParentGatewayId = parent < 0 ? null : merged[parent].Id;
+                changedIds.Add(gateway.Id);
+            }
+
+            GatewayParentEligibility.RevertIneligibleParentChanges(merged, persisted, changedIds);
+
+            foreach (string id in changedIds)
+            {
+                SshGatewayDto gateway = merged.Single(candidate => candidate.Id == id);
+                string? stored = persisted.Single(candidate => candidate.Id == id).ParentGatewayId;
+                bool kept = string.Equals(gateway.ParentGatewayId, stored, StringComparison.OrdinalIgnoreCase);
+                Assert.True(
+                    kept
+                    || gateway.ParentGatewayId is null
+                    || AllChainsResolve(merged, id, gateway.ParentGatewayId),
+                    $"Round {round}: {id} under {gateway.ParentGatewayId} does not resolve.");
+            }
+        }
+    }
+
+    [Fact]
+    public void GatewayEditCommit_KeepsTheStoredParentButAppliesTheRestOfTheEdit()
+    {
+        AppSettings settings = new() { SshGateways = [Gateway("a"), Gateway("b", parent: "a")] };
+        SshGatewayDto edited = Gateway("a", parent: "b");
+        edited.Name = "renamed";
+
+        bool applied = GatewayEditCommit.Apply(settings, "a", edited, out bool parentChangeRefused);
+
+        Assert.True(applied);
+        Assert.True(parentChangeRefused);
+        Assert.Equal("renamed", settings.SshGateways[0].Name);
+        Assert.Null(settings.SshGateways[0].ParentGatewayId);
+    }
+
+    [Fact]
+    public void GatewayEditCommit_AcceptsAnAllowedParent()
+    {
+        AppSettings settings = new() { SshGateways = [Gateway("a"), Gateway("b")] };
+
+        bool applied = GatewayEditCommit.Apply(settings, "a", Gateway("a", parent: "b"), out bool parentChangeRefused);
+
+        Assert.True(applied);
+        Assert.False(parentChangeRefused);
+        Assert.Equal("b", settings.SshGateways[0].ParentGatewayId);
+    }
+
     private static List<SshGatewayDto> RandomInventory(Random random)
     {
         int count = random.Next(1, 9);

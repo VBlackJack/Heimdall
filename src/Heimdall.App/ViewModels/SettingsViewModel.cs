@@ -2231,6 +2231,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
 
         AppSettings? written = null;
+        IReadOnlyList<SshGatewayDto> parentChangesRefused = [];
         await _configManager.MergeSettingAsync((AppSettings settings) =>
         {
             if (deletedGatewayIds.Count > 0)
@@ -2253,15 +2254,35 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             // nothing reseeds it afterwards, and assigning it wholesale erased every gateway
             // another surface had persisted meanwhile. Projects are not edited here any more
             // and are left as they are on disk.
+            List<SshGatewayDto> persistedGateways = settings.SshGateways;
             settings.SshGateways = ReconcileGateways(
-                settings.SshGateways,
+                persistedGateways,
                 sshGateways,
                 editedGatewayIds,
                 deletedGatewayIds);
+
+            // The parent pickers were safe against the panel's snapshot only. Checked again
+            // against disk, a parent another window made unsafe meanwhile is put back.
+            parentChangesRefused = GatewayParentEligibility.RevertIneligibleParentChanges(
+                settings.SshGateways,
+                persistedGateways,
+                editedGatewayIds);
         });
 
         _deletedGatewayIds.Clear();
         _editedGatewayIds.Clear();
+
+        if (parentChangesRefused.Count > 0 && written is not null)
+        {
+            // Nothing is marked edited any more, so this brings the rows put back in line
+            // with what was written.
+            AbsorbExternallyCreatedGateways(written);
+            _dialogService.ShowWarning(
+                _localizer["GatewayParentChangeRefusedTitle"],
+                _localizer.Format(
+                    "GatewayParentChangeRefusedMessage",
+                    string.Join(", ", parentChangesRefused.Select(gateway => gateway.Name))));
+        }
 
         _originalTheme = DefaultTheme;
         _originalAccentTint = AccentTint;

@@ -3979,6 +3979,8 @@
   "ErrorGatewayNotFoundForEdit": "Gateway {0} no longer exists. Choose another gateway for this session.",
   "ErrorGatewayDeletedWhileEditing": "Gateway \"{0}\" was deleted while it was being edited, so your changes were not saved.",
   "ErrorGatewayEditFailed": "The gateway could not be saved: {0}",
+  "GatewayParentChangeRefusedTitle": "Gateway parent not changed",
+  "GatewayParentChangeRefusedMessage": "The parent of {0} was not changed: the gateways were changed in another window meanwhile, and the new parent would now make a loop or a chain too long to connect through. Your other changes were saved.",
   "PinLockedOut": "Too many incorrect attempts. Try again in {0} minutes.",
   "PinLockedOutOne": "Too many incorrect attempts. Try again in {0} minute.",
   "PinInvalidRemaining": "Incorrect PIN. {0} attempts remaining.",

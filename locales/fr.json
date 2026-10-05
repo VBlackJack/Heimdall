@@ -3978,6 +3978,8 @@
   "ErrorGatewayNotFoundForEdit": "La passerelle {0} n'existe plus. Choisissez une autre passerelle pour cette session.",
   "ErrorGatewayDeletedWhileEditing": "La passerelle \"{0}\" a été supprimée pendant sa modification : vos changements n'ont pas été enregistrés.",
   "ErrorGatewayEditFailed": "La passerelle n'a pas pu être enregistrée : {0}",
+  "GatewayParentChangeRefusedTitle": "Parent de passerelle inchangé",
+  "GatewayParentChangeRefusedMessage": "Le parent de {0} n'a pas été modifié : les passerelles ont été modifiées entre-temps dans une autre fenêtre, et le nouveau parent créerait désormais une boucle ou une chaîne trop longue pour s'y connecter. Vos autres modifications ont été enregistrées.",
   "PinLockedOut": "Trop de tentatives incorrectes. R\u00e9essayez dans {0} minutes.",
   "PinLockedOutOne": "Trop de tentatives incorrectes. R\u00e9essayez dans {0} minute.",
   "PinInvalidRemaining": "PIN incorrect. {0} tentatives restantes.",

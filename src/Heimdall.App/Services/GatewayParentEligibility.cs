@@ -146,6 +146,90 @@ public static class GatewayParentEligibility
         return eligible;
     }
 
+    /// <summary>
+    /// Puts back the stored parent of every gateway in <paramref name="changedIds"/> whose new
+    /// parent the merged inventory no longer allows, and returns those gateways.
+    /// </summary>
+    /// <remarks>
+    /// The pickers only offer parents that are safe against the inventory they were opened
+    /// from. Two windows open at once each checked their own snapshot: one made A the parent
+    /// of B while the other made B the parent of A, and the second save closed a loop that
+    /// only surfaced when a session failed to connect. Checked again here, against what was
+    /// just read from disk, the second parent change is refused while the rest of its edit is
+    /// kept. A parent that did not change is never touched, so an inventory already broken on
+    /// disk does not cost the user an unrelated rename.
+    /// </remarks>
+    /// <param name="merged">The inventory about to be written; refused parents are put back in it.</param>
+    /// <param name="persisted">The inventory as read from disk, before this save.</param>
+    /// <param name="changedIds">The gateways this save added or edited.</param>
+    /// <param name="maxDepth">The longest chain a connection accepts.</param>
+    public static IReadOnlyList<SshGatewayDto> RevertIneligibleParentChanges(
+        IReadOnlyList<SshGatewayDto> merged,
+        IReadOnlyList<SshGatewayDto> persisted,
+        IEnumerable<string> changedIds,
+        int maxDepth = GatewayChainResolver.DefaultMaxDepth)
+    {
+        ArgumentNullException.ThrowIfNull(merged);
+        ArgumentNullException.ThrowIfNull(persisted);
+        ArgumentNullException.ThrowIfNull(changedIds);
+
+        Dictionary<string, string?> storedParentById = new(StringComparer.OrdinalIgnoreCase);
+        foreach (SshGatewayDto stored in persisted)
+        {
+            if (!string.IsNullOrWhiteSpace(stored.Id))
+            {
+                storedParentById.TryAdd(stored.Id, stored.ParentGatewayId);
+            }
+        }
+
+        List<string> ids = changedIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        List<SshGatewayDto> reverted = [];
+
+        // Putting one parent back changes the inventory the other changes were checked against,
+        // so the pass runs again until nothing is put back. A gateway put back holds its stored
+        // parent and is never checked again, which bounds the passes by the number of ids.
+        bool revertedThisPass = true;
+        while (revertedThisPass)
+        {
+            revertedThisPass = false;
+            foreach (string id in ids)
+            {
+                SshGatewayDto? gateway = merged.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Id, id, StringComparison.OrdinalIgnoreCase));
+                if (gateway is null || string.IsNullOrWhiteSpace(gateway.ParentGatewayId))
+                {
+                    continue;
+                }
+
+                string? storedParent = storedParentById.GetValueOrDefault(id);
+                if (string.Equals(gateway.ParentGatewayId, storedParent, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                bool allowed = EligibleParents(merged, id, maxDepth).Any(candidate =>
+                    string.Equals(candidate.Id, gateway.ParentGatewayId, StringComparison.OrdinalIgnoreCase));
+                if (allowed)
+                {
+                    continue;
+                }
+
+                gateway.ParentGatewayId = storedParent;
+                if (!reverted.Contains(gateway))
+                {
+                    reverted.Add(gateway);
+                }
+
+                revertedThisPass = true;
+            }
+        }
+
+        return reverted;
+    }
+
     private static void CollectSubtree(
         string gatewayId,
         Dictionary<string, List<string>> childrenById,
