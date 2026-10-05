@@ -56,7 +56,8 @@ public partial class EmbeddedRdpView
         IRdpViewDisposeTarget,
         IRdpConnectWatchdogTimer,
         IRdpConnectAttemptRunner,
-        IRdpTrustPromptSurface
+        IRdpTrustPromptSurface,
+        ISessionPaneOwner
 {
     private const int BeginConnectMaxAttempts = 10;
     private const int MaxReconnectAttemptTimestamps = 3;
@@ -3359,7 +3360,13 @@ public partial class EmbeddedRdpView
             localizedLabel = L(RdpSessionStatusKeys.GetKey(status));
         }
 
-        if (_sessionTab is not null)
+        // A pane that is not its tab's primary has its own status. Written to the tab, it landed on
+        // the primary pane - another session once a split, a merge or a detach had moved this one.
+        if (_ownerPane is not null && !ReferenceEquals(_sessionTab?.PrimaryPane, _ownerPane))
+        {
+            _ownerPane.Status = invariantCode;
+        }
+        else if (_sessionTab is not null)
         {
             _sessionTab.Status = invariantCode;
         }

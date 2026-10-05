@@ -956,14 +956,6 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 _main.CurrentSettings);
             tab.HostControl = hostControl;
             hostOwnsSession = true;
-            if (hostControl is EmbeddedRdpView rdpView)
-            {
-                rdpView.SetOwningPane(tab.PrimaryPane);
-            }
-            else if (hostControl is EmbeddedSftpView sftpView)
-            {
-                sftpView.SetOwningPane(tab.PrimaryPane);
-            }
 
             tab.Status = string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase)
                 ? SessionStatusTokens.Connecting
@@ -1143,7 +1135,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     private void OnHostReconnectRequested(SessionTabViewModel createdFor, SessionPaneModel? pane)
     {
         (SessionTabViewModel owner, bool oneOfSeveral) =
-            ResolveHostOwner(_main.Connection.ActiveSessions, createdFor, pane);
+            ResolveHostOwner(_main.Connection.AllOpenSessions, createdFor, pane);
         if (oneOfSeveral)
         {
             // The tab-level request recorded for an SSH host is not used by a pane reconnect.
@@ -1163,7 +1155,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     private void OnHostCloseRequested(SessionTabViewModel createdFor, SessionPaneModel? pane)
     {
         (SessionTabViewModel owner, bool oneOfSeveral) =
-            ResolveHostOwner(_main.Connection.ActiveSessions, createdFor, pane);
+            ResolveHostOwner(_main.Connection.AllOpenSessions, createdFor, pane);
         if (oneOfSeveral)
         {
             // The full pane-close path: a guard that defers is asked, retried and released. Closing
@@ -1701,11 +1693,6 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 throw;
             }
 
-            if (tab.HostControl is EmbeddedRdpView rdpView)
-            {
-                rdpView.SetOwningPane(tab.PrimaryPane);
-            }
-
             tab.Status = SessionStatusTokens.Connected;
             _main.StatusText = _localizer.Format(
                 "StatusConnected",
@@ -1748,12 +1735,17 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     }
 
     private async Task OnDisconnectRequestedAsync(
-        SessionTabViewModel tab,
+        SessionTabViewModel createdFor,
         SessionPaneModel pane,
         DisconnectReason reason)
     {
+        // Resolved like Reconnect and Close: a merge or a detach moves the pane out of the tab the
+        // host was created for, and returning there left the view showing Disconnecting for good
+        // over a session that stayed connected.
+        (SessionTabViewModel tab, _) = ResolveHostOwner(_main.Connection.AllOpenSessions, createdFor, pane);
         if (SplitTreeHelper.FindPane(tab.RootContent, pane.PaneId) is null)
         {
+            FileLogger.Warn($"Disconnect request for pane '{pane.Title}' found no tab holding it.");
             return;
         }
 
@@ -1836,11 +1828,6 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 };
                 sftpPane.HostControl = _embeddedSessionManager.CreateHostControl(
                     tab, tab.Title, "SFTP", sftpResult.Session, _main.CurrentSettings);
-                if (sftpPane.HostControl is EmbeddedSftpView sftpView)
-                {
-                    sftpView.SetOwningPane(sftpPane);
-                }
-
                 var currentRoot = tab.RootContent;
                 tab.RootContent = new SplitContainerModel
                 {

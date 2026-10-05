@@ -248,4 +248,48 @@ public sealed class SessionTabViewModelTests
             changes.Add(args.PropertyName);
         }
     }
+
+    [Fact]
+    public void PrimaryPaneStatusWrittenDirectly_RaisesTheTabStatusChange()
+    {
+        var vm = new SessionTabViewModel();
+        var pane = new Heimdall.Core.Models.SessionPaneModel { Status = "Connected" };
+        vm.SetRootContent(pane);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        // A host bound to its pane writes the pane, not the tab.
+        pane.Status = "Disconnected";
+
+        Assert.Contains(nameof(SessionTabViewModel.Status), changed);
+        Assert.Equal("Disconnected", vm.Status);
+    }
+
+    [Fact]
+    public void APaneNoLongerPrimary_NoLongerRaisesTheTabStatusChange()
+    {
+        var vm = new SessionTabViewModel();
+        var old = new Heimdall.Core.Models.SessionPaneModel();
+        vm.SetRootContent(old);
+        vm.SetRootContent(new Heimdall.Core.Models.SessionPaneModel());
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        old.Status = "Disconnected";
+
+        Assert.DoesNotContain(nameof(SessionTabViewModel.Status), changed);
+    }
+
+    [Fact]
+    public void PrimaryPaneHostPlacedDirectly_RaisesTheTabHostChange()
+    {
+        var vm = new SessionTabViewModel();
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        // The initial root is watched too, not only a root assigned later.
+        vm.PrimaryPane.HostControl = new object();
+
+        Assert.Contains(nameof(SessionTabViewModel.HostControl), changed);
+    }
 }

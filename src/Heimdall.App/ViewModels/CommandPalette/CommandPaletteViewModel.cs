@@ -550,11 +550,6 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
 
             tab.HostControl = _embeddedSessionManager.CreateHostControl(
                 tab, dto.DisplayName, connType, result.Session, settings);
-            if (tab.HostControl is EmbeddedRdpView rdpView)
-            {
-                rdpView.SetOwningPane(tab.PrimaryPane);
-            }
-
             tab.Status = SessionStatusTokens.Connected;
             _main.StatusText = _localizer.Format("StatusConnected",
                 !string.IsNullOrWhiteSpace(dto.DisplayName) ? dto.DisplayName : dto.RemoteServer);

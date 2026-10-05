@@ -70,6 +70,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     // fall back to the launcher.
     private CitrixSessionHandle? _sessionHandle;
 
+    // The processes that owned a visible window before this launch. A session window owned by one
+    // of them lives in a shared ICA process, which this view must never kill.
+    private IReadOnlySet<int> _preLaunchOwners = new HashSet<int>();
+
     // The Workspace sign-in window, when one has been embedded. It is not a session and has no
     // owning ICA process to validate, so it is the only window whose liveness is its existence.
     private IntPtr _authHwnd;
@@ -288,6 +292,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             ? [.. captured]
             : SnapshotVisibleWindows();
         Core.Logging.FileLogger.Info($"Citrix: {preLaunchWindows.Count} visible window(s) before launch");
+        _preLaunchOwners = CitrixSessionEnvironment.Default.OwnersOf(preLaunchWindows);
 
         bool extendedMessageShown = false;
         for (int attempt = 1; attempt <= WindowCaptureMaxAttempts; attempt++)
@@ -778,7 +783,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
                 window,
                 ReadWindowClassName(window.Hwnd),
                 CitrixSessionEnvironment.Default,
-                out CitrixSessionHandle? handle))
+                out CitrixSessionHandle? handle,
+                _preLaunchOwners))
         {
             _sessionHandle = handle;
             return true;
@@ -837,23 +843,32 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         // fallback: killing it would leave the session the user can see running.
         if (_sessionHandle?.IsAlive != true) return;
 
-        if (_dialogService is not null && _localizer is not null)
+        try
         {
-            bool confirmed = await _dialogService.ShowConfirmAsync(
-                _localizer["CitrixConfirmTerminateTitle"],
-                _localizer["CitrixConfirmTerminateMessage"],
-                "warning");
+            if (_dialogService is not null && _localizer is not null)
+            {
+                bool confirmed = await _dialogService.ShowConfirmAsync(
+                    _localizer["CitrixConfirmTerminateTitle"],
+                    _localizer["CitrixConfirmTerminateMessage"],
+                    "warning");
 
-            if (!confirmed || _disposed) return;
+                if (!confirmed || _disposed) return;
+            }
+
+            ReleaseEmbeddedWindow();
+
+            EmitDisconnect("user");
+
+            _sessionHandle?.Terminate();
+
+            UpdateStatus(false);
         }
-
-        ReleaseEmbeddedWindow();
-
-        EmitDisconnect("user");
-
-        _sessionHandle?.Terminate();
-
-        UpdateStatus(false);
+        catch (Exception ex)
+        {
+            // An async void handler: anything escaping here would reach the dispatcher. A failed
+            // confirmation terminates nothing.
+            Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] terminate: {ex.Message}");
+        }
     }
 
     // Live gate at the seam: the sink is a dumb writer, so the view decides per-emit against the

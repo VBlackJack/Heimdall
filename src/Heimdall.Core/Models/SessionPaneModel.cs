@@ -39,6 +39,17 @@ public partial class SessionPaneModel : ObservableObject, ISplitContent
     [ObservableProperty]
     private object? _hostControl;
 
+    // A host learns its pane where it is placed, not where each caller remembers to tell it. The
+    // callers that forgot left SSH-family hosts with no pane, and a swap, a merge or a detach then
+    // made their Reconnect and Close act on another, live session.
+    partial void OnHostControlChanged(object? value)
+    {
+        if (value is ISessionPaneOwner owner)
+        {
+            owner.SetOwningPane(this);
+        }
+    }
+
     /// <summary>
     /// Session-scoped ID used for state machine keying and tunnel tracking.
     /// </summary>

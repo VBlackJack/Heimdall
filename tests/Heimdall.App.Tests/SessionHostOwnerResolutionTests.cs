@@ -112,6 +112,47 @@ public sealed class SessionHostOwnerResolutionTests
         Assert.Equal("profile-primary", tab.ProfileLookupServerIdFor(null));
     }
 
+    [Fact]
+    public void TerminalRoutingPane_ATerminalWithOnlyItsSftpCompanion_ActsOnTheWholeTab()
+    {
+        SessionPaneModel terminal = new() { PaneId = "ssh", ServerId = "s1", OriginalServerId = "srv", ConnectionType = "SSH" };
+        SessionPaneModel companion = new() { PaneId = "sftp", ServerId = "s2", OriginalServerId = "srv", ConnectionType = "SFTP" };
+        SessionTabViewModel tab = Split(terminal, companion);
+
+        Assert.Null(EmbeddedSessionManager.TerminalRoutingPane(tab, terminal));
+    }
+
+    [Fact]
+    public void TerminalRoutingPane_ATerminalBesideAnotherServer_ActsOnItsOwnPane()
+    {
+        SessionPaneModel terminal = new() { PaneId = "ssh", ServerId = "s1", OriginalServerId = "srv", ConnectionType = "SSH" };
+        SessionPaneModel other = new() { PaneId = "rdp", ServerId = "s2", OriginalServerId = "other", ConnectionType = "RDP" };
+        SessionTabViewModel tab = Split(terminal, other);
+
+        Assert.Same(terminal, EmbeddedSessionManager.TerminalRoutingPane(tab, terminal));
+    }
+
+    [Fact]
+    public void TerminalRoutingPane_ATerminalNoLongerPrimaryInItsTab_ActsOnItsOwnPane()
+    {
+        SessionPaneModel companion = new() { PaneId = "sftp", OriginalServerId = "srv", ConnectionType = "SFTP" };
+        SessionPaneModel terminal = new() { PaneId = "ssh", OriginalServerId = "srv", ConnectionType = "SSH" };
+
+        // Swapped: the terminal is now the second pane.
+        SessionTabViewModel tab = Split(companion, terminal);
+
+        Assert.Same(terminal, EmbeddedSessionManager.TerminalRoutingPane(tab, terminal));
+    }
+
+    [Fact]
+    public void TerminalRoutingPane_ATerminalAloneInItsTab_ActsOnTheTab()
+    {
+        SessionPaneModel terminal = Pane("ssh");
+        SessionTabViewModel tab = new() { RootContent = terminal };
+
+        Assert.Null(EmbeddedSessionManager.TerminalRoutingPane(tab, terminal));
+    }
+
     private static SessionPaneModel Pane(string id) => new() { PaneId = id, ServerId = id, ConnectionType = "SSH" };
 
     private static SessionTabViewModel Split(SessionPaneModel first, SessionPaneModel second) => new()

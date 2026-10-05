@@ -67,4 +67,35 @@ public sealed class SessionPaneModelTests
 
         Assert.Equal("", pane.ProfileLookupServerId);
     }
+
+    [Fact]
+    public void PlacingAHostOnAPane_TellsTheHostWhichPane()
+    {
+        SessionPaneModel first = new();
+        SessionPaneModel second = new();
+        RecordingPaneOwner host = new();
+
+        first.HostControl = host;
+        Assert.Same(first, host.Pane);
+
+        // Moved by a detach or a merge: the pane it lands on is the one it reports.
+        first.HostControl = null;
+        second.HostControl = host;
+        Assert.Same(second, host.Pane);
+    }
+
+    [Fact]
+    public void PlacingAnyOtherObject_IsAccepted()
+    {
+        SessionPaneModel pane = new() { HostControl = new object() };
+
+        Assert.NotNull(pane.HostControl);
+    }
+
+    private sealed class RecordingPaneOwner : ISessionPaneOwner
+    {
+        internal SessionPaneModel? Pane { get; private set; }
+
+        public void SetOwningPane(SessionPaneModel pane) => Pane = pane;
+    }
 }
