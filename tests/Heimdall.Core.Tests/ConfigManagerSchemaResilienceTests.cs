@@ -540,6 +540,73 @@ public sealed class ConfigManagerSchemaResilienceTests : IDisposable
         Assert.Equal("Legacy", Assert.Single(servers).DisplayName);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("\0\0\0\0")]
+    [InlineData("{ \"defaultTheme\": ")]
+    public async Task LoadSettingsAsync_UnreadableFile_LoadsTheLastGoodCopy(string damaged)
+    {
+        await WriteUtf8Async(_manager.SettingsPath, damaged);
+        await WriteUtf8Async(ConfigManager.BackupPathFor(_manager.SettingsPath), """{ "defaultTheme": "Blade" }""");
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        // A file left empty or zeroed by a power cut stopped the application at startup.
+        Assert.Equal("Blade", settings.DefaultTheme);
+        Assert.Contains("settings.json", _manager.DocumentsRecoveredFromBackup);
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_UnreadableFileAndNoBackup_StillFailsAsBefore()
+    {
+        await WriteUtf8Async(_manager.SettingsPath, "{ broken");
+
+        await Assert.ThrowsAnyAsync<JsonException>(() => _manager.LoadSettingsAsync());
+        Assert.Empty(_manager.DocumentsRecoveredFromBackup);
+    }
+
+    [Fact]
+    public async Task EverySave_KeepsTheFileItReplacesAsTheBackup()
+    {
+        await WriteUtf8Async(_manager.SettingsPath, """{ "defaultTheme": "Before" }""");
+
+        await _manager.MergeSettingAsync(settings => settings.DefaultTheme = "After");
+
+        AppSettings saved = await _manager.LoadSettingsAsync();
+        string backup = await File.ReadAllTextAsync(ConfigManager.BackupPathFor(_manager.SettingsPath));
+        Assert.Equal("After", saved.DefaultTheme);
+        Assert.Contains("Before", backup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SavingOverADamagedFile_NeverCopiesTheDamageOverTheGoodBackup()
+    {
+        string backupPath = ConfigManager.BackupPathFor(_manager.SettingsPath);
+        await WriteUtf8Async(_manager.SettingsPath, "\0\0\0");
+        await WriteUtf8Async(backupPath, """{ "defaultTheme": "Good" }""");
+
+        await _manager.MergeSettingAsync(settings => settings.SshDefaultMode = "External");
+
+        AppSettings saved = await _manager.LoadSettingsAsync();
+        Assert.Equal("Good", saved.DefaultTheme);
+        Assert.Equal("External", saved.SshDefaultMode);
+        Assert.Contains("Good", await File.ReadAllTextAsync(backupPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LoadServersAsync_UnreadableFile_LoadsTheLastGoodCopy()
+    {
+        await WriteUtf8Async(_manager.ServersPath, "");
+        await WriteUtf8Async(
+            ConfigManager.BackupPathFor(_manager.ServersPath),
+            """[ { "id": "s1", "displayName": "Kept", "connectionType": "SSH" } ]""");
+
+        List<ServerProfileDto> servers = await _manager.LoadServersAsync();
+
+        Assert.Equal("Kept", Assert.Single(servers).DisplayName);
+        Assert.Contains("servers.json", _manager.DocumentsRecoveredFromBackup);
+    }
+
     private static Task WriteUtf8Async(string path, string content) =>
         File.WriteAllTextAsync(path, content, new UTF8Encoding(false));
 

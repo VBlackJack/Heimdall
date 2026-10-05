@@ -269,7 +269,9 @@ public sealed class VaultLifecycleServiceTests : IAsyncLifetime
     {
         VaultLifecycleService service = await SeedCompletedVaultAsync();
         service.Lock();
+        // Both copies: the last good copy would otherwise stand in for the damaged file.
         await File.WriteAllTextAsync(_configManager.ServersPath, "{");
+        await File.WriteAllTextAsync(ConfigManager.BackupPathFor(_configManager.ServersPath), "{");
 
         await Assert.ThrowsAnyAsync<JsonException>(
             () => NewService().UnlockAsync(Pw(StrongPassword)));

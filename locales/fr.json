@@ -3946,6 +3946,8 @@
   "ErrorPreflightTitle": "Erreur de pr\u00e9v\u00e9rification",
   "MigrationDetectedPrompt": "Une installation Heimdall existante a \u00e9t\u00e9 d\u00e9tect\u00e9e. Souhaitez-vous importer vos serveurs et param\u00e8tres ?",
   "MigrationTitle": "Migration",
+  "ConfigRecoveredFromBackupTitle": "Configuration restaur\u00e9e",
+  "ConfigRecoveredFromBackupMessage": "{0} \u00e9tait illisible et a \u00e9t\u00e9 charg\u00e9 depuis sa derni\u00e8re copie valide. Les changements enregistr\u00e9s apr\u00e8s cette copie peuvent manquer.",
   "MigrationSuccess": "{0} serveurs import\u00e9s avec succ\u00e8s.",
   "MigrationSuccessOne": "{0} serveur import\u00e9 avec succ\u00e8s.",
   "MigrationFailed": "\u00c9chec de la migration : {0}",
