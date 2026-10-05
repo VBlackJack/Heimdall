@@ -1869,7 +1869,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     progressText,
                     LocalizePostConnectStatus(update.Status),
                     update.CurrentStepDisplayText);
-                tab.SetPostConnectState(true, progressText, tooltip, userCancelCts.Cancel);
+                SetPostConnectStateOnUiThread(tab, progressText, tooltip, userCancelCts.Cancel);
             });
 
             var runnableSteps = server.PostConnectSteps.Count(step =>
@@ -1882,8 +1882,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
             if (ProfileExecutionTrust.RequiresPostConnectConfirmation(server))
             {
-                bool approved = await _main.ServerList
-                    .ConfirmAndTrustPostConnectAsync(server, runnableSteps)
+                bool approved = await ConfirmOnUiThreadAsync(
+                        () => _main.ServerList.ConfirmAndTrustPostConnectAsync(server, runnableSteps))
                     .ConfigureAwait(false);
 
                 if (!approved)
@@ -1894,8 +1894,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 }
             }
 
-            tab.SetPostConnectState(
-                true,
+            SetPostConnectStateOnUiThread(
+                tab,
                 $"0/{server.PostConnectSteps.Count}",
                 _localizer["PostConnectProgressStarting"],
                 userCancelCts.Cancel);
@@ -1930,6 +1930,28 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     {
         ArgumentNullException.ThrowIfNull(tab);
         InvokeOnUi(tab.ClearPostConnectState);
+    }
+
+    // The post-connect run continues on the thread pool once the profiles have been read. The
+    // progress state drives a command bound to a button and the confirmation is a modal
+    // dialog; touched from the pool, both threw, the catch below logged "Post-connect run
+    // failed", and the steps never ran. Only the clear went through the dispatcher.
+    internal void SetPostConnectStateOnUiThread(
+        SessionTabViewModel tab,
+        string progressText,
+        string tooltip,
+        Action cancel)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        InvokeOnUi(() => tab.SetPostConnectState(true, progressText, tooltip, cancel));
+    }
+
+    internal async Task<bool> ConfirmOnUiThreadAsync(Func<Task<bool>> confirm)
+    {
+        ArgumentNullException.ThrowIfNull(confirm);
+        bool approved = false;
+        await _uiDispatcher.InvokeAsync(async () => approved = await confirm()).ConfigureAwait(false);
+        return approved;
     }
 
     private string LocalizePostConnectStatus(PostConnectStepStatus status)
