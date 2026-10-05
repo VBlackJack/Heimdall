@@ -174,6 +174,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             .SetupTunnelIfNeededAsync(server, sshPort, settings, ct)
             .ConfigureAwait(false);
         (bool tunnelOk, bool usesTunnel, string targetHost, int targetPort, string? tunnelError) = tunnelOutcome;
+        long tunnelLeaseId = tunnelOutcome.TunnelLeaseId;
 
         if (!tunnelOk)
         {
@@ -193,7 +194,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
 
         if (string.Equals(sshMode, "External", StringComparison.OrdinalIgnoreCase))
         {
-            return await ConnectSshExternal(server, settings, targetHost, targetPort, usesTunnel, ct)
+            return await ConnectSshExternal(server, settings, targetHost, targetPort, usesTunnel, tunnelLeaseId, ct)
                 .ConfigureAwait(false);
         }
 
@@ -204,7 +205,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             string keyPathMessage = LocalizeKeyPathError(sshNetKeyPathError, server.SshKeyPath);
             _connectionSm.SetError(server.Id, keyPathMessage);
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             return new ConnectionResult(
                 false,
                 keyPathMessage,
@@ -257,7 +258,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             var message = _localizer[SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported];
             _connectionSm.SetError(server.Id, message);
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             return new ConnectionResult(
                 false,
                 message,
@@ -279,7 +280,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     targetPort,
                     usesTunnel,
                     originalFailure: null,
-                    ct)
+                    ct,
+                    tunnelLeaseId: tunnelLeaseId)
                 .ConfigureAwait(false);
         }
 
@@ -293,7 +295,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             string usernameMsg = _localizer[SshLocalizationKeys.ErrorSshUsernameRequired];
             _connectionSm.SetError(server.Id, usernameMsg);
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             return new ConnectionResult(
                 false,
                 usernameMsg,
@@ -340,7 +342,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         catch (HostKeyRejectedException ex)
         {
             session.Dispose();
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
 
             if (ex.IsMismatch && !string.IsNullOrWhiteSpace(ex.StoredFingerprint))
             {
@@ -372,7 +374,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             session.Dispose();
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             throw;
         }
         catch (Exception ex)
@@ -401,7 +403,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported)
                         ?? localizedFailure.Message;
                     _connectionSm.SetError(server.Id, message);
-                    ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+                    ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
                     return new ConnectionResult(
                         false,
                         message,
@@ -424,12 +426,13 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         usesTunnel,
                         failure.Code,
                         ct,
-                        localizedFailure.Message)
+                        localizedFailure.Message,
+                        tunnelLeaseId: tunnelLeaseId)
                     .ConfigureAwait(false);
             }
 
             _connectionSm.SetError(server.Id, localizedFailure.Message);
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             return new ConnectionResult(
                 false,
                 localizedFailure.Message,
@@ -593,14 +596,16 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         return false;
     }
 
-    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
+    // The lease names the one reference this connect took, so giving it back here and again
+    // from the pane close that follows a failed connect releases it only once.
+    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort, long tunnelLeaseId)
     {
         if (!usesTunnel || tunnelLocalPort <= 0)
         {
             return;
         }
 
-        _tunnelService.ReleaseTunnelReference(tunnelLocalPort);
+        _tunnelService.ReleaseTunnelReference(tunnelLocalPort, tunnelLeaseId);
     }
 
     /// <summary>
@@ -613,6 +618,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         string targetHost,
         int targetPort,
         bool usesTunnel,
+        long tunnelLeaseId,
         CancellationToken ct)
     {
         bool releaseTunnel = usesTunnel;
@@ -724,7 +730,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 {
                     try
                     {
-                        ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+                        ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
                     }
                     catch (Exception ex)
                     {
@@ -760,7 +766,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         }
         finally
         {
-            ReleaseTunnelIfNeeded(releaseTunnel, targetPort);
+            ReleaseTunnelIfNeeded(releaseTunnel, targetPort, tunnelLeaseId);
         }
     }
 
@@ -776,7 +782,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         bool usesTunnel,
         SshFailureCode? originalFailure,
         CancellationToken ct,
-        string? originalFailureMessage = null)
+        string? originalFailureMessage = null,
+        long tunnelLeaseId = 0)
     {
         bool releaseTunnel = usesTunnel;
         try
@@ -1053,7 +1060,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         }
         finally
         {
-            ReleaseTunnelIfNeeded(releaseTunnel, targetPort);
+            ReleaseTunnelIfNeeded(releaseTunnel, targetPort, tunnelLeaseId);
         }
     }
 

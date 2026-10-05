@@ -41,6 +41,11 @@ internal interface ITunnelsHost
     AppSettings? CurrentSettings { get; }
 
     string StatusText { get; set; }
+
+    /// <summary>
+    /// Asks the user to confirm an action that disconnects sessions; true to go ahead.
+    /// </summary>
+    Task<bool> ConfirmAsync(string title, string message) => Task.FromResult(true);
 }
 
 /// <summary>
@@ -319,10 +324,29 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     /// Force-closes a single tunnel, refreshes the list and reports the
     /// result in the shell status bar.
     /// </summary>
+    /// <remarks>
+    /// Closing ignores how many sessions hold the tunnel, so a session still running through it
+    /// loses its transport. That used to happen without a word; the user is now told how many
+    /// sessions it disconnects and asked first.
+    /// </remarks>
     [RelayCommand]
-    private void Close(TunnelInfo? tunnel)
+    private async Task CloseAsync(TunnelInfo? tunnel)
     {
         if (tunnel is null)
+        {
+            return;
+        }
+
+        int sessions = CountSessionsOnTunnel(tunnel.LocalPort);
+        if (sessions > 0
+            && !await _host.ConfirmAsync(
+                _localizer["ConfirmCloseTunnelInUseTitle"],
+                _localizer.FormatCount(
+                    sessions,
+                    "ConfirmCloseTunnelInUseOne",
+                    "ConfirmCloseTunnelInUseOther",
+                    tunnel.LocalPort,
+                    sessions)))
         {
             return;
         }
@@ -337,8 +361,21 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     /// result in the shell status bar.
     /// </summary>
     [RelayCommand]
-    private void CloseAll()
+    private async Task CloseAllAsync()
     {
+        int sessions = _tunnelManager.GetActiveTunnels().Sum(tunnel => CountSessionsOnTunnel(tunnel.LocalPort));
+        if (sessions > 0
+            && !await _host.ConfirmAsync(
+                _localizer["ConfirmCloseTunnelInUseTitle"],
+                _localizer.FormatCount(
+                    sessions,
+                    "ConfirmCloseAllTunnelsInUseOne",
+                    "ConfirmCloseAllTunnelsInUseOther",
+                    sessions)))
+        {
+            return;
+        }
+
         _tunnelManager.CloseAllTunnels();
         Count = 0;
         RefreshList();
@@ -766,6 +803,25 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         {
             SubscribeToTab(activeTab);
         }
+    }
+
+    // The open panes whose connection runs through the tunnel on this port.
+    private int CountSessionsOnTunnel(int localPort)
+    {
+        int count = 0;
+        foreach (SessionTabViewModel tab in _host.Connection.ActiveSessions.ToList())
+        {
+            foreach (var pane in Heimdall.Core.Models.SplitTreeHelper.EnumerateLeaves(tab.RootContent))
+            {
+                if (!string.IsNullOrWhiteSpace(pane.ServerId)
+                    && _connectionSm.GetStateData(pane.ServerId)?.TunnelLocalPort == localPort)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     private void RefreshAllTunnelBadgeStates()

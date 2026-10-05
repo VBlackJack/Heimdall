@@ -117,6 +117,12 @@ public sealed class TunnelService : ITunnelService
         _tunnelManager.ReleaseReference(localPort);
     }
 
+    /// <inheritdoc />
+    public void ReleaseTunnelReference(int localPort, long leaseId)
+    {
+        _tunnelManager.ReleaseReference(localPort, leaseId);
+    }
+
     /// <summary>
     /// Checks whether the server requires a tunnel and establishes it if needed.
     /// Returns the resolved host and port to connect to.
@@ -165,6 +171,7 @@ public sealed class TunnelService : ITunnelService
         return new TunnelSetupOutcome(true, true, localBindHost, localPort, null, null)
         {
             ReusedExistingTunnel = tunnelResult.ReusedExistingTunnel,
+            TunnelLeaseId = tunnelResult.Tunnel?.LeaseId ?? 0,
 
             // Read off the tunnel, not off the attempt. Every opening path builds its tunnel
             // record with the route already on it, and a reuse hands back a copy of that record,
@@ -255,12 +262,12 @@ public sealed class TunnelService : ITunnelService
         {
             if (ct.IsCancellationRequested)
             {
-                _tunnelManager.ReleaseReference(existing.LocalPort);
+                _tunnelManager.ReleaseReference(existing.LocalPort, existing.LeaseId);
                 ct.ThrowIfCancellationRequested();
             }
             Core.Logging.FileLogger.Info(
                 $"Reusing existing tunnel on port {existing.LocalPort} for {serverId}");
-            _connectionSm.SetTunnelInfo(serverId, existing.LocalPort, 0);
+            _connectionSm.SetTunnelInfo(serverId, existing.LocalPort, 0, existing.LeaseId);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.EstablishingTunnel);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
 
@@ -468,16 +475,18 @@ public sealed class TunnelService : ITunnelService
         if (result.Success)
         {
             int establishedLocalPort = result.Tunnel?.LocalPort ?? localPort;
+            long establishedLeaseId = result.Tunnel?.LeaseId ?? 0;
             await WaitForTunnelEstablishmentOrReleaseAsync(
                     _tunnelManager,
                     establishedLocalPort,
                     settings.TunnelEstablishmentDelayMs,
                     _timeProvider,
-                    ct)
+                    ct,
+                    establishedLeaseId)
                 .ConfigureAwait(false);
 
             Core.Logging.FileLogger.Info($"Tunnel established for {serverId} on port {establishedLocalPort}");
-            _connectionSm.SetTunnelInfo(serverId, establishedLocalPort, 0);
+            _connectionSm.SetTunnelInfo(serverId, establishedLocalPort, 0, establishedLeaseId);
             _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
 
             // Nothing is stamped here. The route was set when the tunnel record was built, which
@@ -803,7 +812,11 @@ public sealed class TunnelService : ITunnelService
             localBindHost: localBindHost,
             gatewayRoute: gatewayRoute);
 
-        if (!_tunnelManager.TryRegisterExternalTunnel(tunnelInfo, runner, () => runner.IsRunning))
+        if (!_tunnelManager.TryRegisterExternalTunnel(
+                tunnelInfo,
+                runner,
+                () => runner.IsRunning,
+                out long pLinkLeaseId))
         {
             runner.Dispose();
             return Refuse(
@@ -817,15 +830,16 @@ public sealed class TunnelService : ITunnelService
                 localPort,
                 settings.TunnelEstablishmentDelayMs,
                 _timeProvider,
-                ct)
+                ct,
+                pLinkLeaseId)
             .ConfigureAwait(false);
 
-        _connectionSm.SetTunnelInfo(serverId, localPort, runner.ProcessId ?? 0);
+        _connectionSm.SetTunnelInfo(serverId, localPort, runner.ProcessId ?? 0, pLinkLeaseId);
         _connectionSm.TryTransition(serverId, Core.Models.ConnectionState.TunnelEstablished);
         Core.Logging.FileLogger.Info(
             $"Plink tunnel established for {serverId} on port {localPort} (pid={runner.ProcessId?.ToString() ?? "unknown"})");
 
-        return new TunnelResult(true, tunnelInfo, null, null);
+        return new TunnelResult(true, tunnelInfo with { LeaseId = pLinkLeaseId }, null, null);
     }
 
     /// <summary>
@@ -850,7 +864,8 @@ public sealed class TunnelService : ITunnelService
         int localPort,
         int delayMs,
         TimeProvider timeProvider,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long leaseId = 0)
     {
         ArgumentNullException.ThrowIfNull(tunnelManager);
 
@@ -863,7 +878,7 @@ public sealed class TunnelService : ITunnelService
         {
             Core.Logging.FileLogger.Info(
                 $"Tunnel establishment on port {localPort} was cancelled; releasing the tunnel reference.");
-            tunnelManager.ReleaseReference(localPort);
+            tunnelManager.ReleaseReference(localPort, leaseId);
             throw;
         }
     }

@@ -50,6 +50,13 @@ public sealed record TunnelSetupOutcome(
     public string? GatewayRoute { get; init; }
 
     /// <summary>
+    /// The reference this connection holds on its tunnel, to give back through
+    /// <see cref="ITunnelService.ReleaseTunnelReference(int, long)"/>; zero for a direct
+    /// connection.
+    /// </summary>
+    public long TunnelLeaseId { get; init; }
+
+    /// <summary>
     /// Five-value deconstruction kept for source compatibility with the previous tuple
     /// contract, so existing consumers continue to compile unchanged.
     /// </summary>

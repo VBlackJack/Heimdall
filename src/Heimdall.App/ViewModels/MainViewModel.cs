@@ -98,6 +98,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     internal AppSettings? CurrentSettings => _currentSettings;
     AppSettings? ITunnelsHost.CurrentSettings => _currentSettings;
 
+    Task<bool> ITunnelsHost.ConfirmAsync(string title, string message) =>
+        _dialogService.ShowConfirmAsync(title, message, "warning");
+
     [ObservableProperty]
     private string _windowTitle = "";
 

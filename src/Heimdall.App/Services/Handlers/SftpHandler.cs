@@ -143,9 +143,11 @@ internal sealed class SftpHandler : IProtocolHandler
                     usernameMsg));
         }
 
-        (bool tunnelOk, bool usesTunnel, string targetHost, int targetPort, string? tunnelError) =
+        TunnelSetupOutcome tunnelOutcome =
             await _tunnelService.SetupTunnelIfNeededAsync(server, port, settings, ct)
                 .ConfigureAwait(false);
+        (bool tunnelOk, bool usesTunnel, string targetHost, int targetPort, string? tunnelError) = tunnelOutcome;
+        long tunnelLeaseId = tunnelOutcome.TunnelLeaseId;
 
         if (!tunnelOk)
         {
@@ -299,7 +301,7 @@ internal sealed class SftpHandler : IProtocolHandler
         {
             if (releaseTunnel)
             {
-                ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+                ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             }
         }
     }
@@ -347,14 +349,16 @@ internal sealed class SftpHandler : IProtocolHandler
             && (InputValidator.ValidateDomain(host) || IPAddress.TryParse(host, out _));
     }
 
-    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
+    // The lease names the one reference this connect took, so giving it back here and again
+    // from the pane close that follows a failed connect releases it only once.
+    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort, long tunnelLeaseId)
     {
         if (!usesTunnel || tunnelLocalPort <= 0)
         {
             return;
         }
 
-        _tunnelService.ReleaseTunnelReference(tunnelLocalPort);
+        _tunnelService.ReleaseTunnelReference(tunnelLocalPort, tunnelLeaseId);
     }
 
     private string BuildHostKeyMismatchMessage(

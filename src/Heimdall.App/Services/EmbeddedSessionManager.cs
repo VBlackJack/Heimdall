@@ -949,9 +949,9 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             {
                 // Taken, not read: this runs on the process's exit thread while a pane close
                 // may be releasing the same port on the UI thread, and only one of them may.
-                if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort))
+                if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort, out long leaseId))
                 {
-                    _tunnelService.ReleaseTunnelReference(localPort);
+                    _tunnelService.ReleaseTunnelReference(localPort, leaseId);
                 }
             }
             finally

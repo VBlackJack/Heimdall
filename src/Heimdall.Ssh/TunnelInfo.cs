@@ -34,6 +34,13 @@ public sealed record TunnelInfo(
     bool IsAlive)
 {
     /// <summary>
+    /// The reference this snapshot was handed out with by an open or a reuse, which the holder
+    /// gives back through <see cref="TunnelManager.ReleaseReference(int, long)"/>; zero on a
+    /// snapshot that carries no reference, such as a listing.
+    /// </summary>
+    public long LeaseId { get; init; }
+
+    /// <summary>
     /// Local port for the SOCKS5 dynamic proxy, or 0 if disabled.
     /// </summary>
     public int SocksProxyPort { get; init; }

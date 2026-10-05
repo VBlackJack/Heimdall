@@ -154,6 +154,7 @@ public sealed class ConnectionStateMachine
                 data.ErrorMessage = null;
                 data.TunnelLocalPort = null;
                 data.TunnelProcessId = null;
+                data.TunnelLeaseId = null;
                 data.ConnectedAtUtc = null;
             }
 
@@ -205,13 +206,21 @@ public sealed class ConnectionStateMachine
     /// <summary>
     /// Stores tunnel information (local port and process ID) for a server connection.
     /// </summary>
-    public void SetTunnelInfo(string serverId, int localPort, int processId)
+    public void SetTunnelInfo(string serverId, int localPort, int processId) =>
+        SetTunnelInfo(serverId, localPort, processId, leaseId: 0);
+
+    /// <summary>
+    /// Stores tunnel information for a server connection, including the lease the connection
+    /// holds on the tunnel, so the release gives back that reference and no other.
+    /// </summary>
+    public void SetTunnelInfo(string serverId, int localPort, int processId, long leaseId)
     {
         lock (_lock)
         {
             ConnectionStateData data = GetOrCreate(serverId);
             data.TunnelLocalPort = localPort;
             data.TunnelProcessId = processId;
+            data.TunnelLeaseId = leaseId > 0 ? leaseId : null;
         }
     }
 
@@ -224,7 +233,15 @@ public sealed class ConnectionStateMachine
     /// a tunnel a third holder still used.
     /// </summary>
     /// <returns>True when a port was recorded and is now the caller's to release.</returns>
-    public bool TryTakeTunnelLocalPort(string serverId, out int localPort)
+    public bool TryTakeTunnelLocalPort(string serverId, out int localPort) =>
+        TryTakeTunnelLocalPort(serverId, out localPort, out _);
+
+    /// <summary>
+    /// Hands the tunnel port and lease recorded for a server to exactly one caller and clears
+    /// them; see <see cref="TryTakeTunnelLocalPort(string, out int)"/>.
+    /// </summary>
+    /// <param name="leaseId">The recorded lease, or zero when none was recorded.</param>
+    public bool TryTakeTunnelLocalPort(string serverId, out int localPort, out long leaseId)
     {
         lock (_lock)
         {
@@ -232,14 +249,17 @@ public sealed class ConnectionStateMachine
                 && data.TunnelLocalPort is int port
                 && port > 0)
             {
+                leaseId = data.TunnelLeaseId ?? 0;
                 data.TunnelLocalPort = null;
                 data.TunnelProcessId = null;
+                data.TunnelLeaseId = null;
                 localPort = port;
                 return true;
             }
         }
 
         localPort = 0;
+        leaseId = 0;
         return false;
     }
 
@@ -387,6 +407,7 @@ public sealed class ConnectionStateMachine
         data.ErrorMessage = null;
         data.TunnelLocalPort = null;
         data.TunnelProcessId = null;
+        data.TunnelLeaseId = null;
         data.ConnectedAtUtc = null;
         data.LastTransitionUtc = DateTime.UtcNow;
         long finalRevision = ++data.Revision;
@@ -509,6 +530,7 @@ public sealed class ConnectionStateData
     public string? ErrorMessage { get; set; }
     public int? TunnelLocalPort { get; set; }
     public int? TunnelProcessId { get; set; }
+    public long? TunnelLeaseId { get; set; }
     public DateTime? ConnectedAtUtc { get; set; }
     public DateTime LastTransitionUtc { get; set; } = DateTime.UtcNow;
     public long Revision { get; set; }
@@ -523,6 +545,7 @@ public sealed class ConnectionStateData
         ErrorMessage = ErrorMessage,
         TunnelLocalPort = TunnelLocalPort,
         TunnelProcessId = TunnelProcessId,
+        TunnelLeaseId = TunnelLeaseId,
         ConnectedAtUtc = ConnectedAtUtc,
         LastTransitionUtc = LastTransitionUtc,
         Revision = Revision,

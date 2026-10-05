@@ -52,4 +52,16 @@ public interface ITunnelService
     /// Releases one reference to an established tunnel local port.
     /// </summary>
     void ReleaseTunnelReference(int localPort);
+
+    /// <summary>
+    /// Gives back the reference <paramref name="leaseId"/> on the tunnel at
+    /// <paramref name="localPort"/>. Giving back a lease twice, or one whose tunnel has since
+    /// closed, does nothing; a non-positive lease releases by port alone.
+    /// </summary>
+    /// <remarks>
+    /// A handler that gave its tunnel back on a failed connect, and the pane close that
+    /// followed, each released the same acquisition by port, so a tunnel another tab shared
+    /// was closed under it. Both now give back the same lease, and only the first counts.
+    /// </remarks>
+    void ReleaseTunnelReference(int localPort, long leaseId) => ReleaseTunnelReference(localPort);
 }

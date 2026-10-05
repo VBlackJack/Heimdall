@@ -581,8 +581,8 @@ public sealed class SplitService : ISplitService
             Core.Logging.ConnectionHistory.RecordDisconnect(
                 historyId, pane.Title, pane.ConnectionType);
 
-            if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort))
-                _tunnelManager.ReleaseReference(localPort);
+            if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort, out long leaseId))
+                _tunnelManager.ReleaseReference(localPort, leaseId);
 
             // Guarded for the reason TearDownPaneState gives: a state observer that throws must
             // not skip the disconnect below, nor leave the pane in the tree.
@@ -915,8 +915,8 @@ public sealed class SplitService : ISplitService
     {
         if (string.IsNullOrEmpty(serverId)) return;
 
-        if (_connectionSm.TryTakeTunnelLocalPort(serverId, out int port))
-            _tunnelManager.ReleaseReference(port);
+        if (_connectionSm.TryTakeTunnelLocalPort(serverId, out int port, out long leaseId))
+            _tunnelManager.ReleaseReference(port, leaseId);
 
         // Same guard, same reason. This one runs while tidying up after a pane that is already
         // gone, so a throw here would abandon the tidy-up and log nothing about why.
@@ -1024,8 +1024,8 @@ public sealed class SplitService : ISplitService
                 Core.Logging.ConnectionHistory.RecordDisconnect(
                     historyId, pane.Title, pane.ConnectionType);
 
-                if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort))
-                    _tunnelManager.ReleaseReference(localPort);
+                if (_connectionSm.TryTakeTunnelLocalPort(pane.ServerId, out int localPort, out long leaseId))
+                    _tunnelManager.ReleaseReference(localPort, leaseId);
 
                 TearDownPaneState(pane);
             }
@@ -1203,8 +1203,8 @@ public sealed class SplitService : ISplitService
     {
         if (string.IsNullOrEmpty(oldServerId)) return;
 
-        if (_connectionSm.TryTakeTunnelLocalPort(oldServerId, out int port))
-            _tunnelManager.ReleaseReference(port);
+        if (_connectionSm.TryTakeTunnelLocalPort(oldServerId, out int port, out long leaseId))
+            _tunnelManager.ReleaseReference(port, leaseId);
         _connectionSm.Teardown(oldServerId);
     }
 
