@@ -247,8 +247,10 @@ public partial class App : System.Windows.Application
             // Apply sleep prevention setting
             SleepPrevention.Enabled = settings.PreventSleepDuringSession;
             SleepPrevention.IntervalSeconds = settings.SleepPreventionIntervalSeconds;
-            Heimdall.Sftp.RemoteFileEditor.UploadDebounceInterval =
-                TimeSpan.FromMilliseconds(settings.SftpUploadDebounceMs);
+            // Clamped: a hand-edited -1 became an infinite timer (a save arriving mid-upload was
+            // never retried) and anything lower made Timer.Change throw.
+            Heimdall.Sftp.RemoteFileEditor.UploadDebounceInterval = TimeSpan.FromMilliseconds(
+                SettingRanges.Of(nameof(AppSettings.SftpUploadDebounceMs)).Clamp(settings.SftpUploadDebounceMs));
 
             // Initialize TwinShell command library (DB + seed on first launch).
             // Awaited to ensure seed completes before tools can be opened.
@@ -1162,10 +1164,16 @@ public partial class App : System.Windows.Application
             Heimdall.Core.Logging.FileLogger.Info("HMAC key generated for credential integrity");
         }
 
+        ApplyHmacKey(settings.HmacKey);
+    }
+
+    /// <summary>Hands the DPAPI-protected HMAC key, in raw form, to <see cref="CredentialProtector"/>.</summary>
+    private static void ApplyHmacKey(string? protectedKey)
+    {
         // Decrypt the DPAPI-protected HMAC key to raw form for CredentialProtector
         try
         {
-            var rawKey = DpapiProvider.Unprotect(settings.HmacKey);
+            var rawKey = DpapiProvider.Unprotect(protectedKey!);
             CredentialProtector.Initialize(rawKey);
         }
         catch (Exception ex)
@@ -1276,6 +1284,14 @@ public partial class App : System.Windows.Application
 
         MigrationService migrationService = new(configManager, localization);
         MigrationResult result = await migrationService.ImportFromLegacyAsync(legacyPath);
+        if (result.Success)
+        {
+            // The migration can bring the legacy HMAC key in place of the one this run generated:
+            // the protector must use the key now on disk, or the imported passwords fail to verify
+            // and anything protected for the rest of the session is unreadable after a restart.
+            ApplyHmacKey((await configManager.LoadSettingsAsync()).HmacKey);
+        }
+
         MigrationPresentation presentation = MigrationPresentationPolicy.Create(
             result,
             localization);

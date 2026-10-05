@@ -359,8 +359,8 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             AppSettings settingsToSave = CloneSettings(settings);
             MergeExtensionData(currentSettings.ExtensionData, settingsToSave.ExtensionData);
             settingsToSave.SchemaVersion = AppSettings.CurrentSchemaVersion;
+            NormalizeCollections(settingsToSave);
             NormalizeTrustedHostKeys(settingsToSave);
-            NormalizeGatewayList(settingsToSave);
             ValidateSettingsWriteInvariants(settingsToSave);
             var json = JsonSerializer.Serialize(settingsToSave, JsonOptions);
             await WriteTextAsync(_settingsPath, json).ConfigureAwait(false);
@@ -478,6 +478,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
                 requireSupportedSchemaForWrite: true).ConfigureAwait(false);
             mutate(settings);
             settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+            NormalizeCollections(settings);
             NormalizeTrustedHostKeys(settings);
             ValidateSettingsWriteInvariants(settings);
             var json = JsonSerializer.Serialize(settings, JsonOptions);
@@ -513,8 +514,8 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             AppSettings.CurrentSchemaVersion,
             requireSupportedSchemaForWrite);
         MigrateLegacyRdpTimeoutKey(json, settings);
+        NormalizeCollections(settings);
         NormalizeTrustedHostKeys(settings);
-        NormalizeGatewayList(settings);
         List<ValidationDiagnostic> diagnostics = [.. SchemaValidator.DiagnoseSettingsLoad(settings).Diagnostics];
         for (int index = 0; index < settings.SshGateways.Count; index++)
         {
@@ -568,6 +569,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
                     requireSupportedSchemaForWrite: true).ConfigureAwait(false);
                 applySettingsMutation(settings);
                 settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+                NormalizeCollections(settings);
                 NormalizeTrustedHostKeys(settings);
                 ValidateSettingsWriteInvariants(settings);
                 await WriteTextAsync(
@@ -897,34 +899,113 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
     }
 
     /// <summary>
-    /// Replaces a null gateway list with an empty one and drops null entries.
+    /// Replaces every null collection with an empty one and drops null entries and values.
     /// </summary>
     /// <remarks>
-    /// The server list was guarded and the gateway list was not: a settings file holding
-    /// <c>"sshGateways": null</c>, or a null inside the array, threw on load and stopped the
-    /// application at startup. Neither carries a gateway, so nothing a user wrote is lost.
+    /// Only the gateway list used to be guarded: a settings file holding <c>"trustedHostKeysV2":
+    /// null</c>, <c>"externalTools": null</c> or a null inside any list or dictionary threw on load
+    /// or at first use and stopped the application at startup. A null carries no entry, so nothing a
+    /// user wrote is lost. Driven by reflection so a collection added later is covered without
+    /// anyone remembering to list it here.
     /// </remarks>
-    private static void NormalizeGatewayList(AppSettings settings)
+    internal static void NormalizeCollections(AppSettings settings)
     {
-        settings.SshGateways ??= [];
-        settings.SshGateways.RemoveAll(gateway => gateway is null);
+        foreach (System.Reflection.PropertyInfo property in NormalizedCollectionProperties)
+        {
+            object? value = property.GetValue(settings);
+            if (value is null)
+            {
+                property.SetValue(settings, EmptyCollectionFor(property));
+                continue;
+            }
+
+            DropNullEntries(value);
+        }
+    }
+
+    private static readonly System.Reflection.PropertyInfo[] NormalizedCollectionProperties =
+        typeof(AppSettings)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Where(property => property.CanRead
+                && property.CanWrite
+                && property.GetIndexParameters().Length == 0
+                && property.GetCustomAttributes(typeof(JsonExtensionDataAttribute), inherit: true).Length == 0
+                && (property.PropertyType.IsArray
+                    || typeof(System.Collections.IList).IsAssignableFrom(property.PropertyType)
+                    || typeof(System.Collections.IDictionary).IsAssignableFrom(property.PropertyType)))
+            .ToArray();
+
+    private static object EmptyCollectionFor(System.Reflection.PropertyInfo property)
+    {
+        Type type = property.PropertyType;
+        if (property.Name == nameof(AppSettings.RdpResolutionPresets))
+        {
+            // The presets list has a meaningful default: a missing list means "the usual sizes".
+            return AppSettings.DefaultRdpResolutionPresets.ToArray();
+        }
+
+        return type.IsArray
+            ? Array.CreateInstance(type.GetElementType()!, 0)
+            : Activator.CreateInstance(type)!;
+    }
+
+    private static void DropNullEntries(object collection)
+    {
+        switch (collection)
+        {
+            case Array:
+                // Fixed size: a null element is left for the consumer, which already skips it.
+                return;
+            case System.Collections.IList list:
+                for (int index = list.Count - 1; index >= 0; index--)
+                {
+                    if (list[index] is null)
+                    {
+                        list.RemoveAt(index);
+                    }
+                }
+
+                return;
+            case System.Collections.IDictionary dictionary:
+                List<object> emptyKeys = [];
+                foreach (System.Collections.DictionaryEntry entry in dictionary)
+                {
+                    if (entry.Value is null)
+                    {
+                        emptyKeys.Add(entry.Key);
+                    }
+                    else if (entry.Value is System.Collections.IList inner)
+                    {
+                        DropNullEntries(inner);
+                    }
+                }
+
+                foreach (object key in emptyKeys)
+                {
+                    dictionary.Remove(key);
+                }
+
+                return;
+        }
     }
 
     private static void NormalizeTrustedHostKeys(AppSettings settings)
     {
-        if (settings.TrustedHostKeysV2.Count == 0 && settings.TrustedHostKeys.Count > 0)
+        // Every legacy entry the v2 map lacks, not only when the v2 map is empty: a trust that
+        // still reaches the legacy map (the fingerprint-only upsert path) after a v2 entry exists
+        // was otherwise dropped on the next load, and the host prompted again.
+        foreach (var (key, fingerprint) in settings.TrustedHostKeys)
         {
-            foreach (var (key, fingerprint) in settings.TrustedHostKeys)
+            if (!string.IsNullOrWhiteSpace(key)
+                && !string.IsNullOrWhiteSpace(fingerprint)
+                && !settings.TrustedHostKeysV2.ContainsKey(key))
             {
-                if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(fingerprint))
-                {
-                    settings.TrustedHostKeysV2[key] = new HostKeyEntry(
-                        fingerprint,
-                        DateTimeOffset.MinValue,
-                        DateTimeOffset.MinValue,
-                        "unknown",
-                        HostKeySource.Unknown);
-                }
+                settings.TrustedHostKeysV2[key] = new HostKeyEntry(
+                    fingerprint,
+                    DateTimeOffset.MinValue,
+                    DateTimeOffset.MinValue,
+                    "unknown",
+                    HostKeySource.Unknown);
             }
         }
 

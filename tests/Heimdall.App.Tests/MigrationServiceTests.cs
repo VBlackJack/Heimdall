@@ -107,6 +107,97 @@ public class MigrationServiceTests : IDisposable
         Assert.False(MigrationService.DetectLegacyInstallation(path!));
     }
 
+    // ── MapLegacySettings: identity material and collections ────────────
+
+    private static readonly DateTime RunStart = new(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+
+    private static JsonElement Legacy(string json) => JsonDocument.Parse(json).RootElement.Clone();
+
+    [Fact]
+    public void MapLegacySettings_KeyThatPredatesThisRun_IsKeptOverTheLegacyOne()
+    {
+        AppSettings target = new() { HmacKey = "established", HmacKeyCreatedAt = RunStart.AddDays(-30) };
+
+        MigrationService.MapLegacySettings(Legacy("""{ "HmacKey": "legacy" }"""), target, RunStart);
+
+        // Secrets saved since may already be protected with it.
+        Assert.Equal("established", target.HmacKey);
+    }
+
+    [Fact]
+    public void MapLegacySettings_KeyGeneratedByThisRun_GivesWayToTheLegacyKey()
+    {
+        AppSettings target = new() { HmacKey = "first-run", HmacKeyCreatedAt = RunStart.AddSeconds(2) };
+
+        MigrationService.MapLegacySettings(Legacy("""{ "HmacKey": "legacy" }"""), target, RunStart);
+
+        // The legacy passwords were protected with the legacy key.
+        Assert.Equal("legacy", target.HmacKey);
+    }
+
+    [Fact]
+    public void MapLegacySettings_NullLegacyValues_NeverClearTheIdentity()
+    {
+        AppSettings target = new()
+        {
+            HmacKey = "first-run",
+            HmacKeyCreatedAt = RunStart.AddSeconds(2),
+            PinHash = "hash",
+            PinSalt = "salt",
+            LastDpapiUser = "me",
+        };
+
+        MigrationService.MapLegacySettings(
+            Legacy("""{ "HmacKey": null, "PinHash": null, "PinSalt": null, "LastDpapiUser": null }"""),
+            target,
+            RunStart);
+
+        Assert.Equal("first-run", target.HmacKey);
+        Assert.Equal("hash", target.PinHash);
+        Assert.Equal("salt", target.PinSalt);
+        Assert.Equal("me", target.LastDpapiUser);
+    }
+
+    [Fact]
+    public void MapLegacySettings_ExistingPin_IsNotReplaced_AndAMissingOneIsAdoptedWhole()
+    {
+        AppSettings withPin = new() { PinHash = "mine", PinSalt = "my-salt" };
+        AppSettings withoutPin = new();
+        JsonElement legacy = Legacy("""{ "PinHash": "legacy-hash", "PinSalt": "legacy-salt" }""");
+
+        MigrationService.MapLegacySettings(legacy, withPin, RunStart);
+        MigrationService.MapLegacySettings(legacy, withoutPin, RunStart);
+
+        Assert.Equal(("mine", "my-salt"), (withPin.PinHash, withPin.PinSalt));
+        Assert.Equal(("legacy-hash", "legacy-salt"), (withoutPin.PinHash, withoutPin.PinSalt));
+    }
+
+    [Fact]
+    public void MapLegacySettings_GatewaysAndProjects_AreAddedToWhatIsThere()
+    {
+        AppSettings target = new()
+        {
+            SshGateways = [new SshGatewayDto { Id = "g1", Name = "Mine" }],
+            Projects = [new ProjectDto { Id = "p1", Name = "Mine" }],
+        };
+
+        MigrationService.MapLegacySettings(
+            Legacy("""
+            {
+              "SshGateways": [ { "Id": "g1", "Name": "Legacy copy" }, { "Id": "g2", "Name": "Legacy" } ],
+              "Projects": [ { "Id": "p2", "Name": "Legacy" } ]
+            }
+            """),
+            target,
+            RunStart);
+
+        // The migration is offered whenever the inventory is empty, so these replaced the
+        // gateways and projects the user had already made here.
+        Assert.Equal(["g1", "g2"], target.SshGateways.Select(gateway => gateway.Id));
+        Assert.Equal("Mine", target.SshGateways[0].Name);
+        Assert.Equal(["p1", "p2"], target.Projects.Select(project => project.Id));
+    }
+
     // ── ImportFromLegacyAsync ────────────────────────────────────────────
 
     [Fact]
