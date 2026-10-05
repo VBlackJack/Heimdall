@@ -3163,6 +3163,7 @@
   "TunnelStatusActive": "Activo",
   "TunnelStatusInterrupted": "Interrumpido",
   "StatusTunnelClosed": "Túnel en el puerto {0} cerrado.",
+  "StatusTunnelLost": "Túnel del puerto {0} cerrado: se perdió su conexión con la pasarela.",
   "ConfirmCloseTunnelInUseTitle": "Cerrar túnel",
   "ConfirmCloseTunnelInUseOne": "El túnel del puerto {0} transporta {1} sesión abierta. Cerrarlo desconecta esa sesión. ¿Cerrarlo de todos modos?",
   "ConfirmCloseTunnelInUseOther": "El túnel del puerto {0} transporta {1} sesiones abiertas. Cerrarlo desconecta esas sesiones. ¿Cerrarlo de todos modos?",

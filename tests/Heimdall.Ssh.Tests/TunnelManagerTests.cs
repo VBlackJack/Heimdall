@@ -1856,6 +1856,93 @@ public class TunnelManagerTests : IDisposable
         Assert.Equal((0, 0, 0, 0), manager.GetRegistryCounts());
     }
 
+    // ── Dead tunnel detection ───────────────────────────────────────
+
+    // A tunnel whose connection went stayed registered for good: it kept its port, the pane and
+    // the badges called it healthy, and nobody was told. Proved against the mutant that never
+    // detaches a dead tunnel: it stays registered and this goes red.
+    [Fact]
+    public void SweepDeadTunnels_ClosesATunnelWhoseConnectionWentAndSaysSo()
+    {
+        bool alive = true;
+        FakeHandle handle = new();
+        Assert.True(_manager.TryRegisterExternalTunnel(MakeInfo(45180), handle, () => alive, out long lease));
+        List<int> closed = [];
+        List<int> lost = [];
+        _manager.TunnelClosed += (port, _) => closed.Add(port);
+        _manager.TunnelLost += lost.Add;
+
+        Assert.Equal(0, _manager.SweepDeadTunnels());
+        alive = false;
+        Assert.Equal(1, _manager.SweepDeadTunnels());
+
+        Assert.False(_manager.HasTunnel(45180));
+        Assert.True(handle.Disposed);
+        Assert.Equal([45180], closed);
+        Assert.Equal([45180], lost);
+
+        // The holder still gives its lease back later; that must be harmless.
+        Assert.False(_manager.ReleaseReference(45180, lease));
+        Assert.Equal(0, _manager.SweepDeadTunnels());
+    }
+
+    [Fact]
+    public void SweepDeadTunnels_LeavesALiveTunnelAlone()
+    {
+        FakeHandle handle = new();
+        Assert.True(RegisterFake(45181, handle, () => true));
+
+        Assert.Equal(0, _manager.SweepDeadTunnels());
+
+        Assert.True(_manager.HasTunnel(45181));
+        Assert.False(handle.Disposed);
+    }
+
+    // A dead hop leaves the final client talking to a forward that no longer goes anywhere, so
+    // the chain is closed even while its last client still reads as connected.
+    [Fact]
+    public async Task SweepDeadTunnels_ClosesAChainWhoseFirstHopWent()
+    {
+        ChainHarness harness = new();
+        using TunnelManager manager = harness.CreateManager();
+        TunnelResult result = await manager.OpenChainedTunnelAsync(
+            ThreeHops(),
+            "db.internal",
+            5432,
+            0,
+            TestHostKeyStore(),
+            TestHostKeyVerifier());
+        Assert.True(result.Success, result.ErrorMessage);
+        harness.Clients.ForEach(client => client.Connected = true);
+
+        Assert.Equal(0, manager.SweepDeadTunnels());
+        harness.Clients[0].Connected = false;
+        Assert.Equal(1, manager.SweepDeadTunnels());
+
+        Assert.False(manager.HasTunnel(result.Tunnel!.LocalPort));
+        Assert.All(harness.Clients, client => Assert.Equal(1, client.DisposeCount));
+    }
+
+    [Fact]
+    public async Task LivenessTimer_ClosesADeadTunnelWithoutBeingAsked()
+    {
+        using TunnelManager manager = new(
+            (_, host, port, _, _, _) => Task.FromResult(new PinnedFingerprintVerifier(host, port, "SHA256:x")),
+            _ => new RecordingSshClient(),
+            (_, _, _, _, _, _) => Task.CompletedTask,
+            (_, _, requested, _) => requested,
+            TimeSpan.FromMilliseconds(50));
+        Assert.True(manager.TryRegisterExternalTunnel(MakeInfo(45182), new FakeHandle(), () => false));
+
+        DateTime deadline = DateTime.UtcNow + ConcurrentCompletionBackstop;
+        while (manager.HasTunnel(45182) && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.False(manager.HasTunnel(45182));
+    }
+
     private static List<SshConnectionParams> ThreeHops() =>
     [
         MakeSshParams("bastion1.example", 22),

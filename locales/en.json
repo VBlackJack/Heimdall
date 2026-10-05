@@ -3163,6 +3163,7 @@
   "TunnelStatusActive": "Active",
   "TunnelStatusInterrupted": "Interrupted",
   "StatusTunnelClosed": "Tunnel on port {0} closed.",
+  "StatusTunnelLost": "Tunnel on port {0} closed: its connection to the gateway was lost.",
   "ConfirmCloseTunnelInUseTitle": "Close tunnel",
   "ConfirmCloseTunnelInUseOne": "The tunnel on port {0} carries {1} open session. Closing it disconnects that session. Close it anyway?",
   "ConfirmCloseTunnelInUseOther": "The tunnel on port {0} carries {1} open sessions. Closing it disconnects those sessions. Close it anyway?",
