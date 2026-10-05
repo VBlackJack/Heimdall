@@ -347,13 +347,31 @@ public partial class EmbeddedVncView : UserControl, IDisposable
             return;
         }
 
-        if (message == "credentials-required:")
+        if (message.StartsWith("credentials-required:", StringComparison.Ordinal))
         {
-            // If we have a password, re-send the connect command with it
-            if (_session?.Password is not null)
-            {
-                SendConnectCommand();
-            }
+            HandleCredentialsRequest(message["credentials-required:".Length..]);
+        }
+    }
+
+    /// <summary>
+    /// Ends the attempt when the server asks for credentials the profile does not hold, and says
+    /// which. See <see cref="VncCredentialsPolicy"/>.
+    /// </summary>
+    private void HandleCredentialsRequest(string requestedTypesJson)
+    {
+        string key = VncCredentialsPolicy.MessageKeyFor(requestedTypesJson);
+        string text = _localizer?[key] ?? key;
+        Core.Logging.FileLogger.Warn($"VNC server asked for credentials the profile does not hold ({key}).");
+        Dispatcher.Invoke(() =>
+        {
+            PostWebMessage("disconnect:");
+            StatusTextBlock.Text = text;
+            ShowReconnectOverlay(text);
+        });
+
+        if (_session?.ServerId is not null)
+        {
+            SessionError?.Invoke(_session.ServerId, text);
         }
     }
 
@@ -380,7 +398,15 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         {
             wsUrl = $"ws://127.0.0.1:{_proxy.ListenPort}",
             password = _session?.Password,
-            viewOnly = _session?.ViewOnly ?? false
+            viewOnly = _session?.ViewOnly ?? false,
+
+            // The page shows and reports these; it used to carry its own English ones.
+            text = new
+            {
+                disconnected = _localizer?["StatusVncDisconnected"],
+                connectionLost = _localizer?["ErrorVncConnectionLost"],
+                initFailed = _localizer?["ErrorVncClientInitFailed"],
+            },
         };
 
         var json = JsonSerializer.Serialize(connectParams);

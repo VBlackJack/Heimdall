@@ -213,6 +213,11 @@
             var selectScaling = document.getElementById('select-scaling');
             var selectQuality = document.getElementById('select-quality');
             var rfb = null;
+            var text = {
+                disconnected: 'Disconnected',
+                connectionLost: 'The VNC connection was lost unexpectedly.',
+                initFailed: 'Failed to initialize VNC client.'
+            };
 
             function postMessage(message) {
                 if (window.chrome && window.chrome.webview) {
@@ -229,6 +234,17 @@
             }
 
             function connect(wsUrl, password) {
+                // A second connect must not stack a second client behind the first: the proxy
+                // serves one connection at a time, and the old one would hold it.
+                if (rfb) {
+                    try {
+                        rfb.disconnect();
+                    } catch (disconnectError) {
+                        console.warn(disconnectError);
+                    }
+                    rfb = null;
+                }
+
                 try {
                     rfb = new RFB(container, wsUrl, {
                         credentials: password ? { password: password } : undefined,
@@ -260,13 +276,14 @@
                         if (event.detail.clean) {
                             postMessage('disconnected:clean');
                         } else {
-                            showError('Disconnected', 'The VNC connection was lost unexpectedly.');
+                            showError(text.disconnected, text.connectionLost);
                             postMessage('disconnected:error');
                         }
                     });
 
-                    rfb.addEventListener('credentialsrequired', function () {
-                        postMessage('credentials-required:');
+                    rfb.addEventListener('credentialsrequired', function (event) {
+                        var types = (event.detail && event.detail.types) || [];
+                        postMessage('credentials-required:' + JSON.stringify(types));
                     });
 
                     rfb.addEventListener('clipboard', function (event) {
@@ -278,7 +295,8 @@
                     });
 
                 } catch (ex) {
-                    showError('Connection Error', ex.message || 'Failed to initialize VNC client.');
+                    console.error(ex);
+                    showError(text.disconnected, text.initFailed);
                 }
             }
 
@@ -309,6 +327,11 @@
 
                     if (msg.indexOf('connect:') === 0) {
                         var params = JSON.parse(msg.substring('connect:'.length));
+                        if (params.text) {
+                            text.disconnected = params.text.disconnected || text.disconnected;
+                            text.connectionLost = params.text.connectionLost || text.connectionLost;
+                            text.initFailed = params.text.initFailed || text.initFailed;
+                        }
                         connect(params.wsUrl, params.password || null);
                         return;
                     }
