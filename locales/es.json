@@ -3337,6 +3337,7 @@
   "ErrorTunnelChainedEstablishmentCancelled": "Se canceló el establecimiento del túnel encadenado.",
   "ErrorTunnelGatewayChainEmpty": "La cadena de pasarelas debe contener al menos una pasarela.",
   "ErrorPlinkProcessStartFailed": "No se pudo iniciar el proceso plink: {0}",
+  "ErrorPlinkExitedBeforeTunnel": "Plink se cerró (código {0}) antes de abrir el túnel: {1}",
   "ErrorPlinkExecutableNotFound": "No se encontró el ejecutable de Plink: {0}",
   "ErrorUnhandledTitle": "Error de Heimdall",
 

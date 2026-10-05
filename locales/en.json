@@ -3337,6 +3337,7 @@
   "ErrorTunnelChainedEstablishmentCancelled": "Chained tunnel establishment was cancelled.",
   "ErrorTunnelGatewayChainEmpty": "The gateway chain must contain at least one gateway.",
   "ErrorPlinkProcessStartFailed": "Failed to start the plink process: {0}",
+  "ErrorPlinkExitedBeforeTunnel": "Plink exited (code {0}) before opening the tunnel: {1}",
   "ErrorPlinkExecutableNotFound": "Plink executable not found: {0}",
   "ErrorUnhandledTitle": "Heimdall Error",
 

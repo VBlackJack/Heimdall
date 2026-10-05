@@ -46,4 +46,7 @@ public static class TunnelMessageKeys
 
     /// <summary>The configured plink executable does not exist; {0} is the path.</summary>
     public const string MessageKeyPlinkExecutableNotFound = "ErrorPlinkExecutableNotFound";
+
+    /// <summary>Plink exited before it opened the tunnel; arguments: exit code, its last stderr line.</summary>
+    public const string MessageKeyPlinkExitedEarly = "ErrorPlinkExitedBeforeTunnel";
 }
