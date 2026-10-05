@@ -601,6 +601,59 @@ public sealed class SplitServiceTests : IDisposable
     // ── Category C: ClosePane / server-pane cleanup ──────────────────────
 
     [Fact]
+    public void RememberSplitRatio_RecordsTheDraggedShareForThePairEitherSide()
+    {
+        var left = MakePane(paneId: "left");
+        left.OriginalServerId = "profile-left";
+        var right = MakePane(paneId: "right");
+        right.OriginalServerId = "profile-right";
+        var container = new SplitContainerModel
+        {
+            First = left,
+            Second = right,
+            Orientation = SplitOrientation.Vertical,
+            SplitRatio = 0.25
+        };
+
+        _sut.RememberSplitRatio(container);
+
+        // Only the split's creation recorded a ratio, always the default, so a resized layout
+        // came back at 50/50.
+        Assert.Equal(0.25, _sut.LayoutMemory.FindRatio("profile-left", "profile-right")!.Value, 6);
+    }
+
+    [Fact]
+    public void ClosePane_NestedPrimaryPane_RefreshesTheTabHeader()
+    {
+        var a = MakePane(paneId: "a", connectionType: "TOOL:NOTES");
+        a.Title = "A";
+        var x = MakePane(paneId: "x", connectionType: "TOOL:NOTES");
+        x.Title = "X";
+        var b = MakePane(paneId: "b", connectionType: "TOOL:NOTES");
+        b.Title = "B";
+        var root = new SplitContainerModel
+        {
+            First = new SplitContainerModel { First = a, Second = x, Orientation = SplitOrientation.Vertical },
+            Second = b,
+            Orientation = SplitOrientation.Horizontal
+        };
+        var session = new SessionTabViewModel { RootContent = root };
+        var raised = new List<string?>();
+        session.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        _sut.ClosePane(session, a.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
+
+        // The tree was edited in place and kept its root, so the header kept the closed pane's
+        // title until something unrelated refreshed it.
+        Assert.Same(root, session.RootContent);
+        Assert.Equal("X", session.Title);
+        Assert.Contains(nameof(SessionTabViewModel.Title), raised);
+        Assert.Contains(nameof(SessionTabViewModel.DisplayTitle), raised);
+        Assert.Contains(nameof(SessionTabViewModel.HeaderToolTip), raised);
+        Assert.Contains(nameof(SessionTabViewModel.ConnectionType), raised);
+    }
+
+    [Fact]
     public void ClosePane_ServerPaneWithTunnel_ReleasesTunnelResetsStateAndPromotesSibling()
     {
         const string serverId = "split-server";

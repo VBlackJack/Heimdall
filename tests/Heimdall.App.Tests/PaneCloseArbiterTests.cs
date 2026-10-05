@@ -347,6 +347,67 @@ public sealed class PaneCloseArbiterTests
     }
 
     [Fact]
+    public async Task ResolveAsync_FirstGuardRefuses_KeepsNothingAboutTheGuardNeverAsked()
+    {
+        PaneCloseArbiter arbiter = new();
+        FakeCloseGuard refusing = new() { IsBusy = true, PollVerdict = CloseVerdict.Defer, Consent = false };
+        FakeCloseGuard behind = new() { IsBusy = true, PollVerdict = CloseVerdict.Defer, Consent = true };
+        CloseRequest request = InteractiveRequest();
+
+        arbiter.Poll(request, [refusing, behind]);
+        Assert.False(await arbiter.ResolveAsync(request, [refusing, behind]));
+        arbiter.Release(request);
+
+        // The guard behind was filed with its reason at poll time and never resolved, so the
+        // arbiter (a singleton) kept it, and the view behind it, for the life of the app.
+        Assert.Equal(0, arbiter.InFlightReasonCount);
+        Assert.Equal(0, arbiter.TrackedDeferredRequestCount);
+    }
+
+    [Fact]
+    public void Poll_ALaterGuardDenies_KeepsNothingAboutTheGuardThatDeferred()
+    {
+        PaneCloseArbiter arbiter = new();
+        FakeCloseGuard deferring = new() { IsBusy = true, PollVerdict = CloseVerdict.Defer };
+        FakeCloseGuard denying = new() { IsBusy = true, PollVerdict = CloseVerdict.Deny };
+
+        arbiter.Poll(InteractiveRequest(), [deferring, denying]);
+
+        Assert.Equal(0, arbiter.InFlightReasonCount);
+        Assert.Equal(0, arbiter.TrackedDeferredRequestCount);
+    }
+
+    [Fact]
+    public void Poll_NothingToDefer_TracksNoRequestEvenWithoutARelease()
+    {
+        PaneCloseArbiter arbiter = new();
+        FakeCloseGuard idle = new() { IsBusy = false };
+
+        arbiter.Poll(InteractiveRequest(), [idle, new object()]);
+
+        Assert.Equal(0, arbiter.TrackedDeferredRequestCount);
+    }
+
+    [Fact]
+    public async Task Poll_WhileResolving_StillReportsTheGuardsReason()
+    {
+        PaneCloseArbiter arbiter = new();
+        TaskCompletionSource<bool> gate = new();
+        FakeCloseGuard guard = new() { IsBusy = true, PollVerdict = CloseVerdict.Defer, ResolveGate = gate };
+        CloseRequest first = InteractiveRequest();
+        arbiter.Poll(first, [guard]);
+        Task<bool> resolving = arbiter.ResolveAsync(first, [guard]);
+
+        CloseDecision second = arbiter.Poll(InteractiveRequest(), [guard]);
+
+        Assert.Equal(CloseVerdict.Defer, second.Verdict);
+        Assert.Equal(FakeCloseGuard.ReasonKey, second.ReasonKey);
+        gate.SetResult(true);
+        Assert.True(await resolving);
+        Assert.Equal(0, arbiter.InFlightReasonCount);
+    }
+
+    [Fact]
     public async Task ResolveAsync_SilentRequest_ConsentsWithoutTouchingAGuard()
     {
         PaneCloseArbiter arbiter = new();

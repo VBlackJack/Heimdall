@@ -320,7 +320,7 @@ public sealed class SessionWindowService : ISessionWindowService
         // Detach host control and remove pane from tree
         pane.HostControl = null;
         var newRoot = SplitTreeHelper.RemovePane(session.RootContent, paneId);
-        session.RootContent = newRoot ?? new SessionPaneModel();
+        session.SetRootContent(newRoot ?? new SessionPaneModel());
 
         // Create a new independent tab and detach it
         var newTab = vm.Connection.AddSession(serverId, title, connType);
@@ -359,7 +359,7 @@ public sealed class SessionWindowService : ISessionWindowService
 
         // Remove pane from tree
         var newRoot = SplitTreeHelper.RemovePane(session.RootContent, paneId);
-        session.RootContent = newRoot ?? new SessionPaneModel();
+        session.SetRootContent(newRoot ?? new SessionPaneModel());
 
         // If the pane was still connecting (no host control), clean up state and abort
         if (hostControl is null)

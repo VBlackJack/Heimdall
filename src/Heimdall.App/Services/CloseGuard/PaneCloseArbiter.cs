@@ -78,7 +78,7 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
             {
                 Core.Logging.FileLogger.Warn(
                     $"CloseGuard SampleCloseGuardState threw; deferring. {ex.Message}");
-                deferredNow.Add(new DeferredGuard(guard, 0));
+                deferredNow.Add(new DeferredGuard(guard, 0, CloseGuardLocaleKeys.BlockedGeneric));
                 worst = CloseDecision.Defer(CloseGuardLocaleKeys.BlockedGeneric, 0);
                 continue;
             }
@@ -109,10 +109,10 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
             {
                 // A re-entrant poll raised by a modal's nested pump, or a second click on the close
                 // button. Defer without polling the guard again and without a second dialog.
-                deferredNow.Add(new DeferredGuard(guard, state.Epoch));
-                worst = CloseDecision.Defer(
-                    _inFlightReason.GetValueOrDefault(guard, CloseGuardLocaleKeys.BlockedGeneric),
-                    state.Epoch);
+                string inFlightReason =
+                    _inFlightReason.GetValueOrDefault(guard, CloseGuardLocaleKeys.BlockedGeneric);
+                deferredNow.Add(new DeferredGuard(guard, state.Epoch, inFlightReason));
+                worst = CloseDecision.Defer(inFlightReason, state.Epoch);
                 continue;
             }
 
@@ -140,13 +140,29 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
             {
                 // The decision's own epoch, not the sample's: the guard stamped what it actually
                 // decided against, and that is the epoch the eventual consent will be about.
-                deferredNow.Add(new DeferredGuard(guard, decision.Epoch));
-                _inFlightReason[guard] = decision.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric;
+                // The reason travels with the deferral and is only filed against the guard once a
+                // resolution actually starts. Filing it here kept the guard (and its view) alive
+                // for good whenever no resolution followed: a later guard denied, an earlier one
+                // refused, or nobody resolved the request at all.
+                deferredNow.Add(new DeferredGuard(
+                    guard,
+                    decision.Epoch,
+                    decision.ReasonKey ?? CloseGuardLocaleKeys.BlockedGeneric));
                 worst = decision;
             }
         }
 
-        _deferred[request.RequestId] = deferredNow;
+        if (deferredNow.Count > 0)
+        {
+            _deferred[request.RequestId] = deferredNow;
+        }
+        else
+        {
+            // Nothing to resolve: an empty entry would only wait for a Release that a caller
+            // closing synchronously never sends.
+            _deferred.Remove(request.RequestId);
+        }
+
         return worst;
     }
 
@@ -165,7 +181,7 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
             return true;
         }
 
-        foreach ((ICloseGuard guard, long decidedEpoch) in pending)
+        foreach ((ICloseGuard guard, long decidedEpoch, string reasonKey) in pending)
         {
             if (WasGranted(request, guard))
             {
@@ -174,7 +190,7 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
 
             Task<bool> resolution = _inFlight.TryGetValue(guard, out Task<bool>? existing)
                 ? existing
-                : StartResolution(guard, request);
+                : StartResolution(guard, request, reasonKey);
 
             if (!await resolution.ConfigureAwait(true))
             {
@@ -209,10 +225,11 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
     /// continuation. Recording the task after the call returned would leave this dictionary empty
     /// for exactly the window it exists to cover.
     /// </remarks>
-    private Task<bool> StartResolution(ICloseGuard guard, CloseRequest request)
+    private Task<bool> StartResolution(ICloseGuard guard, CloseRequest request, string reasonKey)
     {
         TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         _inFlight[guard] = completion.Task;
+        _inFlightReason[guard] = reasonKey;
 
         _ = RunResolutionAsync(guard, request, completion);
         return completion.Task;
@@ -276,5 +293,11 @@ public sealed class PaneCloseArbiter : IPaneCloseArbiter
     }
 
     /// <summary>A guard that deferred, and the epoch its decision was taken against.</summary>
-    private readonly record struct DeferredGuard(ICloseGuard Guard, long Epoch);
+    private readonly record struct DeferredGuard(ICloseGuard Guard, long Epoch, string ReasonKey);
+
+    /// <summary>Requests still holding deferred guards, for tests.</summary>
+    internal int TrackedDeferredRequestCount => _deferred.Count;
+
+    /// <summary>Guards with a reason on file, for tests.</summary>
+    internal int InFlightReasonCount => _inFlightReason.Count;
 }

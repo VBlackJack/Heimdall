@@ -406,8 +406,14 @@ public partial class SessionTabViewModel : ObservableObject
     /// on that side resolves to the leaf a user would point at rather than to the container.
     /// </para>
     /// </remarks>
-    internal SessionPaneModel? SecondaryPaneOrNull =>
-        RootContent is SplitContainerModel c
+    internal SessionPaneModel? SecondaryPaneOrNull => SecondaryPaneOf(RootContent);
+
+    /// <summary>
+    /// The same resolution for any split, not only a tab's root: the one definition, which
+    /// <see cref="SecondaryPaneOrNull"/> and the split-ratio memory both ask.
+    /// </summary>
+    internal static SessionPaneModel? SecondaryPaneOf(ISplitContent? root) =>
+        root is SplitContainerModel c
             ? SplitTreeHelper.FirstLeaf(c.Second)
             : null;
 
@@ -497,6 +503,25 @@ public partial class SessionTabViewModel : ObservableObject
     /// change the <see cref="RootContent"/> reference.
     /// </summary>
     public void NotifyShimPropertiesChanged() => NotifyTreeDependentProperties();
+
+    /// <summary>
+    /// Applies the result of a tree mutation. <see cref="SplitTreeHelper"/> edits a nested tree in
+    /// place and hands back the same root, so assigning it to <see cref="RootContent"/> raised
+    /// nothing: closing a nested primary pane left the header on the closed server's title, tooltip
+    /// and icon. The header is refreshed whether or not the root reference changed.
+    /// </summary>
+    public void SetRootContent(ISplitContent root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+
+        if (ReferenceEquals(RootContent, root))
+        {
+            NotifyTreeDependentProperties();
+            return;
+        }
+
+        RootContent = root;
+    }
 
     /// <summary>
     /// Shared notification for all tree-dependent shim properties.

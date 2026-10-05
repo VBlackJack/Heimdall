@@ -168,6 +168,33 @@ public sealed class SplitLayoutMemoryTests : IDisposable
     }
 
     [Fact]
+    public void FindRatio_RecordedPair_ComesBackAsRecorded()
+    {
+        _memory.Record("a", "b", SplitOrientation.Vertical, 0.3);
+
+        Assert.Equal(0.3, _memory.FindRatio("a", "b")!.Value, 6);
+    }
+
+    [Fact]
+    public void FindRatio_PairSeenTheOtherWayRound_IsMirrored()
+    {
+        _memory.Record("a", "b", SplitOrientation.Vertical, 0.3);
+
+        Assert.Equal(0.7, _memory.FindRatio("b", "a")!.Value, 6);
+    }
+
+    [Fact]
+    public void FindRatio_OnlyMatchesTheExactPair()
+    {
+        _memory.Record("a", "b", SplitOrientation.Vertical, 0.3);
+        _memory.Record("a", "c", SplitOrientation.Vertical, 0.8);
+
+        Assert.Equal(0.3, _memory.FindRatio("a", "b")!.Value, 6);
+        Assert.Null(_memory.FindRatio("b", "c"));
+        Assert.Null(_memory.FindRatio("a", ""));
+    }
+
+    [Fact]
     public void FindAllPartners_EmptyId_ReturnsEmpty()
     {
         _memory.Record("A", "B", SplitOrientation.Horizontal);
