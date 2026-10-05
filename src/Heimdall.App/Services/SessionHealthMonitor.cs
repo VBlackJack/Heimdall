@@ -47,6 +47,7 @@ public sealed class SessionHealthMonitor : IDisposable
     private Task? _schedulerTask;
     private CancellationTokenSource? _cycleCts;
     private AppSettings? _currentSettings;
+    private Schedule? _currentSchedule;
     private long _nextGeneration;
     private long _lifecycleVersion;
     private bool _disposed;
@@ -89,6 +90,7 @@ public sealed class SessionHealthMonitor : IDisposable
             if (_disposed) return;
 
             _currentSettings = settings;
+            _currentSchedule = Schedule.Of(settings);
             StopUnsafe();
             long lifecycleVersion = Interlocked.Increment(ref _lifecycleVersion);
 
@@ -186,7 +188,40 @@ public sealed class SessionHealthMonitor : IDisposable
         }
     }
 
-    private void OnSettingsChanged(AppSettings settings) => Start(settings);
+    /// <summary>
+    /// Restarts the monitor only when a setting it runs on changed. Every settings write raises
+    /// the change, so restarting on each one cancelled the cycle in flight and pushed the next
+    /// probe a whole interval away - a user saving often never saw a dot refresh.
+    /// </summary>
+    private void OnSettingsChanged(AppSettings settings)
+    {
+        lock (_lifecycleGate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (_currentSchedule == Schedule.Of(settings))
+            {
+                _currentSettings = settings;
+                return;
+            }
+        }
+
+        Start(settings);
+    }
+
+    /// <summary>
+    /// The settings the scheduler is armed with. The probe timeout and the concurrency cap are read
+    /// at each cycle from the current settings, so they apply without a restart.
+    /// </summary>
+    private readonly record struct Schedule(bool Enabled, int IntervalSeconds)
+    {
+        public static Schedule Of(AppSettings settings) => new(
+            settings.SessionHealthMonitorEnabled,
+            settings.SessionHealthCheckIntervalSeconds);
+    }
 
     /// <summary>
     /// Executes a single probe cycle. Exposed as internal so unit tests can drive
