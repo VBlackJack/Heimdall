@@ -411,6 +411,34 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         _settingsRuntimeBridgeInitialized = true;
         await ReportPreviousUpdateAttemptAsync(viewModel);
         await CheckForUpdatesOnStartupAsync(viewModel);
+        await RecheckForUpdatesWhileOpenAsync(viewModel);
+    }
+
+    /// <summary>
+    /// Repeats the throttled check while the window is open, so the check interval set in
+    /// Settings applies to a session left running, not only to the next launch.
+    /// </summary>
+    private async Task RecheckForUpdatesWhileOpenAsync(MainViewModel viewModel)
+    {
+        try
+        {
+            using PeriodicTimer timer = new(Core.Configuration.AppConstants.UpdateRecheckPollInterval);
+            while (await timer.WaitForNextTickAsync(_startupUpdateCts.Token))
+            {
+                try
+                {
+                    await viewModel.Update.RecheckAsync(_startupUpdateCts.Token);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Core.Logging.FileLogger.Warn($"[Updates] periodic check: {ex.Message}");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The window closed.
+        }
     }
 
     /// <summary>

@@ -2875,7 +2875,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Grid.Column="0" Text="{Binding Settings.PlinkPath}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsPlinkPathLabel}"
+                                            <TextBox Grid.Column="0" Text="{Binding Settings.PlinkPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsPlinkPathLabel}"
                                                      AutomationProperties.HelpText="{loc:Translate SettingsPlinkPathHint}"/>
                                             <Button Grid.Column="1" x:Name="Mw_SettingsBrowsePlinkPath"
                                                     Padding="6,2" Margin="4,0,0,0" Click="OnBrowsePlinkPathClick"
@@ -2897,7 +2897,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Grid.Column="0" Text="{Binding Settings.PuttyPath}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsPuttyPathLabel}"
+                                            <TextBox Grid.Column="0" Text="{Binding Settings.PuttyPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsPuttyPathLabel}"
                                                      AutomationProperties.HelpText="{loc:Translate SettingsPuttyPathHint}"/>
                                             <Button Grid.Column="1" x:Name="Mw_SettingsBrowsePuttyPath"
                                                     Padding="6,2" Margin="4,0,0,0" Click="OnBrowsePuttyPathClick"
@@ -3045,7 +3045,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBox Grid.Column="0" Text="{Binding Settings.X11ServerPath}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsX11PathLabel}"/>
+                                                <TextBox Grid.Column="0" Text="{Binding Settings.X11ServerPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsX11PathLabel}"/>
                                                 <Button Grid.Column="1" x:Name="Mw_SettingsBrowseX11Path"
                                                         Padding="6,2" Margin="4,0,0,0" Click="OnBrowseX11PathClick"
                                                         Style="{DynamicResource SecondaryButtonStyle}"
@@ -4076,7 +4076,7 @@
                                         </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProviderCmdLabel" Text="{loc:Translate SettingsLabelCredProviderCommand}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                            <TextBox x:Name="Mw_SettingsCredProvCmd" Text="{Binding Settings.CredentialProviderCommand}" Tag="{loc:Translate SettingsCredProvCmdPlaceholder}"
+                                            <TextBox x:Name="Mw_SettingsCredProvCmd" Text="{Binding Settings.CredentialProviderCommand, UpdateSourceTrigger=PropertyChanged}" Tag="{loc:Translate SettingsCredProvCmdPlaceholder}"
                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderCmdLabel}"
                                                      AutomationProperties.HelpText="{loc:Translate CredProvCmdHint}"/>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderCommand]}"/>
@@ -4084,7 +4084,7 @@
                                         </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProvUsernameCmdLabel" Text="{loc:Translate SettingsLabelCredProviderUsernameCmd}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                            <TextBox x:Name="Mw_SettingsCredProvUsernameCmd" Text="{Binding Settings.CredentialProviderUsernameCommand}" Tag="{loc:Translate SettingsCredProviderUsernameCmdPlaceholder}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvUsernameCmdLabel}"
+                                            <TextBox x:Name="Mw_SettingsCredProvUsernameCmd" Text="{Binding Settings.CredentialProviderUsernameCommand, UpdateSourceTrigger=PropertyChanged}" Tag="{loc:Translate SettingsCredProviderUsernameCmdPlaceholder}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvUsernameCmdLabel}"
                                                      AutomationProperties.HelpText="{loc:Translate SettingsCredProviderUsernameCmdHelp}"/>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderUsernameCommand]}"/>
                                             <TextBlock x:Name="Mw_SettingsCredProvUsernameCmdHint" Text="{loc:Translate SettingsCredProviderUsernameCmdHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
@@ -4102,7 +4102,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBox Grid.Column="0" Text="{Binding Settings.CredentialProviderDatabase}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderDbLabel}"/>
+                                                <TextBox Grid.Column="0" Text="{Binding Settings.CredentialProviderDatabase, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderDbLabel}"/>
                                                 <Button Grid.Column="1" x:Name="Mw_SettingsCredProvDbBrowseBtn" Padding="6,2" Margin="4,0,0,0" Click="OnCredProvDbBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate A11yBrowseDatabase}">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
@@ -4119,7 +4119,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBox Grid.Column="0" Text="{Binding Settings.CredentialProviderKeyFile}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderKeyFileLabel}"
+                                                <TextBox Grid.Column="0" Text="{Binding Settings.CredentialProviderKeyFile, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProviderKeyFileLabel}"
                                                          AutomationProperties.HelpText="{loc:Translate SettingsCredProviderKeyFileHint}"/>
                                                 <Button Grid.Column="1" x:Name="Mw_SettingsCredProvKeyFileBrowseBtn" Padding="6,2" Margin="4,0,0,0" Click="OnCredProvKeyFileBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate A11yBrowseKeyFile}">
                                                     <StackPanel Orientation="Horizontal">
@@ -4259,7 +4259,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBox Grid.Column="0" Text="{Binding Settings.SessionLogDirectory}"
+                                                <TextBox Grid.Column="0" Text="{Binding Settings.SessionLogDirectory, UpdateSourceTrigger=PropertyChanged}"
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSessionLogDirLabel}"/>
                                                 <Button Grid.Column="1" x:Name="Mw_SettingsBrowseSessionLogDir"
                                                         Padding="6,2" Margin="4,0,0,0" Click="OnBrowseSessionLogDirClick"
@@ -4273,6 +4273,7 @@
                                                 </Button>
                                             </Grid>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SessionLogDirectory]}"/>
+                                            <TextBlock x:Name="Mw_SettingsSessionLogDirRestartHint" Text="{loc:Translate SettingsSessionLogDirectoryRestartHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             <TextBlock x:Name="Mw_SettingsSessionLogRetentionLabel" Text="{loc:Translate SettingsLabelSessionLogRetentionDays}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,12,0,4"/>
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBox Text="{Binding Settings.SessionLogRetentionDaysText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}"
@@ -4397,7 +4398,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Grid.Column="0" Text="{Binding Settings.ExternalEditorPath}"
+                                            <TextBox Grid.Column="0" Text="{Binding Settings.ExternalEditorPath, UpdateSourceTrigger=PropertyChanged}"
                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsEditorPathLabel}"/>
                                             <Button Grid.Column="1" x:Name="Mw_SettingsBrowseEditorPath"
                                                     Padding="6,2" Margin="4,0,0,0" Click="OnBrowseEditorPathClick"

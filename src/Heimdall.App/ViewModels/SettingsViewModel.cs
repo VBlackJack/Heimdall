@@ -1709,6 +1709,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             return (UpdatedCount: updatedCount, TotalCount: totalCount);
         });
         await _configManager.MergeSettingAsync(settings => writeDefault(settings, mode));
+
+        // The default mode is on disk now: the comparison must know it, or the panel kept
+        // offering to save a value that was already saved.
+        if (_savedSettings is not null)
+        {
+            writeDefault(_savedSettings, mode);
+            IsDirty = PendingDiffersFromSaved(nameof(SshDefaultMode));
+        }
+
         ServerInventoryChanged?.Invoke();
         FileLogger.Info(
             $"Applied {connectionType} mode '{mode}' to {update.UpdatedCount}/{update.TotalCount} saved sessions.");
@@ -1722,183 +1731,192 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         // A load is not an edit: nothing assigned below counts as one the comparison cannot see.
         _loadingPanel = true;
+        try
+        {
+            // General. The language on screen is read before the box is reseeded, because reseeding
+            // the box is itself capable of changing it.
+            _originalLocale = _localizer.CurrentLocale;
+            DefaultLocale = settings.DefaultLocale;
+            DefaultTheme = settings.DefaultTheme;
+            AccentTint = settings.AccentTint;
+            _originalTheme = settings.DefaultTheme;
+            _originalAccentTint = settings.AccentTint;
+            MaxEmbeddedSessions = settings.MaxEmbeddedSessions;
+            PreventSleepDuringSession = settings.PreventSleepDuringSession;
+            CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault;
+            ExternalEditorPath = settings.ExternalEditorPath;
 
-        // General. The language on screen is read before the box is reseeded, because reseeding
-        // the box is itself capable of changing it.
-        _originalLocale = _localizer.CurrentLocale;
-        DefaultLocale = settings.DefaultLocale;
-        DefaultTheme = settings.DefaultTheme;
-        AccentTint = settings.AccentTint;
-        _originalTheme = settings.DefaultTheme;
-        _originalAccentTint = settings.AccentTint;
-        MaxEmbeddedSessions = settings.MaxEmbeddedSessions;
-        PreventSleepDuringSession = settings.PreventSleepDuringSession;
-        CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault;
-        ExternalEditorPath = settings.ExternalEditorPath;
+            // Updates
+            UpdateCheckEnabled = settings.UpdateCheckEnabled;
+            UpdateCheckIntervalHours = settings.UpdateCheckIntervalHours;
+            UpdateSkippedVersion = settings.UpdateSkippedVersion;
+            LegacyMigrationReofferAvailable =
+                LegacyMigrationDecisionPolicy.HasDeclineMarker(settings);
 
-        // Updates
-        UpdateCheckEnabled = settings.UpdateCheckEnabled;
-        UpdateCheckIntervalHours = settings.UpdateCheckIntervalHours;
-        UpdateSkippedVersion = settings.UpdateSkippedVersion;
-        LegacyMigrationReofferAvailable =
-            LegacyMigrationDecisionPolicy.HasDeclineMarker(settings);
+            // UI state
+            ShowToolsPanel = settings.ShowToolsPanel;
 
-        // UI state
-        ShowToolsPanel = settings.ShowToolsPanel;
+            // Advanced / File sharing
+            FileShareEnableTftp = settings.FileShareEnableTftp;
+            _savedFileShareEnableTftp = settings.FileShareEnableTftp;
 
-        // Advanced / File sharing
-        FileShareEnableTftp = settings.FileShareEnableTftp;
-        _savedFileShareEnableTftp = settings.FileShareEnableTftp;
+            // Terminal
+            TerminalFontFamily = settings.TerminalFontFamily;
+            TerminalFontSize = settings.TerminalFontSize;
+            TerminalColorScheme = settings.TerminalColorScheme;
+            PowerShellExecutionPolicy = settings.PowerShellExecutionPolicy;
 
-        // Terminal
-        TerminalFontFamily = settings.TerminalFontFamily;
-        TerminalFontSize = settings.TerminalFontSize;
-        TerminalColorScheme = settings.TerminalColorScheme;
-        PowerShellExecutionPolicy = settings.PowerShellExecutionPolicy;
+            // SSH & SFTP
+            PlinkPath = settings.PlinkPath;
+            PuttyPath = settings.PuttyPath ?? "";
+            SshDefaultMode = settings.SshDefaultMode;
+            SshAgentPreference = settings.SshAgentPreference.ToString();
+            AntiIdleInterval = settings.AntiIdleIntervalSeconds;
+            SshTmoutResetInterval = settings.SshTmoutResetIntervalSeconds;
+            SshKeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds;
+            SyncKnownHostsAtStartup = settings.SyncKnownHostsAtStartup;
+            SshAutoReconnect = settings.SshAutoReconnect;
+            SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
+            SftpBrowserEnabled = settings.SftpBrowserEnabled;
+            SftpAutoOpenOnSsh = settings.SftpAutoOpenOnSsh;
+            SftpFollowSshDirectory = settings.SftpFollowSshDirectory;
+            X11ServerPath = settings.X11ServerPath ?? "";
+            X11AutoStart = settings.X11AutoStart;
+            SysinternalsPath = settings.SysinternalsPath ?? "";
+            NirSoftPath = settings.NirSoftPath ?? "";
+            NanaRunPath = settings.NanaRunPath ?? "";
 
-        // SSH & SFTP
-        PlinkPath = settings.PlinkPath;
-        PuttyPath = settings.PuttyPath ?? "";
-        SshDefaultMode = settings.SshDefaultMode;
-        SshAgentPreference = settings.SshAgentPreference.ToString();
-        AntiIdleInterval = settings.AntiIdleIntervalSeconds;
-        SshTmoutResetInterval = settings.SshTmoutResetIntervalSeconds;
-        SshKeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds;
-        SyncKnownHostsAtStartup = settings.SyncKnownHostsAtStartup;
-        SshAutoReconnect = settings.SshAutoReconnect;
-        SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
-        SftpBrowserEnabled = settings.SftpBrowserEnabled;
-        SftpAutoOpenOnSsh = settings.SftpAutoOpenOnSsh;
-        SftpFollowSshDirectory = settings.SftpFollowSshDirectory;
-        X11ServerPath = settings.X11ServerPath ?? "";
-        X11AutoStart = settings.X11AutoStart;
-        SysinternalsPath = settings.SysinternalsPath ?? "";
-        NirSoftPath = settings.NirSoftPath ?? "";
-        NanaRunPath = settings.NanaRunPath ?? "";
+            // Command Library Git Sync
+            CmdLibGitSyncEnabled = settings.CmdLibGitSyncEnabled;
+            CmdLibGitSyncUrl = settings.CmdLibGitSyncUrl ?? "";
+            CmdLibGitSyncBranch = settings.CmdLibGitSyncBranch;
+            CmdLibGitSyncAuthorName = settings.CmdLibGitSyncAuthorName;
+            CmdLibGitSyncAuthorEmail = settings.CmdLibGitSyncAuthorEmail;
+            CmdLibGitSyncOnStartup = settings.CmdLibGitSyncOnStartup;
+            CmdLibGitSyncAutoPush = settings.CmdLibGitSyncAutoPush;
 
-        // Command Library Git Sync
-        CmdLibGitSyncEnabled = settings.CmdLibGitSyncEnabled;
-        CmdLibGitSyncUrl = settings.CmdLibGitSyncUrl ?? "";
-        CmdLibGitSyncBranch = settings.CmdLibGitSyncBranch;
-        CmdLibGitSyncAuthorName = settings.CmdLibGitSyncAuthorName;
-        CmdLibGitSyncAuthorEmail = settings.CmdLibGitSyncAuthorEmail;
-        CmdLibGitSyncOnStartup = settings.CmdLibGitSyncOnStartup;
-        CmdLibGitSyncAutoPush = settings.CmdLibGitSyncAutoPush;
+            // Session Health Monitor
+            SessionHealthMonitorEnabled = settings.SessionHealthMonitorEnabled;
+            SessionHealthCheckIntervalSeconds = settings.SessionHealthCheckIntervalSeconds;
+            SessionHealthProbeTimeoutMs = settings.SessionHealthProbeTimeoutMs;
+            SessionHealthMaxConcurrent = settings.SessionHealthMaxConcurrent;
 
-        // Session Health Monitor
-        SessionHealthMonitorEnabled = settings.SessionHealthMonitorEnabled;
-        SessionHealthCheckIntervalSeconds = settings.SessionHealthCheckIntervalSeconds;
-        SessionHealthProbeTimeoutMs = settings.SessionHealthProbeTimeoutMs;
-        SessionHealthMaxConcurrent = settings.SessionHealthMaxConcurrent;
+            // RDP defaults
+            DefaultResolutionWidth = settings.DefaultResolutionWidth;
+            DefaultResolutionHeight = settings.DefaultResolutionHeight;
+            RdpDefaultMode = settings.RdpDefaultMode;
+            RdpDefaultNla = settings.RdpDefaultNla;
+            RdpDefaultStrictServerAuthentication = settings.RdpDefaultStrictServerAuthentication;
+            RdpDefaultColorDepth = settings.RdpDefaultColorDepth;
+            RdpDefaultDynamicResolution = settings.RdpDefaultDynamicResolution;
+            RdpDefaultMultiMonitor = settings.RdpDefaultMultiMonitor;
+            RdpDefaultRedirectClipboard = settings.RdpDefaultRedirectClipboard;
+            RdpDefaultRedirectDrives = settings.RdpDefaultRedirectDrives;
+            RdpDefaultRedirectPrinters = settings.RdpDefaultRedirectPrinters;
+            RdpDefaultRedirectComPorts = settings.RdpDefaultRedirectComPorts;
+            RdpDefaultRedirectSmartCards = settings.RdpDefaultRedirectSmartCards;
+            RdpDefaultRedirectWebcam = settings.RdpDefaultRedirectWebcam;
+            RdpDefaultRedirectUsb = settings.RdpDefaultRedirectUsb;
+            RdpDefaultAudioCapture = settings.RdpDefaultAudioCapture;
+            RdpDefaultAutoReconnect = settings.RdpDefaultAutoReconnect;
+            RdpDefaultBitmapCaching = settings.RdpDefaultBitmapCaching;
+            RdpDefaultCompression = settings.RdpDefaultCompression;
+            RdpDefaultHardwareAcceleration = settings.RdpDefaultHardwareAcceleration;
+            RdpDefaultAudioMode = settings.RdpDefaultAudioMode;
+            RdpResolutionPresets = settings.RdpResolutionPresets ?? [];
+            RdpDialogAdvancedDefault = settings.RdpDialogAdvancedDefault;
 
-        // RDP defaults
-        DefaultResolutionWidth = settings.DefaultResolutionWidth;
-        DefaultResolutionHeight = settings.DefaultResolutionHeight;
-        RdpDefaultMode = settings.RdpDefaultMode;
-        RdpDefaultNla = settings.RdpDefaultNla;
-        RdpDefaultStrictServerAuthentication = settings.RdpDefaultStrictServerAuthentication;
-        RdpDefaultColorDepth = settings.RdpDefaultColorDepth;
-        RdpDefaultDynamicResolution = settings.RdpDefaultDynamicResolution;
-        RdpDefaultMultiMonitor = settings.RdpDefaultMultiMonitor;
-        RdpDefaultRedirectClipboard = settings.RdpDefaultRedirectClipboard;
-        RdpDefaultRedirectDrives = settings.RdpDefaultRedirectDrives;
-        RdpDefaultRedirectPrinters = settings.RdpDefaultRedirectPrinters;
-        RdpDefaultRedirectComPorts = settings.RdpDefaultRedirectComPorts;
-        RdpDefaultRedirectSmartCards = settings.RdpDefaultRedirectSmartCards;
-        RdpDefaultRedirectWebcam = settings.RdpDefaultRedirectWebcam;
-        RdpDefaultRedirectUsb = settings.RdpDefaultRedirectUsb;
-        RdpDefaultAudioCapture = settings.RdpDefaultAudioCapture;
-        RdpDefaultAutoReconnect = settings.RdpDefaultAutoReconnect;
-        RdpDefaultBitmapCaching = settings.RdpDefaultBitmapCaching;
-        RdpDefaultCompression = settings.RdpDefaultCompression;
-        RdpDefaultHardwareAcceleration = settings.RdpDefaultHardwareAcceleration;
-        RdpDefaultAudioMode = settings.RdpDefaultAudioMode;
-        RdpResolutionPresets = settings.RdpResolutionPresets ?? [];
-        RdpDialogAdvancedDefault = settings.RdpDialogAdvancedDefault;
+            // Security
+            UseExternalCredentialProvider = settings.UseExternalCredentialProvider;
+            CredentialProviderType = settings.CredentialProviderType;
+            CredentialProviderCommand = settings.CredentialProviderCommand ?? "";
+            CredentialProviderDatabase = settings.CredentialProviderDatabase ?? "";
+            CredentialProviderKeyFile = settings.CredentialProviderKeyFile ?? "";
+            CredentialProviderUsernameCommand = settings.CredentialProviderUsernameCommand ?? "";
+            CredentialProviderFirstLineOnly = settings.CredentialProviderFirstLineOnly;
+            CredentialProviderUnlockSecret =
+                CredentialProtector.Unprotect(settings.CredentialProviderUnlockSecretEncrypted) ?? "";
+            CredentialProviderTimeoutMs = settings.CredentialProviderTimeoutMs;
+            VaultHelloMaxDaysBeforeMasterPassword = settings.VaultHelloMaxDaysBeforeMasterPassword;
+            RequireCredentialGuard = settings.RequireCredentialGuard;
+            RequireWindowsHelloOnConnect = settings.RequireWindowsHelloOnConnect;
+            WindowsHelloGraceMinutes = settings.WindowsHelloGraceMinutes;
+            AutoLockIdleMinutes = settings.AutoLockIdleMinutes;
+            DisconnectOnLock = settings.DisconnectOnLock;
+            IsPinConfigured = !string.IsNullOrEmpty(settings.PinHash) && !string.IsNullOrEmpty(settings.PinSalt);
+            IsVaultEnabled = settings.VaultEnabled;
+            IsVaultHelloEnrolled = settings.VaultHelloEnrolled;
+            IsVaultHelloAvailable = false;
+            RefreshVaultHelloUiState();
 
-        // Security
-        UseExternalCredentialProvider = settings.UseExternalCredentialProvider;
-        CredentialProviderType = settings.CredentialProviderType;
-        CredentialProviderCommand = settings.CredentialProviderCommand ?? "";
-        CredentialProviderDatabase = settings.CredentialProviderDatabase ?? "";
-        CredentialProviderKeyFile = settings.CredentialProviderKeyFile ?? "";
-        CredentialProviderUsernameCommand = settings.CredentialProviderUsernameCommand ?? "";
-        CredentialProviderFirstLineOnly = settings.CredentialProviderFirstLineOnly;
-        CredentialProviderUnlockSecret =
-            CredentialProtector.Unprotect(settings.CredentialProviderUnlockSecretEncrypted) ?? "";
-        CredentialProviderTimeoutMs = settings.CredentialProviderTimeoutMs;
-        VaultHelloMaxDaysBeforeMasterPassword = settings.VaultHelloMaxDaysBeforeMasterPassword;
-        RequireCredentialGuard = settings.RequireCredentialGuard;
-        RequireWindowsHelloOnConnect = settings.RequireWindowsHelloOnConnect;
-        WindowsHelloGraceMinutes = settings.WindowsHelloGraceMinutes;
-        AutoLockIdleMinutes = settings.AutoLockIdleMinutes;
-        DisconnectOnLock = settings.DisconnectOnLock;
-        IsPinConfigured = !string.IsNullOrEmpty(settings.PinHash) && !string.IsNullOrEmpty(settings.PinSalt);
-        IsVaultEnabled = settings.VaultEnabled;
-        IsVaultHelloEnrolled = settings.VaultHelloEnrolled;
-        IsVaultHelloAvailable = false;
-        RefreshVaultHelloUiState();
+            // Advanced / Logging
+            EnableLogging = settings.EnableLogging;
+            SessionLoggingEnabled = settings.SessionLoggingEnabled;
+            _savedSessionLoggingEnabled = settings.SessionLoggingEnabled;
+            SessionLogDirectory = settings.SessionLogDirectory;
+            SessionLogRetentionDays = settings.SessionLogRetentionDays;
+            TunnelEstablishmentDelayMs = settings.TunnelEstablishmentDelayMs;
+            RdpConnectWatchdogTimeoutMs = settings.RdpConnectWatchdogTimeoutMs;
+            ExternalToolTimeoutMs = settings.ExternalToolTimeoutMs;
+            RdpResizeEnableDelayMs = settings.RdpResizeEnableDelayMs;
+            RdpArtifactCleanupDelayMs = settings.RdpArtifactCleanupDelayMs;
+            RdpCredentialAutofillTimeoutMs = settings.RdpCredentialAutofillTimeoutMs;
+            RdpAutoReconnectMaxAttempts = settings.RdpAutoReconnectMaxAttempts;
+            RdpKeepAliveIntervalMs = settings.RdpKeepAliveIntervalMs;
+            RdpHostPoolCapacity = settings.RdpHostPoolCapacity;
+            RdpHostPoolIdleExpiryMinutes = settings.RdpHostPoolIdleExpiryMinutes;
 
-        // Advanced / Logging
-        EnableLogging = settings.EnableLogging;
-        SessionLoggingEnabled = settings.SessionLoggingEnabled;
-        _savedSessionLoggingEnabled = settings.SessionLoggingEnabled;
-        SessionLogDirectory = settings.SessionLogDirectory;
-        SessionLogRetentionDays = settings.SessionLogRetentionDays;
-        TunnelEstablishmentDelayMs = settings.TunnelEstablishmentDelayMs;
-        RdpConnectWatchdogTimeoutMs = settings.RdpConnectWatchdogTimeoutMs;
-        ExternalToolTimeoutMs = settings.ExternalToolTimeoutMs;
-        RdpResizeEnableDelayMs = settings.RdpResizeEnableDelayMs;
-        RdpArtifactCleanupDelayMs = settings.RdpArtifactCleanupDelayMs;
-        RdpCredentialAutofillTimeoutMs = settings.RdpCredentialAutofillTimeoutMs;
-        RdpAutoReconnectMaxAttempts = settings.RdpAutoReconnectMaxAttempts;
-        RdpKeepAliveIntervalMs = settings.RdpKeepAliveIntervalMs;
-        RdpHostPoolCapacity = settings.RdpHostPoolCapacity;
-        RdpHostPoolIdleExpiryMinutes = settings.RdpHostPoolIdleExpiryMinutes;
+            UnsubscribeExternalToolTracking();
 
-        UnsubscribeExternalToolTracking();
+            ExternalTools = new ObservableCollection<ExternalToolItemViewModel>(
+                (settings.ExternalTools ?? []).Where(t => t is not null).Select(t => new ExternalToolItemViewModel
+                {
+                    Name = t.Name,
+                    ExecutablePath = t.ExecutablePath,
+                    Arguments = t.Arguments,
+                    WorkingDirectory = t.WorkingDirectory,
+                    RunAsAdministrator = t.RunAsAdministrator,
+                    RunHidden = t.RunHidden
+                }));
 
-        ExternalTools = new ObservableCollection<ExternalToolItemViewModel>(
-            settings.ExternalTools.Select(t => new ExternalToolItemViewModel
-            {
-                Name = t.Name,
-                ExecutablePath = t.ExecutablePath,
-                Arguments = t.Arguments,
-                WorkingDirectory = t.WorkingDirectory,
-                RunAsAdministrator = t.RunAsAdministrator,
-                RunHidden = t.RunHidden
-            }));
+            SubscribeExternalToolTracking();
 
-        SubscribeExternalToolTracking();
+            Gateways = new ObservableCollection<GatewayItemViewModel>(
+                settings.SshGateways.Select(g => new GatewayItemViewModel
+                {
+                    Id = g.Id,
+                    Name = g.Name,
+                    Host = g.Host,
+                    Port = g.Port,
+                    User = g.User,
+                    HasKey = !string.IsNullOrEmpty(g.KeyPath),
+                    HasPassword = !string.IsNullOrEmpty(g.SshPasswordEncrypted),
+                    ParentGatewayId = g.ParentGatewayId
+                }));
 
-        Gateways = new ObservableCollection<GatewayItemViewModel>(
-            settings.SshGateways.Select(g => new GatewayItemViewModel
-            {
-                Id = g.Id,
-                Name = g.Name,
-                Host = g.Host,
-                Port = g.Port,
-                User = g.User,
-                HasKey = !string.IsNullOrEmpty(g.KeyPath),
-                HasPassword = !string.IsNullOrEmpty(g.SshPasswordEncrypted),
-                ParentGatewayId = g.ParentGatewayId
-            }));
+            // Seed working buffers from loaded settings
+            _pendingGateways = settings.SshGateways.Select(CloneGateway).ToList();
+            _deletedGatewayIds.Clear();
+            _editedGatewayIds.Clear();
 
-        // Seed working buffers from loaded settings
-        _pendingGateways = settings.SshGateways.Select(CloneGateway).ToList();
-        _deletedGatewayIds.Clear();
-        _editedGatewayIds.Clear();
+            SyncNumericTexts();
 
-        SyncNumericTexts();
+            TrustedHostKeys.Refresh();
 
-        TrustedHostKeys.Refresh();
+            // The RDP list reads the server inventory from disk, so its refresh is asynchronous
+            // while this reload is not. Started through its command rather than awaited: the
+            // command owns the failure, and the panel is not on screen when settings load.
+            TrustedRdpCertificates.RefreshCommand.Execute(null);
+        }
+        finally
+        {
+            // Even when a load throws part way: a flag left set made every later edit the
+            // comparison cannot see go unnoticed, so typing an unlock secret never enabled Save.
+            _loadingPanel = false;
+        }
 
-        // The RDP list reads the server inventory from disk, so its refresh is asynchronous
-        // while this reload is not. Started through its command rather than awaited: the
-        // command owns the failure, and the panel is not on screen when settings load.
-        TrustedRdpCertificates.RefreshCommand.Execute(null);
-        _loadingPanel = false;
         IsDirty = false;
+        ClearExternalToolsValidationError();
         ReloadSavedSettings();
         SettingsLoaded?.Invoke();
     }
@@ -2214,7 +2232,6 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.RdpHostPoolIdleExpiryMinutes = RdpHostPoolIdleExpiryMinutes;
 
         // UI state
-        settings.ShowToolsPanel = ShowToolsPanel;
 
         // Advanced / File sharing
         settings.FileShareEnableTftp = FileShareEnableTftp;
@@ -2405,10 +2422,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         defaults.VaultEnabled = persisted.VaultEnabled;
         defaults.VaultHelloEnrolled = persisted.VaultHelloEnrolled;
 
+        // Kept for the same reason as the per-setting reset leaves them out: the external tools are
+        // the user's own entries and the unlock secret is a secret, and the factory file would have
+        // deleted both at the next Save without the confirmation saying so. The skipped update, the
+        // migration decline and the sidebar choice are state no Save writes, so a factory value
+        // here only hid what is still on disk.
+        defaults.ExternalTools = persisted.ExternalTools;
+        defaults.CredentialProviderUnlockSecretEncrypted = persisted.CredentialProviderUnlockSecretEncrypted;
+        defaults.UpdateSkippedVersion = persisted.UpdateSkippedVersion;
+        defaults.LegacyMigrationDeclinedOfferVersion = persisted.LegacyMigrationDeclinedOfferVersion;
+        defaults.LegacyMigrationDeclinedSourceFingerprint = persisted.LegacyMigrationDeclinedSourceFingerprint;
+        defaults.ShowToolsPanel = persisted.ShowToolsPanel;
+
+        // What is on disk, not what the factory says: Save compares against these to decide
+        // whether the TFTP share must be restarted and whether turning transcripts on is new.
+        bool savedTftp = _savedFileShareEnableTftp;
+        bool savedTranscripts = _savedSessionLoggingEnabled;
+
         LoadFromSettings(defaults);
         _originalLocale = localeToReturnTo;
         _originalTheme = themeToReturnTo;
         _originalAccentTint = accentToReturnTo;
+        _savedFileShareEnableTftp = savedTftp;
+        _savedSessionLoggingEnabled = savedTranscripts;
         await RefreshVaultStatusAsync();
 
         foreach (string gatewayId in keptDeletedGatewayIds)
@@ -2421,7 +2457,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             _editedGatewayIds.Add(gatewayId);
         }
 
-        IsDirty = true;
+        // A reload from anywhere but disk is an edit as a whole, including the parts the value
+        // comparison cannot read (tools, unlock secret, gateway buffer). Plain IsDirty let the next
+        // unrelated toggle recompute the flag to false and lose them.
+        MarkEditTheComparisonCannotSee();
     }
 
     private bool CanReofferLegacyMigrationNextStartup() =>
@@ -2550,7 +2589,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             WritePanelInto(current);
             (merged, changed) = SettingsTransfer.Import(current, System.Text.Json.Nodes.JsonNode.Parse(json));
         }
-        catch (Exception ex) when (ex is JsonException or FormatException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is JsonException or FormatException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
             FileLogger.Warn($"Settings import refused: {ex.Message}");
             _dialogService.ShowError(_localizer["SettingsImportTitle"], _localizer["SettingsImportInvalid"]);
@@ -2598,7 +2637,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
 
         await RefreshVaultStatusAsync();
-        IsDirty = true;
+        MarkEditTheComparisonCannotSee();
         ValidateAllProperties();
         RefreshValidationSummary();
     }
@@ -3938,10 +3977,27 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private void OnExternalToolItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         MarkEditTheComparisonCannotSee();
+        ClearExternalToolsValidationError();
+    }
+
+    /// <summary>
+    /// Withdraws the external-tool error once the tools change: it was only cleared by the next
+    /// Save, so fixing or removing the tool, or undoing the edit, left the banner up.
+    /// </summary>
+    private void ClearExternalToolsValidationError()
+    {
+        if (_externalToolsValidationError is null)
+        {
+            return;
+        }
+
+        _externalToolsValidationError = null;
+        RefreshValidationSummary();
     }
 
     private void OnExternalToolsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        ClearExternalToolsValidationError();
         if (e.OldItems is not null)
             foreach (ExternalToolItemViewModel tool in e.OldItems)
                 tool.PropertyChanged -= OnExternalToolItemPropertyChanged;
@@ -4005,6 +4061,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private static readonly HashSet<string> WrittenImmediatelyPropertyNames = new(StringComparer.Ordinal)
     {
         nameof(UpdateSkippedVersion),
+
+        // The sidebar writes its Servers/Tools choice itself, and the panel has no control for it.
+        // Saving the copy the panel read at load put back whatever the sidebar showed then.
+        nameof(ShowToolsPanel),
     };
 
     /// <summary>

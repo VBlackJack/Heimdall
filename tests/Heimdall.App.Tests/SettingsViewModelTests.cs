@@ -1943,6 +1943,106 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task ResetToDefaults_ThenSavingWithTftpOff_StopsTheRunningShare()
+    {
+        var config = new FakeConfigManager();
+        config.Settings.FileShareEnableTftp = true;
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.WhenSavedSettingsLoadedAsync();
+        var announced = new List<bool>();
+        viewModel.FileShareTftpSaved += announced.Add;
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+        Assert.False(viewModel.FileShareEnableTftp);
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        // The reset took the factory value as "what is on disk", so Save saw no change and the
+        // share kept serving anonymous TFTP until the next restart.
+        Assert.Equal([false], announced);
+    }
+
+    [Fact]
+    public async Task ResetToDefaults_KeepsTheUsersToolsAndWhatOnlyTheDiskHolds()
+    {
+        var config = new FakeConfigManager();
+        config.Settings.ExternalTools = [new ExternalToolDefinition { Name = "Mine", ExecutablePath = @"C:	ools\mine.exe" }];
+        config.Settings.UpdateSkippedVersion = "9.9.9";
+        config.Settings.LegacyMigrationDeclinedOfferVersion = 1;
+        config.Settings.ShowToolsPanel = false;
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+
+        Assert.Contains(viewModel.ExternalTools, tool => tool.Name == "Mine");
+        Assert.True(viewModel.HasSkippedVersion);
+        Assert.True(viewModel.LegacyMigrationReofferAvailable);
+        Assert.False(viewModel.ShowToolsPanel);
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.Contains(config.Settings.ExternalTools, tool => tool.Name == "Mine");
+    }
+
+    [Fact]
+    public async Task ResetToDefaults_StaysDirtyWhenAnUnrelatedBoxIsToggledTwice()
+    {
+        var config = new FakeConfigManager();
+        config.Settings.ExternalTools = [new ExternalToolDefinition { Name = "Mine", ExecutablePath = @"C:	ools\mine.exe" }];
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.WhenSavedSettingsLoadedAsync();
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+        await viewModel.WhenSavedSettingsLoadedAsync();
+        viewModel.RdpDefaultNla = !viewModel.RdpDefaultNla;
+        viewModel.RdpDefaultNla = !viewModel.RdpDefaultNla;
+
+        // The next value comparison used to clear the flag although the reset still had pending
+        // changes the comparison cannot see.
+        Assert.True(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public async Task ApplyModeToAll_LeavesThePanelCleanOnceTheDefaultIsOnDisk()
+    {
+        var config = new FakeConfigManager
+        {
+            Servers = [new ServerProfileDto { Id = "ssh-1", ConnectionType = "SSH", SshMode = "Embedded" }],
+        };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        var viewModel = CreateViewModel(config, dialog);
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.WhenSavedSettingsLoadedAsync();
+        viewModel.SshDefaultMode = "External";
+        Assert.True(viewModel.IsDirty);
+
+        await viewModel.ApplySshModeToAllCommand.ExecuteAsync(null);
+
+        Assert.Equal("External", config.Settings.SshDefaultMode);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public async Task Save_LeavesTheSidebarsServersOrToolsChoiceAlone()
+    {
+        var config = new FakeConfigManager();
+        config.Settings.ShowToolsPanel = false;
+        var viewModel = CreateViewModel(config, new FakeDialogService { ConfirmResult = true });
+        viewModel.LoadFromSettings(config.Settings);
+
+        // The sidebar writes its own choice to disk.
+        await config.MergeSettingAsync(settings => settings.ShowToolsPanel = true);
+        viewModel.TerminalFontSize = viewModel.TerminalFontSize + 1;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.True(config.Settings.ShowToolsPanel);
+    }
+
+    [Fact]
     public async Task ResetToDefaultsCommand_RestoresPreferencesButKeepsGateways()
     {
         var dialog = new FakeDialogService { ConfirmResult = true };
@@ -2398,6 +2498,36 @@ public sealed partial class SettingsViewModelTests : IDisposable
             Assert.True(importer.HasValidationErrors);
             Assert.Equal(0, target.MergeSettingCallCount);
             Assert.Contains("Font size: 14 -> 18", Assert.Single(targetDialog.ConfirmCalls).Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Theory]
+    [InlineData("{\"format\":\"heimdall-settings\",\"version\":1,\"settings\":{\"ExternalTools\":null}}")]
+    [InlineData("{\"format\":\"heimdall-settings\",\"version\":1,\"settings\":{\"ExternalTools\":[null]}}")]
+    [InlineData("{\"format\":\"heimdall-settings\",\"version\":1.5,\"settings\":{}}")]
+    public async Task SettingsImport_AFileWithAnEmptyListOrABadVersion_IsRefusedCleanly(string content)
+    {
+        string file = Path.Combine(Path.GetTempPath(), "heimdall-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(file, content);
+            FakeConfigManager target = new();
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel importer = CreateViewModel(target, dialog);
+            importer.LoadFromSettings(target.Settings);
+            importer.SettingsImportPathProvider = () => file;
+
+            // The null passed the import and threw once the panel loaded it, after the user had
+            // confirmed, leaving a half-loaded panel; a fractional version escaped the command.
+            await importer.ImportSettingsCommand.ExecuteAsync(null);
+
+            Assert.Single(dialog.ErrorCalls);
+            Assert.Empty(dialog.ConfirmCalls);
+            Assert.False(importer.IsDirty);
         }
         finally
         {
@@ -3114,6 +3244,7 @@ public sealed partial class SettingsViewModelTests : IDisposable
             if (!property.CanWrite
                 || !persisted
                 || property.Name == nameof(SettingsViewModel.UpdateSkippedVersion)
+                || property.Name == nameof(SettingsViewModel.ShowToolsPanel)
                 || property.Name == nameof(SettingsViewModel.DefaultLocale))
             {
                 continue;
