@@ -123,7 +123,10 @@ public partial class SettingsViewModel
             _hasEditsTheComparisonCannotSee = true;
         }
 
-        if (_hasEditsTheComparisonCannotSee || _savedSettings is null || _deletedGatewayIds.Count > 0)
+        if (_hasEditsTheComparisonCannotSee
+            || _savedSettings is null
+            || _deletedGatewayIds.Count > 0
+            || _editedGatewayIds.Count > 0)
         {
             return true;
         }
