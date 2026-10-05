@@ -290,6 +290,15 @@ public sealed class PlinkTunnelRunner : IDisposable
         {
             return new PlinkTunnelResult(false, ex.Message, SshFailureCode.Unknown);
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Writing the password file failed: a temp directory that cannot be written, or a
+            // name collision. This used to escape as an exception the caller did not expect, so
+            // the loopback alias it had reserved was never released. A partly written file is
+            // removed here, since nothing else will know it exists.
+            CleanupPasswordFile();
+            return new PlinkTunnelResult(false, ex.Message, SshFailureCode.Unknown);
+        }
 
         IPlinkProcess? process = null;
         int expectedProcessId;
