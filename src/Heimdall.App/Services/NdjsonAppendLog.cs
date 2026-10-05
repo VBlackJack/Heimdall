@@ -48,6 +48,10 @@ public abstract class NdjsonAppendLog<TRecord> : IDisposable
     /// <summary>Backoff schedule (ms) for transient IO failures; mirrors <c>FileLogger</c>/<c>SessionLogService</c>.</summary>
     private static readonly int[] RetryDelaysMs = [10, 50, 200];
 
+    // No byte order mark: RFC 8259 says JSON must not carry one, and a line reader that parses each
+    // line as JSON failed on the first line of every file.
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
     private readonly string _rootDirectory;
     private readonly string _basePath;
     private readonly long _maxBytes;
@@ -206,7 +210,7 @@ public abstract class NdjsonAppendLog<TRecord> : IDisposable
             RestrictedLogFile.Create(_currentPath);
         }
 
-        File.AppendAllText(_currentPath, text, Encoding.UTF8);
+        File.AppendAllText(_currentPath, text, Utf8NoBom);
         _currentBytes += byteCount;
     }
 

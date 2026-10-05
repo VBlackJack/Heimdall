@@ -2406,6 +2406,7 @@
   "SessionTranscriptStarted": "Transcript started: {0}",
   "SessionTranscriptStopped": "Transcript stopped",
   "SessionLogHeader": "===== Session started {0} | {1} | host {2} | {3} =====",
+  "SessionLogOutputDropped": "[... {0} characters of output not recorded: the log folder could not be written ...]",
   "SessionLogFooter": "===== Session ended {0} | duration {1} =====",
   "LogSessionLogRollover": "Session log reached its size cap, continuing in {0}",
   "LogSessionLogWriteError": "Session log write failed for {0}: {1}",

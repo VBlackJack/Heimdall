@@ -46,6 +46,12 @@ public sealed class SessionLogService : ISessionLogService
     /// <summary>Backoff schedule (ms) for transient IO failures; mirrors <c>FileLogger</c>.</summary>
     private static readonly int[] RetryDelaysMs = [10, 50, 200];
 
+    /// <summary>
+    /// How much unwritten output a writer keeps, as a multiple of its file size cap, while the
+    /// disk refuses it. Past this, output is dropped and the gap is recorded.
+    /// </summary>
+    private const int PendingBufferFactor = 4;
+
     private readonly string _rootDirectory;
     private readonly SessionLogOptions _options;
     private readonly ILogger<SessionLogService> _logger;
@@ -223,24 +229,35 @@ public sealed class SessionLogService : ISessionLogService
         int deleted = 0;
         try
         {
-            foreach (string path in Directory.EnumerateFiles(_rootDirectory, "*" + LogFileExtension, SearchOption.TopDirectoryOnly))
+            // A transcript and its ".N" continuations go together, and only once the newest of them
+            // has expired: deleting the first file alone left continuations nothing could claim.
+            IEnumerable<IGrouping<string, string>> transcripts = Directory
+                .EnumerateFiles(_rootDirectory, "*" + LogFileExtension, SearchOption.TopDirectoryOnly)
+                .Where(path => TranscriptFileName.IsMatch(Path.GetFileName(path)))
+                .GroupBy(TranscriptStem, StringComparer.OrdinalIgnoreCase);
+
+            foreach (IGrouping<string, string> transcript in transcripts)
             {
-                if (!TranscriptFileName.IsMatch(Path.GetFileName(path))
-                    || activeStems.Any(stem => path.StartsWith(stem, StringComparison.OrdinalIgnoreCase))
-                    || File.GetLastWriteTimeUtc(path) >= cutoff)
+                string stem = transcript.Key;
+                if (activeStems.Any(active => string.Equals(active, stem, StringComparison.OrdinalIgnoreCase))
+                    || !IsHeimdallTranscript(stem + LogFileExtension)
+                    || transcript.Max(File.GetLastWriteTimeUtc) >= cutoff)
                 {
                     continue;
                 }
 
-                try
+                foreach (string path in transcript)
                 {
-                    File.Delete(path);
-                    deleted++;
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    // Held or protected: it stays for the next pass.
-                    _logger.LogWarning("Session transcript retention could not delete {Path}: {Reason}", path, ex.Message);
+                    try
+                    {
+                        File.Delete(path);
+                        deleted++;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // Held or protected: it stays for the next pass.
+                        _logger.LogWarning("Session transcript retention could not delete {Path}: {Reason}", path, ex.Message);
+                    }
                 }
             }
         }
@@ -301,6 +318,50 @@ public sealed class SessionLogService : ISessionLogService
             writer.Flush();
         }
     }
+
+    /// <summary>A transcript file's path without its extension and without a ".N" continuation.</summary>
+    internal static string TranscriptStem(string path)
+    {
+        string stem = Path.ChangeExtension(path, null);
+        int dot = stem.LastIndexOf('.');
+        return dot > 0 && stem[(dot + 1)..].All(char.IsAsciiDigit) && dot < stem.Length - 1
+            ? stem[..dot]
+            : stem;
+    }
+
+    /// <summary>
+    /// Whether a file was written by this service: its first line is the transcript header.
+    /// </summary>
+    /// <remarks>
+    /// The name pattern alone matches the logs other tools write - PuTTY's default
+    /// "&amp;H_&amp;Y&amp;M&amp;D_&amp;T.log" among them - and the folder is the user's choice, so retention
+    /// in a shared folder deleted them. A file that cannot be read is not claimed.
+    /// </remarks>
+    internal static bool IsHeimdallTranscript(string path)
+    {
+        try
+        {
+            using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            Span<byte> start = stackalloc byte[HeaderMarker.Length + Utf8Preamble.Length];
+            int read = stream.ReadAtLeast(start, start.Length, throwOnEndOfStream: false);
+            ReadOnlySpan<byte> head = start[..read];
+            if (head.StartsWith(Utf8Preamble))
+            {
+                head = head[Utf8Preamble.Length..];
+            }
+
+            return head.StartsWith(HeaderMarker);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static ReadOnlySpan<byte> Utf8Preamble => [0xEF, 0xBB, 0xBF];
+
+    // Every translation of SessionLogHeader opens with it.
+    private static ReadOnlySpan<byte> HeaderMarker => "====="u8;
 
     private string BuildHeader(SessionLogContext context)
     {
@@ -369,13 +430,19 @@ public sealed class SessionLogService : ISessionLogService
 
     /// <summary>
     /// One session's writer: a single output file (with size-based rollover continuations), its own
-    /// stateful decoder/stripper, and a buffer. All state is guarded by <c>_lock</c> because the
-    /// streaming helpers are not thread-safe and flush runs on a pool thread concurrently with
-    /// terminal-thread appends.
+    /// stateful decoder/stripper, and a buffer.
     /// </summary>
+    /// <remarks>
+    /// Two locks, so the terminal never waits on the disk. <c>_lock</c> guards the decoder, the
+    /// stripper and the closed state, and is all <see cref="Append"/> takes on the terminal's data
+    /// path. <c>_ioLock</c> guards the file. One lock held across file I/O and its retry sleeps
+    /// used to stall every output chunk behind a slow or dropped network share, and the unwritten
+    /// output was kept without limit.
+    /// </remarks>
     private sealed class SessionLogWriter : IDisposable
     {
         private readonly object _lock = new();
+        private readonly object _ioLock = new();
         private readonly string _basePath;
         private readonly long _maxBytes;
         private readonly ILogger _logger;
@@ -391,6 +458,10 @@ public sealed class SessionLogService : ISessionLogService
         private bool _writeErrorLogged;
         private bool _closed;
         private bool _disposed;
+
+        // Characters buffered and not yet written, and those dropped once the buffer was full.
+        private long _pendingChars;
+        private long _droppedChars;
 
         internal SessionLogWriter(string basePath, long maxBytes, ILogger logger, Func<string, string> localize)
         {
@@ -410,9 +481,9 @@ public sealed class SessionLogService : ISessionLogService
         /// <summary>Opens the first file and writes the header. Returns false if the file cannot be created.</summary>
         internal bool Open(string header)
         {
-            lock (_lock)
+            lock (_ioLock)
             {
-                _queue.Enqueue(header);
+                Enqueue(header);
                 FlushLocked();
                 return _stream is not null;
             }
@@ -432,15 +503,23 @@ public sealed class SessionLogService : ISessionLogService
                 string clean = _stripper.Strip(decoded);
                 if (clean.Length > 0)
                 {
-                    _queue.Enqueue(clean);
+                    Enqueue(clean);
                 }
             }
         }
 
-        /// <summary>Flushes the buffer to disk. Never throws.</summary>
+        /// <summary>
+        /// Flushes the buffer to disk. Never throws, and never waits: a flush still running from
+        /// the previous tick, on a slow disk, is left to finish rather than queued behind.
+        /// </summary>
         internal void Flush()
         {
-            lock (_lock)
+            if (!Monitor.TryEnter(_ioLock))
+            {
+                return;
+            }
+
+            try
             {
                 if (_disposed)
                 {
@@ -449,6 +528,27 @@ public sealed class SessionLogService : ISessionLogService
 
                 FlushLocked();
             }
+            finally
+            {
+                Monitor.Exit(_ioLock);
+            }
+        }
+
+        /// <summary>
+        /// Buffers an entry unless the buffer already holds what the disk could not take. Past
+        /// that, output is counted and dropped; a marker records how much once writing resumes.
+        /// </summary>
+        private void Enqueue(string entry)
+        {
+            long cap = Math.Max(_maxBytes, 1) * PendingBufferFactor;
+            if (Interlocked.Read(ref _pendingChars) + entry.Length > cap)
+            {
+                Interlocked.Add(ref _droppedChars, entry.Length);
+                return;
+            }
+
+            _queue.Enqueue(entry);
+            Interlocked.Add(ref _pendingChars, entry.Length);
         }
 
         /// <summary>Flushes any decoder residue, appends the footer (if any), and flushes a last time.</summary>
@@ -467,17 +567,21 @@ public sealed class SessionLogService : ISessionLogService
                     string clean = _stripper.Strip(residue);
                     if (clean.Length > 0)
                     {
-                        _queue.Enqueue(clean);
+                        Enqueue(clean);
                     }
                 }
 
                 if (footer is not null)
                 {
-                    _queue.Enqueue(footer);
+                    Enqueue(footer);
                 }
 
-                FlushLocked();
                 _closed = true;
+            }
+
+            lock (_ioLock)
+            {
+                FlushLocked();
 
                 if (_stream is not null)
                 {
@@ -498,7 +602,7 @@ public sealed class SessionLogService : ISessionLogService
 
         public void Dispose()
         {
-            lock (_lock)
+            lock (_ioLock)
             {
                 if (_disposed)
                 {
@@ -524,18 +628,28 @@ public sealed class SessionLogService : ISessionLogService
             }
         }
 
-        // Assumes _lock is held. Drains the buffer to disk with bounded retry on transient IO faults.
+        // Assumes _ioLock is held. Drains the buffer to disk with bounded retry on transient IO faults.
         private void FlushLocked()
         {
-            if (_queue.IsEmpty)
+            long dropped = Interlocked.Exchange(ref _droppedChars, 0);
+            if (_queue.IsEmpty && dropped == 0)
             {
                 return;
             }
 
             List<string> batch = [];
+            if (dropped > 0)
+            {
+                batch.Add(Environment.NewLine + string.Format(
+                    CultureInfo.InvariantCulture,
+                    _localize("SessionLogOutputDropped"),
+                    dropped) + Environment.NewLine);
+            }
+
             while (_queue.TryDequeue(out string? entry))
             {
                 batch.Add(entry);
+                Interlocked.Add(ref _pendingChars, -entry.Length);
             }
 
             int written = 0;
@@ -557,13 +671,16 @@ public sealed class SessionLogService : ISessionLogService
                 }
                 catch (IOException ex)
                 {
-                    // Persistent failure: preserve the unwritten remainder for the next flush and
-                    // emit a single diagnostic so the hot path is never crashed or spammed.
+                    // Persistent failure: preserve the unwritten remainder for the next flush, within
+                    // the buffer cap, and emit a single diagnostic so the hot path is never crashed
+                    // or spammed. The broken handle is dropped so the next flush reopens the file
+                    // once the folder is back, instead of retrying a dead handle for good.
                     for (int i = written; i < batch.Count; i++)
                     {
-                        _queue.Enqueue(batch[i]);
+                        Enqueue(batch[i]);
                     }
 
+                    DropBrokenStream();
                     LogWriteErrorOnce(ex.Message);
                     return;
                 }
@@ -575,7 +692,27 @@ public sealed class SessionLogService : ISessionLogService
             }
         }
 
-        // Assumes _lock is held. Writes one entry, rolling the file over first if the cap is reached.
+        // Assumes _ioLock is held.
+        private void DropBrokenStream()
+        {
+            StreamWriter? stream = _stream;
+            _stream = null;
+            if (stream is null)
+            {
+                return;
+            }
+
+            try
+            {
+                stream.Dispose();
+            }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+            {
+                // The handle is already unusable; there is nothing more to release.
+            }
+        }
+
+        // Assumes _ioLock is held. Writes one entry, rolling the file over first if the cap is reached.
         private void WriteEntry(string text)
         {
             long byteCount = Encoding.UTF8.GetByteCount(text);
@@ -590,7 +727,7 @@ public sealed class SessionLogService : ISessionLogService
             _currentBytes += byteCount;
         }
 
-        // Assumes _lock is held. Opens the current file (append, UTF-8), hardening it on first creation.
+        // Assumes _ioLock is held. Opens the current file (append, UTF-8), hardening it on first creation.
         private void EnsureStream()
         {
             if (_stream is not null)
@@ -619,7 +756,7 @@ public sealed class SessionLogService : ISessionLogService
             _currentBytes = new FileInfo(_currentPath).Length;
         }
 
-        // Assumes _lock is held. Closes the current file and switches to the next ".N.log" continuation.
+        // Assumes _ioLock is held. Closes the current file and switches to the next ".N.log" continuation.
         private void RollOver()
         {
             if (_stream is not null)

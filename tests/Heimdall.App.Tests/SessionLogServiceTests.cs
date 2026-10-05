@@ -91,9 +91,9 @@ public sealed class SessionLogServiceTests : IDisposable
         string root = NewTempDirectory();
         Directory.CreateDirectory(root);
         DateTime now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
-        string expired = Touch(root, "SSH_old.example_20260801_101500.log", now.AddDays(-40));
-        string expiredContinuation = Touch(root, "SSH_old.example_20260801_101500_1.2.log", now.AddDays(-40));
-        string recent = Touch(root, "SSH_new.example_20260930_080000.log", now.AddDays(-5));
+        string expired = Transcript(root, "SSH_old.example_20260801_101500.log", now.AddDays(-40));
+        string expiredContinuation = Touch(root, "SSH_old.example_20260801_101500.2.log", now.AddDays(-40));
+        string recent = Transcript(root, "SSH_new.example_20260930_080000.log", now.AddDays(-5));
         string eventLog = Touch(root, "session-events.log", now.AddDays(-400));
         string unrelated = Touch(root, "notes.log", now.AddDays(-400));
         using SessionLogService service = CreateService(root, SessionLogOptions.CreateDefault());
@@ -114,7 +114,7 @@ public sealed class SessionLogServiceTests : IDisposable
         string root = NewTempDirectory();
         Directory.CreateDirectory(root);
         DateTime now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
-        string ancient = Touch(root, "SSH_old.example_20200101_000000.log", now.AddYears(-6));
+        string ancient = Transcript(root, "SSH_old.example_20200101_000000.log", now.AddYears(-6));
         using SessionLogService service = CreateService(root, SessionLogOptions.CreateDefault());
 
         service.PruneExpiredTranscripts(0, now).Should().Be(0);
@@ -133,12 +133,68 @@ public sealed class SessionLogServiceTests : IDisposable
         File.Exists(active!).Should().BeTrue();
     }
 
-    private static string Touch(string root, string name, DateTime lastWriteUtc)
+    private static string Touch(string root, string name, DateTime lastWriteUtc, string content = "x")
     {
         string path = Path.Combine(root, name);
-        File.WriteAllText(path, "x");
+        File.WriteAllText(path, content);
         File.SetLastWriteTimeUtc(path, lastWriteUtc);
         return path;
+    }
+
+    // What every transcript this service writes opens with.
+    private static string Transcript(string root, string name, DateTime lastWriteUtc)
+        => Touch(root, name, lastWriteUtc, "===== Session started 2026-08-01 | SSH | host x | x =====\n");
+
+    [Fact]
+    public void PruneExpiredTranscripts_LeavesAnotherToolsLogThatMerelyLooksLikeATranscript()
+    {
+        string root = NewTempDirectory();
+        Directory.CreateDirectory(root);
+        DateTime now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+        string putty = Touch(root, "srv01_20260105_143000.log", now.AddDays(-200), "=~=~=~=~=~=~= PuTTY log =~=~=~=~=~=~=\n");
+        string ours = Transcript(root, "SSH_srv01_20260105_143000.log", now.AddDays(-200));
+        using SessionLogService service = CreateService(root, SessionLogOptions.CreateDefault());
+
+        service.PruneExpiredTranscripts(30, now).Should().Be(1);
+
+        File.Exists(putty).Should().BeTrue("a file this service did not write is never its to delete");
+        File.Exists(ours).Should().BeFalse();
+    }
+
+    [Fact]
+    public void PruneExpiredTranscripts_KeepsATranscriptWhoseContinuationIsStillRecent()
+    {
+        string root = NewTempDirectory();
+        Directory.CreateDirectory(root);
+        DateTime now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+        string first = Transcript(root, "SSH_long.example_20260801_101500.log", now.AddDays(-40));
+        string continuation = Touch(root, "SSH_long.example_20260801_101500.1.log", now.AddDays(-2));
+        using SessionLogService service = CreateService(root, SessionLogOptions.CreateDefault());
+
+        service.PruneExpiredTranscripts(30, now).Should().Be(0);
+
+        File.Exists(first).Should().BeTrue("its last part is still within the retention");
+        File.Exists(continuation).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("SSH_host_20260105_143000", "SSH_host_20260105_143000.log")]
+    [InlineData("SSH_host_20260105_143000", "SSH_host_20260105_143000.3.log")]
+    [InlineData("SSH_srv.corp.local_20260105_143000", "SSH_srv.corp.local_20260105_143000.log")]
+    public void TranscriptStem_GroupsAFileWithItsContinuations(string expectedStem, string name)
+    {
+        SessionLogService.TranscriptStem(Path.Combine("dir", name)).Should().Be(Path.Combine("dir", expectedStem));
+    }
+
+    [Fact]
+    public void IsHeimdallTranscript_AcceptsTheHeaderAfterAByteOrderMark()
+    {
+        string root = NewTempDirectory();
+        Directory.CreateDirectory(root);
+        string path = Path.Combine(root, "SSH_x_20260105_143000.log");
+        File.WriteAllText(path, "===== Session started =====\n", new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+
+        SessionLogService.IsHeimdallTranscript(path).Should().BeTrue();
     }
 
     [Fact]
