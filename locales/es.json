@@ -6113,6 +6113,7 @@
   "A11ySettingsCmdLibSyncAuthorName": "Nombre del autor",
   "A11ySettingsCmdLibSyncAuthorEmail": "Correo electrónico del autor",
   "SettingsCmdLibSyncOnStartup": "Sincronizar al iniciar",
+  "StatusCmdLibStartupSyncFailed": "Biblioteca de comandos: la sincronización al iniciar falló. Sincronice desde la biblioteca para ver la causa.",
   "SettingsCmdLibSyncAutoPush": "Enviar los cambios locales al sincronizar",
   "SettingsCmdLibSyncTokenSaved": "Token guardado",
   "SettingsCmdLibSyncTokenSaveError": "Falló el guardado",

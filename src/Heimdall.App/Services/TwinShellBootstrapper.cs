@@ -317,10 +317,12 @@ internal static class TwinShellBootstrapper
     /// <para>The option was offered in Settings and read by nothing. Call it after the vault
     /// unlock gate: the settings bridge first cached the settings before the gate, when a token
     /// held by the vault could not be read yet, so it is refreshed here before the sync.</para>
-    /// <para>Nothing is shown: a startup sync the user did not start does not open a dialog.
-    /// The outcome is logged, and a failure never stops the application.</para>
+    /// <para>A startup sync the user did not start does not open a dialog. The outcome is logged,
+    /// a failure never stops the application, and the caller reports a failure on the status bar:
+    /// a sync that failed in silence left the library stale with nothing to say why.</para>
     /// </remarks>
-    internal static async Task SyncOnStartupAsync(
+    /// <returns>Whether a sync ran and failed. A sync not asked for, or cancelled, is not a failure.</returns>
+    internal static async Task<bool> SyncOnStartupAsync(
         AppSettings settings,
         ISettingsService settingsBridge,
         IGitSyncService gitSync)
@@ -329,7 +331,7 @@ internal static class TwinShellBootstrapper
         ArgumentNullException.ThrowIfNull(gitSync);
         if (!ShouldSyncOnStartup(settings))
         {
-            return;
+            return false;
         }
 
         try
@@ -340,16 +342,21 @@ internal static class TwinShellBootstrapper
             {
                 Heimdall.Core.Logging.FileLogger.Info(
                     $"[TwinShell] Startup Git sync done: {result.ItemsImported} imported, {result.ItemsExported} exported");
+                return false;
             }
-            else
-            {
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    $"[TwinShell] Startup Git sync failed ({result.ErrorCode}): {result.Message}");
-            }
+
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[TwinShell] Startup Git sync failed ({result.ErrorCode}): {result.Message}");
+            return result.ErrorCode != GitSyncErrorCode.Cancelled;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
         catch (Exception ex)
         {
             Heimdall.Core.Logging.FileLogger.Warn($"[TwinShell] Startup Git sync failed: {ex.Message}");
+            return true;
         }
     }
 
