@@ -100,12 +100,14 @@ public sealed class SettingsWholeObjectWriteGuardTests
         }
     }
 
-    // The importers and the gateway edit dialog are the sites BL-0095 converted. Naming them
-    // here means a revert reddens with the reason rather than with a bare count.
+    // The importers and the gateway edit are the sites BL-0095 converted. Naming them here means
+    // a revert reddens with the reason rather than with a bare count. The gateway edit opened
+    // from the session dialog moved from the window's code-behind to the shell's view model,
+    // which owns the dialog service it reports through.
     [Theory]
     [InlineData("Services/Import/ProfileImportService.cs")]
     [InlineData("Services/Import/OpenSshConfigImporter.cs")]
-    [InlineData("Views/Dialogs/ServerDialog.xaml.cs")]
+    [InlineData("ViewModels/ServerListViewModel.cs")]
     [InlineData("MainWindow.xaml.cs")]
     [InlineData("ViewModels/Scheduled/ScheduledTasksViewModel.cs")]
     public void ConvertedSites_StillUseTheLockedWrite(string relativePath)

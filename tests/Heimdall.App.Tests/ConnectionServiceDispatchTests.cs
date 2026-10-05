@@ -23,8 +23,18 @@ using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests;
 
-public sealed class ConnectionServiceDispatchTests
+// The unreadable-secret preflight decrypts through CredentialProtector, so the class shares its
+// process-global state with the vault tests and owns a scope around every test.
+[Collection(CredentialProtectorAppCollection.Name)]
+public sealed class ConnectionServiceDispatchTests : IDisposable
 {
+    private readonly CredentialProtectorStateScope _scope = new();
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+    }
+
     [Fact]
     public async Task RunPreflight_MissingGateway_ReturnsActionableFailure()
     {
