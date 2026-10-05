@@ -139,6 +139,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         _tunnelManager.TunnelOpened += OnTunnelOpened;
         _tunnelManager.TunnelClosed += OnTunnelClosed;
+        _tunnelManager.TunnelLost += OnTunnelLost;
         _localizer.LocaleChanged += OnLocaleChanged;
         _configManager.SettingsChanged += OnSettingsChanged;
         _host.Connection.PropertyChanged += _connectionPropertyChangedHandler;
@@ -677,6 +678,12 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         _host.StatusText = status;
     }
 
+    // Raised right after the close of the same tunnel, so this replaces its plain "closed".
+    private void OnTunnelLost(int localPort)
+    {
+        _host.StatusText = _localizer.Format("StatusTunnelLost", localPort);
+    }
+
     private void OnLocaleChanged(string _)
     {
         OnPropertyChanged(nameof(TunnelPanelHeaderPrefix));
@@ -871,6 +878,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         _tunnelManager.TunnelOpened -= OnTunnelOpened;
         _tunnelManager.TunnelClosed -= OnTunnelClosed;
+        _tunnelManager.TunnelLost -= OnTunnelLost;
         _localizer.LocaleChanged -= OnLocaleChanged;
         _configManager.SettingsChanged -= OnSettingsChanged;
         _host.Connection.PropertyChanged -= _connectionPropertyChangedHandler;

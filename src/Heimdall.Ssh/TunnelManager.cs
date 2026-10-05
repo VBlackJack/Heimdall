@@ -70,7 +70,14 @@ public sealed partial class TunnelManager : IDisposable
     private readonly Func<SshConnectionParams, SshClient> _createSshClient;
     private readonly ConnectSshClient _connectSshClient;
     private readonly StartLocalForward _startLocalForward;
+    private readonly Timer? _livenessTimer;
+    private int _livenessSweepQueued;
     private volatile bool _disposed;
+
+    /// <summary>
+    /// How often every registered tunnel is checked for a connection that has gone.
+    /// </summary>
+    internal static readonly TimeSpan DefaultLivenessSweepInterval = TimeSpan.FromSeconds(15);
 
     public TunnelManager()
         : this(
@@ -100,7 +107,8 @@ public sealed partial class TunnelManager : IDisposable
         ResolvePinnedVerifier resolvePinnedVerifier,
         Func<SshConnectionParams, SshClient> createSshClient,
         ConnectSshClient connectSshClient,
-        StartLocalForward startLocalForward)
+        StartLocalForward startLocalForward,
+        TimeSpan? livenessSweepInterval = null)
     {
         _resolvePinnedVerifier = resolvePinnedVerifier
             ?? throw new ArgumentNullException(nameof(resolvePinnedVerifier));
@@ -110,6 +118,12 @@ public sealed partial class TunnelManager : IDisposable
             ?? throw new ArgumentNullException(nameof(connectSshClient));
         _startLocalForward = startLocalForward
             ?? throw new ArgumentNullException(nameof(startLocalForward));
+
+        TimeSpan interval = livenessSweepInterval ?? DefaultLivenessSweepInterval;
+        if (interval > TimeSpan.Zero && interval != Timeout.InfiniteTimeSpan)
+        {
+            _livenessTimer = new Timer(_ => SweepDeadTunnels(), null, interval, interval);
+        }
     }
 
     /// <summary>Raised when a tunnel is successfully opened.</summary>
@@ -123,6 +137,12 @@ public sealed partial class TunnelManager : IDisposable
     /// gateway being unable to reach the forward's remote target.
     /// </summary>
     public event Action<TunnelForwardedPortFailure>? ForwardedPortFailed;
+
+    /// <summary>
+    /// Raised after <see cref="TunnelClosed"/> when a tunnel was closed because its connection
+    /// had gone, rather than because someone closed it.
+    /// </summary>
+    public event Action<int>? TunnelLost;
 
     /// <summary>
     /// Increments the reference count for a tunnel on the specified local port.
@@ -922,6 +942,8 @@ public sealed partial class TunnelManager : IDisposable
             return;
         }
 
+        _livenessTimer?.Dispose();
+
         try
         {
             _lifetimeCts.Cancel();
@@ -1182,6 +1204,120 @@ public sealed partial class TunnelManager : IDisposable
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Debug("TunnelManager.TunnelOpened subscriber failed", ex);
+        }
+    }
+
+    /// <summary>
+    /// Closes every registered tunnel whose connection has gone, and returns how many it closed.
+    /// </summary>
+    /// <remarks>
+    /// A tunnel used to be checked only when someone asked to reuse it. One whose gateway
+    /// dropped stayed registered for good: it kept its port and loopback alias, the Tunnels pane
+    /// and the tab badges kept calling it healthy, and the next connection to the same target
+    /// skipped it and dialled a duplicate. Runs on a timer and whenever a tunnel's SSH client
+    /// reports an error. Liveness is read outside the registry lock, and a tunnel is only
+    /// detached if it is still the registration that was read, so a tunnel reopened on the same
+    /// port in between is left alone.
+    /// </remarks>
+    internal int SweepDeadTunnels()
+    {
+        if (_disposed)
+        {
+            return 0;
+        }
+
+        List<(int LocalPort, object Entry, Func<bool> IsAlive)> candidates;
+        lock (_registryLock)
+        {
+            candidates = _activeTunnels
+                .Select(pair => (pair.Key, (object)pair.Value, (Func<bool>)(() => AreAllClientsConnected(pair.Value))))
+                .Concat(_externalTunnels.Select(pair =>
+                    (pair.Key, (object)pair.Value, (Func<bool>)(() => pair.Value.IsAlive))))
+                .ToList();
+        }
+
+        int closed = 0;
+        foreach ((int localPort, object entry, Func<bool> isAlive) in candidates)
+        {
+            bool alive;
+            try
+            {
+                alive = isAlive();
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"[TunnelManager] Liveness check failed for port {localPort}: {ex.Message}");
+                alive = false;
+            }
+
+            if (alive)
+            {
+                continue;
+            }
+
+            IDisposable? detached = null;
+            lock (_registryLock)
+            {
+                bool stillRegistered =
+                    (_activeTunnels.TryGetValue(localPort, out TunnelSession? active) && ReferenceEquals(active, entry))
+                    || (_externalTunnels.TryGetValue(localPort, out ExternalTunnelSession? external) && ReferenceEquals(external, entry));
+                if (stillRegistered)
+                {
+                    detached = DetachTunnelUnderLock(localPort);
+                }
+            }
+
+            if (detached is null)
+            {
+                continue;
+            }
+
+            Core.Logging.FileLogger.Warn(
+                $"[TunnelManager] Tunnel on port {localPort} lost its connection and was closed.");
+            DisposeAndNotifyClosed(localPort, detached);
+            RaiseTunnelLost(localPort);
+            closed++;
+        }
+
+        return closed;
+    }
+
+    // Every client a chained tunnel runs through has to be up: a dead hop leaves the final
+    // client talking to a local forward that no longer goes anywhere.
+    private static bool AreAllClientsConnected(TunnelSession session)
+    {
+        return IsSessionAlive(session)
+            && session.IntermediateClients.All(client => client.IsConnected);
+    }
+
+    // An SSH client reports the connection it lost on its own message loop thread. Disposing the
+    // client from there is not safe, so the sweep runs on the thread pool, once however many
+    // clients of the chain report at the same time.
+    private void OnTunnelClientError(object? sender, ExceptionEventArgs args)
+    {
+        Core.Logging.FileLogger.Warn($"[TunnelManager] SSH tunnel client error: {args.Exception.Message}");
+        if (_disposed || Interlocked.Exchange(ref _livenessSweepQueued, 1) != 0)
+        {
+            return;
+        }
+
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            Volatile.Write(ref _livenessSweepQueued, 0);
+            SweepDeadTunnels();
+        });
+    }
+
+    private void RaiseTunnelLost(int localPort)
+    {
+        try
+        {
+            TunnelLost?.Invoke(localPort);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Debug("TunnelManager.TunnelLost subscriber failed", ex);
         }
     }
 

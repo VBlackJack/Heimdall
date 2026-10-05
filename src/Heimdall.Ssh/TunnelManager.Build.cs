@@ -286,6 +286,12 @@ public sealed partial class TunnelManager
             };
         }
 
+        session.Client.ErrorOccurred += OnTunnelClientError;
+        foreach (SshClient intermediate in session.IntermediateClients)
+        {
+            intermediate.ErrorOccurred += OnTunnelClientError;
+        }
+
         RaiseTunnelOpened(info);
         return new TunnelResult(true, info with { LeaseId = leaseId }, null, null);
     }
