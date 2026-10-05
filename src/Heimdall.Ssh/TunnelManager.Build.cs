@@ -103,9 +103,11 @@ public sealed partial class TunnelManager
                 DateTimeOffset.UtcNow));
         };
 
-        finalClient.AddForwardedPort(context.FinalPort);
-        StartForwardedPortWithRetry(context.FinalPort, DescribeLocalPort(localPort));
-        int boundLocalPort = ResolveStartedLocalPort(context.FinalPort, localPort);
+        int boundLocalPort = _startLocalForward(
+            finalClient,
+            context.FinalPort,
+            localPort,
+            DescribeLocalPort(localPort));
 
         var logSuffix = isChained ? " (chained tunnel)" : string.Empty;
         if (socksProxyPort > 0)
@@ -130,6 +132,17 @@ public sealed partial class TunnelManager
         }
 
         return boundLocalPort;
+    }
+
+    private static int StartLocalForwardOnClient(
+        SshClient client,
+        ForwardedPortLocal port,
+        int requestedLocalPort,
+        string logContext)
+    {
+        client.AddForwardedPort(port);
+        StartForwardedPortWithRetry(port, logContext);
+        return ResolveStartedLocalPort(port, requestedLocalPort);
     }
 
     private static string DescribeLocalPort(int localPort)
