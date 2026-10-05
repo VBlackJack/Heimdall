@@ -904,6 +904,90 @@ public sealed class ServerListBulkActionTests : IDisposable
     }
 
     [Fact]
+    public async Task ConnectSelected_OneAttemptCancelledOnItsOwn_TheRunCarriesOn()
+    {
+        await using var fixture = await ServerListBulkFixture.CreateAsync(
+            confirmResult: true,
+            protocolHandlers:
+            [
+                new ScriptedProtocolHandler(
+                    "SSH",
+                    Success(),
+                    (_, _) => throw new OperationCanceledException(),
+                    Success())
+            ]);
+        await fixture.LoadServersAsync(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"),
+            CreateServer("beta", "Beta", "ops"),
+            CreateServer("gamma", "Gamma", "ops"));
+
+        await fixture.ViewModel.ConnectServersBulkCoreAsync(
+            fixture.ViewModel.Servers.ToList(),
+            CancellationToken.None);
+
+        // Closing one placeholder tab used to end the whole run, as if Cancel had been pressed
+        // on it: gamma was never attempted.
+        Assert.Equal(
+            "Connected 2, failed 0, skipped 1. Skipped: 1 (cancelled).",
+            fixture.LastStatusMessage);
+    }
+
+    [Fact]
+    public async Task Connect_SshTabClosedWhileTheHandshakeFinished_DiscardsTheSession()
+    {
+        var session = new DisposableSessionResult();
+        await using var fixture = await ServerListBulkFixture.CreateAsync(
+            confirmResult: true,
+            protocolHandlers:
+            [
+                new ScriptedProtocolHandler(
+                    "SSH",
+                    (_, _) => Task.FromResult(new ConnectionResult(true, null, session)))
+            ]);
+        await fixture.LoadServersAsync(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"));
+        var readyCount = 0;
+        var startFailedCount = 0;
+        fixture.ViewModel.SessionStarting += (_, _, _, _, _, _, placeholderCancellation) =>
+            placeholderCancellation.Cancel();
+        fixture.ViewModel.SessionReady += (_, _, _, _, _, _) => readyCount++;
+        fixture.ViewModel.SessionStartFailed += _ => startFailedCount++;
+
+        await fixture.ViewModel.ConnectCommand.ExecuteAsync(fixture.ServerById("alpha"));
+
+        Assert.Equal(0, readyCount);
+        Assert.Equal(1, startFailedCount);
+        Assert.True(session.IsDisposed);
+        Assert.Equal(0, fixture.DialogService.ErrorCallCount);
+    }
+
+    [Theory]
+    [InlineData((int)ConnectFailureReport.Dialog, 1)]
+    [InlineData((int)ConnectFailureReport.FailedTabOnly, 0)]
+    [InlineData((int)ConnectFailureReport.Silent, 0)]
+    public async Task RestoreServerAsync_ShowsAnErrorDialogOnlyWhenAskedTo(
+        int failureReport,
+        int expectedDialogs)
+    {
+        await using var fixture = await ServerListBulkFixture.CreateAsync(
+            confirmResult: true,
+            protocolHandlers: [new ScriptedProtocolHandler("SSH", Fail("refused"))]);
+        await fixture.LoadServersAsync(
+            fixture.ExpandGroups("ops"),
+            CreateServer("alpha", "Alpha", "ops"));
+
+        bool restored = await fixture.ViewModel.RestoreServerAsync(
+            "alpha",
+            CancellationToken.None,
+            failureReport: (ConnectFailureReport)failureReport);
+
+        Assert.False(restored);
+        Assert.Equal(expectedDialogs, fixture.DialogService.ErrorCallCount);
+    }
+
+    [Fact]
     public async Task ConnectSelected_AllToolItems_ShowsNothingToConnectStatus()
     {
         await using var fixture = await ServerListBulkFixture.CreateAsync(confirmResult: true);
@@ -2944,6 +3028,13 @@ public sealed class ServerListBulkActionTests : IDisposable
                 : Success();
             return await behavior(server, ct);
         }
+    }
+
+    private sealed class DisposableSessionResult : ISessionResult, IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose() => IsDisposed = true;
     }
 
     private sealed class FailingSaveConfigManager : IConfigManager

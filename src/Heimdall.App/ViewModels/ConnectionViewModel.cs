@@ -202,6 +202,10 @@ public partial class ConnectionViewModel : ObservableObject
     /// sessions must use the three-argument overload because they do not create
     /// another remote embedded session.
     /// </summary>
+    /// <summary>Every open session: the tabs in the strip and those detached to their own window.</summary>
+    internal IEnumerable<SessionTabViewModel> AllOpenSessions =>
+        ActiveSessions.Concat(_sessionWindows.DetachedSessions);
+
     public SessionTabViewModel? AddSession(
         string serverId,
         string title,
