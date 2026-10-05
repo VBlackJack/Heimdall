@@ -276,18 +276,6 @@ public sealed class SplitService : ISplitService
             }
 
             newPane.HostControl = hostControl;
-            if (hostControl is ISessionPaneOwner paneOwner)
-            {
-                paneOwner.SetOwningPane(newPane);
-            }
-            else if (hostControl is EmbeddedRdpView rdpView)
-            {
-                rdpView.SetOwningPane(newPane);
-            }
-            else if (hostControl is EmbeddedSftpView sftpView)
-            {
-                sftpView.SetOwningPane(newPane);
-            }
             newPane.Status = SessionStatusTokens.Connected;
 
             LayoutMemory.Record(
@@ -789,18 +777,6 @@ public sealed class SplitService : ISplitService
             }
 
             pane.HostControl = hostControl;
-            if (hostControl is ISessionPaneOwner paneOwner)
-            {
-                paneOwner.SetOwningPane(pane);
-            }
-            else if (hostControl is EmbeddedRdpView rdpView)
-            {
-                rdpView.SetOwningPane(pane);
-            }
-            else if (hostControl is EmbeddedSftpView sftpView)
-            {
-                sftpView.SetOwningPane(pane);
-            }
             pane.ServerId = paneScopedServerDto.Id;
             pane.ConnectionType = effectiveConnectionType;
             pane.Status = SessionStatusTokens.Connected;

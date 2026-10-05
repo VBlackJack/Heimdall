@@ -222,6 +222,71 @@ public sealed class CitrixSessionHandleTests
     }
 
     [Fact]
+    public void Terminate_SharedOwner_ClosesOnlyTheSessionWindowAndNeverKills()
+    {
+        FakeSessionProcess process = new(OwnerPid);
+        FakeWin32 win32 = new(SessionHwnd, OwnerPid);
+        CitrixSessionHandle handle = CreateHandle(win32, process, new HashSet<int> { OwnerPid });
+
+        Assert.True(handle.OwnerIsShared);
+        Assert.True(handle.Terminate());
+        Assert.Equal(0, process.KillCount);
+        Assert.Equal([SessionHwnd], win32.ClosedWindows);
+    }
+
+    [Fact]
+    public void Terminate_OwnerStartedByThisLaunch_IsNotShared()
+    {
+        FakeSessionProcess process = new(OwnerPid);
+        FakeWin32 win32 = new(SessionHwnd, OwnerPid);
+        CitrixSessionHandle handle = CreateHandle(win32, process, new HashSet<int> { OtherPid });
+
+        Assert.False(handle.OwnerIsShared);
+        Assert.True(handle.Terminate());
+        Assert.Equal(1, process.KillCount);
+        Assert.Empty(win32.ClosedWindows);
+    }
+
+    [Fact]
+    public void Terminate_KillDeniedByTheSystem_ReportsFailureInsteadOfThrowing()
+    {
+        FakeSessionProcess process = new(OwnerPid) { KillFailure = new System.ComponentModel.Win32Exception(5) };
+        FakeWin32 win32 = new(SessionHwnd, OwnerPid);
+        CitrixSessionHandle handle = CreateHandle(win32, process);
+
+        Assert.False(handle.Terminate());
+        Assert.Equal(1, process.KillCount);
+    }
+
+    [Fact]
+    public void OwnersOf_ResolvesEachWindowOwnerAndSkipsTheUnresolved()
+    {
+        CitrixSessionEnvironment environment = new(
+            _ => true,
+            hwnd => hwnd == 1 ? 100 : hwnd == 2 ? 100 : hwnd == 3 ? 200 : null,
+            _ => null);
+
+        IReadOnlySet<int> owners = environment.OwnersOf([1, 2, 3, 4]);
+
+        Assert.Equal(new HashSet<int> { 100, 200 }, owners);
+    }
+
+    [Fact]
+    public void IsSessionWindow_OnlyTheAdoptedWindow_IsTheSession()
+    {
+        FakeSessionProcess process = new(OwnerPid);
+        FakeWin32 win32 = new(SessionHwnd, OwnerPid);
+        CitrixSessionHandle handle = CreateHandle(win32, process);
+
+        Assert.True(CitrixSessionHandle.IsSessionWindow(handle, SessionHwnd));
+
+        // The Workspace sign-in window, embedded before the session exists, is not it.
+        Assert.False(CitrixSessionHandle.IsSessionWindow(handle, 0x9999));
+        Assert.False(CitrixSessionHandle.IsSessionWindow(null, SessionHwnd));
+        Assert.False(CitrixSessionHandle.IsSessionWindow(handle, IntPtr.Zero));
+    }
+
+    [Fact]
     public void Terminate_DeadSession_KillsNothing()
     {
         FakeSessionProcess process = new(OwnerPid);
@@ -464,13 +529,17 @@ public sealed class CitrixSessionHandleTests
         Assert.DoesNotContain("_session.Process.Kill()", source, StringComparison.Ordinal);
     }
 
-    private static CitrixSessionHandle CreateHandle(FakeWin32 win32, FakeSessionProcess process)
+    private static CitrixSessionHandle CreateHandle(
+        FakeWin32 win32,
+        FakeSessionProcess process,
+        IReadOnlySet<int>? preLaunchOwners = null)
     {
         bool created = CitrixSessionHandle.TryCreate(
             new CitrixSessionWindow(SessionHwnd, OwnerPid),
             "Transparent Windows Client",
             win32.Environment(process),
-            out CitrixSessionHandle? handle);
+            out CitrixSessionHandle? handle,
+            preLaunchOwners);
 
         Assert.True(created);
         Assert.NotNull(handle);
@@ -562,11 +631,18 @@ public sealed class CitrixSessionHandleTests
 
         internal bool WindowExists { get; set; } = true;
 
+        internal List<IntPtr> ClosedWindows { get; } = [];
+
         internal CitrixSessionEnvironment Environment(ICitrixSessionProcess process) =>
             new(
                 hwnd => WindowExists && hwnd == Hwnd,
                 hwnd => hwnd == Hwnd ? CurrentOwnerPid : null,
-                _ => process);
+                _ => process,
+                hwnd =>
+                {
+                    ClosedWindows.Add(hwnd);
+                    return true;
+                });
     }
 
     private sealed class FakeSessionProcess : ICitrixSessionProcess
@@ -584,9 +660,16 @@ public sealed class CitrixSessionHandleTests
 
         internal bool Disposed { get; private set; }
 
+        internal Exception? KillFailure { get; set; }
+
         public void Kill()
         {
             KillCount++;
+            if (KillFailure is not null)
+            {
+                throw KillFailure;
+            }
+
             HasExited = true;
         }
 

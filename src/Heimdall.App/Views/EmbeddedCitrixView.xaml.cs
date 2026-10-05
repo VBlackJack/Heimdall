@@ -24,6 +24,7 @@ using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 using WinForms = System.Windows.Forms;
 
 namespace Heimdall.App.Views;
@@ -33,7 +34,7 @@ namespace Heimdall.App.Views;
 /// 1. Embedded mode: captures the wfica32.exe window via SetParent and hosts it inline.
 /// 2. External mode (fallback): monitors the process and provides Bring to Front / Terminate controls.
 /// </summary>
-public partial class EmbeddedCitrixView : UserControl, IDisposable
+public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPaneOwner
 {
     private const int HealthCheckIntervalMs = 3000;
     private const int WindowCaptureMaxAttempts = 60;
@@ -69,6 +70,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     // are driven from here. A null handle means there is no session to drive, never a reason to
     // fall back to the launcher.
     private CitrixSessionHandle? _sessionHandle;
+
+    // The processes that owned a visible window before this launch. A session window owned by one
+    // of them lives in a shared ICA process, which this view must never kill.
+    private IReadOnlySet<int> _preLaunchOwners = new HashSet<int>();
 
     // The Workspace sign-in window, when one has been embedded. It is not a session and has no
     // owning ICA process to validate, so it is the only window whose liveness is its existence.
@@ -288,6 +293,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
             ? [.. captured]
             : SnapshotVisibleWindows();
         Core.Logging.FileLogger.Info($"Citrix: {preLaunchWindows.Count} visible window(s) before launch");
+        _preLaunchOwners = CitrixSessionEnvironment.Default.OwnersOf(preLaunchWindows);
 
         bool extendedMessageShown = false;
         for (int attempt = 1; attempt <= WindowCaptureMaxAttempts; attempt++)
@@ -675,10 +681,18 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     {
         try
         {
-            // Create a host panel for the captured window
+            // Create a host panel for the captured window. The panel it replaces - the sign-in
+            // window's, on the swap to the session - used to be left undisposed. It is released only
+            // once nothing is embedded in it any more: the swap hands that window back first, and
+            // disposing a panel that still parents a window destroys the window with it.
+            WinForms.Panel? previousPanel = _hostPanel;
             _hostPanel = new WinForms.Panel { Dock = WinForms.DockStyle.Fill };
             _hostPanel.Resize += (_, _) => ResizeCapturedWindow();
             FormsHost.Child = _hostPanel;
+            if (previousPanel is not null && _capturedHwnd == IntPtr.Zero)
+            {
+                previousPanel.Dispose();
+            }
 
             // Strip popup/caption styles and make it a child window. Each inspected call clears
             // the last error first and captures it immediately after, before any other managed
@@ -715,6 +729,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
                 // ShowExternalFallback, for which external mode is a legitimate outcome.
                 Core.Logging.FileLogger.Warn(
                     $"Citrix: window embedding failed at {verdict.Failure}; falling back to external mode.");
+
+                // The style was already rewritten to a child's. Left that way, the window the
+                // fallback offers to bring to front had no caption and could not be moved.
+                RestoreWindowStyle(hwnd, readStyle);
                 _embedded = false;
                 ShowExternalFallback();
                 return;
@@ -722,7 +740,14 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
 
             _capturedHwnd = hwnd;
             _embedded = true;
-            EmitConnect();
+
+            // The sign-in window is embedded too, but it is not the session: Connected is emitted
+            // when the adopted session window takes its place, so the log neither records a
+            // session that never existed nor times one from the sign-in form.
+            if (CitrixSessionHandle.IsSessionWindow(_sessionHandle, hwnd))
+            {
+                EmitConnect();
+            }
 
             // Show embedded container, hide info panel
             CaptureLoadingPanel.Visibility = Visibility.Collapsed;
@@ -778,7 +803,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
                 window,
                 ReadWindowClassName(window.Hwnd),
                 CitrixSessionEnvironment.Default,
-                out CitrixSessionHandle? handle))
+                out CitrixSessionHandle? handle,
+                _preLaunchOwners))
         {
             _sessionHandle = handle;
             return true;
@@ -820,6 +846,17 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     /// </summary>
     public event Action? CloseRequested;
 
+    private SessionPaneModel? _ownerPane;
+
+    /// <summary>The pane this view lives in, wherever a split, a merge or a detach moved it.</summary>
+    internal SessionPaneModel? OwningPane => _ownerPane;
+
+    public void SetOwningPane(SessionPaneModel pane)
+    {
+        ArgumentNullException.ThrowIfNull(pane);
+        _ownerPane = pane;
+    }
+
     private void OnCloseTabClick(object sender, RoutedEventArgs e)
     {
         if (_disposed)
@@ -837,23 +874,32 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
         // fallback: killing it would leave the session the user can see running.
         if (_sessionHandle?.IsAlive != true) return;
 
-        if (_dialogService is not null && _localizer is not null)
+        try
         {
-            bool confirmed = await _dialogService.ShowConfirmAsync(
-                _localizer["CitrixConfirmTerminateTitle"],
-                _localizer["CitrixConfirmTerminateMessage"],
-                "warning");
+            if (_dialogService is not null && _localizer is not null)
+            {
+                bool confirmed = await _dialogService.ShowConfirmAsync(
+                    _localizer["CitrixConfirmTerminateTitle"],
+                    _localizer["CitrixConfirmTerminateMessage"],
+                    "warning");
 
-            if (!confirmed || _disposed) return;
+                if (!confirmed || _disposed) return;
+            }
+
+            ReleaseEmbeddedWindow();
+
+            EmitDisconnect("user");
+
+            _sessionHandle?.Terminate();
+
+            UpdateStatus(false);
         }
-
-        ReleaseEmbeddedWindow();
-
-        EmitDisconnect("user");
-
-        _sessionHandle?.Terminate();
-
-        UpdateStatus(false);
+        catch (Exception ex)
+        {
+            // An async void handler: anything escaping here would reach the dispatcher. A failed
+            // confirmation terminates nothing.
+            Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] terminate: {ex.Message}");
+        }
     }
 
     // Live gate at the seam: the sink is a dumb writer, so the view decides per-emit against the
@@ -989,6 +1035,18 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     /// <summary>
     /// Releases the captured window back to the desktop before disposing.
     /// </summary>
+    private static void RestoreWindowStyle(IntPtr hwnd, uint originalStyle)
+    {
+        try
+        {
+            SetWindowLong(hwnd, GwlStyle, originalStyle);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] style restore: {ex.Message}");
+        }
+    }
+
     private void ReleaseEmbeddedWindow()
     {
         if (_capturedHwnd != IntPtr.Zero && IsWindow(_capturedHwnd))

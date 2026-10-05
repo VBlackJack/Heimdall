@@ -171,6 +171,15 @@ public sealed class SessionWindowService : ISessionWindowService
         if (!vm.Connection.ActiveSessions.Contains(session)) return;
         if (session.HostControl is null) return;
 
+        // A floating window shows one host. Dragging a split tab out of the strip used to detach it
+        // anyway: only the primary pane was shown, and the other panes stayed connected, out of
+        // reach, until the application exited. The context menu already withholds Detach here.
+        if (session.IsSplit)
+        {
+            vm.StatusText = vm.GetLocalizer()["StatusDetachSplitTabRefused"];
+            return;
+        }
+
         // Detach the host control from the tab (UIElement single-parent rule)
         var hostControl = session.HostControl;
         session.HostControl = null;
@@ -307,28 +316,14 @@ public sealed class SessionWindowService : ISessionWindowService
         var pane = SplitTreeHelper.FindPane(session.RootContent, paneId);
         if (pane is null || pane.HostControl is null) return;
 
-        // Capture pane metadata
-        var hostControl = pane.HostControl;
-        var serverId = pane.ServerId;
-        var originalServerId = pane.OriginalServerId;
-        var connType = pane.ConnectionType;
-        var title = pane.Title;
-        var status = pane.Status;
-        var tunnelRoute = pane.TunnelRoute;
-        var envColor = pane.EnvironmentColor;
-
         // Detach host control and remove pane from tree
+        var hostControl = pane.HostControl;
         pane.HostControl = null;
         var newRoot = SplitTreeHelper.RemovePane(session.RootContent, paneId);
         session.SetRootContent(newRoot ?? new SessionPaneModel());
 
-        // Create a new independent tab and detach it
-        var newTab = vm.Connection.AddSession(serverId, title, connType);
-        newTab.OriginalServerId = originalServerId;
-        newTab.HostControl = hostControl;
-        newTab.Status = !string.IsNullOrEmpty(status) ? status : "Connected";
-        newTab.TunnelRoute = tunnelRoute;
-        newTab.EnvironmentColor = envColor;
+        // The pane itself becomes the new tab's root, see MoveIntoOwnTab.
+        var newTab = MoveIntoOwnTab(pane, hostControl, pane.Title, vm);
 
         DetachSessionToFloatingWindow(newTab, vm);
     }
@@ -347,12 +342,7 @@ public sealed class SessionWindowService : ISessionWindowService
         // Capture metadata
         var hostControl = pane.HostControl;
         var serverId = pane.ServerId;
-        var originalServerId = pane.OriginalServerId;
-        var connType = pane.ConnectionType;
         var title = pane.Title;
-        var status = pane.Status;
-        var tunnelRoute = pane.TunnelRoute;
-        var envColor = pane.EnvironmentColor;
 
         // Detach host control (UIElement single-parent rule)
         pane.HostControl = null;
@@ -391,11 +381,36 @@ public sealed class SessionWindowService : ISessionWindowService
 
         // Restore as independent tab with original metadata
         var displayTitle = !string.IsNullOrEmpty(title) ? title : serverId;
-        var restoredTab = vm.Connection.AddSession(serverId, displayTitle, connType);
-        restoredTab.OriginalServerId = originalServerId;
-        restoredTab.HostControl = hostControl;
-        restoredTab.Status = !string.IsNullOrEmpty(status) ? status : "Connected";
-        restoredTab.TunnelRoute = tunnelRoute;
-        restoredTab.EnvironmentColor = envColor;
+        MoveIntoOwnTab(pane, hostControl, displayTitle, vm);
+    }
+
+    /// <summary>
+    /// Opens a tab whose root is <paramref name="pane"/> itself, with its host back on it.
+    /// </summary>
+    /// <remarks>
+    /// The pane object moves rather than being copied into a fresh one. A copy left the host bound
+    /// to a pane that was in no tab any more, so its Close and Reconnect fell back to the tab it
+    /// came from and closed that live session, without confirmation; the copy also lost the
+    /// broadcast target, the SFTP follow setting and the failure details.
+    /// </remarks>
+    private static SessionTabViewModel MoveIntoOwnTab(
+        SessionPaneModel pane,
+        object hostControl,
+        string title,
+        MainViewModel vm)
+    {
+        // The pane is complete before it becomes the root, so the root change announces its host
+        // and title: set afterwards on the pane, the tab never raised them, and the loading overlay
+        // bound to the tab's host could stay over a live session.
+        pane.Title = title;
+        pane.HostControl = hostControl;
+        if (string.IsNullOrEmpty(pane.Status))
+        {
+            pane.Status = SessionStatusTokens.Connected;
+        }
+
+        var tab = vm.Connection.AddSession(pane.ServerId, title, pane.ConnectionType);
+        tab.SetRootContent(pane);
+        return tab;
     }
 }

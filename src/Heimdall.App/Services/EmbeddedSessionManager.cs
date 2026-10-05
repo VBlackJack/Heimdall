@@ -527,7 +527,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             view.SessionLoggingOverride = citrix.SessionLoggingOverride;
             view.InitializeSession(citrix, sessionTab, displayName, _localizer, _dialogService);
             view.SetConnectionInfo(citrix.StoreFrontUrl, citrix.AppName, citrix.Mode);
-            view.CloseRequested += () => CloseRequestedCallback?.Invoke(sessionTab);
+            view.CloseRequested += () => RequestHostClose(sessionTab, view.OwningPane);
             return view;
         }
 
@@ -546,8 +546,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             view.SessionConnected += (serverId) =>
             {
                 _connectionSm.TryTransition(serverId, ConnectionState.Connected);
-                sessionTab.Status = SessionStatusTokens.Connected;
+                WriteHostStatus(sessionTab, view.OwningPane, SessionStatusTokens.Connected);
                 Core.Logging.FileLogger.Info($"VNC connected: {serverId}");
+            };
+            view.SessionDisconnected += (serverId) =>
+            {
+                _connectionSm.TryTransition(serverId, ConnectionState.Disconnected);
+                WriteHostStatus(sessionTab, view.OwningPane, SessionStatusTokens.Disconnected);
+                Core.Logging.FileLogger.Info($"VNC disconnected: {serverId}");
             };
             view.SessionError += (serverId, errorMsg) =>
             {
@@ -556,7 +562,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
 
                 // Free-form on purpose, as on the other failure paths: the pane shows the reason,
                 // and the display converter passes it through unchanged.
-                sessionTab.Status = localizedMsg;
+                WriteHostStatus(sessionTab, view.OwningPane, localizedMsg);
                 Core.Logging.FileLogger.Error($"VNC error for {serverId}: {errorMsg}");
             };
             WireVncSplitRequested(view, sessionTab);
@@ -1029,10 +1035,35 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         view.ReconnectContextRequested += context =>
         {
             StoreReconnectRequest(tab, context);
-            RequestHostReconnect(tab, view.OwningPane);
+            RequestHostReconnect(tab, TerminalRoutingPane(tab, view.OwningPane));
         };
-        view.CloseRequested += () => RequestHostClose(tab, view.OwningPane);
+        view.CloseRequested += () => RequestHostClose(tab, TerminalRoutingPane(tab, view.OwningPane));
         view.CurrentDirectoryChanged += path => FollowSftpToCurrentDirectory(tab, path);
+    }
+
+    /// <summary>
+    /// The pane a terminal host's Reconnect and Close act on, or null for its whole tab.
+    /// </summary>
+    /// <remarks>
+    /// A terminal still primary in the tab it was opened in, with nothing beside it but its own SFTP
+    /// companion, is that tab: Close closes both, and Reconnect goes through the tab path, which keeps
+    /// the automatic retry chain and reopens the companion. That is the default layout, since the
+    /// companion opens with every SSH session. Anywhere else - swapped, merged, detached, or beside
+    /// another server - the host acts on its own pane, so another live session is never closed with it.
+    /// </remarks>
+    internal static SessionPaneModel? TerminalRoutingPane(SessionTabViewModel createdFor, SessionPaneModel? pane)
+    {
+        ArgumentNullException.ThrowIfNull(createdFor);
+        if (pane is null || !ReferenceEquals(createdFor.PrimaryPane, pane))
+        {
+            return pane;
+        }
+
+        bool onlyItsCompanionBeside = SplitTreeHelper.EnumerateLeaves(createdFor.RootContent)
+            .Where(leaf => !ReferenceEquals(leaf, pane))
+            .All(leaf => string.Equals(leaf.ConnectionType, "SFTP", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(leaf.ProfileLookupServerId, pane.ProfileLookupServerId, StringComparison.Ordinal));
+        return onlyItsCompanionBeside ? null : pane;
     }
 
     internal static void ForwardReconnectRequest(
@@ -1242,12 +1273,27 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
 
     private void WireVncReconnectRequested(EmbeddedVncView view, SessionTabViewModel tab)
     {
-        view.RequestReconnect += (_) =>
-            ReconnectRequestedCallback?.Invoke(
-                tab,
-                tab.ProfileLookupServerId,
-                tab.ConnectionType);
-        view.RequestClose += (_) => CloseRequestedCallback?.Invoke(tab);
+        // Through the pane, as RDP, SSH and SFTP do: in a split, the tab-level callbacks closed the
+        // whole tab with its other sessions and reconnected the primary's server instead of this one.
+        view.RequestReconnect += (_) => RequestHostReconnect(tab, view.OwningPane);
+        view.RequestClose += (_) => RequestHostClose(tab, view.OwningPane);
+    }
+
+    /// <summary>
+    /// Writes a host's status on its own pane when that pane is not its tab's primary, and on the
+    /// tab otherwise - the rule the SSH, SFTP and RDP views follow.
+    /// </summary>
+    internal static void WriteHostStatus(SessionTabViewModel tab, SessionPaneModel? pane, string status)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        if (pane is not null && !ReferenceEquals(tab.PrimaryPane, pane))
+        {
+            pane.Status = status;
+        }
+        else
+        {
+            tab.Status = status;
+        }
     }
 
     /// <summary>

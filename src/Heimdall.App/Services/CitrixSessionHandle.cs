@@ -54,16 +54,45 @@ internal interface ICitrixSessionProcess : IDisposable
 /// The process that owns a window right now, or null when it cannot be resolved.
 /// </param>
 /// <param name="OpenProcess">Opens a process by id, or returns null when it cannot be opened.</param>
+/// <param name="CloseWindow">
+/// Asks a window to close, as its own close button would, and says whether the request was posted.
+/// Null where no window can be closed.
+/// </param>
 internal sealed record CitrixSessionEnvironment(
     Func<IntPtr, bool> IsWindow,
     Func<IntPtr, int?> ResolveOwnerProcessId,
-    Func<int, ICitrixSessionProcess?> OpenProcess)
+    Func<int, ICitrixSessionProcess?> OpenProcess,
+    Func<IntPtr, bool>? CloseWindow = null)
 {
+    private const uint WmClose = 0x0010;
+
     /// <summary>The real Win32 and <see cref="Process"/> implementations.</summary>
     internal static CitrixSessionEnvironment Default { get; } = new(
         NativeIsWindow,
         ResolveWindowOwnerProcessId,
-        OpenSessionProcess);
+        OpenSessionProcess,
+        hwnd => PostMessage(hwnd, WmClose, IntPtr.Zero, IntPtr.Zero));
+
+    /// <summary>The processes that own any of <paramref name="windows"/>, resolved now.</summary>
+    internal IReadOnlySet<int> OwnersOf(IEnumerable<IntPtr> windows)
+    {
+        ArgumentNullException.ThrowIfNull(windows);
+
+        HashSet<int> owners = [];
+        foreach (IntPtr hwnd in windows)
+        {
+            if (ResolveOwnerProcessId(hwnd) is int owner && owner > 0)
+            {
+                owners.Add(owner);
+            }
+        }
+
+        return owners;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll", EntryPoint = "IsWindow")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -160,12 +189,14 @@ internal sealed class CitrixSessionHandle : IDisposable
     private CitrixSessionHandle(
         CitrixSessionWindow window,
         ICitrixSessionProcess process,
-        CitrixSessionEnvironment environment)
+        CitrixSessionEnvironment environment,
+        bool ownerIsShared)
     {
         Hwnd = window.Hwnd;
         OwnerProcessId = window.OwnerProcessId;
         _process = process;
         _environment = environment;
+        OwnerIsShared = ownerIsShared;
     }
 
     /// <summary>The captured ICA window. Never the launcher's main window.</summary>
@@ -173,6 +204,13 @@ internal sealed class CitrixSessionHandle : IDisposable
 
     /// <summary>The process that owned <see cref="Hwnd"/> at capture time.</summary>
     internal int OwnerProcessId { get; }
+
+    /// <summary>
+    /// Whether the owning process was already running before this launch. With Citrix session
+    /// sharing, a new application opens inside the ICA process that already hosts the user's other
+    /// published applications; that process is not this session's to end.
+    /// </summary>
+    internal bool OwnerIsShared { get; }
 
     /// <summary>
     /// Whether this handle still designates the session it was created for.
@@ -205,12 +243,16 @@ internal sealed class CitrixSessionHandle : IDisposable
     /// <param name="windowClassName">Its class name, used to reject the sign-in shell.</param>
     /// <param name="environment">The operating-system facts to consult.</param>
     /// <param name="handle">The adopted session, or null when this returns false.</param>
+    /// <param name="preLaunchOwners">
+    /// The processes that owned a visible window before the launch. An owner among them is shared.
+    /// </param>
     /// <returns>True when the window was adopted.</returns>
     internal static bool TryCreate(
         CitrixSessionWindow window,
         string? windowClassName,
         CitrixSessionEnvironment environment,
-        out CitrixSessionHandle? handle)
+        out CitrixSessionHandle? handle,
+        IReadOnlySet<int>? preLaunchOwners = null)
     {
         ArgumentNullException.ThrowIfNull(environment);
 
@@ -241,7 +283,8 @@ internal sealed class CitrixSessionHandle : IDisposable
             return false;
         }
 
-        handle = new CitrixSessionHandle(window, process, environment);
+        bool ownerIsShared = preLaunchOwners?.Contains(ownerProcessId) == true;
+        handle = new CitrixSessionHandle(window, process, environment, ownerIsShared);
         return true;
     }
 
@@ -286,6 +329,11 @@ internal sealed class CitrixSessionHandle : IDisposable
         return false;
     }
 
+    /// <summary>Whether <paramref name="hwnd"/> is the adopted session's own window.</summary>
+    /// <remarks>The Workspace sign-in window is embedded without being the session.</remarks>
+    internal static bool IsSessionWindow(CitrixSessionHandle? handle, IntPtr hwnd)
+        => handle is not null && hwnd != IntPtr.Zero && handle.Hwnd == hwnd;
+
     /// <summary>
     /// Whether falling back to external mode is a connected outcome.
     /// </summary>
@@ -322,9 +370,14 @@ internal sealed class CitrixSessionHandle : IDisposable
     }
 
     /// <summary>
-    /// Ends the session by terminating the process that owns its window, never the launcher.
+    /// Ends the session, never through the launcher.
     /// </summary>
-    /// <returns>True when a termination was actually issued.</returns>
+    /// <remarks>
+    /// A process this launch started is terminated. A shared one is never killed: it hosts the
+    /// user's other published applications, which would all die with unsaved work. Only this
+    /// session's window is asked to close, as its own close button would.
+    /// </remarks>
+    /// <returns>True when a termination or a close request was actually issued.</returns>
     internal bool Terminate()
     {
         if (!IsAlive)
@@ -332,14 +385,23 @@ internal sealed class CitrixSessionHandle : IDisposable
             return false;
         }
 
+        if (OwnerIsShared)
+        {
+            bool posted = _environment.CloseWindow?.Invoke(Hwnd) == true;
+            Core.Logging.FileLogger.Info(
+                $"[CitrixSessionHandle] shared ICA process {OwnerProcessId} kept; close request posted={posted}");
+            return posted;
+        }
+
         try
         {
             _process.Kill();
             return true;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
         {
-            // The process ended between the liveness check and the call.
+            // The process ended between the liveness check and the call, or it cannot be ended
+            // from here. Either way this runs on close paths that must go on releasing the rest.
             Core.Logging.FileLogger.Warn($"[CitrixSessionHandle] terminate: {ex.Message}");
             return false;
         }
