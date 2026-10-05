@@ -1738,6 +1738,7 @@
   "StatusBulkConnectSkipReasonProfileMissing": "profil introuvable",
   "StatusBulkConnectSkipReasonCredentialGuard": "bloqué par la garde d'identifiants",
   "StatusBulkConnectSkipReasonCredentialsUnresolved": "identifiants non résolus",
+  "StatusBulkConnectSkipReasonCancelledByUser": "annulé",
   "StatusBulkConnectNothingToConnect": "Rien \u00e0 connecter.",
   "StatusBulkDuplicated": "{0} \u00e9l\u00e9ments dupliqu\u00e9s.",
   "StatusBulkDuplicatedOne": "{0} \u00e9l\u00e9ment dupliqu\u00e9.",

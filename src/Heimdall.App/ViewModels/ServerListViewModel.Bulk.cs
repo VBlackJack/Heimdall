@@ -1478,8 +1478,14 @@ public partial class ServerListViewModel
                             $"ConnectServersBulkCoreAsync failed for '{candidate.Server.DisplayName}': {outcome.ErrorMessage}");
                         break;
 
-                    case BulkConnectOutcomeStatus.Cancelled:
+                    case BulkConnectOutcomeStatus.Cancelled when cancellationToken.IsCancellationRequested:
                         cancelled = true;
+                        break;
+
+                    case BulkConnectOutcomeStatus.Cancelled:
+                        // Only this server's attempt was abandoned (its tab closed or its Cancel
+                        // pressed); the rest of the run still goes ahead.
+                        skips.Add(BulkConnectSkipReason.CancelledByUser);
                         break;
                 }
             }

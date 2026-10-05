@@ -87,7 +87,10 @@ internal enum BulkConnectSkipReason
     CredentialGuardRefused,
 
     /// <summary>An external credential provider could not answer without prompting.</summary>
-    ExternalCredentialsUnresolved
+    ExternalCredentialsUnresolved,
+
+    /// <summary>The user abandoned this server's attempt without stopping the whole run.</summary>
+    CancelledByUser
 }
 
 /// <summary>
@@ -139,7 +142,8 @@ internal static class BulkConnectSummary
             [BulkConnectSkipReason.ProfileMissing] = "StatusBulkConnectSkipReasonProfileMissing",
             [BulkConnectSkipReason.CredentialGuardRefused] = "StatusBulkConnectSkipReasonCredentialGuard",
             [BulkConnectSkipReason.ExternalCredentialsUnresolved] =
-                "StatusBulkConnectSkipReasonCredentialsUnresolved"
+                "StatusBulkConnectSkipReasonCredentialsUnresolved",
+            [BulkConnectSkipReason.CancelledByUser] = "StatusBulkConnectSkipReasonCancelledByUser"
         };
 
     /// <summary>

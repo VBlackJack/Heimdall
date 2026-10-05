@@ -24,6 +24,7 @@ using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.App.ViewModels.Session;
 using Heimdall.App.ViewModels.Shell;
 using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
@@ -860,10 +861,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// The RDP mode the session being restored ran under. A reconnect keeps the mode the user
     /// forced on the tab; a restore at startup has no tab and follows the profile.
     /// </param>
+    /// <param name="failureReport">How a failed attempt is reported to the user.</param>
     internal async Task<bool> RestoreServerAsync(
         string originalServerId,
         CancellationToken cancellationToken,
-        RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
+        RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile,
+        ConnectFailureReport failureReport = ConnectFailureReport.Dialog)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(originalServerId);
 
@@ -881,7 +884,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             server,
             cancellationToken,
             rdpModeOverride,
-            allowCredentialPrompt: false);
+            allowCredentialPrompt: false,
+            failureReport);
     }
 
     /// <inheritdoc />
@@ -891,7 +895,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     Task<bool> ISessionRestoreHost.RestoreServerAsync(
         string originalServerId,
         CancellationToken cancellationToken)
-        => RestoreServerAsync(originalServerId, cancellationToken);
+        => RestoreServerAsync(
+            originalServerId,
+            cancellationToken,
+            failureReport: ConnectFailureReport.FailedTabOnly);
 
     /// <param name="allowCredentialPrompt">
     /// Whether this connection may put a credential question to the user. True for a
@@ -903,7 +910,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         ServerItemViewModel server,
         CancellationToken cancellationToken,
         RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile,
-        bool allowCredentialPrompt = true)
+        bool allowCredentialPrompt = true,
+        ConnectFailureReport failureReport = ConnectFailureReport.Dialog)
     {
         // Prevent duplicate connections from rapid double-clicks
         if (!_connectingServerIds.Add(server.Id))
@@ -935,7 +943,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     settings,
                     rdpModeOverride,
                     cancellationToken,
-                    showMessage: true))
+                    showMessage: failureReport == ConnectFailureReport.Dialog))
             {
                 return false;
             }
@@ -1011,7 +1019,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return outcome.Status switch
             {
                 BulkConnectOutcomeStatus.Success => true,
-                BulkConnectOutcomeStatus.PreflightFailed => PublishFailureAndShowError(
+                BulkConnectOutcomeStatus.PreflightFailed => ReportConnectFailure(
+                    failureReport,
                     serverDto,
                     sessionId,
                     originalId,
@@ -1019,7 +1028,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     outcome,
                     _localizer["ErrorPreflightTitle"],
                     outcome.ErrorMessage ?? _localizer["ErrorPreflightFailed"]),
-                BulkConnectOutcomeStatus.ConnectionFailed => PublishFailureAndShowError(
+                BulkConnectOutcomeStatus.ConnectionFailed => ReportConnectFailure(
+                    failureReport,
                     serverDto,
                     sessionId,
                     originalId,
@@ -1182,6 +1192,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     return new BulkConnectOutcome(
                         BulkConnectOutcomeStatus.UnsupportedType,
                         unsupportedMessage);
+            }
+
+            if (result.Success
+                && sessionStartCts is { IsCancellationRequested: true }
+                && !cancellationToken.IsCancellationRequested)
+            {
+                // The SSH placeholder alone was closed or cancelled while the handshake finished:
+                // the session is closed rather than handed to a tab nobody is waiting for. A
+                // cancelled caller keeps what already connected; if its tab is gone too, the
+                // coordinator discards the session on arrival.
+                SessionCoordinator.SafeDisposeSessionResult(result.Session);
+                throw new OperationCanceledException(sessionStartCts.Token);
             }
 
             if (result.Success)
@@ -1447,7 +1469,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         return false;
     }
 
-    private bool PublishFailureAndShowError(
+    private bool ReportConnectFailure(
+        ConnectFailureReport failureReport,
         ServerProfileDto serverDto,
         string sessionId,
         string originalId,
@@ -1456,8 +1479,17 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         string title,
         string message)
     {
+        if (failureReport == ConnectFailureReport.Silent)
+        {
+            Core.Logging.FileLogger.Info(
+                $"ConnectAsync: '{server.DisplayName}' failed without a report to the user: {message}");
+            return false;
+        }
+
         PublishFailedSession(serverDto, sessionId, originalId, server, outcome);
-        return ShowConnectionError(title, message);
+        return failureReport == ConnectFailureReport.Dialog
+            ? ShowConnectionError(title, message)
+            : false;
     }
 
     private void PublishFailedSession(
@@ -2594,6 +2626,22 @@ internal enum BulkConnectOutcomeStatus
     ConnectionFailed,
     Cancelled,
     UnsupportedType
+}
+
+/// <summary>How a failed connection attempt is put in front of the user.</summary>
+internal enum ConnectFailureReport
+{
+    /// <summary>A failed-session tab and an error dialog: the user asked for this connection.</summary>
+    Dialog,
+
+    /// <summary>
+    /// A failed-session tab only: the application reconnected on its own and reports the
+    /// outcome once, without a modal per failure.
+    /// </summary>
+    FailedTabOnly,
+
+    /// <summary>Logged only: another attempt follows and will report for this one.</summary>
+    Silent
 }
 
 internal readonly record struct BulkConnectOutcome(
