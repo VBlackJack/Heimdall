@@ -26,6 +26,7 @@ using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views.Dialogs;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.Utilities;
 using Heimdall.Sftp;
@@ -362,6 +363,31 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     /// <summary>The owning session tab for status synchronization.</summary>
     public SessionTabViewModel? SessionTab { get; private set; }
+
+    /// <summary>
+    /// The pane this browser lives in. When it is not the tab's primary pane, the browser's
+    /// connection state is that pane's own.
+    /// </summary>
+    internal SessionPaneModel? OwnerPane { get; set; }
+
+    /// <summary>
+    /// Writes the connection state where it belongs. A companion or split SFTP pane used to write
+    /// the tab's status, which is the primary pane's: disconnecting the SFTP pane turned the SSH
+    /// header to Disconnected while the terminal worked, and browsing after the SSH session dropped
+    /// turned it back to Connected.
+    /// </summary>
+    private void PublishConnectionStatus()
+    {
+        string status = IsConnected ? SessionStatusTokens.Connected : SessionStatusTokens.Disconnected;
+        if (OwnerPane is not null && !ReferenceEquals(SessionTab?.PrimaryPane, OwnerPane))
+        {
+            OwnerPane.Status = status;
+        }
+        else if (SessionTab is not null)
+        {
+            SessionTab.Status = status;
+        }
+    }
 
     /// <summary>Bookmarks associated with the remote browser.</summary>
     public List<string> Bookmarks { get; }
@@ -1047,10 +1073,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         IsErrorStatus = false;
         IsConnected = _browser?.IsConnected == true;
 
-        if (SessionTab is not null)
-        {
-            SessionTab.Status = IsConnected ? SessionStatusTokens.Connected : SessionStatusTokens.Disconnected;
-        }
+        PublishConnectionStatus();
     }
 
     /// <summary>
@@ -1106,10 +1129,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         IsErrorStatus = true;
         IsConnected = _browser?.IsConnected == true;
 
-        if (SessionTab is not null)
-        {
-            SessionTab.Status = IsConnected ? SessionStatusTokens.Connected : SessionStatusTokens.Disconnected;
-        }
+        PublishConnectionStatus();
 
         return message;
     }

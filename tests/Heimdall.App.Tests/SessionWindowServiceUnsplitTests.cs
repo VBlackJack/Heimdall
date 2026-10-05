@@ -61,6 +61,26 @@ public sealed partial class SessionCoordinatorPreMountTests
         });
     }
 
+    [Fact]
+    public void DetachSessionToFloatingWindow_SplitTab_StaysInTheStripAndSaysWhy()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            var openedSessions = new List<SessionTabViewModel>();
+            SessionWindowService service = CreateSessionWindowServiceForDetachTests(openedSessions.Add);
+            SessionTabViewModel split = harness.Main.Connection.AddSession("embedded-rdp", "Embedded RDP", "RDP");
+            split.HostControl = new System.Windows.Controls.Border();
+            split.IsSplit = true;
+
+            service.DetachSessionToFloatingWindow(split, harness.Main);
+
+            Assert.Contains(split, harness.Main.Connection.ActiveSessions);
+            Assert.Empty(openedSessions);
+            Assert.False(string.IsNullOrEmpty(harness.Main.StatusText));
+        });
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

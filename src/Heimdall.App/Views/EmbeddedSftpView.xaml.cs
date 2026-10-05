@@ -211,6 +211,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
         ArgumentNullException.ThrowIfNull(pane);
         _ownerPane = pane;
         _ownerPane.SftpFollowSshDirectory = IsFollowSshDirectoryEnabled;
+        _viewModel.OwnerPane = pane;
     }
 
     internal SessionPaneModel? OwningPane => _ownerPane;
@@ -2358,6 +2359,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
         }
 
         Core.Logging.FileLogger.Info("EmbeddedSFTP Disconnect requested by user");
+
+        // Asked for, so not a lost connection: the next health tick must not report one.
+        StopHealthTimer();
         IRemoteBrowser? browser = _browser;
         try
         {
@@ -2410,6 +2414,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
 
     private void OnBrowserDisconnected(string? errorMessage)
     {
+        // The disconnect has been reported with its cause. Left running, the health tick replaced
+        // that cause, a host-key warning included, with a generic "no longer responding" line.
+        StopHealthTimer();
         _ = Dispatcher.BeginInvoke(() =>
         {
             if (_disposed)
@@ -2453,8 +2460,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
 
     private void StopHealthTimer()
     {
-        _healthTimer?.Dispose();
-        _healthTimer = null;
+        // Called from the timer's own thread and from the UI thread.
+        Interlocked.Exchange(ref _healthTimer, null)?.Dispose();
     }
 
     private void CheckHealth()
