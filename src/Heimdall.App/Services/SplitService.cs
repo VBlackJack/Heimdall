@@ -216,10 +216,10 @@ public sealed class SplitService : ISplitService
                 First = targetPane,
                 Second = newPane,
                 Orientation = orientation,
-                SplitRatio = SplitContainerModel.DefaultRatio
+                SplitRatio = RememberedRatio(targetPane.OriginalServerId, serverDto.Id)
             };
-            session.RootContent = SplitTreeHelper.ReplacePane(
-                session.RootContent, targetPane.PaneId, container);
+            session.SetRootContent(SplitTreeHelper.ReplacePane(
+                session.RootContent, targetPane.PaneId, container));
 
             // Async connection - can be cancelled or session can be closed while waiting
             ConnectionResult result = await ConnectByProtocolAsync(
@@ -234,8 +234,8 @@ public sealed class SplitService : ISplitService
                 // Protocol handlers own transport rollback before returning failure.
                 // Remove only the split state key to avoid releasing a shared tunnel twice.
                 TeardownFailedConnectionState(paneSessionId);
-                session.RootContent = SplitTreeHelper.RemovePane(
-                    session.RootContent, newPane.PaneId) ?? session.PrimaryPane;
+                session.SetRootContent(SplitTreeHelper.RemovePane(
+                    session.RootContent, newPane.PaneId) ?? session.PrimaryPane);
 
                 SetStatusText?.Invoke(result.ErrorMessage ?? _localizer["ErrorSplitSessionFailed"]);
                 Core.Logging.FileLogger.Warn(
@@ -267,8 +267,8 @@ public sealed class SplitService : ISplitService
             {
                 SafeDisposeSessionResult(result.Session);
                 CleanupOrphanedPane(paneSessionId);
-                session.RootContent = SplitTreeHelper.RemovePane(
-                    session.RootContent, newPane.PaneId) ?? session.PrimaryPane;
+                session.SetRootContent(SplitTreeHelper.RemovePane(
+                    session.RootContent, newPane.PaneId) ?? session.PrimaryPane);
                 SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
                 Core.Logging.FileLogger.Error(
                     $"Split host creation failed for '{serverDto.DisplayName}': {ex.Message}", ex);
@@ -370,8 +370,8 @@ public sealed class SplitService : ISplitService
             Orientation = orientation,
             SplitRatio = SplitContainerModel.DefaultRatio
         };
-        session.RootContent = SplitTreeHelper.ReplacePane(
-            session.RootContent, targetPane.PaneId, container);
+        session.SetRootContent(SplitTreeHelper.ReplacePane(
+            session.RootContent, targetPane.PaneId, container));
 
         Core.Logging.FileLogger.Info(
             $"Split session '{session.Title}' with tool '{title}' as {orientation}.");
@@ -485,13 +485,11 @@ public sealed class SplitService : ISplitService
 
         // Step 3: Wrap target pane and source content in a new split container.
         // Restore prior ratio from split layout memory if available.
+        // Only this exact pair counts, mirrored when it was recorded the other way round: the
+        // most recent partner of the target alone could be another server, and a reversed pair
+        // used to come back with the shares swapped.
         var sourceOrigId = SplitTreeHelper.FirstLeaf(sourceContent)?.OriginalServerId ?? "";
-        var priorLayout = LayoutMemory.FindPartner(targetPane.OriginalServerId);
-        var mergeRatio = priorLayout is not null
-            && (string.Equals(priorLayout.SecondaryServerId, sourceOrigId, StringComparison.Ordinal)
-                || string.Equals(priorLayout.PrimaryServerId, sourceOrigId, StringComparison.Ordinal))
-            ? priorLayout.Ratio
-            : SplitContainerModel.DefaultRatio;
+        var mergeRatio = RememberedRatio(targetPane.OriginalServerId, sourceOrigId);
 
         var container = new SplitContainerModel
         {
@@ -500,8 +498,8 @@ public sealed class SplitService : ISplitService
             Orientation = orientation,
             SplitRatio = mergeRatio
         };
-        target.RootContent = SplitTreeHelper.ReplacePane(
-            target.RootContent, targetPane.PaneId, container);
+        target.SetRootContent(SplitTreeHelper.ReplacePane(
+            target.RootContent, targetPane.PaneId, container));
 
         // Step 4: Restore host controls now that panes are in the new tree
         foreach (var (id, control) in hostControls)
@@ -528,6 +526,23 @@ public sealed class SplitService : ISplitService
             targetPane.OriginalServerId, sourceOriginalId,
             orientation, container.SplitRatio);
     }
+
+    /// <summary>
+    /// Records the share the user dragged a splitter to, for the pair of servers either side of
+    /// it. The ratio used to be recorded only when the split was made, so it was always the
+    /// default and a resized layout came back at 50/50.
+    /// </summary>
+    public void RememberSplitRatio(SplitContainerModel container)
+    {
+        ArgumentNullException.ThrowIfNull(container);
+
+        string first = SplitTreeHelper.FirstLeaf(container.First)?.OriginalServerId ?? string.Empty;
+        string second = SessionTabViewModel.SecondaryPaneOf(container)?.OriginalServerId ?? string.Empty;
+        LayoutMemory.Record(first, second, container.Orientation, container.SplitRatio);
+    }
+
+    private double RememberedRatio(string firstServerId, string secondServerId)
+        => LayoutMemory.FindRatio(firstServerId, secondServerId) ?? SplitContainerModel.DefaultRatio;
 
     // ── Close pane ───────────────────────────────────────────────────
 
@@ -594,7 +609,7 @@ public sealed class SplitService : ISplitService
         pane.HostControl = null;
 
         var newRoot = SplitTreeHelper.RemovePane(session.RootContent, paneId);
-        session.RootContent = newRoot ?? new SessionPaneModel();
+        session.SetRootContent(newRoot ?? new SessionPaneModel());
         return PaneCloseResult.Closed;
     }
 

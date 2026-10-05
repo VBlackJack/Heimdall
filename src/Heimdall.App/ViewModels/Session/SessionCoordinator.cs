@@ -1166,7 +1166,10 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             ResolveHostOwner(_main.Connection.ActiveSessions, createdFor, pane);
         if (oneOfSeveral)
         {
-            _main.Split.ClosePane(owner, pane!.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
+            // The full pane-close path: a guard that defers is asked, retried and released. Closing
+            // the pane directly ignored the deferral, so a disconnected SFTP pane holding unsaved
+            // edits did nothing at all when its Close button was pressed.
+            _main.ClosePaneAsync(owner, pane!.PaneId, DisconnectReason.UserAction).SafeFireAndForget();
             return;
         }
 

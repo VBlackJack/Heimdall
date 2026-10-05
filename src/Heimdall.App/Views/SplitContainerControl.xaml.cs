@@ -225,6 +225,7 @@ public partial class SplitContainerControl : UserControl
     {
         if (!IsLoaded || _model is null) return;
         _model.SplitRatio = SplitContainerModel.DefaultRatio;
+        MainViewModelLocator.FindCurrent()?.Split.RememberSplitRatio(_model);
         e.Handled = true;
     }
 
@@ -263,5 +264,6 @@ public partial class SplitContainerControl : UserControl
 
         // Model setter clamps to [MinRatio, MaxRatio]
         _model.SplitRatio = ratio;
+        MainViewModelLocator.FindCurrent()?.Split.RememberSplitRatio(_model);
     }
 }

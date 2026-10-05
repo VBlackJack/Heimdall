@@ -104,6 +104,35 @@ public sealed class SplitLayoutMemory
     }
 
     /// <summary>
+    /// The ratio last used for this exact pair, seen from <paramref name="firstServerId"/>'s side:
+    /// a pair recorded the other way round gives the mirrored share. Null when the pair is unknown.
+    /// </summary>
+    public double? FindRatio(string firstServerId, string secondServerId)
+    {
+        if (string.IsNullOrEmpty(firstServerId) || string.IsNullOrEmpty(secondServerId)) return null;
+
+        lock (_lock)
+        {
+            foreach (SplitLayoutEntry entry in _entries)
+            {
+                if (string.Equals(entry.PrimaryServerId, firstServerId, StringComparison.Ordinal)
+                    && string.Equals(entry.SecondaryServerId, secondServerId, StringComparison.Ordinal))
+                {
+                    return entry.Ratio;
+                }
+
+                if (string.Equals(entry.PrimaryServerId, secondServerId, StringComparison.Ordinal)
+                    && string.Equals(entry.SecondaryServerId, firstServerId, StringComparison.Ordinal))
+                {
+                    return 1 - entry.Ratio;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Returns all known split partners for a given server ID, ordered by most recent.
     /// </summary>
     public IReadOnlyList<SplitLayoutEntry> FindAllPartners(string serverId)
