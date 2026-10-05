@@ -50,7 +50,9 @@ public static class InputValidator
             ["SshGateway"] = BuildPattern(@"^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$"),
 
             // SSH username: alphanumeric, underscore, hyphen, dot, at, backslash
-            ["SshUser"] = BuildPattern(@"^[a-zA-Z0-9._@\\-]+$"),
+            // No leading hyphen: the name reaches plink as "user@host", and an argument that starts
+            // with "-" is read as an option rather than a user name.
+            ["SshUser"] = BuildPattern(@"^[a-zA-Z0-9._@\\][a-zA-Z0-9._@\\-]*$"),
 
             // RDP username: user, DOMAIN\user, or user@domain.com
             ["Username"] = BuildPattern(@"^[a-zA-Z0-9_\-\.]+([\\@][a-zA-Z0-9_\-\.]+)?$"),

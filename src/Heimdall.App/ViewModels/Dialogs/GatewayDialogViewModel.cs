@@ -145,6 +145,10 @@ public partial class GatewayDialogViewModel : ObservableValidator
     // so writing an empty one on save switched it off and broke an encrypted key on a mere rename.
     private bool _sourceUsesLegacySshCredentialMapping;
 
+    // Fields of the gateway this dialog does not show, carried through the edit: the caller
+    // replaces the stored gateway with what ToDto returns, so anything left out is deleted.
+    private Dictionary<string, System.Text.Json.JsonElement>? _sourceExtensionData;
+
     /// <summary>
     /// Returns the label for the SSH password field.
     /// </summary>
@@ -392,6 +396,13 @@ public partial class GatewayDialogViewModel : ObservableValidator
                     : Heimdall.Core.Security.CredentialProtector.Protect(KeyPassphrase);
         }
 
+        if (_sourceExtensionData is not null)
+        {
+            dto.ExtensionData = new Dictionary<string, System.Text.Json.JsonElement>(
+                _sourceExtensionData,
+                _sourceExtensionData.Comparer);
+        }
+
         return dto;
     }
 
@@ -423,6 +434,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
         vm.ExistingSshPasswordEncrypted = dto.SshPasswordEncrypted;
         vm.ExistingSshKeyPassphraseEncrypted = dto.SshKeyPassphraseEncrypted;
         vm._sourceUsesLegacySshCredentialMapping = dto.UsesLegacySshCredentialMapping;
+        vm._sourceExtensionData = dto.CloneFaithfully().ExtensionData;
         vm._isInitializing = false;
         return vm;
     }
