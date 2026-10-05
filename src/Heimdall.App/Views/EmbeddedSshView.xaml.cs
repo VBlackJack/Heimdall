@@ -2872,7 +2872,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         string? displayTextOverride = null,
         bool forceErrorBrush = false)
     {
-        if (_sessionTab is not null)
+        // A secondary pane's status is its own. Written to the tab, it landed on the primary
+        // pane, and the tab header read "Disconnected" while the primary was fine.
+        if (_ownerPane is not null && !ReferenceEquals(_sessionTab?.PrimaryPane, _ownerPane))
+        {
+            _ownerPane.Status = status;
+        }
+        else if (_sessionTab is not null)
         {
             _sessionTab.Status = status;
         }

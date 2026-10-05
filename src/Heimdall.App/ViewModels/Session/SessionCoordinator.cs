@@ -190,6 +190,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _embeddedSessionManager.EditServerRequestedCallback = OnEditServerRequested;
         // Wire overlay Close button: tear down the whole tab through the shared lifecycle path.
         _embeddedSessionManager.CloseRequestedCallback = OnCloseRequested;
+        _embeddedSessionManager.HostReconnectRequestedCallback = OnHostReconnectRequested;
+        _embeddedSessionManager.HostCloseRequestedCallback = OnHostCloseRequested;
 
         // Subscribe to ServerList session lifecycle events to materialize session tabs.
         _main.ServerList.SessionStarting += OnSessionStarting;
@@ -1082,6 +1084,70 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
 
         OnReconnectRequestedAsync(tab, serverId, connectionType, context).SafeFireAndForget();
+    }
+
+    /// <summary>
+    /// Finds the tab a host's pane sits in now, and whether the pane is one of several in it.
+    /// </summary>
+    /// <remarks>
+    /// A host is wired to the tab it was created for, and a merge, a detach or a split moves its
+    /// pane elsewhere. The pane is looked up among the open tabs and the creating tab; a pane
+    /// found nowhere falls back to the creating tab, which is what the host used to act on.
+    /// </remarks>
+    internal static (SessionTabViewModel Owner, bool IsOneOfSeveralPanes) ResolveHostOwner(
+        IEnumerable<SessionTabViewModel> openTabs,
+        SessionTabViewModel createdFor,
+        SessionPaneModel? pane)
+    {
+        ArgumentNullException.ThrowIfNull(openTabs);
+        ArgumentNullException.ThrowIfNull(createdFor);
+        if (pane is null)
+        {
+            return (createdFor, false);
+        }
+
+        SessionTabViewModel? owner = openTabs
+            .Prepend(createdFor)
+            .FirstOrDefault(tab => ReferenceEquals(SplitTreeHelper.FindPane(tab.RootContent, pane.PaneId), pane));
+        if (owner is null)
+        {
+            return (createdFor, false);
+        }
+
+        return (owner, owner.IsSplit);
+    }
+
+    private void OnHostReconnectRequested(SessionTabViewModel createdFor, SessionPaneModel? pane)
+    {
+        (SessionTabViewModel owner, bool oneOfSeveral) =
+            ResolveHostOwner(_main.Connection.ActiveSessions, createdFor, pane);
+        if (oneOfSeveral)
+        {
+            // The tab-level request recorded for an SSH host is not used by a pane reconnect.
+            _ = EmbeddedSessionManager.TakeReconnectRequest(createdFor);
+            OnReconnectPaneRequested(owner, pane!);
+            return;
+        }
+
+        if (!ReferenceEquals(owner, createdFor))
+        {
+            EmbeddedSessionManager.MoveReconnectRequest(createdFor, owner);
+        }
+
+        OnReconnectRequested(owner, owner.ProfileLookupServerId, owner.ConnectionType);
+    }
+
+    private void OnHostCloseRequested(SessionTabViewModel createdFor, SessionPaneModel? pane)
+    {
+        (SessionTabViewModel owner, bool oneOfSeveral) =
+            ResolveHostOwner(_main.Connection.ActiveSessions, createdFor, pane);
+        if (oneOfSeveral)
+        {
+            _main.Split.ClosePane(owner, pane!.PaneId, CloseRequest.Interactive(DisconnectReason.UserAction));
+            return;
+        }
+
+        OnCloseRequested(owner);
     }
 
     private void OnReconnectPaneRequested(SessionTabViewModel tab, SessionPaneModel pane)
