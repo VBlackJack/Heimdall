@@ -329,6 +329,11 @@ internal sealed class CitrixSessionHandle : IDisposable
         return false;
     }
 
+    /// <summary>Whether <paramref name="hwnd"/> is the adopted session's own window.</summary>
+    /// <remarks>The Workspace sign-in window is embedded without being the session.</remarks>
+    internal static bool IsSessionWindow(CitrixSessionHandle? handle, IntPtr hwnd)
+        => handle is not null && hwnd != IntPtr.Zero && handle.Hwnd == hwnd;
+
     /// <summary>
     /// Whether falling back to external mode is a connected outcome.
     /// </summary>

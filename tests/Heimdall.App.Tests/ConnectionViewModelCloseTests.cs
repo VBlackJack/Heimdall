@@ -582,6 +582,81 @@ public sealed class ConnectionViewModelCloseTests
         Assert.Empty(sut.ActiveSessions);
     }
 
+    [Fact]
+    public void RemoveFromStrip_TheSelectedTabInTheMiddle_SelectsTheTabThatTakesItsPlace()
+    {
+        ConnectionViewModel viewModel = CreatePinningViewModel();
+        SessionTabViewModel first = new() { Title = "1" };
+        SessionTabViewModel middle = new() { Title = "2" };
+        SessionTabViewModel next = new() { Title = "3" };
+        SessionTabViewModel last = new() { Title = "4" };
+        AddTabs(viewModel, first, middle, next, last);
+        viewModel.ActiveSession = middle;
+
+        viewModel.RemoveFromStrip(middle);
+
+        Assert.Same(next, viewModel.ActiveSession);
+    }
+
+    [Fact]
+    public void RemoveFromStrip_TheSelectedLastTab_SelectsTheOneBeforeIt()
+    {
+        ConnectionViewModel viewModel = CreatePinningViewModel();
+        SessionTabViewModel first = new() { Title = "1" };
+        SessionTabViewModel last = new() { Title = "2" };
+        AddTabs(viewModel, first, last);
+
+        viewModel.RemoveFromStrip(last);
+
+        Assert.Same(first, viewModel.ActiveSession);
+    }
+
+    [Fact]
+    public void RemoveFromStrip_AnUnselectedTab_KeepsTheSelection()
+    {
+        ConnectionViewModel viewModel = CreatePinningViewModel();
+        SessionTabViewModel first = new() { Title = "1" };
+        SessionTabViewModel selected = new() { Title = "2" };
+        AddTabs(viewModel, first, selected);
+
+        viewModel.RemoveFromStrip(first);
+
+        Assert.Same(selected, viewModel.ActiveSession);
+        Assert.Single(viewModel.ActiveSessions);
+    }
+
+    [Fact]
+    public void RemoveFromStrip_TheOnlyTab_LeavesNothingSelected()
+    {
+        ConnectionViewModel viewModel = CreatePinningViewModel();
+        SessionTabViewModel only = new() { Title = "1" };
+        AddTabs(viewModel, only);
+
+        viewModel.RemoveFromStrip(only);
+
+        Assert.Null(viewModel.ActiveSession);
+    }
+
+    [Fact]
+    public void IsAtEmbeddedSessionLimit_CountsSplitPanesAcrossTabs()
+    {
+        SessionTabViewModel split = new()
+        {
+            RootContent = new SplitContainerModel
+            {
+                First = new SessionPaneModel { ConnectionType = "SSH", HostControl = new object() },
+                Second = new SessionPaneModel { ConnectionType = "RDP", HostControl = new object() },
+            },
+        };
+        SessionTabViewModel single = new();
+        single.PrimaryPane.ConnectionType = "SSH";
+        single.PrimaryPane.HostControl = new object();
+
+        Assert.True(SplitService.IsAtEmbeddedSessionLimit([split, single], 3));
+        Assert.False(SplitService.IsAtEmbeddedSessionLimit([split, single], 4));
+        Assert.False(SplitService.IsAtEmbeddedSessionLimit(null, 1));
+    }
+
     private static ConnectionViewModel CreatePinningViewModel()
         => CreateViewModel(new TrackingDialogService(false), new TrackingSplitService());
 

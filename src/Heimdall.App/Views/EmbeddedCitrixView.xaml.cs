@@ -681,10 +681,18 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     {
         try
         {
-            // Create a host panel for the captured window
+            // Create a host panel for the captured window. The panel it replaces - the sign-in
+            // window's, on the swap to the session - used to be left undisposed. It is released only
+            // once nothing is embedded in it any more: the swap hands that window back first, and
+            // disposing a panel that still parents a window destroys the window with it.
+            WinForms.Panel? previousPanel = _hostPanel;
             _hostPanel = new WinForms.Panel { Dock = WinForms.DockStyle.Fill };
             _hostPanel.Resize += (_, _) => ResizeCapturedWindow();
             FormsHost.Child = _hostPanel;
+            if (previousPanel is not null && _capturedHwnd == IntPtr.Zero)
+            {
+                previousPanel.Dispose();
+            }
 
             // Strip popup/caption styles and make it a child window. Each inspected call clears
             // the last error first and captures it immediately after, before any other managed
@@ -721,6 +729,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
                 // ShowExternalFallback, for which external mode is a legitimate outcome.
                 Core.Logging.FileLogger.Warn(
                     $"Citrix: window embedding failed at {verdict.Failure}; falling back to external mode.");
+
+                // The style was already rewritten to a child's. Left that way, the window the
+                // fallback offers to bring to front had no caption and could not be moved.
+                RestoreWindowStyle(hwnd, readStyle);
                 _embedded = false;
                 ShowExternalFallback();
                 return;
@@ -728,7 +740,14 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
 
             _capturedHwnd = hwnd;
             _embedded = true;
-            EmitConnect();
+
+            // The sign-in window is embedded too, but it is not the session: Connected is emitted
+            // when the adopted session window takes its place, so the log neither records a
+            // session that never existed nor times one from the sign-in form.
+            if (CitrixSessionHandle.IsSessionWindow(_sessionHandle, hwnd))
+            {
+                EmitConnect();
+            }
 
             // Show embedded container, hide info panel
             CaptureLoadingPanel.Visibility = Visibility.Collapsed;
@@ -1016,6 +1035,18 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     /// <summary>
     /// Releases the captured window back to the desktop before disposing.
     /// </summary>
+    private static void RestoreWindowStyle(IntPtr hwnd, uint originalStyle)
+    {
+        try
+        {
+            SetWindowLong(hwnd, GwlStyle, originalStyle);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] style restore: {ex.Message}");
+        }
+    }
+
     private void ReleaseEmbeddedWindow()
     {
         if (_capturedHwnd != IntPtr.Zero && IsWindow(_capturedHwnd))
