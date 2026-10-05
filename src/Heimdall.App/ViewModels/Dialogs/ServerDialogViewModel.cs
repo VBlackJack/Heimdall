@@ -1208,6 +1208,48 @@ public partial class ServerDialogViewModel : ObservableValidator
     public Func<Task<GatewayOption?>>? CreateGatewayRequested { get; set; }
 
     /// <summary>
+    /// Supplied by the shell so this tab can edit the selected gateway. Receives the gateway id
+    /// and returns the gateway options as they stand afterwards, or <see langword="null"/> when
+    /// nothing was saved.
+    /// </summary>
+    /// <remarks>
+    /// The edit used to live in the window's code-behind, out of reach of the dialog service: a
+    /// failure surfaced as the generic unhandled-exception dialog, an edit to a gateway deleted
+    /// meanwhile was dropped without a word, and the list kept the old name after a rename.
+    /// </remarks>
+    public Func<string, Task<IReadOnlyList<GatewayOption>?>>? EditGatewayRequested { get; set; }
+
+    /// <summary>
+    /// Edits the selected gateway through <see cref="EditGatewayRequested"/> and takes in the
+    /// options it returns, keeping the selection.
+    /// </summary>
+    internal async Task EditSelectedGatewayAsync()
+    {
+        if (EditGatewayRequested is null || string.IsNullOrWhiteSpace(SelectedGatewayId))
+        {
+            return;
+        }
+
+        string selected = SelectedGatewayId;
+        IReadOnlyList<GatewayOption>? refreshed = await EditGatewayRequested(selected);
+        if (refreshed is null)
+        {
+            return;
+        }
+
+        // Editing the gateway is not an edit of this session. Replacing the list can make the
+        // picker drop its selection for a moment, so the selection is put back untracked.
+        RunWithoutDirtyTracking(() =>
+        {
+            AvailableGateways = new ObservableCollection<GatewayOption>(refreshed);
+            if (refreshed.Any(option => string.Equals(option.Id, selected, StringComparison.OrdinalIgnoreCase)))
+            {
+                SelectedGatewayId = selected;
+            }
+        });
+    }
+
+    /// <summary>
     /// True when the protocol tunnels but nothing has ever been configured to tunnel
     /// through, which is the state that used to be an empty dropdown and no explanation.
     /// </summary>
@@ -2208,11 +2250,6 @@ public partial class ServerDialogViewModel : ObservableValidator
             SshPasswordEncrypted = string.IsNullOrEmpty(SshPassword)
                 ? ExistingSshPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(SshPassword),
-            SshKeyPassphraseEncrypted = sshKeyPath is null
-                ? null
-                : string.IsNullOrEmpty(SshKeyPassphrase)
-                    ? ExistingSshKeyPassphraseEncrypted ?? string.Empty
-                    : Heimdall.Core.Security.CredentialProtector.Protect(SshKeyPassphrase),
             SshCompression = SshCompression,
             SshX11Forwarding = SshX11Forwarding,
             SshAgentForwarding = SshAgentForwarding,
@@ -2303,9 +2340,35 @@ public partial class ServerDialogViewModel : ObservableValidator
             IsFavorite = IsFavorite
         };
 
+        // The passphrase setter declares the field even when it assigns null, so it is only
+        // called when the field has to be declared.
+        if (!KeepsLegacySshCredentialMapping(sshKeyPath))
+        {
+            dto.SshKeyPassphraseEncrypted = sshKeyPath is null
+                ? null
+                : string.IsNullOrEmpty(SshKeyPassphrase)
+                    ? ExistingSshKeyPassphraseEncrypted ?? string.Empty
+                    : Heimdall.Core.Security.CredentialProtector.Protect(SshKeyPassphrase);
+        }
+
         CarryForwardUneditedFields(dto);
         return dto;
     }
+
+    /// <summary>
+    /// Whether the profile keeps offering its stored password as the key passphrase.
+    /// </summary>
+    /// <remarks>
+    /// A profile saved before the passphrase field existed relies on that mapping, and the
+    /// mapping is read off the field being absent. Writing an empty field on save switched it
+    /// off, so any edit of such a session, a rename included, left its encrypted key unable to
+    /// load. The gateway dialog had the same defect and keeps the field undeclared the same way.
+    /// </remarks>
+    private bool KeepsLegacySshCredentialMapping(string? sshKeyPath) =>
+        _seed is { UsesLegacySshCredentialMapping: true }
+        && sshKeyPath is not null
+        && string.IsNullOrEmpty(SshKeyPassphrase)
+        && ExistingSshKeyPassphraseEncrypted is null;
 
     /// <summary>
     /// Copies the parts of the seed profile this dialog never edits onto the object it returns.

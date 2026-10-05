@@ -2248,6 +2248,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 .FirstOrDefault(option =>
                     string.Equals(option.Id, created.Id, StringComparison.OrdinalIgnoreCase));
         };
+        dialogVm.EditGatewayRequested = EditGatewayFromSessionDialogAsync;
 
         // Pre-select the last-used gateway for new servers (not edit mode)
         if (!dialogVm.IsEditMode
@@ -2274,6 +2275,59 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             .Where(gw => !string.IsNullOrWhiteSpace(gw.Id))
             .GroupBy(gw => gw.Id, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Last(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Edits a gateway from the session dialog and returns the gateway options as they stand
+    /// afterwards, or <see langword="null"/> when nothing was saved.
+    /// </summary>
+    internal async Task<IReadOnlyList<GatewayOption>?> EditGatewayFromSessionDialogAsync(string gatewayId)
+    {
+        try
+        {
+            AppSettings settings = await _configManager.LoadSettingsAsync();
+            SshGatewayDto? gateway = settings.SshGateways.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, gatewayId, StringComparison.OrdinalIgnoreCase));
+            if (gateway is null)
+            {
+                _dialogService.ShowError(
+                    _localizer["GatewayDialogTitleEdit"],
+                    _localizer.Format("ErrorGatewayNotFoundForEdit", gatewayId));
+                return BuildGatewayOptions(settings.SshGateways).ToList();
+            }
+
+            GatewayDialogViewModel dialogViewModel = GatewayDialogViewModel.FromDto(gateway);
+            dialogViewModel.AvailableParents = GatewayParentEligibility.BuildOptions(settings.SshGateways, gateway.Id);
+            GatewayDialogResult? result = await _dialogService.ShowGatewayDialogAsync(dialogViewModel);
+            if (result?.Saved != true)
+            {
+                return null;
+            }
+
+            // The dialog is modal, so the snapshot it was opened from can be minutes old. The
+            // position is resolved against the list MergeSettingAsync reloads under its lock,
+            // and an edit to a gateway deleted meanwhile is reported instead of dropped.
+            bool applied = false;
+            await _configManager.MergeSettingAsync(current =>
+                applied = GatewayEditCommit.Apply(current, gateway.Id, result.Gateway));
+            if (!applied)
+            {
+                _dialogService.ShowError(
+                    _localizer["GatewayDialogTitleEdit"],
+                    _localizer.Format("ErrorGatewayDeletedWhileEditing", gateway.Name));
+            }
+
+            AppSettings refreshed = await _configManager.LoadSettingsAsync();
+            return BuildGatewayOptions(refreshed.SshGateways).ToList();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Core.Logging.FileLogger.Error("Editing a gateway from the session dialog failed", ex);
+            _dialogService.ShowError(
+                _localizer["GatewayDialogTitleEdit"],
+                _localizer.Format("ErrorGatewayEditFailed", ex.Message));
+            return null;
+        }
     }
 
     private static IEnumerable<GatewayOption> BuildGatewayOptions(IEnumerable<SshGatewayDto> gateways)

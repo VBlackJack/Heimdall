@@ -20,6 +20,7 @@ using Heimdall.App.Theming;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Logging;
 using Microsoft.Win32;
 
 namespace Heimdall.App.Views.Dialogs;
@@ -444,35 +445,17 @@ public partial class ServerDialog : Window
 
     private async void OnEditGatewayClick(object sender, RoutedEventArgs e)
     {
-        if (_configManager is null || _localizer is null) return;
         if (DataContext is not ServerDialogViewModel vm) return;
-        if (string.IsNullOrWhiteSpace(vm.SelectedGatewayId)) return;
 
-        var settings = await _configManager.LoadSettingsAsync();
-        var gwDto = settings.SshGateways.FirstOrDefault(
-            g => string.Equals(g.Id, vm.SelectedGatewayId, StringComparison.OrdinalIgnoreCase));
-        if (gwDto is null) return;
-
-        var gwVm = GatewayDialogViewModel.FromDto(gwDto);
-        gwVm.Localizer = _localizer;
-        gwVm.AvailableParents = GatewayParentEligibility.BuildOptions(settings.SshGateways, gwDto.Id);
-
-        var gwDialog = new GatewayDialog
+        // The shell owns the edit and reports its own failures; this only keeps an unexpected
+        // one from reaching the unhandled-exception dialog through an async void handler.
+        try
         {
-            DataContext = gwVm,
-            Owner = this
-        };
-
-        if (gwDialog.ShowDialog() == true)
+            await vm.EditSelectedGatewayAsync();
+        }
+        catch (Exception ex)
         {
-            var updated = gwVm.ToDto();
-
-            // The dialog above is modal, so the snapshot loaded before it opened can be
-            // minutes old. Writing it back whole erased everything persisted in between.
-            // The position is resolved against the list this callback receives, which
-            // MergeSettingAsync reloads under the write lock.
-            await _configManager.MergeSettingAsync(
-                current => GatewayEditCommit.Apply(current, gwDto.Id, updated));
+            FileLogger.Error("Editing the gateway from the session dialog failed", ex);
         }
     }
 

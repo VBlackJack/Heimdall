@@ -1067,9 +1067,11 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
             ConnectionStateMachine stateMachine,
             RecentConnectionTracker recentConnections,
             SessionHealthMonitor? healthMonitor,
-            FakeUiDispatcher dispatcher)
+            FakeUiDispatcher dispatcher,
+            DialogServiceStub dialogs)
         {
             _rootPath = rootPath;
+            Dialogs = dialogs;
             ConfigManager = configManager;
             ViewModel = viewModel;
             StateMachine = stateMachine;
@@ -1079,6 +1081,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
         }
 
         public IConfigManager ConfigManager { get; }
+
+        public DialogServiceStub Dialogs { get; }
 
         public FakeUiDispatcher Dispatcher { get; }
 
@@ -1140,7 +1144,8 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
                 stateMachine,
                 recentConnections,
                 healthMonitor,
-                uiDispatcher);
+                uiDispatcher,
+                dialogService);
         }
 
         public AppSettings ExpandGroups(params string[] groups)
@@ -1288,7 +1293,12 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
         public Task<ServerDialogResult?> ShowServerDialogAsync(ServerDialogViewModel? editVm = null) => Task.FromResult<ServerDialogResult?>(null);
 
-        public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null) => Task.FromResult<GatewayDialogResult?>(null);
+        public Func<GatewayDialogViewModel?, Task<GatewayDialogResult?>>? GatewayDialog { get; set; }
+
+        public List<string> Errors { get; } = [];
+
+        public Task<GatewayDialogResult?> ShowGatewayDialogAsync(GatewayDialogViewModel? editVm = null)
+            => GatewayDialog?.Invoke(editVm) ?? Task.FromResult<GatewayDialogResult?>(null);
 
         public Task<ScheduledTaskDialogResult?> ShowScheduledTaskDialogAsync(ScheduledTaskDialogViewModel? editVm = null) => Task.FromResult<ScheduledTaskDialogResult?>(null);
 
@@ -1320,6 +1330,7 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
 
         public void ShowError(string title, string message)
         {
+            Errors.Add(message);
         }
 
         public void ShowInfo(string title, string message)

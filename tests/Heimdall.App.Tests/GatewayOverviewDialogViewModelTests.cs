@@ -93,7 +93,7 @@ public sealed class GatewayOverviewDialogViewModelTests
         Assert.Equal(["alpha"], capturedRequest!.ServerIds);
         Assert.Null(capturedRequest.TargetGatewayId);
         Assert.Empty(viewModel.MissingReferences);
-        Assert.Equal("Cleared gateway reference on 1 session.", viewModel.StatusMessage);
+        Assert.Equal("Set 1 session to a direct connection.", viewModel.StatusMessage);
     }
 
     /// <summary>
