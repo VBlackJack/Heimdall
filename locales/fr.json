@@ -2407,6 +2407,7 @@
   "SessionTranscriptStarted": "Transcription d\u00e9marr\u00e9e : {0}",
   "SessionTranscriptStopped": "Transcription arr\u00eat\u00e9e",
   "SessionLogHeader": "===== Session d\u00e9marr\u00e9e {0} | {1} | h\u00f4te {2} | {3} =====",
+  "SessionLogOutputDropped": "[... {0} caract\u00e8res de sortie non enregistr\u00e9s : le dossier des journaux \u00e9tait inaccessible en \u00e9criture ...]",
   "SessionLogFooter": "===== Session termin\u00e9e {0} | dur\u00e9e {1} =====",
   "LogSessionLogRollover": "Journal de session : taille maximale atteinte, poursuite dans {0}",
   "LogSessionLogWriteError": "\u00c9chec d'\u00e9criture du journal de session pour {0} : {1}",

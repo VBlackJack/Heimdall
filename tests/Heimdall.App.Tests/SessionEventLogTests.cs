@@ -95,6 +95,19 @@ public sealed class SessionEventLogTests : IDisposable
     }
 
     [Fact]
+    public void LogEvent_WritesNoByteOrderMark_SoEachLineIsPlainJson()
+    {
+        string root = NewTempDirectory();
+        SessionEventLog log = new SessionEventLog(root, LargeCap, FlushIntervalMs);
+
+        log.LogEvent(SessionEventRecord.Connected("RDP", "host.example", "host.example (admin)"));
+        log.Dispose();
+
+        byte[] bytes = File.ReadAllBytes(EventLogPath(root));
+        bytes[0].Should().Be((byte)'{', "RFC 8259: JSON text carries no byte order mark");
+    }
+
+    [Fact]
     public void LogEvent_Disconnected_RoundTripsReasonAndDurationFields()
     {
         string root = NewTempDirectory();

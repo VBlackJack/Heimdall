@@ -2407,6 +2407,7 @@
   "SessionTranscriptStarted": "Transcripción iniciada: {0}",
   "SessionTranscriptStopped": "Transcripción detenida",
   "SessionLogHeader": "===== Sesión iniciada {0} | {1} | host {2} | {3} =====",
+  "SessionLogOutputDropped": "[... {0} caracteres de salida no registrados: no se pudo escribir en la carpeta de registros ...]",
   "SessionLogFooter": "===== Sesión finalizada {0} | duración {1} =====",
   "LogSessionLogRollover": "El registro de sesión alcanzó su tamaño máximo, continuando en {0}",
   "LogSessionLogWriteError": "Falló la escritura del registro de sesión para {0}: {1}",
