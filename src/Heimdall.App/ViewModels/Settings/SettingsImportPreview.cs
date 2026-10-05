@@ -34,6 +34,31 @@ internal static class SettingsImportPreview
 
     private const string Ellipsis = "...";
 
+    /// <summary>
+    /// Settings that decide what runs on this computer: commands, executables and where code is
+    /// fetched from. A settings file is shared between people, and these are the lines an author
+    /// with bad intent would hide among harmless ones.
+    /// </summary>
+    internal static readonly IReadOnlySet<string> SensitiveKeys = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "UseExternalCredentialProvider",
+        "CredentialProviderType",
+        "CredentialProviderCommand",
+        "CredentialProviderUsernameCommand",
+        "CredentialProviderDatabase",
+        "CredentialProviderKeyFile",
+        "ExternalTools",
+        "PlinkPath",
+        "PuttyPath",
+        "PsftpPath",
+        "X11ServerPath",
+        "ExternalEditorPath",
+        "SysinternalsPath",
+        "NirSoftPath",
+        "NanaRunPath",
+        "CmdLibGitSyncUrl",
+    };
+
     private const string ListSeparator = ", ";
 
     /// <summary>The whole confirmation text for <paramref name="changes"/>.</summary>
@@ -44,9 +69,16 @@ internal static class SettingsImportPreview
         ArgumentNullException.ThrowIfNull(localizer);
         ArgumentNullException.ThrowIfNull(changes);
 
+        // The sensitive changes come first, every one of them, at full length. The preview used to
+        // name the first twenty changes in the file's own order, which its author chooses, and cut
+        // every value at sixty characters: a credential command placed twenty-first read as
+        // "and 1 more".
+        List<SettingsTransferChange> sensitive = changes.Where(change => SensitiveKeys.Contains(change.Key)).ToList();
+        List<SettingsTransferChange> others = changes.Where(change => !SensitiveKeys.Contains(change.Key)).ToList();
+
         string lines = string.Join(
             Environment.NewLine,
-            changes.Take(MaxLines).Select(change => DescribeChange(localizer, change)));
+            others.Take(MaxLines).Select(change => DescribeChange(localizer, change)));
         string text = localizer.FormatCount(
             changes.Count,
             "SettingsImportPreviewOne",
@@ -54,14 +86,25 @@ internal static class SettingsImportPreview
             changes.Count,
             lines);
 
-        int rest = changes.Count - MaxLines;
-        return rest > 0
-            ? text + Environment.NewLine + localizer.FormatCount(
+        int rest = others.Count - MaxLines;
+        if (rest > 0)
+        {
+            text += Environment.NewLine + localizer.FormatCount(
                 rest,
                 "SettingsImportPreviewMoreOne",
                 "SettingsImportPreviewMore",
-                rest)
-            : text;
+                rest);
+        }
+
+        if (sensitive.Count == 0)
+        {
+            return text;
+        }
+
+        string warning = localizer["SettingsImportPreviewSensitive"] + Environment.NewLine + string.Join(
+            Environment.NewLine,
+            sensitive.Select(change => DescribeChange(localizer, change, fullLength: true)));
+        return warning + Environment.NewLine + Environment.NewLine + text;
     }
 
     /// <summary>One line of the preview: where the setting lives, then its old and new value.</summary>
@@ -70,6 +113,10 @@ internal static class SettingsImportPreview
     /// test fails for every transferable setting without an entry, so the fallback never ships.
     /// </remarks>
     internal static string DescribeChange(LocalizationManager localizer, SettingsTransferChange change)
+        => DescribeChange(localizer, change, fullLength: false);
+
+    /// <param name="fullLength">Whether values are shown whole, lists of tools item by item.</param>
+    internal static string DescribeChange(LocalizationManager localizer, SettingsTransferChange change, bool fullLength)
     {
         ArgumentNullException.ThrowIfNull(localizer);
         ArgumentNullException.ThrowIfNull(change);
@@ -80,9 +127,39 @@ internal static class SettingsImportPreview
         return localizer.Format(
             "SettingsImportPreviewLine",
             name,
-            DescribeValue(localizer, change.Before),
-            DescribeValue(localizer, change.After));
+            fullLength ? DescribeFullValue(localizer, change.Before) : DescribeValue(localizer, change.Before),
+            fullLength ? DescribeFullValue(localizer, change.After) : DescribeValue(localizer, change.After));
     }
+
+    /// <summary>A sensitive value as the preview shows it: never cut, a tool list tool by tool.</summary>
+    internal static string DescribeFullValue(LocalizationManager localizer, JsonNode? value)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        switch (value)
+        {
+            case JsonArray array when array.Count > 0 && array.All(item => item is JsonObject):
+                return string.Join(ListSeparator, array.Select(item => DescribeTool(localizer, (JsonObject)item!)));
+            case JsonValue scalar when scalar.GetValueKind() == JsonValueKind.String
+                && !string.IsNullOrEmpty(scalar.GetValue<string>()):
+                return scalar.GetValue<string>();
+            default:
+                return DescribeValue(localizer, value);
+        }
+    }
+
+    private static string DescribeTool(LocalizationManager localizer, JsonObject tool)
+    {
+        string name = ReadString(tool, "Name");
+        string executable = ReadString(tool, "ExecutablePath");
+        bool elevated = tool["RunAsAdministrator"]?.GetValueKind() == JsonValueKind.True;
+        return localizer.Format(elevated ? "SettingsImportValueToolAdmin" : "SettingsImportValueTool", name, executable);
+    }
+
+    private static string ReadString(JsonObject obj, string property)
+        => obj[property] is JsonValue value && value.GetValueKind() == JsonValueKind.String
+            ? value.GetValue<string>()
+            : string.Empty;
 
     /// <summary>A setting value as the preview shows it.</summary>
     internal static string DescribeValue(LocalizationManager localizer, JsonNode? value)

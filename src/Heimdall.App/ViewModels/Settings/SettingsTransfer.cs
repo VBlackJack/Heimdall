@@ -117,7 +117,9 @@ internal static class SettingsTransfer
                 continue;
             }
 
-            exported[key] = value?.DeepClone();
+            exported[key] = key == nameof(AppSettings.CmdLibGitSyncUrl)
+                ? WithoutCredentials(value)
+                : value?.DeepClone();
         }
 
         return new JsonObject
@@ -168,6 +170,24 @@ internal static class SettingsTransfer
         AppSettings result = merged.Deserialize<AppSettings>()
             ?? throw new FormatException("The settings file could not be read.");
         return (result, changed);
+    }
+
+    /// <summary>
+    /// The repository address with any "user:token@" taken out. The access token itself is held back
+    /// from the file; a token typed into the address travelled with it in clear.
+    /// </summary>
+    internal static JsonNode? WithoutCredentials(JsonNode? value)
+    {
+        if (value is not JsonValue scalar
+            || scalar.GetValueKind() != JsonValueKind.String
+            || !Uri.TryCreate(scalar.GetValue<string>(), UriKind.Absolute, out Uri? uri)
+            || string.IsNullOrEmpty(uri.UserInfo))
+        {
+            return value?.DeepClone();
+        }
+
+        UriBuilder builder = new(uri) { UserName = string.Empty, Password = string.Empty };
+        return JsonValue.Create(builder.Uri.ToString());
     }
 
     /// <summary>Whether a value names the user's profile folder anywhere inside it.</summary>

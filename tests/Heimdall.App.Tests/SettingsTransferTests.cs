@@ -181,6 +181,51 @@ public sealed class SettingsTransferTests
         Assert.StartsWith(expectedStart, SettingsImportPreview.Compose(localizer, changes), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ThePreview_ShowsACommandFirst_WholeEvenBehindTwentyHarmlessChanges()
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync("en");
+        string payload = "powershell -NoProfile -Command \"" + new string('x', 120) + "\"";
+        List<SettingsTransferChange> changes = Enumerable.Range(0, 21)
+            .Select(index => new SettingsTransferChange(nameof(AppSettings.TerminalFontSize), JsonValue.Create(index), JsonValue.Create(index + 1)))
+            .Append(new SettingsTransferChange(nameof(AppSettings.CredentialProviderCommand), JsonValue.Create(""), JsonValue.Create(payload)))
+            .ToList();
+
+        string preview = SettingsImportPreview.Compose(localizer, changes);
+
+        // The file's author chose the order, and the command used to land in "and 2 more".
+        Assert.Contains(payload, preview, StringComparison.Ordinal);
+        Assert.StartsWith(localizer["SettingsImportPreviewSensitive"], preview, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ThePreview_NamesEachImportedToolAndItsExecutable()
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync("en");
+        JsonArray tools = new(
+            new JsonObject { ["Name"] = "Ping", ["ExecutablePath"] = @"C:\Windows\ping.exe" },
+            new JsonObject { ["Name"] = "Helper", ["ExecutablePath"] = @"\\share\x.exe", ["RunAsAdministrator"] = true });
+
+        string preview = SettingsImportPreview.Compose(
+            localizer,
+            [new SettingsTransferChange(nameof(AppSettings.ExternalTools), new JsonArray(), tools)]);
+
+        Assert.Contains(@"Ping (C:\Windows\ping.exe)", preview, StringComparison.Ordinal);
+        Assert.Contains(@"Helper (\\share\x.exe, as administrator)", preview, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://alice:ghp_secret@github.com/team/commands.git", "https://github.com/team/commands.git")]
+    [InlineData("https://github.com/team/commands.git", "https://github.com/team/commands.git")]
+    public void AnExport_TakesCredentialsOutOfTheRepositoryAddress(string typed, string exported)
+    {
+        AppSettings settings = new() { CmdLibGitSyncUrl = typed };
+
+        JsonObject file = SettingsTransfer.Export(settings, includeUserPaths: true, Profile, out _);
+
+        Assert.Equal(exported, file[SettingsTransfer.SettingsProperty]![nameof(AppSettings.CmdLibGitSyncUrl)]!.GetValue<string>());
+    }
+
     private static async Task<LocalizationManager> LoadLocalizerAsync(string locale)
     {
         var localizer = new LocalizationManager();
