@@ -272,6 +272,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Tree keyboard and start-up**: Ctrl+A selects every session inside the open folders, Enter opens or closes a focused folder, screen readers hear the selection size once more than one session is selected, and the tree opens on the session selected at the last close
 - **Favorites and states on the row**: the context menu marks or unmarks favorites for one session or a selection, and a favorite row shows a star; a session's connection state is a filled dot and the background reachability result a ring, and both survive a tree reload. Move menus nest like the folder tree, with an "Into" entry for the folder itself
 - Global session logging (opt-in): per-session text transcripts for SSH / Telnet / Local Shell and a connect/disconnect event log (reason + duration) for RDP / VNC / Citrix, restrictive ACLs and size rollover; turning transcripts on asks for a confirmation at Save; **per-profile tri-state override** (force on / off / inherit) in the server dialog
+- Optional transcript retention (off by default): transcripts last written more than N days ago (7 to 3,650) are deleted at startup and whenever the settings are saved; transcripts still being written and the event and file-operation logs are never touched
 - Connection history log (JSONL with auto-rotation)
 - Screenshot capture to clipboard (Ctrl+Shift+S)
 
@@ -298,7 +299,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (6,891 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (6,894 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 

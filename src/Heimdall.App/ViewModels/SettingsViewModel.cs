@@ -1083,6 +1083,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.SessionLogRetentionDays))]
+    private int _sessionLogRetentionDays;
+
+    /// <summary>Text of the field that edits <see cref="SessionLogRetentionDays"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sessionLogRetentionDaysText = string.Empty;
+
+    partial void OnSessionLogRetentionDaysTextChanged(string value)
+        => CommitNumericText(value, parsed => SessionLogRetentionDays = parsed);
+
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
     [SettingRangeOf(nameof(AppSettings.TunnelEstablishmentDelayMs))]
     private int _tunnelEstablishmentDelayMs = 2500;
 
@@ -1830,6 +1844,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SessionLoggingEnabled = settings.SessionLoggingEnabled;
         _savedSessionLoggingEnabled = settings.SessionLoggingEnabled;
         SessionLogDirectory = settings.SessionLogDirectory;
+        SessionLogRetentionDays = settings.SessionLogRetentionDays;
         TunnelEstablishmentDelayMs = settings.TunnelEstablishmentDelayMs;
         RdpConnectWatchdogTimeoutMs = settings.RdpConnectWatchdogTimeoutMs;
         ExternalToolTimeoutMs = settings.ExternalToolTimeoutMs;
@@ -1919,6 +1934,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RdpHostPoolCapacityText = RdpHostPoolCapacity.ToString(CultureInfo.InvariantCulture);
         RdpHostPoolIdleExpiryMinutesText = RdpHostPoolIdleExpiryMinutes.ToString(CultureInfo.InvariantCulture);
         SessionHealthCheckIntervalSecondsText = SessionHealthCheckIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+        SessionLogRetentionDaysText = SessionLogRetentionDays.ToString(CultureInfo.InvariantCulture);
         SessionHealthProbeTimeoutMsText = SessionHealthProbeTimeoutMs.ToString(CultureInfo.InvariantCulture);
         SessionHealthMaxConcurrentText = SessionHealthMaxConcurrent.ToString(CultureInfo.InvariantCulture);
         DefaultResolutionWidthText = DefaultResolutionWidth.ToString(CultureInfo.InvariantCulture);
@@ -2185,6 +2201,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.EnableLogging = EnableLogging;
         settings.SessionLoggingEnabled = SessionLoggingEnabled;
         settings.SessionLogDirectory = SessionLogDirectory;
+        settings.SessionLogRetentionDays = SessionLogRetentionDays;
         settings.TunnelEstablishmentDelayMs = TunnelEstablishmentDelayMs;
         settings.RdpConnectWatchdogTimeoutMs = RdpConnectWatchdogTimeoutMs;
         settings.ExternalToolTimeoutMs = ExternalToolTimeoutMs;
@@ -4220,6 +4237,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.AutoLockIdleMinutes)] = "ValidationSettingsAutoLockIdle",
         [nameof(AppSettings.ExternalToolTimeoutMs)] = "ValidationSettingsExtToolTimeout",
         [nameof(AppSettings.SessionHealthCheckIntervalSeconds)] = "ValidationSettingsHealthCheckInterval",
+        [nameof(AppSettings.SessionLogRetentionDays)] = "ValidationSettingsSessionLogRetention",
         [nameof(AppSettings.SessionHealthProbeTimeoutMs)] = "ValidationSettingsHealthProbeTimeout",
         [nameof(AppSettings.SessionHealthMaxConcurrent)] = "ValidationSettingsHealthMaxConcurrent",
         [nameof(AppSettings.SshKeepAliveIntervalSeconds)] = "ValidationSettingsSshKeepAlive",
@@ -4250,6 +4268,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(RdpHostPoolCapacity)] = "SettingsLabelRdpHostPoolCapacity",
         [nameof(RdpHostPoolIdleExpiryMinutes)] = "SettingsLabelRdpHostPoolIdleExpiry",
         [nameof(SessionHealthCheckIntervalSeconds)] = "SettingsLabelSessionHealthCheckInterval",
+        [nameof(SessionLogRetentionDays)] = "SettingsLabelSessionLogRetentionDays",
         [nameof(SessionHealthProbeTimeoutMs)] = "SettingsLabelSessionHealthProbeTimeout",
         [nameof(SessionHealthMaxConcurrent)] = "SettingsLabelSessionHealthMaxConcurrent",
         [nameof(DefaultResolutionWidth)] = "SettingsLabelRdpWidth",
@@ -4301,6 +4320,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(SessionHealthProbeTimeoutMsText),
         nameof(SessionHealthMaxConcurrent),
         nameof(SessionHealthMaxConcurrentText),
+        nameof(SessionLogRetentionDays),
+        nameof(SessionLogRetentionDaysText),
     ];
 
     /// <summary>

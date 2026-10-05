@@ -123,6 +123,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.SessionHealthProbeTimeoutMs)] = new("SettingsLabelSessionHealthProbeTimeout", "SettingsTabAdvanced", "SettingsAdvancedSubTabDiagnostics"),
         [nameof(AppSettings.SessionLogDirectory)] = new("SettingsLabelSessionLogDirectory", "SettingsTabAdvanced", "SettingsAdvancedSubTabDiagnostics"),
         [nameof(AppSettings.SessionLoggingEnabled)] = new("SettingsLabelSessionLoggingEnabled", "SettingsTabAdvanced", "SettingsAdvancedSubTabDiagnostics"),
+        [nameof(AppSettings.SessionLogRetentionDays)] = new("SettingsLabelSessionLogRetentionDays", "SettingsTabAdvanced", "SettingsAdvancedSubTabDiagnostics"),
         [nameof(AppSettings.TunnelEstablishmentDelayMs)] = new("SettingsLabelTunnelDelay", "SettingsTabAdvanced", "SettingsAdvancedSubTabDiagnostics"),
         [nameof(AppSettings.CmdLibGitSyncAuthorEmail)] = new("A11ySettingsCmdLibSyncAuthorEmail", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.CmdLibGitSyncAuthorName)] = new("A11ySettingsCmdLibSyncAuthorName", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),

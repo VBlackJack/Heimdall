@@ -34,6 +34,15 @@ public sealed class SessionLogService : ISessionLogService
 {
     private const string LogFileExtension = ".log";
 
+    /// <summary>
+    /// A transcript's own name: "{protocol}_{host}_{yyyyMMdd_HHmmss}", a "_N" disambiguator, a
+    /// ".N" continuation. The shared event and operation logs in the same folder never match.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex TranscriptFileName = new(
+        @"_\d{8}_\d{6}(?:_\d+)?(?:\.\d+)?\.log$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant
+            | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
     /// <summary>Backoff schedule (ms) for transient IO failures; mirrors <c>FileLogger</c>.</summary>
     private static readonly int[] RetryDelaysMs = [10, 50, 200];
 
@@ -193,6 +202,62 @@ public sealed class SessionLogService : ISessionLogService
             writer.Close(footer);
             writer.Dispose();
         }
+    }
+
+    /// <inheritdoc />
+    public int PruneExpiredTranscripts(int retentionDays) => PruneExpiredTranscripts(retentionDays, DateTime.UtcNow);
+
+    /// <summary>The prune against a given clock, for tests.</summary>
+    internal int PruneExpiredTranscripts(int retentionDays, DateTime nowUtc)
+    {
+        if (retentionDays <= 0 || _disposed || !Directory.Exists(_rootDirectory))
+        {
+            return 0;
+        }
+
+        DateTime cutoff = nowUtc.AddDays(-retentionDays);
+        string[] activeStems = _writers.Values
+            .Select(writer => Path.ChangeExtension(writer.BasePath, null))
+            .ToArray();
+
+        int deleted = 0;
+        try
+        {
+            foreach (string path in Directory.EnumerateFiles(_rootDirectory, "*" + LogFileExtension, SearchOption.TopDirectoryOnly))
+            {
+                if (!TranscriptFileName.IsMatch(Path.GetFileName(path))
+                    || activeStems.Any(stem => path.StartsWith(stem, StringComparison.OrdinalIgnoreCase))
+                    || File.GetLastWriteTimeUtc(path) >= cutoff)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    File.Delete(path);
+                    deleted++;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Held or protected: it stays for the next pass.
+                    _logger.LogWarning("Session transcript retention could not delete {Path}: {Reason}", path, ex.Message);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Session transcript retention could not list {Root}: {Reason}", _rootDirectory, ex.Message);
+        }
+
+        if (deleted > 0)
+        {
+            _logger.LogInformation(
+                "Session transcript retention deleted {Count} transcript(s) older than {Days} day(s).",
+                deleted,
+                retentionDays);
+        }
+
+        return deleted;
     }
 
     /// <inheritdoc />

@@ -1000,6 +1000,23 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task SessionLogRetention_IsOffByDefault_AndRoundTripsThroughSave()
+    {
+        var config = new FakeConfigManager();
+        var viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(new AppSettings());
+
+        Assert.Equal(0, viewModel.SessionLogRetentionDays);
+        Assert.Equal("0", viewModel.SessionLogRetentionDaysText);
+
+        viewModel.SessionLogRetentionDaysText = "90";
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var saved = Assert.IsType<AppSettings>(config.SavedSettings);
+        Assert.Equal(90, saved.SessionLogRetentionDays);
+    }
+
+    [Fact]
     public async Task SessionHealthMonitorSettings_SaveCommand_PersistsAllFieldsToAppSettings()
     {
         var config = new FakeConfigManager();

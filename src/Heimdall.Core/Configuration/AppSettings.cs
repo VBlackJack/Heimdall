@@ -313,6 +313,13 @@ public sealed class AppSettings
     public string SessionLogDirectory { get; set; } = @"logs\sessions";
 
     /// <summary>
+    /// Days a session transcript is kept after its last write; 0 keeps every transcript. Off by
+    /// default: transcripts can be audit records, so deleting them is the user's choice to make.
+    /// </summary>
+    [SettingRange(7, 3650, ZeroMeansOff = true)]
+    public int SessionLogRetentionDays { get; set; }
+
+    /// <summary>
     /// Scope applied when broadcast (type-once, send-to-many) mode is active.
     /// Defaults to <see cref="BroadcastScope.CurrentTab"/> so input never reaches
     /// background tabs without an explicit, confirmed opt-in.
