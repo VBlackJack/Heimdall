@@ -2308,13 +2308,20 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             // position is resolved against the list MergeSettingAsync reloads under its lock,
             // and an edit to a gateway deleted meanwhile is reported instead of dropped.
             bool applied = false;
+            bool parentChangeRefused = false;
             await _configManager.MergeSettingAsync(current =>
-                applied = GatewayEditCommit.Apply(current, gateway.Id, result.Gateway));
+                applied = GatewayEditCommit.Apply(current, gateway.Id, result.Gateway, out parentChangeRefused));
             if (!applied)
             {
                 _dialogService.ShowError(
                     _localizer["GatewayDialogTitleEdit"],
                     _localizer.Format("ErrorGatewayDeletedWhileEditing", gateway.Name));
+            }
+            else if (parentChangeRefused)
+            {
+                _dialogService.ShowWarning(
+                    _localizer["GatewayParentChangeRefusedTitle"],
+                    _localizer.Format("GatewayParentChangeRefusedMessage", result.Gateway.Name));
             }
 
             AppSettings refreshed = await _configManager.LoadSettingsAsync();

@@ -532,6 +532,47 @@ public sealed partial class SettingsViewModelTests : IDisposable
         Assert.Equal("new-secret", persisted.SshPasswordEncrypted);
     }
 
+    // Two windows each offered a parent that was safe against what they had loaded: the server
+    // dialog made B a child of A while this panel made A a child of B, and saving both closed a
+    // loop that only showed when a session failed to connect. Proved against the mutant that
+    // skips the check on save: A is written under B and this goes red.
+    [Fact]
+    public async Task Save_KeepsTheStoredParentWhenAnotherWindowMadeTheNewOneALoop()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                SshGateways = [CreateGateway("gw-a", "A"), CreateGateway("gw-b", "B")]
+            }
+        };
+        SshGatewayDto aUnderB = CreateGateway("ignored", "A renamed");
+        aUnderB.ParentGatewayId = "gw-b";
+        FakeDialogService dialog = new()
+        {
+            GatewayDialogResultToReturn = new GatewayDialogResult(aUnderB, true)
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.SelectedGateway = viewModel.Gateways.Single(row => row.Id == "gw-a");
+        await viewModel.EditGatewayCommand.ExecuteAsync(null);
+
+        SshGatewayDto bUnderA = CreateGateway("unused", "B");
+        bUnderA.ParentGatewayId = "gw-a";
+        await config.MergeSettingAsync(settings =>
+            Assert.True(GatewayEditCommit.Apply(settings, "gw-b", bUnderA)));
+
+        Assert.True(await viewModel.TrySaveAsync());
+
+        SshGatewayDto a = config.Settings.SshGateways.Single(gateway => gateway.Id == "gw-a");
+        Assert.Null(a.ParentGatewayId);
+        Assert.Equal("A renamed", a.Name);
+        Assert.Equal("gw-a", config.Settings.SshGateways.Single(gateway => gateway.Id == "gw-b").ParentGatewayId);
+        Assert.Null(viewModel.Gateways.Single(row => row.Id == "gw-a").ParentGatewayId);
+        Assert.Contains("A renamed", Assert.Single(dialog.WarningCalls).Message, StringComparison.Ordinal);
+    }
+
     // The panel buffered on purpose and still does, but a gateway it never edited is not a draft:
     // left on the old copy, its row kept the old name and the next edit here started from it.
     [Fact]

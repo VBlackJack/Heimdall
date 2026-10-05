@@ -41,8 +41,27 @@ public static class GatewayEditCommit
     /// the dialog was open. Not finding it is not an error: the edit is dropped rather than
     /// resurrecting a gateway someone removed on purpose.
     /// </returns>
-    public static bool Apply(AppSettings settings, string gatewayId, SshGatewayDto updated)
+    public static bool Apply(AppSettings settings, string gatewayId, SshGatewayDto updated) =>
+        Apply(settings, gatewayId, updated, out _);
+
+    /// <summary>
+    /// Replaces the gateway carrying <paramref name="gatewayId"/> with
+    /// <paramref name="updated"/>, keeping its stored parent when the new one is no longer
+    /// allowed.
+    /// </summary>
+    /// <param name="parentChangeRefused">
+    /// <see langword="true"/> when the edit chose a parent the list handed in no longer allows,
+    /// typically because another window changed the gateways in between, and the stored parent
+    /// was kept instead. The rest of the edit is applied either way.
+    /// </param>
+    /// <returns>The same as <see cref="Apply(AppSettings, string, SshGatewayDto)"/>.</returns>
+    public static bool Apply(
+        AppSettings settings,
+        string gatewayId,
+        SshGatewayDto updated,
+        out bool parentChangeRefused)
     {
+        parentChangeRefused = false;
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(updated);
         ArgumentException.ThrowIfNullOrWhiteSpace(gatewayId);
@@ -54,8 +73,13 @@ public static class GatewayEditCommit
             return false;
         }
 
+        // The stored entry is replaced, not mutated, so a shallow copy still holds its parent.
+        List<SshGatewayDto> persisted = [.. settings.SshGateways];
         updated.Id = settings.SshGateways[index].Id;
         settings.SshGateways[index] = updated;
+        parentChangeRefused = GatewayParentEligibility
+            .RevertIneligibleParentChanges(settings.SshGateways, persisted, [updated.Id])
+            .Count > 0;
         return true;
     }
 }
