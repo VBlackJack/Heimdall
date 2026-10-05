@@ -102,6 +102,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     /// </summary>
     public Action<SessionTabViewModel, SessionPaneModel>? ReconnectPaneRequestedCallback { get; set; }
 
+    /// <inheritdoc />
+    public Action<SessionTabViewModel, SessionPaneModel?>? HostReconnectRequestedCallback { get; set; }
+
+    /// <inheritdoc />
+    public Action<SessionTabViewModel, SessionPaneModel?>? HostCloseRequestedCallback { get; set; }
+
     /// <summary>
     /// Optional callback invoked when an embedded view requests user-driven disconnect.
     /// Parameters: (SessionTabViewModel session, SessionPaneModel pane, DisconnectReason reason).
@@ -261,18 +267,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 multimonFallbackStatusKey,
                 _tunnelService.GetRecentForwardedPortFailure);
             WireSplitRequested(view, sessionTab);
-            view.ReconnectRequested += () =>
-                ReconnectRequestedCallback?.Invoke(
-                    sessionTab,
-                    sessionTab.ProfileLookupServerId,
-                    sessionTab.ConnectionType);
+            view.ReconnectRequested += () => RequestHostReconnect(sessionTab, view.OwningPane);
             view.DisconnectRequested += () =>
                 DisconnectRequestedCallback?.Invoke(
                     sessionTab,
                     view.OwningPane ?? sessionTab.PrimaryPane,
                     DisconnectReason.UserAction);
             view.EditServerRequested += serverId => EditServerRequestedCallback?.Invoke(serverId);
-            view.CloseRequested += () => CloseRequestedCallback?.Invoke(sessionTab);
+            view.CloseRequested += () => RequestHostClose(sessionTab, view.OwningPane);
             return view;
         }
 
@@ -1025,8 +1027,11 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         view.EditProfileRequested += () => EditServerRequestedCallback?.Invoke(
             view.OwningPane?.ProfileLookupServerId ?? tab.ProfileLookupServerId);
         view.ReconnectContextRequested += context =>
-            ForwardReconnectRequest(tab, context, ReconnectRequestedCallback);
-        view.CloseRequested += () => CloseRequestedCallback?.Invoke(tab);
+        {
+            StoreReconnectRequest(tab, context);
+            RequestHostReconnect(tab, view.OwningPane);
+        };
+        view.CloseRequested += () => RequestHostClose(tab, view.OwningPane);
         view.CurrentDirectoryChanged += path => FollowSftpToCurrentDirectory(tab, path);
     }
 
@@ -1041,13 +1046,61 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             return;
         }
 
+        StoreReconnectRequest(tab, context);
+        callback(tab, tab.ProfileLookupServerId, tab.ConnectionType);
+    }
+
+    private static void StoreReconnectRequest(SessionTabViewModel tab, ReconnectRequestContext context)
+    {
         PendingReconnectState state = PendingReconnectStates.GetOrCreateValue(tab);
         lock (state.SyncRoot)
         {
             state.Request = context;
         }
+    }
 
-        callback(tab, tab.ProfileLookupServerId, tab.ConnectionType);
+    /// <summary>
+    /// Moves a reconnect request recorded against one tab to another, for a host that has moved
+    /// to a tab other than the one it was created for.
+    /// </summary>
+    internal static void MoveReconnectRequest(SessionTabViewModel from, SessionTabViewModel to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+        StoreReconnectRequest(to, TakeReconnectRequest(from));
+    }
+
+    // A host's Reconnect and Close used to name only the tab it was created for. In a split
+    // that acted on the whole tab: the secondary SSH pane of an RDP + SSH tab dropped, and its
+    // reconnect closed the tab and reconnected the RDP server, while the pane itself never came
+    // back. After a merge or a detach the tab was not even the one the host was in. The pane
+    // travels with the request now, and the receiver works out where it is.
+    private void RequestHostReconnect(SessionTabViewModel tab, SessionPaneModel? pane)
+    {
+        if (HostReconnectRequestedCallback is { } routed)
+        {
+            routed(tab, pane);
+            return;
+        }
+
+        if (tab.IsSplit && pane is not null)
+        {
+            ReconnectPaneRequestedCallback?.Invoke(tab, pane);
+            return;
+        }
+
+        ReconnectRequestedCallback?.Invoke(tab, tab.ProfileLookupServerId, tab.ConnectionType);
+    }
+
+    private void RequestHostClose(SessionTabViewModel tab, SessionPaneModel? pane)
+    {
+        if (HostCloseRequestedCallback is { } routed)
+        {
+            routed(tab, pane);
+            return;
+        }
+
+        CloseRequestedCallback?.Invoke(tab);
     }
 
     internal static ReconnectRequestContext TakeReconnectRequest(SessionTabViewModel tab)
@@ -1163,20 +1216,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     {
         view.EditProfileRequested += () => EditServerRequestedCallback?.Invoke(
             view.OwningPane?.ProfileLookupServerId ?? tab.ProfileLookupServerId);
-        view.ReconnectRequested += () =>
-        {
-            if (tab.IsSplit && view.OwningPane is { } ownerPane)
-            {
-                ReconnectPaneRequestedCallback?.Invoke(tab, ownerPane);
-                return;
-            }
-
-            ReconnectRequestedCallback?.Invoke(
-                tab,
-                tab.ProfileLookupServerId,
-                tab.ConnectionType);
-        };
-        view.CloseRequested += () => CloseRequestedCallback?.Invoke(tab);
+        view.ReconnectRequested += () => RequestHostReconnect(tab, view.OwningPane);
+        view.CloseRequested += () => RequestHostClose(tab, view.OwningPane);
     }
 
     private void WireSplitRequested(EmbeddedSshView view, SessionTabViewModel tab)

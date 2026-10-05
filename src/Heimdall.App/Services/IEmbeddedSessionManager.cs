@@ -89,6 +89,29 @@ public interface IEmbeddedSessionManager
     Action<SessionTabViewModel>? CloseRequestedCallback { get; set; }
 
     /// <summary>
+    /// Optional callback for a host's own Reconnect, given the tab the host was created for and
+    /// the pane it sits in, when it knows it. When set, it replaces
+    /// <see cref="ReconnectRequestedCallback"/> and <see cref="ReconnectPaneRequestedCallback"/>
+    /// for host-raised requests, so the receiver can act on the pane rather than the whole tab.
+    /// </summary>
+    Action<SessionTabViewModel, SessionPaneModel?>? HostReconnectRequestedCallback
+    {
+        get => null;
+        set { }
+    }
+
+    /// <summary>
+    /// Optional callback for a host's own Close, given the tab the host was created for and the
+    /// pane it sits in, when it knows it. When set, it replaces
+    /// <see cref="CloseRequestedCallback"/> for host-raised requests.
+    /// </summary>
+    Action<SessionTabViewModel, SessionPaneModel?>? HostCloseRequestedCallback
+    {
+        get => null;
+        set { }
+    }
+
+    /// <summary>
     /// Optional callback invoked when an embedded RDP view requests server profile editing.
     /// Parameters: (string serverId).
     /// Wired by MainViewModel to open the existing server edit flow.

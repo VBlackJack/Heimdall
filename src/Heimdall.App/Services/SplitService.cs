@@ -22,6 +22,7 @@ using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
 
@@ -603,6 +604,19 @@ public sealed class SplitService : ISplitService
     /// Reconnects a pane by closing its old connection and re-establishing it.
     /// Supports cancellation when the session tab is closed during reconnection.
     /// </summary>
+    // A pane with no host and no failure reads as still connecting: it showed the loading
+    // overlay, which has no Reconnect or Close button, a second reconnect skipped it as already
+    // in progress, and a merge refused its tab. These failures left exactly that. The failure is
+    // recorded so the pane shows its disconnected overlay and can be tried again.
+    private static void MarkPaneReconnectFailed(SessionPaneModel pane, string messageKey, string? detail)
+    {
+        pane.Status = SessionStatusTokens.Error;
+        pane.FailureDetails = new SessionDiagnostic(
+            SessionFailureStage.GenericFailure,
+            messageKey,
+            Detail: detail);
+    }
+
     public async Task ReconnectPaneAsync(SessionTabViewModel session, string paneId)
     {
         var ct = GetSessionToken(session);
@@ -671,7 +685,7 @@ public sealed class SplitService : ISplitService
 
             if (serverDto is null)
             {
-                pane.Status = SessionStatusTokens.Error;
+                MarkPaneReconnectFailed(pane, "ErrorServerNotFound", detail: null);
                 Core.Logging.FileLogger.Warn(
                     $"ReconnectPane failed: server '{serverId}' no longer in inventory.");
                 return;
@@ -702,8 +716,16 @@ public sealed class SplitService : ISplitService
                 // Protocol handlers own transport rollback before returning failure.
                 // Remove only the pane state key to avoid releasing a shared tunnel twice.
                 TryTeardownFailedDispatchState(ref pendingDispatchKey, "ReconnectPane failure");
-                pane.Status = SessionStatusTokens.Error;
-                pane.FailureDetails = result.Failure;
+                if (result.Failure is not null)
+                {
+                    pane.Status = SessionStatusTokens.Error;
+                    pane.FailureDetails = result.Failure;
+                }
+                else
+                {
+                    MarkPaneReconnectFailed(pane, "ErrorSplitSessionFailed", result.ErrorMessage);
+                }
+
                 SetStatusText?.Invoke(result.ErrorMessage ?? _localizer["ErrorSplitSessionFailed"]);
                 Core.Logging.FileLogger.Warn(
                     $"ReconnectPane failed for '{paneScopedServerDto.DisplayName}': {result.ErrorMessage}");
@@ -744,7 +766,7 @@ public sealed class SplitService : ISplitService
             {
                 SafeDisposeSessionResult(result.Session);
                 CleanupOrphanedPane(paneScopedServerDto.Id);
-                pane.Status = SessionStatusTokens.Error;
+                MarkPaneReconnectFailed(pane, "ErrorSplitSessionFailed", ex.Message);
                 SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
                 Core.Logging.FileLogger.Error(
                     $"ReconnectPane host creation failed for '{paneScopedServerDto.DisplayName}': {ex.Message}", ex);
@@ -780,7 +802,7 @@ public sealed class SplitService : ISplitService
         }
         catch (Exception ex)
         {
-            pane.Status = SessionStatusTokens.Error;
+            MarkPaneReconnectFailed(pane, "ErrorSplitSessionFailed", ex.Message);
             TryTeardownFailedDispatchState(ref pendingDispatchKey, "ReconnectPane exception");
             ReleaseOldConnectionStateOnce("ReconnectPane exception");
             Core.Logging.FileLogger.Error($"ReconnectPane error: {ex.Message}", ex);
@@ -1092,10 +1114,11 @@ public sealed class SplitService : ISplitService
             paneConnectionType,
             serverDto.ConnectionType);
 
-        if (string.Equals(connectionType, "WINRM", StringComparison.OrdinalIgnoreCase))
-        {
-            _connectionSm.TryTransition(serverDto.Id, ConnectionState.Initializing);
-        }
+        // Every handler starts at ValidatingConfig, which the state machine only accepts from
+        // Initializing. Only WinRM used to be given that first step here, so a split pane of any
+        // other protocol had every later transition refused, without a word, and never showed as
+        // connected. The main connection pipeline takes the same step for every protocol.
+        _connectionSm.TryTransition(serverDto.Id, ConnectionState.Initializing);
 
         return connectionType.ToUpperInvariant() switch
         {
