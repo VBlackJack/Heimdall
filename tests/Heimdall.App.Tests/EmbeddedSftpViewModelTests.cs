@@ -1964,6 +1964,52 @@ public sealed class EmbeddedSftpViewModelTests
         Assert.Equal(1, actionRuns);
     }
 
+    [Fact]
+    public void Status_OfASecondarySftpPane_StaysOnThatPane()
+    {
+        var primary = new Heimdall.Core.Models.SessionPaneModel { Status = SessionStatusTokens.Connected };
+        var secondary = new Heimdall.Core.Models.SessionPaneModel { Status = SessionStatusTokens.Connected };
+        var tab = new SessionTabViewModel
+        {
+            RootContent = new Heimdall.Core.Models.SplitContainerModel { First = primary, Second = secondary },
+        };
+        var viewModel = new EmbeddedSftpViewModel(new FakeUiDispatcher());
+        SetSessionTab(viewModel, tab);
+        viewModel.OwnerPane = secondary;
+
+        viewModel.UpdateStatus("Disconnected");
+        Assert.Equal(SessionStatusTokens.Disconnected, secondary.Status);
+        Assert.Equal(SessionStatusTokens.Connected, primary.Status);
+
+        secondary.Status = SessionStatusTokens.Connected;
+        viewModel.SetErrorStatus("failed");
+        Assert.Equal(SessionStatusTokens.Disconnected, secondary.Status);
+        Assert.Equal(SessionStatusTokens.Connected, primary.Status);
+    }
+
+    [Fact]
+    public void Status_OfThePrimaryOrAnUnboundPane_IsTheTabs()
+    {
+        var tab = new SessionTabViewModel { Status = SessionStatusTokens.Connected };
+        var viewModel = new EmbeddedSftpViewModel(new FakeUiDispatcher());
+        SetSessionTab(viewModel, tab);
+
+        viewModel.UpdateStatus("Disconnected");
+        Assert.Equal(SessionStatusTokens.Disconnected, tab.Status);
+
+        tab.Status = SessionStatusTokens.Connected;
+        viewModel.OwnerPane = tab.PrimaryPane;
+        viewModel.UpdateStatus("Disconnected");
+        Assert.Equal(SessionStatusTokens.Disconnected, tab.Status);
+    }
+
+    private static void SetSessionTab(EmbeddedSftpViewModel viewModel, SessionTabViewModel tab)
+    {
+        PropertyInfo? property = typeof(EmbeddedSftpViewModel).GetProperty(nameof(EmbeddedSftpViewModel.SessionTab));
+        Assert.NotNull(property);
+        property!.SetValue(viewModel, tab);
+    }
+
     private static Task InvokeRunOnUiAsync(EmbeddedSftpViewModel viewModel, Action action)
     {
         var method = typeof(EmbeddedSftpViewModel).GetMethod("RunOnUiAsync", BindingFlags.Instance | BindingFlags.NonPublic);

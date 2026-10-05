@@ -1652,6 +1652,7 @@
   "LogSessionDuplicated": "Sesión duplicada: {0}",
   "LogSessionRenamed": "Pestaña renombrada: {0} → {1}",
   "LogSessionDetached": "Sesión separada a ventana: {0}",
+  "StatusDetachSplitTabRefused": "Una pestaña dividida no se puede mover a su propia ventana. Deshaga primero la división.",
   "SessionCtxReattach": "Volver a adjuntar a la ventana principal",
   "SessionCtxReattachHint": "Mover esta sesión de vuelta a la ventana principal como pestaña",
   "LogSessionReattached": "Sesión reincorporada a la ventana principal: {0}",

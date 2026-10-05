@@ -1652,6 +1652,7 @@
   "LogSessionDuplicated": "Duplicated session: {0}",
   "LogSessionRenamed": "Tab renamed: {0} \u2192 {1}",
   "LogSessionDetached": "Session detached to window: {0}",
+  "StatusDetachSplitTabRefused": "A split tab cannot be moved to its own window. Unsplit it first.",
   "SessionCtxReattach": "Reattach to Main Window",
   "SessionCtxReattachHint": "Move this session back to the main window as a tab",
   "LogSessionReattached": "Session reattached to main window: {0}",
