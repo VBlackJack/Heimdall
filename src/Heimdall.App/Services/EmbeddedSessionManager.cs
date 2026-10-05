@@ -1029,10 +1029,35 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         view.ReconnectContextRequested += context =>
         {
             StoreReconnectRequest(tab, context);
-            RequestHostReconnect(tab, view.OwningPane);
+            RequestHostReconnect(tab, TerminalRoutingPane(tab, view.OwningPane));
         };
-        view.CloseRequested += () => RequestHostClose(tab, view.OwningPane);
+        view.CloseRequested += () => RequestHostClose(tab, TerminalRoutingPane(tab, view.OwningPane));
         view.CurrentDirectoryChanged += path => FollowSftpToCurrentDirectory(tab, path);
+    }
+
+    /// <summary>
+    /// The pane a terminal host's Reconnect and Close act on, or null for its whole tab.
+    /// </summary>
+    /// <remarks>
+    /// A terminal still primary in the tab it was opened in, with nothing beside it but its own SFTP
+    /// companion, is that tab: Close closes both, and Reconnect goes through the tab path, which keeps
+    /// the automatic retry chain and reopens the companion. That is the default layout, since the
+    /// companion opens with every SSH session. Anywhere else - swapped, merged, detached, or beside
+    /// another server - the host acts on its own pane, so another live session is never closed with it.
+    /// </remarks>
+    internal static SessionPaneModel? TerminalRoutingPane(SessionTabViewModel createdFor, SessionPaneModel? pane)
+    {
+        ArgumentNullException.ThrowIfNull(createdFor);
+        if (pane is null || !ReferenceEquals(createdFor.PrimaryPane, pane))
+        {
+            return pane;
+        }
+
+        bool onlyItsCompanionBeside = SplitTreeHelper.EnumerateLeaves(createdFor.RootContent)
+            .Where(leaf => !ReferenceEquals(leaf, pane))
+            .All(leaf => string.Equals(leaf.ConnectionType, "SFTP", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(leaf.ProfileLookupServerId, pane.ProfileLookupServerId, StringComparison.Ordinal));
+        return onlyItsCompanionBeside ? null : pane;
     }
 
     internal static void ForwardReconnectRequest(
