@@ -153,11 +153,74 @@ public sealed class ConnectionService : IConnectionService
                 _localizer.Format("ErrorGatewayNotFound", server.SshGatewayId, server.DisplayName));
         }
 
+        PreflightResult? unreadable = FindUnreadableGatewaySecret(gateway, settings.SshGateways);
+        if (unreadable is not null)
+        {
+            return unreadable;
+        }
+
         var connParams = ConnectionHelpers.CreateGatewayConnectionParams(
             gateway,
             settings.SshAgentPreference);
         bool isTunnel = server.ConnectionType?.Equals("RDP", StringComparison.OrdinalIgnoreCase) == true;
         return AuthPreflightChecker.Check(connParams, isTunnelMode: isTunnel);
+    }
+
+    /// <summary>
+    /// Finds a gateway on the route whose stored password or passphrase cannot be decrypted.
+    /// </summary>
+    /// <remarks>
+    /// A secret that does not decrypt - a configuration copied from another machine or Windows
+    /// account, a tampered value - came back as no secret at all. The hop was then treated as
+    /// agent-only, and the user was told that no SSH agent was running, or that the server had
+    /// refused an agent key, when the actual problem was a password Heimdall could not read.
+    /// Every hop is checked, since the unreadable one can be a parent of the gateway the session
+    /// names. A route that does not resolve is left to the connection to report.
+    /// </remarks>
+    private PreflightResult? FindUnreadableGatewaySecret(
+        SshGatewayDto gateway,
+        IReadOnlyList<SshGatewayDto> gateways)
+    {
+        IReadOnlyList<SshGatewayDto> route;
+        try
+        {
+            route = GatewayChainResolver.ResolveChainDtos(gateway.Id, gateways);
+        }
+        catch (Exception ex) when (ex is ArgumentException or GatewayChainException)
+        {
+            route = [gateway];
+        }
+
+        foreach (SshGatewayDto hop in route)
+        {
+            if (IsUnreadable(hop.SshPasswordEncrypted) || IsUnreadable(hop.SshKeyPassphraseEncrypted))
+            {
+                return PreflightResult.Fail(
+                    SshFailureCode.CredentialUnreadable,
+                    _localizer.Format("ErrorGatewayCredentialUnreadable", hop.Name));
+            }
+        }
+
+        return null;
+
+        // A vault secret behind a locked vault throws instead of returning null. That is not an
+        // unreadable secret, and the connection path already asks for the vault to be unlocked.
+        static bool IsUnreadable(string? encrypted)
+        {
+            if (string.IsNullOrEmpty(encrypted))
+            {
+                return false;
+            }
+
+            try
+            {
+                return ConnectionHelpers.DecryptPassword(encrypted) is null;
+            }
+            catch (Heimdall.Core.Security.Vault.VaultLockedException)
+            {
+                return false;
+            }
+        }
     }
 
     // --- Protocol dispatch -------------------------------------------------

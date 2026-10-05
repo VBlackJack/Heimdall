@@ -80,4 +80,48 @@ public sealed class ServerDialogSshCredentialTests
         Assert.Null(vm.ExistingSshKeyPassphraseEncrypted);
         Assert.Equal("", vm.SshKeyPassphrase);
     }
+
+    // A session saved before the passphrase field existed offers its stored password to the key,
+    // and that mapping is read off the field being absent. Saving it back with an empty field
+    // declared switched the mapping off, so renaming the session was enough to stop its
+    // encrypted key from loading.
+    [Fact]
+    public void FromDtoToDto_LegacyProfileEditedWithoutPassphrase_KeepsLegacyMapping()
+    {
+        ServerProfileDto legacy = LegacyProfile();
+        Assert.True(legacy.UsesLegacySshCredentialMapping);
+
+        ServerDialogViewModel vm = ServerDialogViewModel.FromDto(legacy);
+        vm.DisplayName = "Renamed";
+
+        ServerProfileDto dto = vm.ToDto();
+
+        Assert.Equal("Renamed", dto.DisplayName);
+        Assert.False(dto.HasSshKeyPassphraseEncryptedField);
+        Assert.True(dto.UsesLegacySshCredentialMapping);
+    }
+
+    // A profile that declared an empty passphrase must not become a legacy one through an edit.
+    [Fact]
+    public void FromDtoToDto_ProfileDeclaringAnEmptyPassphrase_StaysDeclared()
+    {
+        ServerProfileDto declared = LegacyProfile();
+        declared.SshKeyPassphraseEncrypted = string.Empty;
+
+        ServerProfileDto dto = ServerDialogViewModel.FromDto(declared).ToDto();
+
+        Assert.True(dto.HasSshKeyPassphraseEncryptedField);
+        Assert.False(dto.UsesLegacySshCredentialMapping);
+    }
+
+    private static ServerProfileDto LegacyProfile() => new()
+    {
+        Id = "legacy",
+        DisplayName = "Legacy",
+        RemoteServer = "host",
+        ConnectionType = "SSH",
+        SshUsername = "user",
+        SshKeyPath = @"C:\keys\id_rsa",
+        SshPasswordEncrypted = "encrypted-password"
+    };
 }

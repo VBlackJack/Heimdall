@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
@@ -90,6 +91,63 @@ public sealed partial class ServerListSelectionTests
         // separates the two is whether the handler ran at all, and the dispatcher counts that.
         Assert.Equal(scheduledBeforeTheChange, fixture.Dispatcher.InvokeAsyncCalls);
         Assert.Contains("Paris datacentre", fixture.ServerById("alpha").GatewayBadgeText);
+    }
+
+    // Edit gateway from the session dialog lived in the window's code-behind: the list kept the
+    // old name after a rename, because nothing handed the dialog the options again.
+    [Fact]
+    public async Task EditGatewayFromSessionDialog_ReturnsTheOptionsAfterTheRename()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        await fixture.ConfigManager.SaveSettingsAsync(GatewaySettings("gw-1", "Paris datacentre"));
+        fixture.Dialogs.GatewayDialog = vm =>
+        {
+            vm!.Name = "Berlin datacentre";
+            return Task.FromResult<GatewayDialogResult?>(new GatewayDialogResult(vm.ToDto(), true));
+        };
+
+        IReadOnlyList<GatewayOption>? options = await fixture.ViewModel.EditGatewayFromSessionDialogAsync("gw-1");
+
+        Assert.NotNull(options);
+        Assert.Equal("Berlin datacentre", Assert.Single(options!).Name);
+        Assert.Equal("Berlin datacentre", Assert.Single((await fixture.ConfigManager.LoadSettingsAsync()).SshGateways).Name);
+        Assert.Empty(fixture.Dialogs.Errors);
+    }
+
+    // An edit to a gateway deleted while the dialog was open was dropped without a word.
+    [Fact]
+    public async Task EditGatewayFromSessionDialog_GatewayDeletedMeanwhile_SaysSoAndDoesNotResurrectIt()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        await fixture.ConfigManager.SaveSettingsAsync(GatewaySettings("gw-1", "Paris datacentre"));
+        fixture.Dialogs.GatewayDialog = async vm =>
+        {
+            await fixture.ConfigManager.SaveSettingsAsync(new AppSettings());
+            return new GatewayDialogResult(vm!.ToDto(), true);
+        };
+
+        IReadOnlyList<GatewayOption>? options = await fixture.ViewModel.EditGatewayFromSessionDialogAsync("gw-1");
+
+        Assert.Empty(options!);
+        Assert.Empty((await fixture.ConfigManager.LoadSettingsAsync()).SshGateways);
+        Assert.Contains("Paris datacentre", Assert.Single(fixture.Dialogs.Errors), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EditGatewayFromSessionDialog_UnknownGateway_SaysSoWithoutOpeningTheEditor()
+    {
+        await using var fixture = await ServerListSelectionFixture.CreateAsync();
+        bool opened = false;
+        fixture.Dialogs.GatewayDialog = _ =>
+        {
+            opened = true;
+            return Task.FromResult<GatewayDialogResult?>(null);
+        };
+
+        await fixture.ViewModel.EditGatewayFromSessionDialogAsync("gw-gone");
+
+        Assert.False(opened);
+        Assert.Contains("gw-gone", Assert.Single(fixture.Dialogs.Errors), StringComparison.Ordinal);
     }
 
     private static AppSettings GatewaySettings(string gatewayId, string gatewayName)

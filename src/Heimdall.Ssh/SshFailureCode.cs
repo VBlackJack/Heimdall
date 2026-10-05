@@ -137,5 +137,12 @@ public enum SshFailureCode
     CircularChainDependency,
 
     /// <summary>Operation was cancelled via CancellationToken.</summary>
-    Cancelled
+    Cancelled,
+
+    /// <summary>
+    /// A stored gateway secret cannot be decrypted on this machine or Windows account, for
+    /// example after the configuration was copied from another one. Appended last so that the
+    /// values of the existing codes do not move.
+    /// </summary>
+    CredentialUnreadable
 }

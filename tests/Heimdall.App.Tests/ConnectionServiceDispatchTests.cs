@@ -23,8 +23,18 @@ using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests;
 
-public sealed class ConnectionServiceDispatchTests
+// The unreadable-secret preflight decrypts through CredentialProtector, so the class shares its
+// process-global state with the vault tests and owns a scope around every test.
+[Collection(CredentialProtectorAppCollection.Name)]
+public sealed class ConnectionServiceDispatchTests : IDisposable
 {
+    private readonly CredentialProtectorStateScope _scope = new();
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+    }
+
     [Fact]
     public async Task RunPreflight_MissingGateway_ReturnsActionableFailure()
     {
@@ -58,6 +68,72 @@ public sealed class ConnectionServiceDispatchTests
             Assert.Contains("missing-gateway", result.Message, StringComparison.Ordinal);
             Assert.Contains("Missing Gateway Test", result.Message, StringComparison.Ordinal);
             Assert.Contains("Settings", result.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    // A secret that does not decrypt used to come back as no secret, so the hop was treated as
+    // agent-only and the user was told about an SSH agent. The unreadable gateway can be a
+    // parent of the one the session names, so the whole route is checked.
+    [Fact]
+    public async Task RunPreflight_UnreadableSecretOnAParentGateway_NamesThatGateway()
+    {
+        string rootPath = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-preflight-unreadable-secret",
+            Guid.NewGuid().ToString("N"));
+        ConfigManager configManager = new ConfigManager(rootPath);
+
+        try
+        {
+            LocalizationManager localizer = await CreateLocalizerAsync();
+            using ConnectionService service = new ConnectionService(
+                configManager,
+                localizer,
+                new StubTunnelService(),
+                []);
+            AppSettings settings = new()
+            {
+                SshGateways =
+                [
+                    new SshGatewayDto
+                    {
+                        Id = "root",
+                        Name = "Copied Bastion",
+                        Host = "root.example.com",
+                        User = "ops",
+                        SshPasswordEncrypted = "not-a-protected-value"
+                    },
+                    new SshGatewayDto
+                    {
+                        Id = "hop",
+                        Name = "Inner Hop",
+                        Host = "hop.example.com",
+                        User = "ops",
+                        ParentGatewayId = "root"
+                    }
+                ]
+            };
+            ServerProfileDto server = new()
+            {
+                Id = "unreadable-secret-test",
+                DisplayName = "Unreadable Secret Test",
+                ConnectionType = "SSH",
+                RemoteServer = "ssh.example.com",
+                SshGatewayId = "hop"
+            };
+
+            Heimdall.Ssh.PreflightResult result = service.RunPreflight(server, settings);
+
+            Assert.False(result.Success);
+            Assert.Equal(Heimdall.Ssh.SshFailureCode.CredentialUnreadable, result.FailureCode);
+            Assert.Contains("Copied Bastion", result.Message, StringComparison.Ordinal);
         }
         finally
         {
