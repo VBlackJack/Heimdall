@@ -259,6 +259,32 @@ public class SessionHealthMonitorTests
     }
 
     [Fact]
+    public async Task DisablingTheMonitor_ResetsEveryPublishedDotInsteadOfLeavingItStale()
+    {
+        var probe = new FakeHealthProbe((_, _, _, _) =>
+            new HealthState(HealthStatus.Up, DateTime.UtcNow, 1, null));
+        var fakeConfig = new FakeConfigManager(new ServerProfileDto
+        {
+            Id = "srv-1",
+            RemoteServer = "host",
+            ConnectionType = "SSH",
+            SshPort = 22
+        });
+
+        await using var fixture = new MonitorFixture(fakeConfig, probe);
+        await fixture.RunCycleAsync();
+        var updates = new List<HealthStateChange>();
+        fixture.Monitor.StatusChanged += updates.Add;
+
+        fixture.Monitor.Start(new AppSettings { SessionHealthMonitorEnabled = false });
+
+        // The row kept its green dot: nothing told it the verdict was gone.
+        HealthStateChange reset = Assert.Single(updates);
+        Assert.Equal("srv-1", reset.ServerId);
+        Assert.Same(HealthState.Initial, reset.State);
+    }
+
+    [Fact]
     public async Task StopDuringInFlightCycle_DoesNotDisposeProbeThrottle()
     {
         var probe = new BlockingHealthProbe();

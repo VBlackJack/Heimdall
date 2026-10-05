@@ -18,7 +18,6 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Heimdall.Core.Security;
 using Timer = System.Threading.Timer;
 
 namespace Heimdall.App.Services;
@@ -204,22 +203,17 @@ public abstract class NdjsonAppendLog<TRecord> : IDisposable
             // Create the file closed, then apply the restrictive ACL before any data is written.
             // Mirrors SessionLogService/FileLogger: SetFileAcl runs on a handle-free file so it
             // cannot hit a sharing violation against an open writer.
-            using (new FileStream(_currentPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            {
-            }
-
-            if (OperatingSystem.IsWindows())
-            {
-                AclEnforcer.SetFileAcl(_currentPath);
-            }
+            RestrictedLogFile.Create(_currentPath);
         }
 
         File.AppendAllText(_currentPath, text, Encoding.UTF8);
         _currentBytes += byteCount;
     }
 
-    // Assumes _writeLock is held. Lazily seeds the current byte count from any pre-existing file so
-    // that appends across app restarts still respect the size cap.
+    // Assumes _writeLock is held. Lazily resumes where an earlier run stopped: the latest existing
+    // ".N.log" continuation, with its byte count, so appends across app restarts still respect the
+    // size cap. Starting again from the base file sent every restart back to ".1.log", which then
+    // grew past the cap while later continuations were never reached.
     private void EnsureCurrentBytesInitialized()
     {
         if (_currentBytesKnown)
@@ -227,19 +221,36 @@ public abstract class NdjsonAppendLog<TRecord> : IDisposable
             return;
         }
 
+        while (File.Exists(ContinuationPath(_rolloverIndex + 1)))
+        {
+            _rolloverIndex++;
+        }
+
+        _currentPath = ContinuationPath(_rolloverIndex);
         _currentBytes = File.Exists(_currentPath) ? new FileInfo(_currentPath).Length : 0;
         _currentBytesKnown = true;
+    }
+
+    /// <summary>The file for a continuation index; index 0 is the base file itself.</summary>
+    private string ContinuationPath(int index)
+    {
+        if (index == 0)
+        {
+            return _basePath;
+        }
+
+        string stem = _basePath.EndsWith(LogFileExtension, StringComparison.OrdinalIgnoreCase)
+            ? _basePath[..^LogFileExtension.Length]
+            : _basePath;
+        return $"{stem}.{index.ToString(CultureInfo.InvariantCulture)}{LogFileExtension}";
     }
 
     // Assumes _writeLock is held. Switches to the next ".N.log" continuation file.
     private void RollOver()
     {
         _rolloverIndex++;
-        string stem = _basePath.EndsWith(LogFileExtension, StringComparison.OrdinalIgnoreCase)
-            ? _basePath[..^LogFileExtension.Length]
-            : _basePath;
-        _currentPath = $"{stem}.{_rolloverIndex.ToString(CultureInfo.InvariantCulture)}{LogFileExtension}";
-        _currentBytes = 0;
+        _currentPath = ContinuationPath(_rolloverIndex);
+        _currentBytes = File.Exists(_currentPath) ? new FileInfo(_currentPath).Length : 0;
         _currentBytesKnown = true;
 
         Core.Logging.FileLogger.Info($"{DiagnosticName} reached its size cap, continuing in {_currentPath}");

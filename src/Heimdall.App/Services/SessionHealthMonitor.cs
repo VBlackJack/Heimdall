@@ -94,7 +94,7 @@ public sealed class SessionHealthMonitor : IDisposable
 
             if (!settings.SessionHealthMonitorEnabled)
             {
-                _states.Clear();
+                ResetPublishedStates();
                 return;
             }
 
@@ -113,6 +113,34 @@ public sealed class SessionHealthMonitor : IDisposable
                         token),
                     CancellationToken.None);
             }
+        }
+    }
+
+    /// <summary>
+    /// Forgets every verdict and tells subscribers so. Clearing the dictionary alone left each row
+    /// showing its last dot - a stale Up, or a Probing that never ends - once monitoring was off.
+    /// </summary>
+    /// <remarks>Runs under <see cref="_lifecycleGate"/>, after the lifecycle version moved on.</remarks>
+    private void ResetPublishedStates()
+    {
+        List<HealthStateChange> resets = [];
+        foreach (string serverId in _states.Keys.ToList())
+        {
+            object stateGate = _stateGates.GetOrAdd(serverId, static _ => new object());
+            lock (stateGate)
+            {
+                long generation = Interlocked.Increment(ref _nextGeneration);
+                _stateGenerations[serverId] = generation;
+                if (_states.TryRemove(serverId, out _))
+                {
+                    resets.Add(new HealthStateChange(serverId, HealthState.Initial, generation));
+                }
+            }
+        }
+
+        foreach (HealthStateChange reset in resets)
+        {
+            StatusChanged?.Invoke(reset);
         }
     }
 

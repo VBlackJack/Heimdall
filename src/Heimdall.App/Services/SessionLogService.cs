@@ -18,7 +18,6 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Heimdall.Core.Security;
 using Heimdall.Terminal.Logging;
 using Microsoft.Extensions.Logging;
 using Timer = System.Threading.Timer;
@@ -542,14 +541,7 @@ public sealed class SessionLogService : ISessionLogService
                 // Create the file closed, then apply the restrictive ACL before any data is written.
                 // Mirrors FileLogger: SetAccessControl runs on a handle-free file so it cannot hit a
                 // sharing violation against our own still-open StreamWriter.
-                using (FileStream created = new FileStream(_currentPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                {
-                }
-
-                if (OperatingSystem.IsWindows())
-                {
-                    AclEnforcer.SetFileAcl(_currentPath);
-                }
+                RestrictedLogFile.Create(_currentPath);
             }
 
             _stream = new StreamWriter(_currentPath, append: true, Encoding.UTF8)

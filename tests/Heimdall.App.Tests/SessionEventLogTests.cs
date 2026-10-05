@@ -242,6 +242,58 @@ public sealed class SessionEventLogTests : IDisposable
     }
 
     [Fact]
+    public void LogEvent_AfterARestart_ResumesInTheLatestContinuationInsteadOfOverfillingTheFirst()
+    {
+        string root = NewTempDirectory();
+        const long cap = 256;
+        SessionEventLog first = new SessionEventLog(root, cap, flushIntervalMs: 50);
+        for (int i = 0; i < 20; i++)
+        {
+            first.LogEvent(SessionEventRecord.Connected("RDP", $"host-{i}", "session"));
+        }
+
+        first.Dispose();
+        string stem = EventLogPath(root)[..^4];
+        int continuationsBefore = Directory.GetFiles(root).Length;
+        continuationsBefore.Should().BeGreaterThan(2);
+
+        SessionEventLog second = new SessionEventLog(root, cap, flushIntervalMs: 50);
+        for (int i = 0; i < 20; i++)
+        {
+            second.LogEvent(SessionEventRecord.Connected("RDP", $"later-{i}", "session"));
+        }
+
+        second.Dispose();
+
+        // The restart used to roll from the full base file to ".1.log" again and keep appending
+        // there past the cap, never reaching the later continuations.
+        Directory.GetFiles(root)
+            .Should().OnlyContain(file => new FileInfo(file).Length <= cap);
+        ReadLines(stem + ".1.log").Should().NotContain(line => line.Contains("later-"));
+        CountLinesAcrossFiles(root).Should().Be(40);
+    }
+
+    [Fact]
+    public void RestrictedLogFile_WhenTheAclCannotBeApplied_LeavesNoFileForTheNextAttemptToReuse()
+    {
+        string root = NewTempDirectory();
+        Directory.CreateDirectory(root);
+        string path = Path.Combine(root, "transcript.log");
+
+        Action create = () => RestrictedLogFile.Create(
+            path,
+            _ => throw new UnauthorizedAccessException("acl refused"));
+
+        create.Should().Throw<UnauthorizedAccessException>();
+        File.Exists(path).Should().BeFalse();
+
+        string? hardened = null;
+        RestrictedLogFile.Create(path, created => hardened = created);
+        hardened.Should().Be(path);
+        File.Exists(path).Should().BeTrue();
+    }
+
+    [Fact]
     public void LogEvent_BeforeAnyWrite_CreatesNoFile()
     {
         string root = NewTempDirectory();
