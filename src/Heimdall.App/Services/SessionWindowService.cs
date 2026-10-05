@@ -171,6 +171,15 @@ public sealed class SessionWindowService : ISessionWindowService
         if (!vm.Connection.ActiveSessions.Contains(session)) return;
         if (session.HostControl is null) return;
 
+        // A floating window shows one host. Dragging a split tab out of the strip used to detach it
+        // anyway: only the primary pane was shown, and the other panes stayed connected, out of
+        // reach, until the application exited. The context menu already withholds Detach here.
+        if (session.IsSplit)
+        {
+            vm.StatusText = vm.GetLocalizer()["StatusDetachSplitTabRefused"];
+            return;
+        }
+
         // Detach the host control from the tab (UIElement single-parent rule)
         var hostControl = session.HostControl;
         session.HostControl = null;
