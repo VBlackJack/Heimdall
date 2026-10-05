@@ -101,6 +101,17 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     Task<bool> ITunnelsHost.ConfirmAsync(string title, string message) =>
         _dialogService.ShowConfirmAsync(title, message, "warning");
 
+    void ITunnelsHost.RunOnUi(Action action)
+    {
+        if (_uiDispatcher.CheckAccess())
+        {
+            action();
+            return;
+        }
+
+        _uiDispatcher.InvokeAsync(action).SafeFireAndForget();
+    }
+
     [ObservableProperty]
     private string _windowTitle = "";
 

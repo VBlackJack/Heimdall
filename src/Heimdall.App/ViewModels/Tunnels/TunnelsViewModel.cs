@@ -46,6 +46,12 @@ internal interface ITunnelsHost
     /// Asks the user to confirm an action that disconnects sessions; true to go ahead.
     /// </summary>
     Task<bool> ConfirmAsync(string title, string message) => Task.FromResult(true);
+
+    /// <summary>
+    /// Runs <paramref name="action"/> on the UI thread: at once when already on it, queued
+    /// otherwise.
+    /// </summary>
+    void RunOnUi(Action action) => action();
 }
 
 /// <summary>
@@ -352,9 +358,10 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // The close event reports the result, teardown error included; writing the plain
+        // message here as well used to hide that error.
         _tunnelManager.ForceCloseTunnel(tunnel.LocalPort);
         RefreshList();
-        _host.StatusText = _localizer.Format("StatusTunnelClosed", tunnel.LocalPort);
     }
 
     /// <summary>
@@ -626,10 +633,18 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         var stateData = _connectionSm.GetStateData(serverId);
         if (stateData?.TunnelLocalPort is null) return string.Empty;
 
-        // Find which gateway hosts this tunnel by matching the tunnel's ServerName
-        var tunnels = _tunnelManager.GetActiveTunnels();
-        var tunnel = tunnels.FirstOrDefault(t => t.LocalPort == stateData.TunnelLocalPort);
+        var tunnel = _tunnelManager.GetTunnel(stateData.TunnelLocalPort.Value);
         if (tunnel is null) return string.Empty;
+
+        // The route the tunnel was dialled through is recorded on it. Guessing it from the
+        // gateway host named the wrong chain whenever two gateways shared a host, with another
+        // user, port or parent.
+        if (!string.IsNullOrWhiteSpace(tunnel.GatewayRoute))
+        {
+            return _localizer.Format(SshLocalizationKeys.LabelTunnelRouteVia, tunnel.GatewayRoute);
+        }
+
+        // Find which gateway hosts this tunnel by matching the tunnel's ServerName
 
         var gatewayId = settings.SshGateways
             .FirstOrDefault(g => string.Equals(g.Host, tunnel.ServerName, StringComparison.OrdinalIgnoreCase))?.Id;
@@ -657,31 +672,58 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
     // ── Event handlers ───────────────────────────────────────────────
 
+    // The manager raises its events on whatever thread opened or closed the tunnel: an awaited
+    // dial, the liveness sweep, an SSH client's message loop. Refreshing from there enumerated
+    // the open tabs while the UI thread changed them, which threw and left the badges stale, and
+    // a refresh racing a close on the UI thread could put a closed tunnel back in the list. Each
+    // handler now runs on the UI thread, in the order the events were raised.
     private void OnTunnelOpened(TunnelInfo info)
     {
-        RefreshList();
-        RefreshAllTunnelBadgeStates();
-        // Phase 3.1 intentionally leaves visibility to tab/default state; the tab badge surfaces new tunnels.
+        _host.RunOnUi(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            RefreshList();
+            RefreshAllTunnelBadgeStates();
+            // Phase 3.1 intentionally leaves visibility to tab/default state; the tab badge surfaces new tunnels.
+        });
     }
 
     private void OnTunnelClosed(int localPort, string? error)
     {
-        RefreshList();
-        RefreshAllTunnelBadgeStates();
-
-        var status = _localizer.Format("StatusTunnelClosed", localPort);
-        if (!string.IsNullOrEmpty(error))
+        _host.RunOnUi(() =>
         {
-            status += $" ({error})";
-        }
+            if (_disposed)
+            {
+                return;
+            }
 
-        _host.StatusText = status;
+            RefreshList();
+            RefreshAllTunnelBadgeStates();
+
+            var status = _localizer.Format("StatusTunnelClosed", localPort);
+            if (!string.IsNullOrEmpty(error))
+            {
+                status += $" ({error})";
+            }
+
+            _host.StatusText = status;
+        });
     }
 
     // Raised right after the close of the same tunnel, so this replaces its plain "closed".
     private void OnTunnelLost(int localPort)
     {
-        _host.StatusText = _localizer.Format("StatusTunnelLost", localPort);
+        _host.RunOnUi(() =>
+        {
+            if (!_disposed)
+            {
+                _host.StatusText = _localizer.Format("StatusTunnelLost", localPort);
+            }
+        });
     }
 
     private void OnLocaleChanged(string _)
