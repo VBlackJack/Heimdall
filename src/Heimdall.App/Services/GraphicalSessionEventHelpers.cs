@@ -50,16 +50,19 @@ internal static class GraphicalSessionEventHelpers
         return ms < 0 ? 0L : (long)ms;
     }
 
-    // Strips a leading "user@" so a "user@host" endpoint cannot leak an identity into the event log.
-    // Splits on the first '@'; values without one pass through.
-    private static string StripUserPrefix(string host)
+    /// <summary>
+    /// Strips a leading "user@" so a "user@host" endpoint cannot leak an identity into a log.
+    /// Splits on the LAST '@': a host never contains one, a user name can ("alice@corp.example@host"),
+    /// and splitting on the first left "corp.example@host" behind. Values without one pass through.
+    /// </summary>
+    internal static string StripUserPrefix(string host)
     {
         if (string.IsNullOrEmpty(host))
         {
             return host;
         }
 
-        int at = host.IndexOf('@', StringComparison.Ordinal);
+        int at = host.LastIndexOf('@');
         return at >= 0 ? host[(at + 1)..] : host;
     }
 }

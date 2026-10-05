@@ -86,6 +86,28 @@ public sealed class SessionLogServiceTests : IDisposable
     }
 
     [Fact]
+    public void StartSession_FileNameNeverCarriesTheUserName()
+    {
+        string root = NewTempDirectory();
+        using SessionLogService service = CreateService(root, SessionLogOptions.CreateDefault());
+
+        string? path = service.StartSession(new SessionLogContext(
+            "s1",
+            "SSH",
+            "alice@corp.example@host.example:22",
+            "host.example",
+            DateTime.UtcNow));
+
+        path.Should().NotBeNull();
+        string name = Path.GetFileName(path!);
+        name.Should().NotContain("alice").And.NotContain("corp.example");
+        name.Should().StartWith("SSH_host.example");
+
+        // The header, inside the restricted file, still says who connected.
+        ReadAllSharedText(path!).Should().Contain("alice@corp.example@host.example:22");
+    }
+
+    [Fact]
     public void StartSession_CreatesFileWithHeader_AndStopWritesFooterWithDuration()
     {
         string root = NewTempDirectory();

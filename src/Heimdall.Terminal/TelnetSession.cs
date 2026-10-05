@@ -35,6 +35,12 @@ public sealed class TelnetSession : ITerminalSession
     private const byte SE = 240;
     private const byte NAWS = 31;
 
+    /// <summary>
+    /// Most bytes kept from one subnegotiation. Nothing reads the payload today; the cap only stops
+    /// a peer that never sends IAC SE from growing it for the life of the session.
+    /// </summary>
+    internal const int MaxSubnegotiationBytes = 1024;
+
     private enum TelnetParserState
     {
         Data,
@@ -61,6 +67,9 @@ public sealed class TelnetSession : ITerminalSession
     private bool _isRunning;
     private volatile bool _intentionalClose;
     private bool _nawsNegotiated;
+
+    /// <summary>Options already refused, so a repeated request is not answered again (RFC 854).</summary>
+    private readonly HashSet<(byte Verb, byte Option)> _refused = new();
     private int _columns;
     private int _rows;
 
@@ -340,8 +349,11 @@ public sealed class TelnetSession : ITerminalSession
                 HandleWill(option);
                 break;
 
-            case WONT:
             case DONT:
+                HandleDont(option);
+                break;
+
+            case WONT:
                 break;
         }
 
@@ -357,7 +369,15 @@ public sealed class TelnetSession : ITerminalSession
             return;
         }
 
-        _sbBuffer.Add(value);
+        AppendSubnegotiationByte(value);
+    }
+
+    private void AppendSubnegotiationByte(byte value)
+    {
+        if (_sbBuffer.Count < MaxSubnegotiationBytes)
+        {
+            _sbBuffer.Add(value);
+        }
     }
 
     private void ProcessSubnegotiationIacByte(byte value)
@@ -371,7 +391,7 @@ public sealed class TelnetSession : ITerminalSession
 
         if (value == IAC)
         {
-            _sbBuffer.Add(IAC);
+            AppendSubnegotiationByte(IAC);
         }
 
         _parserState = TelnetParserState.IacSbData;
@@ -394,6 +414,8 @@ public sealed class TelnetSession : ITerminalSession
         _pendingVerb = 0;
         _sbOption = 0;
         _sbBuffer.Clear();
+        _nawsNegotiated = false;
+        _refused.Clear();
     }
 
     private void EmitBufferedData(List<byte> data)
@@ -408,22 +430,46 @@ public sealed class TelnetSession : ITerminalSession
     {
         if (option == NAWS)
         {
-            // Accept NAWS - we can report window size
+            // Accept NAWS - we can report window size. A DO for an option already enabled is not
+            // acknowledged again (RFC 854), or two peers can bounce it back and forth forever.
+            if (_nawsNegotiated)
+            {
+                return;
+            }
+
             SendCommand(WILL, NAWS);
             _nawsNegotiated = true;
             SendNawsSubnegotiation(_columns, _rows);
         }
         else
         {
-            // Refuse everything else
-            SendCommand(WONT, option);
+            // Refuse everything else, once.
+            RefuseOnce(WONT, option);
+        }
+    }
+
+    private void HandleDont(byte option)
+    {
+        // The peer withdrew NAWS: stop sending sizes it asked not to receive, and confirm it.
+        if (option == NAWS && _nawsNegotiated)
+        {
+            _nawsNegotiated = false;
+            SendCommand(WONT, NAWS);
         }
     }
 
     private void HandleWill(byte option)
     {
-        // Refuse all server-side options
-        SendCommand(DONT, option);
+        // Refuse all server-side options, once.
+        RefuseOnce(DONT, option);
+    }
+
+    private void RefuseOnce(byte verb, byte option)
+    {
+        if (_refused.Add((verb, option)))
+        {
+            SendCommand(verb, option);
+        }
     }
 
     private void SendCommand(byte command, byte option)
@@ -445,20 +491,33 @@ public sealed class TelnetSession : ITerminalSession
         if (_stream is null || _disposed) return;
         try
         {
-            // IAC SB NAWS <width-hi> <width-lo> <height-hi> <height-lo> IAC SE
-            Span<byte> buf = stackalloc byte[9];
-            buf[0] = IAC;
-            buf[1] = SB;
-            buf[2] = NAWS;
-            buf[3] = (byte)(columns >> 8);
-            buf[4] = (byte)(columns & 0xFF);
-            buf[5] = (byte)(rows >> 8);
-            buf[6] = (byte)(rows & 0xFF);
-            buf[7] = IAC;
-            buf[8] = SE;
-            _stream.Write(buf);
+            _stream.Write(BuildNawsFrame(columns, rows));
         }
         catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] SendNawsSubnegotiation: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// IAC SB NAWS &lt;width-hi&gt; &lt;width-lo&gt; &lt;height-hi&gt; &lt;height-lo&gt; IAC SE, with every
+    /// 255 in the size doubled as RFC 1073 requires. Unescaped, a 255-column window sent IAC and
+    /// the peer read the rest of the frame as a command.
+    /// </summary>
+    internal static byte[] BuildNawsFrame(int columns, int rows)
+    {
+        int width = Math.Clamp(columns, 0, ushort.MaxValue);
+        int height = Math.Clamp(rows, 0, ushort.MaxValue);
+        List<byte> frame = new List<byte>(13) { IAC, SB, NAWS };
+        foreach (byte value in new[] { (byte)(width >> 8), (byte)(width & 0xFF), (byte)(height >> 8), (byte)(height & 0xFF) })
+        {
+            frame.Add(value);
+            if (value == IAC)
+            {
+                frame.Add(IAC);
+            }
+        }
+
+        frame.Add(IAC);
+        frame.Add(SE);
+        return frame.ToArray();
     }
 
     private void EmitData(ReadOnlySpan<byte> data)

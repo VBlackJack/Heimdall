@@ -290,7 +290,10 @@ public sealed class SessionLogService : ISessionLogService
             : context.StartedUtc.ToUniversalTime())
             .ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
 
-        string raw = $"{context.Protocol}_{context.Host}_{timestamp}{LogFileExtension}";
+        // The host without its "user@": a file name shows in every directory listing, backup and
+        // share, where the ACL on the file itself does not reach. The header inside keeps it.
+        string host = GraphicalSessionEventHelpers.StripUserPrefix(context.Host);
+        string raw = $"{context.Protocol}_{host}_{timestamp}{LogFileExtension}";
         return Sanitize(raw);
     }
 

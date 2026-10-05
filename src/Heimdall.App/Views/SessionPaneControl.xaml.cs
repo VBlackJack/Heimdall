@@ -217,7 +217,8 @@ public partial class SessionPaneControl : UserControl
             return;
         }
 
-        string serverId = session.ProfileLookupServerId;
+        // The pane's own profile: a failed secondary pane used to open the primary pane's.
+        string serverId = session.ProfileLookupServerIdFor(_model);
         if (string.IsNullOrEmpty(serverId))
         {
             return;

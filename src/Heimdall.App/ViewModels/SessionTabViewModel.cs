@@ -209,6 +209,15 @@ public partial class SessionTabViewModel : ObservableObject
     /// </summary>
     public string ProfileLookupServerId => PrimaryPane.ProfileLookupServerId;
 
+    /// <summary>
+    /// The profile behind <paramref name="pane"/>: in a split, a secondary pane belongs to its own
+    /// server, not to the tab's primary one. Falls back to the tab's when the pane has none.
+    /// </summary>
+    public string ProfileLookupServerIdFor(SessionPaneModel? pane)
+        => pane is not null && !string.IsNullOrWhiteSpace(pane.ProfileLookupServerId)
+            ? pane.ProfileLookupServerId
+            : ProfileLookupServerId;
+
     public string Title
     {
         get => PrimaryPane.Title;

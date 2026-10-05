@@ -98,6 +98,20 @@ public sealed class SessionHostOwnerResolutionTests
         Assert.Equal(ReconnectRequestContext.Manual, EmbeddedSessionManager.TakeReconnectRequest(from));
     }
 
+    [Fact]
+    public void ProfileLookupServerIdFor_ASecondaryPane_IsItsOwnProfileNotThePrimarys()
+    {
+        SessionPaneModel primary = Pane("primary");
+        primary.OriginalServerId = "profile-primary";
+        SessionPaneModel secondary = Pane("secondary");
+        secondary.OriginalServerId = "profile-secondary";
+        SessionTabViewModel tab = Split(primary, secondary);
+
+        Assert.Equal("profile-secondary", tab.ProfileLookupServerIdFor(secondary));
+        Assert.Equal("profile-primary", tab.ProfileLookupServerIdFor(primary));
+        Assert.Equal("profile-primary", tab.ProfileLookupServerIdFor(null));
+    }
+
     private static SessionPaneModel Pane(string id) => new() { PaneId = id, ServerId = id, ConnectionType = "SSH" };
 
     private static SessionTabViewModel Split(SessionPaneModel first, SessionPaneModel second) => new()
