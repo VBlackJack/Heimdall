@@ -51,6 +51,11 @@ public partial class EmbeddedVncView : UserControl, IDisposable
     private bool _eventConnectEmitted;
     private bool _eventDisconnectEmitted;
 
+    // Whether this view holds a sleep-prevention reference. Watching a remote screen involves no
+    // local input, so without one the machine slept under an open VNC session - RDP and SSH
+    // sessions already held one.
+    private bool _sleepPreventionActive;
+
     /// <summary>Raised when the VNC session connects successfully. Parameter: ServerId.</summary>
     public event Action<string>? SessionConnected;
 
@@ -235,6 +240,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
                 SessionConnected?.Invoke(_session.ServerId);
             }
             EmitConnect();
+            AcquireSleepPrevention();
             return;
         }
 
@@ -270,6 +276,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         if (message.StartsWith("disconnected:", StringComparison.Ordinal))
         {
             EmitDisconnect("remote");
+            ReleaseSleepPrevention();
             Dispatcher.Invoke(() =>
             {
                 StatusTextBlock.Text = _localizer?["StatusVncDisconnected"] ?? "Disconnected";
@@ -285,6 +292,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
 
             // Mid-session error ends the session; the latch makes this a no-op pre-connect.
             EmitDisconnect("remote");
+            ReleaseSleepPrevention();
 
             Dispatcher.Invoke(() =>
             {
@@ -480,6 +488,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
 
         Core.Logging.FileLogger.Info("EmbeddedVNC Disconnect requested by user");
         EmitDisconnect("user");
+        ReleaseSleepPrevention();
         PostWebMessage("disconnect:");
 
         // Mirror the SSH disconnect contract: the view stays alive in the
@@ -547,6 +556,24 @@ public partial class EmbeddedVncView : UserControl, IDisposable
     /// <summary>Raised to request closing the session tab. Parameter: ServerId.</summary>
     public event Action<string>? RequestClose;
 
+    private void AcquireSleepPrevention()
+    {
+        if (!_sleepPreventionActive && !_disposed)
+        {
+            _sleepPreventionActive = true;
+            SleepPrevention.SessionStarted();
+        }
+    }
+
+    private void ReleaseSleepPrevention()
+    {
+        if (_sleepPreventionActive)
+        {
+            _sleepPreventionActive = false;
+            SleepPrevention.SessionEnded();
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -559,6 +586,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable
         // enqueuing here is safe. "teardown" can overstate duration if the remote died earlier and
         // the user left a dead tab open; endTrigger makes that explicit in the log.
         EmitDisconnect("teardown");
+        ReleaseSleepPrevention();
 
         _disposed = true;
         _webViewReady = false;
