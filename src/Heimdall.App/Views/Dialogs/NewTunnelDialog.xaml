@@ -120,7 +120,7 @@
                            Text="{loc:Translate NewTunnelRemotePortLabel}"
                            Style="{StaticResource FormLabelStyle}"/>
                 <TextBox Grid.Row="2" Grid.Column="1"
-                         Text="{Binding RemotePort, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding RemotePortText, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FormTextBoxStyle}"
                          AutomationProperties.Name="{loc:Translate NewTunnelRemotePortLabel}"/>
 
@@ -128,7 +128,7 @@
                            Text="{loc:Translate NewTunnelLocalPortLabel}"
                            Style="{StaticResource FormLabelStyle}"/>
                 <TextBox Grid.Row="3" Grid.Column="1"
-                         Text="{Binding LocalPort, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding LocalPortText, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FormTextBoxStyle}"
                          AutomationProperties.Name="{loc:Translate NewTunnelLocalPortLabel}"/>
 
@@ -145,6 +145,7 @@
 
         <TextBlock Grid.Row="3"
                    Text="{Binding ValidationMessage}"
+                   AutomationProperties.LiveSetting="Assertive"
                    TextWrapping="Wrap"
                    Margin="0,8,0,0"
                    Foreground="{DynamicResource ErrorTextBrush}"

@@ -165,8 +165,13 @@ public sealed class TunnelService : ITunnelService
         int localPort = tunnelResult.Tunnel?.LocalPort ?? server.LocalPort;
 
         // A fresh tunnel is live on this port; drop any stale failure recorded
-        // for it so it cannot mislabel a later, unrelated disconnect.
-        _forwardedPortFailures.Clear(localPort);
+        // for it so it cannot mislabel a later, unrelated disconnect. A reused
+        // tunnel is the same one another session is on, and a failure recorded
+        // for it may be what explains that session's drop, so it stays.
+        if (!tunnelResult.ReusedExistingTunnel)
+        {
+            _forwardedPortFailures.Clear(localPort);
+        }
         var localBindHost = tunnelResult.Tunnel?.LocalBindHost ?? LoopbackBinding.DefaultHost;
         return new TunnelSetupOutcome(true, true, localBindHost, localPort, null, null)
         {
@@ -244,8 +249,7 @@ public sealed class TunnelService : ITunnelService
                     remotePort,
                     socksProxyPort,
                     remoteBindPort,
-                    remoteLocalPort,
-                    preferDistinctLoopback),
+                    remoteLocalPort),
                 ct)
             .ConfigureAwait(false);
 
@@ -944,17 +948,19 @@ public sealed class TunnelService : ITunnelService
         return settings.DefaultSshTunnelPort;
     }
 
-    // The key carries what reuse matches on, plus the loopback preference that narrows it, so
-    // two callers share a key exactly when one could reuse the other's tunnel. A reverse
-    // forward with no local port of its own targets its bind port, as the manager reads it.
+    // The key carries what reuse matches on. The loopback preference is left out on purpose:
+    // it only narrows which tunnel a caller may reuse, and keying on it let an embedded and an
+    // external session to one target, started together, each dial its own tunnel. Waiting
+    // costs a caller whose preference the first tunnel does not meet nothing but the wait. A
+    // reverse forward with no local port of its own targets its bind port, as the manager
+    // reads it.
     internal static string BuildReuseGateKey(
         string gatewayChainKey,
         string remoteHost,
         int remotePort,
         int socksProxyPort,
         int remoteBindPort,
-        int remoteLocalPort,
-        bool preferDistinctLoopback) =>
+        int remoteLocalPort) =>
         string.Join(
             '\n',
             gatewayChainKey,
@@ -963,8 +969,7 @@ public sealed class TunnelService : ITunnelService
             socksProxyPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
             remoteBindPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
             (remoteBindPort <= 0 ? 0 : remoteLocalPort > 0 ? remoteLocalPort : remoteBindPort)
-                .ToString(System.Globalization.CultureInfo.InvariantCulture),
-            preferDistinctLoopback ? "distinct" : "shared");
+                .ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     internal static string BuildGatewayChainKey(IReadOnlyList<SshGatewayDto> chainDtos,
         SshAgentPreference agentPreference = SshAgentPreference.AutoOpenSshFirst)

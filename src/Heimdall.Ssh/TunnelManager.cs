@@ -429,6 +429,9 @@ public sealed partial class TunnelManager : IDisposable
 
         if (gatewayChain.Count == 0)
         {
+            // Every other early return gives back the alias the caller reserved; this one kept it
+            // out of the pool for the life of the process.
+            ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
             return new TunnelResult(false, null, "Gateway chain must contain at least one gateway.", SshFailureCode.Unknown)
             {
                 MessageKey = TunnelMessageKeys.MessageKeyGatewayChainEmpty
@@ -465,6 +468,10 @@ public sealed partial class TunnelManager : IDisposable
         }
 
         var context = new TunnelBuildContext();
+
+        // The hop being dialled when a failure ends the open, so a wrong passphrase on any hop is
+        // named as one rather than classified without the key it was for.
+        SshConnectionParams diallingHop = gatewayChain[0];
 
         try
         {
@@ -525,6 +532,7 @@ public sealed partial class TunnelManager : IDisposable
 
                 // Connect to the next gateway through the forwarded port
                 var hopParams = CreateLoopbackHopParams(nextGateway, intermediateLocalPort);
+                diallingHop = nextGateway;
 
                 var hopPinnedVerifier = await _resolvePinnedVerifier(
                         hopParams,
@@ -591,7 +599,7 @@ public sealed partial class TunnelManager : IDisposable
         catch (Exception ex)
         {
             ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
-            return ClassifyAndBuildFailureResult(ex, context.Cleanup, isChained: true);
+            return ClassifyAndBuildFailureResult(ex, context.Cleanup, isChained: true, diallingHop);
         }
     }
 

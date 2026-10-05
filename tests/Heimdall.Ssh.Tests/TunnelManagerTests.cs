@@ -1677,6 +1677,25 @@ public class TunnelManagerTests : IDisposable
         Assert.Equal(TunnelMessageKeys.MessageKeyGatewayChainEmpty, result.MessageKey);
     }
 
+    // Every other early return gave back the loopback alias the caller had reserved; this one kept
+    // it out of the pool for the life of the process.
+    [Fact]
+    public async Task OpenChainedTunnelAsync_EmptyChain_GivesBackTheReservedAlias()
+    {
+        string alias = _manager.AllocateLoopbackAlias();
+
+        await _manager.OpenChainedTunnelAsync(
+            [],
+            "target.internal",
+            3389,
+            10001,
+            TestHostKeyStore(),
+            TestHostKeyVerifier(),
+            localBindHost: alias);
+
+        Assert.Equal(0, _manager.GetRegistryCounts().Reservations);
+    }
+
     [Fact]
     public async Task OpenChainedTunnelAsync_PortAlreadyTracked_ReturnsPortInUseWithoutEvents()
     {
@@ -1943,6 +1962,39 @@ public class TunnelManagerTests : IDisposable
         Assert.False(manager.HasTunnel(45182));
     }
 
+    // A later hop is dialled through a loopback forward with parameters copied from its gateway.
+    // The copy stopped at the timeout, so a hop needing a keyboard-interactive answer or a longer
+    // sign-in wait only got one as the first hop of a chain.
+    [Fact]
+    public async Task OpenChainedTunnelAsync_ALaterHopKeepsItsOwnSignInSettings()
+    {
+        ChainHarness harness = new();
+        using TunnelManager manager = harness.CreateManager();
+        Func<string, string?> responder = _ => "123456";
+        List<SshConnectionParams> hops = ThreeHops();
+        hops[1] = new SshConnectionParams
+        {
+            Host = "bastion2.example",
+            Port = 2222,
+            Username = "ops",
+            AuthenticationTimeout = TimeSpan.FromMinutes(3),
+            KeepAliveIntervalSeconds = 7,
+            KeyboardInteractiveResponder = responder
+        };
+
+        TunnelResult result = await manager.OpenChainedTunnelAsync(
+            hops, "db.internal", 5432, 0, TestHostKeyStore(), TestHostKeyVerifier());
+
+        Assert.True(result.Success, result.ErrorMessage);
+        SshConnectionParams dialled = harness.CreatedParams[1];
+        Assert.Equal("127.0.0.1", dialled.Host);
+        Assert.Equal(TimeSpan.FromMinutes(3), dialled.AuthenticationTimeout);
+        Assert.Equal(7, dialled.KeepAliveIntervalSeconds);
+        Assert.Same(responder, dialled.KeyboardInteractiveResponder);
+        Assert.Equal("bastion2.example", dialled.HostKeyVerificationHost);
+        Assert.Equal(2222, dialled.HostKeyVerificationPort);
+    }
+
     private static List<SshConnectionParams> ThreeHops() =>
     [
         MakeSshParams("bastion1.example", 22),
@@ -1985,10 +2037,13 @@ public class TunnelManagerTests : IDisposable
                 "SHA256:" + verificationHost));
         }
 
+        public List<SshConnectionParams> CreatedParams { get; } = [];
+
         private SshClient Create(SshConnectionParams connectionParams)
         {
             RecordingSshClient client = new();
             Clients.Add(client);
+            CreatedParams.Add(connectionParams);
             _paramsByClient[client] = connectionParams;
             return client;
         }
