@@ -23,6 +23,7 @@ using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
+using Heimdall.Core.Utilities;
 using Heimdall.Ssh;
 using Heimdall.Ssh.Agents;
 using Heimdall.Ssh.Plink;
@@ -49,6 +50,7 @@ public sealed class TunnelService : ITunnelService
 
     private AppSettings? _currentSettings;
     private readonly RecentForwardedPortFailureTracker _forwardedPortFailures = new();
+    private readonly KeyedAsyncGate _openGate = new(StringComparer.Ordinal);
 
     public TunnelService(
         TunnelManager tunnelManager,
@@ -222,6 +224,23 @@ public sealed class TunnelService : ITunnelService
         // gateway list and so answers with every edit made since - which named the wrong city in
         // a certificate question during a slow establishment.
         string? resolvedRoute = RdpTrustPromptRoute.Describe(false, gatewayId, settings.SshGateways);
+
+        // Reuse only finds a tunnel that is already open. Two sessions through the same gateway
+        // to the same target, started together, both missed it and each dialled a tunnel of its
+        // own: two connections to the bastion and two sign-in prompts. The second one now waits
+        // here for the first to finish, then reuses what it opened, or dials itself if that
+        // attempt failed.
+        using IDisposable openGate = await _openGate.EnterAsync(
+                BuildReuseGateKey(
+                    gatewayChainKey,
+                    remoteHost,
+                    remotePort,
+                    socksProxyPort,
+                    remoteBindPort,
+                    remoteLocalPort,
+                    preferDistinctLoopback),
+                ct)
+            .ConfigureAwait(false);
 
         TunnelInfo? existing = _tunnelManager.AcquireReusableTunnel(
             gatewayChainKey,
@@ -894,6 +913,28 @@ public sealed class TunnelService : ITunnelService
 
         return settings.DefaultSshTunnelPort;
     }
+
+    // The key carries what reuse matches on, plus the loopback preference that narrows it, so
+    // two callers share a key exactly when one could reuse the other's tunnel. A reverse
+    // forward with no local port of its own targets its bind port, as the manager reads it.
+    internal static string BuildReuseGateKey(
+        string gatewayChainKey,
+        string remoteHost,
+        int remotePort,
+        int socksProxyPort,
+        int remoteBindPort,
+        int remoteLocalPort,
+        bool preferDistinctLoopback) =>
+        string.Join(
+            '\n',
+            gatewayChainKey,
+            remoteHost,
+            remotePort.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            socksProxyPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            remoteBindPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (remoteBindPort <= 0 ? 0 : remoteLocalPort > 0 ? remoteLocalPort : remoteBindPort)
+                .ToString(System.Globalization.CultureInfo.InvariantCulture),
+            preferDistinctLoopback ? "distinct" : "shared");
 
     internal static string BuildGatewayChainKey(IReadOnlyList<SshGatewayDto> chainDtos,
         SshAgentPreference agentPreference = SshAgentPreference.AutoOpenSshFirst)
