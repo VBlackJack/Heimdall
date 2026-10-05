@@ -6112,6 +6112,7 @@
   "A11ySettingsCmdLibSyncAuthorName": "Nom de l'auteur",
   "A11ySettingsCmdLibSyncAuthorEmail": "Adresse e-mail de l'auteur",
   "SettingsCmdLibSyncOnStartup": "Synchroniser au d\u00e9marrage",
+  "StatusCmdLibStartupSyncFailed": "Biblioth\u00e8que de commandes : la synchronisation au d\u00e9marrage a \u00e9chou\u00e9. Synchronisez depuis la biblioth\u00e8que pour en voir la cause.",
   "SettingsCmdLibSyncAutoPush": "Pousser les modifications locales lors de la synchronisation",
   "SettingsCmdLibSyncTokenSaved": "Jeton enregistr\u00e9",
   "SettingsCmdLibSyncTokenSaveError": "\u00c9chec de l'enregistrement",

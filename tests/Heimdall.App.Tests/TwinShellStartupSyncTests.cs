@@ -33,9 +33,10 @@ public sealed class TwinShellStartupSyncTests
         RecordingSettingsBridge bridge = new(calls);
         RecordingGitSync gitSync = new(calls, GitOperationResult.Ok("done"));
 
-        await TwinShellBootstrapper.SyncOnStartupAsync(Configured(onStartup: true), bridge, gitSync);
+        bool failed = await TwinShellBootstrapper.SyncOnStartupAsync(Configured(onStartup: true), bridge, gitSync);
 
         Assert.Equal(["load", "full-sync"], calls);
+        Assert.False(failed);
     }
 
     [Theory]
@@ -52,12 +53,13 @@ public sealed class TwinShellStartupSyncTests
             CmdLibGitSyncUrl = url,
         };
 
-        await TwinShellBootstrapper.SyncOnStartupAsync(
+        bool failed = await TwinShellBootstrapper.SyncOnStartupAsync(
             settings,
             new RecordingSettingsBridge(calls),
             new RecordingGitSync(calls, GitOperationResult.Ok()));
 
         Assert.Empty(calls);
+        Assert.False(failed);
     }
 
     [Fact]
@@ -66,12 +68,35 @@ public sealed class TwinShellStartupSyncTests
         List<string> calls = [];
         RecordingGitSync gitSync = new(calls, null);
 
-        await TwinShellBootstrapper.SyncOnStartupAsync(
+        bool failed = await TwinShellBootstrapper.SyncOnStartupAsync(
             Configured(onStartup: true),
             new RecordingSettingsBridge(calls),
             gitSync);
 
         Assert.Equal(["load", "full-sync"], calls);
+        Assert.True(failed);
+    }
+
+    [Fact]
+    public async Task SyncOnStartup_WhenTheSyncReportsAFailure_SaysSo()
+    {
+        bool failed = await TwinShellBootstrapper.SyncOnStartupAsync(
+            Configured(onStartup: true),
+            new RecordingSettingsBridge([]),
+            new RecordingGitSync([], GitOperationResult.Fail("no access", GitSyncErrorCode.AuthenticationFailed)));
+
+        Assert.True(failed);
+    }
+
+    [Fact]
+    public async Task SyncOnStartup_WhenTheSyncIsCancelled_IsNotAFailure()
+    {
+        bool failed = await TwinShellBootstrapper.SyncOnStartupAsync(
+            Configured(onStartup: true),
+            new RecordingSettingsBridge([]),
+            new RecordingGitSync([], GitOperationResult.Fail("cancelled", GitSyncErrorCode.Cancelled)));
+
+        Assert.False(failed);
     }
 
     private static AppSettings Configured(bool onStartup) => new()

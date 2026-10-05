@@ -545,10 +545,11 @@ public partial class App : System.Windows.Application
             mainWindow.Show();
 
             // After the unlock gate, so a Git token held by the vault can be read.
-            _ = Task.Run(() => TwinShellBootstrapper.SyncOnStartupAsync(
+            _ = RunStartupGitSyncAsync(
                 settings,
                 _serviceProvider.GetRequiredService<TwinShell.Core.Interfaces.ISettingsService>(),
-                _serviceProvider.GetRequiredService<TwinShell.Core.Interfaces.IGitSyncService>()));
+                _serviceProvider.GetRequiredService<TwinShell.Core.Interfaces.IGitSyncService>(),
+                localization);
         }
         catch (Exception ex)
         {
@@ -565,6 +566,31 @@ public partial class App : System.Windows.Application
 
             ShowUnhandledException(ex);
             Shutdown(StartupFailureExitCode);
+        }
+    }
+
+    /// <summary>
+    /// Runs the startup sync of the command library off the UI thread and reports a failure on
+    /// the status bar. Never throws: a sync is not a reason to disturb a running application.
+    /// </summary>
+    private async Task RunStartupGitSyncAsync(
+        AppSettings settings,
+        TwinShell.Core.Interfaces.ISettingsService settingsBridge,
+        TwinShell.Core.Interfaces.IGitSyncService gitSync,
+        LocalizationManager localization)
+    {
+        try
+        {
+            bool failed = await Task.Run(() => TwinShellBootstrapper.SyncOnStartupAsync(settings, settingsBridge, gitSync));
+            if (failed && _mainViewModel is { } mainViewModel)
+            {
+                await Dispatcher.InvokeAsync(() =>
+                    mainViewModel.StatusText = localization["StatusCmdLibStartupSyncFailed"]);
+            }
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[TwinShell] Startup Git sync report failed: {ex.Message}");
         }
     }
 
