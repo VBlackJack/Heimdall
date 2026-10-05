@@ -29,6 +29,14 @@ public sealed record SettingRange(string PropertyName, int Min, int Max, int? Di
     /// <summary>Whether <paramref name="value"/> is inside the range or is the disabled sentinel.</summary>
     public bool Accepts(int value)
         => (value >= Min && value <= Max) || (DisabledValue.HasValue && value == DisabledValue.Value);
+
+    /// <summary>
+    /// <paramref name="value"/> brought inside the range, the disabled sentinel left as it is. For a
+    /// value read from disk that is about to be used: the loader keeps out-of-range values as
+    /// written (and diagnoses them), so a consumer must not trust them blindly.
+    /// </summary>
+    public int Clamp(int value)
+        => DisabledValue == value ? value : Math.Clamp(value, Min, Max);
 }
 
 /// <summary>

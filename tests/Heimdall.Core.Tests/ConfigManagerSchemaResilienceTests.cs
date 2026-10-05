@@ -100,6 +100,98 @@ public sealed class ConfigManagerSchemaResilienceTests : IDisposable
         await _manager.MergeSettingAsync(_ => { });
     }
 
+    // Only the gateway list used to be guarded: each of these threw on load or at first use and
+    // stopped the application at startup.
+    [Theory]
+    [InlineData("""{ "trustedHostKeysV2": null }""")]
+    [InlineData("""{ "trustedHostKeys": null, "trustedHostKeysV2": { "h:22": { "fingerprint": "SHA256:a" } } }""")]
+    [InlineData("""{ "trustedHostKeysV2": { "h:22": null } }""")]
+    [InlineData("""{ "externalTools": null, "projects": [ null ], "groupDefaults": { "g": null } }""")]
+    [InlineData("""{ "trustedRdpCertificates": { "host": [ null ] }, "scheduledTasks": null, "treeExpandedNodes": null }""")]
+    public async Task LoadSettingsAsync_NullCollectionsOrEntries_LoadWithoutThrowing(string json)
+    {
+        await WriteUtf8Async(_manager.SettingsPath, json);
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        Assert.NotNull(settings.TrustedHostKeysV2);
+        Assert.DoesNotContain(settings.TrustedHostKeysV2.Values, entry => entry is null);
+        Assert.NotNull(settings.ExternalTools);
+        Assert.DoesNotContain(settings.Projects, project => project is null);
+        Assert.All(settings.TrustedRdpCertificates.Values, list => Assert.DoesNotContain(list, entry => entry is null));
+        await _manager.MergeSettingAsync(_ => { });
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_EveryCollectionNull_LoadsAndKeepsTheDefaultPresets()
+    {
+        var properties = typeof(AppSettings).GetProperties()
+            .Where(property => property.CanWrite
+                && property.Name != nameof(AppSettings.ExtensionData)
+                && (property.PropertyType.IsArray
+                    || typeof(System.Collections.IList).IsAssignableFrom(property.PropertyType)
+                    || typeof(System.Collections.IDictionary).IsAssignableFrom(property.PropertyType)))
+            .ToList();
+        string json = "{ " + string.Join(", ", properties.Select(property => $"\"{JsonNamingPolicy.CamelCase.ConvertName(property.Name)}\": null")) + " }";
+        await WriteUtf8Async(_manager.SettingsPath, json);
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        Assert.All(properties, property => Assert.NotNull(property.GetValue(settings)));
+        Assert.Equal(AppSettings.DefaultRdpResolutionPresets, settings.RdpResolutionPresets);
+    }
+
+    [Theory]
+    [InlineData("""{ "vaultMigrationState": "SomeFutureState" }""")]
+    [InlineData("""{ "credentialProviderType": 42 }""")]
+    [InlineData("""{ "broadcastScope": "Everywhere", "sshAgentPreference": "Telepathy" }""")]
+    public async Task LoadSettingsAsync_UnknownEnumValue_FallsBackInsteadOfFailingTheWholeFile(string json)
+    {
+        await WriteUtf8Async(_manager.SettingsPath, json);
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+        AppSettings defaults = new();
+
+        Assert.Equal(defaults.VaultMigrationState, settings.VaultMigrationState);
+        Assert.Equal(defaults.CredentialProviderType, settings.CredentialProviderType);
+        Assert.Equal(defaults.BroadcastScope, settings.BroadcastScope);
+        Assert.Equal(defaults.SshAgentPreference, settings.SshAgentPreference);
+        Assert.Contains("is not a known", ReadLogContent(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_KnownEnumNames_StillRoundTrip()
+    {
+        await WriteUtf8Async(
+            _manager.SettingsPath,
+            """{ "broadcastScope": "AllTabs", "credentialProviderType": "WindowsCredentialManager" }""");
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+        await _manager.MergeSettingAsync(_ => { });
+        string written = await File.ReadAllTextAsync(_manager.SettingsPath);
+
+        Assert.Equal(CredentialProviderKind.WindowsCredentialManager, settings.CredentialProviderType);
+        Assert.Contains("\"WindowsCredentialManager\"", written, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_LegacyTrustMissingFromV2_IsCarriedOver()
+    {
+        await WriteUtf8Async(
+            _manager.SettingsPath,
+            """
+            {
+              "trustedHostKeys": { "a:22": "SHA256:a", "b:22": "SHA256:b" },
+              "trustedHostKeysV2": { "a:22": { "fingerprint": "SHA256:a" } }
+            }
+            """);
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        // A trust written only to the legacy map after a v2 entry existed was dropped on load.
+        Assert.Equal("SHA256:b", settings.TrustedHostKeysV2["b:22"].Fingerprint);
+    }
+
     [Fact]
     public async Task LoadSettingsAsync_FutureValues_ArePreservedAndLoggedAsWarnings()
     {

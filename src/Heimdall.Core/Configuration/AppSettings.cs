@@ -211,7 +211,7 @@ public sealed class AppSettings
 
     // SSH defaults
     public string SshDefaultMode { get; set; } = "Embedded";
-    [JsonConverter(typeof(JsonStringEnumConverter<SshAgentPreference>))]
+    [JsonConverter(typeof(SshAgentPreferenceJsonConverter))]
     public SshAgentPreference SshAgentPreference { get; set; } = SshAgentPreference.AutoOpenSshFirst;
     public bool SyncKnownHostsAtStartup { get; set; }
     [SettingRange(10, 3600, ZeroMeansOff = true)]
@@ -324,7 +324,7 @@ public sealed class AppSettings
     /// Defaults to <see cref="BroadcastScope.CurrentTab"/> so input never reaches
     /// background tabs without an explicit, confirmed opt-in.
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter<BroadcastScope>))]
+    [JsonConverter(typeof(BroadcastScopeJsonConverter))]
     public BroadcastScope BroadcastScope { get; set; } = BroadcastScope.CurrentTab;
     public string NotesDirectory { get; set; } = @"config\notes";
     public int NotesSidebarWidth { get; set; } = 300;
@@ -436,7 +436,7 @@ public sealed class AppSettings
     public bool UseExternalCredentialProvider { get; set; }
 
     // Which provider implementation to use when the external provider is enabled.
-    [JsonConverter(typeof(JsonStringEnumConverter<CredentialProviderKind>))]
+    [JsonConverter(typeof(CredentialProviderKindJsonConverter))]
     public CredentialProviderKind CredentialProviderType { get; set; } = CredentialProviderKind.Command;
 
     public string? CredentialProviderCommand { get; set; }
@@ -514,7 +514,7 @@ public sealed class AppSettings
     public string? VaultWrappedDek { get; set; }
 
     /// <summary>Resumable forward-migration state for the vault.</summary>
-    [JsonConverter(typeof(JsonStringEnumConverter<VaultMigrationState>))]
+    [JsonConverter(typeof(VaultMigrationStateJsonConverter))]
     public VaultMigrationState VaultMigrationState { get; set; } = VaultMigrationState.None;
 
     /// <summary>UTC timestamp (ISO-8601) of when the vault was first enabled. Non-secret.</summary>
