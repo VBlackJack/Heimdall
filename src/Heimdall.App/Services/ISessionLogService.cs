@@ -54,4 +54,11 @@ public interface ISessionLogService : IDisposable
     /// <param name="sessionKey">The key supplied to <see cref="StartSession"/>.</param>
     /// <returns><c>true</c> when the session is active; otherwise <c>false</c>.</returns>
     bool IsSessionActive(string sessionKey);
+
+    /// <summary>
+    /// Deletes session transcripts last written more than <paramref name="retentionDays"/> days
+    /// ago, and returns how many went. 0 days keeps everything. Transcripts still being written
+    /// and the shared event and operation logs are never touched.
+    /// </summary>
+    int PruneExpiredTranscripts(int retentionDays) => 0;
 }

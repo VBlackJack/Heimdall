@@ -3729,6 +3729,9 @@
   "SettingsSessionLoggingEnableConfirmTitle": "Enregistrer la transcription des sessions ?",
   "SettingsSessionLoggingEnableConfirmBody": "Chaque session de terminal sera \u00e9crite dans un fichier : ce que vous tapez comme ce qui s'affiche, y compris les mots de passe ou jetons renvoy\u00e9s par le terminal. Enregistrer et l'activer ?",
   "SettingsLabelSessionLogDirectory": "R\u00e9pertoire des journaux de session",
+  "SettingsLabelSessionLogRetentionDays": "Supprimer les transcripts de plus de",
+  "SettingsSessionLogRetentionHint": "0 conserve tous les transcripts. Seuls les transcripts de session sont supprim\u00e9s ; les journaux d'\u00e9v\u00e9nements et d'op\u00e9rations sur fichiers sont conserv\u00e9s.",
+  "ValidationSettingsSessionLogRetention": "La conservation des transcripts doit valoir 0 (tout garder) ou \u00eatre comprise entre {0} et {1} jours.",
 
   "SettingsSectionCredentialProvider": "Fournisseur de credentials externe",
   "SettingsLabelCredProviderEnabled": "Utiliser un fournisseur de credentials externe",

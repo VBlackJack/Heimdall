@@ -725,11 +725,20 @@ public partial class App : System.Windows.Application
             // same user-writable data root as the diagnostic logger.
             string root = SessionLogPathResolver.Resolve(currentSettings, dataRoot);
 
-            return new SessionLogService(
+            SessionLogService service = new SessionLogService(
                 root,
                 SessionLogOptions.CreateDefault(),
                 logger,
                 localizer.GetString);
+
+            // Opt-in retention: nothing is deleted unless the user set a number of days. It runs
+            // once here, off the UI thread, and again whenever the settings are saved, so a new
+            // value applies without a restart.
+            _ = Task.Run(() => service.PruneExpiredTranscripts(currentSettings.SessionLogRetentionDays));
+            configManager.SettingsChanged += saved =>
+                _ = Task.Run(() => service.PruneExpiredTranscripts(saved.SessionLogRetentionDays));
+
+            return service;
         });
 
         // Session event log (Lot 2): single shared append-only NDJSON record of graphical-protocol

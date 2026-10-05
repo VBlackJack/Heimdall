@@ -86,6 +86,62 @@ public sealed class SessionLogServiceTests : IDisposable
     }
 
     [Fact]
+    public void PruneExpiredTranscripts_DeletesOnlyTranscriptsPastTheRetention()
+    {
+        string root = NewTempDirectory();
+        Directory.CreateDirectory(root);
+        DateTime now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+        string expired = Touch(root, "SSH_old.example_20260801_101500.log", now.AddDays(-40));
+        string expiredContinuation = Touch(root, "SSH_old.example_20260801_101500_1.2.log", now.AddDays(-40));
+        string recent = Touch(root, "SSH_new.example_20260930_080000.log", now.AddDays(-5));
+        string eventLog = Touch(root, "session-events.log", now.AddDays(-400));
+        string unrelated = Touch(root, "notes.log", now.AddDays(-400));
+        using SessionLogService service = CreateService(root, SessionLogOptions.CreateDefault());
+
+        int deleted = service.PruneExpiredTranscripts(30, now);
+
+        deleted.Should().Be(2);
+        File.Exists(expired).Should().BeFalse();
+        File.Exists(expiredContinuation).Should().BeFalse();
+        File.Exists(recent).Should().BeTrue();
+        File.Exists(eventLog).Should().BeTrue("the shared event log is not a transcript");
+        File.Exists(unrelated).Should().BeTrue();
+    }
+
+    [Fact]
+    public void PruneExpiredTranscripts_ZeroDays_KeepsEverything()
+    {
+        string root = NewTempDirectory();
+        Directory.CreateDirectory(root);
+        DateTime now = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+        string ancient = Touch(root, "SSH_old.example_20200101_000000.log", now.AddYears(-6));
+        using SessionLogService service = CreateService(root, SessionLogOptions.CreateDefault());
+
+        service.PruneExpiredTranscripts(0, now).Should().Be(0);
+        File.Exists(ancient).Should().BeTrue("retention is off unless the user sets a number of days");
+    }
+
+    [Fact]
+    public void PruneExpiredTranscripts_NeverDeletesATranscriptStillBeingWritten()
+    {
+        string root = NewTempDirectory();
+        using SessionLogService service = CreateService(root, SessionLogOptions.CreateDefault());
+        string? active = service.StartSession(Context("s1", DateTime.UtcNow));
+        active.Should().NotBeNull();
+
+        service.PruneExpiredTranscripts(1, DateTime.UtcNow.AddDays(30)).Should().Be(0);
+        File.Exists(active!).Should().BeTrue();
+    }
+
+    private static string Touch(string root, string name, DateTime lastWriteUtc)
+    {
+        string path = Path.Combine(root, name);
+        File.WriteAllText(path, "x");
+        File.SetLastWriteTimeUtc(path, lastWriteUtc);
+        return path;
+    }
+
+    [Fact]
     public void StartSession_FileNameNeverCarriesTheUserName()
     {
         string root = NewTempDirectory();

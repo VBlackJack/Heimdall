@@ -3732,6 +3732,9 @@
   "SettingsSessionLoggingEnableConfirmTitle": "¿Grabar transcripciones de sesión?",
   "SettingsSessionLoggingEnableConfirmBody": "Cada sesión de terminal se escribirá en un archivo: lo que escribes y lo que se muestra, incluidas contraseñas o tokens que el terminal repita. ¿Guardar y activarlo?",
   "SettingsLabelSessionLogDirectory": "Directorio de registro de sesión",
+  "SettingsLabelSessionLogRetentionDays": "Eliminar transcripciones con más de",
+  "SettingsSessionLogRetentionHint": "0 conserva todas las transcripciones. Solo se eliminan las transcripciones de sesión; los registros de eventos y de operaciones de archivos se conservan.",
+  "ValidationSettingsSessionLogRetention": "La retención de transcripciones debe ser 0 (conservar todo) o estar entre {0} y {1} días.",
 
   "SettingsSectionCredentialProvider": "Proveedor de credenciales externo",
   "SettingsLabelCredProviderEnabled": "Usar proveedor de credenciales externo",

@@ -85,6 +85,7 @@ public sealed class SettingRangesTests
         (nameof(AppSettings.SessionHealthCheckIntervalSeconds), 15, 3600, false),
         (nameof(AppSettings.SessionHealthProbeTimeoutMs), 250, 30000, false),
         (nameof(AppSettings.SessionHealthMaxConcurrent), 1, 50, false),
+        (nameof(AppSettings.SessionLogRetentionDays), 7, 3650, true),
         (nameof(AppSettings.WindowsHelloGraceMinutes), 0, 1440, false),
         (nameof(AppSettings.AutoLockIdleMinutes), 0, 1440, false),
         (nameof(AppSettings.VaultHelloMaxDaysBeforeMasterPassword), 0, 3650, false),
