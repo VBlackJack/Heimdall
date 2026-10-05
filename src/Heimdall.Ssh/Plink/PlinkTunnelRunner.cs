@@ -403,10 +403,13 @@ public sealed class PlinkTunnelRunner : IDisposable
                 Stop();
 
                 // A port another process holds is the clearer account, and plink exiting is then
-                // its consequence; the ownership failure below says so.
-                if (exited && ownership != TcpListenerOwnership.OwnedByDifferentProcess)
+                // its consequence; the ownership failure below says so. So it does when plink
+                // said nothing that names a cause.
+                if (exited
+                    && ownership != TcpListenerOwnership.OwnedByDifferentProcess
+                    && TryBuildExitedEarlyResult(exitCode!.Value) is PlinkTunnelResult exitedEarly)
                 {
-                    return BuildExitedEarlyResult(exitCode!.Value);
+                    return exitedEarly;
                 }
 
                 SshFailureCode failureCode = ToFailureCode(ownership);
@@ -965,12 +968,18 @@ public sealed class PlinkTunnelRunner : IDisposable
 
     /// <summary>
     /// Builds the result for a plink that exited before it opened the tunnel, named from what it
-    /// wrote to stderr. Called after <see cref="Stop"/>, which has joined the stderr drain.
+    /// wrote to stderr, or null when what it wrote names no cause. Called after
+    /// <see cref="Stop"/>, which has joined the stderr drain.
     /// </summary>
-    private PlinkTunnelResult BuildExitedEarlyResult(int exitCode)
+    private PlinkTunnelResult? TryBuildExitedEarlyResult(int exitCode)
     {
         List<string> stderr = [.. _recentStderr];
         SshFailureCode code = PlinkStderrClassifier.Classify(stderr);
+        if (code == SshFailureCode.Unknown)
+        {
+            return null;
+        }
+
         string lastLine = stderr.Count > 0 ? stderr[^1] : string.Empty;
         string message = $"Plink exited with code {exitCode} before opening the tunnel: {lastLine}";
         Core.Logging.FileLogger.Error(message);

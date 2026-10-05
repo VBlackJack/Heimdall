@@ -123,6 +123,33 @@ public sealed class PlinkTunnelRunnerEarlyExitTests
         }
     }
 
+    // A plink that exits without naming a cause gets the port check's own verdict, as before.
+    [Fact]
+    public async Task StartAsync_PlinkExitsWithoutNamingACause_ReportsThePortCheck()
+    {
+        string plinkStandIn = Path.GetTempFileName();
+        using PlinkTunnelRunner runner = new(
+            new PlinkTunnelRunnerOptions(PortCheckIntervalMs: 1000, KillGracePeriodMs: 100),
+            new FixedProbe(TcpListenerOwnership.NothingListening),
+            _ => new ExitedPlinkProcess("'gw.test' is not recognized as an internal or external command.\r\n"));
+
+        try
+        {
+            Stopwatch elapsed = Stopwatch.StartNew();
+            PlinkTunnelResult result = await runner.StartAsync(
+                plinkStandIn,
+                "gw.test", 22, "ops", null, "s3cret",
+                "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+
+            Assert.Equal(SshFailureCode.TunnelPortNotListening, result.FailureCode);
+            Assert.True(elapsed.Elapsed < TimeSpan.FromSeconds(5), $"Took {elapsed.Elapsed}.");
+        }
+        finally
+        {
+            File.Delete(plinkStandIn);
+        }
+    }
+
     // Another process on the port is the clearer account of why plink gave up.
     [Fact]
     public async Task StartAsync_PlinkExitsWhileAnotherProcessHoldsThePort_ReportsThePortOwnership()
