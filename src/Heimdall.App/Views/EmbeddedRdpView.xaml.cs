@@ -5380,9 +5380,18 @@ public partial class EmbeddedRdpView
     [SupportedOSPlatform("windows")]
     private void OnAntiIdleTick(object? sender, EventArgs e)
     {
-        if (_disposed || _rdpHost is null || !_rdpHost.IsConnected)
+        if (_disposed || _rdpHost is null)
         {
             StopAntiIdleTimer();
+            return;
+        }
+
+        // Skipped, not stopped: during an auto-reconnect bounce the host reads as not connected,
+        // and nothing restarts the timer once it reconnects. A tick landing in that window used
+        // to end anti-idle silently for the rest of the session. A session that really ends
+        // stops the timer on its own disconnect path.
+        if (!_rdpHost.IsConnected)
+        {
             return;
         }
 

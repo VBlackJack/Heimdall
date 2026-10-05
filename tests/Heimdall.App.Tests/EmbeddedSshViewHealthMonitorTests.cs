@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 
 namespace Heimdall.App.Tests;
 
@@ -51,6 +52,42 @@ public sealed class EmbeddedSshViewHealthMonitorTests
             stopStatements.Count == 1,
             $"Expected exactly one '{StopStatement}' statement in OnDisconnected, found {stopStatements.Count}. "
             + "A disconnect that leaves the monitor running polls a disposed SSH client until the tab closes.");
+    }
+
+    [Theory]
+    [InlineData("ReleaseSleepPrevention();")]
+    [InlineData("StopKeepAliveTimer();")]
+    public void OnDisconnected_ReleasesWhatOnlyALiveSessionNeeds(string statement)
+    {
+        string body = ExtractMethodBody(ReadAppSource(ViewSourcePath), DisconnectHandlerSignature);
+
+        int count = body
+            .Split('\n')
+            .Select(static line => line.Trim())
+            .Count(line => string.Equals(line, statement, StringComparison.Ordinal));
+
+        Assert.True(
+            count == 1,
+            $"Expected exactly one '{statement}' statement in OnDisconnected, found {count}. "
+            + "A tab left open on a dead session kept the machine awake and kept sending keep-alives.");
+    }
+
+    private const string PolicyGate = "if (!TerminalSurfaceFailurePolicy.IsFatal(e.ProcessFailedKind))";
+
+    private const string FallbackCall = "ShowWebViewUnavailable(";
+
+    [Fact]
+    public void OnWebViewProcessFailed_ConsultsThePolicyBeforeBlankingTheTerminal()
+    {
+        string logic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(ReadAppSource(ViewSourcePath)),
+            "private void OnWebViewProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e)");
+
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, PolicyGate), "The process failure handler does not consult the policy.");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, FallbackCall), "The handler no longer falls back for a fatal failure.");
+        Assert.True(
+            logic.IndexOf(PolicyGate, StringComparison.Ordinal) < logic.IndexOf(FallbackCall, StringComparison.Ordinal),
+            "The terminal is blanked before the policy is consulted.");
     }
 
     private static string ExtractMethodBody(string source, string signature)

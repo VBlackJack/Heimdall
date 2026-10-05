@@ -1346,6 +1346,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private void OnWebViewProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e)
     {
         Core.Logging.FileLogger.Warn($"EmbeddedSSH WebView2 process failed: {e.ProcessFailedKind}");
+        if (!TerminalSurfaceFailurePolicy.IsFatal(e.ProcessFailedKind))
+        {
+            return;
+        }
+
         ShowWebViewUnavailable(_localizer?["ErrorTerminalRendererCrashed"] ?? "ErrorTerminalRendererCrashed");
     }
 
@@ -1718,7 +1723,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     private void QueueOutput(ReadOnlySpan<byte> data)
     {
-        if (_disposed || _webViewUnavailable || data.IsEmpty)
+        if (_disposed || data.IsEmpty)
         {
             return;
         }
@@ -1731,6 +1736,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             // transcript is active for this key, so replayed bootstrap bytes that arrive before
             // StartSession are not logged, and live bytes after it are logged exactly once.
             SessionLogService.WriteOutput(_sessionLogKey, data);
+        }
+
+        // Only the drawing stops with the renderer. The transcript and a running macro read
+        // the session, which is still connected; they used to stop silently with the page.
+        if (_webViewUnavailable)
+        {
+            return;
         }
 
         ObserveWinRmEarlyOutput(data);
@@ -1787,6 +1799,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             // left running would poll that disposed client until the tab
             // closes. Whatever branch below is taken, there is nothing to poll.
             StopHealthMonitor();
+
+            // Nothing is connected any more: a tab left open on a dead session kept the machine
+            // awake overnight and kept sending keep-alives into a closed shell. A reconnect builds
+            // a new view, which acquires its own.
+            ReleaseSleepPrevention();
+            StopKeepAliveTimer();
 
             string? errorMessage = SshDisconnectMessageResolver.Resolve(
                 disconnectInfo,

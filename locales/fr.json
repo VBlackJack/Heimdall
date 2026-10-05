@@ -4404,6 +4404,8 @@
   "HealthReasonUnreachable": "H\u00f4te injoignable",
   "HealthReasonDns": "R\u00e9solution DNS \u00e9chou\u00e9e",
   "HealthReasonBehindGateway": "Derri\u00e8re une gateway SSH - non sond\u00e9",
+  "HealthReasonBehindRdGateway": "Derri\u00e8re une gateway RD - non sond\u00e9",
+  "HealthReasonOther": "\u00c9chec de la connexion",
   "HealthReasonNoPort": "Pas de port \u00e0 sonder pour ce protocole",
   "HealthReasonNoHost": "Aucun h\u00f4te configur\u00e9",
   "HealthLastCheckedNever": "jamais",
