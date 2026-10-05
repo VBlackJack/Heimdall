@@ -272,6 +272,21 @@ public sealed class CitrixSessionHandleTests
     }
 
     [Fact]
+    public void IsSessionWindow_OnlyTheAdoptedWindow_IsTheSession()
+    {
+        FakeSessionProcess process = new(OwnerPid);
+        FakeWin32 win32 = new(SessionHwnd, OwnerPid);
+        CitrixSessionHandle handle = CreateHandle(win32, process);
+
+        Assert.True(CitrixSessionHandle.IsSessionWindow(handle, SessionHwnd));
+
+        // The Workspace sign-in window, embedded before the session exists, is not it.
+        Assert.False(CitrixSessionHandle.IsSessionWindow(handle, 0x9999));
+        Assert.False(CitrixSessionHandle.IsSessionWindow(null, SessionHwnd));
+        Assert.False(CitrixSessionHandle.IsSessionWindow(handle, IntPtr.Zero));
+    }
+
+    [Fact]
     public void Terminate_DeadSession_KillsNothing()
     {
         FakeSessionProcess process = new(OwnerPid);
