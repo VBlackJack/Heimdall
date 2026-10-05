@@ -52,7 +52,7 @@ public sealed class PlinkTunnelRunnerEarlyExitTests
 
             Assert.False(result.Success);
             Assert.True(elapsed.Elapsed < TimeSpan.FromSeconds(5), $"Took {elapsed.Elapsed}.");
-            Assert.Equal(SshFailureCode.NoSupportedAuth, result.FailureCode);
+            Assert.Equal(SshFailureCode.AuthRejected, result.FailureCode);
             Assert.Equal(TunnelMessageKeys.MessageKeyPlinkExitedEarly, result.MessageKey);
             Assert.Equal(1, result.MessageArguments![0]);
             Assert.Equal("FATAL ERROR: No supported authentication methods available", result.MessageArguments[1]);
@@ -69,6 +69,8 @@ public sealed class PlinkTunnelRunnerEarlyExitTests
     [InlineData("FATAL ERROR: Network error: Connection timed out", SshFailureCode.NetworkTimedOut)]
     [InlineData("FATAL ERROR: Host does not exist", SshFailureCode.NetworkUnreachable)]
     [InlineData("WARNING - POTENTIAL SECURITY BREACH!", SshFailureCode.HostKeyMismatch)]
+    [InlineData("Host key did not appear in manually configured list", SshFailureCode.HostKeyMismatch)]
+    [InlineData("FATAL ERROR: No supported authentication methods available", SshFailureCode.NoSupportedAuth)]
     [InlineData("Wrong passphrase", SshFailureCode.PassphraseRejected)]
     [InlineData("Unable to use key file \"C:\\keys\\id.ppk\" (unable to open file)", SshFailureCode.KeyFileInvalid)]
     [InlineData("Server refused our key", SshFailureCode.KeyRejected)]
@@ -85,6 +87,65 @@ public sealed class PlinkTunnelRunnerEarlyExitTests
         Assert.Equal(
             SshFailureCode.KeyRejected,
             PlinkStderrClassifier.Classify(["Server refused our key", "Access denied"]));
+    }
+
+    // Plink's host key warning runs to seven lines and names the mismatch in its first two.
+    // Proved against the mutant that keeps only the last five lines: this comes back Unknown.
+    [Fact]
+    public async Task StartAsync_HostKeyWarning_IsNamedFromItsFirstLines()
+    {
+        string plinkStandIn = Path.GetTempFileName();
+        const string warning =
+            "WARNING - POTENTIAL SECURITY BREACH!\r\n"
+            + "The host key does not match the one PuTTY has cached for this server.\r\n"
+            + "This means that either the server administrator has changed the host key,\r\n"
+            + "or you have actually connected to another computer pretending to be the server.\r\n"
+            + "The new ssh-ed25519 key fingerprint is:\r\n"
+            + "ssh-ed25519 255 SHA256:abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG\r\n"
+            + "Connection abandoned.\r\n";
+        using PlinkTunnelRunner runner = new(
+            new PlinkTunnelRunnerOptions(PortCheckIntervalMs: 1000, KillGracePeriodMs: 100),
+            new FixedProbe(TcpListenerOwnership.NothingListening),
+            _ => new ExitedPlinkProcess(warning));
+
+        try
+        {
+            PlinkTunnelResult result = await runner.StartAsync(
+                plinkStandIn,
+                "gw.test", 22, "ops", null, "s3cret",
+                "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+
+            Assert.Equal(SshFailureCode.HostKeyMismatch, result.FailureCode);
+        }
+        finally
+        {
+            File.Delete(plinkStandIn);
+        }
+    }
+
+    // Another process on the port is the clearer account of why plink gave up.
+    [Fact]
+    public async Task StartAsync_PlinkExitsWhileAnotherProcessHoldsThePort_ReportsThePortOwnership()
+    {
+        string plinkStandIn = Path.GetTempFileName();
+        using PlinkTunnelRunner runner = new(
+            new PlinkTunnelRunnerOptions(PortCheckIntervalMs: 1000, KillGracePeriodMs: 100),
+            new FixedProbe(TcpListenerOwnership.OwnedByDifferentProcess),
+            _ => new ExitedPlinkProcess("FATAL ERROR: Local port 9090 forwarding failed: Address already in use\r\n"));
+
+        try
+        {
+            PlinkTunnelResult result = await runner.StartAsync(
+                plinkStandIn,
+                "gw.test", 22, "ops", null, "s3cret",
+                "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+
+            Assert.Equal(SshFailureCode.TunnelPortOwnedByDifferentProcess, result.FailureCode);
+        }
+        finally
+        {
+            File.Delete(plinkStandIn);
+        }
     }
 
     private static int GetAvailableLoopbackPort()
@@ -105,6 +166,11 @@ public sealed class PlinkTunnelRunnerEarlyExitTests
     {
         public TcpListenerOwnership Probe(string bindHost, int port, int expectedProcessId) =>
             TcpListenerOwnership.NothingListening;
+    }
+
+    private sealed class FixedProbe(TcpListenerOwnership ownership) : ITcpListenerOwnershipProbe
+    {
+        public TcpListenerOwnership Probe(string bindHost, int port, int expectedProcessId) => ownership;
     }
 
     private sealed class ExitedPlinkProcess(string stderr) : IPlinkProcess

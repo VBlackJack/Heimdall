@@ -33,11 +33,16 @@ internal static class PlinkStderrClassifier
     [
         ("WARNING - POTENTIAL SECURITY BREACH", SshFailureCode.HostKeyMismatch),
         ("host key does not match", SshFailureCode.HostKeyMismatch),
+        ("Host key did not appear in manually configured list", SshFailureCode.HostKeyMismatch),
         ("Wrong passphrase", SshFailureCode.PassphraseRejected),
         ("Unable to use key file", SshFailureCode.KeyFileInvalid),
         ("Server refused our key", SshFailureCode.KeyRejected),
-        ("No supported authentication methods", SshFailureCode.NoSupportedAuth),
+
+        // A refused password prints "Access denied" and then, as plink gives up, "No supported
+        // authentication methods available". Only without the first is it the server offering
+        // nothing plink can use.
         ("Access denied", SshFailureCode.AuthRejected),
+        ("No supported authentication methods", SshFailureCode.NoSupportedAuth),
         ("Connection refused", SshFailureCode.NetworkRefused),
         ("timed out", SshFailureCode.NetworkTimedOut),
         ("Connection reset", SshFailureCode.NetworkReset),

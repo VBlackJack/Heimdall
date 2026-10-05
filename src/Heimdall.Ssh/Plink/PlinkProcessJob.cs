@@ -51,14 +51,16 @@ internal static class PlinkProcessJob
             return false;
         }
 
-        SafeFileHandle? job = Job.Value;
-        if (job is null || job.IsInvalid)
-        {
-            return false;
-        }
-
         try
         {
+            // Inside the try: plink is already running when this is called, and nothing that
+            // goes wrong here may escape and leave it without an owner.
+            SafeFileHandle? job = Job.Value;
+            if (job is null || job.IsInvalid)
+            {
+                return false;
+            }
+
             if (AssignProcessToJobObject(job, process.SafeHandle))
             {
                 return true;
@@ -67,7 +69,7 @@ internal static class PlinkProcessJob
             Core.Logging.FileLogger.Warn(
                 $"[PlinkProcessJob] Could not tie plink pid={process.Id} to Heimdall's lifetime: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
         }
-        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+        catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"[PlinkProcessJob] Could not tie plink to Heimdall's lifetime: {ex.Message}");
         }
