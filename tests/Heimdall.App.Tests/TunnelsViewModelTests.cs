@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Tunnels;
@@ -357,6 +358,74 @@ public sealed class TunnelsViewModelTests
         Assert.True(tunnelManager.HasTunnel(50143));
     }
 
+    // A tunnel event used to refresh the list and the badges on the thread that raised it, which
+    // enumerated the open tabs while the UI thread changed them. Proved against the mutant that
+    // handles the event in place: the list is refreshed before the UI thread runs anything.
+    [Fact]
+    public void TunnelEvents_AreHandledOnTheUiThread()
+    {
+        var settings = new AppSettings();
+        var host = new TestTunnelsHost(settings) { QueueUiWork = true };
+        using var tunnelManager = new TunnelManager();
+        using var vm = CreateViewModel(host, new FakeConfigManager(settings), tunnelManager);
+
+        RegisterTunnel(tunnelManager, 50150, isAlive: true);
+
+        Assert.Equal(0, vm.Count);
+        Assert.Single(host.UiQueue);
+        host.DrainUi();
+        Assert.Equal(1, vm.Count);
+
+        tunnelManager.ForceCloseTunnel(50150);
+        Assert.Equal(1, vm.Count);
+        host.DrainUi();
+        Assert.Equal(0, vm.Count);
+    }
+
+    [Fact]
+    public void TunnelEvents_QueuedBeforeDispose_DoNothingAfterIt()
+    {
+        var settings = new AppSettings();
+        var host = new TestTunnelsHost(settings) { QueueUiWork = true };
+        using var tunnelManager = new TunnelManager();
+        var vm = CreateViewModel(host, new FakeConfigManager(settings), tunnelManager);
+        RegisterTunnel(tunnelManager, 50151, isAlive: true);
+
+        vm.Dispose();
+        host.DrainUi();
+
+        Assert.Equal(0, vm.Count);
+    }
+
+    // Two gateways on one host with different users: guessing the route from the host named
+    // whichever came first. The route the tunnel was dialled through is recorded on it.
+    [Fact]
+    public async Task ResolveRoute_NamesTheRouteTheTunnelWasDialledThrough()
+    {
+        var settings = new AppSettings
+        {
+            SshGateways =
+            [
+                new SshGatewayDto { Id = "gw-a", Name = "Alpha", Host = "bastion.example.test", User = "a" },
+                new SshGatewayDto { Id = "gw-b", Name = "Beta", Host = "bastion.example.test", User = "b" }
+            ]
+        };
+        var host = new TestTunnelsHost(settings);
+        var stateMachine = new ConnectionStateMachine();
+        using var tunnelManager = new TunnelManager();
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        using var vm = CreateViewModel(host, new FakeConfigManager(settings), tunnelManager, stateMachine, localizer);
+        var info = new TunnelInfo("bastion.example.test", 50152, "target.internal", 3389, DateTime.UtcNow, true)
+        {
+            GatewayRoute = "Beta"
+        };
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(info, new TestDisposable(), () => true));
+        stateMachine.SetTunnelInfo("server-1", 50152, processId: 0);
+
+        Assert.Equal(localizer.Format("SessionGatewayBadgeVia", "Beta"), vm.ResolveRoute("server-1"));
+    }
+
     [Fact]
     public void TunnelClosed_UpdatesBadgeStateForAllTabs()
     {
@@ -447,11 +516,12 @@ public sealed class TunnelsViewModelTests
         TestTunnelsHost host,
         FakeConfigManager config,
         TunnelManager? tunnelManager = null,
-        ConnectionStateMachine? stateMachine = null)
+        ConnectionStateMachine? stateMachine = null,
+        LocalizationManager? localizer = null)
     {
         return new TunnelsViewModel(
             host,
-            new LocalizationManager(),
+            localizer ?? new LocalizationManager(),
             tunnelManager ?? new TunnelManager(),
             stateMachine ?? new ConnectionStateMachine(),
             new HostKeyStore(),
@@ -579,6 +649,29 @@ public sealed class TunnelsViewModelTests
         public string StatusText { get; set; } = string.Empty;
 
         public bool ConfirmAnswer { get; set; } = true;
+
+        public bool QueueUiWork { get; set; }
+
+        public Queue<Action> UiQueue { get; } = new();
+
+        public void RunOnUi(Action action)
+        {
+            if (QueueUiWork)
+            {
+                UiQueue.Enqueue(action);
+                return;
+            }
+
+            action();
+        }
+
+        public void DrainUi()
+        {
+            while (UiQueue.TryDequeue(out Action? action))
+            {
+                action();
+            }
+        }
 
         public List<string> ConfirmMessages { get; } = [];
 
