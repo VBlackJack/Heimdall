@@ -721,22 +721,36 @@ public sealed class TunnelService : ITunnelService
         PlinkTunnelRunner runner = new PlinkTunnelRunner(
             _currentSettings?.PlinkPortCheckIntervalMs ?? AppSettings.DefaultPlinkPortCheckIntervalMs,
             _currentSettings?.PlinkKillGracePeriodMs ?? AppSettings.DefaultPlinkKillGracePeriodMs);
-        PlinkTunnelResult result = await runner.StartAsync(
-                plinkPath,
-                gatewayParams.Host,
-                gatewayParams.Port,
-                gatewayParams.Username,
-                gatewayParams.KeyPath,
-                gatewayParams.Password,
-                remoteHost,
-                remotePort,
-                localPort,
-                fingerprint,
-                ct,
-                gatewayParams.KeyPassphrase,
-                _localizer[SshLocalizationKeys.ErrorPlinkPassphraseUnsupported],
-                localBindHost)
-            .ConfigureAwait(false);
+        PlinkTunnelResult result;
+        try
+        {
+            result = await runner.StartAsync(
+                    plinkPath,
+                    gatewayParams.Host,
+                    gatewayParams.Port,
+                    gatewayParams.Username,
+                    gatewayParams.KeyPath,
+                    gatewayParams.Password,
+                    remoteHost,
+                    remotePort,
+                    localPort,
+                    fingerprint,
+                    ct,
+                    gatewayParams.KeyPassphrase,
+                    _localizer[SshLocalizationKeys.ErrorPlinkPassphraseUnsupported],
+                    localBindHost)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            // Whatever ends the start - a cancellation included - the alias reserved above and
+            // the runner are released here. Only the failure result used to release them, so an
+            // exception kept the alias out of the pool for the life of the process.
+            _tunnelManager.ReleaseLoopbackAliasReservation(localBindHost);
+            runner.Dispose();
+            throw;
+        }
+
         result = TunnelFailureMessageResolver.Localize(result, _localizer);
 
         if (!result.Success)

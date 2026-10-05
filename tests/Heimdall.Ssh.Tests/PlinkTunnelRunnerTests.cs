@@ -920,6 +920,42 @@ public class PlinkTunnelRunnerTests : IDisposable
             processFactory);
     }
 
+    // A password file that cannot be written - a temp directory that is gone or read-only -
+    // escaped StartAsync as an exception, and the caller, which only expected a result, never
+    // released the loopback alias it had reserved for the tunnel.
+    [Fact]
+    public async Task StartAsync_PasswordFileCannotBeWritten_ReturnsAFailureWithoutStartingPlink()
+    {
+        string plinkStandIn = Path.GetTempFileName();
+        string missingDirectory = Path.Combine(Path.GetTempPath(), "heimdall-missing-" + Guid.NewGuid().ToString("N"));
+        bool processStarted = false;
+        using PlinkTunnelRunner runner = new(
+            new PlinkTunnelRunnerOptions(1, 100),
+            new FakeOwnershipProbe(TcpListenerOwnership.OwnedByExpectedProcess),
+            _ =>
+            {
+                processStarted = true;
+                return new FakePlinkProcess();
+            },
+            () => missingDirectory);
+
+        try
+        {
+            PlinkTunnelResult result = await runner.StartAsync(
+                plinkStandIn,
+                "gw.test", 22, "user", null, "s3cret",
+                "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+
+            Assert.False(result.Success);
+            Assert.False(processStarted);
+            Assert.False(Directory.Exists(missingDirectory));
+        }
+        finally
+        {
+            File.Delete(plinkStandIn);
+        }
+    }
+
     [Fact]
     public async Task ThePasswordFileIsWrittenWhereTheRunnerWasToldAndNowhereElse()
     {
