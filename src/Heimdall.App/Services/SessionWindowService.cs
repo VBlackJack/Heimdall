@@ -43,6 +43,7 @@ public sealed class SessionWindowService : ISessionWindowService
 {
     private readonly Action<SessionTabViewModel, LocalizationManager> _showFloatingWindow;
     private readonly Func<IReadOnlyList<SessionTabViewModel>> _readDetachedSessions;
+    private readonly Func<SessionTabViewModel, bool> _reattachDetachedSession;
 
     /// <summary>
     /// Initialises a new <see cref="SessionWindowService"/>.
@@ -61,11 +62,21 @@ public sealed class SessionWindowService : ISessionWindowService
     internal SessionWindowService(
         Action<SessionTabViewModel, LocalizationManager> showFloatingWindow,
         Func<IReadOnlyList<SessionTabViewModel>> readDetachedSessions)
+        : this(showFloatingWindow, readDetachedSessions, ReattachDetachedSession)
+    {
+    }
+
+    internal SessionWindowService(
+        Action<SessionTabViewModel, LocalizationManager> showFloatingWindow,
+        Func<IReadOnlyList<SessionTabViewModel>> readDetachedSessions,
+        Func<SessionTabViewModel, bool> reattachDetachedSession)
     {
         _showFloatingWindow = showFloatingWindow
             ?? throw new ArgumentNullException(nameof(showFloatingWindow));
         _readDetachedSessions = readDetachedSessions
             ?? throw new ArgumentNullException(nameof(readDetachedSessions));
+        _reattachDetachedSession = reattachDetachedSession
+            ?? throw new ArgumentNullException(nameof(reattachDetachedSession));
     }
 
     /// <inheritdoc />
@@ -93,6 +104,48 @@ public sealed class SessionWindowService : ISessionWindowService
                 .OfType<Views.FloatingSessionWindow>()
                 .Select(window => window.Session)
         ];
+    }
+
+    /// <summary>
+    /// Hands a session hosted by a floating window back to the main window, through the window
+    /// itself so it lets go of the host control first. False when no window hosts it.
+    /// </summary>
+    private static bool ReattachDetachedSession(SessionTabViewModel session)
+    {
+        Views.FloatingSessionWindow? window = System.Windows.Application.Current?.Windows
+            .OfType<Views.FloatingSessionWindow>()
+            .FirstOrDefault(candidate => ReferenceEquals(candidate.Session, session));
+        if (window is null)
+        {
+            return false;
+        }
+
+        window.ReattachToMainWindow();
+        return true;
+    }
+
+    /// <summary>
+    /// Makes sure <paramref name="session"/> is a tab of the main window before it is split.
+    /// </summary>
+    /// <remarks>
+    /// A floating window shows only the session's single host. Splitting the session there added
+    /// a pane nothing displayed, which still connected and held its server. The session goes back
+    /// to the main window first, where the split is visible.
+    /// </remarks>
+    private bool EnsureInMainWindow(SessionTabViewModel session, MainViewModel vm)
+    {
+        if (vm.Connection.ActiveSessions.Contains(session))
+        {
+            return true;
+        }
+
+        if (_reattachDetachedSession(session) && vm.Connection.ActiveSessions.Contains(session))
+        {
+            return true;
+        }
+
+        FileLogger.Warn($"Split ignored for '{session.Title}': the session is not in the main window.");
+        return false;
     }
 
     /// <summary>
@@ -194,6 +247,11 @@ public sealed class SessionWindowService : ISessionWindowService
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(vm);
+
+        if (!EnsureInMainWindow(session, vm))
+        {
+            return;
+        }
 
         vm.CommandPalette.OpenSplit(session, orientation);
         SplitPaletteRequested?.Invoke(this, EventArgs.Empty);
@@ -311,16 +369,33 @@ public sealed class SessionWindowService : ISessionWindowService
             return;
         }
 
-        // Restore as independent tab with original metadata
-        if (!string.IsNullOrEmpty(serverId))
+        // A pane without a server id cannot become a tab of its own; its host would otherwise be
+        // dropped here still holding its connection.
+        if (string.IsNullOrEmpty(serverId))
         {
-            var displayTitle = !string.IsNullOrEmpty(title) ? title : serverId;
-            var restoredTab = vm.Connection.AddSession(serverId, displayTitle, connType);
-            restoredTab.OriginalServerId = originalServerId;
-            restoredTab.HostControl = hostControl;
-            restoredTab.Status = !string.IsNullOrEmpty(status) ? status : "Connected";
-            restoredTab.TunnelRoute = tunnelRoute;
-            restoredTab.EnvironmentColor = envColor;
+            if (hostControl is IDisposable disposable)
+            {
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Already gone.
+                }
+            }
+
+            FileLogger.Warn($"Detached pane '{title}' had no server id; its host was disposed.");
+            return;
         }
+
+        // Restore as independent tab with original metadata
+        var displayTitle = !string.IsNullOrEmpty(title) ? title : serverId;
+        var restoredTab = vm.Connection.AddSession(serverId, displayTitle, connType);
+        restoredTab.OriginalServerId = originalServerId;
+        restoredTab.HostControl = hostControl;
+        restoredTab.Status = !string.IsNullOrEmpty(status) ? status : "Connected";
+        restoredTab.TunnelRoute = tunnelRoute;
+        restoredTab.EnvironmentColor = envColor;
     }
 }

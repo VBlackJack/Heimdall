@@ -375,14 +375,25 @@ public partial class ConnectionViewModel : ObservableObject
     private async Task CloseSession(SessionTabViewModel? session)
         => await CloseSessionAsync(session, DisconnectReason.TabClose);
 
+    /// <param name="clearedRequest">
+    /// A request the guards already cleared for this gesture (a floating window asks them before
+    /// it lets go of the session). Reusing it keeps their answer instead of asking again. The
+    /// request is released here.
+    /// </param>
     public async Task<PaneCloseResult> CloseSessionAsync(
         SessionTabViewModel? session,
         DisconnectReason reason,
         bool confirm = true,
-        CloseIntent intent = CloseIntent.Interactive)
+        CloseIntent intent = CloseIntent.Interactive,
+        CloseRequest? clearedRequest = null)
     {
         if (session is null)
         {
+            if (clearedRequest is not null)
+            {
+                _closeArbiter.Release(clearedRequest);
+            }
+
             return PaneCloseResult.Closed;
         }
 
@@ -396,15 +407,21 @@ public partial class ConnectionViewModel : ObservableObject
             bool confirmed = await _dialogService.ShowConfirmAsync(title, message, "warning");
             if (!confirmed)
             {
+                if (clearedRequest is not null)
+                {
+                    _closeArbiter.Release(clearedRequest);
+                }
+
                 return PaneCloseResult.Blocked(CloseGuardLocaleKeys.BlockedGeneric);
             }
         }
 
         // The connected-session confirmation above stays first and separate. A guard is not a
         // confirmation: no clearance may be issued for a close the user then declines.
-        CloseRequest request = intent == CloseIntent.Silent
-            ? CloseRequest.Silent(reason)
-            : CloseRequest.Interactive(reason);
+        CloseRequest request = clearedRequest
+            ?? (intent == CloseIntent.Silent
+                ? CloseRequest.Silent(reason)
+                : CloseRequest.Interactive(reason));
         try
         {
             return await CloseSessionWithRequestAsync(session, request);
@@ -547,6 +564,7 @@ public partial class ConnectionViewModel : ObservableObject
         }
 
         HasActiveSessions = ActiveSessions.Count > 0;
+        session.MarkClosed();
         return PaneCloseResult.Closed;
     }
 
