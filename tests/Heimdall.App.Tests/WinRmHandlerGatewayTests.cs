@@ -284,8 +284,11 @@ public sealed class WinRmHandlerGatewayTests
         Assert.NotEqual(ConnectionState.Connected, stateMachine.GetState("winrm-gateway-test"));
     }
 
+    // WinRM over SSL cannot run through a gateway, and saying so needs nothing from the tunnel.
+    // The tunnel used to be dialled first, sign-in and host key prompts included, and only then
+    // was the connection refused and the tunnel released.
     [Fact]
-    public async Task ConnectAsync_TunneledHttpsProfile_FailsFastAndReleasesTunnel()
+    public async Task ConnectAsync_TunneledHttpsProfile_IsRefusedWithoutDiallingTheTunnel()
     {
         FakeTunnelService tunnelService = new FakeTunnelService
         {
@@ -309,8 +312,8 @@ public sealed class WinRmHandlerGatewayTests
 
         Assert.False(result.Success);
         Assert.Equal("ErrorWinRmSslGatewayUnsupported", result.ErrorMessage);
-        Assert.Equal(1, tunnelService.ReleaseCount);
-        Assert.Equal(55986, tunnelService.ReleasedLocalPort);
+        Assert.Equal(0, tunnelService.SetupCount);
+        Assert.Equal(0, tunnelService.ReleaseCount);
         Assert.Null(terminalSession.Arguments);
     }
 
@@ -721,6 +724,7 @@ public sealed class WinRmHandlerGatewayTests
         public int TargetPort { get; init; }
         public int ReleaseCount { get; private set; }
         public int ReleasedLocalPort { get; private set; }
+        public int SetupCount { get; private set; }
 
         public Task<TunnelSetupOutcome> SetupTunnelIfNeededAsync(
             ServerProfileDto server,
@@ -729,6 +733,7 @@ public sealed class WinRmHandlerGatewayTests
             CancellationToken ct,
             bool preferDistinctLoopback = false)
         {
+            SetupCount++;
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
             return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));

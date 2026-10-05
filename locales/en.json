@@ -2621,6 +2621,7 @@
   "NewTunnelValidationLocalPortInUse": "Local port {0} is already in use by an active tunnel.",
   "NewTunnelValidationRemotePort": "Remote port must be between {0} and {1}.",
   "NewTunnelValidationRemoteHost": "Remote host is required.",
+  "NewTunnelValidationRemoteHostInvalid": "Remote host must be a host name or an IP address, without a port.",
   "NewTunnelSettingsUnavailable": "Settings are not loaded yet.",
   "StatusManualTunnelOpened": "Tunnel opened on local port {0} \u2192 {1}:{2}.",
   "StatusManualTunnelFailed": "Tunnel creation failed: {0}",

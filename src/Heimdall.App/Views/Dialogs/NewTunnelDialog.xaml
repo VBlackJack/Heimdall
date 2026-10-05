@@ -1,6 +1,7 @@
 <Window x:Class="Heimdall.App.Views.Dialogs.NewTunnelDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:loc="clr-namespace:Heimdall.App.Localization"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -120,7 +121,7 @@
                            Text="{loc:Translate NewTunnelRemotePortLabel}"
                            Style="{StaticResource FormLabelStyle}"/>
                 <TextBox Grid.Row="2" Grid.Column="1"
-                         Text="{Binding RemotePort, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding RemotePortText, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FormTextBoxStyle}"
                          AutomationProperties.Name="{loc:Translate NewTunnelRemotePortLabel}"/>
 
@@ -128,7 +129,7 @@
                            Text="{loc:Translate NewTunnelLocalPortLabel}"
                            Style="{StaticResource FormLabelStyle}"/>
                 <TextBox Grid.Row="3" Grid.Column="1"
-                         Text="{Binding LocalPort, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding LocalPortText, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FormTextBoxStyle}"
                          AutomationProperties.Name="{loc:Translate NewTunnelLocalPortLabel}"/>
 
@@ -144,7 +145,10 @@
         </Border>
 
         <TextBlock Grid.Row="3"
-                   Text="{Binding ValidationMessage}"
+                   Text="{Binding ValidationMessage, NotifyOnTargetUpdated=True}"
+                   AutomationProperties.Name="{Binding ValidationMessage}"
+                   AutomationProperties.LiveSetting="Assertive"
+                   behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                    TextWrapping="Wrap"
                    Margin="0,8,0,0"
                    Foreground="{DynamicResource ErrorTextBrush}"

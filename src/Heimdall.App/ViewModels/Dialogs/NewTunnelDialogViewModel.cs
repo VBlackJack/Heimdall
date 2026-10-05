@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
+using System.Globalization;
+using System.Net;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
@@ -74,6 +77,15 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private int _localPort = 9090;
 
+    // The port boxes bind to text. Bound to the numbers directly, a value that did not parse
+    // ("abc", "22a") never reached the view model: it kept the last good port, raised no
+    // validation message, and the tunnel opened to a port the box no longer showed.
+    [ObservableProperty]
+    private string _remotePortText = "22";
+
+    [ObservableProperty]
+    private string _localPortText = "9090";
+
     [ObservableProperty]
     private string _label = string.Empty;
 
@@ -88,9 +100,45 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
 
     partial void OnRemoteHostChanged(string value) => RefreshValidation();
 
-    partial void OnRemotePortChanged(int value) => RefreshValidation();
+    partial void OnRemotePortChanged(int value)
+    {
+        if (ParsePort(RemotePortText) != value)
+        {
+            RemotePortText = value.ToString(CultureInfo.InvariantCulture);
+        }
 
-    partial void OnLocalPortChanged(int value) => RefreshValidation();
+        RefreshValidation();
+    }
+
+    partial void OnLocalPortChanged(int value)
+    {
+        if (ParsePort(LocalPortText) != value)
+        {
+            LocalPortText = value.ToString(CultureInfo.InvariantCulture);
+        }
+
+        RefreshValidation();
+    }
+
+    partial void OnRemotePortTextChanged(string value) => RemotePort = ParsePort(value);
+
+    partial void OnLocalPortTextChanged(string value) => LocalPort = ParsePort(value);
+
+    // Anything that is not a plain number reads as port 0, which the range check refuses.
+    private static int ParsePort(string? text) =>
+        int.TryParse(text?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port)
+            ? port
+            : 0;
+
+    // A host name or an address, nothing else: "host:22" or a name with a space in it used to
+    // pass and only failed once the tunnel was dialled.
+    private static bool IsValidRemoteHost(string host)
+    {
+        string trimmed = host.Trim();
+        return IPAddress.TryParse(trimmed, out _)
+            || (InputValidator.TryCanonicalizeDomain(trimmed, out string canonical)
+                && string.Equals(canonical, trimmed, StringComparison.OrdinalIgnoreCase));
+    }
 
     partial void OnValidationMessageChanged(string? value)
     {
@@ -150,6 +198,11 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(RemoteHost))
         {
             return _localizer["NewTunnelValidationRemoteHost"];
+        }
+
+        if (!IsValidRemoteHost(RemoteHost))
+        {
+            return _localizer["NewTunnelValidationRemoteHostInvalid"];
         }
 
         if (RemotePort is < 1 or > 65535)

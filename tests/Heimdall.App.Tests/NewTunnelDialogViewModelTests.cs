@@ -63,6 +63,77 @@ public sealed class NewTunnelDialogViewModelTests
         Assert.True(vm.HasValidationMessage);
     }
 
+    // Bound to the numbers, a port box holding "abc" never reached the view model: it kept the
+    // last good port, showed no message, and the tunnel opened to a port the box did not show.
+    // Proved against the mutant that ignores text that does not parse: Confirm stays enabled.
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("22a")]
+    [InlineData("")]
+    [InlineData("-1")]
+    public void APortBoxThatDoesNotHoldANumber_BlocksConfirmation(string text)
+    {
+        var vm = new NewTunnelDialogViewModel([CreateGateway()], new LocalizationManager())
+        {
+            RemoteHost = "10.0.0.42"
+        };
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
+
+        vm.RemotePortText = text;
+
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
+        Assert.True(vm.HasValidationMessage);
+
+        vm.RemotePortText = "5432";
+        vm.LocalPortText = text;
+
+        Assert.Equal(5432, vm.RemotePort);
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void SettingAPortNumber_ShowsItInItsBox()
+    {
+        var vm = new NewTunnelDialogViewModel([CreateGateway()], new LocalizationManager())
+        {
+            RemotePort = 5432,
+            LocalPort = 15432
+        };
+
+        Assert.Equal("5432", vm.RemotePortText);
+        Assert.Equal("15432", vm.LocalPortText);
+    }
+
+    [Theory]
+    [InlineData("db.internal:5432")]
+    [InlineData("db internal")]
+    [InlineData("*.example.test")]
+    public void ARemoteHostThatIsNotAHostNameOrAnAddress_BlocksConfirmation(string host)
+    {
+        var vm = new NewTunnelDialogViewModel([CreateGateway()], new LocalizationManager())
+        {
+            RemoteHost = host
+        };
+
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
+        Assert.Equal("NewTunnelValidationRemoteHostInvalid", vm.ValidationMessage);
+    }
+
+    [Theory]
+    [InlineData("db.example.test")]
+    [InlineData("server01")]
+    [InlineData("10.0.0.42")]
+    [InlineData("fe80::1")]
+    public void AHostNameOrAnAddress_IsAccepted(string host)
+    {
+        var vm = new NewTunnelDialogViewModel([CreateGateway()], new LocalizationManager())
+        {
+            RemoteHost = host
+        };
+
+        Assert.True(vm.ConfirmCommand.CanExecute(null), vm.ValidationMessage);
+    }
+
     private static SshGatewayDto CreateGateway()
     {
         return new SshGatewayDto

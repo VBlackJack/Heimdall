@@ -113,6 +113,11 @@ public sealed partial class TunnelManager
         if (socksProxyPort > 0)
         {
             context.DynamicPort = new ForwardedPortDynamic(LoopbackBinding.DefaultHost, (uint)socksProxyPort);
+
+            // Only the main forward reported its failures; a SOCKS or reverse forward that failed
+            // at run time did so without a trace.
+            context.DynamicPort.Exception += (_, args) => Core.Logging.FileLogger.Error(
+                $"SOCKS5 proxy on port {socksProxyPort}{logSuffix} exception: {args.Exception.Message}");
             finalClient.AddForwardedPort(context.DynamicPort);
             StartForwardedPortWithRetry(context.DynamicPort, $"SOCKS5 port {socksProxyPort}");
             Core.Logging.FileLogger.Info(
@@ -125,6 +130,8 @@ public sealed partial class TunnelManager
             context.RemotePortForward = new ForwardedPortRemote(
                 LoopbackBinding.DefaultHost, (uint)remoteBindPort,
                 LoopbackBinding.DefaultHost, (uint)localFwd);
+            context.RemotePortForward.Exception += (_, args) => Core.Logging.FileLogger.Error(
+                $"Remote forward server:{remoteBindPort} \u2192 local:{localFwd}{logSuffix} exception: {args.Exception.Message}");
             finalClient.AddForwardedPort(context.RemotePortForward);
             context.RemotePortForward.Start();
             Core.Logging.FileLogger.Info(
@@ -380,7 +387,17 @@ public sealed partial class TunnelManager
             LegacyCredentialName = nextGateway.LegacyCredentialName,
             AgentForwarding = nextGateway.AgentForwarding,
             Compression = nextGateway.Compression,
-            ConnectTimeout = nextGateway.ConnectTimeout
+            ConnectTimeout = nextGateway.ConnectTimeout,
+
+            // The rest of the hop's own settings travel too: the copy used to stop at the
+            // timeout, so a hop that needed a keyboard-interactive answer or a longer sign-in
+            // wait only got one as the first hop of a chain.
+            LogicalHost = nextGateway.HostKeyVerificationHost,
+            LogicalPort = nextGateway.HostKeyVerificationPort,
+            AuthenticationTimeout = nextGateway.AuthenticationTimeout,
+            KeepAliveIntervalSeconds = nextGateway.KeepAliveIntervalSeconds,
+            KeyboardInteractive = nextGateway.KeyboardInteractive,
+            KeyboardInteractiveResponder = nextGateway.KeyboardInteractiveResponder
         };
     }
 

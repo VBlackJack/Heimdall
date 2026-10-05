@@ -99,6 +99,24 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
             WinRmPowerShellLaunchBuilder.ValidateProfile(server);
             int remotePort = WinRmPowerShellLaunchBuilder.ResolvePort(server);
 
+            // Refused before the tunnel is dialled: the answer needs nothing from the tunnel, and
+            // dialling first put the user through the gateway's sign-in and host key prompts for a
+            // connection that was then refused anyway.
+            if (server.WinRmUseSsl
+                && !server.UseDirectConnection
+                && !string.IsNullOrEmpty(server.SshGatewayId))
+            {
+                string message = _localizer["ErrorWinRmSslGatewayUnsupported"];
+                _connectionSm.SetError(server.Id, message);
+                return new ConnectionResult(
+                    false,
+                    message,
+                    null,
+                    SshSessionDiagnosticFactory.CreateGatewayFailure(
+                        message,
+                        "ErrorWinRmSslGatewayUnsupported"));
+            }
+
             TunnelSetupOutcome tunnelOutcome =
                 await _tunnelService.SetupTunnelIfNeededAsync(server, remotePort, settings, ct)
                     .ConfigureAwait(false);
@@ -119,20 +137,6 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
             if (usesTunnel)
             {
                 tunnelLocalPort = targetPort;
-            }
-
-            if (usesTunnel && server.WinRmUseSsl)
-            {
-                string message = _localizer["ErrorWinRmSslGatewayUnsupported"];
-                ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort, tunnelLeaseId);
-                _connectionSm.SetError(server.Id, message);
-                return new ConnectionResult(
-                    false,
-                    message,
-                    null,
-                    SshSessionDiagnosticFactory.CreateGatewayFailure(
-                        message,
-                        "ErrorWinRmSslGatewayUnsupported"));
             }
 
             if (server.WinRmUseSsl && server.WinRmSkipCertificateCheck)
