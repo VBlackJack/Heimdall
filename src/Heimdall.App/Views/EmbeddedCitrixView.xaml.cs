@@ -24,6 +24,7 @@ using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
 using WinForms = System.Windows.Forms;
 
 namespace Heimdall.App.Views;
@@ -33,7 +34,7 @@ namespace Heimdall.App.Views;
 /// 1. Embedded mode: captures the wfica32.exe window via SetParent and hosts it inline.
 /// 2. External mode (fallback): monitors the process and provides Bring to Front / Terminate controls.
 /// </summary>
-public partial class EmbeddedCitrixView : UserControl, IDisposable
+public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPaneOwner
 {
     private const int HealthCheckIntervalMs = 3000;
     private const int WindowCaptureMaxAttempts = 60;
@@ -825,6 +826,17 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable
     /// Raised when the user asks the shared pane lifecycle to close this session tab.
     /// </summary>
     public event Action? CloseRequested;
+
+    private SessionPaneModel? _ownerPane;
+
+    /// <summary>The pane this view lives in, wherever a split, a merge or a detach moved it.</summary>
+    internal SessionPaneModel? OwningPane => _ownerPane;
+
+    public void SetOwningPane(SessionPaneModel pane)
+    {
+        ArgumentNullException.ThrowIfNull(pane);
+        _ownerPane = pane;
+    }
 
     private void OnCloseTabClick(object sender, RoutedEventArgs e)
     {
