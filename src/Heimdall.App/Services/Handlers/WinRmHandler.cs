@@ -91,6 +91,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
         string? bootstrapScriptPath = null;
         bool usesTunnel = false;
         int tunnelLocalPort = 0;
+        long tunnelLeaseId = 0;
 
         try
         {
@@ -98,9 +99,11 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
             WinRmPowerShellLaunchBuilder.ValidateProfile(server);
             int remotePort = WinRmPowerShellLaunchBuilder.ResolvePort(server);
 
-            (bool tunnelOk, usesTunnel, string targetHost, int targetPort, string? tunnelError) =
+            TunnelSetupOutcome tunnelOutcome =
                 await _tunnelService.SetupTunnelIfNeededAsync(server, remotePort, settings, ct)
                     .ConfigureAwait(false);
+            (bool tunnelOk, usesTunnel, string targetHost, int targetPort, string? tunnelError) = tunnelOutcome;
+            tunnelLeaseId = tunnelOutcome.TunnelLeaseId;
 
             if (!tunnelOk)
             {
@@ -121,7 +124,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
             if (usesTunnel && server.WinRmUseSsl)
             {
                 string message = _localizer["ErrorWinRmSslGatewayUnsupported"];
-                ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort);
+                ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort, tunnelLeaseId);
                 _connectionSm.SetError(server.Id, message);
                 return new ConnectionResult(
                     false,
@@ -204,12 +207,12 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
         {
             DeleteBootstrap(bootstrap, bootstrapScriptPath);
             session?.Dispose();
-            ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort);
+            ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort, tunnelLeaseId);
             throw;
         }
         catch (WinRmPreflightException ex)
         {
-            ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort);
+            ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort, tunnelLeaseId);
             string message = _localizer.Format(ex.LocalizationKey, ex.LocalizationArguments);
             Core.Logging.FileLogger.Warn(
                 $"WinRM preflight failed for host '{server.RemoteServer}' protocol=WINRM");
@@ -220,7 +223,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
         {
             DeleteBootstrap(bootstrap, bootstrapScriptPath);
             session?.Dispose();
-            ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort);
+            ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort, tunnelLeaseId);
 
             string message = _localizer.Format(ex.LocalizationKey, ex.LocalizationArguments);
             Core.Logging.FileLogger.Warn(
@@ -237,6 +240,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
                 bootstrapScriptPath,
                 usesTunnel,
                 tunnelLocalPort,
+                tunnelLeaseId,
                 "ErrorWinRmInvalidConfiguration",
                 ex);
         }
@@ -249,6 +253,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
                 bootstrapScriptPath,
                 usesTunnel,
                 tunnelLocalPort,
+                tunnelLeaseId,
                 "ErrorWinRmInvalidConfiguration",
                 ex);
         }
@@ -263,6 +268,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
                 bootstrapScriptPath,
                 usesTunnel,
                 tunnelLocalPort,
+                tunnelLeaseId,
                 "ErrorWinRmLaunchFailed",
                 ex);
         }
@@ -275,6 +281,7 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
         string? bootstrapScriptPath,
         bool usesTunnel,
         int tunnelLocalPort,
+        long tunnelLeaseId,
         string localizationKey,
         Exception exception)
     {
@@ -290,19 +297,21 @@ internal sealed class WinRmHandler : IProtocolHandler, IDisposable
 
         Core.Logging.FileLogger.Warn(
             $"WinRM connection failed for host '{server.RemoteServer}': {exception.Message}");
-        ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort);
+        ReleaseTunnelIfNeeded(usesTunnel, tunnelLocalPort, tunnelLeaseId);
         _connectionSm.SetError(server.Id, message);
         return new ConnectionResult(false, message, null);
     }
 
-    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
+    // The lease names the one reference this connect took, so giving it back here and again
+    // from the pane close that follows a failed connect releases it only once.
+    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort, long tunnelLeaseId)
     {
         if (!usesTunnel || tunnelLocalPort <= 0)
         {
             return;
         }
 
-        _tunnelService.ReleaseTunnelReference(tunnelLocalPort);
+        _tunnelService.ReleaseTunnelReference(tunnelLocalPort, tunnelLeaseId);
     }
 
     private static string CanonicalizeRemoteHost(string? remoteHost)

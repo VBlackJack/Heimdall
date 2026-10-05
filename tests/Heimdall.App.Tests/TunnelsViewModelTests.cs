@@ -297,6 +297,66 @@ public sealed class TunnelsViewModelTests
         Assert.Equal(TunnelBadgeState.Hidden, noTunnelTab.TunnelBadgeState);
     }
 
+    // Closing ignores how many sessions hold the tunnel, so the session on it lost its transport
+    // without a word. Proved against the mutant that skips the question: the tunnel closes.
+    [Fact]
+    public async Task Close_ATunnelASessionRunsThrough_AsksFirstAndKeepsItWhenRefused()
+    {
+        var settings = new AppSettings();
+        var host = new TestTunnelsHost(settings) { ConfirmAnswer = false };
+        var stateMachine = new ConnectionStateMachine();
+        using var tunnelManager = new TunnelManager();
+        host.Connection.ActiveSessions.Add(CreateSavedTab("server-1"));
+        using var vm = CreateViewModel(host, new FakeConfigManager(settings), tunnelManager, stateMachine);
+        stateMachine.SetTunnelInfo("server-1", 50140, processId: 0);
+        RegisterTunnel(tunnelManager, 50140, isAlive: true);
+
+        await vm.CloseCommand.ExecuteAsync(tunnelManager.GetTunnel(50140));
+
+        Assert.Single(host.ConfirmMessages);
+        Assert.True(tunnelManager.HasTunnel(50140));
+
+        host.ConfirmAnswer = true;
+        await vm.CloseCommand.ExecuteAsync(tunnelManager.GetTunnel(50140));
+
+        Assert.False(tunnelManager.HasTunnel(50140));
+    }
+
+    [Fact]
+    public async Task Close_ATunnelNoSessionRunsThrough_ClosesWithoutAsking()
+    {
+        var settings = new AppSettings();
+        var host = new TestTunnelsHost(settings) { ConfirmAnswer = false };
+        using var tunnelManager = new TunnelManager();
+        using var vm = CreateViewModel(host, new FakeConfigManager(settings), tunnelManager);
+        RegisterTunnel(tunnelManager, 50141, isAlive: true);
+
+        await vm.CloseCommand.ExecuteAsync(tunnelManager.GetTunnel(50141));
+
+        Assert.Empty(host.ConfirmMessages);
+        Assert.False(tunnelManager.HasTunnel(50141));
+    }
+
+    [Fact]
+    public async Task CloseAll_WhileASessionRunsThroughATunnel_AsksFirst()
+    {
+        var settings = new AppSettings();
+        var host = new TestTunnelsHost(settings) { ConfirmAnswer = false };
+        var stateMachine = new ConnectionStateMachine();
+        using var tunnelManager = new TunnelManager();
+        host.Connection.ActiveSessions.Add(CreateSavedTab("server-1"));
+        using var vm = CreateViewModel(host, new FakeConfigManager(settings), tunnelManager, stateMachine);
+        stateMachine.SetTunnelInfo("server-1", 50142, processId: 0);
+        RegisterTunnel(tunnelManager, 50142, isAlive: true);
+        RegisterTunnel(tunnelManager, 50143, isAlive: true);
+
+        await vm.CloseAllCommand.ExecuteAsync(null);
+
+        Assert.Single(host.ConfirmMessages);
+        Assert.True(tunnelManager.HasTunnel(50142));
+        Assert.True(tunnelManager.HasTunnel(50143));
+    }
+
     [Fact]
     public void TunnelClosed_UpdatesBadgeStateForAllTabs()
     {
@@ -517,6 +577,16 @@ public sealed class TunnelsViewModelTests
         public AppSettings? CurrentSettings => Settings;
 
         public string StatusText { get; set; } = string.Empty;
+
+        public bool ConfirmAnswer { get; set; } = true;
+
+        public List<string> ConfirmMessages { get; } = [];
+
+        public Task<bool> ConfirmAsync(string title, string message)
+        {
+            ConfirmMessages.Add(message);
+            return Task.FromResult(ConfirmAnswer);
+        }
 
         public void ApplySettings(AppSettings settings)
         {

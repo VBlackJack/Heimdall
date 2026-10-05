@@ -245,6 +245,7 @@ public sealed partial class TunnelManager
     {
         bool registered = false;
         bool rejectedBecauseDisposed = false;
+        long leaseId = 0;
 
         lock (_registryLock)
         {
@@ -255,7 +256,7 @@ public sealed partial class TunnelManager
             }
             else if (!IsPortTracked(localPort) && _activeTunnels.TryAdd(localPort, session))
             {
-                AddReferenceUnderLock(localPort);
+                leaseId = AddReferenceUnderLock(localPort);
                 registered = true;
             }
             else
@@ -286,7 +287,7 @@ public sealed partial class TunnelManager
         }
 
         RaiseTunnelOpened(info);
-        return new TunnelResult(true, info, null, null);
+        return new TunnelResult(true, info with { LeaseId = leaseId }, null, null);
     }
 
     /// <summary>

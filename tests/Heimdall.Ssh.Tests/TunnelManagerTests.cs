@@ -288,6 +288,89 @@ public class TunnelManagerTests : IDisposable
         Assert.False(_manager.HasTunnel(12345));
     }
 
+    // ── Leases ──────────────────────────────────────────────────────
+
+    // A session whose connect failed gave its tunnel back from the handler and again from its
+    // pane close. By port, that was two references, and the tunnel another tab shared closed.
+    // Proved against the mutant that ignores the lease and releases by port: this goes red.
+    [Fact]
+    public void ReleaseReference_TheSameLeaseTwice_GivesBackOneReference()
+    {
+        FakeHandle handle = new();
+        Assert.True(_manager.TryRegisterExternalTunnel(
+            MakeInfo(45170, gatewayChainKey: "chain"), handle, () => true, out long firstLease));
+        TunnelInfo shared = Assert.IsType<TunnelInfo>(
+            _manager.AcquireReusableTunnel("chain", "target.internal", 3389, 0, 0, 0));
+
+        Assert.False(_manager.ReleaseReference(45170, shared.LeaseId));
+        Assert.False(_manager.ReleaseReference(45170, shared.LeaseId));
+
+        Assert.True(_manager.HasTunnel(45170));
+        Assert.False(handle.Disposed);
+        Assert.Equal(1, _manager.GetReferenceCount(45170));
+        Assert.True(_manager.ReleaseReference(45170, firstLease));
+        Assert.True(handle.Disposed);
+    }
+
+    // A tunnel closed from the Tunnels pane left its holders with a port a newer tunnel could
+    // take; a holder's late release then took a reference from that newer tunnel.
+    [Fact]
+    public void ReleaseReference_ALeaseOnAClosedTunnel_LeavesTheTunnelNowOnItsPortAlone()
+    {
+        Assert.True(_manager.TryRegisterExternalTunnel(
+            MakeInfo(45171), new FakeHandle(), () => true, out long staleLease));
+        _manager.ForceCloseTunnel(45171);
+        FakeHandle newer = new();
+        Assert.True(_manager.TryRegisterExternalTunnel(
+            MakeInfo(45171), newer, () => true, out long newerLease));
+
+        Assert.False(_manager.ReleaseReference(45171, staleLease));
+
+        Assert.NotEqual(staleLease, newerLease);
+        Assert.True(_manager.HasTunnel(45171));
+        Assert.False(newer.Disposed);
+        Assert.Equal(1, _manager.GetReferenceCount(45171));
+    }
+
+    [Fact]
+    public void AcquireReusableTunnel_HandsOutADistinctLeaseEachTime()
+    {
+        Assert.True(_manager.TryRegisterExternalTunnel(
+            MakeInfo(45172, gatewayChainKey: "chain"), new FakeHandle(), () => true, out long registered));
+
+        long first = _manager.AcquireReusableTunnel("chain", "target.internal", 3389, 0, 0, 0)!.LeaseId;
+        long second = _manager.AcquireReusableTunnel("chain", "target.internal", 3389, 0, 0, 0)!.LeaseId;
+
+        Assert.Equal(3, new HashSet<long> { registered, first, second }.Count);
+        Assert.DoesNotContain(0L, new[] { registered, first, second });
+        Assert.Equal(3, _manager.GetReferenceCount(45172));
+    }
+
+    // A release by port still gives back one lease on that port, so the two kinds of release
+    // cannot together give back more references than were taken.
+    [Fact]
+    public void ReleaseReference_ByPortThenByLease_NeverGivesBackMoreThanWasTaken()
+    {
+        FakeHandle handle = new();
+        Assert.True(_manager.TryRegisterExternalTunnel(
+            MakeInfo(45173, gatewayChainKey: "chain"), handle, () => true, out long registered));
+        long reused = _manager.AcquireReusableTunnel("chain", "target.internal", 3389, 0, 0, 0)!.LeaseId;
+        Assert.True(_manager.TryRegisterExternalTunnel(
+            MakeInfo(45174), new FakeHandle(), () => true, out _));
+
+        Assert.False(_manager.ReleaseReference(45173));
+        Assert.True(_manager.ReleaseReference(45173, registered) || _manager.ReleaseReference(45173, reused));
+
+        Assert.True(handle.Disposed);
+        Assert.True(_manager.HasTunnel(45174));
+    }
+
+    [Fact]
+    public void GetReferenceCount_IsZeroForAPortWithNoTunnel()
+    {
+        Assert.Equal(0, _manager.GetReferenceCount(45175));
+    }
+
     // ── TryRegisterExternalTunnel ─────────────────────────────────────
 
     [Fact]

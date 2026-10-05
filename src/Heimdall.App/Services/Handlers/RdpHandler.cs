@@ -237,6 +237,7 @@ internal sealed class RdpHandler : IProtocolHandler
                 preferDistinctLoopback: !isEmbedded)
             .ConfigureAwait(false);
         var (tunnelOk, usesTunnel, targetHost, targetPort, tunnelError) = tunnelOutcome;
+        long tunnelLeaseId = tunnelOutcome.TunnelLeaseId;
 
         if (!tunnelOk)
         {
@@ -513,7 +514,7 @@ internal sealed class RdpHandler : IProtocolHandler
 
                 try
                 {
-                    ReleaseTunnelIfNeeded(usesTunnel, targetPort);
+                    ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
                 }
                 catch (Exception ex)
                 {
@@ -640,18 +641,20 @@ internal sealed class RdpHandler : IProtocolHandler
             }
 
             rdpPassword = null;
-            ReleaseTunnelIfNeeded(releaseTunnel, targetPort);
+            ReleaseTunnelIfNeeded(releaseTunnel, targetPort, tunnelLeaseId);
         }
     }
 
-    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort)
+    // The lease names the one reference this connect took, so giving it back here and again
+    // from the pane close that follows a failed connect releases it only once.
+    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort, long tunnelLeaseId)
     {
         if (!usesTunnel || tunnelLocalPort <= 0)
         {
             return;
         }
 
-        _tunnelService.ReleaseTunnelReference(tunnelLocalPort);
+        _tunnelService.ReleaseTunnelReference(tunnelLocalPort, tunnelLeaseId);
     }
 
     /// <summary>

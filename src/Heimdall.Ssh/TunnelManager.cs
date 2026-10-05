@@ -58,6 +58,11 @@ public sealed partial class TunnelManager : IDisposable
     private readonly ConcurrentDictionary<int, TunnelSession> _activeTunnels = new();
     private readonly ConcurrentDictionary<int, ExternalTunnelSession> _externalTunnels = new();
     private readonly ConcurrentDictionary<int, int> _refCounts = new();
+
+    // Every reference handed out by an open or a reuse, by lease, with the port it was taken
+    // on. Guarded by _registryLock.
+    private readonly Dictionary<long, int> _leasePorts = new();
+    private long _lastLeaseId;
     private readonly HashSet<string> _reservedLoopbackAliases = new(StringComparer.Ordinal);
     private readonly object _registryLock = new();
     private readonly CancellationTokenSource _lifetimeCts = new();
@@ -147,29 +152,20 @@ public sealed partial class TunnelManager : IDisposable
     /// <returns>True if the tunnel should be closed; false if still in use.</returns>
     public bool ReleaseReference(int localPort)
     {
-        IDisposable? detached = null;
-        bool shouldClose = false;
+        IDisposable? detached;
+        bool shouldClose;
 
         lock (_registryLock)
         {
-            if (!_refCounts.TryGetValue(localPort, out int current))
+            // Keeps the leases in step with the count: one reference given back by port is one
+            // lease on that port fewer.
+            long anyLease = _leasePorts.FirstOrDefault(pair => pair.Value == localPort).Key;
+            if (anyLease != 0)
             {
-                shouldClose = true;
-                detached = DetachTunnelUnderLock(localPort);
+                _leasePorts.Remove(anyLease);
             }
-            else
-            {
-                int newCount = Math.Max(0, current - 1);
-                if (newCount <= 0)
-                {
-                    shouldClose = true;
-                    detached = DetachTunnelUnderLock(localPort);
-                }
-                else
-                {
-                    _refCounts[localPort] = newCount;
-                }
-            }
+
+            shouldClose = ReleaseCountUnderLock(localPort, out detached);
         }
 
         if (detached is not null)
@@ -178,6 +174,83 @@ public sealed partial class TunnelManager : IDisposable
         }
 
         return shouldClose;
+    }
+
+    /// <summary>
+    /// Gives back the reference <paramref name="leaseId"/>, handed out by the open or the reuse
+    /// that returned it, and closes the tunnel when it was the last one.
+    /// </summary>
+    /// <remarks>
+    /// A release by port alone acted on whatever tunnel held the port at that moment, as many
+    /// times as it was called. A session whose connect failed gave its tunnel back from the
+    /// handler and again from its pane close, which closed a tunnel another tab still shared;
+    /// and a holder of a tunnel closed from the Tunnels pane could later release a newer
+    /// tunnel that had taken the same port. A lease is given back once, and only to the tunnel
+    /// it was taken on: a second release, or one whose tunnel is gone, does nothing.
+    /// </remarks>
+    /// <param name="localPort">Local port the lease was taken on, used only for logging.</param>
+    /// <param name="leaseId">
+    /// <see cref="TunnelInfo.LeaseId"/> of the snapshot the open or reuse returned. A
+    /// non-positive value releases by port, as <see cref="ReleaseReference(int)"/> does.
+    /// </param>
+    /// <returns>True when this release closed the tunnel.</returns>
+    public bool ReleaseReference(int localPort, long leaseId)
+    {
+        if (leaseId <= 0)
+        {
+            return ReleaseReference(localPort);
+        }
+
+        IDisposable? detached = null;
+        bool shouldClose = false;
+        int leasePort = 0;
+
+        lock (_registryLock)
+        {
+            if (!_leasePorts.Remove(leaseId, out leasePort))
+            {
+                Core.Logging.FileLogger.Info(
+                    $"[TunnelManager] Lease {leaseId} on port {localPort} was already given back or its tunnel has closed; nothing released.");
+            }
+            else
+            {
+                shouldClose = ReleaseCountUnderLock(leasePort, out detached);
+            }
+        }
+
+        if (detached is not null)
+        {
+            DisposeAndNotifyClosed(leasePort, detached);
+        }
+
+        return shouldClose;
+    }
+
+    /// <summary>
+    /// Returns how many references are held on the tunnel bound to <paramref name="localPort"/>,
+    /// or zero when no tunnel is registered there.
+    /// </summary>
+    public int GetReferenceCount(int localPort)
+    {
+        lock (_registryLock)
+        {
+            return IsPortTracked(localPort) && _refCounts.TryGetValue(localPort, out int count)
+                ? count
+                : 0;
+        }
+    }
+
+    private bool ReleaseCountUnderLock(int localPort, out IDisposable? detached)
+    {
+        if (_refCounts.TryGetValue(localPort, out int current) && current > 1)
+        {
+            _refCounts[localPort] = current - 1;
+            detached = null;
+            return false;
+        }
+
+        detached = DetachTunnelUnderLock(localPort);
+        return true;
     }
 
     /// <summary>
@@ -717,8 +790,8 @@ public sealed partial class TunnelManager : IDisposable
                     continue;
                 }
 
-                AddReferenceUnderLock(candidate.Info.LocalPort);
-                return candidate.Info with { IsAlive = true };
+                long leaseId = AddReferenceUnderLock(candidate.Info.LocalPort);
+                return candidate.Info with { IsAlive = true, LeaseId = leaseId };
             }
         }
 
@@ -732,22 +805,42 @@ public sealed partial class TunnelManager : IDisposable
     public bool TryRegisterExternalTunnel(
         TunnelInfo info,
         IDisposable tunnelHandle,
-        Func<bool> isAlive)
+        Func<bool> isAlive) =>
+        TryRegisterExternalTunnel(info, tunnelHandle, isAlive, out _);
+
+    /// <summary>
+    /// Registers an externally managed tunnel and hands back the lease of the one reference the
+    /// registration takes, for <see cref="ReleaseReference(int, long)"/>.
+    /// </summary>
+    public bool TryRegisterExternalTunnel(
+        TunnelInfo info,
+        IDisposable tunnelHandle,
+        Func<bool> isAlive,
+        out long leaseId)
     {
+        leaseId = 0;
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(info);
         ArgumentNullException.ThrowIfNull(tunnelHandle);
         ArgumentNullException.ThrowIfNull(isAlive);
         info = info with { LocalBindHost = LoopbackBinding.NormalizeHost(info.LocalBindHost) };
 
-        return TryRegisterExternalTunnelCore(info, tunnelHandle, isAlive);
+        return TryRegisterExternalTunnelCore(info, tunnelHandle, isAlive, out leaseId);
     }
 
     internal bool TryRegisterExternalTunnelCore(
         TunnelInfo info,
         IDisposable tunnelHandle,
-        Func<bool> isAlive)
+        Func<bool> isAlive) =>
+        TryRegisterExternalTunnelCore(info, tunnelHandle, isAlive, out _);
+
+    internal bool TryRegisterExternalTunnelCore(
+        TunnelInfo info,
+        IDisposable tunnelHandle,
+        Func<bool> isAlive,
+        out long leaseId)
     {
+        leaseId = 0;
         var session = new ExternalTunnelSession(info, tunnelHandle, isAlive);
         bool registered = false;
 
@@ -757,7 +850,7 @@ public sealed partial class TunnelManager : IDisposable
                 && !IsPortTracked(info.LocalPort)
                 && _externalTunnels.TryAdd(info.LocalPort, session))
             {
-                AddReferenceUnderLock(info.LocalPort);
+                leaseId = AddReferenceUnderLock(info.LocalPort);
                 registered = true;
             }
             else
@@ -855,6 +948,7 @@ public sealed partial class TunnelManager : IDisposable
             _activeTunnels.Clear();
             _externalTunnels.Clear();
             _refCounts.Clear();
+            _leasePorts.Clear();
             _reservedLoopbackAliases.Clear();
         }
 
@@ -921,14 +1015,21 @@ public sealed partial class TunnelManager : IDisposable
         Func<bool> IsAlive,
         bool IsExternal);
 
-    private void AddReferenceUnderLock(int localPort)
+    private long AddReferenceUnderLock(int localPort)
     {
         _refCounts.AddOrUpdate(localPort, 1, (_, current) => current + 1);
+        long leaseId = ++_lastLeaseId;
+        _leasePorts[leaseId] = localPort;
+        return leaseId;
     }
 
     private IDisposable? DetachTunnelUnderLock(int localPort)
     {
         _refCounts.TryRemove(localPort, out _);
+        foreach (long leaseId in _leasePorts.Where(pair => pair.Value == localPort).Select(pair => pair.Key).ToList())
+        {
+            _leasePorts.Remove(leaseId);
+        }
 
         if (_activeTunnels.TryRemove(localPort, out var session))
         {
