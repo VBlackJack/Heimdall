@@ -97,6 +97,18 @@ public sealed class SettingRangesTests
         (nameof(ServerProfileDto.RdpColorDepth), 16, 32, false),
     ];
 
+    [Theory]
+    [InlineData(-1, 500)]
+    [InlineData(-2, 500)]
+    [InlineData(2000, 2000)]
+    [InlineData(99999, 30000)]
+    public void Clamp_BringsADiskValueInsideTheRange(int stored, int expected)
+        => Assert.Equal(expected, SettingRanges.Of(nameof(AppSettings.SftpUploadDebounceMs)).Clamp(stored));
+
+    [Fact]
+    public void Clamp_LeavesTheDisabledSentinelAlone()
+        => Assert.Equal(0, SettingRanges.Of(nameof(AppSettings.AntiIdleIntervalSeconds)).Clamp(0));
+
     [Fact]
     public void AppSettings_DeclaresExactlyTheFrozenRanges()
     {
