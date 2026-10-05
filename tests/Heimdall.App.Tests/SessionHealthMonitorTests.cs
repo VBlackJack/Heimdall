@@ -466,6 +466,48 @@ public class SessionHealthMonitorTests
         Assert.Equal(HealthStatus.Up, fixture.Monitor.GetState("srv-rearm").Status);
     }
 
+    [Fact]
+    public async Task SettingsChanged_ThatLeavesTheScheduleAlone_KeepsTheSchedulerRunning()
+    {
+        int seenTimeout = 0;
+        await using var fixture = new MonitorFixture(
+            new FakeHealthProbe((_, _, timeoutMs, _) =>
+            {
+                seenTimeout = timeoutMs;
+                return new HealthState(HealthStatus.Up, DateTime.UtcNow, 1, null);
+            }),
+            new ServerProfileDto { Id = "srv-keep", RemoteServer = "host", ConnectionType = "SSH", SshPort = 22 });
+        long lifecycleVersion = fixture.Monitor.LifecycleVersion;
+        AppSettings unrelated = new()
+        {
+            SessionHealthMonitorEnabled = true,
+            SessionHealthProbeTimeoutMs = 4321,
+            DefaultTheme = "Light",
+        };
+
+        fixture.ConfigManager.RaiseSettingsChanged(unrelated);
+        await fixture.RunCycleAsync();
+
+        Assert.Equal(lifecycleVersion, fixture.Monitor.LifecycleVersion);
+        Assert.Equal(4321, seenTimeout);
+    }
+
+    [Fact]
+    public async Task SettingsChanged_WithANewInterval_RearmsTheScheduler()
+    {
+        await using var fixture = new MonitorFixture(new FakeHealthProbe());
+        long lifecycleVersion = fixture.Monitor.LifecycleVersion;
+        AppSettings changed = new()
+        {
+            SessionHealthMonitorEnabled = true,
+            SessionHealthCheckIntervalSeconds = new AppSettings().SessionHealthCheckIntervalSeconds + 30,
+        };
+
+        fixture.ConfigManager.RaiseSettingsChanged(changed);
+
+        Assert.NotEqual(lifecycleVersion, fixture.Monitor.LifecycleVersion);
+    }
+
     // ── Test doubles ─────────────────────────────────────────────────
 
     private static async Task WaitUntilAsync(Func<bool> predicate)
@@ -509,9 +551,7 @@ public class SessionHealthMonitorTests
 
         public void RemoveServer(string id) => _profiles.RemoveAll(p => p.Id == id);
 
-        // raise compiler-unused warning suppressor — the event is part of the contract,
-        // tests don't invoke it but the interface requires it to compile.
-        private void TouchEvent() => SettingsChanged?.Invoke(_settings);
+        public void RaiseSettingsChanged(AppSettings settings) => SettingsChanged?.Invoke(settings);
 
         public Task<List<ServerProfileDto>> LoadServersAsync()
             => Task.FromResult(_profiles.ToList());
@@ -657,6 +697,8 @@ public class SessionHealthMonitorTests
     {
         public SessionHealthMonitor Monitor { get; }
         private readonly FakeConfigManager _configManager;
+
+        public FakeConfigManager ConfigManager => _configManager;
 
         public MonitorFixture(IHealthProbe probe, params ServerProfileDto[] profiles)
             : this(new FakeConfigManager(profiles), probe) { }

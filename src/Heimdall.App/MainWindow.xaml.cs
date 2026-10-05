@@ -722,6 +722,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         TabSettings.IsChecked = true;
         SwitchToTab(ShellTab.Settings);
         Mw_SettingsSubTabControl.SelectedItem = Mw_SettingsTabSsh;
+
+        // The SSH tab alone opened on whichever sub-tab was last shown, usually Connection, and
+        // left the user to find the gateways.
+        Mw_SettingsSshSubTabControl.SelectedItem = Mw_SettingsSshSubTabGateways;
     }
 
     /// <summary>
