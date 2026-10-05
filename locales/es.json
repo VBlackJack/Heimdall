@@ -4404,6 +4404,8 @@
   "HealthReasonUnreachable": "Host no accesible",
   "HealthReasonDns": "Falló la resolución DNS",
   "HealthReasonBehindGateway": "Detrás de una pasarela SSH: no se sondeó",
+  "HealthReasonBehindRdGateway": "Detrás de una pasarela RD: no se sondeó",
+  "HealthReasonOther": "La conexión falló",
   "HealthReasonNoPort": "No hay puerto de sondeo para este protocolo",
   "HealthReasonNoHost": "No hay ningún host configurado",
   "HealthLastCheckedNever": "nunca",

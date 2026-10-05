@@ -4404,6 +4404,8 @@
   "HealthReasonUnreachable": "Host unreachable",
   "HealthReasonDns": "DNS resolution failed",
   "HealthReasonBehindGateway": "Behind SSH gateway - not probed",
+  "HealthReasonBehindRdGateway": "Behind RD Gateway - not probed",
+  "HealthReasonOther": "Connection failed",
   "HealthReasonNoPort": "No probe port for this protocol",
   "HealthReasonNoHost": "No host configured",
   "HealthLastCheckedNever": "never",

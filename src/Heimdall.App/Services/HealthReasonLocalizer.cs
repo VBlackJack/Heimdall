@@ -55,6 +55,8 @@ public static class HealthReasonLocalizer
             "unreachable" => "HealthReasonUnreachable",
             "dns" => "HealthReasonDns",
             "behind-gateway" => "HealthReasonBehindGateway",
+            "behind-rd-gateway" => "HealthReasonBehindRdGateway",
+            "other" => "HealthReasonOther",
             "no-port" => "HealthReasonNoPort",
             "no-host" => "HealthReasonNoHost",
             _ => null
