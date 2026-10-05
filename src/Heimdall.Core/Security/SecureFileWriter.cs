@@ -444,6 +444,7 @@ public static class SecureFileWriter
                 try
                 {
                     await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                    FlushToDisk(stream);
                 }
                 finally
                 {
@@ -482,6 +483,7 @@ public static class SecureFileWriter
                 // The caller's buffer is written straight through. No copy is made, so there is
                 // nothing here to clear, and clearing the caller's memory would be a bug.
                 await stream.WriteAsync(content, cancellationToken).ConfigureAwait(false);
+                FlushToDisk(stream);
             }
         }
 
@@ -493,13 +495,28 @@ public static class SecureFileWriter
             byte[] bytes = Utf8NoBom.GetBytes(content ?? string.Empty);
             try
             {
-                await File.WriteAllBytesAsync(path, bytes, cancellationToken).ConfigureAwait(false);
+                await using FileStream stream = new(
+                    path,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    4096,
+                    FileOptions.Asynchronous);
+                await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                FlushToDisk(stream);
             }
             finally
             {
                 Array.Clear(bytes);
             }
         }
+
+        /// <summary>
+        /// Pushes the temp file's bytes through to the disk before it is renamed over the target.
+        /// Without it the rename could reach the disk ahead of the data, and a power cut in between
+        /// left a target of zeros or no length at all.
+        /// </summary>
+        private static void FlushToDisk(FileStream stream) => stream.Flush(flushToDisk: true);
 
         public void ApplyRestrictedAcl(string path)
             => new FileInfo(path).SetAccessControl(BuildRestrictedSecurity());

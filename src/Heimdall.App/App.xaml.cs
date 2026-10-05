@@ -382,6 +382,16 @@ public partial class App : System.Windows.Application
             themeService.ApplyTheme(settings.DefaultTheme);
             themeService.ApplyAccentTint(settings.AccentTint);
 
+            // A configuration file left unreadable (a power cut mid-save) was loaded from its last
+            // good copy: say so, because whatever was saved after that copy is missing.
+            if (configManager is ConfigManager concreteConfig
+                && concreteConfig.DocumentsRecoveredFromBackup is { Count: > 0 } recovered)
+            {
+                _serviceProvider.GetRequiredService<IDialogService>().ShowWarning(
+                    localization["ConfigRecoveredFromBackupTitle"],
+                    localization.Format("ConfigRecoveredFromBackupMessage", string.Join(", ", recovered)));
+            }
+
             // Check for legacy Heimdall installation and offer migration on first run
             await TryMigrateLegacyAsync(
                 configManager,

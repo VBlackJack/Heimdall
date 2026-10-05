@@ -504,7 +504,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             return new AppSettings();
         }
 
-        var json = await File.ReadAllTextAsync(_settingsPath, Utf8NoBom).ConfigureAwait(false);
+        var json = await ReadDocumentTextAsync(_settingsPath, "settings.json").ConfigureAwait(false);
         var settings = JsonSerializer.Deserialize<AppSettings>(json, ReadOptions) ?? new AppSettings();
         ValidateSchemaVersion(
             "settings",
@@ -1006,8 +1006,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             return new ServerInventoryDocument();
         }
 
-        var json = await File.ReadAllTextAsync(_serversPath, Utf8NoBom)
-            .ConfigureAwait(false);
+        var json = await ReadDocumentTextAsync(_serversPath, "servers.json").ConfigureAwait(false);
         using JsonDocument parsed = JsonDocument.Parse(json);
         ServerInventoryDocument document;
         if (parsed.RootElement.ValueKind == JsonValueKind.Array)
@@ -1288,6 +1287,120 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             Directory.CreateDirectory(directory);
         }
 
+        await BackUpLastGoodCopyAsync(path).ConfigureAwait(false);
+        await WriteFileAsync(path, content).ConfigureAwait(false);
+    }
+
+    /// <summary>The last good copy kept beside a configuration document.</summary>
+    internal static string BackupPathFor(string path) => path + ".bak";
+
+    /// <summary>
+    /// Copies the document about to be replaced to its backup, when it is readable JSON.
+    /// </summary>
+    /// <remarks>
+    /// A damaged file is never copied: it would replace the one good copy there is. The copy goes
+    /// through the same restricted write as the document, since it holds the same secrets.
+    /// </remarks>
+    private static async Task BackUpLastGoodCopyAsync(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            string current = await File.ReadAllTextAsync(path, Utf8NoBom).ConfigureAwait(false);
+            if (IsReadableJson(current))
+            {
+                await WriteFileAsync(BackupPathFor(path), current).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The write itself still goes ahead: a missing backup must not cost the user a save.
+            Logging.FileLogger.Warn($"Could not keep a backup of {path}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Reads a configuration document, falling back to its backup when the document itself is not
+    /// readable JSON.
+    /// </summary>
+    /// <remarks>
+    /// A file left empty or zeroed by a power cut stopped the application at startup, and the
+    /// trusted keys, the vault material and the HMAC key went with it. The backup is only read here;
+    /// the damaged file is replaced by the next save, which runs under the write lock. When there
+    /// is no usable backup the original text is returned and fails as it always did.
+    /// </remarks>
+    private async Task<string> ReadDocumentTextAsync(string path, string documentName)
+    {
+        string text = await File.ReadAllTextAsync(path, Utf8NoBom).ConfigureAwait(false);
+        if (IsReadableJson(text))
+        {
+            return text;
+        }
+
+        string backupPath = BackupPathFor(path);
+        if (!File.Exists(backupPath))
+        {
+            return text;
+        }
+
+        string backup = await File.ReadAllTextAsync(backupPath, Utf8NoBom).ConfigureAwait(false);
+        if (!IsReadableJson(backup))
+        {
+            return text;
+        }
+
+        Logging.FileLogger.Error(
+            $"{documentName} is not readable; loaded the last good copy from {backupPath}. "
+            + "The damaged file is replaced at the next save.");
+        lock (_recoveredDocuments)
+        {
+            _recoveredDocuments.Add(documentName);
+        }
+
+        return backup;
+    }
+
+    private readonly HashSet<string> _recoveredDocuments = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The documents (e.g. "settings.json") that were unreadable this run and were loaded from their
+    /// backup instead, so the application can tell the user.
+    /// </summary>
+    public IReadOnlyCollection<string> DocumentsRecoveredFromBackup
+    {
+        get
+        {
+            lock (_recoveredDocuments)
+            {
+                return [.. _recoveredDocuments];
+            }
+        }
+    }
+
+    private static bool IsReadableJson(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument _ = JsonDocument.Parse(text);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static async Task WriteFileAsync(string path, string content)
+    {
         if (OperatingSystem.IsWindows())
         {
             // Atomic write-temp-then-rename with the restrictive ACL applied at
