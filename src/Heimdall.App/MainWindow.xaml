@@ -4273,6 +4273,7 @@
                                                 </Button>
                                             </Grid>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SessionLogDirectory]}"/>
+                                            <TextBlock x:Name="Mw_SettingsSessionLogDirRestartHint" Text="{loc:Translate SettingsSessionLogDirectoryRestartHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             <TextBlock x:Name="Mw_SettingsSessionLogRetentionLabel" Text="{loc:Translate SettingsLabelSessionLogRetentionDays}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,12,0,4"/>
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBox Text="{Binding Settings.SessionLogRetentionDaysText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}"

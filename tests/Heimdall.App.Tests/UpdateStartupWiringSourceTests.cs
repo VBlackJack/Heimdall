@@ -32,6 +32,7 @@ public sealed class UpdateStartupWiringSourceTests
     private const string BridgeStatement = "_settingsRuntimeBridgeInitialized = true;";
     private const string ReportStatement = "await ReportPreviousUpdateAttemptAsync(viewModel);";
     private const string CheckStatement = "await CheckForUpdatesOnStartupAsync(viewModel);";
+    private const string RecheckStatement = "await RecheckForUpdatesWhileOpenAsync(viewModel);";
 
     private const string ClosedMember = "protected override void OnClosed(EventArgs e)";
     private const string CancelStatement = "_startupUpdateCts.Cancel();";
@@ -55,6 +56,7 @@ public sealed class UpdateStartupWiringSourceTests
         Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, BridgeStatement), "the bridge flag is not a step of the startup update work");
         Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, ReportStatement), "the previous-attempt report is not a step of the startup update work");
         Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, CheckStatement), "the startup check is not a step of the startup update work");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, RecheckStatement), "the periodic check is not a step of the startup update work");
 
         int bridge = logic.IndexOf(BridgeStatement, StringComparison.Ordinal);
         Assert.True(bridge < logic.IndexOf(ReportStatement, StringComparison.Ordinal), "the bridge is initialised after the report");

@@ -128,6 +128,13 @@ public static class AppConstants
     public const int SessionLogFlushIntervalMs = 500;
 
     /// <summary>
+    /// How often a running instance asks whether an update check is due. The check itself still
+    /// waits for the interval set in Settings; this only lets that interval elapse in a session
+    /// left open for days, where the startup check alone never ran again.
+    /// </summary>
+    public static readonly TimeSpan UpdateRecheckPollInterval = TimeSpan.FromHours(1);
+
+    /// <summary>
     /// Default maximum size in bytes of the shared graphical-protocol session-event log before
     /// rollover (4 MiB). Mirrors <see cref="DefaultSessionLogMaxBytes"/>: events are low-volume
     /// (two lines per session), so this cap is reached only over very long-lived installs and the

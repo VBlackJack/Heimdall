@@ -185,6 +185,25 @@ public sealed class ServerDialogOriginPreservationTests
         Assert.Equal(configuredMode, persisted.SshMode);
     }
 
+    [Theory]
+    [InlineData("External")]
+    [InlineData("Embedded")]
+    public async Task ServerListViewModel_AddServer_UsesConfiguredRdpDefaultMode(string configuredMode)
+    {
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(new ServerProfileDto
+        {
+            DisplayName = "New RDP server",
+            RemoteServer = "new.example.com",
+            ConnectionType = "RDP"
+        });
+        await fixture.ConfigManager.MergeSettingAsync(settings => settings.RdpDefaultMode = configuredMode);
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+
+        await fixture.ViewModel.AddServerCommand.ExecuteAsync(null);
+
+        Assert.Equal(configuredMode, Assert.IsType<ServerDialogViewModel>(fixture.DialogService.LastServerDialogViewModel).RdpMode);
+    }
+
     // Lot 2 of BL-0094, and it crosses the wiring rather than assuming it: the creation path
     // is attached where the dialog options are built, so a dialog opened by the shell must
     // come out able to create a gateway. Before this, the tab could only choose from a list
