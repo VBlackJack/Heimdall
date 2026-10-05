@@ -47,19 +47,31 @@ public sealed class TcpHealthProbe : IHealthProbe
         }
         catch (SocketException ex)
         {
-            var reason = ex.SocketErrorCode switch
-            {
-                SocketError.ConnectionRefused => "refused",
-                SocketError.HostNotFound => "dns",
-                SocketError.HostUnreachable or SocketError.NetworkUnreachable => "unreachable",
-                SocketError.TimedOut => "timeout",
-                _ => ex.SocketErrorCode.ToString().ToLowerInvariant()
-            };
-            return new HealthState(HealthStatus.Down, DateTime.UtcNow, null, reason);
+            return new HealthState(HealthStatus.Down, DateTime.UtcNow, null, ReasonFor(ex.SocketErrorCode));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new HealthState(HealthStatus.Down, DateTime.UtcNow, null, ex.GetType().Name.ToLowerInvariant());
+            // A reason the user can read: the exception type, shown as it was, reached the tooltip.
+            return new HealthState(HealthStatus.Down, DateTime.UtcNow, null, OtherReason);
         }
     }
+
+    /// <summary>The reason tag for an unrecognised failure.</summary>
+    public const string OtherReason = "other";
+
+    /// <summary>
+    /// The reason tag for a socket failure. Every code maps to a tag the tooltip can name; the
+    /// code itself, lower-cased, used to reach the user as "(tryagain)".
+    /// </summary>
+    internal static string ReasonFor(SocketError code) => code switch
+    {
+        SocketError.ConnectionRefused or SocketError.ConnectionReset => "refused",
+        SocketError.HostNotFound or SocketError.TryAgain or SocketError.NoData => "dns",
+        SocketError.HostUnreachable
+            or SocketError.NetworkUnreachable
+            or SocketError.NetworkDown
+            or SocketError.AddressNotAvailable => "unreachable",
+        SocketError.TimedOut => "timeout",
+        _ => OtherReason
+    };
 }

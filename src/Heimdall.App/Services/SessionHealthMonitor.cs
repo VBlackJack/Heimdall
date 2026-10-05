@@ -15,6 +15,7 @@
  */
 
 using System.Collections.Concurrent;
+using System.Net;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 using Heimdall.Core.SessionHealth;
@@ -254,6 +255,7 @@ public sealed class SessionHealthMonitor : IDisposable
             seenIds.Add(dto.Id);
             tasks.Add(ProbeOneAsync(
                 dto,
+                settings,
                 settings.SessionHealthProbeTimeoutMs,
                 throttle,
                 generation,
@@ -330,8 +332,41 @@ public sealed class SessionHealthMonitor : IDisposable
         }
     }
 
+    /// <summary>
+    /// Why a server is not probed directly, or null when it is.
+    /// </summary>
+    /// <remarks>
+    /// A server reached through a gateway is not reachable from here by design. Dialling it
+    /// directly marked it Down - a red dot for a session that connects fine - and sent a DNS query
+    /// and a SYN to an internal name every interval. That covered an SSH gateway set on the profile,
+    /// but not one inherited from its group defaults, as the connection itself applies, nor an RD
+    /// Gateway.
+    /// </remarks>
+    internal static string? UnprobedReason(ServerProfileDto dto, AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        if (!string.IsNullOrEmpty(dto.SshGatewayId)
+            || (settings.GroupDefaults.Count > 0
+                && !string.IsNullOrEmpty(dto.Group)
+                && !string.IsNullOrEmpty(GroupDefaultsDto.Resolve(dto.Group, settings.GroupDefaults).SshGatewayId)))
+        {
+            return "behind-gateway";
+        }
+
+        if (string.Equals(dto.ConnectionType, "RDP", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(dto.RdpGateway))
+        {
+            return "behind-rd-gateway";
+        }
+
+        return null;
+    }
+
     private async Task ProbeOneAsync(
         ServerProfileDto dto,
+        AppSettings settings,
         int timeoutMs,
         SemaphoreSlim throttle,
         long generation,
@@ -341,18 +376,18 @@ public sealed class SessionHealthMonitor : IDisposable
         // Gateway-fronted servers and protocols without a probe port short-circuit
         // before they queue against the throttle, leaving slots free for probes
         // that will actually hit the network.
-        if (!string.IsNullOrEmpty(dto.SshGatewayId))
+        if (UnprobedReason(dto, settings) is { } unprobed)
         {
             PublishState(
                 dto.Id,
-                new HealthState(HealthStatus.Unknown, DateTime.UtcNow, null, "behind-gateway"),
+                new HealthState(HealthStatus.Unknown, DateTime.UtcNow, null, unprobed),
                 generation,
                 lifecycleVersion);
             return;
         }
 
         var port = ResolveProbePort(dto);
-        if (!port.HasValue || port.Value <= 0)
+        if (!port.HasValue || port.Value <= 0 || port.Value > IPEndPoint.MaxPort)
         {
             PublishState(
                 dto.Id,
