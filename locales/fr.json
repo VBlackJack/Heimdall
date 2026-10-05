@@ -3334,6 +3334,7 @@
   "ErrorTunnelChainedEstablishmentCancelled": "L'\u00e9tablissement du tunnel en cha\u00eene a \u00e9t\u00e9 annul\u00e9.",
   "ErrorTunnelGatewayChainEmpty": "La cha\u00eene de passerelles doit contenir au moins une passerelle.",
   "ErrorPlinkProcessStartFailed": "Impossible de d\u00e9marrer le processus plink : {0}",
+  "ErrorPlinkExitedBeforeTunnel": "Plink s'est arrêté (code {0}) avant d'ouvrir le tunnel : {1}",
   "ErrorPlinkExecutableNotFound": "Ex\u00e9cutable plink introuvable : {0}",
   "ErrorUnhandledTitle": "Erreur Heimdall",
 

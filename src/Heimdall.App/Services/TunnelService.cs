@@ -380,6 +380,15 @@ public sealed class TunnelService : ITunnelService
                 .ConfigureAwait(false);
         }
 
+        // The manager reports a cancelled open as a failed result. Turned into an error here, it
+        // was logged as a tunnel failure, written to the connection state, and shown as a failed
+        // connection the user had in fact cancelled. A cancellation of the caller's own token
+        // leaves as one, the way a cancelled wait for the gate above already does.
+        if (!result.Success && result.FailureCode == SshFailureCode.Cancelled)
+        {
+            ct.ThrowIfCancellationRequested();
+        }
+
         // Sentences the manager composed itself travel as locale keys; formatted here,
         // once, before anything below reads or appends to the message.
         result = TunnelFailureMessageResolver.Localize(result, _localizer);
@@ -784,6 +793,12 @@ public sealed class TunnelService : ITunnelService
         if (!result.Success)
         {
             _tunnelManager.ReleaseLoopbackAliasReservation(localBindHost);
+            if (result.FailureCode == SshFailureCode.Cancelled && ct.IsCancellationRequested)
+            {
+                runner.Dispose();
+                ct.ThrowIfCancellationRequested();
+            }
+
             string errorMsg = result.FailureCode is SshFailureCode.TunnelPortOwnedByDifferentProcess
                     or SshFailureCode.TunnelPortNotListening
                     or SshFailureCode.TunnelPortOwnershipIndeterminate

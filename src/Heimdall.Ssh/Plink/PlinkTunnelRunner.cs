@@ -145,6 +145,12 @@ public sealed class PlinkTunnelRunner : IDisposable
     private IPlinkProcess? _process;
     private string? _pwFilePath;
     private Task? _drainTask;
+
+    // The last lines plink wrote to stderr, sanitized; what it said before it exited is the
+    // only account of why. Room for its longest message, the host key warning, whose telling
+    // lines come first.
+    private readonly ConcurrentQueue<string> _recentStderr = new();
+    private const int RecentStderrCapacity = 20;
     private CancellationTokenSource? _drainCts;
     private bool _disposed;
 
@@ -343,8 +349,10 @@ public sealed class PlinkTunnelRunner : IDisposable
             {
                 while (true)
                 {
+                    // Read to the end of the pipe rather than stopping once the process has
+                    // exited: the lines it wrote just before exiting say why it did.
                     var proc = _process;
-                    if (proc is null || proc.HasExited)
+                    if (proc is null)
                     {
                         break;
                     }
@@ -354,7 +362,12 @@ public sealed class PlinkTunnelRunner : IDisposable
                     if (line is null) break;
                     if (!string.IsNullOrWhiteSpace(line))
                     {
-                        Core.Logging.FileLogger.Info($"Plink stderr (port {localPort}, untrusted): {SanitizeForLog(line)}");
+                        string sanitized = SanitizeForLog(line);
+                        Core.Logging.FileLogger.Info($"Plink stderr (port {localPort}, untrusted): {sanitized}");
+                        _recentStderr.Enqueue(sanitized);
+                        while (_recentStderr.Count > RecentStderrCapacity && _recentStderr.TryDequeue(out _))
+                        {
+                        }
                     }
                 }
             }
@@ -375,10 +388,29 @@ public sealed class PlinkTunnelRunner : IDisposable
             if (ownership != TcpListenerOwnership.OwnedByExpectedProcess)
             {
                 // Process may have already exited with an error
-                var exitInfo = _process is { HasExited: true }
-                    ? $"(exit code {_process.ExitCode})"
+                bool exited = _process is { HasExited: true };
+                int? exitCode = exited ? _process!.ExitCode : null;
+                var exitInfo = exited
+                    ? $"(exit code {exitCode})"
                     : "(still running but port not bound)";
+                if (exited)
+                {
+                    // The pipe closes with the process, so the drain ends on its own once it
+                    // has read the last lines; Stop would cancel it before it got there.
+                    WaitForDrainToFinish();
+                }
+
                 Stop();
+
+                // A port another process holds is the clearer account, and plink exiting is then
+                // its consequence; the ownership failure below says so. So it does when plink
+                // said nothing that names a cause.
+                if (exited
+                    && ownership != TcpListenerOwnership.OwnedByDifferentProcess
+                    && TryBuildExitedEarlyResult(exitCode!.Value) is PlinkTunnelResult exitedEarly)
+                {
+                    return exitedEarly;
+                }
 
                 SshFailureCode failureCode = ToFailureCode(ownership);
                 var message =
@@ -590,7 +622,13 @@ public sealed class PlinkTunnelRunner : IDisposable
 
         public bool Start()
         {
-            return _inner.Start();
+            if (!_inner.Start())
+            {
+                return false;
+            }
+
+            PlinkProcessJob.TryAssign(_inner);
+            return true;
         }
 
         public void Kill()
@@ -904,9 +942,52 @@ public sealed class PlinkTunnelRunner : IDisposable
             {
                 return ownership;
             }
+
+            // A plink that has exited will never bind the port. Waiting out the remaining
+            // attempts cost every refused sign-in about half a minute.
+            if (_process is { HasExited: true })
+            {
+                return ownership;
+            }
         }
 
         return ownership;
+    }
+
+    private void WaitForDrainToFinish()
+    {
+        try
+        {
+            _drainTask?.Wait(DrainJoinTimeout);
+        }
+        catch (AggregateException ex)
+        {
+            Core.Logging.FileLogger.Debug("[PlinkTunnelRunner] stderr drain ended with an error", ex);
+        }
+    }
+
+    /// <summary>
+    /// Builds the result for a plink that exited before it opened the tunnel, named from what it
+    /// wrote to stderr, or null when what it wrote names no cause. Called after
+    /// <see cref="Stop"/>, which has joined the stderr drain.
+    /// </summary>
+    private PlinkTunnelResult? TryBuildExitedEarlyResult(int exitCode)
+    {
+        List<string> stderr = [.. _recentStderr];
+        SshFailureCode code = PlinkStderrClassifier.Classify(stderr);
+        if (code == SshFailureCode.Unknown)
+        {
+            return null;
+        }
+
+        string lastLine = stderr.Count > 0 ? stderr[^1] : string.Empty;
+        string message = $"Plink exited with code {exitCode} before opening the tunnel: {lastLine}";
+        Core.Logging.FileLogger.Error(message);
+        return new PlinkTunnelResult(false, message, code)
+        {
+            MessageKey = TunnelMessageKeys.MessageKeyPlinkExitedEarly,
+            MessageArguments = [exitCode, lastLine]
+        };
     }
 
     private static SshFailureCode ToFailureCode(TcpListenerOwnership ownership)
