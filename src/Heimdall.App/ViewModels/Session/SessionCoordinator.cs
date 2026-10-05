@@ -164,6 +164,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         // Wire SplitService callbacks for access to session tab state
         _main.Split.ActiveSessionsProvider = () => _main.Connection.ActiveSessions;
         _main.Split.ActiveSessionProvider = () => _main.Connection.ActiveSession;
+        _main.Split.OpenSessionsProvider = () => _main.Connection.AllOpenSessions;
         _main.Split.SetActiveSession = s => _main.Connection.ActiveSession = s;
         _main.Split.SetHasActiveSessions = v => _main.Connection.HasActiveSessions = v;
         _main.Split.SetStatusText = s => _main.StatusText = s;
@@ -1328,12 +1329,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             FileLogger.Warn(
                 $"Overlay close: forcing removal of orphan tab title='{title}' " +
                 $"(CloseSessionAsync did not remove it)");
-            _main.Connection.ActiveSessions.Remove(tab);
-            if (ReferenceEquals(_main.Connection.ActiveSession, tab))
-            {
-                _main.Connection.ActiveSession =
-                    _main.Connection.ActiveSessions.LastOrDefault();
-            }
+            _main.Connection.RemoveFromStrip(tab);
 
             _main.Connection.HasActiveSessions =
                 _main.Connection.ActiveSessions.Count > 0;
@@ -1456,12 +1452,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 FileLogger.Warn(
                     $"Reconnect: forcing removal of orphan tab serverId={serverId} " +
                     $"(CloseSessionAsync did not remove it)");
-                _main.Connection.ActiveSessions.Remove(tab);
-                if (ReferenceEquals(_main.Connection.ActiveSession, tab))
-                {
-                    _main.Connection.ActiveSession =
-                        _main.Connection.ActiveSessions.LastOrDefault();
-                }
+                _main.Connection.RemoveFromStrip(tab);
 
                 _main.Connection.HasActiveSessions =
                     _main.Connection.ActiveSessions.Count > 0;

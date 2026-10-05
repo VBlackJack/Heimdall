@@ -556,16 +556,40 @@ public partial class ConnectionViewModel : ObservableObject
             return result;
         }
 
-        ActiveSessions.Remove(session);
-
-        if (ActiveSession == session)
-        {
-            ActiveSession = ActiveSessions.LastOrDefault();
-        }
+        RemoveFromStrip(session);
 
         HasActiveSessions = ActiveSessions.Count > 0;
         session.MarkClosed();
         return PaneCloseResult.Closed;
+    }
+
+    /// <summary>
+    /// Takes a tab out of the strip. When it was the selected tab, its neighbour is selected: the
+    /// tab that takes its place, or the one before it when it was last, as browsers and editors do.
+    /// </summary>
+    /// <remarks>
+    /// The last tab of the strip used to be selected instead, so closing tab 3 of 10 jumped to
+    /// tab 10.
+    /// </remarks>
+    internal void RemoveFromStrip(SessionTabViewModel session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        int index = ActiveSessions.IndexOf(session);
+        if (index < 0)
+        {
+            return;
+        }
+
+        // Read before the removal: a view bound to the selection may move it while the item goes.
+        bool wasSelected = ReferenceEquals(ActiveSession, session);
+        ActiveSessions.RemoveAt(index);
+        if (wasSelected || ReferenceEquals(ActiveSession, session))
+        {
+            ActiveSession = ActiveSessions.Count == 0
+                ? null
+                : ActiveSessions[Math.Min(index, ActiveSessions.Count - 1)];
+        }
     }
 
     /// <summary>

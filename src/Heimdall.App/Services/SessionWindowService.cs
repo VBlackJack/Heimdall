@@ -176,11 +176,7 @@ public sealed class SessionWindowService : ISessionWindowService
         session.HostControl = null;
 
         // Remove the session from the main window's collection
-        vm.Connection.ActiveSessions.Remove(session);
-        if (vm.Connection.ActiveSession == session)
-        {
-            vm.Connection.ActiveSession = vm.Connection.ActiveSessions.LastOrDefault();
-        }
+        vm.Connection.RemoveFromStrip(session);
         vm.Connection.HasActiveSessions = vm.Connection.ActiveSessions.Count > 0;
 
         // Re-assign the host control so the floating window can pick it up
