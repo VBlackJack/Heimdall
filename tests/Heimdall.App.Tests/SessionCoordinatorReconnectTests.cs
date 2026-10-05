@@ -85,6 +85,36 @@ public sealed partial class SessionCoordinatorPreMountTests
     }
 
     [Fact]
+    public async Task AutoReconnect_FailureWithoutAPlaceholder_StillRetriesAndNeverRaisesADialog()
+    {
+        // SFTP, like Telnet or a preflight refusal, fails without an SSH placeholder ever being
+        // mounted. The silent first attempt used to end the chain with nothing reported.
+        using TestHarness harness = TestHarness.Create();
+        ManualReconnectDelayScheduler scheduler = new ManualReconnectDelayScheduler();
+        harness.Main.Session.ReconnectDelayAsync = scheduler.DelayAsync;
+        ServerProfileDto server = harness.CreateServer("SFTP");
+        await harness.PersistServerAsync(server);
+        SessionTabViewModel source = AddReconnectSource(harness, server);
+        ControlledProtocolHandler firstHandler = harness.GetHandler("SFTP");
+
+        RaiseAutomaticReconnect(harness, source, attempt: 1, maxAttempts: 2);
+
+        await firstHandler.Started.Task.WaitAsync(TestTimeout);
+        firstHandler.Result.SetResult(new ConnectionResult(false, "first failure", null));
+        ScheduledReconnectDelay secondDelay = await scheduler.TakeAsync();
+
+        harness.ResetHandler("SFTP");
+        ControlledProtocolHandler secondHandler = harness.GetHandler("SFTP");
+        secondDelay.Release();
+        await secondHandler.Started.Task.WaitAsync(TestTimeout);
+        secondHandler.Result.SetResult(new ConnectionResult(false, "second failure", null));
+
+        await WaitUntilAsync(() => harness.Main.Session.ActiveReconnectChainCount == 0);
+        Assert.Equal(1, scheduler.ScheduledCount);
+        Assert.Equal(0, harness.DialogService.ErrorCallCount);
+    }
+
+    [Fact]
     public async Task AutoReconnect_ThreeAttempts_UsesFirstSecondAndSubsequentDelays()
     {
         using TestHarness harness = TestHarness.Create();

@@ -903,8 +903,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 {
                     // The view never took the session: close it here and drop the placeholder, so
                     // neither a live connection nor a tab stuck in Connecting is left behind.
-                    SafeDisposeSessionResult(session);
                     _main.Connection.CloseFailedMaterialization(existingTab);
+                    SafeDisposeSessionResult(session);
                     throw;
                 }
 
@@ -914,10 +914,12 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
-            if (_connectingCancellations.ContainsKey(sessionId))
+            if (_connectingCancellations.TryGetValue(sessionId, out ConnectingSessionCancellation? connecting)
+                && connecting.IsCancellationRequested)
             {
-                // A placeholder was mounted for this attempt and has been closed since: the user
-                // walked away from it, so the late session is closed instead of reopening a tab.
+                // The placeholder mounted for this attempt was closed (or its Cancel pressed): the
+                // user walked away from it, so the late session is closed instead of reopening a
+                // tab. A placeholder that only moved to a floating window is not cancelled.
                 FileLogger.Info($"SessionReady for SSH sessionId={sessionId} arrived after its tab was closed; discarding it.");
                 SafeDisposeSessionResult(session);
                 throw new OperationCanceledException();
@@ -1202,7 +1204,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         // A tab or pane closed while the vault was locked was given up by the user: replaying its
         // reconnect would bring it back.
-        var openTabs = _main.Connection.ActiveSessions;
+        var openTabs = _main.Connection.AllOpenSessions.ToHashSet();
         var pending = _deferredReconnects
             .Where(d => openTabs.Contains(d.Tab))
             .ToList();
@@ -1550,11 +1552,11 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
 
         await reconnectChain.FailureCleanupTask;
-        if (!reconnectChain.FailureObserved)
-        {
-            CompleteReconnectChain(reconnectChain);
-            return;
-        }
+
+        // Not every failure goes through a placeholder (a preflight refusal, a Telnet session):
+        // the attempt itself said it did not restore, and a silent attempt must not end the
+        // chain without the last one reporting.
+        reconnectChain.FailureObserved = true;
 
         await ContinueReconnectChainAfterFailureAsync(reconnectChain);
     }

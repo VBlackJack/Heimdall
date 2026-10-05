@@ -943,7 +943,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     settings,
                     rdpModeOverride,
                     cancellationToken,
-                    showMessage: true))
+                    showMessage: failureReport == ConnectFailureReport.Dialog))
             {
                 return false;
             }
