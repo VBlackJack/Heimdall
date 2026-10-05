@@ -56,7 +56,7 @@ namespace Heimdall.App.Views;
 /// state into it and forwards the three members.
 /// </para>
 /// </remarks>
-public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard
+public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, ISessionPaneOwner
 {
     private const long MaxInlineEditFileBytes = 16L * 1024 * 1024;
 

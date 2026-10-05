@@ -529,6 +529,7 @@ public partial class SessionTabViewModel : ObservableObject
     /// </summary>
     private void NotifyTreeDependentProperties()
     {
+        WatchPrimaryPaneStatus();
         OnPropertyChanged(nameof(PrimaryPane));
         OnPropertyChanged(nameof(ServerId));
         OnPropertyChanged(nameof(OriginalServerId));
@@ -547,6 +548,41 @@ public partial class SessionTabViewModel : ObservableObject
         OnPropertyChanged(nameof(SplitOrientation));
         OnPropertyChanged(nameof(SplitRatio));
     }
+
+    /// <summary>
+    /// Follows the status of whichever pane is primary now.
+    /// </summary>
+    /// <remarks>
+    /// A host writes its own pane's status once that pane has been moved, and a pane detached into
+    /// a tab of its own is that tab's primary. Without this the header kept the status the tab
+    /// opened with, because only the tab's own setter raised the change.
+    /// </remarks>
+    private void WatchPrimaryPaneStatus()
+    {
+        SessionPaneModel primary = PrimaryPane;
+        if (ReferenceEquals(_watchedPrimaryPane, primary))
+        {
+            return;
+        }
+
+        if (_watchedPrimaryPane is not null)
+        {
+            _watchedPrimaryPane.PropertyChanged -= OnWatchedPrimaryPanePropertyChanged;
+        }
+
+        _watchedPrimaryPane = primary;
+        primary.PropertyChanged += OnWatchedPrimaryPanePropertyChanged;
+    }
+
+    private void OnWatchedPrimaryPanePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (string.Equals(e.PropertyName, nameof(SessionPaneModel.Status), StringComparison.Ordinal))
+        {
+            OnPropertyChanged(nameof(Status));
+        }
+    }
+
+    private SessionPaneModel? _watchedPrimaryPane;
 
     /// <summary>
     /// Fallback pane for when the tree is empty. Per-instance to avoid shared state.

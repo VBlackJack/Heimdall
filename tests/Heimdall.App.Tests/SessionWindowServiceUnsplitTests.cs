@@ -17,6 +17,7 @@
 using System.Reflection;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.Session;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
@@ -197,6 +198,48 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Equal("Connected", restored.Status);
         Assert.Equal("gw-1", restored.TunnelRoute);
         Assert.Equal("#FF0000", restored.EnvironmentColor);
+    }
+
+    [Fact]
+    public void UnsplitSession_MovesTheSecondaryPaneItself_SoItsHostStillFindsIt()
+    {
+        using TestHarness harness = TestHarness.Create();
+        SessionWindowService service = new SessionWindowService();
+        SessionTabViewModel session = harness.Main.Connection.AddSession("srv-primary", "Primary", "SSH");
+        PaneOwnerHost secondaryHost = new();
+        SessionPaneModel secondaryPane = new SessionPaneModel
+        {
+            PaneId = "secondary",
+            ServerId = "srv-secondary",
+            ConnectionType = "SSH",
+            Title = "Secondary",
+            Status = "Connected",
+            IsBroadcastTarget = true,
+            HostControl = secondaryHost
+        };
+        session.RootContent = new SplitContainerModel
+        {
+            First = new SessionPaneModel { PaneId = "primary", ServerId = "srv-primary", ConnectionType = "SSH" },
+            Second = secondaryPane
+        };
+
+        service.UnsplitSession(session, harness.Main);
+
+        SessionTabViewModel restored = harness.Main.Connection.ActiveSessions[^1];
+        Assert.Same(secondaryPane, restored.PrimaryPane);
+        Assert.Same(secondaryPane, secondaryHost.Pane);
+        Assert.True(secondaryPane.IsBroadcastTarget);
+        (SessionTabViewModel owner, bool oneOfSeveral) = SessionCoordinator.ResolveHostOwner(
+            harness.Main.Connection.ActiveSessions, session, secondaryHost.Pane);
+        Assert.Same(restored, owner);
+        Assert.False(oneOfSeveral);
+    }
+
+    private sealed class PaneOwnerHost : ISessionPaneOwner
+    {
+        internal SessionPaneModel? Pane { get; private set; }
+
+        public void SetOwningPane(SessionPaneModel pane) => Pane = pane;
     }
 
     [Fact]

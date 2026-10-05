@@ -56,7 +56,8 @@ public partial class EmbeddedRdpView
         IRdpViewDisposeTarget,
         IRdpConnectWatchdogTimer,
         IRdpConnectAttemptRunner,
-        IRdpTrustPromptSurface
+        IRdpTrustPromptSurface,
+        ISessionPaneOwner
 {
     private const int BeginConnectMaxAttempts = 10;
     private const int MaxReconnectAttemptTimestamps = 3;
