@@ -142,8 +142,9 @@ internal static class SettingsTransfer
         if (document is not JsonObject root
             || root[FormatProperty]?.GetValueKind() != JsonValueKind.String
             || root[FormatProperty]!.GetValue<string>() != FormatName
-            || root[VersionProperty]?.GetValueKind() != JsonValueKind.Number
-            || root[VersionProperty]!.GetValue<int>() != FormatVersion
+            || root[VersionProperty] is not JsonValue versionValue
+            || !versionValue.TryGetValue(out int version)
+            || version != FormatVersion
             || root[SettingsProperty] is not JsonObject imported)
         {
             throw new FormatException("Not a Heimdall settings file of a supported version.");
@@ -156,6 +157,14 @@ internal static class SettingsTransfer
             if (!TransferableKeys.Contains(key))
             {
                 continue;
+            }
+
+            // A null for a setting that cannot be null, or a null inside a list, passed the import
+            // and threw only once the panel loaded it, after the user had confirmed.
+            if ((value is null && !AcceptsNull(key))
+                || (value is JsonArray items && items.Any(item => item is null)))
+            {
+                throw new FormatException($"The settings file holds an empty value for {key}.");
             }
 
             JsonNode? before = merged[key];
@@ -188,6 +197,23 @@ internal static class SettingsTransfer
 
         UriBuilder builder = new(uri) { UserName = string.Empty, Password = string.Empty };
         return JsonValue.Create(builder.Uri.ToString());
+    }
+
+    private static readonly System.Reflection.NullabilityInfoContext Nullability = new();
+
+    /// <summary>Whether the setting saved under <paramref name="key"/> may hold null.</summary>
+    private static bool AcceptsNull(string key)
+    {
+        System.Reflection.PropertyInfo? property = typeof(AppSettings).GetProperty(key);
+        if (property is null)
+        {
+            return false;
+        }
+
+        lock (Nullability)
+        {
+            return Nullability.Create(property).WriteState == System.Reflection.NullabilityState.Nullable;
+        }
     }
 
     /// <summary>Whether a value names the user's profile folder anywhere inside it.</summary>
