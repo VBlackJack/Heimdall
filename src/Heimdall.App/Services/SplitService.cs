@@ -60,6 +60,11 @@ public sealed class SplitService : ISplitService
 
     internal Func<ObservableCollection<SessionTabViewModel>>? ActiveSessionsProvider { get; set; }
     internal Func<SessionTabViewModel?>? ActiveSessionProvider { get; set; }
+
+    /// <summary>
+    /// Every open session, floating windows included: what the embedded-session limit counts.
+    /// </summary>
+    internal Func<IEnumerable<SessionTabViewModel>>? OpenSessionsProvider { get; set; }
     internal Action<SessionTabViewModel?>? SetActiveSession { get; set; }
     internal Action<bool>? SetHasActiveSessions { get; set; }
     internal Action<string>? SetStatusText { get; set; }
@@ -137,6 +142,12 @@ public sealed class SplitService : ISplitService
         }
     }
 
+    /// <summary>Whether another embedded pane would exceed <paramref name="maxEmbeddedSessions"/>.</summary>
+    internal static bool IsAtEmbeddedSessionLimit(IEnumerable<SessionTabViewModel>? openSessions, int maxEmbeddedSessions)
+        => openSessions is not null
+            && maxEmbeddedSessions > 0
+            && ConnectionViewModel.CountEmbeddedPanes(openSessions) >= maxEmbeddedSessions;
+
     internal CancellationToken GetSessionToken(SessionTabViewModel session)
     {
         return _sessionCts.TryGetValue(session, out var cts) ? cts.Token : CancellationToken.None;
@@ -178,6 +189,16 @@ public sealed class SplitService : ISplitService
             var servers = await _configManager.LoadServersAsync();
             var settings = await _configManager.LoadSettingsAsync();
             ct.ThrowIfCancellationRequested();
+
+            // A split pane is a hosted session like a tab, and the limit counts panes. Only opening
+            // a tab checked it, so splitting every tab once hosted twice the configured maximum.
+            if (IsAtEmbeddedSessionLimit(OpenSessionsProvider?.Invoke(), settings.MaxEmbeddedSessions))
+            {
+                SetStatusText?.Invoke(_localizer.Format("SessionLimitReachedMessage", settings.MaxEmbeddedSessions));
+                Core.Logging.FileLogger.Info(
+                    $"Split rejected: the limit of {settings.MaxEmbeddedSessions} embedded sessions is reached.");
+                return;
+            }
 
             var serverDto = servers.FirstOrDefault(
                 s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
