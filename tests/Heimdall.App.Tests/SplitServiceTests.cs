@@ -717,6 +717,44 @@ public sealed class SplitServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SplitSessionWithServerAsync_Ssh_InitializesRuntimeStateBeforeDispatch()
+    {
+        const string inventoryServerId = "ssh-inventory-1";
+        RecordingConnectionService connectionService = new RecordingConnectionService(
+            stateMachine: _connectionSm);
+        SplitService sut = CreateSplitService(connectionService, new FakeEmbeddedSessionManager());
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new ServerProfileDto
+            {
+                Id = inventoryServerId,
+                DisplayName = "SSH server",
+                ConnectionType = "SSH"
+            }
+        });
+
+        SessionPaneModel primaryPane = MakePane(
+            paneId: "primary-pane",
+            serverId: "primary-runtime",
+            connectionType: "SSH");
+        SessionTabViewModel session = new SessionTabViewModel { RootContent = primaryPane };
+        ObservableCollection<SessionTabViewModel> activeSessions = new ObservableCollection<SessionTabViewModel>
+        {
+            session
+        };
+        sut.ActiveSessionsProvider = () => activeSessions;
+
+        await sut.SplitSessionWithServerAsync(
+            session,
+            inventoryServerId,
+            SplitOrientation.Vertical,
+            primaryPane.PaneId);
+
+        Assert.True(connectionService.ConnectInvoked);
+        Assert.Equal(ConnectionState.Initializing, connectionService.SshStateAtDispatch);
+    }
+
+    [Fact]
     public async Task SplitSessionWithServerAsync_WinRm_InitializesRuntimeStateBeforeDispatch()
     {
         const string inventoryServerId = "winrm-inventory-1";
@@ -1156,6 +1194,35 @@ public sealed class SplitServiceTests : IDisposable
         Assert.Contains("boom", capturedStatus);
         Assert.Equal(ConnectionState.Disconnected, _connectionSm.GetState("old-session"));
         Assert.Null(_connectionSm.GetStateData("old-session")?.TunnelLocalPort);
+        Assert.True(pane.HasFailureDetails);
+    }
+
+    // A failed reconnect used to leave a pane with no host and no failure, which reads as still
+    // connecting: it kept the loading overlay, with no Reconnect or Close button, and the next
+    // reconnect skipped it as already in progress. Proved against the mutant that leaves the
+    // failure unrecorded: the second attempt never reaches the connection service.
+    [Fact]
+    public async Task ReconnectPaneAsync_AfterAFailedReconnect_CanBeTriedAgain()
+    {
+        var connectionService = new RecordingConnectionService();
+        var sut = CreateSplitService(new ThrowingConnectionService(new InvalidOperationException("boom")));
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new() { Id = "server-1", DisplayName = "Server 1", ConnectionType = "RDP" }
+        });
+        var pane = MakePane(paneId: "pane-1", serverId: "old-session", connectionType: "RDP");
+        pane.OriginalServerId = "server-1";
+        pane.HostControl = new DisposableHost();
+        var session = new SessionTabViewModel { RootContent = pane };
+        sut.ActiveSessionsProvider = () => new ObservableCollection<SessionTabViewModel> { session };
+        await sut.ReconnectPaneAsync(session, pane.PaneId);
+        Assert.Null(pane.HostControl);
+
+        var retry = CreateSplitService(connectionService);
+        retry.ActiveSessionsProvider = () => new ObservableCollection<SessionTabViewModel> { session };
+        await retry.ReconnectPaneAsync(session, pane.PaneId);
+
+        Assert.True(connectionService.ConnectInvoked);
     }
 
     [Fact]
@@ -1195,7 +1262,10 @@ public sealed class SplitServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ReconnectPaneAsync_FailedConnectionWithoutDiagnostic_LeavesFailureDetailsNull()
+    // The stale diagnostic must go; a failure the handler did not describe still has to be
+    // recorded, or the pane reads as connecting and keeps the loading overlay, which has no
+    // Reconnect or Close button, and a second reconnect skips it.
+    public async Task ReconnectPaneAsync_FailedConnectionWithoutDiagnostic_RecordsAGenericFailure()
     {
         var staleDiagnostic = new SessionDiagnostic(
             SessionFailureStage.SshGateway,
@@ -1224,7 +1294,9 @@ public sealed class SplitServiceTests : IDisposable
 
         Assert.Null(ex);
         Assert.Equal("Error", pane.Status);
-        Assert.Null(pane.FailureDetails);
+        Assert.NotSame(staleDiagnostic, pane.FailureDetails);
+        Assert.Equal(SessionFailureStage.GenericFailure, pane.FailureDetails?.Stage);
+        Assert.True(pane.HasFailureDetails);
     }
 
     [Fact]
@@ -1498,6 +1570,7 @@ public sealed class SplitServiceTests : IDisposable
         Assert.True(newSession.Disposed);
         Assert.Null(pane.HostControl);
         Assert.Equal("Error", pane.Status);
+        Assert.True(pane.HasFailureDetails);
         Assert.Equal(ConnectionState.Disconnected, _connectionSm.GetState("server-1"));
     }
 
@@ -2134,6 +2207,7 @@ public sealed class SplitServiceTests : IDisposable
         public ServerProfileDto? LastServer { get; private set; }
         public ConnectionState? WinRmStateAtDispatch { get; private set; }
         public string? WinRmServerIdAtDispatch { get; private set; }
+        public ConnectionState? SshStateAtDispatch { get; private set; }
 
         public AppSettings? CurrentSettings => null;
 
@@ -2144,7 +2218,10 @@ public sealed class SplitServiceTests : IDisposable
             ServerProfileDto server,
             AppSettings settings,
             CancellationToken ct = default)
-            => RecordConnectAsync("SSH", server, ct);
+        {
+            SshStateAtDispatch = _stateMachine?.GetState(server.Id);
+            return RecordConnectAsync("SSH", server, ct);
+        }
 
         public Task<ConnectionResult> ConnectRdpAsync(
             ServerProfileDto server,
@@ -2435,7 +2512,9 @@ public sealed class SplitServiceTests : IDisposable
         {
             ct.ThrowIfCancellationRequested();
 
-            if (!_connectionSm.TryTransition(server.Id, ConnectionState.Initializing)
+            // The split service takes the Initializing step before dispatch, as the main
+            // pipeline does; real handlers start at ValidatingConfig.
+            if (_connectionSm.GetState(server.Id) != ConnectionState.Initializing
                 || !_connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig)
                 || !_connectionSm.TryTransition(server.Id, ConnectionState.LaunchingRdp)
                 || !_connectionSm.TryTransition(server.Id, ConnectionState.Connected))
