@@ -1525,6 +1525,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         var settings = await _configManager.LoadSettingsAsync();
         dialogVm.SshMode = settings.SshDefaultMode;
+
+        // The RDP default was offered in Settings, badged "applies to connections opened after
+        // Save", and read by nothing: every new RDP session started as Embedded.
+        dialogVm.RdpMode = settings.RdpDefaultMode;
         PopulateServerDialogOptions(dialogVm, settings);
         dialogVm.Settings = settings;
 

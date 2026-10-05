@@ -49,6 +49,33 @@ public sealed class UpdateBannerViewModelTests
     }
 
     [Fact]
+    public async Task Recheck_WhileTheBannerShows_DoesNotCheckAgain()
+    {
+        var settings = BaseSettings();
+        var update = new StubUpdateService { Result = Available(Newer) };
+        var vm = CreateViewModel(settings, update, Current);
+        vm.IsBannerVisible = true;
+
+        await vm.RecheckAsync(CancellationToken.None);
+
+        Assert.False(update.WasCalled);
+    }
+
+    [Fact]
+    public async Task Recheck_OnceTheIntervalElapsed_ChecksAndShowsTheBanner()
+    {
+        var settings = BaseSettings();
+        settings.UpdateLastCheckUtc = DateTimeOffset.UtcNow.AddHours(-25).ToString("O");
+        var update = new StubUpdateService { Result = Available(Newer) };
+        var vm = CreateViewModel(settings, update, Current);
+
+        await vm.RecheckAsync(CancellationToken.None);
+
+        Assert.True(update.WasCalled);
+        Assert.True(vm.IsBannerVisible);
+    }
+
+    [Fact]
     public async Task CheckOnStartup_RecentLastCheck_Throttled()
     {
         var settings = BaseSettings();

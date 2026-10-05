@@ -233,7 +233,7 @@ public partial class App : System.Windows.Application
             await configManager.InitializeAsync();
 
             var localization = _serviceProvider.GetRequiredService<LocalizationManager>();
-            var settings = await configManager.LoadSettingsAsync();
+            var settings = await LoadStartupSettingsAsync(configManager);
             _notesStoragePath = ResolveNotesStoragePath(settings, _dataRoot);
 
             await localization.LoadAsync(
@@ -244,9 +244,24 @@ public partial class App : System.Windows.Application
             // so that {loc:Translate} markup extensions can resolve keys
             LocalizationSource.Instance.Initialize(localization);
 
-            // Apply sleep prevention setting
+            // Apply sleep prevention setting. Every continuous request goes to the UI thread, because
+            // Windows lets only the thread that set it clear it. Always queued, even from the UI
+            // thread, so requests keep their order; never waited on, because the caller holds a lock.
+            Dispatcher uiDispatcher = Dispatcher;
+            SleepPrevention.ContinuousStateThread = action =>
+            {
+                if (uiDispatcher.HasShutdownStarted)
+                {
+                    action();
+                }
+                else
+                {
+                    _ = uiDispatcher.BeginInvoke(action);
+                }
+            };
             SleepPrevention.Enabled = settings.PreventSleepDuringSession;
-            SleepPrevention.IntervalSeconds = settings.SleepPreventionIntervalSeconds;
+            SleepPrevention.IntervalSeconds =
+                SettingRanges.Of(nameof(AppSettings.SleepPreventionIntervalSeconds)).Clamp(settings.SleepPreventionIntervalSeconds);
             // Clamped: a hand-edited -1 became an infinite timer (a save arriving mid-upload was
             // never retried) and anything lower made Timer.Change throw.
             Heimdall.Sftp.RemoteFileEditor.UploadDebounceInterval = TimeSpan.FromMilliseconds(
@@ -518,6 +533,12 @@ public partial class App : System.Windows.Application
             MainWindow = mainWindow;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             mainWindow.Show();
+
+            // After the unlock gate, so a Git token held by the vault can be read.
+            _ = Task.Run(() => TwinShellBootstrapper.SyncOnStartupAsync(
+                settings,
+                _serviceProvider.GetRequiredService<TwinShell.Core.Interfaces.ISettingsService>(),
+                _serviceProvider.GetRequiredService<TwinShell.Core.Interfaces.IGitSyncService>()));
         }
         catch (Exception ex)
         {
@@ -535,6 +556,20 @@ public partial class App : System.Windows.Application
             ShowUnhandledException(ex);
             Shutdown(StartupFailureExitCode);
         }
+    }
+
+    /// <summary>
+    /// Loads the settings the startup works from, and applies the logging switch they carry.
+    /// </summary>
+    /// <remarks>
+    /// Only a settings change applied the switch before: logging turned off came back on at every
+    /// start until some unrelated write happened to raise SettingsChanged.
+    /// </remarks>
+    private static async Task<AppSettings> LoadStartupSettingsAsync(IConfigManager configManager)
+    {
+        AppSettings settings = await configManager.LoadSettingsAsync();
+        Core.Logging.FileLogger.SetEnabled(settings.EnableLogging);
+        return settings;
     }
 
     /// <summary>
