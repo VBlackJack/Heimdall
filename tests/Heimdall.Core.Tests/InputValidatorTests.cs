@@ -55,6 +55,8 @@ public class InputValidatorTests
     [InlineData("user$(id)", false)]
     [InlineData("user`whoami`", false)]
     [InlineData("user | cat /etc/passwd", false)]
+    [InlineData("-oProxyCommand=calc", false)]
+    [InlineData("-user", false)]
     public void Validate_SshUser_RejectsInjection(string? value, bool expected)
     {
         Assert.Equal(expected, InputValidator.Validate(value, "SshUser"));

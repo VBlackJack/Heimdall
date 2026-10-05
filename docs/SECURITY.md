@@ -131,6 +131,22 @@ mitigations are in place:
 Callers may still observe `SshFailureCode.PortInUse` when the port is
 genuinely occupied; retry is safe at any layer.
 
+### Local tunnel endpoints are not authenticated
+
+Every local endpoint a tunnel opens - the local forward, the SOCKS proxy of a
+profile with `SocksProxyPort`, and the intermediate forwards of a gateway chain
+- listens on a loopback address only (`LoopbackBinding` refuses anything outside
+`127.0.0.1`-`127.0.0.254`), and none of them asks who is connecting. This is the
+model of `ssh -L` and `ssh -D`: any process running on the same machine can
+connect to these ports for as long as the tunnel is open, and reach what the
+gateway reaches with the operator's authenticated session.
+
+On a single-user workstation that is the expected trade-off. On a machine
+shared by several users at once, such as a Remote Desktop Session Host used as
+a jump box, the other users' processes share the loopback interface. On such a
+host, prefer a plain forward to the one destination over a SOCKS proxy, and
+close tunnels when the session that needed them ends.
+
 ### SSH host-key trust model
 
 Host-key trust decisions are resolved **before** the real `Connect()` via a

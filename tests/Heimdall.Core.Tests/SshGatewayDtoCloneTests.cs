@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text.Json;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.Core.Tests;
@@ -95,6 +96,21 @@ public sealed class SshGatewayDtoCloneTests
         Assert.Equal(source.IsDefault, clone.IsDefault);
         Assert.Equal(source.ParentGatewayId, clone.ParentGatewayId);
         Assert.Equal(source.HostKeyFingerprint, clone.HostKeyFingerprint);
+    }
+
+    // A gateway field written by a newer build was dropped by the first save of an older one.
+    [Fact]
+    public void AFieldThisBuildDoesNotKnow_SurvivesARoundTripAndTheClone()
+    {
+        SshGatewayDto read = JsonSerializer.Deserialize<SshGatewayDto>(
+            """{ "Id": "gw-1", "Name": "Bastion", "FutureOption": { "enabled": true } }""")!;
+
+        SshGatewayDto clone = read.CloneFaithfully();
+        read.ExtensionData.Clear();
+
+        string written = JsonSerializer.Serialize(clone);
+        Assert.Contains("\"FutureOption\"", written, StringComparison.Ordinal);
+        Assert.Contains("\"enabled\":true", written, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -143,6 +143,24 @@ Les appelants peuvent encore observer `SshFailureCode.PortInUse` lorsque le
 port est réellement occupé ; réessayer est sans danger à n'importe quelle
 couche.
 
+### Les points d'accès locaux des tunnels ne sont pas authentifiés
+
+Chaque point d'accès local qu'ouvre un tunnel - la redirection locale, le proxy
+SOCKS d'un profil avec `SocksProxyPort` et les redirections intermédiaires d'une
+chaîne de passerelles - n'écoute que sur une adresse de bouclage
+(`LoopbackBinding` refuse tout ce qui sort de `127.0.0.1`-`127.0.0.254`), et
+aucun ne demande qui se connecte. C'est le modèle de `ssh -L` et `ssh -D` : tout
+processus de la même machine peut se connecter à ces ports tant que le tunnel
+est ouvert, et atteindre ce que la passerelle atteint avec la session
+authentifiée de l'opérateur.
+
+Sur un poste mono-utilisateur, c'est le compromis attendu. Sur une machine
+partagée par plusieurs utilisateurs à la fois, comme un hôte de session Bureau
+à distance servant de rebond, les processus des autres utilisateurs partagent
+l'interface de bouclage. Sur un tel hôte, préférez une redirection simple vers
+la seule destination utile à un proxy SOCKS, et fermez les tunnels quand la
+session qui en avait besoin se termine.
+
 ### Modèle de confiance des clés d'hôte SSH
 
 Les décisions de confiance sur les clés d'hôte sont résolues **avant** le

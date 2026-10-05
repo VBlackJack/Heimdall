@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using Heimdall.Core.Models;
 
 namespace Heimdall.Core.Configuration;
 
@@ -26,10 +28,22 @@ public sealed class SshGatewayDto
 {
     private string? _sshKeyPassphraseEncrypted;
 
+    /// <summary>
+    /// Fields this build does not know, kept so that saving does not delete them.
+    /// </summary>
+    /// <remarks>
+    /// The settings and the server profiles already carried this and the gateways did not, so a
+    /// gateway field written by a newer build was dropped the first time an older one saved, and
+    /// by every JSON round trip of the settings in between.
+    /// </remarks>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> ExtensionData { get; set; } =
+        new(StringComparer.Ordinal);
+
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Host { get; set; } = string.Empty;
-    public int Port { get; set; } = 22;
+    public int Port { get; set; } = DefaultPorts.Ssh;
     public string User { get; set; } = string.Empty;
     public string? KeyPath { get; set; }
     public string? SshPasswordEncrypted { get; set; }
@@ -67,10 +81,23 @@ public sealed class SshGatewayDto
     /// <see cref="UsesLegacySshCredentialMapping"/> is derived from, and that derivation decides on
     /// three connect paths whether the stored password is offered as the key passphrase - so such a
     /// copy authenticates differently from the gateway it was copied from.</para>
-    /// <para>Every member is a string, an int or a bool, so the shallow copy is complete. A member
-    /// that is not, added later, has to be copied here explicitly.</para>
+    /// <para>Every member is a string, an int or a bool, so the shallow copy is complete, except
+    /// <see cref="ExtensionData"/>, which is copied here. A member that is not a value, added later,
+    /// has to be copied here explicitly too.</para>
     /// </remarks>
-    public SshGatewayDto CloneFaithfully() => (SshGatewayDto)MemberwiseClone();
+    public SshGatewayDto CloneFaithfully()
+    {
+        SshGatewayDto clone = (SshGatewayDto)MemberwiseClone();
+        clone.ExtensionData = new Dictionary<string, JsonElement>(ExtensionData.Count, ExtensionData.Comparer);
+        foreach (KeyValuePair<string, JsonElement> entry in ExtensionData)
+        {
+            // Clone(): the element otherwise stays bound to the document it was parsed from, which
+            // the source gateway owns.
+            clone.ExtensionData[entry.Key] = entry.Value.Clone();
+        }
+
+        return clone;
+    }
 
     /// <summary>
     /// Returns a complete copy with the stored secrets removed.

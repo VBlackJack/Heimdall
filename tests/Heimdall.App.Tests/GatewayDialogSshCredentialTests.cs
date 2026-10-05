@@ -181,6 +181,19 @@ public sealed class GatewayDialogSshCredentialTests
         Assert.Equal(vm.PortError, vm.ValidationError);
     }
 
+    // The caller replaces the stored gateway with what the dialog returns, so a field the
+    // dialog does not show has to ride through the edit or it is deleted.
+    [Fact]
+    public void FromDtoToDto_KeepsFieldsThisBuildDoesNotKnow()
+    {
+        SshGatewayDto stored = System.Text.Json.JsonSerializer.Deserialize<SshGatewayDto>(
+            """{ "Id": "gw-1", "Name": "Bastion", "Host": "h", "User": "u", "FutureOption": 7 }""")!;
+
+        SshGatewayDto saved = GatewayDialogViewModel.FromDto(stored).ToDto();
+
+        Assert.Equal(7, saved.ExtensionData["FutureOption"].GetInt32());
+    }
+
     private static SshGatewayDto LegacyGateway() => new()
     {
         Id = "gw-legacy",
