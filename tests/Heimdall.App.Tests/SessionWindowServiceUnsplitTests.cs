@@ -60,6 +60,43 @@ public sealed partial class SessionCoordinatorPreMountTests
         });
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RequestSplitSession_OnAFloatingSession_SplitsOnlyOnceItIsBackInTheMainWindow(bool windowFound)
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            var reattached = new List<SessionTabViewModel>();
+            SessionWindowService service = new SessionWindowService(
+                static (_, _) => { },
+                static () => [],
+                session =>
+                {
+                    reattached.Add(session);
+                    if (windowFound)
+                    {
+                        harness.Main.Connection.ReintroduceSession(session);
+                    }
+
+                    return windowFound;
+                });
+            int palettes = 0;
+            service.SplitPaletteRequested += (_, _) => palettes++;
+            SessionTabViewModel floating = harness.Main.Connection.AddSession("ssh-1", "SSH", "SSH");
+            floating.HostControl = new System.Windows.Controls.Border();
+            service.DetachSessionToFloatingWindow(floating, harness.Main);
+
+            service.RequestSplitSession(floating, SplitOrientation.Vertical, harness.Main);
+
+            // Split inside the floating window, the new pane was never shown and still connected.
+            Assert.Same(floating, Assert.Single(reattached));
+            Assert.Equal(windowFound ? 1 : 0, palettes);
+            Assert.Equal(windowFound, harness.Main.Connection.ActiveSessions.Contains(floating));
+        });
+    }
+
     private static SessionWindowService CreateSessionWindowServiceForDetachTests(
         Action<SessionTabViewModel> onWindowOpened)
     {

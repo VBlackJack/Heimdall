@@ -718,6 +718,40 @@ public sealed class ConnectionViewModelCloseTests
     }
 
     [Fact]
+    public async Task CloseSessionAsync_WithAClearedRequest_ReusesItSoTheGuardsAreNotAskedAgain()
+    {
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = true };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        SessionTabViewModel session = CreateSplitSession("Disconnected", "Disconnected");
+        AddActiveSession(sut, session);
+        CloseRequest cleared = CloseRequest.Interactive(DisconnectReason.TabClose);
+
+        await sut.CloseSessionAsync(session, DisconnectReason.TabClose, clearedRequest: cleared);
+
+        Assert.Same(cleared, Assert.Single(splitService.Requests));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CloseSessionAsync_MarksTheSessionClosedOnlyWhenItWasTornDown(bool torn)
+    {
+        TrackingDialogService dialogService = new(true);
+        TrackingSplitService splitService = new() { CloseAllPanesResult = torn };
+        ConnectionViewModel sut = CreateViewModel(dialogService, splitService);
+        SessionTabViewModel session = CreateSplitSession("Disconnected", "Disconnected");
+        AddActiveSession(sut, session);
+        List<string?> changes = [];
+        session.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        await sut.CloseSessionAsync(session, DisconnectReason.TabClose);
+
+        Assert.Equal(torn, session.IsClosed);
+        Assert.Equal(torn, changes.Contains(nameof(SessionTabViewModel.IsClosed)));
+    }
+
+    [Fact]
     public async Task CloseSessionsAsync_ContextMenuGroup_IsInteractive()
     {
         TrackingDialogService dialogService = new(true);

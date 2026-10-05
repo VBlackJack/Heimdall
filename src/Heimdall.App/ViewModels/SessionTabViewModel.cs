@@ -49,6 +49,24 @@ public partial class SessionTabViewModel : ObservableObject
     [ObservableProperty]
     private bool _isActive;
 
+    /// <summary>
+    /// Set once the session's panes have been torn down. A floating window hosting it closes on
+    /// this, whoever closed the session (a reconnect, a host's close button, a disconnect).
+    /// </summary>
+    public bool IsClosed { get; private set; }
+
+    /// <summary>Records that the session's panes were torn down.</summary>
+    internal void MarkClosed()
+    {
+        if (IsClosed)
+        {
+            return;
+        }
+
+        IsClosed = true;
+        OnPropertyChanged(nameof(IsClosed));
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayTitle))]
     [NotifyPropertyChangedFor(nameof(HeaderToolTip))]

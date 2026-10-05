@@ -195,6 +195,58 @@ public sealed class FloatingSessionWindowLifecycleTests
         });
     }
 
+    [StaFact]
+    [Trait("Category", "RequiresDesktop")]
+    public void SessionClosedElsewhere_ClosesTheWindowWithoutAskingOrHandingItBack()
+    {
+        WpfTestHost.Invoke(() =>
+        {
+            DecliningDialogProxy dialogProxy = new();
+            ISplitService splitService = DispatchProxy.Create<ISplitService, RejectingSplitProxy>();
+            ConnectionViewModel connection = new(
+                WpfTestHost.Localizer,
+                dialogProxy.Create(),
+                splitService,
+                new PaneCloseArbiter(),
+                new SessionWindowService());
+            MainViewModel main = CreateMainViewModel(connection);
+            Window mainWindow = new()
+            {
+                DataContext = main
+            };
+            Window? previousMainWindow = Application.Current.MainWindow;
+            SessionTabViewModel session = new()
+            {
+                Title = "Reconnected elsewhere",
+                ConnectionType = "SSH",
+                Status = "Connected",
+                HostControl = new Border()
+            };
+            FloatingSessionWindow window = new(session, WpfTestHost.Localizer, new PaneCloseArbiter());
+            bool windowClosed = false;
+            window.Closed += (_, _) => windowClosed = true;
+
+            try
+            {
+                Application.Current.MainWindow = mainWindow;
+                window.Show();
+
+                // A reconnect or the host's own close button tore the session down.
+                session.MarkClosed();
+                FlushDispatcher();
+
+                Assert.True(windowClosed);
+                Assert.Equal(0, dialogProxy.ConfirmCallCount);
+                Assert.Empty(connection.ActiveSessions);
+            }
+            finally
+            {
+                Application.Current.MainWindow = previousMainWindow;
+                mainWindow.Close();
+            }
+        });
+    }
+
     private static MainViewModel CreateMainViewModel(ConnectionViewModel connection)
     {
         MainViewModel main = (MainViewModel)RuntimeHelpers.GetUninitializedObject(typeof(MainViewModel));

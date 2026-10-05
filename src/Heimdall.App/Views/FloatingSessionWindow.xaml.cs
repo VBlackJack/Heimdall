@@ -17,6 +17,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
+using Heimdall.App.Extensions;
 using Heimdall.App.Services;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels;
@@ -37,6 +38,18 @@ public partial class FloatingSessionWindow : Window
 
     /// <summary>Set once the guards have cleared this window, so the re-issued close goes through.</summary>
     private bool _closeGranted;
+
+    /// <summary>
+    /// The request the guards cleared, held until the session close reuses it so they are not
+    /// asked a second time about the same gesture.
+    /// </summary>
+    private CloseRequest? _clearedRequest;
+
+    /// <summary>Set when the session was closed elsewhere: there is nothing left to hand back.</summary>
+    private bool _sessionClosedElsewhere;
+
+    /// <summary>Set once the window has closed, so late notifications leave it alone.</summary>
+    private bool _windowClosed;
 
     /// <summary>
     /// Gets the hosted session tab view model.
@@ -147,6 +160,7 @@ public partial class FloatingSessionWindow : Window
     {
         CloseRequest request = CloseRequest.Interactive(DisconnectReason.TabClose);
         object?[] hosts = [_session.HostControl];
+        bool handedOn = false;
         try
         {
             CloseDecision decision = _closeArbiter.Poll(request, hosts);
@@ -170,6 +184,8 @@ public partial class FloatingSessionWindow : Window
             }
 
             _closeGranted = true;
+            _clearedRequest = request;
+            handedOn = true;
 
             // Never Close() on this stack. The confirmation returns an already-completed task, so
             // the await above can resume synchronously inside OnClosing, and closing a window from
@@ -179,7 +195,10 @@ public partial class FloatingSessionWindow : Window
         }
         finally
         {
-            _closeArbiter.Release(request);
+            if (!handedOn)
+            {
+                _closeArbiter.Release(request);
+            }
         }
     }
 
@@ -195,10 +214,22 @@ public partial class FloatingSessionWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _windowClosed = true;
         bool isShuttingDown = Application.Current is Heimdall.App.App { IsShuttingDown: true };
-        if (!_reattached)
+        if (_sessionClosedElsewhere)
+        {
+            SessionHost.Content = null;
+        }
+        else if (!_reattached)
         {
             ReleaseSessionOnClose(isShuttingDown);
+        }
+
+        // Still held only when the session close below never took it over.
+        if (_clearedRequest is { } unused)
+        {
+            _clearedRequest = null;
+            _closeArbiter.Release(unused);
         }
 
         _session.PropertyChanged -= OnSessionPropertyChanged;
@@ -239,7 +270,13 @@ public partial class FloatingSessionWindow : Window
         RestoreSession(vm);
         if (ShutdownDecisions.FloatingWindowShouldCloseSessionInteractively(isShuttingDown, _reattached))
         {
-            vm.Connection.CloseSessionCommand.Execute(_session);
+            CloseRequest? cleared = _clearedRequest;
+            _clearedRequest = null;
+            vm.Connection.CloseSessionAsync(
+                    _session,
+                    DisconnectReason.TabClose,
+                    clearedRequest: cleared)
+                .SafeFireAndForget();
         }
     }
 
@@ -255,6 +292,20 @@ public partial class FloatingSessionWindow : Window
 
     private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(SessionTabViewModel.IsClosed))
+        {
+            if (Dispatcher.CheckAccess())
+            {
+                CloseForClosedSession();
+            }
+            else
+            {
+                Dispatcher.BeginInvoke(new Action(CloseForClosedSession));
+            }
+
+            return;
+        }
+
         if (!string.IsNullOrEmpty(e.PropertyName)
             && e.PropertyName != nameof(SessionTabViewModel.Title))
         {
@@ -268,6 +319,22 @@ public partial class FloatingSessionWindow : Window
         }
 
         Dispatcher.BeginInvoke(new Action(ApplyWindowTitle));
+    }
+
+    /// <summary>
+    /// The session was closed from somewhere else (a reconnect, its host's close button): its
+    /// host is disposed, so the window goes too instead of framing a dead control.
+    /// </summary>
+    private void CloseForClosedSession()
+    {
+        if (_windowClosed || _reattached || !_session.IsClosed)
+        {
+            return;
+        }
+
+        _sessionClosedElsewhere = true;
+        _closeGranted = true;
+        Close();
     }
 
     private void ApplyWindowTitle()
