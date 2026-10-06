@@ -12,6 +12,276 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-06: split panes act on their own session, and settings survive a damaged file (v2026.100601)
+
+### Settings: a last good copy, and an import that shows what it runs
+
+- **A damaged settings.json or servers.json no longer stops Heimdall.** Every configuration
+  write now first keeps the document it replaces as `<name>.bak`, with the same restricted
+  permissions, and only when that document is readable, so a damaged file never overwrites the
+  good copy. A file that is empty, zeroed or truncated is loaded from that copy at startup, and a
+  "Configuration restored" message names the file and warns that changes saved after the copy
+  may be missing. The new file is also flushed to disk before it replaces the old one, so a power
+  cut can no longer leave an empty file. Before, the trusted host keys, the vault material and the
+  signing key were lost with the file.
+- **A settings import leads with what decides what runs on this computer.** Under a "Check these
+  first" heading, the confirmation lists in full the credential provider (switch, type, commands,
+  database and key file), the Plink, PuTTY, Psftp, X11, editor, Sysinternals, NirSoft and NanaRun
+  paths, every external tool by name and executable, flagged when it runs as administrator, and
+  the Git sync address. Before, the preview showed the first 20 changes in the order the file's
+  author chose, cut at 60 characters, so a credential command placed 21st read as "and 1 more".
+  "and N more" now counts only the other changes.
+- **An export takes any `user:token@` out of the Git sync address.** The access token field was
+  already held back, but a token typed into the address travelled in clear.
+- **A null or unknown value no longer stops startup.** A `null` list, list item or dictionary
+  value anywhere in settings.json is dropped on load and before each write, and an unknown name or
+  number for the SSH agent preference, the broadcast scope, the credential provider type or the
+  vault migration state falls back to its default with a warning in the log, as in a file written
+  by a newer build. A hand-edited SFTP upload delay is brought back within its range.
+- **The legacy migration no longer damages what it finds.** It kept a signing key that already
+  protected secrets instead of replacing it, so imported passwords verify and nothing saved after
+  it becomes unreadable after a restart. Empty legacy values never clear an existing PIN, and
+  gateways and projects are added to the existing ones instead of replacing them. A host key
+  trusted only in the old format is carried over instead of being asked for again.
+
+### Citrix: closing a session no longer closes the other applications
+
+- **Terminate and closing the tab leave a shared Citrix session running.** With session sharing,
+  a published application opens inside the Citrix process that already hosts the user's other
+  applications, and closing the tab killed that process, with every other application and its
+  unsaved work. Heimdall now records which processes were already there before the launch; for
+  those it only asks the session's own window to close, as its close button would. A process
+  started by the launch is ended as before, and a refused kill no longer interrupts the rest of
+  the clean-up.
+- **The session is logged as Connected when the session window appears.** It was logged when the
+  Workspace sign-in window was embedded, so an abandoned sign-in left a session that never
+  existed in the event log, and a real one was timed from the sign-in form.
+- **A failed embed gives the window back its frame.** When embedding failed, the external
+  fallback offered Bring to front for a window with no caption that could not be moved; its
+  original style is now put back first. The panel that held the sign-in window is released after
+  the swap instead of being kept until Heimdall closes.
+
+### Sessions: Close and Reconnect act on the pane that asked
+
+- **Each pane of a split tab is closed and reconnected on its own.** RDP, SSH and SFTP panes sent
+  Close and Reconnect to the tab they were created for, and SSH, Telnet, Local, WinRM and Serial
+  panes were never tied to a pane at all. After swapping panes, a dropped SSH session silently
+  closed the whole tab and reconnected the other server; after Unsplit or Detach secondary, Close
+  on the moved pane closed the original tab without asking, and Reconnect reconnected the wrong
+  server; a moved RDP pane stayed on "Disconnecting". Every pane now knows its place, including
+  in floating windows, and only that pane is closed or reconnected; a pane that is alone in its
+  tab handles the whole tab, as before. Unsplit and Detach secondary move the pane itself, so it
+  keeps its broadcast target, its SFTP follow setting and its failure details.
+- **VNC and Citrix panes do the same.** In a split, a failing VNC pane wrote its error onto the
+  other session's pane and the tab header, its Reconnect closed the tab and reconnected the
+  primary server, and VNC or Citrix Close closed the other session too, without asking. The VNC
+  status, the VNC Reconnect and the VNC and Citrix Close now act on their own pane only.
+- **The tab header follows the pane it shows.** Closing a primary pane inside a nested split left
+  the tab on the closed server's title, icon and status; the header is now refreshed after every
+  change to the split.
+- **A failed pane reconnect can be retried** for every protocol, as it already could for WinRM,
+  and every failure records a diagnostic. Edit profile on a failed secondary pane opens that
+  pane's profile, not the primary's.
+- **Closing the selected tab selects its neighbour,** the next tab, or the previous one when it
+  was last. Closing tab 3 of 10 used to jump to tab 10.
+- **Split panes count against the session limit.** Only opening a tab checked it, so splitting
+  every tab once hosted twice the configured maximum. A split at the limit is now refused with the
+  same message on the status bar, and panes in floating windows are counted too.
+- **A split tab stays in the strip when it is dragged out.** A floating window shows one pane, so
+  the others stayed connected but out of reach until Heimdall closed. The status bar now says "A
+  split tab cannot be moved to its own window. Unsplit it first."
+- **Floating windows follow their session.** A close guard asks once instead of twice; a session
+  closed elsewhere, by a reconnect or its own Close button, closes its window instead of leaving
+  an empty frame; splitting a floating session brings it back to the main window first, so the
+  new pane is visible.
+- **The divider of a split remembers where it was dragged.** The ratio was recorded only when the
+  split was made, so a dragged layout always came back at 50/50. It is now kept per pair of
+  servers, and reused, mirrored when needed, by a new split or a merge of the same pair.
+- **A disconnected SFTP pane with unsaved edits asks before it closes.** Its Close button inside a
+  split did nothing.
+- **Closed tabs stay closed.** An SSH session that finished its handshake after its tab had been
+  closed or cancelled is now closed instead of opening a tab nobody waits for, and reconnects held
+  back by a locked vault are dropped on unlock if their tab is gone. A session whose display
+  failed to attach closes its tab instead of leaving it on Connecting.
+- **One report instead of one dialog per failure.** An automatic reconnect stays silent until its
+  last attempt, which marks the tab as failed; a snapshot restore marks the failed tabs and keeps
+  its one summary. A connection you asked for still shows its dialog. Connect all carries on when
+  one attempt is cancelled and counts that server as skipped, "cancelled".
+- **A profile's post-connect steps run.** Their progress and their confirmation were updated from
+  a background thread, which failed, so the steps silently never ran.
+
+### Tunnels: shared once, closed when their connection goes, and failures named
+
+- **Sessions that share a gateway and a target, started together, share one tunnel.** A double
+  click, a group launch or a reconnect used to open one tunnel each, with two connections to the
+  bastion, two local ports and two sign-in or host-key prompts. The second session now waits for
+  the first and reuses its tunnel, or opens its own if the first failed. Embedded and external
+  sessions to the same target share it too.
+- **Closing a tunnel that sessions still use asks first.** Close and Close all in the Tunnels pane
+  say how many open sessions run through it and that closing disconnects them.
+- **A tunnel whose gateway connection has gone is closed.** A bastion reboot or a network cut left
+  the tunnel registered and shown as healthy, holding its port, and the next connection dialled a
+  duplicate. Tunnels are now checked every 15 seconds and as soon as a hop reports an error; a
+  chained tunnel counts as alive only while every hop is connected. The status bar says "Tunnel on
+  port N closed: its connection to the gateway was lost."
+- **A tab that gives up a shared tunnel no longer breaks the other tab.** A failed connect on a
+  reused tunnel gave its reference back twice, which could close the tunnel under the tab still
+  using it, and a late release could take a reference from a newer tunnel on the same port. Each
+  reference is now given back once, and only to the tunnel it came from.
+- **A Plink tunnel that exits at once says why, in seconds.** A refused sign-in, an unreachable
+  gateway or a changed host key used to wait out the whole port check, about 28 seconds, and was
+  reported as Plink not opening the port. The message now gives Plink's own last line, "Plink
+  exited (code N) before opening the tunnel: ...", and the failure is named from what Plink wrote.
+- **Plink no longer outlives Heimdall.** On Windows, tunnel Plink processes end with Heimdall,
+  however it ends, instead of leaving an authenticated forward with no owner.
+- **Cancelling a tunnel is a cancellation,** not a failed connection, in the log and on screen.
+- **The Tunnels pane is up to date and names the right route.** It was updated from background
+  threads, so tab badges could stay stale and a closed tunnel could come back in the list. The
+  route shown is the one dialled, even when two gateways share a host, and an error while closing
+  a tunnel reaches the status bar.
+- **Fewer leaks and better hops.** A loopback address is given back when a Plink start fails or a
+  chain is empty. Every hop of a chain keeps its own sign-in timeout, keep-alive and host key, and
+  a wrong passphrase on any hop is named as one. WinRM over SSL through a gateway is refused before
+  the tunnel is dialled, not after its sign-in prompts.
+- **The New tunnel dialog checks what is typed.** A port that is not a number blocks Confirm
+  instead of keeping the last good one, and the remote host must be a host name or an address
+  without a port. Validation errors are read by screen readers.
+
+### SSH gateways: no more loops, removable secrets, and safer imports
+
+- **The parent picker only offers parents that work, and offers none.** It used to leave out only
+  the gateway being edited, so a loop or a chain too deep to resolve could be saved and was only
+  found when a session failed. Descendants, broken routes and parents that would make the chain
+  too long are now left out, the current parent is always kept, and "None (direct connection)" is
+  the first entry, so a loop already saved can be broken. When two windows edit gateways at once
+  and a save would still make a loop, that parent change is refused with a "Gateway parent not
+  changed" message and the rest of the edit is saved.
+- **A stored gateway password or passphrase can be removed.** An empty box means "keep what is
+  stored", so a gateway switched to a key or an agent kept sending its old password. The dialog
+  now has a Clear button for each, as the server dialog does. Enter no longer saves the previous
+  Port or Key path, an unreadable port blocks Save, and the window has a title.
+- **A password saved on another machine or Windows account is named as such.** Heimdall treated
+  it as no password and talked about the SSH agent; it now says which gateway on the route holds a
+  password or passphrase that cannot be read, and to enter it again.
+- **An imported gateway can no longer replace a host key you trusted.** A shared profile could
+  declare its own fingerprint for a host this machine already trusts, and it replaced the trusted
+  key at startup. Imported fingerprints are dropped, and a stored key is never overwritten.
+- **Saving Settings no longer undoes a gateway edit made from the server dialog.** Only the
+  gateways the panel itself changed replace the saved ones, and the panel picks up the others as
+  they were saved.
+- **Editing an old gateway or session keeps its key usable.** For a profile saved before the
+  passphrase field existed, the password is used as the key passphrase. Any edit, even a rename,
+  turned that off and the encrypted key no longer loaded; it is now kept unless you type a
+  passphrase.
+- **Edit gateway from the session dialog** reports a gateway deleted in the meantime instead of
+  dropping the edit, shows errors in a translated message, and lists the new name after a rename.
+- **Three broken configurations no longer break everything.** A `null` gateway list stopped
+  startup. A gateway without an id was saved again on every save until every route failed. A
+  self-parented gateway in an imported profile left its servers pointing at nothing; the import
+  now breaks the loop and reports the lost link.
+- **Gateway timeouts and DNS failures are named.** A connect or banner timeout, a proxy error, a
+  missing or wrong key passphrase, a reset and an unknown host all read "Unknown" through a
+  gateway. They now get their own message, and timeouts and DNS failures reconnect automatically
+  like the other network failures.
+- **Smaller fixes.** The gateway overview's Clear button is now "Set direct", which is what it
+  does. An SSH user name starting with "-" is refused, since Plink would read it as an option.
+  Gateway fields written by a newer build are kept through an edit.
+
+### Session logs: opt-in retention, and a terminal that never waits on the disk
+
+- **Session transcripts can be deleted after a number of days.** Settings > Advanced >
+  Diagnostics has a new "Delete transcripts older than" setting under the transcript folder. 0,
+  the default, keeps everything; otherwise it takes 7 to 3,650 days. Expired transcripts and
+  their continuations are deleted at startup and after each save, and only once the newest part
+  has expired. A file counts as a transcript only when it starts with Heimdall's own header, so
+  other tools' logs in the same folder, the event log and the file-operations log are never
+  touched, and a transcript still being written is skipped.
+- **A log folder that stops answering no longer freezes the terminal.** The terminal waited for
+  every write, so a dropped network share made it stutter or freeze, and unwritten output piled up
+  without limit. Output is now buffered up to a cap, a marker in the transcript says how many
+  characters were not recorded, and the file is reopened once it can be written again.
+- **Logs stay within their size cap after a restart.** The event log started again at its first
+  file on every launch, rolled over to the same continuation and kept growing it past the cap.
+- **Smaller fixes.** A log file whose permissions could not be restricted is removed and created
+  again, not written with inherited permissions. Transcript file names no longer contain the user
+  name, and a user name with an `@` is removed whole from the logs. A VNC password is never written
+  to the log. The event and file-operation logs are written without a byte order mark, which
+  line-by-line JSON readers refused.
+
+### VNC: a server that wants other credentials says so
+
+- **A VNC server that asks for credentials Heimdall does not have ends the attempt with a reason.**
+  The pane hung on Connecting or stacked attempts. It now says either "This VNC server asks for a
+  username and a password. Heimdall does not store a VNC username, so it cannot sign in to this
+  server." or that the profile has no password, and offers Reconnect.
+- **The VNC page's errors are in the interface language**, and a clean disconnect, yours or the
+  server's, now marks the session Disconnected; before, only the pane text changed.
+- **An open VNC session keeps the machine awake,** as the sleep prevention setting promises for
+  embedded sessions.
+
+### SSH and RDP: terminals survive a helper crash, and keep-alives stop with the session
+
+- **A GPU driver reset no longer blanks every terminal.** Every crash of a WebView2 helper process
+  was treated as fatal, so a display change replaced every open terminal with "renderer crashed"
+  while the SSH connections stayed up. WebView2 restarts those helpers itself, so only a browser
+  or page process that exits or stops responding does that now. When the page is really gone,
+  the transcript and the macros keep receiving output.
+- **A dead SSH session stops keeping the machine awake.** A tab left open on a disconnected
+  session kept sleep prevention and its keep-alives going until it was closed.
+- **RDP anti-idle survives an automatic reconnect.** A tick during the reconnect stopped it for the
+  rest of the session, and the server's idle policy then locked or disconnected it.
+
+### SFTP: the status stays on its pane
+
+- **An SFTP pane next to a terminal writes its own status.** Disconnecting it turned the SSH header
+  to "Disconnected" while the terminal still worked, and browsing after the SSH session dropped
+  turned it back to "Connected".
+- **A disconnect reason stays on screen.** The health check kept running after a disconnect and
+  replaced its reason, a host-key mismatch included, with "Connection lost".
+
+### Health dots: no red dot for a server behind a gateway, and every reason named
+
+- **Servers behind an RD Gateway or an inherited SSH gateway are not probed.** They were dialled
+  directly, read Down from outside the network, and sent a DNS query and a connection attempt to
+  an internal name at each interval. An RD Gateway now shows "Behind RD Gateway - not probed".
+- **Every failure in the tooltip is in words.** DNS, unreachable and refused failures are named,
+  anything else reads "Connection failed", and a port above 65535 reads as no probe port. Raw
+  codes such as "(tryagain)" no longer reach the tooltip.
+- **Saving settings no longer delays the next probe.** Every save restarted the monitor, so someone
+  who saved often never saw a dot refresh. Only turning it on or off or changing its interval does
+  now. Turning the monitor off clears the dots instead of leaving the last ones, Probing included.
+
+### Settings: saved values now apply, and Reset keeps what it should
+
+- **Settings that were saved but never used now apply.** Logging turned off stays off after a
+  restart. A new RDP server starts in the default RDP mode instead of always Embedded. Sleep
+  prevention turned back on with sessions open keeps the machine awake again, and its interval
+  applies without a restart. The update check interval also covers a Heimdall left open. A hint
+  says a new session log folder is used after a restart.
+- **Reset defaults keeps the external tools, the credential provider unlock secret, the skipped
+  update, the declined migration and the sidebar choice,** and Save after a reset with TFTP off
+  stops the running share. After Reset or Import, toggling an unrelated box no longer hides the
+  pending changes, and an edited gateway keeps the panel unsaved.
+- **An import with a `null` value or a fractional version is refused** before it asks to confirm,
+  instead of failing after.
+- **The path and command fields enable Save as you type,** for Plink, PuTTY, X11, the credential
+  provider, the session log folder and the external editor.
+- **Go to gateway settings opens the Gateways sub-tab,** and saving no longer re-reads the server
+  inventory to place the Tunnels panel.
+
+### Command library: Sync on startup runs, and says when it fails
+
+- **"Sync on startup" syncs.** It was saved and never read. It now runs one sync after the vault
+  is unlocked, and a failure shows on the status bar: "Command library: the sync at startup
+  failed. Sync from the library to see why." "Auto-push after changes" is renamed "Push local
+  changes when syncing", which is what it does.
+
+### Telnet: window size negotiation follows the standard
+
+- **A 255-column window no longer garbles the session.** The size is now escaped, a server that
+  refuses window sizes stops receiving them, repeated requests are answered once, and an
+  unterminated negotiation can no longer grow without limit.
+
 ## 2026-10-03: Edit profile works on a quick connection (v2026.100302)
 
 ### Quick connect: Edit profile opens the session dialog
