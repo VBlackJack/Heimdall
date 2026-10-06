@@ -59,11 +59,21 @@ Enregistrer. Refuser n'écrit rien et laisse vos modifications en attente.
 erreur passe en rouge et son infobulle donne la raison, le bandeau dit combien de réglages
 demandent votre attention, et le focus va au premier d'entre eux en ouvrant son onglet.
 
+**Si un fichier de configuration est endommagé.** Chaque enregistrement garde le fichier qu'il
+remplace comme dernière copie valide, `settings.json.bak` et `servers.json.bak`, à côté de
+lui. Si `settings.json` ou `servers.json` n'est plus lisible au démarrage (vide, rempli de
+zéros ou tronqué, après une coupure de courant par exemple), Heimdall charge cette copie à la
+place, vous dit quel fichier a été restauré et prévient que des changements enregistrés après
+cette copie peuvent manquer. L'enregistrement suivant remplace le fichier endommagé. Sans copie
+utilisable, le démarrage échoue comme avant.
+
 **Valeurs par défaut** ramène chaque onglet à sa valeur d'usine, sous forme de modifications en
 attente : rien n'est écrit avant l'enregistrement. Il garde votre langue, votre thème et votre
-accent, vos sessions et vos passerelles SSH, ainsi que votre mot de passe maître, votre PIN et
-votre enrôlement Windows Hello. Il désactive en revanche le fournisseur d'identifiants externe,
-les exigences Credential Guard et Windows Hello et le partage TFTP, et réinitialise le délai de
+accent, vos sessions et vos passerelles SSH, vos outils externes et le secret de déverrouillage
+du fournisseur d'identifiants, la version de mise à jour ignorée, ainsi que votre mot de passe
+maître, votre PIN et votre enrôlement Windows Hello. Il désactive en revanche le fournisseur
+d'identifiants externe, les exigences Credential Guard et Windows Hello et le partage TFTP, et
+réinitialise le délai de
 grâce Windows Hello, le délai de verrouillage automatique et la déconnexion au verrouillage ; la
 confirmation les énumère. **Réinitialiser les valeurs RDP** ne touche que l'onglet RDP : le
 délai de surveillance de connexion RDP, dans Avancé > Diagnostics, garde sa valeur.
@@ -112,6 +122,15 @@ sa section, sa valeur actuelle et sa nouvelle valeur (par exemple "Terminal > Ap
 terminal > Taille de police : 14 -> 18"), et demande. Si vous acceptez, ils sont chargés comme modifications en
 attente et vérifiés comme des valeurs saisies : rien n'est écrit avant d'appuyer sur Enregistrer,
 et Annuler les modifications rétablit tout. Un secret ajouté à la main dans le fichier est ignoré.
+
+Les réglages qui décident de ce que Heimdall exécute sur cet ordinateur viennent en premier,
+sous **Vérifiez d'abord ceux-ci**, chacun affiché en entier : le fournisseur d'identifiants et
+ses commandes, sa base et son fichier clé ; les chemins de Plink, PuTTY, Psftp, X11, de l'éditeur,
+de Sysinternals, NirSoft et NanaRun ; chaque outil externe avec son nom et son exécutable, marqué
+quand il s'exécute en administrateur ; et l'adresse de synchronisation Git. Lisez-les avant
+d'accepter un fichier que quelqu'un d'autre vous a donné. Les autres changements suivent, et "et N
+autres" ne compte qu'eux. Un export retire de l'adresse de synchronisation Git tout nom
+d'utilisateur et jeton écrits dedans.
 
 ## Verrouiller Heimdall lui-même
 
@@ -305,6 +324,10 @@ coupe pas une connexion inactive.
 
 **Activer les sondes de joignabilité en arrière-plan** - Heimdall ouvre périodiquement une
 connexion TCP vers chaque serveur configuré pour colorer la pastille dans l'arbre des sessions.
+Les serveurs atteints par une passerelle SSH (définie sur la session ou héritée des réglages par
+défaut de son dossier) ou par une passerelle RD ne sont pas sondés, puisque depuis votre poste ils
+paraîtraient toujours hors ligne ; l'infobulle de leur anneau indique "Derrière une gateway SSH -
+non sondé" ou "Derrière une gateway RD - non sondé".
 C'est pourquoi les journaux d'un serveur montrent une connexion courte par intervalle depuis
 votre poste, même sans session ouverte. Ce n'est pas une tentative de connexion et cela ne
 s'authentifie pas.
@@ -336,6 +359,16 @@ Paramètres restent en attente.
 contenu des sessions terminal dans **Répertoire des journaux de session**. La seconde enregistre
 ce que vous tapez et ce qui revient, mots de passe ou jetons renvoyés par le terminal compris :
 réfléchissez à l'emplacement de ce répertoire ; Heimdall demande confirmation avant de l'activer.
+Un nouveau **Répertoire des journaux de session** est utilisé après le redémarrage de Heimdall.
+
+**Supprimer les transcripts de plus de** (0, la valeur par défaut, garde tout ; sinon de 7 à
+3650 jours) supprime les transcriptions expirées au démarrage et à chaque enregistrement des
+paramètres. Seules les transcriptions de Heimdall sont supprimées, reconnues à l'en-tête que
+Heimdall écrit au début de chacune, si bien que les journaux d'un autre outil rangés dans le même
+dossier restent intacts. Une longue transcription découpée en fichiers de suite est supprimée en
+entier, et seulement une fois le plus récent de ses fichiers expiré. Une transcription en cours
+d'écriture, le journal des événements de connexion et le journal des opérations sur fichiers ne
+sont jamais supprimés.
 
 **Réglages qui n'existent plus** - `EnableEventLog`, `EnableSessionPersistence` et
 `EmbeddedIdleTimeoutMs` figuraient dans les réglages mais rien ne les lisait : les changer dans

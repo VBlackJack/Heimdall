@@ -75,6 +75,9 @@ Index of all issues encountered during development and their solutions.
 58. [FTP/SFTP - Uploading a New File Is Refused](#upload-new-file-refused)
 59. [Settings - Save Is Greyed Out, or Refuses to Save](#settings-save-greyed-or-refused)
 60. [Settings - An Imported Settings File Is Refused or Changes Nothing](#settings-import-refused)
+61. [Settings - "Configuration restored" at Startup](#settings-restored-from-backup)
+62. [Tunnel - "Plink exited before opening the tunnel"](#tunnel-plink-exited-early)
+63. [VNC - The Server Asks for a Username or a Password](#vnc-credentials-required)
 
 ---
 
@@ -640,7 +643,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 **Solution**:
 1. If the terminal appears blank after re-docking, the session is still alive - try clicking in the terminal area
 2. For RDP sessions, detach is one-way (ActiveX controls cannot be safely re-parented)
-3. Split sessions cannot be detached (by design)
+3. Split sessions cannot be detached (by design). A split tab dragged out of the strip stays there, and the status bar says to unsplit it first
 
 **Files**: `Views/FloatingSessionWindow.xaml.cs`, `MainWindow.xaml.cs`
 
@@ -1095,7 +1098,54 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 **Solution**:
 
 1. Export again from the source computer with Export settings..., and import that file.
-2. After the import, check the listed changes, then press Save settings.
+2. After the import, check the listed changes, starting with those under "Check these first", which decide what Heimdall runs on this computer, then press Save settings.
 3. Secrets never travel in the file (master password, PIN, Git access token, credential provider unlock secret, SSH gateways): set them again on the new computer. Paths inside the user profile travel only when you agreed to include them at export.
 
 **Files**: `ViewModels/Settings/SettingsTransfer.cs`, `ViewModels/SettingsViewModel.cs`
+
+---
+
+## 61. Settings - "Configuration restored" at Startup {#settings-restored-from-backup}
+
+**Symptom**: At startup Heimdall shows "Configuration restored": `settings.json` or `servers.json` could not be read and was loaded from its last good copy, and changes saved after that copy was made may be missing.
+
+**Root cause**: The named file is no longer readable JSON: empty, zeroed or cut short, typically after a power cut or a crash during a write. Every save of these files first keeps the document it replaces as `<name>.bak` beside it (only when that document is readable, so a damaged file never overwrites the good copy), and the load falls back to it. Before this, a damaged `settings.json` stopped startup and took the trusted host keys, the vault material and the HMAC key with it.
+
+**Solution**:
+
+1. Check the most recent changes: a session, gateway or setting saved just before the damage may be missing; add it again.
+2. Nothing else is needed: the next save replaces the damaged file.
+3. If startup fails with no such message, no usable `.bak` exists either; restore the file from a backup of your own.
+
+**Files**: `Heimdall.Core/Configuration/ConfigManager.cs`, `Heimdall.Core/Security/SecureFileWriter.cs`, `App.xaml.cs`
+
+---
+
+## 62. Tunnel - "Plink exited before opening the tunnel" {#tunnel-plink-exited-early}
+
+**Symptom**: A session that runs through a Plink tunnel fails at once with "Plink exited (code N) before opening the tunnel:" followed by a line from plink.
+
+**Root cause**: plink stopped before it opened the forwarded port: the gateway refused the sign-in or the key, the key file or its passphrase was wrong, the gateway's host key did not match, or the gateway refused, reset or did not answer the connection. Heimdall now stops waiting as soon as plink has exited and quotes plink's own last line. Before, it waited out the whole port check (about 28 seconds) and then reported that plink did not open the forwarded port itself.
+
+**Solution**:
+
+1. Read the quoted line: it is plink's own description of the failure.
+2. For a sign-in or key failure, check the gateway's account, key and passphrase; for a host key mismatch, do not accept the new key before checking why it changed (see the host key warning in the User Guide); for a refused or unanswered connection, check the gateway address, port and firewall.
+3. When plink names no cause, or another process holds the port, the port check's own message is shown as before.
+
+**Files**: `Heimdall.Ssh/Plink/PlinkTunnelRunner.cs`, `Heimdall.Ssh/Plink/PlinkStderrClassifier.cs`, `Heimdall.Ssh/Plink/PlinkProcessJob.cs`
+
+---
+
+## 63. VNC - The Server Asks for a Username or a Password {#vnc-credentials-required}
+
+**Symptom**: A VNC tab ends the connection with "This VNC server asks for a username and a password" or "This VNC server asks for a password, and the profile has none", and offers to reconnect. Before, the tab stayed on Connecting.
+
+**Root cause**: The server asked for credentials the session cannot give. Some servers want a username as well as a password: macOS Screen Sharing (Apple Remote Desktop authentication), VeNCrypt Plain, TightVNC's Unix login, UltraVNC's MS-Logon. Heimdall stores only a VNC password, never a VNC username. Other servers simply want a password the profile does not hold.
+
+**Solution**:
+
+1. For the password message, add the VNC password to the session (VNC Authentication in the session dialog) and reconnect.
+2. For the username message, switch the server to plain VNC password authentication if you control it (on macOS, the Screen Sharing option that lets VNC viewers control the screen with a password), or use another client for that server.
+
+**Files**: `Services/VncCredentialsPolicy.cs`, `Views/EmbeddedVncView.xaml.cs`, `Assets/vnc.html`

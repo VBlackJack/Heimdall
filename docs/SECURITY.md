@@ -147,6 +147,14 @@ a jump box, the other users' processes share the loopback interface. On such a
 host, prefer a plain forward to the one destination over a SOCKS proxy, and
 close tunnels when the session that needed them ends.
 
+A tunnel does not outlive what it serves. One whose connection to the gateway
+is lost, on any hop, is closed and its port released (`TunnelManager` checks
+every 15 seconds and on any SSH client error). A Plink tunnel process is placed
+in a Windows job object marked kill-on-close (`PlinkProcessJob`), so it ends
+with Heimdall's process however that ends, and a crash no longer leaves an
+authenticated forward on loopback with no owner. When the job cannot be set up,
+plink runs as before and the reason is logged.
+
 ### SSH host-key trust model
 
 Host-key trust decisions are resolved **before** the real `Connect()` via a

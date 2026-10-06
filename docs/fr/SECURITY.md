@@ -161,6 +161,16 @@ l'interface de bouclage. Sur un tel hôte, préférez une redirection simple ver
 la seule destination utile à un proxy SOCKS, et fermez les tunnels quand la
 session qui en avait besoin se termine.
 
+Un tunnel ne survit pas à ce qu'il sert. Un tunnel dont la connexion à la
+passerelle est perdue, sur n'importe quel saut, est fermé et son port libéré
+(`TunnelManager` vérifie toutes les 15 secondes et à chaque erreur d'un client
+SSH). Un processus de tunnel Plink est placé dans un objet job Windows marqué
+kill-on-close (`PlinkProcessJob`) : il se termine avec le processus de
+Heimdall, quelle que soit la façon dont celui-ci se termine, et un plantage ne
+laisse plus de redirection authentifiée sans propriétaire sur l'adresse de
+bouclage. Quand le job ne peut pas être mis en place, plink s'exécute comme
+avant et la raison est journalisée.
+
 ### Modèle de confiance des clés d'hôte SSH
 
 Les décisions de confiance sur les clés d'hôte sont résolues **avant** le

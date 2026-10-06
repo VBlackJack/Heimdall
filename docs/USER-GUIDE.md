@@ -103,7 +103,7 @@ directly such as `admin@192.168.1.10`. It is the fastest way to reach something 
 - Search results include the folder path and host address. Hover over that line to read the full values. If nothing matches, use **Clear search**.
 - A selection that a search or a closed folder hides is given back once its rows are visible again, unless you selected something else in the meantime.
 - Right-click a session, or several, and choose **Add to favorites** to mark them. A favorite shows a small star, and the filter menu can keep favorites only.
-- The dot before a session shows its state. A filled dot is the connection: open, opening or failed. A ring of the same colours is the background check of whether the host answers. Hover a row for its full name, protocol and state.
+- The dot before a session shows its state. A filled dot is the connection: open, opening or failed. A ring of the same colours is the background check of whether the host answers. Hover a row for its full name, protocol and state. A session reached through an SSH gateway or an RD Gateway is not checked, and its hover text says so.
 - Select several sessions to show the selection count with **Connect selected**, **Move** and **More actions** below the tree. These use the same checks as the context menu.
 - **Move to folder** follows the folder tree: a folder with sub-folders opens a submenu, and its first entry, **Into** followed by the folder's name, moves into that folder itself.
 - While dragging, a hint names the destination and the number of sessions, or the folder being moved. Hold over a closed folder to expand it; approach the top or bottom of the tree to scroll. To take a session or a folder out of its folder, drop it on **Drop here to take it out of its folder**, which appears below the tree while you drag.
@@ -187,6 +187,7 @@ Heimdall shows the reason in plain language wherever it can. The common ones:
 | A WinRM session ends as soon as it opens | The sign-in failed. When Heimdall recognizes the cause (credentials rejected, access denied, Kerberos, TrustedHosts, a host unreachable behind a gateway), the status line at the top of the tab says so in red, and the PowerShell error above the end marker gives the detail. Heimdall ends PowerShell rather than leave you at a prompt on your own machine in that tab. If the message says the execution policy refused the sign-in script, use the current Windows identity for that host, or ask your administrator. |
 | A message about WebView2 | The machine has no Microsoft Edge. See [Installing](#installing). |
 | "SSH gateway not found" | The session points at a gateway that no longer exists. Edit the session and choose one, or recreate it in Settings. |
+| A VNC server asks for a username, or for a password | The server wants a username (macOS Screen Sharing, for example), which Heimdall does not store, or a password the session does not have. For a password, add it to the session and reconnect. |
 
 An RDP session that disconnects on its own will try to reconnect by itself, and shows you what it
 is doing. You can cancel that from the toolbar. **Escape** closes a disconnect message without
