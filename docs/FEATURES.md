@@ -49,10 +49,12 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - User-confirmed TOFU host key verification with persistent fingerprint pinning; trust decisions resolved *before* `Connect()` via a dedicated pre-authentication probe - SSH.NET's `HostKeyReceived` callback never performs async work or UI dispatch
 - Fail-closed host-key enforcement for SSH.NET and Plink fallback paths, including `HostKeyUnavailable` when a pinned gateway key cannot be resolved without falling back to PuTTY/Plink's cache
 - Gateway-aware tunnel reuse includes endpoints, accounts, stored credentials and agent preference. Connection-affecting edits open a fresh tunnel; display-name changes preserve sharing.
-- Multi-gateway tunnel chaining with circular dependency detection
+- Multi-gateway tunnel chaining with circular dependency detection. The parent gateway pickers offer only parents that keep every chain resolvable, with **None (direct connection)** first; a save whose new parent another open window has meanwhile turned into a loop keeps the stored parent and names the gateway in a warning
+- The gateway dialog clears a stored password or key passphrase with its own **Clear** button, as the server dialog does; an empty box still keeps what is stored
 - **Test gateway route** from the gateway add/edit dialog: preview every ancestor, test SSH authentication at each hop, optionally confirm a destination TCP port, and copy an anonymized report with durations and next actions. Each step gets the per-hop connect timeout a real tunnel gives (15 s), and a destination the gateway's SOCKS reply refuses, or a reply it cannot read, is a failure. Tests use existing trusted host keys, can be cancelled, and do not save the form or disturb existing tunnels
 - Dynamic tunnel port allocation with bounded retry on bind-race (`AddressAlreadyInUse`)
 - Tunnel ref-counting (shared tunnels survive individual session close, and a failed reconnect of one split pane)
+- A Plink tunnel whose plink exits before opening its port (refused sign-in, unreachable gateway, changed host key) fails at once with plink's own last line instead of waiting out the port check; a tunnel plink ends with Heimdall, even after a crash
 - Terminal resize via SSH window-change request (public `ShellStream.ChangeWindowSize` API, no reflection)
 - X11 forwarding with automatic X server detection and auto-start; when no X server is available the session says so in its status text and launches without forwarding. The managed VcXsrv keeps host access control on
 - Clipboard pastes into the terminal go through xterm's own paste path (bracketed paste when the shell enabled it, CR+LF folded), and Shift+Insert reaches the same paste guard as Ctrl+V
@@ -64,11 +66,14 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Structured failure codes, one per cause, each with a localized error message
 - Typed mid-session security events distinguish host-key attacks from ordinary disconnects and suppress SSH auto-reconnect on MITM signals
 - Auto-reconnect overlay on unexpected disconnect (SSH and RDP)
+- A crash or restart of a WebView2 GPU or utility helper process (a graphics driver reset, a display change) leaves open terminals running; only the loss of the browser or renderer process falls back, and the transcript and macro expect steps keep running on the connection behind it
 
 ### VNC
 - Embedded VNC viewer via noVNC + WebView2
 - WebSocket-to-TCP proxy for seamless integration
 - Clipboard sync, scaling modes, view-only mode
+- A server that asks for a username (macOS Screen Sharing, VeNCrypt Plain and similar) or for a password the profile does not hold ends the attempt with a message saying which, instead of staying on Connecting; Heimdall stores no VNC username
+- An open VNC session keeps the machine awake, like the other embedded sessions
 - WebView2 portable deployment (bundled Fixed Version Runtime for isolated servers)
 
 ### Telnet
@@ -111,6 +116,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - StoreBrowse integration for published applications and desktops
 - SSO (Kerberos) authentication support
 - Embedded session tabs with the same UX as RDP
+- Closing a session, or Terminate, never ends a Citrix Workspace process that other published applications share: only the session's own window is asked to close
 
 ### WinRM (PowerShell Remoting)
 - Remote PowerShell sessions over native WinRM / PS-Remoting - direct connections need no SSH
@@ -170,7 +176,7 @@ generator that produces the final command for you.
 - Nothing is recorded while the vault is locked, and rows are pruned after 90 days
 
 **Sharing**
-- Import and export as JSON, and Git synchronization for a shared team library
+- Import and export as JSON, and Git synchronization for a shared team library; **Sync on startup** runs once after the vault is unlocked, and a failure is reported on the status bar
 - Actions that arrive from an import have their risk level and platform clamped to known values, so an unrecognized level is treated as dangerous rather than harmless
 
 ### Quick Connect (Ctrl+K)
@@ -187,6 +193,8 @@ generator that produces the final command for you.
 - Real-time status, local port, remote target, and gateway chain display
 - Tunnel chain visualization in session tab headers (via GatewayA -> GatewayB)
 - Dynamic port allocation with ref-counting for shared tunnels
+- **Close Selected** and **Close All** ask first when open sessions still run through the tunnel, and say how many
+- A tunnel whose connection to its gateway is lost (any hop of a chain, or a Plink process that ended) is closed, its port released, and the status bar says so
 
 ### Server Health Monitoring
 - Collapsible sidebar panel showing CPU, RAM, and Disk usage
@@ -238,7 +246,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 
 ### Session Management
 - Tabbed sessions with drag-to-reorder
-- Tab detach to floating window (Chrome-style drag-out or context menu)
+- Tab detach to floating window (Chrome-style drag-out or context menu); a split tab stays in the strip, and the status bar says to unsplit it first
+- Closing the selected tab selects the tab that takes its place, or the one before it when it was the last
+- **Max embedded sessions** counts every embedded pane, split panes and floating windows included; a split that would exceed it is refused with the same message as a new tab
 - **Recursive N-pane split**: up to 8 panes per tab in any layout (2x2, L-shape, 3 side-by-side, etc.)
 - Split any pane further: right-click → "Split..." → Horizontal | Vertical, or Command Palette
 - **Merge existing tab**: right-click → "Merge with..." → session or tool → Horizontal | Vertical (reparents live connection without reconnecting)
@@ -271,8 +281,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Gateway facet and optional badge**: the filter menu keeps only the sessions routed through an SSH gateway (a missing one included) and can hide the "via gateway" badge for inventories that route everything through one gateway; the row's hover text names the gateway instead, and a missing gateway keeps its badge
 - **Tree keyboard and start-up**: Ctrl+A selects every session inside the open folders, Enter opens or closes a focused folder, screen readers hear the selection size once more than one session is selected, and the tree opens on the session selected at the last close
 - **Favorites and states on the row**: the context menu marks or unmarks favorites for one session or a selection, and a favorite row shows a star; a session's connection state is a filled dot and the background reachability result a ring, and both survive a tree reload. Move menus nest like the folder tree, with an "Into" entry for the folder itself
+- Background reachability checks skip servers reached through an SSH gateway (their own or one inherited from folder defaults) or an RD Gateway, which would read as down from outside; the ring's tooltip names the reason for every result
 - Global session logging (opt-in): per-session text transcripts for SSH / Telnet / Local Shell and a connect/disconnect event log (reason + duration) for RDP / VNC / Citrix, restrictive ACLs and size rollover; turning transcripts on asks for a confirmation at Save; **per-profile tri-state override** (force on / off / inherit) in the server dialog
-- Optional transcript retention (off by default): transcripts last written more than N days ago (7 to 3,650) are deleted at startup and whenever the settings are saved; transcripts still being written and the event and file-operation logs are never touched
+- Optional transcript retention (off by default): transcripts last written more than N days ago (7 to 3,650) are deleted at startup and whenever the settings are saved. Only files that begin with Heimdall's transcript header are deleted, so other tools' logs in the same folder are kept; a transcript and its continuation files go together, once the newest of them has expired. Transcripts still being written and the event and file-operation logs are never touched
 - Connection history log (JSONL with auto-rotation)
 - Screenshot capture to clipboard (Ctrl+Shift+S)
 
@@ -320,6 +331,8 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Citrix launch tokens are decrypted only at the launch boundary and are never written to any log or exception; a locked vault fails closed rather than launching
 - Path traversal prevention on local file browser rename/new folder operations
 - ConfigManager concurrency-safe writes via SemaphoreSlim
+- Each write of `settings.json` and `servers.json` is flushed to disk before it replaces the file, and keeps the document it replaces as a last good copy (`settings.json.bak`, `servers.json.bak`, same restricted ACL). A file that is no longer readable JSON is loaded from that copy at startup, and Heimdall says which file was restored and that later changes may be missing
+- Settings import lists first, in full, the settings that decide what runs on this computer: the credential provider and its commands, the tool paths, the external tools (with their executable and whether they run as administrator) and the Git sync address. An export takes any `user:token@` out of the Git sync address
 - WebView2 Content Security Policy (CSP) and navigation blocking
 - Embedded WebView documents (Milkdown notes editor, VNC view) enforce an exact scheme/host/port/path origin for accepted `postMessage` traffic and navigation - a substring-style trust match is not used, so a foreign document cannot post into or navigate the host
 - Pageant IPC hardened with self-only DACL on the shared file mapping, cryptographic random suffix in the mapping name (64 bits of entropy), trusted Pageant process whitelist before any agent traffic, and empty-agent preflight check

@@ -49,10 +49,12 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Vérification TOFU de la clé d'hôte confirmée par l'utilisateur avec épinglage persistant de l'empreinte ; les décisions de confiance sont tranchées *avant* `Connect()` via une sonde de pré-authentification dédiée - le callback `HostKeyReceived` de SSH.NET n'effectue jamais de travail asynchrone ni de dispatch UI
 - Application fail-closed de la clé d'hôte pour SSH.NET comme pour le repli Plink, avec `HostKeyUnavailable` lorsqu'une clé de passerelle épinglée ne peut pas être résolue sans retomber sur le cache de PuTTY/Plink
 - La réutilisation des tunnels tient compte des adresses, comptes, identifiants enregistrés et préférences d'agent. Une modification de connexion ouvre un nouveau tunnel ; un simple renommage conserve le partage.
-- Chaînage de tunnels multi-passerelles avec détection des dépendances circulaires
+- Chaînage de tunnels multi-passerelles avec détection des dépendances circulaires. Les listes de passerelle parente ne proposent que des parents qui laissent chaque chaîne résoluble, avec **Aucune (connexion directe)** en tête ; un enregistrement dont le nouveau parent a entre-temps été transformé en boucle par une autre fenêtre ouverte garde le parent enregistré et nomme la passerelle dans un avertissement
+- La boîte de dialogue de passerelle efface un mot de passe ou une phrase secrète de clé enregistrés avec son propre bouton **Effacer**, comme la boîte de dialogue serveur ; un champ vide garde toujours ce qui est enregistré
 - **Tester le parcours** depuis le formulaire de création/modification d'une passerelle : afficher tous les parents, tester l'authentification SSH à chaque saut, vérifier éventuellement un port TCP cible et copier un rapport anonymisé avec les durées et les actions à entreprendre. Chaque étape dispose du délai de connexion par saut qu'un vrai tunnel accorde (15 s), et une destination que la réponse SOCKS de la passerelle refuse, ou une réponse illisible, est un échec. Le test utilise les clés d'hôtes de confiance existantes, peut être annulé et ne sauvegarde pas le formulaire ni ne perturbe les tunnels ouverts
 - Allocation dynamique du port de tunnel avec nouvelles tentatives bornées en cas de course sur le bind (`AddressAlreadyInUse`)
 - Comptage de références des tunnels (les tunnels partagés survivent à la fermeture d'une session isolée, et à l'échec de reconnexion d'un volet scindé)
+- Un tunnel Plink dont le plink s'arrête avant d'ouvrir son port (connexion refusée, passerelle injoignable, clé d'hôte changée) échoue aussitôt avec la dernière ligne de plink lui-même au lieu d'attendre la fin de la vérification du port ; le plink d'un tunnel se termine avec Heimdall, même après un plantage
 - Redimensionnement du terminal via la requête SSH window-change (API publique `ShellStream.ChangeWindowSize`, sans réflexion)
 - Redirection X11 avec détection automatique du serveur X et démarrage automatique ; quand aucun serveur X n'est disponible, la session le dit dans son texte d'état et se lance sans redirection. Le VcXsrv géré conserve son contrôle d'accès par hôte
 - Les collages dans le terminal passent par le chemin de collage propre à xterm (collage encadré quand le shell l'a activé, CR+LF repliés), et Shift+Insert passe par la même garde de collage que Ctrl+V
@@ -64,11 +66,14 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Des codes d'échec structurés, un par cause, chacun avec un message d'erreur localisé
 - Des événements de sécurité typés en cours de session distinguent les attaques sur la clé d'hôte des déconnexions ordinaires et suppriment la reconnexion automatique SSH en cas de signal MITM
 - Surcouche de reconnexion automatique en cas de déconnexion inattendue (SSH et RDP)
+- Le plantage ou le redémarrage d'un processus auxiliaire GPU ou utilitaire de WebView2 (réinitialisation du pilote graphique, changement d'affichage) laisse tourner les terminaux ouverts ; seule la perte du processus navigateur ou de rendu déclenche le repli, et la transcription et les étapes d'attente des macros continuent sur la connexion qui reste derrière
 
 ### VNC
 - Visionneuse VNC embarquée via noVNC + WebView2
 - Proxy WebSocket vers TCP pour une intégration transparente
 - Synchronisation du presse-papiers, modes de mise à l'échelle, mode lecture seule
+- Un serveur qui demande un nom d'utilisateur (Partage d'écran macOS, VeNCrypt Plain et équivalents) ou un mot de passe que le profil ne contient pas met fin à la tentative avec un message qui dit lequel, au lieu de rester sur Connexion ; Heimdall n'enregistre pas de nom d'utilisateur VNC
+- Une session VNC ouverte empêche la mise en veille de la machine, comme les autres sessions embarquées
 - Déploiement portable de WebView2 (Fixed Version Runtime embarqué pour les serveurs isolés)
 
 ### Telnet
@@ -111,6 +116,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Intégration StoreBrowse pour les applications et bureaux publiés
 - Prise en charge de l'authentification SSO (Kerberos)
 - Onglets de session embarqués avec la même ergonomie que RDP
+- Fermer une session, ou Terminer, n'arrête jamais un processus Citrix Workspace que partagent d'autres applications publiées : seule la fenêtre propre à la session reçoit une demande de fermeture
 
 ### WinRM (PowerShell Remoting)
 - Sessions PowerShell distantes via WinRM / PS-Remoting natif - les connexions directes ne nécessitent aucun SSH
@@ -170,7 +176,7 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Rien n'est enregistré coffre verrouillé, et les lignes sont purgées au-delà de 90 jours
 
 **Partager**
-- Import et export en JSON, et synchronisation Git pour une bibliothèque d'équipe
+- Import et export en JSON, et synchronisation Git pour une bibliothèque d'équipe ; **Synchroniser au démarrage** s'exécute une fois après le déverrouillage du coffre, et un échec est signalé dans la barre d'état
 - Les actions issues d'un import voient leur niveau de risque et leur plateforme ramenés à des valeurs connues : un niveau non reconnu est traité comme dangereux plutôt qu'anodin
 
 ### Connexion rapide (Ctrl+K)
@@ -187,6 +193,8 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Affichage en temps réel de l'état, du port local, de la cible distante et de la chaîne de passerelles
 - Visualisation de la chaîne de tunnels dans l'en-tête des onglets de session (via GatewayA → GatewayB)
 - Allocation dynamique des ports avec comptage de références pour les tunnels partagés
+- **Fermer la sélection** et **Tout fermer** demandent d'abord confirmation quand des sessions ouvertes passent encore par le tunnel, et disent combien
+- Un tunnel dont la connexion à sa passerelle est perdue (n'importe quel saut d'une chaîne, ou un processus Plink arrêté) est fermé, son port libéré, et la barre d'état le signale
 
 ### Supervision de la santé des serveurs
 - Panneau repliable de la barre latérale affichant l'usage CPU, RAM et disque
@@ -238,7 +246,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 
 ### Gestion des sessions
 - Sessions à onglets avec réorganisation par glisser-déposer
-- Détachement d'un onglet vers une fenêtre flottante (glisser-sortir façon Chrome ou menu contextuel)
+- Détachement d'un onglet vers une fenêtre flottante (glisser-sortir façon Chrome ou menu contextuel) ; un onglet scindé reste dans la barre d'onglets, et la barre d'état indique d'annuler d'abord la division
+- Fermer l'onglet sélectionné sélectionne l'onglet qui prend sa place, ou celui qui le précède s'il était le dernier
+- **Sessions intégrées max** compte chaque volet embarqué, volets scindés et fenêtres flottantes compris ; un split qui dépasserait la limite est refusé avec le même message qu'un nouvel onglet
 - **Split récursif à N volets** : jusqu'à 8 volets par onglet, dans n'importe quelle disposition (2x2, en L, 3 côte à côte, etc.)
 - Split supplémentaire de n'importe quel volet : clic droit → "Split..." → Horizontal | Vertical, ou palette de commandes
 - **Fusionner un onglet existant** : clic droit → "Merge with..." → session ou outil → Horizontal | Vertical (rattache la connexion vivante sans reconnexion)
@@ -271,8 +281,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Facette passerelle et badge masquable** : le menu de filtre ne garde que les sessions passant par une passerelle SSH (passerelle manquante incluse) et peut masquer le badge "via passerelle" pour les inventaires qui passent tout par une seule passerelle ; l'infobulle de la ligne nomme alors la passerelle, et une passerelle manquante garde son badge
 - **Clavier et démarrage de l'arborescence** : Ctrl+A sélectionne toutes les sessions des dossiers ouverts, Entrée ouvre ou ferme un dossier en surbrillance, les lecteurs d'écran annoncent la taille de la sélection dès qu'elle dépasse une session, et l'arborescence s'ouvre sur la session sélectionnée à la dernière fermeture
 - **Favoris et états sur la ligne** : le menu contextuel ajoute ou retire des favoris pour une session ou une sélection, et une ligne favorite porte une étoile ; l'état de connexion d'une session est une pastille pleine et le résultat du contrôle de joignabilité un anneau, et les deux survivent à un rechargement de l'arborescence. Les menus de déplacement s'imbriquent comme l'arborescence des dossiers, avec une entrée "Dans" pour le dossier lui-même
+- Le contrôle de joignabilité en arrière-plan ignore les serveurs atteints par une passerelle SSH (la leur ou une passerelle héritée des réglages par défaut du dossier) ou par une passerelle RD, qui paraîtraient hors ligne vus de l'extérieur ; l'infobulle de l'anneau nomme la raison de chaque résultat
 - Journalisation globale des sessions (optionnelle) : transcriptions texte par session pour SSH / Telnet / Shell local et journal d'événements connexion/déconnexion (motif + durée) pour RDP / VNC / Citrix, avec ACL restrictives et rotation par taille ; activer les transcriptions demande une confirmation à l'enregistrement ; **forçage tri-état par profil** (activé / désactivé / hérité) dans la boîte de dialogue serveur
-- Conservation des transcriptions (optionnelle, désactivée par défaut) : les transcriptions écrites pour la dernière fois il y a plus de N jours (7 à 3 650) sont supprimées au démarrage et à chaque enregistrement des réglages ; une transcription en cours d'écriture et les journaux d'événements et d'opérations sur fichiers ne sont jamais touchés
+- Conservation des transcriptions (optionnelle, désactivée par défaut) : les transcriptions écrites pour la dernière fois il y a plus de N jours (7 à 3 650) sont supprimées au démarrage et à chaque enregistrement des réglages. Seuls les fichiers qui commencent par l'en-tête de transcription de Heimdall sont supprimés, si bien que les journaux d'autres outils rangés dans le même dossier sont conservés ; une transcription et ses fichiers de suite partent ensemble, une fois le plus récent d'entre eux expiré. Une transcription en cours d'écriture et les journaux d'événements et d'opérations sur fichiers ne sont jamais touchés
 - Journal de l'historique des connexions (JSONL avec rotation automatique)
 - Capture d'écran vers le presse-papiers (Ctrl+Shift+S)
 
@@ -320,6 +331,8 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - Les jetons de lancement Citrix ne sont déchiffrés qu'à la frontière du lancement et ne sont jamais écrits dans un log ou une exception ; un coffre verrouillé échoue en fail-closed plutôt que de lancer la session
 - Prévention de la traversée de chemins sur les opérations de renommage et de création de dossier du navigateur de fichiers local
 - Écritures de ConfigManager sûres en concurrence via SemaphoreSlim
+- Chaque écriture de `settings.json` et `servers.json` est vidée sur le disque avant de remplacer le fichier, et garde le document qu'elle remplace comme dernière copie valide (`settings.json.bak`, `servers.json.bak`, avec la même ACL restrictive). Un fichier qui n'est plus du JSON lisible est chargé depuis cette copie au démarrage, et Heimdall indique quel fichier a été restauré et que des changements ultérieurs peuvent manquer
+- L'import des paramètres liste d'abord, en entier, les réglages qui décident de ce qui s'exécute sur cet ordinateur : le fournisseur d'identifiants et ses commandes, les chemins d'outils, les outils externes (avec leur exécutable et s'ils s'exécutent en administrateur) et l'adresse de synchronisation Git. Un export retire tout `user:token@` de l'adresse de synchronisation Git
 - Content Security Policy (CSP) et blocage de navigation pour WebView2
 - Les documents WebView embarqués (éditeur de notes Milkdown, vue VNC) imposent une origine exacte schéma/hôte/port/chemin pour le trafic `postMessage` accepté et pour la navigation - aucune correspondance de confiance par sous-chaîne n'est utilisée, si bien qu'un document étranger ne peut ni poster vers l'hôte ni le faire naviguer
 - IPC Pageant durcie : DACL réservée à soi-même sur le mappage de fichier partagé, suffixe aléatoire cryptographique dans le nom du mappage (64 bits d'entropie), liste blanche des processus Pageant de confiance avant tout trafic d'agent, et vérification préalable d'agent vide

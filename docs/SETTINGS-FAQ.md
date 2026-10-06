@@ -53,9 +53,17 @@ and leaves your edits pending.
 red and its tooltip gives the reason, the banner says how many settings need attention, and the
 focus moves to the first of them, opening its tab.
 
+**If a configuration file is damaged.** Each save keeps the file it replaces as a last good copy,
+`settings.json.bak` and `servers.json.bak`, beside it. If `settings.json` or `servers.json` is no
+longer readable at startup (empty, zeroed or cut short, after a power cut for example), Heimdall
+loads that copy instead, tells you which file was restored, and warns that changes saved after the
+copy was made may be missing. The next save replaces the damaged file. With no usable copy,
+startup fails as before.
+
 **Reset defaults** returns every tab to its factory value, as pending edits: nothing is written
-until you save. It keeps your language, theme and accent, your sessions and SSH gateways, and
-your master password, PIN and Windows Hello enrolment. It does turn off the external credential
+until you save. It keeps your language, theme and accent, your sessions and SSH gateways, your
+external tools and credential provider unlock secret, your skipped update version, and your
+master password, PIN and Windows Hello enrolment. It does turn off the external credential
 provider, the Credential Guard and Windows Hello requirements and the TFTP share, and resets the
 Windows Hello grace period, the auto-lock delay and disconnect on lock; the confirmation lists
 them. **Reset RDP defaults** touches the RDP tab only: the RDP connection watchdog, on Advanced >
@@ -99,6 +107,14 @@ each under the label this screen gives it, with its tab and section and its curr
 value (for example "Terminal > Terminal Appearance > Font size: 14 -> 18"), and asks. Accepted, they are loaded as pending edits and checked like typed values: nothing is
 written until you press Save settings, and Undo changes puts everything back. A secret added to
 the file by hand is ignored.
+
+The settings that decide what Heimdall runs on this computer come first, under **Check these
+first**, each shown in full: the credential provider and its commands, database and key file;
+the Plink, PuTTY, Psftp, X11, editor, Sysinternals, NirSoft and NanaRun paths; each external
+tool by name and executable, marked when it runs as administrator; and the Git sync address. Read
+them before accepting a file someone else gave you. The other changes follow, and "and N more"
+counts only those. An export takes any user name and token written into the Git sync address out
+of it.
 
 ## Locking Heimdall itself
 
@@ -271,7 +287,10 @@ gateways, so that a firewall or the server does not drop an idle connection.
 ## Background probes
 
 **Enable background reachability probes** - Heimdall periodically opens a TCP connection to
-each configured server to colour the dot in the session tree. This is why a server's logs show
+each configured server to colour the dot in the session tree. Servers reached through an SSH
+gateway (set on the session or inherited from its folder's defaults) or through an RD Gateway are
+not probed, since from your machine they would always look down; their ring's tooltip says "Behind
+SSH gateway - not probed" or "Behind RD Gateway - not probed". This is why a server's logs show
 one short connection per interval from your machine even when you are not connected. It is not
 a connection attempt and it does not authenticate.
 
@@ -300,7 +319,15 @@ Your other pending edits on the Settings screen are left pending.
 **Record session transcripts** additionally records the content of terminal sessions to **Session
 log directory**. The second one records what you typed and what came back, passwords or tokens
 echoed to the terminal included, so consider where that directory lives; Heimdall asks before it
-turns it on.
+turns it on. A new **Session log directory** is used after Heimdall restarts.
+
+**Delete transcripts older than** (0, the default, keeps everything; otherwise 7 to 3650 days)
+deletes expired transcripts at startup and each time you save the settings. It deletes only
+Heimdall's own transcripts, recognised by the header Heimdall writes at the top of each one, so
+another tool's logs kept in the same folder are left alone. A long transcript split into
+continuation files is deleted as a whole, and only once the newest of its files has expired. A
+transcript still being written, the connection event log and the file operations log are never
+deleted.
 
 **Settings that no longer exist** - `EnableEventLog`, `EnableSessionPersistence` and
 `EmbeddedIdleTimeoutMs` were in the settings type but nothing read them, so changing them in

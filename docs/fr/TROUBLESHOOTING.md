@@ -75,6 +75,9 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 58. [FTP/SFTP - le téléversement d'un nouveau fichier est refusé](#upload-new-file-refused)
 59. [Paramètres - Enregistrer est grisé, ou refuse d'enregistrer](#settings-save-greyed-or-refused)
 60. [Paramètres - un fichier de paramètres importé est refusé ou ne change rien](#settings-import-refused)
+61. [Paramètres - "Configuration restaurée" au démarrage](#settings-restored-from-backup)
+62. [Tunnel - "Plink s'est arrêté avant d'ouvrir le tunnel"](#tunnel-plink-exited-early)
+63. [VNC - le serveur demande un nom d'utilisateur ou un mot de passe](#vnc-credentials-required)
 
 ---
 
@@ -640,7 +643,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 **Solution** :
 1. Si le terminal apparaît vide après réancrage, la session est toujours vivante - essayez de cliquer dans la zone du terminal
 2. Pour les sessions RDP, le détachement est irréversible (les contrôles ActiveX ne peuvent pas changer de parent en toute sécurité)
-3. Les sessions fractionnées ne peuvent pas être détachées (par conception)
+3. Les sessions fractionnées ne peuvent pas être détachées (par conception). Un onglet fractionné que l'on fait glisser hors de la barre d'onglets y reste, et la barre d'état indique d'annuler d'abord la division
 
 **Fichiers** : `Views/FloatingSessionWindow.xaml.cs`, `MainWindow.xaml.cs`
 
@@ -1095,7 +1098,54 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 **Solution** :
 
 1. Exporter de nouveau depuis l'ordinateur d'origine avec Exporter les paramètres..., et importer ce fichier.
-2. Après l'import, vérifier les modifications énumérées, puis appuyer sur Enregistrer.
+2. Après l'import, vérifier les modifications énumérées, en commençant par celles placées sous "Vérifiez d'abord ceux-ci", qui décident de ce que Heimdall exécute sur cet ordinateur, puis appuyer sur Enregistrer.
 3. Les secrets ne voyagent jamais dans le fichier (mot de passe maître, PIN, jeton d'accès Git, secret de déverrouillage du fournisseur d'identifiants, passerelles SSH) : les renseigner de nouveau sur le nouvel ordinateur. Les chemins du profil utilisateur ne voyagent que si vous avez accepté de les inclure à l'export.
 
 **Fichiers** : `ViewModels/Settings/SettingsTransfer.cs`, `ViewModels/SettingsViewModel.cs`
+
+---
+
+## 61. Paramètres - "Configuration restaurée" au démarrage {#settings-restored-from-backup}
+
+**Symptôme** : au démarrage, Heimdall affiche "Configuration restaurée" : `settings.json` ou `servers.json` était illisible et a été chargé depuis sa dernière copie valide, et des changements enregistrés après cette copie peuvent manquer.
+
+**Cause racine** : le fichier nommé n'est plus du JSON lisible : vide, rempli de zéros ou tronqué, en général après une coupure de courant ou un plantage pendant une écriture. Chaque enregistrement de ces fichiers garde d'abord le document qu'il remplace sous `<nom>.bak`, à côté de lui (seulement quand ce document est lisible, si bien qu'un fichier endommagé n'écrase jamais la bonne copie), et le chargement se rabat sur cette copie. Auparavant, un `settings.json` endommagé bloquait le démarrage et emportait avec lui les clés d'hôtes de confiance, les éléments du coffre et la clé HMAC.
+
+**Solution** :
+
+1. Vérifier les changements les plus récents : une session, une passerelle ou un réglage enregistré juste avant l'incident peut manquer ; l'ajouter de nouveau.
+2. Rien d'autre à faire : l'enregistrement suivant remplace le fichier endommagé.
+3. Si le démarrage échoue sans ce message, aucun `.bak` utilisable n'existe non plus ; restaurer le fichier depuis une sauvegarde personnelle.
+
+**Fichiers** : `Heimdall.Core/Configuration/ConfigManager.cs`, `Heimdall.Core/Security/SecureFileWriter.cs`, `App.xaml.cs`
+
+---
+
+## 62. Tunnel - "Plink s'est arrêté avant d'ouvrir le tunnel" {#tunnel-plink-exited-early}
+
+**Symptôme** : une session qui passe par un tunnel Plink échoue aussitôt avec "Plink s'est arrêté (code N) avant d'ouvrir le tunnel :" suivi d'une ligne de plink.
+
+**Cause racine** : plink s'est arrêté avant d'ouvrir le port redirigé : la passerelle a refusé la connexion ou la clé, le fichier de clé ou sa phrase secrète était incorrect, la clé d'hôte de la passerelle ne correspondait pas, ou la passerelle a refusé, réinitialisé ou laissé sans réponse la connexion. Heimdall cesse désormais d'attendre dès que plink s'est arrêté et cite la dernière ligne de plink lui-même. Auparavant, il attendait toute la vérification du port (environ 28 secondes) puis indiquait que plink n'avait pas ouvert lui-même le port redirigé.
+
+**Solution** :
+
+1. Lire la ligne citée : c'est la description de l'échec par plink lui-même.
+2. Pour un échec de connexion ou de clé, vérifier le compte, la clé et la phrase secrète de la passerelle ; pour une clé d'hôte différente, ne pas accepter la nouvelle clé avant d'avoir vérifié pourquoi elle a changé (voir l'avertissement sur la clé d'hôte dans le Guide utilisateur) ; pour une connexion refusée ou sans réponse, vérifier l'adresse, le port et le pare-feu de la passerelle.
+3. Quand plink ne nomme aucune cause, ou qu'un autre processus occupe le port, le message de la vérification du port s'affiche comme avant.
+
+**Fichiers** : `Heimdall.Ssh/Plink/PlinkTunnelRunner.cs`, `Heimdall.Ssh/Plink/PlinkStderrClassifier.cs`, `Heimdall.Ssh/Plink/PlinkProcessJob.cs`
+
+---
+
+## 63. VNC - le serveur demande un nom d'utilisateur ou un mot de passe {#vnc-credentials-required}
+
+**Symptôme** : un onglet VNC met fin à la connexion avec "Ce serveur VNC demande un nom d'utilisateur et un mot de passe" ou "Ce serveur VNC demande un mot de passe et le profil n'en contient pas", et propose de se reconnecter. Auparavant, l'onglet restait sur Connexion.
+
+**Cause racine** : le serveur a demandé des identifiants que la session ne peut pas fournir. Certains serveurs veulent un nom d'utilisateur en plus du mot de passe : le Partage d'écran de macOS (authentification Apple Remote Desktop), VeNCrypt Plain, la connexion Unix de TightVNC, MS-Logon d'UltraVNC. Heimdall n'enregistre qu'un mot de passe VNC, jamais de nom d'utilisateur VNC. D'autres serveurs veulent simplement un mot de passe que le profil ne contient pas.
+
+**Solution** :
+
+1. Pour le message sur le mot de passe, ajouter le mot de passe VNC à la session (Authentification VNC dans la boîte de dialogue de session) et se reconnecter.
+2. Pour le message sur le nom d'utilisateur, passer le serveur à l'authentification VNC par simple mot de passe si vous le maîtrisez (sur macOS, l'option du Partage d'écran qui autorise les visualiseurs VNC à contrôler l'écran avec un mot de passe), ou utiliser un autre client pour ce serveur.
+
+**Fichiers** : `Services/VncCredentialsPolicy.cs`, `Views/EmbeddedVncView.xaml.cs`, `Assets/vnc.html`
