@@ -960,6 +960,10 @@ public class PlinkTunnelRunnerTests : IDisposable
     public async Task ThePasswordFileIsWrittenWhereTheRunnerWasToldAndNowhereElse()
     {
         using PasswordFileDirectory passwordFiles = new();
+        // Unique to this run: other test assemblies dial plink concurrently and drop their own
+        // password files in the shared directory, so "nothing new there" is not something this
+        // test can own. "Nothing of mine there" is.
+        string password = $"pw-{Guid.NewGuid():N}";
         string sharedTemp = Path.GetTempPath();
         HashSet<string> sharedBefore = Directory
             .EnumerateFiles(sharedTemp, PlinkPasswordFileNaming.SearchPattern)
@@ -980,7 +984,7 @@ public class PlinkTunnelRunnerTests : IDisposable
         {
             Task<PlinkTunnelResult> startTask = Task.Run(() => runner.StartAsync(
                 GetCommandProcessorPath(),
-                "gw.test", 22, "user", null, "s3cret",
+                "gw.test", 22, "user", null, password,
                 "remote", 22, GetAvailableLoopbackPort(), "SHA256:test"));
 
             await process.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
@@ -990,12 +994,13 @@ public class PlinkTunnelRunnerTests : IDisposable
                 // The seam is honoured: the file lands in the directory this test owns.
                 string written = Assert.Single(passwordFiles.EnumeratePasswordFiles());
                 Assert.Equal(passwordFiles.Path, Path.GetDirectoryName(written));
+                Assert.Equal(password, File.ReadAllText(written));
 
-                // And the shared directory gained nothing. Without this the assertion above would
+                // And nothing of it reached the shared directory. Without this the assertion above would
                 // still hold if the runner wrote to BOTH, and the isolation would be an illusion.
                 Assert.DoesNotContain(
                     Directory.EnumerateFiles(sharedTemp, PlinkPasswordFileNaming.SearchPattern),
-                    path => !sharedBefore.Contains(path));
+                    path => !sharedBefore.Contains(path) && HoldsPassword(path, password));
             }
             finally
             {
@@ -1008,6 +1013,22 @@ public class PlinkTunnelRunnerTests : IDisposable
         {
             startGate.TrySetResult();
             runner.Stop();
+        }
+    }
+
+    /// <summary>
+    /// Reads a password file another test may be deleting or still writing; one that cannot be
+    /// read was not written by the runner under test, which has already finished its write.
+    /// </summary>
+    private static bool HoldsPassword(string path, string password)
+    {
+        try
+        {
+            return string.Equals(File.ReadAllText(path), password, StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 
