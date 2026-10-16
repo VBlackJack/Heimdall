@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -426,34 +425,60 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     /// <summary>The scaling modes the page accepts, in the order the header offers them.</summary>
     internal static readonly string[] ScalingModes = ["remote", "scale", "none"];
 
-    /// <summary>The compression levels the page accepts, best quality first.</summary>
-    internal static readonly int[] QualityLevels = [0, 3, 6, 9];
+    /// <summary>
+    /// One option of the header's quality selector, and the two noVNC levels it sets together.
+    /// </summary>
+    /// <remarks>
+    /// The selector used to set the compression level alone. That level is zlib's, lossless: it
+    /// trades bandwidth against CPU and never changes the picture, so "Best quality" looked like
+    /// every other option. The JPEG quality level is what changes the image.
+    /// </remarks>
+    /// <param name="Name">The Tag the header option carries.</param>
+    /// <param name="QualityLevel">noVNC's JPEG quality, from 0 (smallest) to 9 (sharpest).</param>
+    /// <param name="CompressionLevel">noVNC's zlib compression, from 0 (none) to 9 (most).</param>
+    internal sealed record QualityPreset(string Name, int QualityLevel, int CompressionLevel);
+
+    /// <summary>The JPEG quality noVNC uses when nothing sets it, kept by the default preset.</summary>
+    internal const int NoVncDefaultQualityLevel = 6;
+
+    /// <summary>The presets the header offers, best picture first.</summary>
+    internal static readonly QualityPreset[] QualityPresets =
+    [
+        new("best", QualityLevel: 9, CompressionLevel: 0),
+        new("balanced", QualityLevel: 8, CompressionLevel: 3),
+        new("performance", QualityLevel: NoVncDefaultQualityLevel, CompressionLevel: 6),
+        new("low-bandwidth", QualityLevel: 3, CompressionLevel: 9),
+    ];
 
     /// <summary>What a session starts on when the header's selection says nothing.</summary>
     internal const string DefaultScalingMode = "scale";
 
-    /// <summary>The quality a session starts on when the header's selection says nothing.</summary>
-    internal const int DefaultQualityLevel = 6;
+    /// <summary>The preset a session starts on when the header's selection says nothing.</summary>
+    internal const string DefaultQualityPresetName = "performance";
 
     /// <summary>The message that carries a scaling mode to the page.</summary>
     internal static string ScalingMessage(string mode) => $"scaling:{mode}";
 
-    /// <summary>The message that carries a quality level to the page.</summary>
-    internal static string QualityMessage(int level) => $"quality:{level}";
+    /// <summary>The message that carries a preset's two levels to the page.</summary>
+    internal static string QualityMessage(QualityPreset preset) =>
+        "quality:" + JsonSerializer.Serialize(new
+        {
+            qualityLevel = preset.QualityLevel,
+            compressionLevel = preset.CompressionLevel,
+        });
+
+    /// <summary>The preset named <paramref name="name"/>, or the default one for an unknown name.</summary>
+    internal static QualityPreset QualityPresetNamed(string? name) =>
+        QualityPresets.FirstOrDefault(preset => preset.Name == name)
+        ?? QualityPresets.First(preset => preset.Name == DefaultQualityPresetName);
 
     /// <summary>The scaling mode the header currently shows.</summary>
     private string SelectedScalingMode() =>
         (ScalingSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? DefaultScalingMode;
 
-    /// <summary>The quality level the header currently shows.</summary>
-    private int SelectedQualityLevel() =>
-        int.TryParse(
-            (QualitySelector.SelectedItem as ComboBoxItem)?.Tag as string,
-            NumberStyles.None,
-            CultureInfo.InvariantCulture,
-            out int level)
-            ? level
-            : DefaultQualityLevel;
+    /// <summary>The quality preset the header currently shows.</summary>
+    private QualityPreset SelectedQualityPreset() =>
+        QualityPresetNamed((QualitySelector.SelectedItem as ComboBoxItem)?.Tag as string);
 
     private void SendConnectCommand()
     {
@@ -484,7 +509,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         // than on the page's own defaults. The page applies them in the order they arrive and
         // keeps them until the client exists.
         PostWebMessage(ScalingMessage(SelectedScalingMode()));
-        PostWebMessage(QualityMessage(SelectedQualityLevel()));
+        PostWebMessage(QualityMessage(SelectedQualityPreset()));
     }
 
     private void PostWebMessage(string message) => PageMessageSink(message);
@@ -657,10 +682,10 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         PostWebMessage(ScalingMessage(SelectedScalingMode()));
     }
 
-    /// <summary>Sends the quality level the user picked to the page.</summary>
+    /// <summary>Sends the quality preset the user picked to the page.</summary>
     private void OnQualitySelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        PostWebMessage(QualityMessage(SelectedQualityLevel()));
+        PostWebMessage(QualityMessage(SelectedQualityPreset()));
     }
 
     /// <summary>Shows the reconnect overlay and header button after an unexpected disconnect.</summary>

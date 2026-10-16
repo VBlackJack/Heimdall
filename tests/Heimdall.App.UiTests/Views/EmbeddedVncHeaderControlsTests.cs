@@ -74,8 +74,12 @@ public sealed class EmbeddedVncHeaderControlsTests
         Assert.Equal(["scaling:remote"], sent);
     }
 
+    /// <summary>
+    /// Picking "Best quality" sends the JPEG quality that sharpens the picture, not only the
+    /// lossless compression level the selector used to send alone.
+    /// </summary>
     [StaFact]
-    public void PickingAQualityLevel_SendsItToThePage()
+    public void PickingAQualityPreset_SendsBothItsLevelsToThePage()
     {
         List<string> sent = [];
 
@@ -87,7 +91,7 @@ public sealed class EmbeddedVncHeaderControlsTests
             view.QualitySelector.SelectedIndex = 0;
         });
 
-        Assert.Equal(["quality:0"], sent);
+        Assert.Equal(["quality:{\"qualityLevel\":9,\"compressionLevel\":0}"], sent);
     }
 
     /// <summary>
@@ -114,7 +118,9 @@ public sealed class EmbeddedVncHeaderControlsTests
 
         Assert.Equal(3, sent.Count);
         Assert.StartsWith("connect:", sent[0], StringComparison.Ordinal);
-        Assert.Equal(["scaling:none", "quality:9"], sent.Skip(1));
+        Assert.Equal(
+            ["scaling:none", "quality:{\"qualityLevel\":3,\"compressionLevel\":9}"],
+            sent.Skip(1));
     }
 
     private static void SetPrivateField(object target, string fieldName, object value)
