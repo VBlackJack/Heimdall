@@ -99,9 +99,23 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     /// <summary>Per-profile session-logging override. Null means inherit the live global setting.</summary>
     public bool? SessionLoggingOverride { get; set; }
 
+    /// <summary>
+    /// Where every message for the page goes. The product sends them to the live WebView2; a test
+    /// puts a recorder here to read what the header sends without a browser engine behind it.
+    /// </summary>
+    internal Action<string> PageMessageSink { get; set; }
+
     public EmbeddedVncView()
     {
+        PageMessageSink = PostToLivePage;
+
         InitializeComponent();
+
+        // Wired here and not in the markup: both selectors carry their initial selection in XAML,
+        // so a handler declared there runs inside InitializeComponent, before VncWebView exists,
+        // and the view could not be constructed at all.
+        ScalingSelector.SelectionChanged += OnScalingSelectionChanged;
+        QualitySelector.SelectionChanged += OnQualitySelectionChanged;
 
         // Set WebView2 background from theme to avoid flash of wrong color
         if (TryFindResource("BackgroundColor") is System.Windows.Media.Color themeColor)
@@ -473,7 +487,9 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         PostWebMessage(QualityMessage(SelectedQualityLevel()));
     }
 
-    private void PostWebMessage(string message)
+    private void PostWebMessage(string message) => PageMessageSink(message);
+
+    private void PostToLivePage(string message)
     {
         if (VncWebView.CoreWebView2 is { } core
             && VncDocumentPolicy.CanExchangeMessages(_webViewReady, core.Source))

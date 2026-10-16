@@ -60,7 +60,6 @@
                           FontSize="{StaticResource FontSizeCaption}"
                           VerticalAlignment="Center"
                           SelectedIndex="1"
-                          SelectionChanged="OnScalingSelectionChanged"
                           ToolTip="{loc:Translate TooltipVncScaling}"
                           AutomationProperties.Name="{loc:Translate A11yVncScaling}">
                     <ComboBoxItem Content="{loc:Translate VncScalingRemote}" Tag="remote"/>
@@ -74,7 +73,6 @@
                           FontSize="{StaticResource FontSizeCaption}"
                           VerticalAlignment="Center"
                           SelectedIndex="2"
-                          SelectionChanged="OnQualitySelectionChanged"
                           ToolTip="{loc:Translate TooltipVncQuality}"
                           AutomationProperties.Name="{loc:Translate A11yVncQuality}">
                     <ComboBoxItem Content="{loc:Translate VncQualityBest}" Tag="0"/>
