@@ -43,6 +43,15 @@ public enum SharedSessionSourceStatus
 /// <param name="GatewayCount">How many shared gateways the source holds.</param>
 /// <param name="Warnings">What the parser could not take as it is.</param>
 /// <param name="DroppedProfileCount">How many parsed sessions the sanitizer refused.</param>
+/// <param name="Notice">
+/// Why what is held is not what the file holds now, localized, or null when it is: the file could
+/// not be read and the offline copy stands in, or a change could not be taken and the previous
+/// version is kept. The sessions are still held and connect.
+/// </param>
+/// <param name="OfflineCopyFromUtc">
+/// When the offline copy standing in for the file was taken, or null when the sessions come from
+/// the file itself.
+/// </param>
 public sealed record SharedSessionSourceState(
     string SourceId,
     string Name,
@@ -52,4 +61,10 @@ public sealed record SharedSessionSourceState(
     int ProfileCount,
     int GatewayCount,
     IReadOnlyList<MobaXtermImportWarning> Warnings,
-    int DroppedProfileCount);
+    int DroppedProfileCount,
+    string? Notice = null,
+    DateTime? OfflineCopyFromUtc = null)
+{
+    /// <summary>Whether the sessions held come from the offline copy rather than the file.</summary>
+    public bool IsOfflineCopy => OfflineCopyFromUtc is not null;
+}

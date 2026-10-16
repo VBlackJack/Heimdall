@@ -50,13 +50,16 @@ public sealed class ServerItemViewModelGatewayBadgeTests
     }
 
     [Fact]
-    public void HidingTheBadge_MovesTheGatewayIntoTheRowTooltip()
+    // The row tooltip names the gateway whether the badge shows or not: a narrow sidebar gives the
+    // session name the width first and may cut the badge short or leave it out (NameFirstPanel),
+    // so the badge alone no longer guarantees the gateway is readable.
+    public void TheRowTooltip_NamesTheGateway_WhetherTheBadgeShowsOrNot()
     {
         ServerItemViewModel routed = CreateServer("routed", "gw1");
         List<string?> changed = [];
         routed.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
         string shown = Assert.IsType<string>(routed.RowTooltipText);
-        Assert.DoesNotContain("Bastion", shown, StringComparison.Ordinal);
+        Assert.Contains("Gateway: Bastion", shown, StringComparison.Ordinal);
 
         routed.ShowGatewayBadge = false;
 

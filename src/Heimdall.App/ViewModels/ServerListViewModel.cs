@@ -616,6 +616,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         RebuildHealthServerIndex();
+        OnPropertyChanged(nameof(SharedServerCount));
 
         RefreshLookupCollections(settings);
         IsSidebarVisible = !settings.SidebarCollapsed;

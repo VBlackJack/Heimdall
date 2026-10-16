@@ -137,9 +137,25 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     [NotifyPropertyChangedFor(nameof(ServerCountText))]
     private int _serverCount;
 
-    /// <summary>The session count on the status bar, worded by its number.</summary>
-    public string ServerCountText =>
-        _localizer.FormatCount(ServerCount, "StatusServerCountOne", "StatusServerCount", ServerCount);
+    /// <summary>
+    /// The session count on the status bar, worded by its number: the local sessions, then the
+    /// shared ones when the tree lists any.
+    /// </summary>
+    public string ServerCountText => FormatServerCount(_localizer, ServerCount, ServerList?.SharedServerCount ?? 0);
+
+    /// <summary>The words of the status bar count for <paramref name="local"/> and <paramref name="shared"/> sessions.</summary>
+    internal static string FormatServerCount(LocalizationManager localizer, int local, int shared)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        string localText = localizer.FormatCount(local, "StatusServerCountOne", "StatusServerCount", local);
+        return shared <= 0
+            ? localText
+            : localizer.Format(
+                "StatusServerCountWithShared",
+                localText,
+                localizer.FormatCount(shared, "StatusSharedServerCountOne", "StatusSharedServerCount", shared));
+    }
 
     [ObservableProperty]
     private bool _isBusy;
@@ -511,6 +527,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         ServerList.ToolSessionRequested += _onToolSessionRequested;
         _onStatusMessageRequested = message => StatusText = message;
         ServerList.StatusMessageRequested += _onStatusMessageRequested;
+        ServerList.PropertyChanged += OnServerListPropertyChanged;
 
         // Session tabs grouped by folder read their group from the tree, and follow it.
         Connection.TabGroupResolver = ServerList.ResolveTabGroup;
@@ -934,6 +951,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _themeService.ThemeChanged -= OnThemeServiceThemeChanged;
         ServerList.ToolSessionRequested -= _onToolSessionRequested;
         ServerList.StatusMessageRequested -= _onStatusMessageRequested;
+        ServerList.PropertyChanged -= OnServerListPropertyChanged;
         ServerList.FolderLayoutChanged -= _onFolderLayoutChanged;
         Connection.PropertyChanged -= _connectionPropertyChangedHandler;
     }
@@ -1259,6 +1277,15 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// to resolve i18n keys outside the view model (e.g., floating windows).
     /// </summary>
     public LocalizationManager GetLocalizer() => _localizer;
+
+    /// <summary>The shared sessions the tree lists change the status bar count.</summary>
+    private void OnServerListPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ServerListViewModel.SharedServerCount))
+        {
+            OnPropertyChanged(nameof(ServerCountText));
+        }
+    }
 
     internal async Task ReloadConfigurationAsync(AppSettings settings, List<ServerProfileDto>? servers = null)
     {

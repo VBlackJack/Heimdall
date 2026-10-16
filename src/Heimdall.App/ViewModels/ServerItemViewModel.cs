@@ -452,12 +452,14 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
                     ProtocolDisplayName));
             }
 
-            // With the badge hidden the row no longer says where it routes; the hover does, so
-            // the fact stays one gesture away. With the badge shown, the badge's own tooltip
-            // already says it and repeating it here would be the redundancy the dot avoids.
-            if (HasGateway && !IsGatewayBadgeVisible)
+            // Where the session routes, always: the badge that says it may be hidden by the
+            // preference, cut short, or left out altogether by a narrow sidebar, which gives the
+            // session name the width first (NameFirstPanel). A missing gateway is named by its id.
+            if (HasGateway)
             {
-                lines.Add(Format("SessionTreeRowTooltipGateway", GatewayName));
+                lines.Add(IsGatewayMissing
+                    ? GatewayBadgeTooltip
+                    : Format("SessionTreeRowTooltipGateway", GatewayName));
             }
 
             if (IsShared)

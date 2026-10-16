@@ -116,6 +116,8 @@ internal sealed class StubSharedSessionProvider(
 
     public event Action? Changed;
 
+    public event Action<SharedSessionSourceState>? SourceReloaded;
+
     public int LoadCount { get; private set; }
 
     /// <summary>The settings the last load was asked to read.</summary>
@@ -148,6 +150,13 @@ internal sealed class StubSharedSessionProvider(
         LastLoadedSettings = settings;
         Changed?.Invoke();
         return Task.CompletedTask;
+    }
+
+    /// <summary>Raises the reload of one source, as the provider does after a file changed.</summary>
+    public void RaiseSourceReloaded(SharedSessionSourceState state)
+    {
+        Changed?.Invoke();
+        SourceReloaded?.Invoke(state);
     }
 
     /// <summary>A loaded state for <paramref name="sourceId"/>.</summary>

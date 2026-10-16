@@ -819,7 +819,9 @@
                                                     </Style>
                                                 </Path.Style>
                                             </Path>
-                                            <Grid Grid.Column="1">
+                                            <controls:NameFirstPanel Grid.Column="1"
+                                                                     MinTrailingWidth="{StaticResource SessionTreeBadgeMinWidth}">
+                                            <Grid>
                                                 <TextBlock Text="{Binding Name}"
                                                            FontSize="{StaticResource FontSizeBody}"
                                                            FontWeight="SemiBold"
@@ -837,6 +839,17 @@
                                                          behaviors:InlineRenameFocusBehavior.CommitRequested="OnInlineRenameEditorCommitRequested"
                                                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </Grid>
+                                            <!-- A shared source served from its offline copy, or keeping its previous
+                                                 version, says so beside its name; the reason is in the row tooltip. -->
+                                            <TextBlock Text="{Binding NoticeBadgeText}"
+                                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                                       Foreground="{DynamicResource WarningTextBrush}"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxWidth="{StaticResource SessionTreeGatewayBadgeMaxWidth}"
+                                                       Margin="8,0,0,0"
+                                                       Visibility="{Binding HasNotice, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </controls:NameFirstPanel>
                                             <TextBlock Grid.Column="2"
                                                        Text="{Binding CountBadgeText}"
                                                        FontSize="{StaticResource FontSizeSmallCaption}"
@@ -876,7 +889,6 @@
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <!-- Protocol / tool vector icon (resolved by converters).
                                                  The ThemeRevision trigger forces re-evaluation on runtime theme swap. -->
@@ -936,8 +948,12 @@
                                                 </Ellipse.Style>
                                             </Ellipse>
                                             </Border>
-                                            <!-- Server name -->
-                                            <Grid Grid.Column="2">
+                                            <!-- Server name, then its marks. The name takes the width first; the marks get
+                                                 what is left and ellipsize, and are hidden below a minimum, each keeping
+                                                 its full text in a tooltip. -->
+                                            <controls:NameFirstPanel Grid.Column="2"
+                                                                     MinTrailingWidth="{StaticResource SessionTreeBadgeMinWidth}">
+                                            <Grid>
                                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                                 <!-- A long name ends in an ellipsis; the row's tooltip opens with the full name. -->
                                                 <TextBlock Text="{Binding DisplayName}"
@@ -962,34 +978,53 @@
                                                            ToolTip="{Binding SearchContextText}"
                                                            Visibility="{Binding DataContext.ServerList.ShowSearchContext, RelativeSource={RelativeSource AncestorType={x:Type TreeView}}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </Grid>
-                                            <StackPanel Grid.Column="3"
-                                                        Orientation="Horizontal"
-                                                        VerticalAlignment="Center">
-                                                <!-- Read-only mark of a session from a shared source; its tooltip names
-                                                     the source. The spoken row name says "shared" and "read-only" itself. -->
-                                                <Path Data="{StaticResource Geo.Tree.ReadOnly}"
-                                                      Width="{StaticResource SessionTreeReadOnlyIconSize}"
-                                                      Height="{StaticResource SessionTreeReadOnlyIconSize}"
-                                                      Stretch="Uniform"
-                                                      Fill="{DynamicResource TextSecondaryBrush}"
-                                                      Margin="6,0,0,0"
-                                                      VerticalAlignment="Center"
-                                                      ToolTip="{Binding SharedReadOnlyText}"
-                                                      ToolTipService.InitialShowDelay="{StaticResource SessionTreeStatusToolTipDelay}"
-                                                      AutomationProperties.Name="{Binding SharedReadOnlyText}"
-                                                      Visibility="{Binding IsShared, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                                <!-- Favorite mark. The spoken row name carries "favorite" itself;
-                                                     the glyph is for the eye. -->
-                                                <TextBlock Text="&#xE735;"
-                                                           FontFamily="Segoe MDL2 Assets"
-                                                           FontSize="{StaticResource FontSizeSmallCaption}"
-                                                           Foreground="{DynamicResource WarningBrush}"
-                                                           Margin="6,0,0,0"
-                                                           VerticalAlignment="Center"
-                                                           ToolTip="{loc:Translate SessionTreeFavoriteMark}"
-                                                           AutomationProperties.Name="{loc:Translate SessionTreeFavoriteMark}"
-                                                           Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                                <Border BorderThickness="1"
+                                            <!-- The fixed marks first; the gateway badge takes what is left, ellipsized,
+                                                 and is hidden below its own minimum rather than shown as an empty frame. -->
+                                            <controls:NameFirstPanel VerticalAlignment="Center"
+                                                                     MinTrailingWidth="{StaticResource SessionTreeGatewayBadgeMinWidth}">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <!-- Read-only mark of a session from a shared source; its tooltip names
+                                                         the source. The spoken row name says "shared" and "read-only" itself. -->
+                                                    <Path Data="{StaticResource Geo.Tree.ReadOnly}"
+                                                          Width="{StaticResource SessionTreeReadOnlyIconSize}"
+                                                          Height="{StaticResource SessionTreeReadOnlyIconSize}"
+                                                          Stretch="Uniform"
+                                                          Fill="{DynamicResource TextSecondaryBrush}"
+                                                          Margin="6,0,0,0"
+                                                          VerticalAlignment="Center"
+                                                          ToolTip="{Binding SharedReadOnlyText}"
+                                                          ToolTipService.InitialShowDelay="{StaticResource SessionTreeStatusToolTipDelay}"
+                                                          AutomationProperties.Name="{Binding SharedReadOnlyText}"
+                                                          Visibility="{Binding IsShared, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <!-- Favorite mark. The spoken row name carries "favorite" itself;
+                                                         the glyph is for the eye. -->
+                                                    <TextBlock Text="&#xE735;"
+                                                               FontFamily="Segoe MDL2 Assets"
+                                                               FontSize="{StaticResource FontSizeSmallCaption}"
+                                                               Foreground="{DynamicResource WarningBrush}"
+                                                               Margin="6,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               ToolTip="{loc:Translate SessionTreeFavoriteMark}"
+                                                               AutomationProperties.Name="{loc:Translate SessionTreeFavoriteMark}"
+                                                               Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <Border Background="{DynamicResource CardBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="{StaticResource SessionTreeBadgeCornerRadius}"
+                                                            Padding="4,0"
+                                                            Margin="6,0,0,0"
+                                                            VerticalAlignment="Center"
+                                                            ToolTip="{Binding OriginDisplayName}"
+                                                            Visibility="{Binding IsOriginBadgeVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <TextBlock Text="{Binding OriginBadgeCode}"
+                                                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <Border HorizontalAlignment="Right"
+                                                        BorderThickness="1"
                                                         CornerRadius="{StaticResource SessionTreeBadgeCornerRadius}"
                                                         Padding="4,0"
                                                         Margin="6,0,0,0"
@@ -1026,22 +1061,8 @@
                                                         </TextBlock.Style>
                                                     </TextBlock>
                                                 </Border>
-                                                <Border Background="{DynamicResource CardBrush}"
-                                                        BorderBrush="{DynamicResource BorderBrush}"
-                                                        BorderThickness="1"
-                                                        CornerRadius="{StaticResource SessionTreeBadgeCornerRadius}"
-                                                        Padding="4,0"
-                                                        Margin="6,0,0,0"
-                                                        VerticalAlignment="Center"
-                                                        ToolTip="{Binding OriginDisplayName}"
-                                                        Visibility="{Binding IsOriginBadgeVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                    <TextBlock Text="{Binding OriginBadgeCode}"
-                                                               FontSize="{StaticResource FontSizeSmallCaption}"
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                                               VerticalAlignment="Center"/>
-                                                </Border>
-                                            </StackPanel>
+                                            </controls:NameFirstPanel>
+                                            </controls:NameFirstPanel>
                                         </Grid>
                                     </Border>
                                     <DataTemplate.Triggers>
@@ -3207,6 +3228,9 @@
                                                                 <Style TargetType="TextBlock">
                                                                     <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                                                     <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasStatusWarning}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                                        </DataTrigger>
                                                                         <DataTrigger Binding="{Binding HasStatusError}" Value="True">
                                                                             <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                                                                         </DataTrigger>

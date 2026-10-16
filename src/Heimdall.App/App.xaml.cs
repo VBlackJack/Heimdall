@@ -906,7 +906,12 @@ public partial class App : System.Windows.Application
 
         // Shared MobaXterm sessions: one provider holds them in memory, and every read path finds
         // profiles through the one lookup (servers.json first, then the shared sources).
-        services.AddSingleton<ISharedSessionProvider, SharedSessionProvider>();
+        // The offline copies live in the data root of this process, and the files are watched: a
+        // test builds its provider without either.
+        services.AddSingleton<ISharedSessionProvider>(sp => new SharedSessionProvider(
+            sp.GetRequiredService<LocalizationManager>(),
+            SharedSessionSourceCache.ForDataRoot(),
+            watchSourceFiles: true));
         services.AddSingleton<IProfileLookup, ProfileLookup>();
         services.AddSingleton<SessionHealthMonitor>();
         services.AddSingleton<NetworkScannerService>();

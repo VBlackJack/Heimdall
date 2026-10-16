@@ -63,6 +63,13 @@ public partial class SharedSessionSourceItemViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasStatusError;
 
+    /// <summary>
+    /// Whether <see cref="StatusDescription"/> reports sessions that are not what the file holds
+    /// now: an offline copy, or a previous version kept.
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasStatusWarning;
+
     public bool HasNameError => NameError is not null;
 
     public bool HasPathError => PathError is not null;

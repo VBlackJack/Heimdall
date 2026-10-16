@@ -426,6 +426,25 @@ public sealed class AppSettings
     public List<SharedSessionSourceDto> SharedSessionSources { get; set; } = new();
 
     /// <summary>
+    /// How long a shared source file must stay quiet after a change before it is read again. Sync
+    /// clients and editors write a file in several steps; reading after the first one would read
+    /// half a file.
+    /// </summary>
+    [SettingRange(250, 30000)]
+    public int SharedSourceReloadDebounceMs { get; set; } = 1500;
+
+    /// <summary>
+    /// How many more times a changed shared source file is read when it is locked or cannot be
+    /// read, before the previous version is kept.
+    /// </summary>
+    [SettingRange(0, 20)]
+    public int SharedSourceReloadRetryCount { get; set; } = 5;
+
+    /// <summary>The wait between two reads of a changed shared source file that failed.</summary>
+    [SettingRange(100, 30000)]
+    public int SharedSourceReloadRetryDelayMs { get; set; } = 1000;
+
+    /// <summary>
     /// The post-connect commands of shared sessions the user allowed to run. Key: the shared
     /// profile identifier. Value: the <see cref="PostConnectFingerprint"/> of the commands that
     /// were allowed, so a change to them in the shared file asks again.

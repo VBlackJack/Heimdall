@@ -57,7 +57,9 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     /// which is what the "no group" folder's empty <see cref="FullPath"/> produced.
     /// </remarks>
     public string? TooltipText => IsShared
-        ? (HasError ? ErrorMessage : SharedTooltipText)
+        ? (HasError ? ErrorMessage
+            : HasNotice ? SharedTooltipText + System.Environment.NewLine + Notice
+            : SharedTooltipText)
         : string.IsNullOrEmpty(FullPath) ? null : FullPath;
 
     /// <summary>
@@ -97,6 +99,23 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
 
     /// <summary>Whether this shared source root stands for a source that could not be read.</summary>
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    /// <summary>
+    /// Why the sessions a shared source root lists are not what its file holds now: an offline
+    /// copy stands in for a file that cannot be read, or a change was refused and the previous
+    /// version kept. Null when they are. The sessions are listed and connect either way.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotice))]
+    [NotifyPropertyChangedFor(nameof(TooltipText))]
+    private string? _notice;
+
+    /// <summary>The short form of <see cref="Notice"/> the root row shows beside its name.</summary>
+    [ObservableProperty]
+    private string _noticeBadgeText = "";
+
+    /// <summary>Whether this shared source root carries a <see cref="Notice"/>.</summary>
+    public bool HasNotice => !string.IsNullOrEmpty(Notice);
 
     /// <summary>The read-only notice a shared folder shows on hover and on its lock mark.</summary>
     public string SharedReadOnlyText => IsShared

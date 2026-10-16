@@ -16,7 +16,6 @@
 
 using Heimdall.App.Services.SharedSessions;
 using Heimdall.Core.Configuration;
-using Heimdall.Core.SessionHealth;
 
 namespace Heimdall.App.ViewModels;
 
@@ -135,6 +134,7 @@ public partial class ServerListViewModel
         }
 
         _profileLookup.SharedSessions.Changed += OnSharedSessionsChanged;
+        _profileLookup.SharedSessions.SourceReloaded += OnSharedSourceReloaded;
         _sharedSessionsSubscribed = true;
     }
 
@@ -146,6 +146,7 @@ public partial class ServerListViewModel
         }
 
         _profileLookup.SharedSessions.Changed -= OnSharedSessionsChanged;
+        _profileLookup.SharedSessions.SourceReloaded -= OnSharedSourceReloaded;
         _sharedSessionsSubscribed = false;
     }
 
@@ -163,41 +164,79 @@ public partial class ServerListViewModel
     }
 
     /// <summary>
-    /// Replaces the shared rows with what the provider holds now and rebuilds the tree; the local
-    /// rows, their selection and their state are left as they are.
+    /// Says on the status line what a reload of one source after its file changed came to: the
+    /// sessions it holds now, or why the previous ones were kept.
     /// </summary>
+    private void OnSharedSourceReloaded(SharedSessionSourceState state)
+    {
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            if (!_disposed)
+            {
+                StatusMessageRequested?.Invoke(DescribeSharedSourceReload(state));
+            }
+        });
+    }
+
+    /// <summary>The status line of a reload of one shared source.</summary>
+    internal string DescribeSharedSourceReload(SharedSessionSourceState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        string name = string.IsNullOrWhiteSpace(state.Name) ? state.SourceId : state.Name;
+        string? problem = state.Status == SharedSessionSourceStatus.Error ? state.ErrorMessage : state.Notice;
+        return problem is null
+            ? _localizer.FormatCount(
+                state.ProfileCount,
+                "StatusSharedSourceUpdatedOne",
+                "StatusSharedSourceUpdated",
+                name,
+                state.ProfileCount)
+            : _localizer.Format("StatusSharedSourceNotUpdated", name, problem);
+    }
+
+    /// <summary>How many shared sessions the tree lists.</summary>
+    public int SharedServerCount => _allServers.Count(server => server.IsShared);
+
+    /// <summary>
+    /// Brings the shared rows in line with what the provider holds now and rebuilds the tree; the
+    /// local rows are left as they are.
+    /// </summary>
+    /// <remarks>
+    /// A session still held keeps its row: the instance is updated in place, so it stays selected,
+    /// keeps its health dot and its session state, and the folders keep their expansion, which is
+    /// filed under keys made of the source and the path. Only a session gone from its source loses
+    /// its row; a session open on it is not touched.
+    /// </remarks>
     internal void RefreshSharedSessions()
     {
         AppSettings settings = _currentSettings ?? new AppSettings();
-        Dictionary<string, HealthState> healthById = _allServers
+        Dictionary<string, ServerItemViewModel> previous = _allServers
             .Where(server => server.IsShared)
-            .ToDictionary(server => server.Id, server => server.HealthState, StringComparer.Ordinal);
+            .GroupBy(server => server.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
         _allServers.RemoveAll(server => server.IsShared);
         HashSet<string> localIds = _allServers
             .Select(server => server.Id)
             .ToHashSet(StringComparer.Ordinal);
-        foreach (ServerItemViewModel shared in BuildSharedRows(localIds, settings))
-        {
-            if (healthById.TryGetValue(shared.Id, out HealthState? health))
-            {
-                shared.HealthState = health;
-            }
-
-            _allServers.Add(shared);
-        }
+        _allServers.AddRange(BuildSharedRows(localIds, settings, previous));
 
         RebuildHealthServerIndex();
         RebuildStableTreeProjection();
         ApplyFilter(EffectiveSelectedServerId);
         OnPropertyChanged(nameof(HasNoInventory));
+        OnPropertyChanged(nameof(SharedServerCount));
     }
 
     /// <summary>
     /// The rows of every shared profile the provider holds, except one whose identifier a local
     /// profile already uses (the door refuses that, so it can only be an older inventory).
     /// </summary>
-    private IEnumerable<ServerItemViewModel> BuildSharedRows(IReadOnlySet<string> localIds, AppSettings settings)
+    private IEnumerable<ServerItemViewModel> BuildSharedRows(
+        IReadOnlySet<string> localIds,
+        AppSettings settings,
+        IReadOnlyDictionary<string, ServerItemViewModel>? reuse = null)
     {
         ISharedSessionProvider provider = _profileLookup.SharedSessions;
 
@@ -218,12 +257,22 @@ public partial class ServerListViewModel
                 continue;
             }
 
-            ServerItemViewModel row = ServerItemViewModel.FromDto(
-                profile,
-                project: null,
-                _connectionSm.GetState(profile.Id).ToString(),
-                gateways,
-                _localizer);
+            ServerItemViewModel row;
+            if (reuse is not null && reuse.TryGetValue(profile.Id, out ServerItemViewModel? existing))
+            {
+                existing.UpdateFromDto(profile, project: null, gateways, _localizer);
+                row = existing;
+            }
+            else
+            {
+                row = ServerItemViewModel.FromDto(
+                    profile,
+                    project: null,
+                    _connectionSm.GetState(profile.Id).ToString(),
+                    gateways,
+                    _localizer);
+            }
+
             row.SharedSourceName = string.IsNullOrWhiteSpace(sourceName) ? sourceId : sourceName;
             yield return row;
         }
@@ -265,6 +314,15 @@ public partial class ServerListViewModel
                 root.ViewModel!.ErrorMessage = string.IsNullOrWhiteSpace(source.ErrorMessage)
                     ? _localizer["SharedSessionSourceErrorUnknown"]
                     : source.ErrorMessage;
+            }
+            else if (source.Notice is not null)
+            {
+                root.ViewModel!.Notice = source.Notice;
+                root.ViewModel.NoticeBadgeText = source.OfflineCopyFromUtc is { } takenAtUtc
+                    ? _localizer.Format(
+                        "SessionTreeSharedRootOfflineBadge",
+                        takenAtUtc.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture))
+                    : _localizer["SessionTreeSharedRootStaleBadge"];
             }
 
             _stableTreeRoot.Children.Add(root);

@@ -326,7 +326,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 103 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 115 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -424,6 +424,27 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     jamais exportées ni importées avec les paramètres, et **Valeurs par défaut** les efface tout en
     conservant les sources elles-mêmes
   - L'en-tête de session nomme la passerelle partagée par laquelle passe une session partagée
+  - Rechargement automatique : le fichier de chaque source activée est surveillé (y compris les
+    enregistrements atomiques des éditeurs et des clients de synchronisation, qui écrivent un fichier
+    temporaire puis le renomment par-dessus l'original). Une fois le fichier resté calme pendant
+    `SharedSourceReloadDebounceMs` (1500 ms par défaut), cette source seule est relue et
+    l'arborescence suit, en gardant les dossiers dépliés et la sélection ; la ligne d'état indique
+    "Sessions partagées mises à jour : <nom>, N sessions". Un fichier verrouillé ou à moitié écrit
+    est relu jusqu'à `SharedSourceReloadRetryCount` fois (5 par défaut), à
+    `SharedSourceReloadRetryDelayMs` d'intervalle (1000 ms par défaut). S'il reste illisible, ne se
+    lit pas comme un fichier de sessions ou ne contient soudain plus aucune session, les sessions
+    précédentes sont conservées et la source dit pourquoi : une source qui fonctionne n'est jamais
+    remplacée par une source vide. Un rechargement ne touche jamais aux sessions ouvertes ; si une
+    session disparaît du fichier pendant qu'elle est ouverte, elle reste ouverte, et une reconnexion
+    ultérieure indique que le profil est introuvable
+  - Copie hors ligne : après chaque lecture réussie, le fichier brut et sa provenance (chemin, heure,
+    SHA-256) sont conservés dans `SharedSessionCache` sous le dossier de données, avec les mêmes ACL
+    restreintes que les fichiers de configuration. Quand le fichier est absent ou illisible, les
+    sessions sont lues depuis cette copie, par le même analyseur et le même filtrage que le fichier
+    lui-même. La racine de la source affiche alors "copie hors ligne du <date>", avec la raison au
+    survol, et la carte des paramètres indique la même chose. Supprimer une source supprime sa
+    copie ; les copies ne sont jamais écrites dans servers.json, dans un export des paramètres ni
+    dans le dépôt
 - Les imports de sessions JSON ne contiennent que des profils de serveurs. Les définitions de passerelles SSH vivent dans `settings.json`
   (`AppSettings.SshGateways`), si bien que des jeux de test comme `Heimdall-TestEnv` doivent injecter la
   passerelle correspondante dans la configuration de build d'exécution exacte avant que les sessions tunnelisées puissent la résoudre.

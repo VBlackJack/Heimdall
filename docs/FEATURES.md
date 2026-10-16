@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,103 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,115 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -418,6 +418,24 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     changes them. The approvals are personal trust: they are never exported or imported with the
     settings, and **Reset defaults** clears them, while it keeps the sources themselves
   - The session header names the shared gateway a shared session goes through
+  - Automatic reload: each enabled source file is watched (including the atomic saves of editors
+    and sync clients, which write a temporary file and rename it over the original). Once the file
+    has been quiet for `SharedSourceReloadDebounceMs` (default 1500 ms), that source alone is read
+    again and the tree follows, keeping expanded folders and the selection; the status line says
+    "Shared sessions updated: <name>, N sessions". A file that is locked or half written is read
+    again up to `SharedSourceReloadRetryCount` times (default 5), `SharedSourceReloadRetryDelayMs`
+    apart (default 1000 ms). If it still cannot be read, does not parse, or suddenly holds no
+    session, the previous sessions are kept and the source says why: a working source is never
+    replaced by an empty one. Open sessions are never touched by a reload; if a session disappears
+    from the file while it is open, it stays open, and a later reconnect says the profile was not
+    found
+  - Offline copy: after each successful read, the raw file and where it came from (path, time,
+    SHA-256) are kept in `SharedSessionCache` under the data directory, with the same restricted
+    ACL as the configuration files. When the file is missing or unreadable, the sessions are read
+    from that copy instead, through the same parser and the same sanitizer as the file itself. The
+    source root then shows "offline copy from <date>", with the reason on hover, and the Settings
+    card says the same. Removing a source deletes its copy; the copies are never written to
+    servers.json, to a settings export or to the repository
 - JSON session imports contain server profiles only. SSH gateway definitions live in `settings.json`
   (`AppSettings.SshGateways`), so test fixtures such as `Heimdall-TestEnv` must inject the
   matching gateway into the exact runtime build configuration before tunneled sessions can resolve it.

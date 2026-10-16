@@ -35,6 +35,13 @@ public sealed class EmptySharedSessionProvider : ISharedSessionProvider
     }
 
     /// <inheritdoc />
+    public event Action<SharedSessionSourceState>? SourceReloaded
+    {
+        add { }
+        remove { }
+    }
+
+    /// <inheritdoc />
     public IReadOnlyList<SharedSessionSourceState> Sources => [];
 
     /// <inheritdoc />

@@ -265,17 +265,23 @@ public partial class SettingsViewModel
             {
                 row.StatusDescription = _localizer["SettingsSharedSourceStatusPending"];
                 row.HasStatusError = false;
+                row.HasStatusWarning = false;
                 continue;
             }
+
+            row.HasStatusWarning = state.Status == SharedSessionSourceStatus.Loaded && state.Notice is not null;
 
             (row.StatusDescription, row.HasStatusError) = state.Status switch
             {
                 SharedSessionSourceStatus.Loaded => (
+                    // The same notice as the tree's root: an offline copy says from when, a kept
+                    // version says why the file was not taken.
                     _localizer.FormatCount(
                         state.ProfileCount,
                         "SettingsSharedSourceStatusLoadedOne",
                         "SettingsSharedSourceStatusLoaded",
-                        state.ProfileCount),
+                        state.ProfileCount)
+                    + (state.Notice is null ? "" : System.Environment.NewLine + state.Notice),
                     false),
                 SharedSessionSourceStatus.Error => (
                     string.IsNullOrWhiteSpace(state.ErrorMessage)

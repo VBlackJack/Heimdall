@@ -142,6 +142,8 @@
     <!-- Ring width of a status dot that shows a reachability verdict rather than an open session. -->
     <sys:Double x:Key="SessionTreeStatusRingThickness">1.5</sys:Double>
     <sys:Double x:Key="SessionTreeGatewayBadgeMaxWidth">140</sys:Double>
+    <sys:Double x:Key="SessionTreeBadgeMinWidth">28</sys:Double>
+    <sys:Double x:Key="SessionTreeGatewayBadgeMinWidth">56</sys:Double>
     <sys:Double x:Key="SessionTreeFilterChipMaxWidth">160</sys:Double>
     <sys:Double x:Key="SessionTreeDropHintMaxWidth">380</sys:Double>
     <!-- Hover delays, in milliseconds: the row's summary, then the status dot's own verdict. -->

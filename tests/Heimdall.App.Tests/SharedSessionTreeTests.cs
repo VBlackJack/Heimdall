@@ -419,6 +419,121 @@ public sealed partial class SharedSessionConnectTests
         Assert.Equal(baseline + 2, provider.LoadCount);
     }
 
+    // --- Live reload ---
+
+    [Fact]
+    public async Task SourceReload_KeepsTheRowsTheSelectionAndTheExpandedFolders()
+    {
+        StubSharedSessionProvider? provider = null;
+        await using Fixture fixture = await Fixture.CreateAsync(shared => provider = LoadedTeamProvider(shared));
+        await LoadTreeAsync(fixture, LocalProfile(LocalInSharedFolderId, SharedSessionTestData.SharedFolder));
+        FolderViewModel sharedRoot = Assert.Single(fixture.ViewModel.GroupedServers, folder => folder.IsSharedRoot);
+        sharedRoot.IsExpanded = true;
+        Assert.Single(sharedRoot.SubFolders).IsExpanded = true;
+        ServerItemViewModel selected = Row(fixture, fixture.Shared.Profile.Id);
+        fixture.ViewModel.SelectSingle(selected);
+        ServerProfileDto added = fixture.Shared.DirectProfile.CloneFaithfully();
+        added.Id = SharedSessionIds.PrefixFor(SharedSessionTestData.SourceId) + "profile3";
+        added.DisplayName = "srv-web01";
+        SharedSessionSourceState state = StubSharedSessionProvider.Loaded(SharedSessionTestData.SourceId, TeamSourceName, 3);
+        provider!.SetContents([fixture.Shared.Profile, fixture.Shared.DirectProfile, added], [fixture.Shared.Gateway], [state]);
+
+        provider.RaiseSourceReloaded(state);
+
+        FolderViewModel rootAfter = Assert.Single(fixture.ViewModel.GroupedServers, folder => folder.IsSharedRoot);
+        Assert.True(rootAfter.IsExpanded);
+        Assert.True(Assert.Single(rootAfter.SubFolders).IsExpanded);
+        Assert.Same(selected, Row(fixture, fixture.Shared.Profile.Id));
+        Assert.Same(selected, fixture.ViewModel.SelectedServer);
+        Assert.Contains(selected, fixture.ViewModel.SelectedItems);
+        Assert.Contains(fixture.ViewModel.Servers, server => server.Id == added.Id);
+    }
+
+    [Fact]
+    public async Task SourceReload_SaysWhatItCameTo_OnTheStatusLine()
+    {
+        StubSharedSessionProvider? provider = null;
+        await using Fixture fixture = await Fixture.CreateAsync(shared => provider = LoadedTeamProvider(shared));
+        await LoadTreeAsync(fixture);
+        List<string> statuses = [];
+        fixture.ViewModel.StatusMessageRequested += statuses.Add;
+        SharedSessionSourceState updated = StubSharedSessionProvider.Loaded(SharedSessionTestData.SourceId, TeamSourceName, 2);
+        SharedSessionSourceState kept = updated with { Notice = "The previous version is kept. The file is locked." };
+
+        provider!.RaiseSourceReloaded(updated);
+        provider.RaiseSourceReloaded(kept);
+
+        Assert.Equal(
+            [
+                fixture.Localizer.FormatCount(2, "StatusSharedSourceUpdatedOne", "StatusSharedSourceUpdated", TeamSourceName, 2),
+                fixture.Localizer.Format("StatusSharedSourceNotUpdated", TeamSourceName, kept.Notice!),
+            ],
+            statuses);
+        Assert.Equal("Shared sessions updated: Team, 2 sessions", statuses[0]);
+    }
+
+    [Fact]
+    public async Task OfflineSource_RootSaysFromWhen_AndKeepsItsSessions()
+    {
+        DateTime takenAtUtc = new(2026, 10, 14, 7, 30, 0, DateTimeKind.Utc);
+        const string notice = "Offline copy from then. The file was not found.";
+        await using Fixture fixture = await Fixture.CreateAsync(shared => new StubSharedSessionProvider(
+            [shared.Profile, shared.DirectProfile],
+            [shared.Gateway],
+            [StubSharedSessionProvider.Loaded(SharedSessionTestData.SourceId, TeamSourceName, 2) with
+            {
+                Notice = notice,
+                OfflineCopyFromUtc = takenAtUtc,
+            }]));
+        await LoadTreeAsync(fixture);
+
+        FolderViewModel root = Assert.Single(fixture.ViewModel.GroupedServers, folder => folder.IsSharedRoot);
+
+        Assert.False(root.HasError);
+        Assert.True(root.HasNotice);
+        Assert.Contains(notice, root.TooltipText, StringComparison.Ordinal);
+        Assert.Equal(
+            fixture.Localizer.Format(
+                "SessionTreeSharedRootOfflineBadge",
+                takenAtUtc.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture)),
+            root.NoticeBadgeText);
+        Assert.Equal(2, root.ServerCount);
+    }
+
+    [Fact]
+    public async Task SharedServerCount_FollowsTheSharedRows()
+    {
+        StubSharedSessionProvider? provider = null;
+        await using Fixture fixture = await Fixture.CreateAsync(shared => provider = LoadedTeamProvider(shared));
+        await LoadTreeAsync(fixture, LocalProfile(LocalInSharedFolderId, SharedSessionTestData.SharedFolder));
+        List<string?> raised = [];
+        fixture.ViewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        Assert.Equal(2, fixture.ViewModel.SharedServerCount);
+
+        provider!.SetContents(
+            [fixture.Shared.DirectProfile],
+            [],
+            [StubSharedSessionProvider.Loaded(SharedSessionTestData.SourceId, TeamSourceName, 1)]);
+        await provider.LoadAsync(new AppSettings());
+
+        Assert.Equal(1, fixture.ViewModel.SharedServerCount);
+        Assert.Contains(nameof(ServerListViewModel.SharedServerCount), raised);
+    }
+
+    [Theory]
+    [InlineData("en", 12, 0, "12 sessions")]
+    [InlineData("en", 12, 79, "12 sessions, 79 shared")]
+    [InlineData("en", 1, 1, "1 session, 1 shared")]
+    [InlineData("fr", 2, 1, "2 sessions, 1 partagée")]
+    [InlineData("fr", 0, 3, "0 session, 3 partagées")]
+    public async Task StatusBarCount_NamesTheSharedSessions_WhenThereAreAny(string locale, int local, int shared, string expected)
+    {
+        var localizer = new Heimdall.Core.Localization.LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+
+        Assert.Equal(expected, MainViewModel.FormatServerCount(localizer, local, shared));
+    }
+
     // --- Helpers ---
 
     private static StubSharedSessionProvider LoadedTeamProvider(SharedSessionTestData shared) =>
