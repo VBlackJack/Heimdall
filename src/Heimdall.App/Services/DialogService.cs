@@ -195,6 +195,16 @@ public interface IDialogService
     Task ShowTrustedHostKeyDetailsAsync(TrustedHostKeyDetailsDialogViewModel viewModel);
 
     /// <summary>
+    /// Shows the read-only import report of a shared session source. Returns once it is closed.
+    /// </summary>
+    /// <remarks>A test double that does not show dialogs has nothing to show it in.</remarks>
+    Task ShowSharedSessionImportReportAsync(SharedSessionImportReportDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Shows known_hosts import conflicts and returns the user's resolution,
     /// or <c>null</c> when the dialog is cancelled.
     /// </summary>

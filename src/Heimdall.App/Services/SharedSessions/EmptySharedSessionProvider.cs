@@ -35,7 +35,7 @@ public sealed class EmptySharedSessionProvider : ISharedSessionProvider
     }
 
     /// <inheritdoc />
-    public event Action<SharedSessionSourceState>? SourceReloaded
+    public event Action<SharedSessionSourceReload>? SourceReloaded
     {
         add { }
         remove { }

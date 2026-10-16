@@ -102,7 +102,7 @@ public sealed class SharedSessionReloadTests : IDisposable
         WriteSource(TwoSessions);
         SharedSessionProvider provider = await LoadedProviderAsync();
         List<SharedSessionSourceState> reloaded = [];
-        provider.SourceReloaded += reloaded.Add;
+        provider.SourceReloaded += reload => reloaded.Add(reload.State);
 
         WriteSource(ThreeSessions);
         SharedSessionSourceState? state = await provider.ReloadSourceAsync(SourceId);
@@ -414,7 +414,7 @@ public sealed class SharedSessionReloadTests : IDisposable
         settings.SharedSourceReloadDebounceMs = 250;
         await provider.LoadAsync(settings);
         var reloaded = new TaskCompletionSource<SharedSessionSourceState>(TaskCreationOptions.RunContinuationsAsynchronously);
-        provider.SourceReloaded += state => reloaded.TrySetResult(state);
+        provider.SourceReloaded += reload => reloaded.TrySetResult(reload.State);
 
         WriteSource(ThreeSessions);
 

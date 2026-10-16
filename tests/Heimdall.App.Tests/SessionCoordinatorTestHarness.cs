@@ -758,6 +758,14 @@ public sealed partial class SessionCoordinatorPreMountTests
 
     private sealed class FakeDialogService : IDialogService
     {
+        public List<SharedSessionImportReportDialogViewModel> SharedReports { get; } = [];
+
+        public Task ShowSharedSessionImportReportAsync(SharedSessionImportReportDialogViewModel viewModel)
+        {
+            SharedReports.Add(viewModel);
+            return Task.CompletedTask;
+        }
+
         public int ErrorCallCount { get; private set; }
 
         public bool ConfirmResult { get; set; } = true;

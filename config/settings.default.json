@@ -33,6 +33,8 @@
     "sharedSourceReloadDebounceMs": 1500,
     "sharedSourceReloadRetryCount": 5,
     "sharedSourceReloadRetryDelayMs": 1000,
+    "sharedReportGatewayMajorityPercent": 60,
+    "sharedReportGatewayMinFolderSessions": 3,
     "serverShutdownTimeoutMs": 2000,
     "sleepPreventionIntervalSeconds": 60,
     "fileLoggerFlushIntervalMs": 2000,

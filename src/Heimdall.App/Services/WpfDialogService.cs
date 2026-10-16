@@ -504,6 +504,21 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
+    public Task ShowSharedSessionImportReportAsync(SharedSessionImportReportDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+
+        var dialog = new SharedSessionImportReportDialog
+        {
+            DataContext = viewModel,
+            Owner = GetOwnerWindow()
+        };
+
+        dialog.ShowDialog();
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     public Task<ImportKnownHostsConflictResolution?> ShowImportKnownHostsConflictAsync(
         ImportKnownHostsConflictDialogViewModel viewModel)
     {

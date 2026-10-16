@@ -70,6 +70,14 @@ public partial class SharedSessionSourceItemViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasStatusWarning;
 
+    /// <summary>How many findings the import report of the source's last read holds.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasIssues))]
+    private int _issueCount;
+
+    /// <summary>Whether the source has an import report worth opening.</summary>
+    public bool HasIssues => IssueCount > 0;
+
     public bool HasNameError => NameError is not null;
 
     public bool HasPathError => PathError is not null;

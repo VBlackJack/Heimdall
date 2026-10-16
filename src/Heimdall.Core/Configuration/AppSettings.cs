@@ -445,6 +445,17 @@ public sealed class AppSettings
     public int SharedSourceReloadRetryDelayMs { get; set; } = 1000;
 
     /// <summary>
+    /// The share of a folder's sessions, in percent, that must go through one gateway for the
+    /// shared import report to call it the folder's gateway and list the sessions that do not.
+    /// </summary>
+    [SettingRange(51, 100)]
+    public int SharedReportGatewayMajorityPercent { get; set; } = 60;
+
+    /// <summary>The fewest sessions a folder needs before the import report looks for a gateway outlier in it.</summary>
+    [SettingRange(2, 1000)]
+    public int SharedReportGatewayMinFolderSessions { get; set; } = 3;
+
+    /// <summary>
     /// The post-connect commands of shared sessions the user allowed to run. Key: the shared
     /// profile identifier. Value: the <see cref="PostConnectFingerprint"/> of the commands that
     /// were allowed, so a change to them in the shared file asks again.

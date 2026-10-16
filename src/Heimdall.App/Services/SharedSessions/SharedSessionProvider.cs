@@ -80,7 +80,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     public event Action? Changed;
 
     /// <inheritdoc />
-    public event Action<SharedSessionSourceState>? SourceReloaded;
+    public event Action<SharedSessionSourceReload>? SourceReloaded;
 
     /// <inheritdoc />
     public IReadOnlyList<SharedSessionSourceState> Sources =>
@@ -150,6 +150,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     public async Task<SharedSessionSourceState?> ReloadSourceAsync(string sourceId, CancellationToken cancellationToken = default)
     {
         SharedSessionSourceState? state = null;
+        int previousIssueCount = 0;
         await _loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -168,6 +169,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
                 return null;
             }
 
+            previousIssueCount = loads[index].State.IssueCount;
             HashSet<string> seenSourceIds = [.. loads.Where((_, position) => position != index).Select(load => load.State.SourceId)];
             SourceLoad reloaded = await LoadSourceAsync(
                     source,
@@ -189,7 +191,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         Changed?.Invoke();
         if (state is not null)
         {
-            SourceReloaded?.Invoke(state);
+            SourceReloaded?.Invoke(new SharedSessionSourceReload(state, previousIssueCount));
         }
 
         return state;
@@ -253,11 +255,12 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         TimeSpan retryDelay = TimeSpan.FromMilliseconds(
             SettingRanges.Of(nameof(AppSettings.SharedSourceReloadRetryDelayMs)).Clamp(settings.SharedSourceReloadRetryDelayMs));
 
+        SharedSessionImportReportBuilder.Options reportOptions = SharedSessionImportReportBuilder.Options.FromSettings(settings);
         ReadOutcome read = await ReadWithRetriesAsync(path, attempts, retryDelay, cancellationToken).ConfigureAwait(false);
         string reason;
         if (read.Content is { } content)
         {
-            Parsed? parsed = TryParse(source.Id, content, resolver, out string? parseError);
+            Parsed? parsed = TryParse(source.Id, name, content, resolver, reportOptions, out string? parseError);
             if (parsed is not null
                 && (parsed.Profiles.Count > 0 || previous is null || previous.Profiles.Count == 0))
             {
@@ -271,7 +274,8 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
                         parsed.Profiles.Count,
                         parsed.Gateways.Count,
                         parsed.Warnings,
-                        parsed.Dropped),
+                        parsed.Dropped,
+                        Report: parsed.Report),
                     parsed.Profiles,
                     parsed.Gateways);
                 _lastGood[source.Id] = loaded;
@@ -311,7 +315,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
             };
         }
 
-        if (await LoadOfflineCopyAsync(source, name, path, resolver, reason, cancellationToken).ConfigureAwait(false) is { } offline)
+        if (await LoadOfflineCopyAsync(source, name, path, resolver, reportOptions, reason, cancellationToken).ConfigureAwait(false) is { } offline)
         {
             _lastGood[source.Id] = offline;
             return offline;
@@ -329,6 +333,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         string name,
         string path,
         Func<string, string?> resolver,
+        SharedSessionImportReportBuilder.Options reportOptions,
         string reason,
         CancellationToken cancellationToken)
     {
@@ -345,7 +350,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
             return null;
         }
 
-        Parsed? parsed = TryParse(source.Id, copy.Content, resolver, out string? parseError);
+        Parsed? parsed = TryParse(source.Id, name, copy.Content, resolver, reportOptions, out string? parseError);
         if (parsed is null || parsed.Profiles.Count == 0)
         {
             FileLogger.Warn($"Shared sessions: the offline copy of source {source.Id} holds no usable session {parseError}");
@@ -367,7 +372,8 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
                 parsed.Warnings,
                 parsed.Dropped,
                 OfflineNotice(copy.LoadedAtUtc, reason),
-                copy.LoadedAtUtc),
+                copy.LoadedAtUtc,
+                parsed.Report),
             parsed.Profiles,
             parsed.Gateways);
     }
@@ -384,15 +390,19 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     /// </summary>
     private static Parsed? TryParse(
         string sourceId,
+        string sourceName,
         byte[] content,
         Func<string, string?> resolver,
+        SharedSessionImportReportBuilder.Options reportOptions,
         out string? error)
     {
         MobaXtermImportResult result;
+        string text;
         try
         {
+            text = MobaXtermFileDecoder.Decode(content);
             result = MobaXtermImporter.Parse(
-                MobaXtermFileDecoder.Decode(content),
+                text,
                 new MobaXtermImportOptions
                 {
                     IdPrefix = SharedSessionIds.PrefixFor(sourceId),
@@ -417,14 +427,14 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         }
 
         List<ServerProfileDto> profiles = [];
-        int dropped = 0;
+        List<ServerProfileDto> refused = [];
         foreach (ServerProfileDto parsedProfile in result.Servers)
         {
             ServerProfileDto? profile = SharedProfileSanitizer.Sanitize(parsedProfile);
             if (profile is null
                 || (SshGatewayRoute.IsAssigned(profile.SshGatewayId) && !gatewaysById.ContainsKey(profile.SshGatewayId!)))
             {
-                dropped++;
+                refused.Add(parsedProfile);
                 continue;
             }
 
@@ -432,7 +442,13 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         }
 
         error = null;
-        return new Parsed(profiles, [.. gatewaysById.Values], result.Warnings, dropped);
+        List<SshGatewayDto> gateways = [.. gatewaysById.Values];
+        return new Parsed(
+            profiles,
+            gateways,
+            result.Warnings,
+            refused.Count,
+            SharedSessionImportReportBuilder.Build(sourceId, sourceName, text, result.Warnings, profiles, gateways, refused, reportOptions));
     }
 
     /// <summary>
@@ -579,7 +595,8 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         IReadOnlyList<ServerProfileDto> Profiles,
         IReadOnlyList<SshGatewayDto> Gateways,
         IReadOnlyList<MobaXtermImportWarning> Warnings,
-        int Dropped);
+        int Dropped,
+        SharedSessionImportReport Report);
 
     private sealed record SourceLoad(
         SharedSessionSourceState State,

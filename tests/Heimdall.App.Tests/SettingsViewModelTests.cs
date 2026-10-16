@@ -4861,6 +4861,14 @@ public sealed partial class SettingsViewModelTests : IDisposable
 
     private sealed class FakeDialogService : IDialogService
     {
+        public List<SharedSessionImportReportDialogViewModel> SharedReports { get; } = [];
+
+        public Task ShowSharedSessionImportReportAsync(SharedSessionImportReportDialogViewModel viewModel)
+        {
+            SharedReports.Add(viewModel);
+            return Task.CompletedTask;
+        }
+
         public bool ConfirmResult { get; set; }
 
         public bool? SaveDiscardResult { get; set; }

@@ -615,6 +615,25 @@ public sealed class ContextMenuFactory
         // or deleted here. A source that could not be read says why instead.
         if (folder.IsShared)
         {
+            // The import report of the source: what its file holds that its maintainers may want
+            // to fix. A source that could not be read has none, and says why instead.
+            if (folder.IsSharedRoot)
+            {
+                MenuItem reportItem = new()
+                {
+                    Header = vm.Localize("TreeCtxShowImportReport"),
+                    IsEnabled = !folder.HasError,
+                };
+                if (folder.HasError)
+                {
+                    ExplainDisabled(reportItem, folder.ErrorMessage!);
+                }
+
+                string sourceId = folder.SharedSourceId;
+                reportItem.Click += async (_, _) => await vm.ServerList.ShowSharedImportReportAsync(sourceId);
+                menu.Items.Add(reportItem);
+            }
+
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateReadOnlyNoticeItem(
                 folder.HasError ? folder.ErrorMessage! : folder.SharedReadOnlyText));

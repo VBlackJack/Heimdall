@@ -136,6 +136,33 @@ public partial class SettingsViewModel
         RefreshSharedSessionSourceStatuses();
     }
 
+    /// <summary>Puts the plain text of an import report on the clipboard; replaced by tests.</summary>
+    internal Services.IClipboardService ReportClipboard { get; set; } = new Services.WpfClipboardService();
+
+    /// <summary>Asks where to export an import report as CSV; replaced by tests.</summary>
+    internal Func<string, string?>? ReportCsvPathPicker { get; set; }
+
+    /// <summary>
+    /// Shows the import report of a row's source, as of the source's last successful read.
+    /// </summary>
+    [RelayCommand]
+    private Task ShowSharedSourceReportAsync(SharedSessionSourceItemViewModel? row)
+    {
+        if (row is null
+            || _sharedSessions?.Sources.FirstOrDefault(
+                state => string.Equals(state.SourceId, row.Id, StringComparison.Ordinal))?.Report is not { } report)
+        {
+            return Task.CompletedTask;
+        }
+
+        return _dialogService.ShowSharedSessionImportReportAsync(new Dialogs.SharedSessionImportReportDialogViewModel(
+            report,
+            _localizer,
+            ReportClipboard,
+            ReportCsvPathPicker
+                ?? (proposed => Dialogs.SharedSessionImportReportDialogViewModel.PickCsvPathWithDialog(_localizer, proposed))));
+    }
+
     /// <summary>Replaces the rows with the sources in <paramref name="settings"/>.</summary>
     private void LoadSharedSessionSources(AppSettings settings)
     {
@@ -266,8 +293,11 @@ public partial class SettingsViewModel
                 row.StatusDescription = _localizer["SettingsSharedSourceStatusPending"];
                 row.HasStatusError = false;
                 row.HasStatusWarning = false;
+                row.IssueCount = 0;
                 continue;
             }
+
+            row.IssueCount = state.IssueCount;
 
             row.HasStatusWarning = state.Status == SharedSessionSourceStatus.Loaded && state.Notice is not null;
 

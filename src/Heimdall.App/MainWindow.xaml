@@ -841,14 +841,33 @@
                                             </Grid>
                                             <!-- A shared source served from its offline copy, or keeping its previous
                                                  version, says so beside its name; the reason is in the row tooltip. -->
-                                            <TextBlock Text="{Binding NoticeBadgeText}"
-                                                       FontSize="{StaticResource FontSizeSmallCaption}"
-                                                       Foreground="{DynamicResource WarningTextBrush}"
-                                                       VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       MaxWidth="{StaticResource SessionTreeGatewayBadgeMaxWidth}"
-                                                       Margin="8,0,0,0"
-                                                       Visibility="{Binding HasNotice, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <!-- The issue count of the source's import report, then the notice; the
+                                                 count is short and comes first, the notice ellipsizes. -->
+                                            <controls:NameFirstPanel VerticalAlignment="Center"
+                                                                     MinTrailingWidth="{StaticResource SessionTreeBadgeMinWidth}">
+                                                <Border BorderThickness="1"
+                                                        BorderBrush="{DynamicResource WarningTextBrush}"
+                                                        CornerRadius="{StaticResource SessionTreeBadgeCornerRadius}"
+                                                        Padding="4,0"
+                                                        Margin="8,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        ToolTip="{loc:Translate SessionTreeSharedRootIssuesTooltip}"
+                                                        AutomationProperties.Name="{Binding IssueBadgeText}"
+                                                        Visibility="{Binding HasIssues, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                    <TextBlock Text="{Binding IssueBadgeText}"
+                                                               FontSize="{StaticResource FontSizeSmallCaption}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource WarningTextBrush}"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding NoticeBadgeText}"
+                                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                                           Foreground="{DynamicResource WarningTextBrush}"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           MaxWidth="{StaticResource SessionTreeGatewayBadgeMaxWidth}"
+                                                           Margin="8,0,0,0"
+                                                           Visibility="{Binding HasNotice, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </controls:NameFirstPanel>
                                             </controls:NameFirstPanel>
                                             <TextBlock Grid.Column="2"
                                                        Text="{Binding CountBadgeText}"
@@ -3219,8 +3238,8 @@
                                                         <CheckBox Grid.Column="2" Margin="8,4,0,0" VerticalAlignment="Top" HorizontalAlignment="Center"
                                                                   IsChecked="{Binding Enabled}"
                                                                   AutomationProperties.Name="{loc:Translate SettingsSharedSourceColumnEnabled}"/>
-                                                        <TextBlock Grid.Column="3" Margin="8,4,0,0"
-                                                                   Text="{Binding StatusDescription}"
+                                                        <StackPanel Grid.Column="3" Margin="8,4,0,0">
+                                                        <TextBlock Text="{Binding StatusDescription}"
                                                                    ToolTip="{Binding StatusDescription}"
                                                                    FontSize="{StaticResource FontSizeBody}"
                                                                    TextWrapping="Wrap">
@@ -3238,6 +3257,18 @@
                                                                 </Style>
                                                             </TextBlock.Style>
                                                         </TextBlock>
+                                                        <!-- The import report of the last read, when it found anything. -->
+                                                        <Button HorizontalAlignment="Left"
+                                                                Margin="0,6,0,0"
+                                                                Padding="8,2"
+                                                                Content="{loc:Translate SettingsSharedSourceReport}"
+                                                                Command="{Binding DataContext.Settings.ShowSharedSourceReportCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                                FontSize="{StaticResource FontSizeCaption}"
+                                                                AutomationProperties.Name="{loc:Translate AccessSettingsSharedSourceReport}"
+                                                                Visibility="{Binding HasIssues, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                        </StackPanel>
                                                         <Button Grid.Column="4" VerticalAlignment="Top" Margin="8,0,0,0"
                                                                 Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
                                                                 FontSize="{StaticResource FontSizeCaption}"

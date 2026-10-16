@@ -52,6 +52,9 @@ public enum SharedSessionSourceStatus
 /// When the offline copy standing in for the file was taken, or null when the sessions come from
 /// the file itself.
 /// </param>
+/// <param name="Report">
+/// What the last successful read of the file found to report, or null when it was never read.
+/// </param>
 public sealed record SharedSessionSourceState(
     string SourceId,
     string Name,
@@ -63,8 +66,21 @@ public sealed record SharedSessionSourceState(
     IReadOnlyList<MobaXtermImportWarning> Warnings,
     int DroppedProfileCount,
     string? Notice = null,
-    DateTime? OfflineCopyFromUtc = null)
+    DateTime? OfflineCopyFromUtc = null,
+    SharedSessionImportReport? Report = null)
 {
+    /// <summary>How many findings the import report holds; zero without a report.</summary>
+    public int IssueCount => Report?.Count ?? 0;
+
     /// <summary>Whether the sessions held come from the offline copy rather than the file.</summary>
     public bool IsOfflineCopy => OfflineCopyFromUtc is not null;
+}
+
+/// <summary>A reload of one shared source, and how many findings its report held before it.</summary>
+/// <param name="State">The state the source is in after the reload.</param>
+/// <param name="PreviousIssueCount">How many findings its import report held before.</param>
+public sealed record SharedSessionSourceReload(SharedSessionSourceState State, int PreviousIssueCount)
+{
+    /// <summary>Whether the reload changed how many findings the import report holds.</summary>
+    public bool IssueCountChanged => State.IssueCount != PreviousIssueCount;
 }

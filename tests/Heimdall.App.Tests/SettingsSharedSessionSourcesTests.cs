@@ -275,6 +275,37 @@ public sealed partial class SettingsViewModelTests
         Assert.Equal(SavedSourceId, Assert.Single(merged.SharedSessionSources).Id);
     }
 
+    [Fact]
+    public void SharedSources_ARowWithFindings_OffersTheReport_AndOpensIt()
+    {
+        FakeConfigManager config = new() { Settings = SettingsWithOneSource() };
+        config.Settings.SharedSessionSources.Add(new SharedSessionSourceDto { Id = "cleansrc1", Name = "Clean", Path = @"C:\shares\clean.mxtsessions" });
+        var report = new SharedSessionImportReport(
+            SavedSourceId,
+            "Team",
+            [new SharedSessionReportEntry(SharedSessionReportCheck.DuplicateHost, "PROD", "db01", "db01.example.test", "db01-bis")]);
+        var provider = new StubSharedSessionProvider(
+            [],
+            [],
+            [
+                StubSharedSessionProvider.Loaded(SavedSourceId, "Team", 3) with { Report = report },
+                StubSharedSessionProvider.Loaded("cleansrc1", "Clean", 1) with { Report = SharedSessionImportReport.Empty("cleansrc1", "Clean") },
+            ]);
+        var dialog = new FakeDialogService();
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, sharedSessions: provider);
+        viewModel.LoadFromSettings(config.Settings);
+        SharedSessionSourceItemViewModel reported = viewModel.SharedSessionSources[0];
+        SharedSessionSourceItemViewModel clean = viewModel.SharedSessionSources[1];
+
+        Assert.True(reported.HasIssues);
+        Assert.Equal(1, reported.IssueCount);
+        Assert.False(clean.HasIssues);
+
+        viewModel.ShowSharedSourceReportCommand.Execute(reported);
+
+        Assert.Same(report, Assert.Single(dialog.SharedReports).Report);
+    }
+
     private static AppSettings SettingsWithOneSource()
     {
         var settings = new AppSettings();

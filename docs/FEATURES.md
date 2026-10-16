@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,115 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,161 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -436,6 +436,25 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     source root then shows "offline copy from <date>", with the reason on hover, and the Settings
     card says the same. Removing a source deletes its copy; the copies are never written to
     servers.json, to a settings export or to the repository
+  - Import report: every successful read of a source builds a report of what its file holds that
+    its maintainers may want to fix. It is informational: it never stops a session from loading and
+    never changes one. It lists, with the folder, the session and a short explanation:
+    - skipped sessions and why (unsupported type, missing host, unusable gateway, duplicate name in
+      a folder, malformed line, or refused by the shared-session filter)
+    - unresolved `[NAME]` variables
+    - name and host mismatch: the session name is neither the host nor the host's first label (what
+      precedes the first dot), compared case-insensitively; a host given as an IP address is not
+      checked
+    - gateway outliers: in a folder of at least `SharedReportGatewayMinFolderSessions` sessions
+      (default 3) where one route (a gateway, or a direct connection) is taken by at least
+      `SharedReportGatewayMajorityPercent` percent of them (default 60), the sessions taking another
+      route; a folder without such a majority has none
+    - duplicate hosts: two or more sessions of the same folder reaching the same host
+  - The source root in the tree shows the number of issues next to its name, and its context menu
+    has **Show import report**; the Settings card has a **Report** button on each source with
+    findings. Both open the same read-only dialog: the count of each check, then the findings by
+    check, with **Copy** (plain text) and **Export CSV** (every cell neutralized against formula
+    injection). When a reload changes the number of issues, the status line says so
 - JSON session imports contain server profiles only. SSH gateway definitions live in `settings.json`
   (`AppSettings.SshGateways`), so test fixtures such as `Heimdall-TestEnv` must inject the
   matching gateway into the exact runtime build configuration before tunneled sessions can resolve it.

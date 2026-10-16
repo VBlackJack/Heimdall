@@ -326,7 +326,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 115 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 161 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -445,6 +445,28 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     survol, et la carte des paramètres indique la même chose. Supprimer une source supprime sa
     copie ; les copies ne sont jamais écrites dans servers.json, dans un export des paramètres ni
     dans le dépôt
+  - Rapport d'import : chaque lecture réussie d'une source produit un rapport de ce que son fichier
+    contient et que ses responsables voudront peut-être corriger. Il est informatif : il n'empêche
+    jamais une session de se charger et n'en modifie aucune. Il liste, avec le dossier, la session
+    et une courte explication :
+    - les sessions ignorées et pourquoi (type non pris en charge, hôte absent, passerelle
+      inutilisable, nom en double dans un dossier, ligne mal formée, ou refus par le filtrage des
+      sessions partagées)
+    - les variables `[NOM]` non résolues
+    - nom et hôte différents : le nom de la session n'est ni l'hôte ni le premier élément de l'hôte
+      (ce qui précède le premier point), sans tenir compte de la casse ; un hôte donné par une adresse
+      IP n'est pas vérifié
+    - passerelles inhabituelles : dans un dossier d'au moins `SharedReportGatewayMinFolderSessions`
+      sessions (3 par défaut) où un même chemin (une passerelle, ou une connexion directe) est pris
+      par au moins `SharedReportGatewayMajorityPercent` pour cent d'entre elles (60 par défaut), les
+      sessions qui prennent un autre chemin ; un dossier sans telle majorité n'en a aucune
+    - hôtes en double : deux sessions ou plus d'un même dossier qui joignent le même hôte
+  - La racine de la source dans l'arborescence affiche le nombre de problèmes à côté de son nom, et
+    son menu contextuel propose **Afficher le rapport d'import** ; la carte des paramètres a un
+    bouton **Rapport** sur chaque source qui a des constats. Les deux ouvrent la même fenêtre en
+    lecture seule : le nombre de constats par vérification, puis les constats par vérification, avec
+    **Copier** (texte brut) et **Exporter en CSV** (chaque cellule neutralisée contre l'injection de
+    formules). Quand un rechargement change le nombre de problèmes, la ligne d'état l'indique
 - Les imports de sessions JSON ne contiennent que des profils de serveurs. Les définitions de passerelles SSH vivent dans `settings.json`
   (`AppSettings.SshGateways`), si bien que des jeux de test comme `Heimdall-TestEnv` doivent injecter la
   passerelle correspondante dans la configuration de build d'exécution exacte avant que les sessions tunnelisées puissent la résoudre.

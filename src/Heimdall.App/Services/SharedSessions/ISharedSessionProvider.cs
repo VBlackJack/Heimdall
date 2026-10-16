@@ -52,5 +52,5 @@ public interface ISharedSessionProvider
     /// Raised after one source was read again on its own, with the state it is in now: its file
     /// changed, or it was retried. <see cref="Changed"/> is raised first.
     /// </summary>
-    event Action<SharedSessionSourceState>? SourceReloaded;
+    event Action<SharedSessionSourceReload>? SourceReloaded;
 }

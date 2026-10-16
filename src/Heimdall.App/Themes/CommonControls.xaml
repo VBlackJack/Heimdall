@@ -143,6 +143,7 @@
     <sys:Double x:Key="SessionTreeStatusRingThickness">1.5</sys:Double>
     <sys:Double x:Key="SessionTreeGatewayBadgeMaxWidth">140</sys:Double>
     <sys:Double x:Key="SessionTreeBadgeMinWidth">28</sys:Double>
+    <sys:Double x:Key="SharedReportStatusMaxWidth">420</sys:Double>
     <sys:Double x:Key="SessionTreeGatewayBadgeMinWidth">56</sys:Double>
     <sys:Double x:Key="SessionTreeFilterChipMaxWidth">160</sys:Double>
     <sys:Double x:Key="SessionTreeDropHintMaxWidth">380</sys:Double>

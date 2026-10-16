@@ -167,25 +167,29 @@ public partial class ServerListViewModel
     /// Says on the status line what a reload of one source after its file changed came to: the
     /// sessions it holds now, or why the previous ones were kept.
     /// </summary>
-    private void OnSharedSourceReloaded(SharedSessionSourceState state)
+    private void OnSharedSourceReloaded(SharedSessionSourceReload reload)
     {
         _ = _uiDispatcher.InvokeAsync(() =>
         {
             if (!_disposed)
             {
-                StatusMessageRequested?.Invoke(DescribeSharedSourceReload(state));
+                StatusMessageRequested?.Invoke(DescribeSharedSourceReload(reload));
             }
         });
     }
 
-    /// <summary>The status line of a reload of one shared source.</summary>
-    internal string DescribeSharedSourceReload(SharedSessionSourceState state)
+    /// <summary>
+    /// The status line of a reload of one shared source: the sessions it holds now or why they
+    /// were kept, then the issue count of its import report when the reload changed it.
+    /// </summary>
+    internal string DescribeSharedSourceReload(SharedSessionSourceReload reload)
     {
-        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(reload);
 
+        SharedSessionSourceState state = reload.State;
         string name = string.IsNullOrWhiteSpace(state.Name) ? state.SourceId : state.Name;
         string? problem = state.Status == SharedSessionSourceStatus.Error ? state.ErrorMessage : state.Notice;
-        return problem is null
+        string message = problem is null
             ? _localizer.FormatCount(
                 state.ProfileCount,
                 "StatusSharedSourceUpdatedOne",
@@ -193,6 +197,41 @@ public partial class ServerListViewModel
                 name,
                 state.ProfileCount)
             : _localizer.Format("StatusSharedSourceNotUpdated", name, problem);
+        return reload.IssueCountChanged
+            ? _localizer.Format(
+                "StatusSharedSourceWithIssues",
+                message,
+                _localizer.FormatCount(
+                    state.IssueCount,
+                    "StatusSharedSourceIssuesChangedOne",
+                    "StatusSharedSourceIssuesChanged",
+                    state.IssueCount,
+                    reload.PreviousIssueCount))
+            : message;
+    }
+
+    /// <summary>Puts the plain text of an import report on the clipboard; replaced by tests.</summary>
+    internal Services.IClipboardService ReportClipboard { get; set; } = new Services.WpfClipboardService();
+
+    /// <summary>Asks where to export an import report as CSV; replaced by tests.</summary>
+    internal Func<string, string?>? ReportCsvPathPicker { get; set; }
+
+    /// <summary>
+    /// Shows the import report of <paramref name="sourceId"/> as of its last successful read. A
+    /// source that was never read shows an empty report.
+    /// </summary>
+    internal Task ShowSharedImportReportAsync(string sourceId)
+    {
+        SharedSessionSourceState? state = _profileLookup.SharedSessions.Sources
+            .FirstOrDefault(source => string.Equals(source.SourceId, sourceId, StringComparison.Ordinal));
+        string name = string.IsNullOrWhiteSpace(state?.Name) ? sourceId : state!.Name;
+        var viewModel = new ViewModels.Dialogs.SharedSessionImportReportDialogViewModel(
+            state?.Report ?? SharedSessionImportReport.Empty(sourceId, name),
+            _localizer,
+            ReportClipboard,
+            ReportCsvPathPicker
+                ?? (proposed => ViewModels.Dialogs.SharedSessionImportReportDialogViewModel.PickCsvPathWithDialog(_localizer, proposed)));
+        return _dialogService.ShowSharedSessionImportReportAsync(viewModel);
     }
 
     /// <summary>How many shared sessions the tree lists.</summary>
@@ -315,7 +354,17 @@ public partial class ServerListViewModel
                     ? _localizer["SharedSessionSourceErrorUnknown"]
                     : source.ErrorMessage;
             }
-            else if (source.Notice is not null)
+            else if (source.IssueCount > 0)
+            {
+                root.ViewModel!.IssueCount = source.IssueCount;
+                root.ViewModel.IssueBadgeText = _localizer.FormatCount(
+                    source.IssueCount,
+                    "SessionTreeSharedRootIssuesOne",
+                    "SessionTreeSharedRootIssues",
+                    source.IssueCount);
+            }
+
+            if (source.Status != SharedSessionSourceStatus.Error && source.Notice is not null)
             {
                 root.ViewModel!.Notice = source.Notice;
                 root.ViewModel.NoticeBadgeText = source.OfflineCopyFromUtc is { } takenAtUtc
