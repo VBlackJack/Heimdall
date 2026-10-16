@@ -77,49 +77,6 @@
             font-size: 13px;
         }
 
-        /* Toolbar overlay */
-        #vnc-toolbar {
-            position: absolute;
-            top: 4px;
-            right: 12px;
-            z-index: 100;
-            display: flex;
-            gap: 4px;
-            background: rgba(30, 30, 46, 0.85);
-            border: 1px solid #45475A;
-            border-radius: 6px;
-            padding: 4px 8px;
-            align-items: center;
-        }
-
-        .toolbar-btn {
-            background: #313244;
-            color: #CDD6F4;
-            border: 1px solid #45475A;
-            border-radius: 4px;
-            padding: 3px 8px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-
-        .toolbar-btn:hover {
-            background: #45475A;
-        }
-
-        .toolbar-btn.active {
-            background: #89B4FA;
-            color: #1E1E2E;
-            border-color: #89B4FA;
-        }
-
-        .toolbar-select {
-            background: #313244;
-            color: #CDD6F4;
-            border: 1px solid #45475A;
-            border-radius: 4px;
-            padding: 2px 6px;
-            font-size: 11px;
-        }
     </style>
 </head>
 <body>
@@ -129,20 +86,6 @@
             <h2 id="error-title">Connection Failed</h2>
             <p id="error-message"></p>
         </div>
-    </div>
-    <div id="vnc-toolbar">
-        <button class="toolbar-btn" id="btn-clipboard" title="Sync clipboard">Clipboard</button>
-        <select class="toolbar-select" id="select-scaling" title="Scaling mode">
-            <option value="remote">Remote Resize</option>
-            <option value="scale" selected>Scale</option>
-            <option value="none">No Scaling</option>
-        </select>
-        <select class="toolbar-select" id="select-quality" title="Quality">
-            <option value="0">Best Quality</option>
-            <option value="3">Balanced</option>
-            <option value="6" selected>Performance</option>
-            <option value="9">Low Bandwidth</option>
-        </select>
     </div>
     <div id="vnc-container"></div>
 
@@ -209,10 +152,14 @@
             var errorTitle = document.getElementById('error-title');
             var errorMessage = document.getElementById('error-message');
             var container = document.getElementById('vnc-container');
-            var btnClipboard = document.getElementById('btn-clipboard');
-            var selectScaling = document.getElementById('select-scaling');
-            var selectQuality = document.getElementById('select-quality');
             var rfb = null;
+
+            // Display settings, owned by the host: the tab header carries the controls and every
+            // change arrives as a message below. They are held here rather than applied on
+            // arrival, because a change can land before the client it applies to exists.
+            var scalingMode = 'scale';
+            var qualityLevel = 6;
+            var SCALING_MODES = ['remote', 'scale', 'none'];
             var text = {
                 disconnected: 'Disconnected',
                 connectionLost: 'The VNC connection was lost unexpectedly.',
@@ -233,6 +180,23 @@
                 postMessage('error:' + message);
             }
 
+            function applyScaling() {
+                if (!rfb) {
+                    return;
+                }
+
+                rfb.scaleViewport = (scalingMode === 'scale');
+                rfb.resizeSession = (scalingMode === 'remote');
+            }
+
+            function applyQuality() {
+                if (!rfb) {
+                    return;
+                }
+
+                rfb.compressionLevel = qualityLevel;
+            }
+
             function connect(wsUrl, password) {
                 // A second connect must not stack a second client behind the first: the proxy
                 // serves one connection at a time, and the old one would hold it.
@@ -251,10 +215,9 @@
                         wsProtocols: ['binary']
                     });
 
-                    rfb.scaleViewport = true;
-                    rfb.resizeSession = false;
-                    rfb.compressionLevel = 6;
                     rfb.showDotCursor = true;
+                    applyScaling();
+                    applyQuality();
 
                     rfb.addEventListener('connect', function () {
                         loadingElement.style.display = 'none';
@@ -300,24 +263,6 @@
                 }
             }
 
-            // ---- Toolbar controls ----
-
-            selectScaling.addEventListener('change', function () {
-                if (!rfb) return;
-                var mode = selectScaling.value;
-                rfb.scaleViewport = (mode === 'scale');
-                rfb.resizeSession = (mode === 'remote');
-            });
-
-            selectQuality.addEventListener('change', function () {
-                if (!rfb) return;
-                rfb.compressionLevel = parseInt(selectQuality.value, 10);
-            });
-
-            btnClipboard.addEventListener('click', function () {
-                postMessage('clipboard-read:');
-            });
-
             // ---- Host message handling ----
 
             if (window.chrome && window.chrome.webview) {
@@ -340,6 +285,24 @@
                         var b64 = msg.substring('clipboard-paste:'.length);
                         if (rfb && b64) {
                             rfb.clipboardPasteFrom(atob(b64));
+                        }
+                        return;
+                    }
+
+                    if (msg.indexOf('scaling:') === 0) {
+                        var mode = msg.substring('scaling:'.length);
+                        if (SCALING_MODES.indexOf(mode) !== -1) {
+                            scalingMode = mode;
+                            applyScaling();
+                        }
+                        return;
+                    }
+
+                    if (msg.indexOf('quality:') === 0) {
+                        var level = parseInt(msg.substring('quality:'.length), 10);
+                        if (level >= 0 && level <= 9) {
+                            qualityLevel = level;
+                            applyQuality();
                         }
                         return;
                     }
