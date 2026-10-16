@@ -792,18 +792,28 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <Path Grid.Column="0"
-                                                  Data="{StaticResource Geo.Tree.Group}"
                                                   Width="{StaticResource SessionTreeFolderIconSize}"
                                                   Height="{StaticResource SessionTreeFolderIconSize}"
                                                   Stretch="Uniform"
                                                   VerticalAlignment="Center" Margin="0,0,7,0">
-                                                <!-- A folder given a colour paints its icon with it; the rest keep the theme's. -->
+                                                <!-- A folder given a colour paints its icon with it; the rest keep the theme's.
+                                                     A shared source root has its own icon, and one that could not be read
+                                                     shows the error mark instead, its reason in the row's tooltip. -->
                                                 <Path.Style>
                                                     <Style TargetType="Path">
+                                                        <Setter Property="Data" Value="{StaticResource Geo.Tree.Group}"/>
                                                         <Setter Property="Fill" Value="{DynamicResource InfoBrush}"/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding HasColor}" Value="True">
                                                                 <Setter Property="Fill" Value="{Binding Color, Converter={StaticResource StringToBrushConverter}}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsSharedRoot}" Value="True">
+                                                                <Setter Property="Data" Value="{StaticResource Geo.Tree.SharedSource}"/>
+                                                                <Setter Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding HasError}" Value="True">
+                                                                <Setter Property="Data" Value="{StaticResource Geo.Status.Error}"/>
+                                                                <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
@@ -832,7 +842,8 @@
                                                        FontSize="{StaticResource FontSizeSmallCaption}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        VerticalAlignment="Center"
-                                                       Margin="8,0,2,0"/>
+                                                       Margin="8,0,2,0"
+                                                       Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
                                         </Grid>
                                     </Border>
                                     <HierarchicalDataTemplate.Triggers>
@@ -954,6 +965,19 @@
                                             <StackPanel Grid.Column="3"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center">
+                                                <!-- Read-only mark of a session from a shared source; its tooltip names
+                                                     the source. The spoken row name says "shared" and "read-only" itself. -->
+                                                <Path Data="{StaticResource Geo.Tree.ReadOnly}"
+                                                      Width="{StaticResource SessionTreeReadOnlyIconSize}"
+                                                      Height="{StaticResource SessionTreeReadOnlyIconSize}"
+                                                      Stretch="Uniform"
+                                                      Fill="{DynamicResource TextSecondaryBrush}"
+                                                      Margin="6,0,0,0"
+                                                      VerticalAlignment="Center"
+                                                      ToolTip="{Binding SharedReadOnlyText}"
+                                                      ToolTipService.InitialShowDelay="{StaticResource SessionTreeStatusToolTipDelay}"
+                                                      AutomationProperties.Name="{Binding SharedReadOnlyText}"
+                                                      Visibility="{Binding IsShared, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                 <!-- Favorite mark. The spoken row name carries "favorite" itself;
                                                      the glyph is for the eye. -->
                                                 <TextBlock Text="&#xE735;"
@@ -3063,6 +3087,142 @@
                                                                 CommandParameter="{Binding}"
                                                                 ToolTip="{loc:Translate AccessSettingsMobaXtermVariableRemove}"
                                                                 AutomationProperties.Name="{loc:Translate AccessSettingsMobaXtermVariableRemove}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Shared session sources: MobaXterm files other people edit, listed read-only in the
+                                     tree. The status column says what the last read found. -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel Grid.IsSharedSizeScope="True">
+                                        <DockPanel Margin="0,0,0,8">
+                                            <TextBlock x:Name="Mw_SettingsSharedSourcesTitle"
+                                                       Text="{loc:Translate SettingsSectionSharedSessionSources}"
+                                                       FontSize="{StaticResource FontSizeSubtitle}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button x:Name="Mw_SettingsSharedSourcesReloadBtn"
+                                                        Content="{loc:Translate SettingsSharedSourcesReload}"
+                                                        Command="{Binding Settings.ReloadSharedSessionSourcesCommand}"
+                                                        Visibility="{Binding Settings.CanReloadSharedSessions, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,4,0"
+                                                        ToolTip="{loc:Translate SettingsSharedSourcesReloadTooltip}"
+                                                        AutomationProperties.Name="{loc:Translate SettingsSharedSourcesReload}"
+                                                        AutomationProperties.HelpText="{loc:Translate SettingsSharedSourcesReloadTooltip}"/>
+                                                <Button x:Name="Mw_SettingsSharedSourceAddBtn"
+                                                        Content="{loc:Translate BtnAdd}"
+                                                        Command="{Binding Settings.AddSharedSessionSourceCommand}"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        Padding="8,3" FontSize="{StaticResource FontSizeCaption}"
+                                                        AutomationProperties.Name="{loc:Translate AccessSettingsSharedSourceAdd}"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock x:Name="Mw_SettingsSharedSourcesHint"
+                                                   Text="{loc:Translate SettingsSharedSourcesHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,12"/>
+                                        <Grid Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="4*"/>
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="SharedSourceEnabled"/>
+                                                <ColumnDefinition Width="3*"/>
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="SharedSourceAction"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{loc:Translate SettingsSharedSourceColumnName}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}"/>
+                                            <TextBlock Grid.Column="1" Text="{loc:Translate SettingsSharedSourceColumnPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="8,0,0,0"/>
+                                            <TextBlock Grid.Column="2" Text="{loc:Translate SettingsSharedSourceColumnEnabled}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="8,0,0,0"/>
+                                            <TextBlock Grid.Column="3" Text="{loc:Translate SettingsSharedSourceColumnStatus}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="8,0,0,0"/>
+                                        </Grid>
+                                        <ItemsControl x:Name="Mw_SettingsSharedSourcesList"
+                                                      ItemsSource="{Binding Settings.SharedSessionSources}"
+                                                      Focusable="False"
+                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSharedSourcesTitle}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="2*"/>
+                                                            <ColumnDefinition Width="4*"/>
+                                                            <ColumnDefinition Width="Auto" SharedSizeGroup="SharedSourceEnabled"/>
+                                                            <ColumnDefinition Width="3*"/>
+                                                            <ColumnDefinition Width="Auto" SharedSizeGroup="SharedSourceAction"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                                     FontSize="{StaticResource FontSizeBody}"
+                                                                     AutomationProperties.Name="{loc:Translate SettingsSharedSourceColumnName}"
+                                                                     AutomationProperties.HelpText="{Binding NameError}"/>
+                                                            <TextBlock Text="{Binding NameError}"
+                                                                       Foreground="{DynamicResource ErrorTextBrush}"
+                                                                       FontSize="{StaticResource FontSizeCaption}"
+                                                                       TextWrapping="Wrap" Margin="0,2,0,0"
+                                                                       Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBox Grid.Column="0" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}"
+                                                                         FontSize="{StaticResource FontSizeBody}"
+                                                                         ToolTip="{loc:Translate SettingsSharedSourcePathTooltip}"
+                                                                         AutomationProperties.Name="{loc:Translate SettingsSharedSourceColumnPath}"
+                                                                         AutomationProperties.HelpText="{Binding PathError}"/>
+                                                                <Button Grid.Column="1"
+                                                                        Padding="6,2" Margin="4,0,0,0" Click="OnSharedSessionSourceBrowseClick"
+                                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                                        FontSize="{StaticResource FontSizeCaption}"
+                                                                        AutomationProperties.Name="{loc:Translate AccessSettingsSharedSourceBrowse}">
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
+                                                                        <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                                    </StackPanel>
+                                                                </Button>
+                                                            </Grid>
+                                                            <TextBlock Text="{Binding PathError}"
+                                                                       Foreground="{DynamicResource ErrorTextBrush}"
+                                                                       FontSize="{StaticResource FontSizeCaption}"
+                                                                       TextWrapping="Wrap" Margin="0,2,0,0"
+                                                                       Visibility="{Binding HasPathError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                        </StackPanel>
+                                                        <CheckBox Grid.Column="2" Margin="8,4,0,0" VerticalAlignment="Top" HorizontalAlignment="Center"
+                                                                  IsChecked="{Binding Enabled}"
+                                                                  AutomationProperties.Name="{loc:Translate SettingsSharedSourceColumnEnabled}"/>
+                                                        <TextBlock Grid.Column="3" Margin="8,4,0,0"
+                                                                   Text="{Binding StatusDescription}"
+                                                                   ToolTip="{Binding StatusDescription}"
+                                                                   FontSize="{StaticResource FontSizeBody}"
+                                                                   TextWrapping="Wrap">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasStatusError}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <Button Grid.Column="4" VerticalAlignment="Top" Margin="8,0,0,0"
+                                                                Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
+                                                                FontSize="{StaticResource FontSizeCaption}"
+                                                                Style="{DynamicResource GhostButtonStyle}"
+                                                                MinHeight="{StaticResource TargetMinSize}"
+                                                                Command="{Binding DataContext.Settings.RemoveSharedSessionSourceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                ToolTip="{loc:Translate AccessSettingsSharedSourceRemove}"
+                                                                AutomationProperties.Name="{loc:Translate AccessSettingsSharedSourceRemove}"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>

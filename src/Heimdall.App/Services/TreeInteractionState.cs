@@ -455,6 +455,13 @@ public sealed class TreeInteractionState
         bool acceptsRootTarget,
         out string? targetGroup)
     {
+        // A shared folder is the file's: nothing is dropped into it.
+        if (folder is { IsShared: true })
+        {
+            targetGroup = null;
+            return false;
+        }
+
         if (folder is not null)
         {
             targetGroup = folder.FullPath;
@@ -481,8 +488,27 @@ public sealed class TreeInteractionState
     {
         ArgumentNullException.ThrowIfNull(dragged);
         ArgumentNullException.ThrowIfNull(anchor);
-        return !dragged.Contains(anchor);
+
+        // Neither a shared row nor a place among shared rows: their order is the file's.
+        return !anchor.IsShared
+            && !dragged.Any(server => server.IsShared)
+            && !dragged.Contains(anchor);
     }
+
+    /// <summary>
+    /// Whether a drag may start from <paramref name="item"/> carrying <paramref name="selection"/>:
+    /// never from a shared folder, and never with a shared row on board.
+    /// </summary>
+    /// <param name="item">The pressed row's item.</param>
+    /// <param name="selection">The rows the drag would carry, for a session row.</param>
+    public static bool CanStartDrag(object? item, IReadOnlyList<ServerItemViewModel>? selection) =>
+        item switch
+        {
+            FolderViewModel folder => !folder.IsShared,
+            ServerItemViewModel server => !server.IsShared
+                && (selection is null || !selection.Any(selected => selected.IsShared)),
+            _ => false,
+        };
 
     /// <summary>
     /// Whether dropping <paramref name="folderPath"/> on <paramref name="targetParentPath"/>

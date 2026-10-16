@@ -4247,7 +4247,8 @@ public sealed partial class SettingsViewModelTests : IDisposable
         IUpdateService? updateService = null,
         IAppVersionProvider? appVersionProvider = null,
         IUpdateInstallFlow? installFlow = null,
-        IBrowserLauncher? browserLauncher = null)
+        IBrowserLauncher? browserLauncher = null,
+        Heimdall.App.Services.SharedSessions.ISharedSessionProvider? sharedSessions = null)
     {
         localizer ??= new LocalizationManager();
         dialog ??= new FakeDialogService();
@@ -4282,7 +4283,8 @@ public sealed partial class SettingsViewModelTests : IDisposable
             appVersionProvider,
             installFlow,
             browserLauncher,
-            profileImportService);
+            profileImportService,
+            sharedSessions: sharedSessions);
     }
 
     /// <summary>

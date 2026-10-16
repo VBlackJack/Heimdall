@@ -92,7 +92,7 @@ public partial class ServerListViewModel
     [RelayCommand]
     private async Task SetFavoriteAsync(FavoriteChangeRequest? request)
     {
-        if (request is null || request.Servers.Count == 0)
+        if (request is null || request.Servers.Count == 0 || !EnsureNoSharedRows(request.Servers))
         {
             return;
         }

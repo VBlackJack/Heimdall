@@ -135,6 +135,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.ExternalEditorPath)] = new("SettingsLabelEditorPath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.ExternalTools)] = new("SettingsSectionExternalToolsList", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.MobaXtermUserVariables)] = new("SettingsSectionMobaXtermVariables", "SettingsTabGeneral", "SettingsSectionMobaXtermVariables"),
+        [nameof(AppSettings.SharedSessionSources)] = new("SettingsSectionSharedSessionSources", "SettingsTabGeneral", "SettingsSectionSharedSessionSources"),
         [nameof(AppSettings.NanaRunPath)] = new("SettingsLblNanaRunPath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.NirSoftPath)] = new("SettingsLblNirSoftPath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.SysinternalsPath)] = new("SettingsLblSysinternalsPath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),

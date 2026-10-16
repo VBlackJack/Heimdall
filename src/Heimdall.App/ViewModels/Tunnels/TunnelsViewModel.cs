@@ -40,6 +40,12 @@ internal interface ITunnelsHost
 
     AppSettings? CurrentSettings { get; }
 
+    /// <summary>
+    /// The gateways of the shared session sources, which the canonical settings never hold; a
+    /// shared session's route is named from them.
+    /// </summary>
+    IReadOnlyList<SshGatewayDto> SharedGateways => [];
+
     string StatusText { get; set; }
 
     /// <summary>
@@ -625,10 +631,19 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     /// for chained tunnels. Returns an empty string for direct connections
     /// or when the server has no active tunnel.
     /// </summary>
-    public string ResolveRoute(string serverId)
+    /// <param name="serverId">The session identifier the state machine tracks.</param>
+    /// <param name="profileId">
+    /// The profile the session was opened from. A shared profile's gateways live in its source,
+    /// not in the settings, so its route is named from the settings the connection itself used.
+    /// </param>
+    public string ResolveRoute(string serverId, string? profileId = null)
     {
-        var settings = _host.CurrentSettings;
-        if (settings is null) return string.Empty;
+        var canonical = _host.CurrentSettings;
+        if (canonical is null) return string.Empty;
+
+        AppSettings settings = SharedSessionIds.IsShared(profileId) || SharedSessionIds.IsShared(serverId)
+            ? SharedSessionSettings.WithSharedGateways(canonical, _host.SharedGateways)
+            : canonical;
 
         var stateData = _connectionSm.GetStateData(serverId);
         if (stateData?.TunnelLocalPort is null) return string.Empty;

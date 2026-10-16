@@ -61,6 +61,7 @@ public partial class SettingsViewModel
             [nameof(ShowToolsPanel)] = "window state with no control on the panel",
             [nameof(ExternalTools)] = "an inventory of user-defined tools",
             [nameof(MobaXtermUserVariables)] = "an inventory of user-defined variables",
+            [nameof(SharedSessionSources)] = "an inventory of user-defined shared session sources",
         };
 
     private static IReadOnlyDictionary<string, (PropertyInfo Panel, PropertyInfo Setting)>? s_markerProperties;

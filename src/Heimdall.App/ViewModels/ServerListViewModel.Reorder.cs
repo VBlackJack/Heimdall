@@ -42,8 +42,19 @@ public partial class ServerListViewModel
     {
         ArgumentNullException.ThrowIfNull(servers);
         ArgumentNullException.ThrowIfNull(anchor);
+        if (!EnsureNoSharedRows(servers))
+        {
+            return false;
+        }
 
-        List<ServerItemViewModel> moving = NormalizeSelection(servers);
+        // A place among shared rows is the file's to decide, not a drop target.
+        if (anchor.IsShared)
+        {
+            StatusMessageRequested?.Invoke(_localizer["StatusSharedSessionMoveRefused"]);
+            return false;
+        }
+
+        List<ServerItemViewModel> moving = NormalizeMutableSelection(servers);
         if (moving.Count == 0 || moving.Contains(anchor))
         {
             return false;
@@ -98,6 +109,10 @@ public partial class ServerListViewModel
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(server);
+        if (!EnsureNoSharedRows([server]))
+        {
+            return false;
+        }
 
         List<ServerItemViewModel> siblings = GetStableSiblings(server.Group).ToList();
         int index = siblings.IndexOf(server);

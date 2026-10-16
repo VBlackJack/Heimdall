@@ -156,6 +156,7 @@
     <sys:Double x:Key="SessionTreeFolderRowMinHeight">26</sys:Double>
     <sys:Double x:Key="SessionTreeServerRowMinHeight">24</sys:Double>
     <sys:Double x:Key="SessionTreeFolderIconSize">13</sys:Double>
+    <sys:Double x:Key="SessionTreeReadOnlyIconSize">10</sys:Double>
     <!-- The "all open tabs" button over the right end of an overflowing session tab strip. -->
     <sys:Double x:Key="SessionTabListButtonWidth">32</sys:Double>
     <!-- Close button of a tab neither hovered nor selected. 0.3 measured 2.37:1 against the strip

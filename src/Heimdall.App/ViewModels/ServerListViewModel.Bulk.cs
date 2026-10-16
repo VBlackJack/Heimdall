@@ -173,6 +173,11 @@ public partial class ServerListViewModel
             return;
         }
 
+        if (!EnsureNoSharedRows(selectedItems))
+        {
+            return;
+        }
+
         var message = BuildBulkDeleteConfirmationMessage(selectedItems);
         var confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["DialogTitleDeleteSelectedItems"],
@@ -201,6 +206,11 @@ public partial class ServerListViewModel
             return;
         }
 
+        if (!EnsureNoSharedRows(selectedItems))
+        {
+            return;
+        }
+
         await MoveServersToGroupCoreAsync(selectedItems, request.GroupName, cancellationToken);
     }
 
@@ -218,6 +228,16 @@ public partial class ServerListViewModel
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(servers);
+        if (!EnsureNoSharedRows(servers))
+        {
+            return 0;
+        }
+
+        if (IsSharedFolderKey(targetGroup))
+        {
+            ReportSharedFolderReadOnly();
+            return 0;
+        }
 
         // Counted here from the same predicate the core filters on, rather than from the size of
         // the request: dragging eight rows into the folder three of them already sit in moves five.
@@ -252,6 +272,11 @@ public partial class ServerListViewModel
 
         var selectedItems = SelectedItems.ToList();
         if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        if (!EnsureNoSharedRows(selectedItems))
         {
             return;
         }
@@ -291,6 +316,11 @@ public partial class ServerListViewModel
             return;
         }
 
+        if (!EnsureNoSharedRows(selectedItems))
+        {
+            return;
+        }
+
         var clones = await DuplicateServersCoreAsync(selectedItems, cancellationToken);
         if (clones.Count == 0)
         {
@@ -308,6 +338,11 @@ public partial class ServerListViewModel
     {
         var selectedItems = NormalizeSelection(selection ?? SelectedItems.ToList());
         if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        if (!EnsureNoSharedRows(selectedItems))
         {
             return;
         }
@@ -339,6 +374,11 @@ public partial class ServerListViewModel
     {
         var selectedItems = NormalizeSelection(selection ?? SelectedItems.ToList());
         if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        if (!EnsureNoSharedRows(selectedItems))
         {
             return;
         }
@@ -384,6 +424,11 @@ public partial class ServerListViewModel
             return;
         }
 
+        if (!EnsureNoSharedRows(selectedItems))
+        {
+            return;
+        }
+
         int eligibleCount = selectedItems.Count(CanBulkEditPasswordTarget);
         int skippedWinRmUsernameCount = selectedItems.Count(server =>
             string.Equals(server.ConnectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
@@ -419,6 +464,11 @@ public partial class ServerListViewModel
     {
         var selectedItems = NormalizeSelection(selection ?? SelectedItems.ToList());
         if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        if (!EnsureNoSharedRows(selectedItems))
         {
             return;
         }
@@ -483,21 +533,21 @@ public partial class ServerListViewModel
         await ConnectServersBulkCoreAsync(plan, cancellationToken);
     }
 
-    private bool CanDeleteSelected() => SelectionCount > 1;
+    private bool CanDeleteSelected() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanMoveSelectedToGroup() => SelectionCount > 1;
+    private bool CanMoveSelectedToGroup() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanMoveSelectedToProject() => SelectionCount > 1;
+    private bool CanMoveSelectedToProject() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanDuplicateSelected() => SelectionCount > 1;
+    private bool CanDuplicateSelected() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanBulkEditPort() => SelectionCount > 1;
+    private bool CanBulkEditPort() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanBulkEditUsername() => SelectionCount > 1;
+    private bool CanBulkEditUsername() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanBulkEditPassword() => SelectionCount > 1;
+    private bool CanBulkEditPassword() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanBulkEditGateway() => SelectionCount > 1;
+    private bool CanBulkEditGateway() => SelectionCount > 1 && !SelectionHasShared;
 
     public async Task ConnectServersBulkCoreAsync(
         IReadOnlyList<ServerItemViewModel> serversToConnect,
@@ -517,7 +567,7 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(serversToDuplicate);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var selectedServers = NormalizeSelection(serversToDuplicate);
+        var selectedServers = NormalizeMutableSelection(serversToDuplicate);
         if (selectedServers.Count == 0)
         {
             return [];
@@ -610,7 +660,7 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(sources);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var selectedServers = NormalizeSelection(sources);
+        var selectedServers = NormalizeMutableSelection(sources);
         if (selectedServers.Count == 0)
         {
             return;
@@ -691,7 +741,7 @@ public partial class ServerListViewModel
         ArgumentException.ThrowIfNullOrEmpty(newUsername);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var selectedServers = NormalizeSelection(sources);
+        var selectedServers = NormalizeMutableSelection(sources);
         if (selectedServers.Count == 0)
         {
             return;
@@ -786,7 +836,7 @@ public partial class ServerListViewModel
         ArgumentException.ThrowIfNullOrEmpty(newPlaintextPassword);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var selectedServers = NormalizeSelection(sources);
+        var selectedServers = NormalizeMutableSelection(sources);
         if (selectedServers.Count == 0)
         {
             return;
@@ -944,7 +994,7 @@ public partial class ServerListViewModel
         cancellationToken.ThrowIfCancellationRequested();
 
         string[] ids = serverIds
-            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Where(id => !string.IsNullOrWhiteSpace(id) && !SharedSessionIds.IsShared(id))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         if (ids.Length == 0)
@@ -1158,7 +1208,7 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(serversToDelete);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var servers = NormalizeSelection(serversToDelete);
+        var servers = NormalizeMutableSelection(serversToDelete);
         if (servers.Count == 0)
         {
             return false;
@@ -1218,7 +1268,7 @@ public partial class ServerListViewModel
         cancellationToken.ThrowIfCancellationRequested();
 
         var normalizedTarget = NormalizeProjectForPersistence(targetProjectId);
-        var selectedServers = NormalizeSelection(serversToMove);
+        var selectedServers = NormalizeMutableSelection(serversToMove);
         if (selectedServers.Count == 0)
         {
             return 0;
@@ -1575,8 +1625,14 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(serversToMove);
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (IsSharedFolderKey(targetGroup))
+        {
+            ReportSharedFolderReadOnly();
+            return false;
+        }
+
         var normalizedTarget = NormalizeGroupForPersistence(targetGroup);
-        var selectedServers = NormalizeSelection(serversToMove);
+        var selectedServers = NormalizeMutableSelection(serversToMove);
         if (selectedServers.Count == 0)
         {
             return false;

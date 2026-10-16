@@ -34,7 +34,7 @@ namespace Heimdall.App.Tests;
 /// A shared session found, connected and edited through the one profile lookup, over a real
 /// configuration manager, so what reaches the disk is what the tests read back.
 /// </summary>
-public sealed class SharedSessionConnectTests
+public sealed partial class SharedSessionConnectTests
 {
     private const string LocalProfileId = "local-profile-1";
 
@@ -322,7 +322,8 @@ public sealed class SharedSessionConnectTests
 
         public ProfileLookup Lookup { get; }
 
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(
+            Func<SharedSessionTestData, ISharedSessionProvider>? providerFactory = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(), "heimdall-shared-connect", Guid.NewGuid().ToString("N"));
@@ -333,7 +334,7 @@ public sealed class SharedSessionConnectTests
             await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
 
             SharedSessionTestData shared = SharedSessionTestData.Create();
-            var lookup = new ProfileLookup(configManager, shared.Provider);
+            var lookup = new ProfileLookup(configManager, providerFactory?.Invoke(shared) ?? shared.Provider);
             var handler = new RecordingSshHandler();
             var connectionService = new ConnectionService(
                 configManager, localizer, new NullTunnelService(), [handler]);

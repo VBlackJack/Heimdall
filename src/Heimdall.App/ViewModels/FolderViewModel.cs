@@ -56,7 +56,56 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     /// WPF opens no tooltip for a null content but does open an empty one for an empty string,
     /// which is what the "no group" folder's empty <see cref="FullPath"/> produced.
     /// </remarks>
-    public string? TooltipText => string.IsNullOrEmpty(FullPath) ? null : FullPath;
+    public string? TooltipText => IsShared
+        ? (HasError ? ErrorMessage : SharedTooltipText)
+        : string.IsNullOrEmpty(FullPath) ? null : FullPath;
+
+    /// <summary>
+    /// Whether this folder belongs to a shared session source: the source's own root or a folder
+    /// read from its file.
+    /// </summary>
+    /// <remarks>
+    /// Set once, when the projection builds the node. A shared folder is keyed apart from the local
+    /// folders, so a local folder of the same name never merges with it; its
+    /// <see cref="FullPath"/> is a reserved key, not a path any local operation could act on.
+    /// </remarks>
+    public bool IsShared { get; init; }
+
+    /// <summary>Whether this is the root node standing for a whole shared source.</summary>
+    public bool IsSharedRoot { get; init; }
+
+    /// <summary>The identifier of the shared source this folder belongs to, or empty.</summary>
+    public string SharedSourceId { get; init; } = "";
+
+    /// <summary>The name of the shared source this folder belongs to, or empty.</summary>
+    public string SharedSourceName { get; init; } = "";
+
+    /// <summary>
+    /// The folder path inside the shared source, as the file names it; empty for the source root.
+    /// </summary>
+    public string SharedPath { get; init; } = "";
+
+    /// <summary>
+    /// The localized reason a shared source could not be read, or null when it was read. Only a
+    /// source root carries one, and a root in error has no children.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    [NotifyPropertyChangedFor(nameof(TooltipText))]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
+    private string? _errorMessage;
+
+    /// <summary>Whether this shared source root stands for a source that could not be read.</summary>
+    public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    /// <summary>The read-only notice a shared folder shows on hover and on its lock mark.</summary>
+    public string SharedReadOnlyText => IsShared
+        ? Format("SessionTreeSharedReadOnlyTooltip", SharedSourceName)
+        : "";
+
+    private string SharedTooltipText => string.IsNullOrEmpty(SharedPath)
+        ? SharedReadOnlyText
+        : SharedPath + System.Environment.NewLine + SharedReadOnlyText;
 
     /// <summary>Hex colour of the folder icon, or empty for the themed default.</summary>
     [ObservableProperty]
@@ -98,7 +147,15 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
         string.IsNullOrEmpty(FullPath) ? "::nogroup" : FullPath;
 
     /// <summary>Localized UI Automation name that distinguishes a folder from a server.</summary>
-    public string AccessibleName => Format("SessionTreeFolderAccessibleName", Name);
+    /// <remarks>
+    /// A shared folder says so, and a source in error says why: the lock and the error mark are
+    /// for the eye, and a screen reader reads neither.
+    /// </remarks>
+    public string AccessibleName => !IsShared
+        ? Format("SessionTreeFolderAccessibleName", Name)
+        : HasError
+            ? Format("SessionTreeSharedRootErrorAccessibleName", Name, ErrorMessage ?? "")
+            : Format("SessionTreeSharedFolderAccessibleName", Name, SharedSourceName);
 
     /// <summary>Localized keyboard guidance exposed to UI Automation clients.</summary>
     public string AccessibleHelpText => Translate("SessionTreeFolderAccessibleHelp");
@@ -264,6 +321,8 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     internal void RefreshLocalizedState()
     {
         OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(SharedReadOnlyText));
+        OnPropertyChanged(nameof(TooltipText));
         OnPropertyChanged(nameof(AccessibleHelpText));
         OnPropertyChanged(nameof(CountBadgeText));
     }
@@ -348,6 +407,9 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     private static string Fallback(string key) => key switch
     {
         "SessionTreeFolderAccessibleName" => "{0}, folder",
+        "SessionTreeSharedFolderAccessibleName" => "{0}, shared folder from {1}, read-only",
+        "SessionTreeSharedRootErrorAccessibleName" => "{0}, shared source, cannot be read: {1}",
+        "SessionTreeSharedReadOnlyTooltip" => "Read-only: shared from {0}. Edit these sessions in MobaXterm.",
         "SessionTreeFolderCountFiltered" => "{0}/{1}",
         "SessionTreeFolderAccessibleHelp" =>
             "Folder. Use Left and Right Arrow or Enter to collapse or expand. Press Shift+F10 for actions.",

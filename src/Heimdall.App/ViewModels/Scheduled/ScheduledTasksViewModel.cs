@@ -300,8 +300,9 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
             s => s.DisplayName,
             out ScheduledTaskResolution resolution);
 
-        // The tree does not list shared sessions, so a task naming one by identifier finds no row
-        // there; the lookup builds it. By identifier only: the name fallback stays on local rows.
+        // The tree lists the shared sessions of the loaded sources, so the identifier and the name
+        // rules above already reach them. A task that runs before the tree is loaded, or names a
+        // session of a source reloaded since, still finds it by identifier through the lookup.
         if (server is null
             && !string.IsNullOrEmpty(task.ServerId)
             && await _main.ServerList.FindSharedServerItemAsync(task.ServerId) is { } shared)

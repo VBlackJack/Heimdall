@@ -249,6 +249,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         InitializeSelectionModel();
         _connectionSm.StateChanged += OnConnectionStateChanged;
         _configManager.SettingsChanged += OnSettingsChanged;
+        SubscribeToSharedSessions();
         if (_healthMonitor is not null)
         {
             _healthMonitor.StatusChanged += OnServerHealthChanged;
@@ -285,10 +286,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
             _currentSettings = settings;
             ApplyPersistedViewPreferences(settings);
+            ReloadSharedSessionsIfSourcesChanged(settings);
             SessionGatewayContext gateways = SessionGatewayContext.FromSettings(settings);
+            SessionGatewayContext sharedGateways = SharedGatewayContext(settings);
             foreach (ServerItemViewModel server in _allServers)
             {
-                server.RefreshGatewayState(gateways);
+                server.RefreshGatewayState(server.IsShared ? sharedGateways : gateways);
             }
 
             RefreshLookupCollections(settings);
@@ -425,6 +428,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         _connectionSm.StateChanged -= OnConnectionStateChanged;
         _configManager.SettingsChanged -= OnSettingsChanged;
+        UnsubscribeFromSharedSessions();
         if (_healthMonitor is not null)
         {
             _healthMonitor.StatusChanged -= OnServerHealthChanged;
@@ -558,6 +562,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         _currentSettings = settings;
 
+        // The startup load read the shared sources from these settings; a later change is measured
+        // against them.
+        _sharedSourcesSignature ??= SharedSourcesSignature(settings);
+
         // Nothing selected yet is a fresh start: open on the session the previous run left
         // selected. A reload after a folder operation keeps whatever is selected now.
         var selectedServerId = EffectiveSelectedServerId ?? settings.LastSelectedServerId;
@@ -596,6 +604,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 gateways,
                 _localizer))
             .ToList();
+        _allServers.AddRange(BuildSharedRows(
+            _allServers.Select(server => server.Id).ToHashSet(StringComparer.Ordinal),
+            settings));
         foreach (ServerItemViewModel server in _allServers)
         {
             if (healthById.TryGetValue(server.Id, out HealthState? health))
@@ -680,6 +691,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         // session's own - the one the tree displays - and sorting the union rather than only the
         // in-use half stops empty folders from piling up at the bottom in settings order.
         var groupTargets = _allServers
+            .Where(server => !server.IsShared)
             .Select(server => server.Group)
             .Concat(_currentSettings?.EmptyGroups ?? [])
             .Where(path => !string.IsNullOrWhiteSpace(path))
@@ -980,12 +992,19 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// the shared namespace or a shared profile no source holds.
     /// </summary>
     /// <remarks>
-    /// The tree does not list shared sessions yet, so a reconnect, a restore or a scheduled task
-    /// naming one finds no row there. The row built here carries the profile's identifier, and
-    /// the connection resolves the profile itself through the lookup again.
+    /// The tree's own row when it lists the session. Otherwise (the tree not loaded yet, or the
+    /// source reloaded since) a row is built here: it carries the profile's identifier, and the
+    /// connection resolves the profile itself through the lookup again.
     /// </remarks>
     internal async Task<ServerItemViewModel?> FindSharedServerItemAsync(string serverId)
     {
+        if (SharedSessionIds.IsShared(serverId)
+            && _allServers.FirstOrDefault(
+                candidate => string.Equals(candidate.Id, serverId, StringComparison.Ordinal)) is { } listed)
+        {
+            return listed;
+        }
+
         if (!SharedSessionIds.IsShared(serverId)
             || await _profileLookup.FindAsync(serverId) is not { } shared
             || !SharedSessionIds.IsSharedProfile(shared))
@@ -1771,7 +1790,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     [RelayCommand]
     private async Task EditServerAsync(ServerItemViewModel? server, CancellationToken cancellationToken)
     {
-        if (server is null)
+        if (server is null || !EnsureNoSharedRows([server]))
         {
             return;
         }
@@ -1892,6 +1911,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serverId);
 
+        // A shared session is in the tree now, so it is answered before its row is found.
+        if (SharedSessionIds.IsShared(serverId))
+        {
+            StatusMessageRequested?.Invoke(_localizer["StatusSharedSessionReadOnly"]);
+            return true;
+        }
+
         var server = _allServers.FirstOrDefault(
             candidate => string.Equals(candidate.Id, serverId, StringComparison.Ordinal));
 
@@ -1914,7 +1940,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     [RelayCommand]
     private async Task DeleteServerAsync(ServerItemViewModel? server, CancellationToken cancellationToken)
     {
-        if (server is null)
+        if (server is null || !EnsureNoSharedRows([server]))
         {
             return;
         }
@@ -1941,7 +1967,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     [RelayCommand]
     private async Task DuplicateServerAsync(ServerItemViewModel? server, CancellationToken cancellationToken)
     {
-        if (server is null)
+        if (server is null || !EnsureNoSharedRows([server]))
         {
             return;
         }
@@ -2132,6 +2158,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(server);
+        if (!EnsureNoSharedRows([server]))
+        {
+            return false;
+        }
+
         return await MoveServersToGroupCoreAsync([server], targetGroup, cancellationToken);
     }
 
@@ -2141,6 +2172,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(server);
+        if (!EnsureNoSharedRows([server]))
+        {
+            return false;
+        }
+
         return await MoveServersToProjectCoreAsync([server], targetProjectId, cancellationToken) > 0;
     }
 
@@ -2374,7 +2410,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         Groups = new ObservableCollection<string>(
             _allServers
-                .Where(server => !string.IsNullOrWhiteSpace(server.Group))
+                .Where(server => !server.IsShared && !string.IsNullOrWhiteSpace(server.Group))
                 .Select(server => server.Group)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(name => name, DisplayNameOrdering.Comparer));

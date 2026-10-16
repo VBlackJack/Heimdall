@@ -990,8 +990,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         ISessionResult session)
     {
         // Resolve tunnel chain route for visual display in session header
-        // (uses sessionId - correct for state machine lookup)
-        tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId);
+        // (uses sessionId - correct for state machine lookup; the profile names a shared gateway)
+        tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId, originalServerId);
 
         _main.StatusText = string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase)
             ? _localizer.Format("StatusEmbeddedRdpOpening", displayName)
@@ -1067,7 +1067,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         // much, and a failed session is not counted as live either way.
         tab.Status = statusText;
         tab.FailureDetails = diagnostic;
-        tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId);
+        tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId, originalServerId);
         _main.StatusText = statusText;
     }
 

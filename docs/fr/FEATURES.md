@@ -326,7 +326,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 073 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 103 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -399,6 +399,31 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     la fois précédente, y compris les modifications locales qui leur ont été apportées
   - Les mots de passe enregistrés par MobaXterm ne sont pas importés (chiffrement propriétaire) ; le
     résumé d'import les compte
+- Sources de sessions MobaXterm partagées (Paramètres > Général > Sources de sessions partagées) :
+  - Une source est un nom et le chemin d'un fichier `.mxtsessions`, en général sur un partage
+    d'équipe ou un dossier synchronisé ; les variables d'environnement sont acceptées
+    (`%OneDriveCommercial%\...`). Chaque source activée est lue au démarrage et apparaît dans
+    l'arborescence des sessions comme une racine à part, sous les dossiers locaux, avec sa propre
+    icône. Ses dossiers MobaXterm se rangent dessous, et un dossier local du même nom n'est jamais
+    fusionné avec un dossier partagé
+  - Les sessions partagées sont en lecture seule dans Heimdall et continuent d'être modifiées dans
+    MobaXterm : elles se connectent, s'ouvrent en vue scindée, copient leur hôte et affichent leur
+    état comme toute autre session, mais ne peuvent être ni modifiées, ni renommées, ni dupliquées,
+    ni déplacées, ni réordonnées, ni supprimées, ni mises en favori, et rien ne se glisse hors d'un
+    dossier partagé ni dedans. Un cadenas sur la ligne nomme la source. Une sélection qui contient
+    une session partagée garde Connecter et refuse les autres actions groupées, en disant combien de
+    sessions partagées elle contient
+  - Une source illisible (fichier absent, illisible ou trop volumineux) garde sa racine dans
+    l'arborescence avec une marque d'erreur et la raison au survol, et n'affiche aucune session
+  - La carte des paramètres indique ce que chaque source contient après sa dernière lecture.
+    **Recharger** relit les sources enregistrées et actualise l'arborescence sans redémarrage ;
+    enregistrer une modification des sources ou des variables d'import MobaXterm les recharge aussi
+  - Les commandes post-connexion d'une session partagée s'approuvent par utilisateur : Heimdall
+    demande avant de les saisir, retient l'approbation pour ces commandes exactes, et redemande quand
+    le fichier partagé les change. Les approbations sont une confiance personnelle : elles ne sont
+    jamais exportées ni importées avec les paramètres, et **Valeurs par défaut** les efface tout en
+    conservant les sources elles-mêmes
+  - L'en-tête de session nomme la passerelle partagée par laquelle passe une session partagée
 - Les imports de sessions JSON ne contiennent que des profils de serveurs. Les définitions de passerelles SSH vivent dans `settings.json`
   (`AppSettings.SshGateways`), si bien que des jeux de test comme `Heimdall-TestEnv` doivent injecter la
   passerelle correspondante dans la configuration de build d'exécution exacte avant que les sessions tunnelisées puissent la résoudre.

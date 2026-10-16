@@ -101,29 +101,64 @@ internal sealed class SharedSessionTestData
     }
 }
 
-/// <summary>Holds a fixed set of shared profiles and gateways and hands out copies, like the provider.</summary>
+/// <summary>
+/// Holds a set of shared profiles, gateways and source states and hands out copies, like the
+/// provider. Without states it reports no source, as before the tree listed shared sessions.
+/// </summary>
 internal sealed class StubSharedSessionProvider(
     IReadOnlyList<ServerProfileDto> profiles,
-    IReadOnlyList<SshGatewayDto> gateways) : ISharedSessionProvider
+    IReadOnlyList<SshGatewayDto> gateways,
+    IReadOnlyList<SharedSessionSourceState>? sources = null) : ISharedSessionProvider
 {
+    private IReadOnlyList<ServerProfileDto> _profiles = profiles;
+    private IReadOnlyList<SshGatewayDto> _gateways = gateways;
+    private IReadOnlyList<SharedSessionSourceState> _sources = sources ?? [];
+
     public event Action? Changed;
 
     public int LoadCount { get; private set; }
 
-    public IReadOnlyList<SharedSessionSourceState> Sources => [];
+    /// <summary>The settings the last load was asked to read.</summary>
+    public AppSettings? LastLoadedSettings { get; private set; }
 
-    public IReadOnlyList<ServerProfileDto> Profiles => profiles.Select(profile => profile.CloneFaithfully()).ToList();
+    public IReadOnlyList<SharedSessionSourceState> Sources => _sources;
 
-    public IReadOnlyList<SshGatewayDto> Gateways => gateways.Select(gateway => gateway.CloneFaithfully()).ToList();
+    public IReadOnlyList<ServerProfileDto> Profiles => _profiles.Select(profile => profile.CloneFaithfully()).ToList();
+
+    public IReadOnlyList<SshGatewayDto> Gateways => _gateways.Select(gateway => gateway.CloneFaithfully()).ToList();
 
     public ServerProfileDto? FindProfile(string profileId) =>
-        profiles.FirstOrDefault(profile => string.Equals(profile.Id, profileId, StringComparison.Ordinal))
+        _profiles.FirstOrDefault(profile => string.Equals(profile.Id, profileId, StringComparison.Ordinal))
             ?.CloneFaithfully();
+
+    /// <summary>Replaces what the next load hands out, as a changed file would.</summary>
+    public void SetContents(
+        IReadOnlyList<ServerProfileDto> profiles,
+        IReadOnlyList<SshGatewayDto> gateways,
+        IReadOnlyList<SharedSessionSourceState> sources)
+    {
+        _profiles = profiles;
+        _gateways = gateways;
+        _sources = sources;
+    }
 
     public Task LoadAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         LoadCount++;
+        LastLoadedSettings = settings;
         Changed?.Invoke();
         return Task.CompletedTask;
     }
+
+    /// <summary>A loaded state for <paramref name="sourceId"/>.</summary>
+    public static SharedSessionSourceState Loaded(string sourceId, string name, int profileCount) =>
+        new(sourceId, name, @"C:\shares\" + sourceId + ".mxtsessions", SharedSessionSourceStatus.Loaded, null, profileCount, 0, [], 0);
+
+    /// <summary>A failed state for <paramref name="sourceId"/>, carrying <paramref name="reason"/>.</summary>
+    public static SharedSessionSourceState Failed(string sourceId, string name, string reason) =>
+        new(sourceId, name, @"C:\shares\" + sourceId + ".mxtsessions", SharedSessionSourceStatus.Error, reason, 0, 0, [], 0);
+
+    /// <summary>A disabled state for <paramref name="sourceId"/>.</summary>
+    public static SharedSessionSourceState Disabled(string sourceId, string name) =>
+        new(sourceId, name, "", SharedSessionSourceStatus.Disabled, null, 0, 0, [], 0);
 }

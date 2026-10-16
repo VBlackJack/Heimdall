@@ -1370,9 +1370,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IBrowserLauncher browserLauncher,
         IProfileImportService? profileImportService = null,
         ICredentialGuardService? credentialGuardService = null,
-        TrustedWebCertificatesSettingsViewModel? trustedWebCertificates = null)
+        TrustedWebCertificatesSettingsViewModel? trustedWebCertificates = null,
+        Services.SharedSessions.ISharedSessionProvider? sharedSessions = null)
     {
         _configManager = configManager;
+        _sharedSessions = sharedSessions;
         _localizer = localizer;
         _dialogService = dialogService;
         _pinManager = pinManager;
@@ -1397,6 +1399,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // The markers and the posture card are worded, so they follow the interface language.
         _localizer.LocaleChanged += OnPanelLocaleChanged;
+        SubscribeToSharedSessionProvider();
         RefreshSecurityPosture();
     }
 
@@ -1414,6 +1417,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // The row errors are worded once, when the rows are validated.
         RevalidateMobaXtermVariables();
+        RevalidateSharedSessionSources();
+        RefreshSharedSessionSourceStatuses();
     }
 
     /// <summary>
@@ -1895,6 +1900,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SubscribeExternalToolTracking();
 
             LoadMobaXtermUserVariables(settings);
+            LoadSharedSessionSources(settings);
 
             Gateways = new ObservableCollection<GatewayItemViewModel>(
                 settings.SshGateways.Select(g => new GatewayItemViewModel
@@ -2070,6 +2076,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Dropped before the tools are measured again, so a fixed tool stops being reported.
         _externalToolsValidationError = null;
         _mobaXtermVariablesValidationError = null;
+        _sharedSessionSourcesValidationError = null;
         RefreshValidationSummary();
 
         if (HasErrors)
@@ -2095,6 +2102,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         if (mobaXtermVariablesError is not null)
         {
             _mobaXtermVariablesValidationError = mobaXtermVariablesError;
+            RefreshValidationSummary();
+            return false;
+        }
+
+        string? sharedSourcesError = ValidateSharedSessionSources();
+        if (sharedSourcesError is not null)
+        {
+            _sharedSessionSourcesValidationError = sharedSourcesError;
             RefreshValidationSummary();
             return false;
         }
@@ -2264,6 +2279,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // Import
         settings.MobaXtermUserVariables = BuildMobaXtermUserVariables();
+        settings.SharedSessionSources = BuildSharedSessionSources();
     }
 
     private async Task PersistValidatedSettingsAsync(CancellationToken cancellationToken)
@@ -2294,8 +2310,16 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         AppSettings? written = null;
         IReadOnlyList<SshGatewayDto> parentChangesRefused = [];
+        bool clearSharedApprovals = _clearSharedApprovalsOnSave;
         await _configManager.MergeSettingAsync((AppSettings settings) =>
         {
+            // Not a panel value, so WritePanelInto never touches it: only the save that follows a
+            // factory reset clears the approvals, and nothing else writes them from here.
+            if (clearSharedApprovals)
+            {
+                settings.SharedPostConnectApprovals = new();
+            }
+
             if (deletedGatewayIds.Count > 0)
             {
                 foreach (GroupDefaultsDto defaults in settings.GroupDefaults.Values)
@@ -2333,6 +2357,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         _deletedGatewayIds.Clear();
         _editedGatewayIds.Clear();
+        if (clearSharedApprovals)
+        {
+            _clearSharedApprovalsOnSave = false;
+        }
 
         if (parentChangesRefused.Count > 0 && written is not null)
         {
@@ -2457,6 +2485,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // here only hid what is still on disk.
         defaults.ExternalTools = persisted.ExternalTools;
         defaults.MobaXtermUserVariables = persisted.MobaXtermUserVariables;
+
+        // The sources are the user's own entries too. The approvals given to shared post-connect
+        // commands are trust, and a reset is how trust is withdrawn: they go at the next save.
+        defaults.SharedSessionSources = persisted.SharedSessionSources;
         defaults.CredentialProviderUnlockSecretEncrypted = persisted.CredentialProviderUnlockSecretEncrypted;
         defaults.UpdateSkippedVersion = persisted.UpdateSkippedVersion;
         defaults.LegacyMigrationDeclinedOfferVersion = persisted.LegacyMigrationDeclinedOfferVersion;
@@ -2469,6 +2501,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         bool savedTranscripts = _savedSessionLoggingEnabled;
 
         LoadFromSettings(defaults);
+        _clearSharedApprovalsOnSave = true;
         _originalLocale = localeToReturnTo;
         _originalTheme = themeToReturnTo;
         _originalAccentTint = accentToReturnTo;
@@ -4133,6 +4166,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         UnsubscribeExternalToolTracking();
         UnsubscribeMobaXtermVariableTracking();
+        UnsubscribeSharedSessionSourceTracking();
+        UnsubscribeFromSharedSessionProvider();
         _localizer.LocaleChanged -= OnPanelLocaleChanged;
         TrustedHostKeys.Dispose();
         TrustedRdpCertificates.Dispose();
@@ -4673,7 +4708,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // With several, the banner says how many: showing only the first read as "fix this one
         // and you are done", and the next Save then refused again over a field nobody had named.
         ValidationSummary = firstError is null
-            ? _externalToolsValidationError ?? _mobaXtermVariablesValidationError
+            ? _externalToolsValidationError ?? _mobaXtermVariablesValidationError ?? _sharedSessionSourcesValidationError
             : errorCount > 1
                 ? _localizer.Format("SettingsValidationSummaryCount", errorCount, firstError)
                 : firstError;

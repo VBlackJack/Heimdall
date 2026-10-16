@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,073 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,103 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -396,6 +396,28 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     any local edits made to them
   - Passwords stored by MobaXterm are not imported (proprietary encryption); the import summary
     counts them
+- Shared MobaXterm session sources (Settings > General > Shared session sources):
+  - A source is a name and the path of a `.mxtsessions` file, typically on a team share or a
+    synchronized folder; environment variables are allowed (`%OneDriveCommercial%\...`). Each
+    enabled source is read at startup and appears in the session tree as a root of its own, below
+    the local folders, with its own icon. Its MobaXterm folders sit underneath it, and a local folder
+    with the same name is never merged with a shared one
+  - Shared sessions are read-only in Heimdall and keep being edited in MobaXterm: they connect,
+    connect in a split, copy their host and show their health like any other session, but they
+    cannot be edited, renamed, duplicated, moved, reordered, deleted or marked favorite, and nothing
+    can be dragged out of or onto a shared folder. A lock on the row names the source. A selection
+    that holds a shared session keeps Connect and refuses the other bulk actions, saying how many
+    shared sessions it holds
+  - A source that cannot be read (file missing, unreadable or too large) keeps its root in the
+    tree with an error mark and the reason on hover, and lists no sessions
+  - The settings card shows what each source holds after its last read. **Reload** reads the saved
+    sources again and refreshes the tree without a restart; saving a change to the sources or to the
+    MobaXterm import variables reloads them too
+  - Post-connect commands of a shared session are approved per user: Heimdall asks before typing
+    them, remembers the approval for those exact commands, and asks again when the shared file
+    changes them. The approvals are personal trust: they are never exported or imported with the
+    settings, and **Reset defaults** clears them, while it keeps the sources themselves
+  - The session header names the shared gateway a shared session goes through
 - JSON session imports contain server profiles only. SSH gateway definitions live in `settings.json`
   (`AppSettings.SshGateways`), so test fixtures such as `Heimdall-TestEnv` must inject the
   matching gateway into the exact runtime build configuration before tunneled sessions can resolve it.

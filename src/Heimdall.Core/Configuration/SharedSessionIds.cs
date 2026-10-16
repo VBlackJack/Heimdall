@@ -73,6 +73,31 @@ public static partial class SharedSessionIds
     public static bool IsValidSourceId(string? sourceId) =>
         sourceId is not null && SourceIdRegex().IsMatch(sourceId);
 
+    /// <summary>
+    /// The source a shared identifier was minted for, or null when <paramref name="id"/> is not a
+    /// well-formed shared identifier.
+    /// </summary>
+    /// <remarks>
+    /// Unambiguous because a source identifier never holds the separator: the first separator after
+    /// the prefix ends it.
+    /// </remarks>
+    public static string? SourceIdOf(string? id)
+    {
+        if (!IsShared(id))
+        {
+            return null;
+        }
+
+        int separator = id!.IndexOf(SourceSeparator, Prefix.Length);
+        if (separator <= Prefix.Length)
+        {
+            return null;
+        }
+
+        string sourceId = id[Prefix.Length..separator];
+        return IsValidSourceId(sourceId) ? sourceId : null;
+    }
+
     /// <summary>A new source identifier.</summary>
     public static string NewSourceId() => Guid.NewGuid().ToString("N");
 

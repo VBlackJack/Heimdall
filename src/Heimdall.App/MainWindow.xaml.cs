@@ -2829,6 +2829,40 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
+    /// <summary>The file pattern of a MobaXterm session file, offered by the shared source browse.</summary>
+    private const string MobaXtermSessionFilePattern = "*.mxtsessions";
+
+    /// <summary>
+    /// Picks the file of one shared source row; the row is the button's own data context. The
+    /// picked path is written as it is: the user may still replace the start of it with an
+    /// environment variable such as %OneDriveCommercial%.
+    /// </summary>
+    private void OnSharedSessionSourceBrowseClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not ViewModels.Settings.SharedSessionSourceItemViewModel row)
+        {
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = BuildFileDialogFilter("FilterMobaXtermSessions", MobaXtermSessionFilePattern)
+        };
+
+        string? directory = string.IsNullOrWhiteSpace(row.Path)
+            ? null
+            : System.IO.Path.GetDirectoryName(Environment.ExpandEnvironmentVariables(row.Path.Trim()));
+        if (!string.IsNullOrEmpty(directory) && System.IO.Directory.Exists(directory))
+        {
+            dialog.InitialDirectory = directory;
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            row.Path = dialog.FileName;
+        }
+    }
+
     private void OnExtToolWorkDirBrowseClick(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog();

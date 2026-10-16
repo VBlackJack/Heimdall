@@ -153,7 +153,8 @@ public partial class ServerListViewModel
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
 
         return _allServers.Count(server =>
-            server.Group is string group
+            !server.IsShared
+            && server.Group is string group
             && FolderPath.IsSelfOrDescendant(group, folderPath));
     }
 
@@ -532,7 +533,8 @@ public partial class ServerListViewModel
     {
         foreach (StableFolderNode node in EnumerateStableFolders(_stableTreeRoot))
         {
-            if (!node.IsNoGroup)
+            // A shared folder takes no colour: the colours are filed by local path.
+            if (!node.IsNoGroup && !node.IsShared)
             {
                 node.ViewModel!.Color = ResolveFolderColor(node.ViewModel.FullPath);
             }
@@ -564,6 +566,15 @@ public partial class ServerListViewModel
             return null;
         }
 
+        // A shared session groups under its own source's folder, never under a local folder that
+        // happens to be spelled the same.
+        if (server.IsShared)
+        {
+            return ResolveSharedFolderOf(server) is { } shared
+                ? new SessionTabGroupInfo(shared.FullPath, shared.Name, shared.Color)
+                : null;
+        }
+
         string path = string.Join('/', NormalizeFolderPath(server.Group)
             .Split('/', StringSplitOptions.RemoveEmptyEntries));
         if (path.Length == 0
@@ -590,6 +601,11 @@ public partial class ServerListViewModel
     public async Task SetFolderColorAsync(string folderPath, string? color)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
+        if (IsSharedFolderKey(folderPath))
+        {
+            ReportSharedFolderReadOnly();
+            return;
+        }
 
         string? normalized = string.IsNullOrWhiteSpace(color) ? null : color.Trim();
         if (_stableFoldersByPath.TryGetValue(folderPath, out StableFolderNode? node))
@@ -636,6 +652,12 @@ public partial class ServerListViewModel
         StableFolderNode? noGroupNode = null;
         foreach (ServerItemViewModel server in _allServers)
         {
+            // Filed by ProjectSharedSources, under the source's own root.
+            if (server.IsShared)
+            {
+                continue;
+            }
+
             string folderPath = NormalizeFolderPath(server.Group);
             StableFolderNode target;
             if (folderPath.Length == 0)
@@ -662,6 +684,7 @@ public partial class ServerListViewModel
             }
         }
 
+        ProjectSharedSources();
         SortStableTree(_stableTreeRoot);
         _stableServerOrder = _allServers
             .OrderBy(server => SessionOrdering.RankOf(server.SortOrder))
@@ -739,6 +762,12 @@ public partial class ServerListViewModel
         _stableFoldersByPath.Clear();
         foreach (StableFolderNode node in EnumerateStableFolders(_stableTreeRoot))
         {
+            // Shared folders keep their own index; a local path must never resolve to one.
+            if (node.IsShared)
+            {
+                continue;
+            }
+
             string key = node.IsNoGroup
                 ? NoGroupProjectionKey
                 : node.ViewModel!.FullPath;
@@ -756,9 +785,17 @@ public partial class ServerListViewModel
     {
         node.Children.Sort((left, right) =>
         {
-            if (left.IsNoGroup != right.IsNoGroup)
+            // Local folders first, then "no folder", then the shared sources in the order the
+            // settings list them.
+            int rank = left.SortRank.CompareTo(right.SortRank);
+            if (rank != 0)
             {
-                return left.IsNoGroup ? 1 : -1;
+                return rank;
+            }
+
+            if (left.ViewModel!.IsSharedRoot)
+            {
+                return left.SharedOrder.CompareTo(right.SharedOrder);
             }
 
             return names.Compare(
@@ -841,6 +878,15 @@ public partial class ServerListViewModel
         public FolderViewModel? ViewModel { get; }
 
         public bool IsNoGroup { get; }
+
+        /// <summary>Whether the node is a shared source root or one of its folders.</summary>
+        public bool IsShared => ViewModel?.IsShared == true;
+
+        /// <summary>Where a shared source root stands among the others, in settings order.</summary>
+        public int SharedOrder { get; set; }
+
+        /// <summary>The band a node sorts in among its siblings: local, "no folder", shared root.</summary>
+        public int SortRank => ViewModel?.IsSharedRoot == true ? 2 : IsNoGroup ? 1 : 0;
 
         public List<StableFolderNode> Children { get; } = [];
 

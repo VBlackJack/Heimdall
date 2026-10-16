@@ -32,7 +32,32 @@ namespace Heimdall.App.ViewModels;
 public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, IAccessibleItemViewModel
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsShared))]
+    [NotifyPropertyChangedFor(nameof(SharedReadOnlyText))]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
+    [NotifyPropertyChangedFor(nameof(RowTooltipText))]
     private string _id = "";
+
+    /// <summary>
+    /// Whether the row stands for a session read from a shared source. Such a row connects like any
+    /// other and is never edited, renamed, moved, duplicated, deleted or marked favorite here.
+    /// </summary>
+    /// <remarks>
+    /// Read from the identifier: the shared namespace is reserved, and no local profile can carry
+    /// an identifier in it.
+    /// </remarks>
+    public bool IsShared => SharedSessionIds.IsShared(Id);
+
+    /// <summary>The name of the shared source the session comes from, or empty for a local one.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SharedReadOnlyText))]
+    [NotifyPropertyChangedFor(nameof(RowTooltipText))]
+    private string _sharedSourceName = "";
+
+    /// <summary>The read-only notice the lock mark of a shared row shows, naming its source.</summary>
+    public string SharedReadOnlyText => IsShared
+        ? Format("SessionTreeSharedReadOnlyTooltip", SharedSourceName)
+        : "";
 
     [ObservableProperty]
     private string _displayName = "";
@@ -360,12 +385,15 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// </para>
     /// </remarks>
     public string AccessibleName => Format(
-        IsFavorite ? "SessionTreeServerAccessibleNameFavorite" : "SessionTreeServerAccessibleName",
+        IsShared ? "SessionTreeServerAccessibleNameShared"
+        : IsFavorite ? "SessionTreeServerAccessibleNameFavorite"
+        : "SessionTreeServerAccessibleName",
         DisplayName,
         ProtocolDisplayName,
         StatusShowsConnectionState
             ? ConnectionStateDisplayName
-            : HealthTooltipText);
+            : HealthTooltipText,
+        SharedSourceName);
 
     /// <summary>Localized keyboard guidance exposed to UI Automation clients.</summary>
     /// <remarks>
@@ -430,6 +458,11 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
             if (HasGateway && !IsGatewayBadgeVisible)
             {
                 lines.Add(Format("SessionTreeRowTooltipGateway", GatewayName));
+            }
+
+            if (IsShared)
+            {
+                lines.Add(SharedReadOnlyText);
             }
 
             return lines.Count == 0
@@ -537,6 +570,8 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
 
     partial void OnIsFavoriteChanged(bool value) => OnPropertyChanged(nameof(AccessibleName));
 
+    partial void OnSharedSourceNameChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
+
     /// <summary>
     /// Takes a favorite flag the inventory has just persisted, keeping the retained DTO in step
     /// so a later reader of the profile sees the same answer as the row.
@@ -628,6 +663,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         OnPropertyChanged(nameof(LatencyText));
         OnPropertyChanged(nameof(LastOpenedText));
         OnPropertyChanged(nameof(OriginDisplayName));
+        OnPropertyChanged(nameof(SharedReadOnlyText));
         OnPropertyChanged(nameof(AccessibleHelpText));
         OnPropertyChanged(nameof(HealthTooltipText));
         OnPropertyChanged(nameof(ConnectionStateDisplayName));
@@ -830,6 +866,8 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         "SessionTreeRowTooltipUser" => "User: {0}",
         "SessionTreeRowTooltipProtocol" => "Protocol: {0}",
         "SessionTreeRowTooltipGateway" => "Gateway: {0}",
+        "SessionTreeServerAccessibleNameShared" => "{0}, shared from {3}, read-only, protocol {1}, state {2}",
+        "SessionTreeSharedReadOnlyTooltip" => "Read-only: shared from {0}. Edit these sessions in MobaXterm.",
         "SessionStatusConnected" => "Connected",
         "SessionStatusConnecting" => "Connecting...",
         "SessionStatusDisconnected" => "Disconnected",
