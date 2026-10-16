@@ -16,6 +16,7 @@
 
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
 using Heimdall.Core.Codecs;
@@ -37,6 +38,7 @@ public sealed class SplitService : ISplitService
     public const int MaxPanesPerTab = 8;
 
     private readonly IConfigManager _configManager;
+    private readonly IProfileLookup _profileLookup;
     private readonly LocalizationManager _localizer;
     private readonly ConnectionStateMachine _connectionSm;
     private readonly TunnelManager _tunnelManager;
@@ -79,9 +81,11 @@ public sealed class SplitService : ISplitService
         IConnectionService connectionService,
         ToolRegistry toolRegistry,
         IDialogService dialogService,
-        IPaneCloseArbiter closeArbiter)
+        IPaneCloseArbiter closeArbiter,
+        IProfileLookup? profileLookup = null)
     {
         _configManager = configManager;
+        _profileLookup = profileLookup ?? ProfileLookup.LocalOnly(configManager);
         _localizer = localizer;
         _connectionSm = connectionSm;
         _tunnelManager = tunnelManager;
@@ -181,7 +185,7 @@ public sealed class SplitService : ISplitService
                 return;
             }
 
-            var servers = await _configManager.LoadServersAsync();
+            var serverDto = await _profileLookup.FindAsync(serverId);
             var settings = await _configManager.LoadSettingsAsync();
             ct.ThrowIfCancellationRequested();
 
@@ -189,14 +193,14 @@ public sealed class SplitService : ISplitService
             // Only opening a tab used to, and splitting every tab once hosted twice the setting.
             NoteNewConnection?.Invoke(settings.MaxEmbeddedSessions);
 
-            var serverDto = servers.FirstOrDefault(
-                s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
             if (serverDto is null)
             {
                 Core.Logging.FileLogger.Warn(
                     $"Split aborted: server '{serverId}' not found in inventory.");
                 return;
             }
+
+            settings = _profileLookup.EffectiveSettingsFor(serverDto, settings);
 
             if (ForceEmbeddedMode(serverDto))
             {
@@ -689,12 +693,9 @@ public sealed class SplitService : ISplitService
             pane.HostControl = null;
             pane.Status = SessionStatusTokens.Connecting;
 
-            var servers = await _configManager.LoadServersAsync();
+            var serverDto = await _profileLookup.FindAsync(serverId);
             var settings = await _configManager.LoadSettingsAsync();
             ct.ThrowIfCancellationRequested();
-
-            var serverDto = servers.FirstOrDefault(
-                s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
 
             if (serverDto is null)
             {
@@ -703,6 +704,8 @@ public sealed class SplitService : ISplitService
                     $"ReconnectPane failed: server '{serverId}' no longer in inventory.");
                 return;
             }
+
+            settings = _profileLookup.EffectiveSettingsFor(serverDto, settings);
 
             var effectiveConnectionType = ResolvePaneConnectionType(
                 pane.ConnectionType,

@@ -21,6 +21,7 @@ using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SessionSnapshot;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
@@ -259,7 +260,8 @@ public sealed partial class SessionCoordinatorPreMountTests
             bool checkAccess = true,
             ITunnelsViewModelFactory? tunnelsFactory = null,
             ISessionRestoreCoordinator? sessionRestore = null,
-            ICommandPaletteViewModelFactory? paletteFactory = null)
+            ICommandPaletteViewModelFactory? paletteFactory = null,
+            Func<IConfigManager, IProfileLookup>? profileLookupFactory = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -267,6 +269,7 @@ public sealed partial class SessionCoordinatorPreMountTests
                 Guid.NewGuid().ToString("N"));
             ConfigManager configManager = new ConfigManager(rootPath);
             configManager.InitializeAsync().GetAwaiter().GetResult();
+            IProfileLookup? profileLookup = profileLookupFactory?.Invoke(configManager);
 
             LocalizationManager localizer = new LocalizationManager();
             localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en")
@@ -301,7 +304,8 @@ public sealed partial class SessionCoordinatorPreMountTests
                 embeddedSessionManager,
                 connectionService,
                 toolRegistry,
-                dialogService, closeArbiter);
+                dialogService, closeArbiter,
+                profileLookup);
             FakeUiDispatcher dispatcher = new(checkAccess);
             ConnectionViewModel connection = new ConnectionViewModel(
                 localizer,
@@ -318,7 +322,8 @@ public sealed partial class SessionCoordinatorPreMountTests
                 dialogService,
                 new FakeRdpImportService(),
                 new PuttySessionImporter(new FakePuttySessionRegistrySource(), configManager),
-                new Heimdall.App.Services.Import.KnownHostsImporter(configManager, hostKeyStore));
+                new Heimdall.App.Services.Import.KnownHostsImporter(configManager, hostKeyStore),
+                profileLookup: profileLookup);
             // A real trusted-host-keys view model rather than null!: the shell's own load
             // sequence runs LoadFromSettings, which refreshes it, so the null stood between this
             // harness and every assertion about what loading the shell does.

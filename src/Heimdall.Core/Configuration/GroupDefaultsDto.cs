@@ -107,7 +107,9 @@ public sealed class GroupDefaultsDto
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(allDefaults);
 
-        if (allDefaults.Count == 0 || string.IsNullOrWhiteSpace(server.Group))
+        // A shared folder is named in a file other people edit; a local folder of the same name
+        // would otherwise hand its gateway, login, key and port to every shared session under it.
+        if (allDefaults.Count == 0 || string.IsNullOrWhiteSpace(server.Group) || SharedSessionIds.IsSharedProfile(server))
             return;
 
         Resolve(server.Group, allDefaults).ApplyTo(server);

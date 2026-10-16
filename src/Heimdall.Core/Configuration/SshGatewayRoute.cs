@@ -70,7 +70,8 @@ public static class SshGatewayRoute
             return server.SshGatewayId;
         }
 
-        if (groupDefaults is null || groupDefaults.Count == 0)
+        // A shared profile never inherits a local folder's gateway (see GroupDefaultsDto.ApplyInherited).
+        if (groupDefaults is null || groupDefaults.Count == 0 || SharedSessionIds.IsSharedProfile(server))
         {
             return null;
         }

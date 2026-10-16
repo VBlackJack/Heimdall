@@ -101,6 +101,8 @@
     "mobaXtermUserVariables": {
         "DAS": "%USERNAME%"
     },
+    "sharedSessionSources": [],
+    "sharedPostConnectApprovals": {},
     "scheduledTasks": [],
     "groupDefaults": {},
     "sshGateways": [],

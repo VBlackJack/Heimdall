@@ -638,6 +638,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             var settings = await _configManager.LoadSettingsAsync();
             var servers = await _configManager.LoadServersAsync();
 
+            // Before the session restore below, which may reconnect a shared session. A source that
+            // cannot be read is reported in its own state, never thrown here.
+            await ServerList.ProfileLookup.SharedSessions.LoadAsync(settings, cancellationToken);
+
             ServerCount = servers.Count;
             Tunnels.RefreshList();
 

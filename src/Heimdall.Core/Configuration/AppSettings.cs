@@ -418,6 +418,25 @@ public sealed class AppSettings
         ["DAS"] = "%USERNAME%",
     };
 
+    /// <summary>
+    /// MobaXterm session files read at startup as read-only sources of shared sessions. Their
+    /// profiles and gateways are held in memory and never written to servers.json or to
+    /// <see cref="SshGateways"/>.
+    /// </summary>
+    public List<SharedSessionSourceDto> SharedSessionSources { get; set; } = new();
+
+    /// <summary>
+    /// The post-connect commands of shared sessions the user allowed to run. Key: the shared
+    /// profile identifier. Value: the <see cref="PostConnectFingerprint"/> of the commands that
+    /// were allowed, so a change to them in the shared file asks again.
+    /// </summary>
+    /// <remarks>
+    /// Kept here rather than as <see cref="ServerProfileDto.ExecutionConfirmed"/> on the profile:
+    /// a shared profile is rebuilt from a file other people edit, and a flag on it would approve
+    /// whatever that file says next.
+    /// </remarks>
+    public Dictionary<string, string> SharedPostConnectApprovals { get; set; } = new();
+
     // SSH host key trust store (TOFU - persisted across restarts)
     // Key: "host:port", Value: "SHA256:<base64-no-padding>"
     public Dictionary<string, string> TrustedHostKeys { get; set; } = new();

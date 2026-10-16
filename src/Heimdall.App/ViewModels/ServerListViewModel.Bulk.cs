@@ -1318,7 +1318,7 @@ public partial class ServerListViewModel
             return new BulkConnectPlan(settings, [], new BulkConnectSkipTally(), Refused: true);
         }
 
-        var serverDtos = await _configManager.LoadServersAsync();
+        var serverDtos = await _profileLookup.GetAllAsync();
         var dtoMap = serverDtos.ToDictionary(dto => dto.Id, StringComparer.Ordinal);
         var candidates = new List<BulkConnectCandidate>(selectedServers.Count);
         BulkConnectSkipTally skips = new BulkConnectSkipTally();
@@ -1380,7 +1380,17 @@ public partial class ServerListViewModel
             candidates.Add(new BulkConnectCandidate(server, serverDto));
         }
 
-        return new BulkConnectPlan(settings, candidates, skips);
+        // One settings instance serves the whole batch. When it holds a shared session, it is a
+        // copy carrying the shared gateways as well; the local candidates resolve exactly as
+        // before, since only gateways were added and none of theirs can be shadowed.
+        ServerProfileDto? sharedCandidate = candidates
+            .Select(candidate => candidate.ServerDto)
+            .FirstOrDefault(SharedSessionIds.IsSharedProfile);
+        AppSettings planSettings = sharedCandidate is null
+            ? settings
+            : _profileLookup.EffectiveSettingsFor(sharedCandidate, settings);
+
+        return new BulkConnectPlan(planSettings, candidates, skips);
     }
 
     internal async Task ConnectServersBulkCoreAsync(

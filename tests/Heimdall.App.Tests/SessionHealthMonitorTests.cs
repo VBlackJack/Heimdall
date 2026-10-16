@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.Services;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.SessionHealth;
 
@@ -517,6 +518,37 @@ public partial class SessionHealthMonitorTests
         {
             await Task.Delay(10, timeout.Token);
         }
+    }
+
+    [Fact]
+    public async Task RunCycle_SharedProfiles_AreProbedThroughTheLookup()
+    {
+        SharedSessionTestData shared = SharedSessionTestData.Create();
+        List<string> probedHosts = [];
+        var probe = new FakeHealthProbe((host, _, _, _) =>
+        {
+            lock (probedHosts)
+            {
+                probedHosts.Add(host);
+            }
+
+            return new HealthState(HealthStatus.Up, DateTime.UtcNow, 1, null);
+        });
+        var configManager = new FakeConfigManager();
+        using var monitor = new SessionHealthMonitor(
+            configManager,
+            probe,
+            webProbe: null,
+            new ProfileLookup(configManager, shared.Provider));
+        monitor.Start(new AppSettings { SessionHealthMonitorEnabled = true }, armTimer: false);
+
+        await monitor.RunCycleAsync(CancellationToken.None);
+
+        // The direct shared session gets a dot; the one behind its shared gateway is left
+        // unprobed, as a local one would be.
+        Assert.Contains(shared.DirectProfile.RemoteServer, probedHosts);
+        Assert.DoesNotContain(shared.Profile.RemoteServer, probedHosts);
+        Assert.True(monitor.States.ContainsKey(shared.DirectProfile.Id));
     }
 
     private sealed class FakeHealthProbe : IHealthProbe

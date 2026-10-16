@@ -16,6 +16,7 @@
 
 using System.Collections.Concurrent;
 using System.Net;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 using Heimdall.Core.SessionHealth;
@@ -40,6 +41,7 @@ namespace Heimdall.App.Services;
 public sealed class SessionHealthMonitor : IDisposable
 {
     private readonly IConfigManager _configManager;
+    private readonly IProfileLookup _profileLookup;
     private readonly IHealthProbe _probe;
     private readonly IWebHealthProbe? _webProbe;
     private readonly ConcurrentDictionary<string, HealthState> _states = new(StringComparer.Ordinal);
@@ -61,9 +63,11 @@ public sealed class SessionHealthMonitor : IDisposable
     public SessionHealthMonitor(
         IConfigManager configManager,
         IHealthProbe probe,
-        IWebHealthProbe? webProbe = null)
+        IWebHealthProbe? webProbe = null,
+        IProfileLookup? profileLookup = null)
     {
         _configManager = configManager;
+        _profileLookup = profileLookup ?? ProfileLookup.LocalOnly(configManager);
         _probe = probe;
         _webProbe = webProbe;
         _configManager.SettingsChanged += OnSettingsChanged;
@@ -248,7 +252,9 @@ public sealed class SessionHealthMonitor : IDisposable
 
         long generation = Interlocked.Increment(ref _nextGeneration);
         var maxConcurrent = Math.Max(SettingRanges.Of(nameof(AppSettings.SessionHealthMaxConcurrent)).Min, settings.SessionHealthMaxConcurrent);
-        var profiles = await _configManager.LoadServersAsync().ConfigureAwait(false);
+        // Shared profiles too: a shared session behind its gateway is left unprobed like a local
+        // one, and a direct one gets its dot.
+        var profiles = await _profileLookup.GetAllAsync().ConfigureAwait(false);
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
 
         // The throttle is scoped to this cycle: created and disposed here, so a

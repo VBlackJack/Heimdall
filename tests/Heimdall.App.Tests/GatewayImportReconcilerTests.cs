@@ -59,6 +59,26 @@ public sealed class GatewayImportReconcilerTests
         Assert.Equal(0, result.MergedCount);
     }
 
+    // The control is the test above: an unused ordinary identifier is kept.
+    [Fact]
+    public void Reconcile_RemintsAnIdentifierInTheSharedSessionNamespace()
+    {
+        const string reservedId = "shared-teamfile1-gateway";
+        SshGatewayDto imported = Gateway(reservedId, "bastion.example.com", "ops");
+        ServerProfileDto server = Server("server-1", reservedId);
+
+        GatewayImportReconciliationResult result = GatewayImportReconciler.Reconcile(
+            [],
+            [imported],
+            [server],
+            NewIdFactory("fresh-gateway"));
+
+        SshGatewayDto gateway = Assert.Single(result.GatewaysToAdd);
+        Assert.Equal("fresh-gateway", gateway.Id);
+        Assert.Equal("fresh-gateway", result.GatewayIdMap[reservedId]);
+        Assert.Empty(result.OrphanReferences);
+    }
+
     [Fact]
     public void Reconcile_ReusesExistingGatewayByIdentity_AndRemapsImportedId()
     {

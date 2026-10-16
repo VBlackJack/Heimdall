@@ -23,6 +23,7 @@ using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Session;
 using Heimdall.App.ViewModels.Shell;
@@ -53,6 +54,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     private const int DefaultSshPort = 22;
 
     private readonly IConfigManager _configManager;
+    private readonly IProfileLookup _profileLookup;
+
+    /// <summary>
+    /// The one way to find a profile by identifier, local inventory first, then the shared
+    /// sources. Shared with the session coordinator and the scheduler, which reach it through here.
+    /// </summary>
+    internal IProfileLookup ProfileLookup => _profileLookup;
     private readonly LocalizationManager _localizer;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly TimeProvider _timeProvider;
@@ -216,9 +224,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         ICredentialProviderFactory? credentialProviderFactory = null,
         IWindowsHelloService? windowsHelloService = null,
         TimeProvider? timeProvider = null,
-        ICredentialGuardService? credentialGuardService = null)
+        ICredentialGuardService? credentialGuardService = null,
+        IProfileLookup? profileLookup = null)
     {
         _configManager = configManager;
+        _profileLookup = profileLookup ?? Services.SharedSessions.ProfileLookup.LocalOnly(configManager);
         _localizer = localizer;
         _uiDispatcher = uiDispatcher;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -481,6 +491,29 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         await PersistExecutionTrustAsync(profile);
 
         return true;
+    }
+
+    /// <summary>
+    /// Asks whether the post-connect commands of a shared session may run. Persists nothing: the
+    /// caller records the approval against the commands it was given.
+    /// </summary>
+    internal Task<bool> ConfirmSharedPostConnectAsync(ServerProfileDto profile, int commandCount)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        string body = _localizer.FormatCount(
+            commandCount,
+            "ConfirmPostConnectSharedBodyOne",
+            "ConfirmPostConnectSharedBody",
+            profile.DisplayName,
+            commandCount,
+            string.Join(Environment.NewLine, profile.PostConnectSteps
+                .Where(step => step.Enabled && !string.IsNullOrWhiteSpace(step.Input))
+                .Select(step => step.Input)));
+        return _dialogService.ShowConfirmAsync(
+            _localizer["ConfirmPostConnectSharedTitle"],
+            body,
+            "warning");
     }
 
     private async Task PersistExecutionTrustAsync(ServerProfileDto profile)
@@ -924,7 +957,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         ArgumentException.ThrowIfNullOrWhiteSpace(originalServerId);
 
         var server = Servers.FirstOrDefault(
-            candidate => string.Equals(candidate.Id, originalServerId, StringComparison.OrdinalIgnoreCase));
+            candidate => string.Equals(candidate.Id, originalServerId, StringComparison.OrdinalIgnoreCase))
+            ?? await FindSharedServerItemAsync(originalServerId);
 
         if (server is null)
         {
@@ -939,6 +973,35 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             rdpModeOverride,
             allowCredentialPrompt: false,
             failureReport);
+    }
+
+    /// <summary>
+    /// The row a shared profile stands for, built from the lookup; null for an identifier outside
+    /// the shared namespace or a shared profile no source holds.
+    /// </summary>
+    /// <remarks>
+    /// The tree does not list shared sessions yet, so a reconnect, a restore or a scheduled task
+    /// naming one finds no row there. The row built here carries the profile's identifier, and
+    /// the connection resolves the profile itself through the lookup again.
+    /// </remarks>
+    internal async Task<ServerItemViewModel?> FindSharedServerItemAsync(string serverId)
+    {
+        if (!SharedSessionIds.IsShared(serverId)
+            || await _profileLookup.FindAsync(serverId) is not { } shared
+            || !SharedSessionIds.IsSharedProfile(shared))
+        {
+            return null;
+        }
+
+        AppSettings settings = _profileLookup.EffectiveSettingsFor(
+            shared,
+            _currentSettings ?? await _configManager.LoadSettingsAsync());
+        return ServerItemViewModel.FromDto(
+            shared,
+            ResolveProject(BuildProjectMap(settings), shared.ProjectId),
+            _connectionSm.GetState(shared.Id).ToString(),
+            SessionGatewayContext.FromSettings(settings),
+            _localizer);
     }
 
     /// <inheritdoc />
@@ -975,9 +1038,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         try
         {
 
-            var servers = await _configManager.LoadServersAsync();
-            var serverDto = servers.FirstOrDefault(
-                s => string.Equals(s.Id, server.Id, StringComparison.Ordinal));
+            var serverDto = await _profileLookup.FindAsync(server.Id);
 
             if (serverDto is null)
             {
@@ -989,7 +1050,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             // several, one per restored session. The copy is detached and never saved.
             serverDto.AllowCredentialPrompt = allowCredentialPrompt;
 
-            var settings = await _configManager.LoadSettingsAsync();
+            // A shared profile's gateways live in memory only: the connection gets a copy of the
+            // settings holding them, and the canonical settings stay as they are on disk.
+            var settings = _profileLookup.EffectiveSettingsFor(
+                serverDto,
+                await _configManager.LoadSettingsAsync());
 
             if (!await EnforceCredentialGuardAsync(
                     serverDto,
@@ -1717,6 +1782,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         if (serverDto is null)
         {
+            // A shared session is edited in MobaXterm, in the file it comes from: said so rather
+            // than doing nothing, which reads as a broken button.
+            if (SharedSessionIds.IsShared(server.Id))
+            {
+                StatusMessageRequested?.Invoke(_localizer["StatusSharedSessionReadOnly"]);
+            }
+
             return;
         }
 
@@ -1825,6 +1897,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         if (server is null)
         {
+            // The disconnect overlay's "Edit profile" on a shared session: answered, not ignored.
+            if (SharedSessionIds.IsShared(serverId))
+            {
+                StatusMessageRequested?.Invoke(_localizer["StatusSharedSessionReadOnly"]);
+                return true;
+            }
+
             return false;
         }
 

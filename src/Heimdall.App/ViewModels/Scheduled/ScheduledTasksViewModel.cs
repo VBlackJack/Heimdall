@@ -237,7 +237,7 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
     /// </summary>
     private async Task PopulateServersAsync(ScheduledTaskDialogViewModel vm)
     {
-        var servers = await _configManager.LoadServersAsync();
+        var servers = await _main.ServerList.ProfileLookup.GetAllAsync();
         var options = servers
             .OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
             .Select(s => new ServerOption(
@@ -299,6 +299,15 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
             s => s.Id,
             s => s.DisplayName,
             out ScheduledTaskResolution resolution);
+
+        // The tree does not list shared sessions, so a task naming one by identifier finds no row
+        // there; the lookup builds it. By identifier only: the name fallback stays on local rows.
+        if (server is null
+            && !string.IsNullOrEmpty(task.ServerId)
+            && await _main.ServerList.FindSharedServerItemAsync(task.ServerId) is { } shared)
+        {
+            server = shared;
+        }
 
         if (server is null)
         {

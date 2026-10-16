@@ -46,9 +46,6 @@ namespace Heimdall.App.ViewModels;
 /// </summary>
 public partial class SettingsViewModel : ObservableValidator, IDisposable
 {
-    private static bool HasUtf8Bom(byte[] bytes) =>
-        bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
-
     private static readonly JsonSerializerOptions ExportJsonOptions = new()
     {
         WriteIndented = true,
@@ -2930,6 +2927,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 int updatedCount = 0;
                 foreach (ServerProfileDto server in imported)
                 {
+                    if (SharedSessionIds.IsShared(server.Id))
+                    {
+                        FileLogger.Warn(SharedSessionIds.DescribeRemint(server.Id));
+                        server.Id = string.Empty;
+                    }
+
                     if (string.IsNullOrEmpty(server.Id))
                     {
                         server.Id = Guid.NewGuid().ToString();
@@ -3037,9 +3040,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         string filePath, CancellationToken cancellationToken)
     {
         var bytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
-        var content = HasUtf8Bom(bytes)
-            ? System.Text.Encoding.UTF8.GetString(bytes)
-            : System.Text.Encoding.GetEncoding(1252).GetString(bytes);
+        string content = MobaXtermFileDecoder.Decode(bytes);
         AppSettings settings = await _configManager.LoadSettingsAsync();
         var options = new MobaXtermImportOptions
         {

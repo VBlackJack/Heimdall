@@ -435,6 +435,14 @@ public sealed class MigrationService
             dto.Id = Guid.NewGuid().ToString();
         }
 
+        // The same door for the shared session namespace, which the configuration manager would
+        // otherwise refuse and so fail the whole migration over one entry.
+        if (SharedSessionIds.IsShared(dto.Id))
+        {
+            Core.Logging.FileLogger.Warn(SharedSessionIds.DescribeRemint(dto.Id));
+            dto.Id = Guid.NewGuid().ToString();
+        }
+
         MapString(legacy, "DisplayName", v => dto.DisplayName = v);
         MapString(legacy, "RemoteServer", v => dto.RemoteServer = v);
         MapInt(legacy, "RemotePort", v => dto.RemotePort = v);
