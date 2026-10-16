@@ -1414,6 +1414,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         OnPropertyChanged(nameof(PinStatusText));
         OnPropertyChanged(nameof(VaultStatusText));
         OnPropertyChanged(nameof(AutoLockAvailabilityHint));
+
+        // The row errors are worded once, when the rows are validated.
+        RevalidateMobaXtermVariables();
     }
 
     /// <summary>
@@ -1894,6 +1897,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             SubscribeExternalToolTracking();
 
+            LoadMobaXtermUserVariables(settings);
+
             Gateways = new ObservableCollection<GatewayItemViewModel>(
                 settings.SshGateways.Select(g => new GatewayItemViewModel
                 {
@@ -2067,6 +2072,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // Dropped before the tools are measured again, so a fixed tool stops being reported.
         _externalToolsValidationError = null;
+        _mobaXtermVariablesValidationError = null;
         RefreshValidationSummary();
 
         if (HasErrors)
@@ -2084,6 +2090,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         if (extToolError is not null)
         {
             _externalToolsValidationError = extToolError;
+            RefreshValidationSummary();
+            return false;
+        }
+
+        string? mobaXtermVariablesError = ValidateMobaXtermVariables();
+        if (mobaXtermVariablesError is not null)
+        {
+            _mobaXtermVariablesValidationError = mobaXtermVariablesError;
             RefreshValidationSummary();
             return false;
         }
@@ -2250,6 +2264,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Advanced / File sharing
         settings.FileShareEnableTftp = FileShareEnableTftp;
         settings.ExternalTools = externalTools;
+
+        // Import
+        settings.MobaXtermUserVariables = BuildMobaXtermUserVariables();
     }
 
     private async Task PersistValidatedSettingsAsync(CancellationToken cancellationToken)
@@ -2442,6 +2459,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // migration decline and the sidebar choice are state no Save writes, so a factory value
         // here only hid what is still on disk.
         defaults.ExternalTools = persisted.ExternalTools;
+        defaults.MobaXtermUserVariables = persisted.MobaXtermUserVariables;
         defaults.CredentialProviderUnlockSecretEncrypted = persisted.CredentialProviderUnlockSecretEncrypted;
         defaults.UpdateSkippedVersion = persisted.UpdateSkippedVersion;
         defaults.LegacyMigrationDeclinedOfferVersion = persisted.LegacyMigrationDeclinedOfferVersion;
@@ -4113,6 +4131,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _disposed = true;
 
         UnsubscribeExternalToolTracking();
+        UnsubscribeMobaXtermVariableTracking();
         _localizer.LocaleChanged -= OnPanelLocaleChanged;
         TrustedHostKeys.Dispose();
         TrustedRdpCertificates.Dispose();
@@ -4653,7 +4672,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // With several, the banner says how many: showing only the first read as "fix this one
         // and you are done", and the next Save then refused again over a field nobody had named.
         ValidationSummary = firstError is null
-            ? _externalToolsValidationError
+            ? _externalToolsValidationError ?? _mobaXtermVariablesValidationError
             : errorCount > 1
                 ? _localizer.Format("SettingsValidationSummaryCount", errorCount, firstError)
                 : firstError;

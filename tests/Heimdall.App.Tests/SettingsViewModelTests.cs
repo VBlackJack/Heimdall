@@ -3672,6 +3672,191 @@ public sealed partial class SettingsViewModelTests : IDisposable
         }
     }
 
+    // --- MobaXterm import variables ---
+
+    [Fact]
+    public void MobaXtermVariables_FreshSettings_ShowTheDasRowResolvedLikeTheImport()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        viewModel.LoadFromSettings(config.Settings);
+
+        MobaXtermVariableItemViewModel row = Assert.Single(viewModel.MobaXtermUserVariables);
+        Assert.Equal("DAS", row.Name);
+        Assert.Equal("%USERNAME%", row.Value);
+        Assert.True(row.IsValid);
+        Assert.Equal(
+            MobaXtermVariableResolver.FromVariables(config.Settings.MobaXtermUserVariables)("DAS"),
+            row.ResolvedValue);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public void MobaXtermVariables_Preview_FollowsTheSharedResolver()
+    {
+        string environmentName = "HEIMDALL_SETTINGS_MOBA_" + Guid.NewGuid().ToString("N");
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        MobaXtermVariableItemViewModel row = Assert.Single(viewModel.MobaXtermUserVariables);
+
+        Environment.SetEnvironmentVariable(environmentName, "corp-id-7");
+        try
+        {
+            row.Value = $"%{environmentName}%";
+
+            Assert.Equal("corp-id-7", row.ResolvedValue);
+            Assert.Equal(MobaXtermVariableResolver.ResolveValue(row.Value), row.ResolvedValue);
+            Assert.True(row.IsResolved);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(environmentName, null);
+        }
+
+        row.Value = $"%{environmentName}_MISSING%";
+
+        Assert.Null(row.ResolvedValue);
+        Assert.False(row.IsResolved);
+    }
+
+    [Theory]
+    [InlineData("DA-S")]
+    [InlineData("DA S")]
+    [InlineData("1DAS")]
+    [InlineData("[DAS]")]
+    public async Task MobaXtermVariables_NameOutsideTheTokenSyntax_IsRejected(string name)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        MobaXtermVariableItemViewModel row = Assert.Single(viewModel.MobaXtermUserVariables);
+        row.Name = name;
+
+        Assert.Equal(localizer["SettingsMobaXtermVariableNameInvalid"], row.NameError);
+        Assert.False(row.IsValid);
+        Assert.True(viewModel.HasInvalidMobaXtermVariables);
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_DuplicateNamesInAnyCase_FlagBothRows()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.AddMobaXtermVariableCommand.Execute(null);
+        MobaXtermVariableItemViewModel added = viewModel.MobaXtermUserVariables[^1];
+        added.Name = "das";
+        added.Value = "someone";
+
+        Assert.All(
+            viewModel.MobaXtermUserVariables,
+            row => Assert.Equal(localizer["SettingsMobaXtermVariableNameDuplicate"], row.NameError));
+
+        added.Name = "OTHER";
+
+        Assert.All(viewModel.MobaXtermUserVariables, row => Assert.Null(row.NameError));
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_EmptyNameOrValue_IsRequired()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        MobaXtermVariableItemViewModel row = Assert.Single(viewModel.MobaXtermUserVariables);
+
+        row.Value = "   ";
+        row.Name = string.Empty;
+
+        Assert.Equal(localizer["SettingsMobaXtermVariableValueRequired"], row.ValueError);
+        Assert.Equal(localizer["SettingsMobaXtermVariableNameRequired"], row.NameError);
+    }
+
+    [Fact]
+    public void MobaXtermVariables_AddAndRemove_ChangeTheRowsAndArmSave()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.AddMobaXtermVariableCommand.Execute(null);
+
+        Assert.Equal(2, viewModel.MobaXtermUserVariables.Count);
+        Assert.True(viewModel.IsDirty);
+        Assert.False(viewModel.MobaXtermUserVariables[^1].IsValid);
+
+        MobaXtermVariableItemViewModel dasRow = viewModel.MobaXtermUserVariables[0];
+        viewModel.RemoveMobaXtermVariableCommand.Execute(dasRow);
+
+        MobaXtermVariableItemViewModel remaining = Assert.Single(viewModel.MobaXtermUserVariables);
+        Assert.NotSame(dasRow, remaining);
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_InvalidRow_RefusesTheSaveAndWritesNothing()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.AddMobaXtermVariableCommand.Execute(null);
+        viewModel.MobaXtermUserVariables[^1].Name = "BAD-NAME";
+        viewModel.MobaXtermUserVariables[^1].Value = "x";
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.Equal(localizer["ValidationMobaXtermVariablesInvalid"], viewModel.ValidationSummary);
+
+        // Fixing the row withdraws the banner the refused save raised.
+        viewModel.MobaXtermUserVariables[^1].Name = "APP";
+        Assert.Null(viewModel.ValidationSummary);
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_ValidRows_ArePersistedTrimmed()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.MobaXtermUserVariables[0].Value = "  jdoe  ";
+        viewModel.AddMobaXtermVariableCommand.Execute(null);
+        viewModel.MobaXtermUserVariables[^1].Name = " APP_USER ";
+        viewModel.MobaXtermUserVariables[^1].Value = "app_prod";
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.True(saved);
+        Assert.Equal(
+            new Dictionary<string, string> { ["DAS"] = "jdoe", ["APP_USER"] = "app_prod" },
+            config.Settings.MobaXtermUserVariables);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_RemovingEveryRow_PersistsAnEmptySet()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.RemoveMobaXtermVariableCommand.Execute(viewModel.MobaXtermUserVariables[0]);
+
+        Assert.True(await viewModel.TrySaveAsync());
+        Assert.Empty(config.Settings.MobaXtermUserVariables);
+    }
+
     [Fact]
     public async Task ImportCitrixApps_VaultDisabled_PreservesHistoricPlaintextPath()
     {

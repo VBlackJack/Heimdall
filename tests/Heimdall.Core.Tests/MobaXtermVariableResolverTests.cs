@@ -75,6 +75,48 @@ public sealed class MobaXtermVariableResolverTests
         Assert.Null(MobaXtermVariableResolver.FromVariables(null)("DAS"));
     }
 
+    // The settings editor accepts a name through IsValidName; the parser replaces a token through
+    // its own pattern. A name one accepts and the other never matches would be saved and silently
+    // ignored at import, so the two are held to the same answer here.
+    [Theory]
+    [InlineData("DAS")]
+    [InlineData("das")]
+    [InlineData("_x")]
+    [InlineData("A1_b2")]
+    [InlineData("1DAS")]
+    [InlineData("DA-S")]
+    [InlineData("DA S")]
+    [InlineData("DÉS")]
+    public void IsValidName_AgreesWithTheTokensTheParserReplaces(string name)
+    {
+        string ini = "[Bookmarks]\nSubRep=\nImgNum=42\nsrv=#126#0%srv.example.test%22%[" + name + "]%\n";
+
+        MobaXtermImportResult result = MobaXtermImporter.Parse(
+            ini,
+            new MobaXtermImportOptions { VariableResolver = _ => "resolved" });
+
+        bool parserReplaced = Assert.Single(result.Servers).SshUsername == "resolved";
+        Assert.Equal(parserReplaced, MobaXtermVariableResolver.IsValidName(name));
+    }
+
+    [Fact]
+    public void ResolveValue_IsWhatTheImportResolverReturns()
+    {
+        Environment.SetEnvironmentVariable(EnvironmentName, "corp-id-9");
+        try
+        {
+            string value = $"%{EnvironmentName}%";
+
+            Assert.Equal(
+                MobaXtermVariableResolver.FromVariables(new Dictionary<string, string> { ["DAS"] = value })("DAS"),
+                MobaXtermVariableResolver.ResolveValue(value));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(EnvironmentName, null);
+        }
+    }
+
     [Fact]
     public void AppSettingsDefault_MapsDasToTheWindowsUserName()
     {

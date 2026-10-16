@@ -2970,6 +2970,106 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- MobaXterm import: the values that replace [NAME] in a session file.
+                                     The preview column resolves through the importer's own resolver. -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <!-- The header row and the variable rows share the width of the remove column, so the headings stay over their fields. -->
+                                    <StackPanel Grid.IsSharedSizeScope="True">
+                                        <DockPanel Margin="0,0,0,8">
+                                            <TextBlock x:Name="Mw_SettingsMobaXtermVariablesTitle"
+                                                       Text="{loc:Translate SettingsSectionMobaXtermVariables}"
+                                                       FontSize="{StaticResource FontSizeSubtitle}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <Button x:Name="Mw_SettingsMobaXtermVariableAddBtn"
+                                                    DockPanel.Dock="Right" HorizontalAlignment="Right"
+                                                    Content="{loc:Translate BtnAdd}"
+                                                    Command="{Binding Settings.AddMobaXtermVariableCommand}"
+                                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                                    Padding="8,3" FontSize="{StaticResource FontSizeCaption}"
+                                                    AutomationProperties.Name="{loc:Translate AccessSettingsMobaXtermVariableAdd}"/>
+                                        </DockPanel>
+                                        <TextBlock x:Name="Mw_SettingsMobaXtermVariablesHint"
+                                                   Text="{loc:Translate SettingsMobaXtermVariablesHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,12"/>
+                                        <Grid Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="3*"/>
+                                                <ColumnDefinition Width="3*"/>
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="MobaXtermVariableAction"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{loc:Translate SettingsMobaXtermVariableColumnName}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}"/>
+                                            <TextBlock Grid.Column="1" Text="{loc:Translate SettingsMobaXtermVariableColumnValue}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="8,0,0,0"/>
+                                            <TextBlock Grid.Column="2" Text="{loc:Translate SettingsMobaXtermVariableColumnResolved}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="8,0,0,0"/>
+                                        </Grid>
+                                        <ItemsControl x:Name="Mw_SettingsMobaXtermVariablesList"
+                                                      ItemsSource="{Binding Settings.MobaXtermUserVariables}"
+                                                      Focusable="False"
+                                                      AutomationProperties.LabeledBy="{x:Reference Mw_SettingsMobaXtermVariablesTitle}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="2*"/>
+                                                            <ColumnDefinition Width="3*"/>
+                                                            <ColumnDefinition Width="3*"/>
+                                                            <ColumnDefinition Width="Auto" SharedSizeGroup="MobaXtermVariableAction"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                                     FontSize="{StaticResource FontSizeBody}"
+                                                                     AutomationProperties.Name="{loc:Translate SettingsMobaXtermVariableColumnName}"
+                                                                     AutomationProperties.HelpText="{Binding NameError}"/>
+                                                            <TextBlock Text="{Binding NameError}"
+                                                                       Foreground="{DynamicResource ErrorTextBrush}"
+                                                                       FontSize="{StaticResource FontSizeCaption}"
+                                                                       TextWrapping="Wrap" Margin="0,2,0,0"
+                                                                       Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                     FontSize="{StaticResource FontSizeBody}"
+                                                                     AutomationProperties.Name="{loc:Translate SettingsMobaXtermVariableColumnValue}"
+                                                                     AutomationProperties.HelpText="{Binding ValueError}"/>
+                                                            <TextBlock Text="{Binding ValueError}"
+                                                                       Foreground="{DynamicResource ErrorTextBrush}"
+                                                                       FontSize="{StaticResource FontSizeCaption}"
+                                                                       TextWrapping="Wrap" Margin="0,2,0,0"
+                                                                       Visibility="{Binding HasValueError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2" Margin="8,4,0,0">
+                                                            <TextBlock Text="{Binding ResolvedValue}"
+                                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                       FontSize="{StaticResource FontSizeBody}"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Visibility="{Binding IsResolved, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                            <TextBlock Text="{loc:Translate SettingsMobaXtermVariableUnresolved}"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                       FontSize="{StaticResource FontSizeBody}"
+                                                                       FontStyle="Italic"
+                                                                       Visibility="{Binding IsResolved, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="3" VerticalAlignment="Top" Margin="8,0,0,0"
+                                                                Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
+                                                                FontSize="{StaticResource FontSizeCaption}"
+                                                                Style="{DynamicResource GhostButtonStyle}"
+                                                                MinHeight="{StaticResource TargetMinSize}"
+                                                                Command="{Binding DataContext.Settings.RemoveMobaXtermVariableCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                ToolTip="{loc:Translate AccessSettingsMobaXtermVariableRemove}"
+                                                                AutomationProperties.Name="{loc:Translate AccessSettingsMobaXtermVariableRemove}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Replaying the tour is the only way back into it. One reflex
                                      Escape used to end it permanently: Skip and Escape both call
                                      CompleteAsync, which persists OnboardingCompleted, and that

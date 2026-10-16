@@ -326,7 +326,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 050 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 063 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -383,8 +383,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     locale de même hôte, port et utilisateur est réutilisée au lieu d'être dupliquée. Une session
     sans rebond se connecte en direct
   - Les variables comme `[DAS]` dans un champ utilisateur sont résolues depuis le réglage
-    `MobaXtermUserVariables` de `settings.json` (par défaut `DAS` = `%USERNAME%`, variables
-    d'environnement développées). Une variable non résolue est conservée telle quelle et signalée
+    `MobaXtermUserVariables` (par défaut `DAS` = `%USERNAME%`, variables d'environnement
+    développées), modifiable dans Paramètres > Général > Variables d'import MobaXterm, qui affiche
+    ce que devient chaque valeur. Une variable non résolue est conservée telle quelle et signalée
     dans le résumé d'import
   - La commande de connexion (par exemple `sudo su - www`) devient une étape post-connexion. Le
     profil est importé avec `ExecutionConfirmed = false`, donc Heimdall demande confirmation avant

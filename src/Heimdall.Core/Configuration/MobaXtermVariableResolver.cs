@@ -47,10 +47,26 @@ public static partial class MobaXtermVariableResolver
             }
         }
 
-        return name => lookup.TryGetValue(name, out string? raw) ? Expand(raw) : null;
+        return name => lookup.TryGetValue(name, out string? raw) ? ResolveValue(raw) : null;
     }
 
-    internal static string? Expand(string? raw)
+    /// <summary>
+    /// Whether <paramref name="name"/> can name a variable: letters, digits and underscores, not
+    /// starting with a digit, which is the token body the MobaXterm parser recognises inside
+    /// <c>[...]</c>. A name outside it could be saved but would never be replaced.
+    /// </summary>
+    public static bool IsValidName(string? name) =>
+        !string.IsNullOrEmpty(name) && VariableNameRegex().IsMatch(name);
+
+    /// <summary>
+    /// The value a variable resolves to: <paramref name="raw"/> with environment variables
+    /// expanded, or null when that leaves nothing or an undefined <c>%NAME%</c>.
+    /// </summary>
+    /// <remarks>
+    /// The one place a value is resolved, for the import and for the settings preview alike, so
+    /// the two cannot disagree.
+    /// </remarks>
+    public static string? ResolveValue(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
         {
@@ -68,4 +84,7 @@ public static partial class MobaXtermVariableResolver
 
     [GeneratedRegex(@"%[^%\s]+%")]
     private static partial Regex UnexpandedReferenceRegex();
+
+    [GeneratedRegex(@"^[A-Za-z_][A-Za-z0-9_]*$")]
+    private static partial Regex VariableNameRegex();
 }

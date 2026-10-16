@@ -60,6 +60,7 @@ public partial class SettingsViewModel
             [nameof(CredentialProviderUnlockSecret)] = "a secret",
             [nameof(ShowToolsPanel)] = "window state with no control on the panel",
             [nameof(ExternalTools)] = "an inventory of user-defined tools",
+            [nameof(MobaXtermUserVariables)] = "an inventory of user-defined variables",
         };
 
     private static IReadOnlyDictionary<string, (PropertyInfo Panel, PropertyInfo Setting)>? s_markerProperties;

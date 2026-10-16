@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,050 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,063 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -382,8 +382,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     Sessions that share a jump host share one gateway, and a local gateway with the same host, port
     and user is reused instead of duplicated. A session without a jump host connects directly
   - Variables such as `[DAS]` in a user field are resolved from the `MobaXtermUserVariables`
-    setting in `settings.json` (default `DAS` = `%USERNAME%`, environment variables expanded). An
-    unresolved variable is kept as written and reported in the import summary
+    setting (default `DAS` = `%USERNAME%`, environment variables expanded), edited in Settings >
+    General > MobaXterm import variables, which shows what each value resolves to. An unresolved
+    variable is kept as written and reported in the import summary
   - The login command (for example `sudo su - www`) becomes a post-connect step. The profile is
     imported with `ExecutionConfirmed = false`, so Heimdall asks for confirmation before typing it
     into the session
