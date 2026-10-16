@@ -3545,6 +3545,134 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportConfigCommand_MobaXtermGateways_PersistedBeforeServersAndReused()
+    {
+        const string localGatewayId = "local-gw1";
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                MobaXtermUserVariables = new Dictionary<string, string> { ["DAS"] = "jdoe" },
+                SshGateways =
+                [
+                    new SshGatewayDto
+                    {
+                        Id = localGatewayId,
+                        Name = "Corporate bastion",
+                        Host = "gw1.example.test",
+                        Port = 22,
+                        User = "jdoe",
+                    },
+                ],
+            },
+        };
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        string importRoot = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-settings-import-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(importRoot);
+        string importPath = Path.Combine(importRoot, "shared.mxtsessions");
+        const string content = """
+            [Bookmarks_1]
+            SubRep=PROD
+            ImgNum=41
+            srv-db01=#126#0%srv-db01.example.test%22%[DAS]%%0%-1%sudo su - www%gw1.example.test%22%[DAS]%-1#MobaFont%10#0#database
+            srv-db02=#126#0%srv-db02.example.test%22%[DAS]%%0%-1%%gw1.example.test%22%[DAS]%-1#MobaFont%10#0#database
+            srv-hap01=#117#0%srv-hap01.example.test%22%[DAS]%%0%-1%%gw2.example.test%2222%[DAS]%-1#MobaFont%10#0#ha-proxy
+            browser=#126#999%srv-web.example.test%8080%%
+            [SharedSettings]
+            AllowedEditors=editor-a
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(importPath, content);
+            viewModel.ImportFilePathProvider = () => importPath;
+
+            await viewModel.ImportConfigCommand.ExecuteAsync(null);
+
+            Assert.Equal(new[] { "settings", "servers" }, config.PersistenceCalls);
+
+            Assert.Equal(2, config.Settings.SshGateways.Count);
+            SshGatewayDto created = Assert.Single(
+                config.Settings.SshGateways,
+                gateway => gateway.Host == "gw2.example.test");
+            Assert.Equal(2222, created.Port);
+            Assert.Equal("jdoe", created.User);
+
+            Assert.NotNull(config.SavedServers);
+            Assert.Equal(3, config.SavedServers.Count);
+            Assert.All(config.SavedServers, server => Assert.Equal("jdoe", server.SshUsername));
+            Assert.Equal(localGatewayId, config.SavedServers.Single(s => s.DisplayName == "srv-db01").SshGatewayId);
+            Assert.Equal(localGatewayId, config.SavedServers.Single(s => s.DisplayName == "srv-db02").SshGatewayId);
+            Assert.Equal(created.Id, config.SavedServers.Single(s => s.DisplayName == "srv-hap01").SshGatewayId);
+            Assert.False(config.SavedServers.Single(s => s.DisplayName == "srv-db01").ExecutionConfirmed);
+
+            (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
+            Assert.Contains("1 issue was found in the file:", warning.Message, StringComparison.Ordinal);
+            Assert.Contains(
+                "[Bookmarks_1] browser: session type 999 is not supported; not imported.",
+                warning.Message,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(importRoot))
+            {
+                Directory.Delete(importRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ImportConfigCommand_MobaXtermOnlySkippedSessions_ShowsWhyInsteadOfNothingFound()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        string importRoot = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-settings-import-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(importRoot);
+        string importPath = Path.Combine(importRoot, "shared.mxtsessions");
+        const string content = """
+            [Bookmarks]
+            SubRep=
+            ImgNum=42
+            WSL-Dev-box=#151#14%Dev-box-daemon%
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(importPath, content);
+            viewModel.ImportFilePathProvider = () => importPath;
+
+            await viewModel.ImportConfigCommand.ExecuteAsync(null);
+
+            Assert.Empty(config.PersistenceCalls);
+            Assert.Empty(dialog.ConfirmCalls);
+            (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
+            Assert.Contains("session type 14 is not supported", warning.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(importRoot))
+            {
+                Directory.Delete(importRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ImportCitrixApps_VaultDisabled_PreservesHistoricPlaintextPath()
     {
         const string launchToken = "-qlaunch app=LegacyCalculator";

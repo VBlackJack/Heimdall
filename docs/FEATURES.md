@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,041 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,050 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -374,6 +374,27 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 ### Import and Migration
 - Migration from Heimdall v1 (DPAPI-encrypted credentials preserved)
 - Import from JSON, MobaXterm (.mxtsessions / .ini), mRemoteNG (.xml), RDCMan (.rdg), and .rdp files
+- MobaXterm session files (Settings > Import):
+  - SSH and RDP sessions are imported. Every other MobaXterm session type (FTP, SFTP, VNC, Telnet,
+    WSL and others) is listed as unsupported in the import summary, with its INI section and
+    session name; no line is skipped without a warning
+  - The jump host fields of a session (gateway host, port and user) become an SSH gateway.
+    Sessions that share a jump host share one gateway, and a local gateway with the same host, port
+    and user is reused instead of duplicated. A session without a jump host connects directly
+  - Variables such as `[DAS]` in a user field are resolved from the `MobaXtermUserVariables`
+    setting in `settings.json` (default `DAS` = `%USERNAME%`, environment variables expanded). An
+    unresolved variable is kept as written and reported in the import summary
+  - The login command (for example `sudo su - www`) becomes a post-connect step. The profile is
+    imported with `ExecutionConfirmed = false`, so Heimdall asks for confirmation before typing it
+    into the session
+  - The session comment becomes the profile's tags, comma-separated
+  - SSH key paths are never imported: they belong to the machine that wrote the file, and a UNC
+    path would make this machine authenticate to a remote file server when the key is read
+  - Profile and gateway identifiers are derived from the file (folder and session name; host, port
+    and user), so importing the same file again replaces the profiles it created before, including
+    any local edits made to them
+  - Passwords stored by MobaXterm are not imported (proprietary encryption); the import summary
+    counts them
 - JSON session imports contain server profiles only. SSH gateway definitions live in `settings.json`
   (`AppSettings.SshGateways`), so test fixtures such as `Heimdall-TestEnv` must inject the
   matching gateway into the exact runtime build configuration before tunneled sessions can resolve it.

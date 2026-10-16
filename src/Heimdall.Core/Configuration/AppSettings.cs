@@ -404,6 +404,20 @@ public sealed class AppSettings
     /// </summary>
     public List<string> EmptyGroups { get; set; } = new();
 
+    /// <summary>
+    /// Values for the <c>[NAME]</c> variables MobaXterm session files carry in their login fields.
+    /// Key: the variable name without brackets, matched case-insensitively. Value: the login,
+    /// with environment variables such as <c>%USERNAME%</c> expanded when the file is read.
+    /// </summary>
+    /// <remarks>
+    /// The default mirrors settings.default.json, so an installation whose settings were written
+    /// before this field existed resolves the same variable as a new one.
+    /// </remarks>
+    public Dictionary<string, string> MobaXtermUserVariables { get; set; } = new()
+    {
+        ["DAS"] = "%USERNAME%",
+    };
+
     // SSH host key trust store (TOFU - persisted across restarts)
     // Key: "host:port", Value: "SHA256:<base64-no-padding>"
     public Dictionary<string, string> TrustedHostKeys { get; set; } = new();

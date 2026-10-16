@@ -98,6 +98,9 @@
     "treeExpandedNodes": [],
     "tunnelGridColumnWidths": null,
     "emptyGroups": [],
+    "mobaXtermUserVariables": {
+        "DAS": "%USERNAME%"
+    },
     "scheduledTasks": [],
     "groupDefaults": {},
     "sshGateways": [],
