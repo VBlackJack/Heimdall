@@ -54,8 +54,8 @@ public sealed class VncCredentialsPolicyTests
         string page = ReadSource("Assets", "vnc.html");
 
         // The old body went straight to the constructor; the new one disposes the previous client.
-        Assert.DoesNotContain("function connect(wsUrl, password) {\r\n                try {", page, StringComparison.Ordinal);
-        Assert.DoesNotContain("function connect(wsUrl, password) {\n                try {", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("function connect(wsUrl, password, viewOnly) {\r\n                try {", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("function connect(wsUrl, password, viewOnly) {\n                try {", page, StringComparison.Ordinal);
     }
 
     [Fact]
