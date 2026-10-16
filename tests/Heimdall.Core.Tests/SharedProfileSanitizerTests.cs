@@ -198,6 +198,44 @@ public sealed class SharedProfileSanitizerTests
         Assert.Null(SharedProfileSanitizer.Sanitize(source));
     }
 
+    // A shared file is read without review: a host the inventory would refuse is refused here
+    // too. A leading dash would pass for an option of Plink or of an external tool, and a space
+    // would split it into two arguments.
+    [Theory]
+    [InlineData("-proxycmd=calc.exe")]
+    [InlineData("srv-a01.example.test -oProxyCommand=calc")]
+    [InlineData("srv a01")]
+    [InlineData("")]
+    public void Sanitize_Profile_RefusesAHostTheInventoryWouldRefuse(string host)
+    {
+        var source = new ServerProfileDto { Id = SharedProfileId, ConnectionType = "SSH", RemoteServer = host };
+
+        Assert.Null(SharedProfileSanitizer.Sanitize(source));
+    }
+
+    [Theory]
+    [InlineData("srv-a01")]
+    [InlineData("srv-a01.example.test")]
+    [InlineData("192.0.2.10")]
+    [InlineData("2001:db8::10")]
+    public void Sanitize_Profile_KeepsAHostnameOrAnAddress(string host)
+    {
+        var source = new ServerProfileDto { Id = SharedProfileId, ConnectionType = "SSH", RemoteServer = host };
+
+        Assert.Equal(host, SharedProfileSanitizer.Sanitize(source)?.RemoteServer);
+    }
+
+    [Theory]
+    [InlineData("-proxycmd=calc.exe", false)]
+    [InlineData("gw one.example.test", false)]
+    [InlineData("gw1.example.test", true)]
+    public void Sanitize_Gateway_RefusesAHostTheInventoryWouldRefuse(string host, bool kept)
+    {
+        SshGatewayDto? sanitized = SharedProfileSanitizer.Sanitize(new SshGatewayDto { Id = SharedGatewayId, Host = host });
+
+        Assert.Equal(kept, sanitized is not null);
+    }
+
     [Fact]
     public void Sanitize_Gateway_ResetsEveryPropertyOutsideTheAllowlist()
     {

@@ -70,9 +70,11 @@ public static class SharedProfileSanitizer
 
     /// <summary>
     /// The shared form of <paramref name="source"/>, or null when it cannot be a shared profile:
-    /// an identifier outside the shared namespace, a protocol other than SSH or RDP, or a gateway
-    /// reference outside the shared namespace (dropping that reference would turn a session meant
-    /// to cross a bastion into a direct one).
+    /// an identifier outside the shared namespace, a protocol other than SSH or RDP, a host the
+    /// inventory would refuse (<see cref="SchemaValidator.IsValidHost"/>: a value starting with a
+    /// dash or holding a space could pass for an option of Plink or of an external tool), or a
+    /// gateway reference outside the shared namespace (dropping that reference would turn a session
+    /// meant to cross a bastion into a direct one).
     /// </summary>
     public static ServerProfileDto? Sanitize(ServerProfileDto source)
     {
@@ -81,6 +83,7 @@ public static class SharedProfileSanitizer
         string? connectionType = NormalizeConnectionType(source.ConnectionType);
         if (!SharedSessionIds.IsShared(source.Id)
             || connectionType is null
+            || !SchemaValidator.IsValidHost(source.RemoteServer)
             || (SshGatewayRoute.IsAssigned(source.SshGatewayId) && !SharedSessionIds.IsShared(source.SshGatewayId)))
         {
             return null;
@@ -115,13 +118,14 @@ public static class SharedProfileSanitizer
 
     /// <summary>
     /// The shared form of <paramref name="source"/>, or null when its identifier is outside the
-    /// shared namespace. A parent outside the namespace is dropped.
+    /// shared namespace or its host is one the inventory would refuse. A parent outside the
+    /// namespace is dropped.
     /// </summary>
     public static SshGatewayDto? Sanitize(SshGatewayDto source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        if (!SharedSessionIds.IsShared(source.Id))
+        if (!SharedSessionIds.IsShared(source.Id) || !SchemaValidator.IsValidHost(source.Host))
         {
             return null;
         }
