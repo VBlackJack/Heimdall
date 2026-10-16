@@ -223,7 +223,7 @@
                 return levels;
             }
 
-            function connect(wsUrl, password) {
+            function connect(wsUrl, password, viewOnly) {
                 // A second connect must not stack a second client behind the first: the proxy
                 // serves one connection at a time, and the old one would hold it.
                 if (rfb) {
@@ -286,7 +286,21 @@
                 } catch (ex) {
                     console.error(ex);
                     showError(text.disconnected, text.initFailed);
+                    return;
                 }
+
+                // noVNC drops keyboard, mouse and clipboard input while this is set.
+                rfb.viewOnly = viewOnly;
+            }
+
+            function connectFromMessage(json) {
+                var params = JSON.parse(json);
+                if (params.text) {
+                    text.disconnected = params.text.disconnected || text.disconnected;
+                    text.connectionLost = params.text.connectionLost || text.connectionLost;
+                    text.initFailed = params.text.initFailed || text.initFailed;
+                }
+                connect(params.wsUrl, params.password || null, params.viewOnly === true);
             }
 
             // ---- Host message handling ----
@@ -297,13 +311,7 @@
                     if (typeof msg !== 'string') return;
 
                     if (msg.indexOf('connect:') === 0) {
-                        var params = JSON.parse(msg.substring('connect:'.length));
-                        if (params.text) {
-                            text.disconnected = params.text.disconnected || text.disconnected;
-                            text.connectionLost = params.text.connectionLost || text.connectionLost;
-                            text.initFailed = params.text.initFailed || text.initFailed;
-                        }
-                        connect(params.wsUrl, params.password || null);
+                        connectFromMessage(msg.substring('connect:'.length));
                         return;
                     }
 
