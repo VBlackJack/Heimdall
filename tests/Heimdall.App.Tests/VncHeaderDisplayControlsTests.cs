@@ -121,6 +121,62 @@ public sealed class VncHeaderDisplayControlsTests
         EmbeddedVncView.QualityMessage(6).Should().Be("quality:6");
     }
 
+    // The page half of the wiring. The host side is driven on the real view in
+    // EmbeddedVncHeaderControlsTests; the page runs in WebView2, so it is read here, one statement
+    // per line. A commented-out statement fails; folding one behind an always-false condition would
+    // not, which is the limit of reading a script as text.
+
+    /// <summary>A scaling message the page stores but does not apply leaves the session as it was.</summary>
+    [Fact]
+    public void ThePage_AppliesTheScalingItReceives()
+    {
+        string page = PageSource();
+
+        StatementsOf(BlockAfter(page, "if (msg.indexOf('scaling:') === 0)"))
+            .Should().Contain(["scalingMode = mode;", "applyScaling();"]);
+        StatementsOf(BlockAfter(page, "function applyScaling()"))
+            .Should().Contain([
+                "rfb.scaleViewport = (scalingMode === 'scale');",
+                "rfb.resizeSession = (scalingMode === 'remote');",
+            ]);
+    }
+
+    /// <summary>The same for the quality message.</summary>
+    [Fact]
+    public void ThePage_AppliesTheQualityItReceives()
+    {
+        string page = PageSource();
+
+        StatementsOf(BlockAfter(page, "if (msg.indexOf('quality:') === 0)"))
+            .Should().Contain(["qualityLevel = level;", "applyQuality();"]);
+        StatementsOf(BlockAfter(page, "function applyQuality()"))
+            .Should().Contain("rfb.compressionLevel = qualityLevel;");
+    }
+
+    /// <summary>The text between the brace that follows <paramref name="anchor"/> and its match.</summary>
+    private static string BlockAfter(string source, string anchor)
+    {
+        int at = source.IndexOf(anchor, StringComparison.Ordinal);
+        at.Should().BeGreaterThanOrEqualTo(0, $"the page contains {anchor}");
+
+        int open = source.IndexOf('{', at + anchor.Length);
+        int depth = 0;
+        for (int i = open; i < source.Length; i++)
+        {
+            depth += source[i] switch { '{' => 1, '}' => -1, _ => 0 };
+            if (depth == 0)
+            {
+                return source[(open + 1)..i];
+            }
+        }
+
+        throw new InvalidOperationException($"The block after {anchor} is not closed.");
+    }
+
+    /// <summary>Each line of a block, trimmed, so a statement matches only when it stands alone.</summary>
+    private static IEnumerable<string> StatementsOf(string block) =>
+        block.Split('\n').Select(line => line.Trim());
+
     private static IEnumerable<string> OptionTags(string selectorName) =>
         FindByName(Markup(), selectorName)!
             .Elements()
