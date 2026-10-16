@@ -75,10 +75,10 @@
                           SelectedIndex="2"
                           ToolTip="{loc:Translate TooltipVncQuality}"
                           AutomationProperties.Name="{loc:Translate A11yVncQuality}">
-                    <ComboBoxItem Content="{loc:Translate VncQualityBest}" Tag="0"/>
-                    <ComboBoxItem Content="{loc:Translate VncQualityBalanced}" Tag="3"/>
-                    <ComboBoxItem Content="{loc:Translate VncQualityPerformance}" Tag="6"/>
-                    <ComboBoxItem Content="{loc:Translate VncQualityLowBandwidth}" Tag="9"/>
+                    <ComboBoxItem Content="{loc:Translate VncQualityBest}" Tag="best"/>
+                    <ComboBoxItem Content="{loc:Translate VncQualityBalanced}" Tag="balanced"/>
+                    <ComboBoxItem Content="{loc:Translate VncQualityPerformance}" Tag="performance"/>
+                    <ComboBoxItem Content="{loc:Translate VncQualityLowBandwidth}" Tag="low-bandwidth"/>
                 </ComboBox>
 
                 <Button x:Name="SplitButton"

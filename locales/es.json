@@ -3788,7 +3788,7 @@
   "VncQualityBalanced": "Equilibrado",
   "VncQualityPerformance": "Rendimiento",
   "VncQualityLowBandwidth": "Bajo ancho de banda",
-  "TooltipVncQuality": "Calidad de imagen",
+  "TooltipVncQuality": "Calidad de imagen y ancho de banda",
   "A11yVncQuality": "Calidad de imagen",
   "StatusCitrixConnecting": "Conectando a Citrix...",
   "LogCitrixLaunching": "Iniciando sesión de Citrix",

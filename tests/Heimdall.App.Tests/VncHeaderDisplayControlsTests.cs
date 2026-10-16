@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-using System.Globalization;
 using System.IO;
 using System.Xml.Linq;
 using FluentAssertions;
@@ -79,9 +78,50 @@ public sealed class VncHeaderDisplayControlsTests
     }
 
     [Fact]
-    public void TheQualityOptions_AreTheLevelsTheHostSends()
+    public void TheQualityOptions_AreThePresetsTheHostSends()
     {
-        OptionLevels("QualitySelector").Should().Equal(EmbeddedVncView.QualityLevels);
+        OptionTags("QualitySelector").Should().Equal(EmbeddedVncView.QualityPresets.Select(p => p.Name));
+    }
+
+    /// <summary>
+    /// The presets read best picture first, so each one down the list gives up JPEG quality for
+    /// bandwidth. The selector used to move the compression level alone, which is lossless: the
+    /// first option looked like every other.
+    /// </summary>
+    [Fact]
+    public void ThePresets_TradePictureForBandwidthDownTheList()
+    {
+        EmbeddedVncView.QualityPresets.Select(p => p.QualityLevel)
+            .Should().BeInDescendingOrder().And.OnlyHaveUniqueItems();
+        EmbeddedVncView.QualityPresets.Select(p => p.CompressionLevel)
+            .Should().BeInAscendingOrder().And.OnlyHaveUniqueItems();
+    }
+
+    /// <summary>
+    /// A session that keeps the header as it opens is unchanged by the presets: compression 6, as
+    /// before, and noVNC's own JPEG quality, which the page never set until now. The page holds the
+    /// same pair before any message arrives.
+    /// </summary>
+    [Fact]
+    public void TheDefaultPreset_KeepsTheLevelsASessionHadBefore()
+    {
+        EmbeddedVncView.QualityPreset preset =
+            EmbeddedVncView.QualityPresetNamed(EmbeddedVncView.DefaultQualityPresetName);
+
+        preset.Should().Be(new EmbeddedVncView.QualityPreset("performance", 6, 6));
+
+        StatementsOf(PageSource()).Should().Contain([
+            "var qualityLevel = 6;",
+            "var compressionLevel = 6;",
+        ]);
+    }
+
+    /// <summary>A Tag the table does not know falls back on the default rather than on nothing.</summary>
+    [Fact]
+    public void AnUnknownPresetName_FallsBackOnTheDefault()
+    {
+        EmbeddedVncView.QualityPresetNamed("6").Name.Should().Be(EmbeddedVncView.DefaultQualityPresetName);
+        EmbeddedVncView.QualityPresetNamed(null).Name.Should().Be(EmbeddedVncView.DefaultQualityPresetName);
     }
 
     /// <summary>
@@ -95,8 +135,7 @@ public sealed class VncHeaderDisplayControlsTests
         XDocument markup = Markup();
 
         SelectedTag(markup, "ScalingSelector").Should().Be(EmbeddedVncView.DefaultScalingMode);
-        SelectedTag(markup, "QualitySelector").Should().Be(
-            EmbeddedVncView.DefaultQualityLevel.ToString(CultureInfo.InvariantCulture));
+        SelectedTag(markup, "QualitySelector").Should().Be(EmbeddedVncView.DefaultQualityPresetName);
     }
 
     [Fact]
@@ -118,7 +157,8 @@ public sealed class VncHeaderDisplayControlsTests
     public void TheMessages_CarryTheValueThePageReads()
     {
         EmbeddedVncView.ScalingMessage("none").Should().Be("scaling:none");
-        EmbeddedVncView.QualityMessage(6).Should().Be("quality:6");
+        EmbeddedVncView.QualityMessage(new EmbeddedVncView.QualityPreset("any", 9, 0))
+            .Should().Be("quality:{\"qualityLevel\":9,\"compressionLevel\":0}");
     }
 
     // The page half of the wiring. The host side is driven on the real view in
@@ -141,16 +181,38 @@ public sealed class VncHeaderDisplayControlsTests
             ]);
     }
 
-    /// <summary>The same for the quality message.</summary>
+    /// <summary>
+    /// The same for the quality message, which carries two levels: a page that applied only the
+    /// compression would bring back the defect, a selector that leaves the picture as it was.
+    /// </summary>
     [Fact]
     public void ThePage_AppliesTheQualityItReceives()
     {
         string page = PageSource();
 
         StatementsOf(BlockAfter(page, "if (msg.indexOf('quality:') === 0)"))
-            .Should().Contain(["qualityLevel = level;", "applyQuality();"]);
+            .Should().Contain([
+                "qualityLevel = levels.qualityLevel;",
+                "compressionLevel = levels.compressionLevel;",
+                "applyQuality();",
+            ]);
         StatementsOf(BlockAfter(page, "function applyQuality()"))
-            .Should().Contain("rfb.compressionLevel = qualityLevel;");
+            .Should().Contain([
+                "rfb.qualityLevel = qualityLevel;",
+                "rfb.compressionLevel = compressionLevel;",
+            ]);
+    }
+
+    /// <summary>
+    /// The page refuses a message whose two levels it cannot both apply, rather than handing noVNC
+    /// a value it would log and drop, and keeps the levels it has.
+    /// </summary>
+    [Fact]
+    public void ThePage_ReadsBothLevelsBeforeItAppliesEither()
+    {
+        StatementsOf(BlockAfter(PageSource(), "function readQualityLevels(payload)"))
+            .Should().Contain(
+                "if (!levels || !isLevel(levels.qualityLevel) || !isLevel(levels.compressionLevel)) {");
     }
 
     /// <summary>The text between the brace that follows <paramref name="anchor"/> and its match.</summary>
@@ -181,9 +243,6 @@ public sealed class VncHeaderDisplayControlsTests
         FindByName(Markup(), selectorName)!
             .Elements()
             .Select(item => (string?)item.Attribute("Tag") ?? string.Empty);
-
-    private static IEnumerable<int> OptionLevels(string selectorName) =>
-        OptionTags(selectorName).Select(tag => int.Parse(tag, NumberStyles.None, CultureInfo.InvariantCulture));
 
     /// <summary>The Tag of the option each selector lands on when the header is first drawn.</summary>
     private static string SelectedTag(XDocument markup, string selectorName)
