@@ -78,6 +78,14 @@ public partial class SharedSessionSourceItemViewModel : ObservableObject
     /// <summary>Whether the source has an import report worth opening.</summary>
     public bool HasIssues => IssueCount > 0;
 
+    /// <summary>How many passwords are remembered for the source on this computer.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSavedPasswords))]
+    private int _savedPasswordCount;
+
+    /// <summary>Whether there are remembered passwords to forget.</summary>
+    public bool HasSavedPasswords => SavedPasswordCount > 0;
+
     public bool HasNameError => NameError is not null;
 
     public bool HasPathError => PathError is not null;

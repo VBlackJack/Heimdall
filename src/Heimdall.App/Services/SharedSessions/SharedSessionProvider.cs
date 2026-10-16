@@ -49,6 +49,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
 
     private readonly LocalizationManager _localizer;
     private readonly SharedSessionSourceCache? _cache;
+    private readonly SharedSessionSecretStore? _secrets;
     private readonly TimeProvider _timeProvider;
     private readonly SharedSessionSourceWatcher? _watcher;
     private readonly SemaphoreSlim _loadGate = new(1, 1);
@@ -61,14 +62,19 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     /// <param name="cache">Where the offline copies are kept; null keeps none.</param>
     /// <param name="timeProvider">The clock of the reload debounce and of the retries.</param>
     /// <param name="watchSourceFiles">Whether the files are watched and read again when they change.</param>
+    /// <param name="secrets">
+    /// The passwords remembered for shared sessions, forgotten with their source; null keeps none.
+    /// </param>
     public SharedSessionProvider(
         LocalizationManager localizer,
         SharedSessionSourceCache? cache = null,
         TimeProvider? timeProvider = null,
-        bool watchSourceFiles = false)
+        bool watchSourceFiles = false,
+        SharedSessionSecretStore? secrets = null)
     {
         _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
         _cache = cache;
+        _secrets = secrets;
         _timeProvider = timeProvider ?? TimeProvider.System;
         if (watchSourceFiles)
         {
@@ -131,7 +137,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
             }
 
             _snapshot = Snapshot.From(loads);
-            ForgetRemovedSources(settings);
+            await ForgetRemovedSourcesAsync(settings).ConfigureAwait(false);
             UpdateWatches(settings, loads);
         }
         finally
@@ -501,9 +507,10 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     };
 
     /// <summary>
-    /// Drops what is remembered of a source no longer in the settings, its offline copy included.
+    /// Drops what is remembered of a source no longer in the settings, its offline copy and the
+    /// passwords saved for it included.
     /// </summary>
-    private void ForgetRemovedSources(AppSettings settings)
+    private async Task ForgetRemovedSourcesAsync(AppSettings settings)
     {
         HashSet<string> kept = (settings.SharedSessionSources ?? [])
             .Where(source => source is not null && SharedSessionIds.IsValidSourceId(source.Id))
@@ -515,6 +522,10 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         }
 
         _cache?.DeleteAllExcept(kept);
+        if (_secrets is not null)
+        {
+            await _secrets.ForgetAllExceptAsync(kept).ConfigureAwait(false);
+        }
     }
 
     /// <summary>Watches the file of every enabled source that has one, and nothing else.</summary>

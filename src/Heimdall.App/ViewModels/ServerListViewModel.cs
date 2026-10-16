@@ -56,6 +56,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     private readonly IConfigManager _configManager;
     private readonly IProfileLookup _profileLookup;
 
+    /// <summary>Remembered and asked passwords of shared sessions; null keeps none.</summary>
+    private readonly SharedCredentialApplier? _sharedCredentials;
+
     /// <summary>
     /// The one way to find a profile by identifier, local inventory first, then the shared
     /// sources. Shared with the session coordinator and the scheduler, which reach it through here.
@@ -225,9 +228,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         IWindowsHelloService? windowsHelloService = null,
         TimeProvider? timeProvider = null,
         ICredentialGuardService? credentialGuardService = null,
-        IProfileLookup? profileLookup = null)
+        IProfileLookup? profileLookup = null,
+        SharedCredentialApplier? sharedCredentials = null)
     {
         _configManager = configManager;
+        _sharedCredentials = sharedCredentials;
         _profileLookup = profileLookup ?? Services.SharedSessions.ProfileLookup.LocalOnly(configManager);
         _localizer = localizer;
         _uiDispatcher = uiDispatcher;
@@ -1107,6 +1112,23 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 cancellationToken,
                 skipOnFailure: false);
 
+            // After the gate and after the vault: a shared session takes the passwords its user
+            // chose to remember, and is asked for the ones it needs and has no other way to get.
+            SharedCredentialApplier.SharedCredentialPlan? sharedCredentials = null;
+            if (_sharedCredentials is not null && SharedSessionIds.IsSharedProfile(serverDto))
+            {
+                sharedCredentials = await _sharedCredentials.ApplyAsync(
+                    serverDto,
+                    settings,
+                    allowCredentialPrompt,
+                    cancellationToken);
+                if (sharedCredentials is null)
+                {
+                    StatusMessageRequested?.Invoke(_localizer["StatusSharedPasswordCancelled"]);
+                    return false;
+                }
+            }
+
             // Generate a unique session ID so duplicate connections to the same server
             // get independent state tracking (tunnel lifecycle, error recovery)
             string sessionId = SessionIdCodec.Create(server.Id);
@@ -1148,6 +1170,15 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 server,
                 cancellationToken,
                 rdpModeOverride);
+
+            if (sharedCredentials is not null)
+            {
+                await sharedCredentials.SettleAsync(
+                    outcome.Status == BulkConnectOutcomeStatus.Success,
+                    outcome.Authenticated,
+                    outcome.Failure?.Code,
+                    outcome.Failure?.Stage == Core.SessionDiagnostics.SessionFailureStage.SshGateway);
+            }
 
             return outcome.Status switch
             {
@@ -1356,7 +1387,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     result.Session,
                     rdpModeOverride);
                 lifecycleHandedOff = result.Session is not null;
-                return new BulkConnectOutcome(BulkConnectOutcomeStatus.Success, null);
+                return new BulkConnectOutcome(
+                    BulkConnectOutcomeStatus.Success,
+                    null,
+                    Authenticated: result.Session is SshSessionResult);
             }
 
             server.ConnectionState = "Error";
@@ -2831,7 +2865,16 @@ internal enum ConnectFailureReport
     Silent
 }
 
+/// <param name="Status">How the attempt ended.</param>
+/// <param name="ErrorMessage">Why it failed, in words; null on success.</param>
+/// <param name="Failure">The structured failure, when the handler classified one.</param>
+/// <param name="Authenticated">
+/// Whether the server accepted the credentials before the attempt returned. A Plink or an external
+/// terminal returns once the process started, before it signed in, so its success says nothing of
+/// the password.
+/// </param>
 internal readonly record struct BulkConnectOutcome(
     BulkConnectOutcomeStatus Status,
     string? ErrorMessage,
-    SessionDiagnostic? Failure = null);
+    SessionDiagnostic? Failure = null,
+    bool Authenticated = false);

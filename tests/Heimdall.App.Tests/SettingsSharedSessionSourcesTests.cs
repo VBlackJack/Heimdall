@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using System.Text.Json.Nodes;
 using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels;
@@ -304,6 +305,65 @@ public sealed partial class SettingsViewModelTests
         viewModel.ShowSharedSourceReportCommand.Execute(reported);
 
         Assert.Same(report, Assert.Single(dialog.SharedReports).Report);
+    }
+
+    [Fact]
+    public async Task SharedSources_SavedPasswords_AreCountedPerRow_AndForgottenForThatSourceOnly()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "heimdall-settings-shared-secrets", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var secrets = new SharedSessionSecretStore(Path.Combine(directory, SharedSessionSecretStore.FileName));
+            await secrets.RememberAsync(SharedSecretKind.Gateway, SavedSourceId, "g", "sealed-1");
+            await secrets.RememberAsync(SharedSecretKind.Session, SavedSourceId, "s", "sealed-2");
+            await secrets.RememberAsync(SharedSecretKind.Session, "othersource1", "s", "sealed-3");
+            FakeConfigManager config = new() { Settings = SettingsWithOneSource() };
+            SettingsViewModel viewModel = CreateViewModel(config, sharedSecrets: secrets);
+            viewModel.LoadFromSettings(config.Settings);
+            SharedSessionSourceItemViewModel row = Assert.Single(viewModel.SharedSessionSources);
+
+            Assert.Equal(2, row.SavedPasswordCount);
+            Assert.True(row.HasSavedPasswords);
+
+            await viewModel.ForgetSharedSourcePasswordsCommand.ExecuteAsync(row);
+
+            Assert.Equal(0, row.SavedPasswordCount);
+            Assert.False(row.HasSavedPasswords);
+            Assert.Equal(0, new SharedSessionSecretStore(secrets.FilePath).CountFor(SavedSourceId));
+            Assert.Equal(1, secrets.CountFor("othersource1"));
+
+            // Not a panel value: nothing to save, and Cancel cannot bring them back.
+            Assert.False(viewModel.IsDirty);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SharedSources_ResetDefaults_KeepsTheSavedPasswords()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "heimdall-settings-shared-secrets", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var secrets = new SharedSessionSecretStore(Path.Combine(directory, SharedSessionSecretStore.FileName));
+            await secrets.RememberAsync(SharedSecretKind.Session, SavedSourceId, "s", "sealed-1");
+            FakeConfigManager config = new() { Settings = SettingsWithOneSource() };
+            var dialog = new FakeDialogService { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog, sharedSecrets: secrets);
+            viewModel.LoadFromSettings(config.Settings);
+
+            await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+            Assert.True(await viewModel.TrySaveAsync());
+
+            Assert.Equal(1, new SharedSessionSecretStore(secrets.FilePath).CountFor(SavedSourceId));
+            Assert.Equal(1, Assert.Single(viewModel.SharedSessionSources).SavedPasswordCount);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     private static AppSettings SettingsWithOneSource()

@@ -129,6 +129,31 @@ public sealed class WpfDialogService(
         string prompt,
         CancellationToken cancellationToken = default)
     {
+        // Not an async method: on the UI thread the dialog runs inline, and a cancellation it
+        // raises must reach the caller as it did, thrown, not wrapped in a faulted task.
+        Task<PasswordPromptResult?> shown = ShowPasswordDialogAsync(title, prompt, rememberLabel: null, cancellationToken);
+        return shown.IsCompletedSuccessfully
+            ? Task.FromResult(shown.Result?.Password)
+            : PasswordOfAsync(shown);
+
+        static async Task<string?> PasswordOfAsync(Task<PasswordPromptResult?> pending) =>
+            (await pending.ConfigureAwait(false))?.Password;
+    }
+
+    /// <inheritdoc/>
+    public Task<PasswordPromptResult?> ShowPasswordInputWithRememberAsync(
+        string title,
+        string prompt,
+        string rememberLabel,
+        CancellationToken cancellationToken = default) =>
+        ShowPasswordDialogAsync(title, prompt, rememberLabel, cancellationToken);
+
+    private Task<PasswordPromptResult?> ShowPasswordDialogAsync(
+        string title,
+        string prompt,
+        string? rememberLabel,
+        CancellationToken cancellationToken)
+    {
         return InvokeOnUiThreadAsync(
             () =>
             {
@@ -137,6 +162,7 @@ public sealed class WpfDialogService(
                 {
                     Title = title,
                     Prompt = prompt,
+                    RememberLabel = rememberLabel,
                     Owner = GetOwnerWindow()
                 };
 
@@ -154,7 +180,9 @@ public sealed class WpfDialogService(
                     }
                 });
                 cancellationToken.ThrowIfCancellationRequested();
-                string? result = dialog.ShowDialog() == true ? dialog.ResultPassword : null;
+                PasswordPromptResult? result = dialog.ShowDialog() == true && dialog.ResultPassword is { } password
+                    ? new PasswordPromptResult(password, dialog.RememberChosen)
+                    : null;
                 cancellationToken.ThrowIfCancellationRequested();
                 return result;
             },

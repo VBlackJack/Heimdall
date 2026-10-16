@@ -39,10 +39,14 @@ namespace Heimdall.App.ViewModels;
 /// through the session list, which watches the settings.</para>
 /// <para>The post-connect approvals of shared sessions are not a panel value: they are never
 /// exported, never imported, and a factory reset clears them at the next save.</para>
+/// <para>Nor are the passwords a user chose to remember for a source: they live in their own
+/// store, which an export, an import or a factory reset never touches. A row forgets them at once,
+/// and a saved removal of the source forgets them through the provider.</para>
 /// </remarks>
 public partial class SettingsViewModel
 {
     private readonly ISharedSessionProvider? _sharedSessions;
+    private readonly SharedSessionSecretStore? _sharedSecrets;
 
     [ObservableProperty]
     private ObservableCollection<SharedSessionSourceItemViewModel> _sharedSessionSources = new();
@@ -161,6 +165,22 @@ public partial class SettingsViewModel
             ReportClipboard,
             ReportCsvPathPicker
                 ?? (proposed => Dialogs.SharedSessionImportReportDialogViewModel.PickCsvPathWithDialog(_localizer, proposed))));
+    }
+
+    /// <summary>
+    /// Forgets the passwords remembered for a row's source on this computer. Not a panel value:
+    /// it happens now, and Cancel does not bring them back.
+    /// </summary>
+    [RelayCommand]
+    private async Task ForgetSharedSourcePasswordsAsync(SharedSessionSourceItemViewModel? row)
+    {
+        if (row is null || _sharedSecrets is null)
+        {
+            return;
+        }
+
+        await _sharedSecrets.ForgetSourceAsync(row.Id);
+        RefreshSharedSessionSourceStatuses();
     }
 
     /// <summary>Replaces the rows with the sources in <paramref name="settings"/>.</summary>
@@ -288,6 +308,7 @@ public partial class SettingsViewModel
 
         foreach (SharedSessionSourceItemViewModel row in SharedSessionSources)
         {
+            row.SavedPasswordCount = _sharedSecrets?.CountFor(row.Id) ?? 0;
             if (!states.TryGetValue(row.Id, out SharedSessionSourceState? state))
             {
                 row.StatusDescription = _localizer["SettingsSharedSourceStatusPending"];

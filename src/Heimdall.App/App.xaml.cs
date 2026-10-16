@@ -908,10 +908,17 @@ public partial class App : System.Windows.Application
         // profiles through the one lookup (servers.json first, then the shared sources).
         // The offline copies live in the data root of this process, and the files are watched: a
         // test builds its provider without either.
+        // The passwords a user chose to remember for them are kept beside, never in the settings.
+        services.AddSingleton(_ => SharedSessionSecretStore.ForDataRoot());
         services.AddSingleton<ISharedSessionProvider>(sp => new SharedSessionProvider(
             sp.GetRequiredService<LocalizationManager>(),
             SharedSessionSourceCache.ForDataRoot(),
-            watchSourceFiles: true));
+            watchSourceFiles: true,
+            secrets: sp.GetRequiredService<SharedSessionSecretStore>()));
+        services.AddSingleton(sp => new SharedCredentialApplier(
+            sp.GetRequiredService<SharedSessionSecretStore>(),
+            sp.GetRequiredService<IDialogService>(),
+            sp.GetRequiredService<LocalizationManager>()));
         services.AddSingleton<IProfileLookup, ProfileLookup>();
         services.AddSingleton<SessionHealthMonitor>();
         services.AddSingleton<NetworkScannerService>();

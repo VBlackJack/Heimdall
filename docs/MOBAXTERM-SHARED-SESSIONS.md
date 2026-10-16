@@ -44,7 +44,23 @@ You are asked again when the command changes in the file. Approvals are personal
 
 ## 5. Passwords and SSH keys stay personal
 
-A shared file never provides a password or a key: Heimdall does not read them from it, even when MobaXterm stored some. For the bastion and for the server, the password is typed when the connection asks for it, or comes from the external credential provider if you use one. Keys come from your SSH agent (Pageant or the Windows OpenSSH agent). Nothing you type is written to a shared session, which stays read-only.
+A shared file never provides a password or a key: Heimdall does not read them from it, even when MobaXterm stored some. Keys come from your SSH agent (Pageant or the Windows OpenSSH agent).
+
+When your agent offers no key, Heimdall asks for the password of the bastion, then of the server, before it connects. The question has a **Remember this password on this computer** box, and each person chooses, as in MobaXterm:
+
+- **Ticked**: the password is kept once the server has accepted it, and the next connections use it without asking.
+- **Not ticked**: the password is used for this connection only.
+
+A remembered password is yours alone. It stays on this computer, encrypted for your Windows account, in `shared-session-secrets.json` in the Heimdall data folder. It is never written to the shared file, to the offline copy, to `servers.json` or to the settings, an export of the settings or of the profiles never carries it, and **Reset defaults** does not delete it.
+
+A remembered password belongs to one bastion (its host, port and login) or to one session (the session, its host, port and login). If the shared file sends a session to another host or another login, Heimdall asks again instead of sending the old password. When a server refuses a remembered password, Heimdall forgets it and asks again next time.
+
+- If you use an external credential provider, its password comes first: a remembered password only fills what it leaves empty.
+- When **Windows Hello** is required to connect, it is asked before any remembered password is used.
+- Reopening sessions at startup and **Connect all** use remembered passwords but never ask: a session without one asks when you open it alone.
+- An RDP session asks for its password in the RDP window, which Heimdall does not remember. The password of its bastion is remembered like any other.
+
+In the settings, each source with remembered passwords shows **Forget saved passwords**. Removing a source also forgets its passwords. Nothing you type is ever written to a shared session, which stays read-only.
 
 ## 6. Automatic reload and offline copy
 

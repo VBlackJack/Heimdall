@@ -24,6 +24,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Import;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.Security;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
 using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
@@ -202,10 +203,16 @@ public sealed partial class SharedSessionConnectTests
             (await fixture.ViewModel.FindSharedServerItemAsync(fixture.Shared.Profile.Id))!.Id);
     }
 
-    /// <summary>Records the profile and settings every SSH connection is dispatched with.</summary>
-    private sealed class RecordingSshHandler : IProtocolHandler
+    /// <summary>
+    /// Records the profile and settings every SSH connection is dispatched with, and answers with
+    /// <see cref="Answer"/>, a failure by default.
+    /// </summary>
+    internal sealed class RecordingSshHandler : IProtocolHandler
     {
         public List<(ServerProfileDto Server, AppSettings Settings)> Dispatched { get; } = [];
+
+        /// <summary>The result of the next connections; null answers with an unclassified failure.</summary>
+        public Func<ConnectionResult>? Answer { get; set; }
 
         public string Protocol => "SSH";
 
@@ -216,7 +223,7 @@ public sealed partial class SharedSessionConnectTests
             RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
         {
             Dispatched.Add((server.CloneFaithfully(), settings));
-            return Task.FromResult(new ConnectionResult(false, "recorded", null));
+            return Task.FromResult(Answer?.Invoke() ?? new ConnectionResult(false, "recorded", null));
         }
     }
 
@@ -288,7 +295,7 @@ public sealed partial class SharedSessionConnectTests
         }
     }
 
-    private sealed class Fixture : IAsyncDisposable
+    internal sealed class Fixture : IAsyncDisposable
     {
         private readonly string _rootPath;
 
@@ -299,7 +306,9 @@ public sealed partial class SharedSessionConnectTests
             ConfigManager configManager,
             LocalizationManager localizer,
             SharedSessionTestData shared,
-            ProfileLookup lookup)
+            ProfileLookup lookup,
+            SharedSessionSecretStore? secrets,
+            SharedPasswordPromptProxy? prompts)
         {
             _rootPath = rootPath;
             ViewModel = viewModel;
@@ -308,7 +317,15 @@ public sealed partial class SharedSessionConnectTests
             Localizer = localizer;
             Shared = shared;
             Lookup = lookup;
+            Secrets = secrets;
+            Prompts = prompts;
         }
+
+        /// <summary>The remembered passwords, when the fixture was built to keep them.</summary>
+        public SharedSessionSecretStore? Secrets { get; }
+
+        /// <summary>The password questions, when the fixture was built to keep passwords.</summary>
+        public SharedPasswordPromptProxy? Prompts { get; }
 
         public ServerListViewModel ViewModel { get; }
 
@@ -322,8 +339,19 @@ public sealed partial class SharedSessionConnectTests
 
         public ProfileLookup Lookup { get; }
 
+        /// <param name="providerFactory">The shared provider; null uses the test data's stub.</param>
+        /// <param name="rememberSharedPasswords">Whether shared passwords are asked and remembered.</param>
+        /// <param name="seal">How a typed password is sealed; null uses the protector.</param>
+        /// <param name="isReadable">Whether a sealed password opens; null asks the protector.</param>
+        /// <param name="windowsHello">The Windows Hello service; null leaves the gate to its default.</param>
+        /// <param name="credentialProviders">The external credential providers; null uses the real factory.</param>
         public static async Task<Fixture> CreateAsync(
-            Func<SharedSessionTestData, ISharedSessionProvider>? providerFactory = null)
+            Func<SharedSessionTestData, ISharedSessionProvider>? providerFactory = null,
+            bool rememberSharedPasswords = false,
+            Func<string, string>? seal = null,
+            Func<string, bool>? isReadable = null,
+            IWindowsHelloService? windowsHello = null,
+            ICredentialProviderFactory? credentialProviders = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(), "heimdall-shared-connect", Guid.NewGuid().ToString("N"));
@@ -339,6 +367,16 @@ public sealed partial class SharedSessionConnectTests
             var connectionService = new ConnectionService(
                 configManager, localizer, new NullTunnelService(), [handler]);
 
+            SharedSessionSecretStore? secrets = null;
+            SharedPasswordPromptProxy? prompts = null;
+            SharedCredentialApplier? applier = null;
+            if (rememberSharedPasswords)
+            {
+                secrets = new SharedSessionSecretStore(Path.Combine(rootPath, SharedSessionSecretStore.FileName));
+                (IDialogService passwordDialogs, prompts) = SharedPasswordPromptProxy.Create();
+                applier = new SharedCredentialApplier(secrets, passwordDialogs, localizer, _ => 0, seal, isReadable);
+            }
+
             var viewModel = new ServerListViewModel(
                 configManager,
                 localizer,
@@ -349,9 +387,12 @@ public sealed partial class SharedSessionConnectTests
                 new UnusedRdpImportService(),
                 new PuttySessionImporter(new FakePuttySessionRegistrySource([]), configManager),
                 new KnownHostsImporter(configManager, new HostKeyStore()),
-                profileLookup: lookup);
+                credentialProviderFactory: credentialProviders,
+                windowsHelloService: windowsHello,
+                profileLookup: lookup,
+                sharedCredentials: applier);
 
-            return new Fixture(rootPath, viewModel, handler, configManager, localizer, shared, lookup);
+            return new Fixture(rootPath, viewModel, handler, configManager, localizer, shared, lookup, secrets, prompts);
         }
 
         public Task SeedLocalProfileAsync() => ConfigManager.SaveServersAsync(

@@ -3268,6 +3268,17 @@
                                                                 FontSize="{StaticResource FontSizeCaption}"
                                                                 AutomationProperties.Name="{loc:Translate AccessSettingsSharedSourceReport}"
                                                                 Visibility="{Binding HasIssues, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                        <!-- The passwords remembered for this source on this computer, when there are any. -->
+                                                        <Button HorizontalAlignment="Left"
+                                                                Margin="0,6,0,0"
+                                                                Padding="8,2"
+                                                                Content="{loc:Translate SettingsSharedSourceForgetPasswords}"
+                                                                Command="{Binding DataContext.Settings.ForgetSharedSourcePasswordsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                                FontSize="{StaticResource FontSizeCaption}"
+                                                                AutomationProperties.Name="{loc:Translate AccessSettingsSharedSourceForgetPasswords}"
+                                                                Visibility="{Binding HasSavedPasswords, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                         </StackPanel>
                                                         <Button Grid.Column="4" VerticalAlignment="Top" Margin="8,0,0,0"
                                                                 Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"

@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
@@ -1504,6 +1505,13 @@ public partial class ServerListViewModel
                 Core.Logging.FileLogger.Info(
                     $"ConnectServersBulkCoreAsync: {candidate.Server.DisplayName} type={candidate.ServerDto.ConnectionType} gateway={candidate.ServerDto.SshGatewayId} sessionId={sessionId}");
 
+                // Remembered passwords only: a batch asks nothing, one modal per session would be
+                // a storm. The gate and the vault ran when the plan was prepared.
+                SharedCredentialApplier.SharedCredentialPlan? sharedCredentials =
+                    _sharedCredentials is not null && SharedSessionIds.IsSharedProfile(candidate.ServerDto)
+                        ? await _sharedCredentials.ApplyAsync(candidate.ServerDto, plan.Settings, allowPrompt: false, cancellationToken)
+                        : null;
+
                 var outcome = await RunConnectionPipelineAsync(
                     candidate.ServerDto,
                     plan.Settings,
@@ -1511,6 +1519,15 @@ public partial class ServerListViewModel
                     candidate.Server.Id,
                     candidate.Server,
                     cancellationToken);
+
+                if (sharedCredentials is not null)
+                {
+                    await sharedCredentials.SettleAsync(
+                        outcome.Status == BulkConnectOutcomeStatus.Success,
+                        outcome.Authenticated,
+                        outcome.Failure?.Code,
+                        outcome.Failure?.Stage == Core.SessionDiagnostics.SessionFailureStage.SshGateway);
+                }
 
                 switch (outcome.Status)
                 {

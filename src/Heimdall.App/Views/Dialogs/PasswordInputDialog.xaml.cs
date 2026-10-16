@@ -41,6 +41,24 @@ public partial class PasswordInputDialog : Window
 
     public string? ResultPassword { get; private set; }
 
+    /// <summary>
+    /// The label of the remember choice, or null to leave the choice out. The choice starts
+    /// unticked: keeping a password is something the user asks for.
+    /// </summary>
+    public string? RememberLabel
+    {
+        get => RememberCheckBox.Content as string;
+        set
+        {
+            RememberCheckBox.Content = value;
+            RememberCheckBox.Visibility = string.IsNullOrEmpty(value) ? Visibility.Collapsed : Visibility.Visible;
+            System.Windows.Automation.AutomationProperties.SetName(RememberCheckBox, value ?? string.Empty);
+        }
+    }
+
+    /// <summary>Whether the user ticked the remember choice when it was offered.</summary>
+    public bool RememberChosen { get; private set; }
+
     private void OnOkClick(object sender, RoutedEventArgs e)
     {
         SubmitPassword();
@@ -58,6 +76,7 @@ public partial class PasswordInputDialog : Window
     private void SubmitPassword()
     {
         ResultPassword = PasswordBox.Password;
+        RememberChosen = RememberCheckBox.Visibility == Visibility.Visible && RememberCheckBox.IsChecked == true;
         PasswordBox.Clear();
         DialogResult = true;
     }

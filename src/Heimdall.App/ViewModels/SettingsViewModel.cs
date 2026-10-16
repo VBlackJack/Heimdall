@@ -1371,10 +1371,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IProfileImportService? profileImportService = null,
         ICredentialGuardService? credentialGuardService = null,
         TrustedWebCertificatesSettingsViewModel? trustedWebCertificates = null,
-        Services.SharedSessions.ISharedSessionProvider? sharedSessions = null)
+        Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
+        Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null)
     {
         _configManager = configManager;
         _sharedSessions = sharedSessions;
+        _sharedSecrets = sharedSecrets;
         _localizer = localizer;
         _dialogService = dialogService;
         _pinManager = pinManager;

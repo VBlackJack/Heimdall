@@ -44,7 +44,23 @@ La question revient quand la commande change dans le fichier. Les approbations s
 
 ## 5. Mots de passe et clés SSH restent personnels
 
-Un fichier partagé ne fournit jamais de mot de passe ni de clé : Heimdall ne les y lit pas, même quand MobaXterm en a enregistré. Pour le bastion comme pour le serveur, le mot de passe se saisit quand la connexion le demande, ou vient du fournisseur d'identifiants externe si vous en utilisez un. Les clés viennent de votre agent SSH (Pageant ou l'agent OpenSSH de Windows). Rien de ce que vous saisissez n'est écrit dans une session partagée, qui reste en lecture seule.
+Un fichier partagé ne fournit jamais de mot de passe ni de clé : Heimdall ne les y lit pas, même quand MobaXterm en a enregistré. Les clés viennent de votre agent SSH (Pageant ou l'agent OpenSSH de Windows).
+
+Quand votre agent ne propose aucune clé, Heimdall demande le mot de passe du bastion, puis celui du serveur, avant de se connecter. La question comporte une case **Mémoriser ce mot de passe sur cet ordinateur**, et chacun choisit, comme dans MobaXterm :
+
+- **Cochée** : le mot de passe est conservé une fois que le serveur l'a accepté, et les connexions suivantes l'utilisent sans rien demander.
+- **Non cochée** : le mot de passe sert pour cette connexion seulement.
+
+Un mot de passe mémorisé n'appartient qu'à vous. Il reste sur cet ordinateur, chiffré pour votre compte Windows, dans `shared-session-secrets.json` dans le dossier de données de Heimdall. Il n'est jamais écrit dans le fichier partagé, dans la copie hors ligne, dans `servers.json` ni dans les paramètres, un export des paramètres ou des profils ne l'emporte jamais, et **Valeurs par défaut** ne le supprime pas.
+
+Un mot de passe mémorisé appartient à un bastion (son hôte, son port et son identifiant) ou à une session (la session, son hôte, son port et son identifiant). Si le fichier partagé envoie une session vers un autre hôte ou un autre identifiant, Heimdall redemande au lieu d'envoyer l'ancien mot de passe. Quand un serveur refuse un mot de passe mémorisé, Heimdall l'oublie et redemande la fois suivante.
+
+- Si vous utilisez un fournisseur d'identifiants externe, son mot de passe passe en premier : un mot de passe mémorisé ne complète que ce qu'il laisse vide.
+- Quand **Windows Hello** est exigé pour se connecter, il est demandé avant qu'aucun mot de passe mémorisé ne soit utilisé.
+- La réouverture des sessions au démarrage et **Tout connecter** utilisent les mots de passe mémorisés mais ne demandent jamais rien : une session qui n'en a pas le demande quand vous l'ouvrez seule.
+- Une session RDP demande son mot de passe dans la fenêtre RDP, que Heimdall ne mémorise pas. Le mot de passe de son bastion est mémorisé comme les autres.
+
+Dans les paramètres, chaque source qui a des mots de passe mémorisés affiche **Oublier les mots de passe enregistrés**. Supprimer une source oublie aussi ses mots de passe. Rien de ce que vous saisissez n'est jamais écrit dans une session partagée, qui reste en lecture seule.
 
 ## 6. Rechargement automatique et copie hors ligne
 
