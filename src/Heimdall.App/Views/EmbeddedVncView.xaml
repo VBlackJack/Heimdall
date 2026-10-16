@@ -1,6 +1,7 @@
 <UserControl x:Class="Heimdall.App.Views.EmbeddedVncView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Heimdall.App.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
@@ -38,6 +39,47 @@
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"
                         Visibility="Collapsed"/>
+
+                <!-- Display controls. They belong in the header, outside the remote screen: drawn
+                     over the page they took the top right corner of the remote desktop, where
+                     the remote windows keep their minimize, maximize and close buttons. -->
+                <Button x:Name="ClipboardButton"
+                        DockPanel.Dock="Right"
+                        Click="OnClipboardClick"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Padding="8,2"
+                        FontSize="{StaticResource FontSizeCaption}"
+                        Margin="8,0,0,0"
+                        Content="{loc:Translate VncClipboardSync}"
+                        ToolTip="{loc:Translate TooltipVncClipboard}"
+                        AutomationProperties.Name="{loc:Translate A11yVncClipboard}"/>
+
+                <ComboBox x:Name="ScalingSelector"
+                          DockPanel.Dock="Right"
+                          Margin="8,0,0,0"
+                          FontSize="{StaticResource FontSizeCaption}"
+                          VerticalAlignment="Center"
+                          SelectedIndex="1"
+                          ToolTip="{loc:Translate TooltipVncScaling}"
+                          AutomationProperties.Name="{loc:Translate A11yVncScaling}">
+                    <ComboBoxItem Content="{loc:Translate VncScalingRemote}" Tag="remote"/>
+                    <ComboBoxItem Content="{loc:Translate VncScalingScale}" Tag="scale"/>
+                    <ComboBoxItem Content="{loc:Translate VncScalingNone}" Tag="none"/>
+                </ComboBox>
+
+                <ComboBox x:Name="QualitySelector"
+                          DockPanel.Dock="Right"
+                          Margin="8,0,0,0"
+                          FontSize="{StaticResource FontSizeCaption}"
+                          VerticalAlignment="Center"
+                          SelectedIndex="2"
+                          ToolTip="{loc:Translate TooltipVncQuality}"
+                          AutomationProperties.Name="{loc:Translate A11yVncQuality}">
+                    <ComboBoxItem Content="{loc:Translate VncQualityBest}" Tag="0"/>
+                    <ComboBoxItem Content="{loc:Translate VncQualityBalanced}" Tag="3"/>
+                    <ComboBoxItem Content="{loc:Translate VncQualityPerformance}" Tag="6"/>
+                    <ComboBoxItem Content="{loc:Translate VncQualityLowBandwidth}" Tag="9"/>
+                </ComboBox>
 
                 <Button x:Name="SplitButton"
                         DockPanel.Dock="Right"
