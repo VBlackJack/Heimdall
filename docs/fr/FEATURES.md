@@ -399,7 +399,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     la fois précédente, y compris les modifications locales qui leur ont été apportées
   - Les mots de passe enregistrés par MobaXterm ne sont pas importés (chiffrement propriétaire) ; le
     résumé d'import les compte
-- Sources de sessions MobaXterm partagées (Paramètres > Général > Sources de sessions partagées) :
+- Sources de sessions MobaXterm partagées (Paramètres > Général > Sources de sessions partagées) ;
+  un guide pas à pas pour les équipes qui viennent de MobaXterm est dans
+  [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md) :
   - Une source est un nom et le chemin d'un fichier `.mxtsessions`, en général sur un partage
     d'équipe ou un dossier synchronisé ; les variables d'environnement sont acceptées
     (`%OneDriveCommercial%\...`). Chaque source activée est lue au démarrage et apparaît dans

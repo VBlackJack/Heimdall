@@ -396,7 +396,8 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     any local edits made to them
   - Passwords stored by MobaXterm are not imported (proprietary encryption); the import summary
     counts them
-- Shared MobaXterm session sources (Settings > General > Shared session sources):
+- Shared MobaXterm session sources (Settings > General > Shared session sources); a step-by-step
+  guide for teams coming from MobaXterm is in [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md):
   - A source is a name and the path of a `.mxtsessions` file, typically on a team share or a
     synchronized folder; environment variables are allowed (`%OneDriveCommercial%\...`). Each
     enabled source is read at startup and appears in the session tree as a root of its own, below
