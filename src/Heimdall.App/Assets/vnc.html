@@ -158,8 +158,13 @@
             // change arrives as a message below. They are held here rather than applied on
             // arrival, because a change can land before the client it applies to exists.
             var scalingMode = 'scale';
+            // JPEG quality changes the picture; compression is zlib's, lossless, and only trades
+            // bandwidth against CPU. A preset sets both.
             var qualityLevel = 6;
+            var compressionLevel = 6;
             var SCALING_MODES = ['remote', 'scale', 'none'];
+            var MIN_LEVEL = 0;
+            var MAX_LEVEL = 9;
             var text = {
                 disconnected: 'Disconnected',
                 connectionLost: 'The VNC connection was lost unexpectedly.',
@@ -194,7 +199,28 @@
                     return;
                 }
 
-                rfb.compressionLevel = qualityLevel;
+                rfb.qualityLevel = qualityLevel;
+                rfb.compressionLevel = compressionLevel;
+            }
+
+            function isLevel(value) {
+                return Number.isInteger(value) && value >= MIN_LEVEL && value <= MAX_LEVEL;
+            }
+
+            // The two levels of a quality message, or null when either is missing or out of range.
+            function readQualityLevels(payload) {
+                var levels;
+                try {
+                    levels = JSON.parse(payload);
+                } catch (parseError) {
+                    return null;
+                }
+
+                if (!levels || !isLevel(levels.qualityLevel) || !isLevel(levels.compressionLevel)) {
+                    return null;
+                }
+
+                return levels;
             }
 
             function connect(wsUrl, password) {
@@ -299,9 +325,10 @@
                     }
 
                     if (msg.indexOf('quality:') === 0) {
-                        var level = parseInt(msg.substring('quality:'.length), 10);
-                        if (level >= 0 && level <= 9) {
-                            qualityLevel = level;
+                        var levels = readQualityLevels(msg.substring('quality:'.length));
+                        if (levels) {
+                            qualityLevel = levels.qualityLevel;
+                            compressionLevel = levels.compressionLevel;
                             applyQuality();
                         }
                         return;
