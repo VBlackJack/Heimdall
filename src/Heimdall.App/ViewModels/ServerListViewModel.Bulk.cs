@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
@@ -173,6 +174,11 @@ public partial class ServerListViewModel
             return;
         }
 
+        if (!EnsureNoSharedRows(selectedItems))
+        {
+            return;
+        }
+
         var message = BuildBulkDeleteConfirmationMessage(selectedItems);
         var confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["DialogTitleDeleteSelectedItems"],
@@ -201,6 +207,11 @@ public partial class ServerListViewModel
             return;
         }
 
+        if (!EnsureNoSharedRows(selectedItems))
+        {
+            return;
+        }
+
         await MoveServersToGroupCoreAsync(selectedItems, request.GroupName, cancellationToken);
     }
 
@@ -218,6 +229,16 @@ public partial class ServerListViewModel
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(servers);
+        if (!EnsureNoSharedRows(servers))
+        {
+            return 0;
+        }
+
+        if (IsSharedFolderKey(targetGroup))
+        {
+            ReportSharedFolderReadOnly();
+            return 0;
+        }
 
         // Counted here from the same predicate the core filters on, rather than from the size of
         // the request: dragging eight rows into the folder three of them already sit in moves five.
@@ -252,6 +273,11 @@ public partial class ServerListViewModel
 
         var selectedItems = SelectedItems.ToList();
         if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        if (!EnsureNoSharedRows(selectedItems))
         {
             return;
         }
@@ -291,6 +317,11 @@ public partial class ServerListViewModel
             return;
         }
 
+        if (!EnsureNoSharedRows(selectedItems))
+        {
+            return;
+        }
+
         var clones = await DuplicateServersCoreAsync(selectedItems, cancellationToken);
         if (clones.Count == 0)
         {
@@ -308,6 +339,11 @@ public partial class ServerListViewModel
     {
         var selectedItems = NormalizeSelection(selection ?? SelectedItems.ToList());
         if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        if (!EnsureNoSharedRows(selectedItems))
         {
             return;
         }
@@ -339,6 +375,11 @@ public partial class ServerListViewModel
     {
         var selectedItems = NormalizeSelection(selection ?? SelectedItems.ToList());
         if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        if (!EnsureNoSharedRows(selectedItems))
         {
             return;
         }
@@ -384,6 +425,11 @@ public partial class ServerListViewModel
             return;
         }
 
+        if (!EnsureNoSharedRows(selectedItems))
+        {
+            return;
+        }
+
         int eligibleCount = selectedItems.Count(CanBulkEditPasswordTarget);
         int skippedWinRmUsernameCount = selectedItems.Count(server =>
             string.Equals(server.ConnectionType, "WINRM", StringComparison.OrdinalIgnoreCase)
@@ -419,6 +465,11 @@ public partial class ServerListViewModel
     {
         var selectedItems = NormalizeSelection(selection ?? SelectedItems.ToList());
         if (selectedItems.Count <= 1)
+        {
+            return;
+        }
+
+        if (!EnsureNoSharedRows(selectedItems))
         {
             return;
         }
@@ -483,21 +534,21 @@ public partial class ServerListViewModel
         await ConnectServersBulkCoreAsync(plan, cancellationToken);
     }
 
-    private bool CanDeleteSelected() => SelectionCount > 1;
+    private bool CanDeleteSelected() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanMoveSelectedToGroup() => SelectionCount > 1;
+    private bool CanMoveSelectedToGroup() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanMoveSelectedToProject() => SelectionCount > 1;
+    private bool CanMoveSelectedToProject() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanDuplicateSelected() => SelectionCount > 1;
+    private bool CanDuplicateSelected() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanBulkEditPort() => SelectionCount > 1;
+    private bool CanBulkEditPort() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanBulkEditUsername() => SelectionCount > 1;
+    private bool CanBulkEditUsername() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanBulkEditPassword() => SelectionCount > 1;
+    private bool CanBulkEditPassword() => SelectionCount > 1 && !SelectionHasShared;
 
-    private bool CanBulkEditGateway() => SelectionCount > 1;
+    private bool CanBulkEditGateway() => SelectionCount > 1 && !SelectionHasShared;
 
     public async Task ConnectServersBulkCoreAsync(
         IReadOnlyList<ServerItemViewModel> serversToConnect,
@@ -517,7 +568,7 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(serversToDuplicate);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var selectedServers = NormalizeSelection(serversToDuplicate);
+        var selectedServers = NormalizeMutableSelection(serversToDuplicate);
         if (selectedServers.Count == 0)
         {
             return [];
@@ -610,7 +661,7 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(sources);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var selectedServers = NormalizeSelection(sources);
+        var selectedServers = NormalizeMutableSelection(sources);
         if (selectedServers.Count == 0)
         {
             return;
@@ -691,7 +742,7 @@ public partial class ServerListViewModel
         ArgumentException.ThrowIfNullOrEmpty(newUsername);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var selectedServers = NormalizeSelection(sources);
+        var selectedServers = NormalizeMutableSelection(sources);
         if (selectedServers.Count == 0)
         {
             return;
@@ -786,7 +837,7 @@ public partial class ServerListViewModel
         ArgumentException.ThrowIfNullOrEmpty(newPlaintextPassword);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var selectedServers = NormalizeSelection(sources);
+        var selectedServers = NormalizeMutableSelection(sources);
         if (selectedServers.Count == 0)
         {
             return;
@@ -944,7 +995,7 @@ public partial class ServerListViewModel
         cancellationToken.ThrowIfCancellationRequested();
 
         string[] ids = serverIds
-            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Where(id => !string.IsNullOrWhiteSpace(id) && !SharedSessionIds.IsShared(id))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         if (ids.Length == 0)
@@ -1158,7 +1209,7 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(serversToDelete);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var servers = NormalizeSelection(serversToDelete);
+        var servers = NormalizeMutableSelection(serversToDelete);
         if (servers.Count == 0)
         {
             return false;
@@ -1218,7 +1269,7 @@ public partial class ServerListViewModel
         cancellationToken.ThrowIfCancellationRequested();
 
         var normalizedTarget = NormalizeProjectForPersistence(targetProjectId);
-        var selectedServers = NormalizeSelection(serversToMove);
+        var selectedServers = NormalizeMutableSelection(serversToMove);
         if (selectedServers.Count == 0)
         {
             return 0;
@@ -1318,7 +1369,7 @@ public partial class ServerListViewModel
             return new BulkConnectPlan(settings, [], new BulkConnectSkipTally(), Refused: true);
         }
 
-        var serverDtos = await _configManager.LoadServersAsync();
+        var serverDtos = await _profileLookup.GetAllAsync();
         var dtoMap = serverDtos.ToDictionary(dto => dto.Id, StringComparer.Ordinal);
         var candidates = new List<BulkConnectCandidate>(selectedServers.Count);
         BulkConnectSkipTally skips = new BulkConnectSkipTally();
@@ -1380,7 +1431,17 @@ public partial class ServerListViewModel
             candidates.Add(new BulkConnectCandidate(server, serverDto));
         }
 
-        return new BulkConnectPlan(settings, candidates, skips);
+        // One settings instance serves the whole batch. When it holds a shared session, it is a
+        // copy carrying the shared gateways as well; the local candidates resolve exactly as
+        // before, since only gateways were added and none of theirs can be shadowed.
+        ServerProfileDto? sharedCandidate = candidates
+            .Select(candidate => candidate.ServerDto)
+            .FirstOrDefault(SharedSessionIds.IsSharedProfile);
+        AppSettings planSettings = sharedCandidate is null
+            ? settings
+            : _profileLookup.EffectiveSettingsFor(sharedCandidate, settings);
+
+        return new BulkConnectPlan(planSettings, candidates, skips);
     }
 
     internal async Task ConnectServersBulkCoreAsync(
@@ -1444,6 +1505,13 @@ public partial class ServerListViewModel
                 Core.Logging.FileLogger.Info(
                     $"ConnectServersBulkCoreAsync: {candidate.Server.DisplayName} type={candidate.ServerDto.ConnectionType} gateway={candidate.ServerDto.SshGatewayId} sessionId={sessionId}");
 
+                // Remembered passwords only: a batch asks nothing, one modal per session would be
+                // a storm. The gate and the vault ran when the plan was prepared.
+                SharedCredentialApplier.SharedCredentialPlan? sharedCredentials =
+                    _sharedCredentials is not null && SharedSessionIds.IsSharedProfile(candidate.ServerDto)
+                        ? await _sharedCredentials.ApplyAsync(candidate.ServerDto, plan.Settings, allowPrompt: false, cancellationToken)
+                        : null;
+
                 var outcome = await RunConnectionPipelineAsync(
                     candidate.ServerDto,
                     plan.Settings,
@@ -1451,6 +1519,15 @@ public partial class ServerListViewModel
                     candidate.Server.Id,
                     candidate.Server,
                     cancellationToken);
+
+                if (sharedCredentials is not null)
+                {
+                    await sharedCredentials.SettleAsync(
+                        outcome.Status == BulkConnectOutcomeStatus.Success,
+                        outcome.Authenticated,
+                        outcome.Failure?.Code,
+                        outcome.Failure?.Stage == Core.SessionDiagnostics.SessionFailureStage.SshGateway);
+                }
 
                 switch (outcome.Status)
                 {
@@ -1565,8 +1642,14 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(serversToMove);
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (IsSharedFolderKey(targetGroup))
+        {
+            ReportSharedFolderReadOnly();
+            return false;
+        }
+
         var normalizedTarget = NormalizeGroupForPersistence(targetGroup);
-        var selectedServers = NormalizeSelection(serversToMove);
+        var selectedServers = NormalizeMutableSelection(serversToMove);
         if (selectedServers.Count == 0)
         {
             return false;

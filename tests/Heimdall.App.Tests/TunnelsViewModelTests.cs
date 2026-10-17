@@ -445,6 +445,39 @@ public sealed class TunnelsViewModelTests
         Assert.Equal(localizer.Format("SessionGatewayBadgeVia", "Beta"), vm.ResolveRoute("server-1"));
     }
 
+    // A shared session's gateway lives in its source, never in the settings: the route of a tunnel
+    // that recorded none is named from the settings the connection used, not from the canonical
+    // ones, which only knew the host.
+    [Fact]
+    public async Task ResolveRoute_SharedSessionWithNoRecordedRoute_NamesTheSharedGateway()
+    {
+        string sharedGatewayId = SharedSessionIds.PrefixFor("teamsource1") + "gateway1";
+        var host = new TestTunnelsHost(new AppSettings())
+        {
+            SharedGateways =
+            [
+                new SshGatewayDto { Id = sharedGatewayId, Name = "jdoe@gw1.example.test", Host = "gw1.example.test", User = "jdoe" }
+            ]
+        };
+        var stateMachine = new ConnectionStateMachine();
+        using var tunnelManager = new TunnelManager();
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        using var vm = CreateViewModel(host, new FakeConfigManager(new AppSettings()), tunnelManager, stateMachine, localizer);
+        var info = new TunnelInfo("gw1.example.test", 50153, "srv-db01.example.test", 22, DateTime.UtcNow, true);
+        Assert.True(tunnelManager.TryRegisterExternalTunnel(info, new TestDisposable(), () => true));
+        stateMachine.SetTunnelInfo("session-1", 50153, processId: 0);
+
+        Assert.Equal(
+            localizer.Format("SessionGatewayBadgeVia", "jdoe@gw1.example.test"),
+            vm.ResolveRoute("session-1", SharedSessionIds.PrefixFor("teamsource1") + "profile1"));
+
+        // The control: a local profile through the same tunnel has only the host to go by.
+        Assert.Equal(
+            localizer.Format("SessionGatewayBadgeVia", "gw1.example.test"),
+            vm.ResolveRoute("session-1", "local-profile-1"));
+    }
+
     [Fact]
     public void TunnelClosed_UpdatesBadgeStateForAllTabs()
     {
@@ -664,6 +697,8 @@ public sealed class TunnelsViewModelTests
         public AppSettings Settings { get; private set; } = settings;
 
         public AppSettings? CurrentSettings => Settings;
+
+        public IReadOnlyList<SshGatewayDto> SharedGateways { get; set; } = [];
 
         public string StatusText { get; set; } = string.Empty;
 

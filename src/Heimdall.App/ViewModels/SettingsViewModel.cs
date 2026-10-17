@@ -46,9 +46,6 @@ namespace Heimdall.App.ViewModels;
 /// </summary>
 public partial class SettingsViewModel : ObservableValidator, IDisposable
 {
-    private static bool HasUtf8Bom(byte[] bytes) =>
-        bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
-
     private static readonly JsonSerializerOptions ExportJsonOptions = new()
     {
         WriteIndented = true,
@@ -115,6 +112,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private bool _disposed;
 
     private int _mobaStoredCredentialCount;
+
+    // The gateways the last MobaXterm parse synthesized, persisted before the profiles that
+    // reference them. Empty for every other import format.
+    private IReadOnlyList<SshGatewayDto> _mobaGateways = [];
 
     private string _originalTheme = "";
     private string _originalAccentTint = "Default";
@@ -715,6 +716,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     /// <summary>The file name the server list export dialog proposes.</summary>
     private const string ServersExportDefaultFileName = "servers.json";
+
+    /// <summary>How many warning lines an import summary quotes before the count stands alone.</summary>
+    private const int MaxImportWarningLines = 10;
 
     /// <summary>The argument template a new external tool starts with: the host it is run against.</summary>
     private const string NewExternalToolArguments = "{Host}";
@@ -1366,9 +1370,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IBrowserLauncher browserLauncher,
         IProfileImportService? profileImportService = null,
         ICredentialGuardService? credentialGuardService = null,
-        TrustedWebCertificatesSettingsViewModel? trustedWebCertificates = null)
+        TrustedWebCertificatesSettingsViewModel? trustedWebCertificates = null,
+        Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
+        Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null)
     {
         _configManager = configManager;
+        _sharedSessions = sharedSessions;
+        _sharedSecrets = sharedSecrets;
         _localizer = localizer;
         _dialogService = dialogService;
         _pinManager = pinManager;
@@ -1393,6 +1401,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // The markers and the posture card are worded, so they follow the interface language.
         _localizer.LocaleChanged += OnPanelLocaleChanged;
+        SubscribeToSharedSessionProvider();
         RefreshSecurityPosture();
     }
 
@@ -1407,6 +1416,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         OnPropertyChanged(nameof(PinStatusText));
         OnPropertyChanged(nameof(VaultStatusText));
         OnPropertyChanged(nameof(AutoLockAvailabilityHint));
+
+        // The row errors are worded once, when the rows are validated.
+        RevalidateMobaXtermVariables();
+        RevalidateSharedSessionSources();
+        RefreshSharedSessionSourceStatuses();
     }
 
     /// <summary>
@@ -1887,6 +1901,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             SubscribeExternalToolTracking();
 
+            LoadMobaXtermUserVariables(settings);
+            LoadSharedSessionSources(settings);
+
             Gateways = new ObservableCollection<GatewayItemViewModel>(
                 settings.SshGateways.Select(g => new GatewayItemViewModel
                 {
@@ -2060,6 +2077,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // Dropped before the tools are measured again, so a fixed tool stops being reported.
         _externalToolsValidationError = null;
+        _mobaXtermVariablesValidationError = null;
+        _sharedSessionSourcesValidationError = null;
         RefreshValidationSummary();
 
         if (HasErrors)
@@ -2077,6 +2096,22 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         if (extToolError is not null)
         {
             _externalToolsValidationError = extToolError;
+            RefreshValidationSummary();
+            return false;
+        }
+
+        string? mobaXtermVariablesError = ValidateMobaXtermVariables();
+        if (mobaXtermVariablesError is not null)
+        {
+            _mobaXtermVariablesValidationError = mobaXtermVariablesError;
+            RefreshValidationSummary();
+            return false;
+        }
+
+        string? sharedSourcesError = ValidateSharedSessionSources();
+        if (sharedSourcesError is not null)
+        {
+            _sharedSessionSourcesValidationError = sharedSourcesError;
             RefreshValidationSummary();
             return false;
         }
@@ -2243,6 +2278,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Advanced / File sharing
         settings.FileShareEnableTftp = FileShareEnableTftp;
         settings.ExternalTools = externalTools;
+
+        // Import
+        settings.MobaXtermUserVariables = BuildMobaXtermUserVariables();
+        settings.SharedSessionSources = BuildSharedSessionSources();
     }
 
     private async Task PersistValidatedSettingsAsync(CancellationToken cancellationToken)
@@ -2273,8 +2312,16 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         AppSettings? written = null;
         IReadOnlyList<SshGatewayDto> parentChangesRefused = [];
+        bool clearSharedApprovals = _clearSharedApprovalsOnSave;
         await _configManager.MergeSettingAsync((AppSettings settings) =>
         {
+            // Not a panel value, so WritePanelInto never touches it: only the save that follows a
+            // factory reset clears the approvals, and nothing else writes them from here.
+            if (clearSharedApprovals)
+            {
+                settings.SharedPostConnectApprovals = new();
+            }
+
             if (deletedGatewayIds.Count > 0)
             {
                 foreach (GroupDefaultsDto defaults in settings.GroupDefaults.Values)
@@ -2312,6 +2359,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         _deletedGatewayIds.Clear();
         _editedGatewayIds.Clear();
+        if (clearSharedApprovals)
+        {
+            _clearSharedApprovalsOnSave = false;
+        }
 
         if (parentChangesRefused.Count > 0 && written is not null)
         {
@@ -2435,6 +2486,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // migration decline and the sidebar choice are state no Save writes, so a factory value
         // here only hid what is still on disk.
         defaults.ExternalTools = persisted.ExternalTools;
+        defaults.MobaXtermUserVariables = persisted.MobaXtermUserVariables;
+
+        // The sources are the user's own entries too. The approvals given to shared post-connect
+        // commands are trust, and a reset is how trust is withdrawn: they go at the next save.
+        defaults.SharedSessionSources = persisted.SharedSessionSources;
         defaults.CredentialProviderUnlockSecretEncrypted = persisted.CredentialProviderUnlockSecretEncrypted;
         defaults.UpdateSkippedVersion = persisted.UpdateSkippedVersion;
         defaults.LegacyMigrationDeclinedOfferVersion = persisted.LegacyMigrationDeclinedOfferVersion;
@@ -2447,6 +2503,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         bool savedTranscripts = _savedSessionLoggingEnabled;
 
         LoadFromSettings(defaults);
+        _clearSharedApprovalsOnSave = true;
         _originalLocale = localeToReturnTo;
         _originalTheme = themeToReturnTo;
         _originalAccentTint = accentToReturnTo;
@@ -2838,6 +2895,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             }
 
             _mobaStoredCredentialCount = 0;
+            _mobaGateways = [];
+            bool isMobaXterm = ext is ".mxtsessions" or ".ini" or ".mobaconf";
+            string warningsOneKey = isMobaXterm ? "ImportMobaXtermIssuesOne" : "ImportMobaXtermWarningsOne";
+            string warningsKey = isMobaXterm ? "ImportMobaXtermIssues" : "ImportMobaXtermWarnings";
             var (imported, importWarnings) = ext switch
             {
                 ".mxtsessions" or ".ini" or ".mobaconf" => await ImportMobaXtermAsync(filePath, cancellationToken),
@@ -2848,9 +2909,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             if (imported.Count == 0)
             {
-                _dialogService.ShowInfo(
-                    _localizer["ImportDialogTitle"],
-                    _localizer["ImportNoSessionsFound"]);
+                ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
                 return;
             }
 
@@ -2867,24 +2926,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             if (imported.Count == 0)
             {
-                if (validationFailures.Count > 0)
-                {
-                    string warningText = string.Join("\n", validationFailures.Take(10));
-                    string warningMessage = _localizer.FormatCount(
-                            validationFailures.Count,
-                            "ImportMobaXtermWarningsOne",
-                            "ImportMobaXtermWarnings",
-                            validationFailures.Count)
-                        + "\n" + warningText;
-                    _dialogService.ShowWarning(_localizer["ImportDialogTitle"], warningMessage);
-                }
-                else
-                {
-                    _dialogService.ShowInfo(
-                        _localizer["ImportDialogTitle"],
-                        _localizer["ImportNoSessionsFound"]);
-                }
-
+                ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
                 return;
             }
 
@@ -2909,12 +2951,23 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 return;
             }
 
+            if (_mobaGateways.Count > 0)
+            {
+                await PersistImportedGatewaysAsync(imported, _mobaGateways);
+            }
+
             var importResult = await _configManager.MutateServersAsync(existing =>
             {
                 int newCount = 0;
                 int updatedCount = 0;
                 foreach (ServerProfileDto server in imported)
                 {
+                    if (SharedSessionIds.IsShared(server.Id))
+                    {
+                        FileLogger.Warn(SharedSessionIds.DescribeRemint(server.Id));
+                        server.Id = string.Empty;
+                    }
+
                     if (string.IsNullOrEmpty(server.Id))
                     {
                         server.Id = Guid.NewGuid().ToString();
@@ -2953,13 +3006,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             if (importWarnings is { Count: > 0 })
             {
-                var warningText = string.Join("\n", importWarnings.Take(10));
-                statusMessage += "\n\n" + _localizer.FormatCount(
-                        importWarnings.Count,
-                        "ImportMobaXtermWarningsOne",
-                        "ImportMobaXtermWarnings",
-                        importWarnings.Count)
-                    + "\n" + warningText;
+                statusMessage += "\n\n" + FormatImportWarnings(importWarnings, warningsOneKey, warningsKey);
             }
 
             if (ext is ".mxtsessions" or ".ini" or ".mobaconf")
@@ -3028,12 +3075,113 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         string filePath, CancellationToken cancellationToken)
     {
         var bytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
-        var content = HasUtf8Bom(bytes)
-            ? System.Text.Encoding.UTF8.GetString(bytes)
-            : System.Text.Encoding.GetEncoding(1252).GetString(bytes);
-        var mobaResult = MobaXtermImporter.Parse(content);
+        string content = MobaXtermFileDecoder.Decode(bytes);
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        var options = new MobaXtermImportOptions
+        {
+            IdPrefix = MobaXtermImporter.DefaultIdPrefix,
+            VariableResolver = MobaXtermVariableResolver.FromVariables(settings.MobaXtermUserVariables),
+        };
+        MobaXtermImportResult mobaResult = MobaXtermImporter.Parse(content, options);
         _mobaStoredCredentialCount = mobaResult.StoredCredentialCount;
-        return (mobaResult.Servers, mobaResult.Warnings);
+        _mobaGateways = mobaResult.Gateways;
+        return (mobaResult.Servers, mobaResult.Warnings.Select(FormatMobaXtermWarning).ToList());
+    }
+
+    private string FormatMobaXtermWarning(MobaXtermImportWarning warning)
+    {
+        string key = warning.Kind switch
+        {
+            MobaXtermImportWarningKind.MalformedSessionLine => "ImportMobaXtermWarningMalformedLine",
+            MobaXtermImportWarningKind.UnsupportedSessionType => "ImportMobaXtermWarningUnsupportedType",
+            MobaXtermImportWarningKind.MissingHost => "ImportMobaXtermWarningMissingHost",
+            MobaXtermImportWarningKind.InvalidGatewayHost => "ImportMobaXtermWarningInvalidGatewayHost",
+            MobaXtermImportWarningKind.DuplicateSession => "ImportMobaXtermWarningDuplicateSession",
+            MobaXtermImportWarningKind.UnresolvedVariable => "ImportMobaXtermWarningUnresolvedVariable",
+            _ => "ImportMobaXtermWarningParseError",
+        };
+
+        return _localizer.Format(key, warning.Section, warning.SessionName, warning.Detail);
+    }
+
+    /// <summary>
+    /// The warning block of an import summary: the count, then the first few lines.
+    /// </summary>
+    private string FormatImportWarnings(IReadOnlyList<string> warnings, string oneKey, string otherKey) =>
+        _localizer.FormatCount(warnings.Count, oneKey, otherKey, warnings.Count)
+        + "\n"
+        + string.Join("\n", warnings.Take(MaxImportWarningLines));
+
+    /// <summary>
+    /// Ends an import that produced nothing to persist. When lines were skipped the user is told
+    /// which and why; only an import that skipped nothing says that no session was found.
+    /// </summary>
+    private void ShowImportWarningsOrNothingFound(
+        IReadOnlyList<string>? warnings,
+        string oneKey,
+        string otherKey)
+    {
+        if (warnings is { Count: > 0 })
+        {
+            _dialogService.ShowWarning(
+                _localizer["ImportDialogTitle"],
+                FormatImportWarnings(warnings, oneKey, otherKey));
+            return;
+        }
+
+        _dialogService.ShowInfo(_localizer["ImportDialogTitle"], _localizer["ImportNoSessionsFound"]);
+    }
+
+    /// <summary>
+    /// Persists the gateways the imported profiles reference, before the profiles themselves,
+    /// and points each profile at the gateway that was kept.
+    /// </summary>
+    /// <remarks>
+    /// Reconciled inside the settings write, against the gateways on disk at that instant: a
+    /// local gateway with the same host, port and user is reused rather than duplicated, and only
+    /// the gateways that are new are added. Writing the gateways first means an interrupted
+    /// import leaves an unused gateway, never a profile pointing at one that was not saved.
+    /// </remarks>
+    private async Task PersistImportedGatewaysAsync(
+        IReadOnlyList<ServerProfileDto> imported,
+        IReadOnlyList<SshGatewayDto> gateways)
+    {
+        HashSet<string> referencedIds = imported
+            .Select(server => server.SshGatewayId)
+            .OfType<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        List<SshGatewayDto> referenced = gateways
+            .Where(gateway => referencedIds.Contains(gateway.Id))
+            .ToList();
+        if (referenced.Count == 0)
+        {
+            return;
+        }
+
+        GatewayImportReconciliationResult? reconciliation = null;
+        await _configManager.MergeSettingAsync(settings =>
+        {
+            reconciliation = GatewayImportReconciler.Reconcile(settings.SshGateways, referenced, imported);
+            settings.SshGateways.AddRange(reconciliation.GatewaysToAdd);
+        });
+
+        if (reconciliation is null)
+        {
+            return;
+        }
+
+        foreach (ServerProfileDto server in imported)
+        {
+            if (server.SshGatewayId is not null
+                && reconciliation.GatewayIdMap.TryGetValue(server.SshGatewayId, out string? keptId))
+            {
+                server.SshGatewayId = keptId;
+            }
+        }
+
+        FileLogger.Info(
+            $"MobaXterm import gateways: {reconciliation.CreatedCount} created, "
+            + $"{reconciliation.MergedCount} reused, {reconciliation.OrphanReferences.Count} orphan reference(s).");
     }
 
     private async Task<(List<ServerProfileDto> Servers, List<string>? Warnings)> ImportRdcManAsync(
@@ -4019,6 +4167,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _disposed = true;
 
         UnsubscribeExternalToolTracking();
+        UnsubscribeMobaXtermVariableTracking();
+        UnsubscribeSharedSessionSourceTracking();
+        UnsubscribeFromSharedSessionProvider();
         _localizer.LocaleChanged -= OnPanelLocaleChanged;
         TrustedHostKeys.Dispose();
         TrustedRdpCertificates.Dispose();
@@ -4559,7 +4710,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // With several, the banner says how many: showing only the first read as "fix this one
         // and you are done", and the next Save then refused again over a field nobody had named.
         ValidationSummary = firstError is null
-            ? _externalToolsValidationError
+            ? _externalToolsValidationError ?? _mobaXtermVariablesValidationError ?? _sharedSessionSourcesValidationError
             : errorCount > 1
                 ? _localizer.Format("SettingsValidationSummaryCount", errorCount, firstError)
                 : firstError;

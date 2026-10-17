@@ -23,6 +23,7 @@ using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.ViewModels.Session;
 using Heimdall.App.ViewModels.Shell;
@@ -53,6 +54,16 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     private const int DefaultSshPort = 22;
 
     private readonly IConfigManager _configManager;
+    private readonly IProfileLookup _profileLookup;
+
+    /// <summary>Remembered and asked passwords of shared sessions; null keeps none.</summary>
+    private readonly SharedCredentialApplier? _sharedCredentials;
+
+    /// <summary>
+    /// The one way to find a profile by identifier, local inventory first, then the shared
+    /// sources. Shared with the session coordinator and the scheduler, which reach it through here.
+    /// </summary>
+    internal IProfileLookup ProfileLookup => _profileLookup;
     private readonly LocalizationManager _localizer;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly TimeProvider _timeProvider;
@@ -216,9 +227,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         ICredentialProviderFactory? credentialProviderFactory = null,
         IWindowsHelloService? windowsHelloService = null,
         TimeProvider? timeProvider = null,
-        ICredentialGuardService? credentialGuardService = null)
+        ICredentialGuardService? credentialGuardService = null,
+        IProfileLookup? profileLookup = null,
+        SharedCredentialApplier? sharedCredentials = null)
     {
         _configManager = configManager;
+        _sharedCredentials = sharedCredentials;
+        _profileLookup = profileLookup ?? Services.SharedSessions.ProfileLookup.LocalOnly(configManager);
         _localizer = localizer;
         _uiDispatcher = uiDispatcher;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -239,6 +254,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         InitializeSelectionModel();
         _connectionSm.StateChanged += OnConnectionStateChanged;
         _configManager.SettingsChanged += OnSettingsChanged;
+        SubscribeToSharedSessions();
         if (_healthMonitor is not null)
         {
             _healthMonitor.StatusChanged += OnServerHealthChanged;
@@ -275,10 +291,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
             _currentSettings = settings;
             ApplyPersistedViewPreferences(settings);
+            ReloadSharedSessionsIfSourcesChanged(settings);
             SessionGatewayContext gateways = SessionGatewayContext.FromSettings(settings);
+            SessionGatewayContext sharedGateways = SharedGatewayContext(settings);
             foreach (ServerItemViewModel server in _allServers)
             {
-                server.RefreshGatewayState(gateways);
+                server.RefreshGatewayState(server.IsShared ? sharedGateways : gateways);
             }
 
             RefreshLookupCollections(settings);
@@ -415,6 +433,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         _connectionSm.StateChanged -= OnConnectionStateChanged;
         _configManager.SettingsChanged -= OnSettingsChanged;
+        UnsubscribeFromSharedSessions();
         if (_healthMonitor is not null)
         {
             _healthMonitor.StatusChanged -= OnServerHealthChanged;
@@ -483,6 +502,29 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         return true;
     }
 
+    /// <summary>
+    /// Asks whether the post-connect commands of a shared session may run. Persists nothing: the
+    /// caller records the approval against the commands it was given.
+    /// </summary>
+    internal Task<bool> ConfirmSharedPostConnectAsync(ServerProfileDto profile, int commandCount)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        string body = _localizer.FormatCount(
+            commandCount,
+            "ConfirmPostConnectSharedBodyOne",
+            "ConfirmPostConnectSharedBody",
+            profile.DisplayName,
+            commandCount,
+            string.Join(Environment.NewLine, profile.PostConnectSteps
+                .Where(step => step.Enabled && !string.IsNullOrWhiteSpace(step.Input))
+                .Select(step => step.Input)));
+        return _dialogService.ShowConfirmAsync(
+            _localizer["ConfirmPostConnectSharedTitle"],
+            body,
+            "warning");
+    }
+
     private async Task PersistExecutionTrustAsync(ServerProfileDto profile)
     {
         try
@@ -525,6 +567,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         _currentSettings = settings;
 
+        // The startup load read the shared sources from these settings; a later change is measured
+        // against them.
+        _sharedSourcesSignature ??= SharedSourcesSignature(settings);
+
         // Nothing selected yet is a fresh start: open on the session the previous run left
         // selected. A reload after a folder operation keeps whatever is selected now.
         var selectedServerId = EffectiveSelectedServerId ?? settings.LastSelectedServerId;
@@ -563,6 +609,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 gateways,
                 _localizer))
             .ToList();
+        _allServers.AddRange(BuildSharedRows(
+            _allServers.Select(server => server.Id).ToHashSet(StringComparer.Ordinal),
+            settings));
         foreach (ServerItemViewModel server in _allServers)
         {
             if (healthById.TryGetValue(server.Id, out HealthState? health))
@@ -572,6 +621,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         RebuildHealthServerIndex();
+        OnPropertyChanged(nameof(SharedServerCount));
 
         RefreshLookupCollections(settings);
         IsSidebarVisible = !settings.SidebarCollapsed;
@@ -647,6 +697,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         // session's own - the one the tree displays - and sorting the union rather than only the
         // in-use half stops empty folders from piling up at the bottom in settings order.
         var groupTargets = _allServers
+            .Where(server => !server.IsShared)
             .Select(server => server.Group)
             .Concat(_currentSettings?.EmptyGroups ?? [])
             .Where(path => !string.IsNullOrWhiteSpace(path))
@@ -924,7 +975,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         ArgumentException.ThrowIfNullOrWhiteSpace(originalServerId);
 
         var server = Servers.FirstOrDefault(
-            candidate => string.Equals(candidate.Id, originalServerId, StringComparison.OrdinalIgnoreCase));
+            candidate => string.Equals(candidate.Id, originalServerId, StringComparison.OrdinalIgnoreCase))
+            ?? await FindSharedServerItemAsync(originalServerId);
 
         if (server is null)
         {
@@ -939,6 +991,42 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             rdpModeOverride,
             allowCredentialPrompt: false,
             failureReport);
+    }
+
+    /// <summary>
+    /// The row a shared profile stands for, built from the lookup; null for an identifier outside
+    /// the shared namespace or a shared profile no source holds.
+    /// </summary>
+    /// <remarks>
+    /// The tree's own row when it lists the session. Otherwise (the tree not loaded yet, or the
+    /// source reloaded since) a row is built here: it carries the profile's identifier, and the
+    /// connection resolves the profile itself through the lookup again.
+    /// </remarks>
+    internal async Task<ServerItemViewModel?> FindSharedServerItemAsync(string serverId)
+    {
+        if (SharedSessionIds.IsShared(serverId)
+            && _allServers.FirstOrDefault(
+                candidate => string.Equals(candidate.Id, serverId, StringComparison.Ordinal)) is { } listed)
+        {
+            return listed;
+        }
+
+        if (!SharedSessionIds.IsShared(serverId)
+            || await _profileLookup.FindAsync(serverId) is not { } shared
+            || !SharedSessionIds.IsSharedProfile(shared))
+        {
+            return null;
+        }
+
+        AppSettings settings = _profileLookup.EffectiveSettingsFor(
+            shared,
+            _currentSettings ?? await _configManager.LoadSettingsAsync());
+        return ServerItemViewModel.FromDto(
+            shared,
+            ResolveProject(BuildProjectMap(settings), shared.ProjectId),
+            _connectionSm.GetState(shared.Id).ToString(),
+            SessionGatewayContext.FromSettings(settings),
+            _localizer);
     }
 
     /// <inheritdoc />
@@ -975,9 +1063,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         try
         {
 
-            var servers = await _configManager.LoadServersAsync();
-            var serverDto = servers.FirstOrDefault(
-                s => string.Equals(s.Id, server.Id, StringComparison.Ordinal));
+            var serverDto = await _profileLookup.FindAsync(server.Id);
 
             if (serverDto is null)
             {
@@ -989,7 +1075,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             // several, one per restored session. The copy is detached and never saved.
             serverDto.AllowCredentialPrompt = allowCredentialPrompt;
 
-            var settings = await _configManager.LoadSettingsAsync();
+            // A shared profile's gateways live in memory only: the connection gets a copy of the
+            // settings holding them, and the canonical settings stay as they are on disk.
+            var settings = _profileLookup.EffectiveSettingsFor(
+                serverDto,
+                await _configManager.LoadSettingsAsync());
 
             if (!await EnforceCredentialGuardAsync(
                     serverDto,
@@ -1021,6 +1111,23 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 settings,
                 cancellationToken,
                 skipOnFailure: false);
+
+            // After the gate and after the vault: a shared session takes the passwords its user
+            // chose to remember, and is asked for the ones it needs and has no other way to get.
+            SharedCredentialApplier.SharedCredentialPlan? sharedCredentials = null;
+            if (_sharedCredentials is not null && SharedSessionIds.IsSharedProfile(serverDto))
+            {
+                sharedCredentials = await _sharedCredentials.ApplyAsync(
+                    serverDto,
+                    settings,
+                    allowCredentialPrompt,
+                    cancellationToken);
+                if (sharedCredentials is null)
+                {
+                    StatusMessageRequested?.Invoke(_localizer["StatusSharedPasswordCancelled"]);
+                    return false;
+                }
+            }
 
             // Generate a unique session ID so duplicate connections to the same server
             // get independent state tracking (tunnel lifecycle, error recovery)
@@ -1063,6 +1170,15 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 server,
                 cancellationToken,
                 rdpModeOverride);
+
+            if (sharedCredentials is not null)
+            {
+                await sharedCredentials.SettleAsync(
+                    outcome.Status == BulkConnectOutcomeStatus.Success,
+                    outcome.Authenticated,
+                    outcome.Failure?.Code,
+                    outcome.Failure?.Stage == Core.SessionDiagnostics.SessionFailureStage.SshGateway);
+            }
 
             return outcome.Status switch
             {
@@ -1271,7 +1387,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     result.Session,
                     rdpModeOverride);
                 lifecycleHandedOff = result.Session is not null;
-                return new BulkConnectOutcome(BulkConnectOutcomeStatus.Success, null);
+                return new BulkConnectOutcome(
+                    BulkConnectOutcomeStatus.Success,
+                    null,
+                    Authenticated: result.Session is SshSessionResult);
             }
 
             server.ConnectionState = "Error";
@@ -1706,7 +1825,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     [RelayCommand]
     private async Task EditServerAsync(ServerItemViewModel? server, CancellationToken cancellationToken)
     {
-        if (server is null)
+        if (server is null || !EnsureNoSharedRows([server]))
         {
             return;
         }
@@ -1717,6 +1836,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         if (serverDto is null)
         {
+            // A shared session is edited in MobaXterm, in the file it comes from: said so rather
+            // than doing nothing, which reads as a broken button.
+            if (SharedSessionIds.IsShared(server.Id))
+            {
+                StatusMessageRequested?.Invoke(_localizer["StatusSharedSessionReadOnly"]);
+            }
+
             return;
         }
 
@@ -1820,11 +1946,25 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serverId);
 
+        // A shared session is in the tree now, so it is answered before its row is found.
+        if (SharedSessionIds.IsShared(serverId))
+        {
+            StatusMessageRequested?.Invoke(_localizer["StatusSharedSessionReadOnly"]);
+            return true;
+        }
+
         var server = _allServers.FirstOrDefault(
             candidate => string.Equals(candidate.Id, serverId, StringComparison.Ordinal));
 
         if (server is null)
         {
+            // The disconnect overlay's "Edit profile" on a shared session: answered, not ignored.
+            if (SharedSessionIds.IsShared(serverId))
+            {
+                StatusMessageRequested?.Invoke(_localizer["StatusSharedSessionReadOnly"]);
+                return true;
+            }
+
             return false;
         }
 
@@ -1835,7 +1975,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     [RelayCommand]
     private async Task DeleteServerAsync(ServerItemViewModel? server, CancellationToken cancellationToken)
     {
-        if (server is null)
+        if (server is null || !EnsureNoSharedRows([server]))
         {
             return;
         }
@@ -1862,7 +2002,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     [RelayCommand]
     private async Task DuplicateServerAsync(ServerItemViewModel? server, CancellationToken cancellationToken)
     {
-        if (server is null)
+        if (server is null || !EnsureNoSharedRows([server]))
         {
             return;
         }
@@ -2053,6 +2193,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(server);
+        if (!EnsureNoSharedRows([server]))
+        {
+            return false;
+        }
+
         return await MoveServersToGroupCoreAsync([server], targetGroup, cancellationToken);
     }
 
@@ -2062,6 +2207,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(server);
+        if (!EnsureNoSharedRows([server]))
+        {
+            return false;
+        }
+
         return await MoveServersToProjectCoreAsync([server], targetProjectId, cancellationToken) > 0;
     }
 
@@ -2295,7 +2445,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         Groups = new ObservableCollection<string>(
             _allServers
-                .Where(server => !string.IsNullOrWhiteSpace(server.Group))
+                .Where(server => !server.IsShared && !string.IsNullOrWhiteSpace(server.Group))
                 .Select(server => server.Group)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(name => name, DisplayNameOrdering.Comparer));
@@ -2715,7 +2865,16 @@ internal enum ConnectFailureReport
     Silent
 }
 
+/// <param name="Status">How the attempt ended.</param>
+/// <param name="ErrorMessage">Why it failed, in words; null on success.</param>
+/// <param name="Failure">The structured failure, when the handler classified one.</param>
+/// <param name="Authenticated">
+/// Whether the server accepted the credentials before the attempt returned. A Plink or an external
+/// terminal returns once the process started, before it signed in, so its success says nothing of
+/// the password.
+/// </param>
 internal readonly record struct BulkConnectOutcome(
     BulkConnectOutcomeStatus Status,
     string? ErrorMessage,
-    SessionDiagnostic? Failure = null);
+    SessionDiagnostic? Failure = null,
+    bool Authenticated = false);

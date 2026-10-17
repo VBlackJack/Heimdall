@@ -18,6 +18,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading;
 using Heimdall.App.Services;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
 using Heimdall.App.Views.EmbeddedRdp;
@@ -2047,7 +2048,8 @@ public sealed class SplitServiceTests : IDisposable
 
     private SplitService CreateSplitService(
         IConnectionService connectionService,
-        IEmbeddedSessionManager sessionManager)
+        IEmbeddedSessionManager sessionManager,
+        IProfileLookup? profileLookup = null)
         => new(
             _configManager,
             _localizer,
@@ -2057,7 +2059,43 @@ public sealed class SplitServiceTests : IDisposable
             connectionService,
             _toolRegistry,
             dialogService: null!,
-            closeArbiter: new PaneCloseArbiter());
+            closeArbiter: new PaneCloseArbiter(),
+            profileLookup);
+
+    [Fact]
+    public async Task SplitSessionWithServerAsync_SharedProfile_ResolvesThroughTheLookupWithSharedGateways()
+    {
+        SharedSessionTestData shared = SharedSessionTestData.Create();
+        RecordingConnectionService connectionService = new RecordingConnectionService(stateMachine: _connectionSm);
+        SplitService sut = CreateSplitService(
+            connectionService,
+            new FakeEmbeddedSessionManager(),
+            new ProfileLookup(_configManager, shared.Provider));
+
+        SessionPaneModel primaryPane = MakePane(
+            paneId: "primary-pane",
+            serverId: "primary-runtime",
+            connectionType: "SSH");
+        SessionTabViewModel session = new SessionTabViewModel { RootContent = primaryPane };
+        ObservableCollection<SessionTabViewModel> activeSessions = new ObservableCollection<SessionTabViewModel>
+        {
+            session
+        };
+        sut.ActiveSessionsProvider = () => activeSessions;
+
+        await sut.SplitSessionWithServerAsync(
+            session,
+            shared.Profile.Id,
+            SplitOrientation.Vertical,
+            primaryPane.PaneId);
+
+        Assert.True(connectionService.ConnectInvoked);
+        Assert.Equal(shared.Profile.InventoryProfileId, connectionService.LastServer!.InventoryProfileId);
+        Assert.Contains(connectionService.LastSshSettings!.SshGateways, gateway => gateway.Id == shared.Gateway.Id);
+        Assert.DoesNotContain(
+            (await _configManager.LoadSettingsAsync()).SshGateways,
+            gateway => SharedSessionIds.IsShared(gateway.Id));
+    }
 
     private void RegisterTrackedTunnel(string serverId, int localPort)
     {
@@ -2267,6 +2305,7 @@ public sealed class SplitServiceTests : IDisposable
         public ConnectionState? WinRmStateAtDispatch { get; private set; }
         public string? WinRmServerIdAtDispatch { get; private set; }
         public ConnectionState? SshStateAtDispatch { get; private set; }
+        public AppSettings? LastSshSettings { get; private set; }
 
         public AppSettings? CurrentSettings => null;
 
@@ -2279,6 +2318,7 @@ public sealed class SplitServiceTests : IDisposable
             CancellationToken ct = default)
         {
             SshStateAtDispatch = _stateMachine?.GetState(server.Id);
+            LastSshSettings = settings;
             return RecordConnectAsync("SSH", server, ct);
         }
 

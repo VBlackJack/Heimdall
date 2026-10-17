@@ -133,6 +133,10 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
         MoveSelectedToProjectCommand.NotifyCanExecuteChanged();
         MoveSelectedToGroupCommand.NotifyCanExecuteChanged();
         BulkEditGatewayCommand.NotifyCanExecuteChanged();
+        BulkEditPortCommand.NotifyCanExecuteChanged();
+        BulkEditUsernameCommand.NotifyCanExecuteChanged();
+        BulkEditPasswordCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(SelectionHasShared));
         OnPropertiesPanelSelectionChanged();
     }
 
@@ -345,6 +349,14 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
             _suppressSelectedServerSync = false;
         }
     }
+
+    /// <summary>
+    /// <see cref="NormalizeSelection"/> without the shared rows: what a write may touch. The entry
+    /// points have already refused a shared row aloud; this keeps a core reached another way from
+    /// writing one.
+    /// </summary>
+    private List<ServerItemViewModel> NormalizeMutableSelection(IReadOnlyList<ServerItemViewModel> requestedItems) =>
+        NormalizeSelection(requestedItems).Where(item => !item.IsShared).ToList();
 
     private List<ServerItemViewModel> NormalizeSelection(IReadOnlyList<ServerItemViewModel> requestedItems)
     {

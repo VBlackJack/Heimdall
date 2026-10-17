@@ -24,6 +24,7 @@ using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.Import;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SessionSnapshot;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.CommandPalette;
 using Heimdall.App.ViewModels.Dialogs;
@@ -902,6 +903,23 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ExternalToolLaunchService>();
         services.AddSingleton<IHealthProbe, TcpHealthProbe>();
         services.AddSingleton<IWebHealthProbe, HttpHealthProbe>();
+
+        // Shared MobaXterm sessions: one provider holds them in memory, and every read path finds
+        // profiles through the one lookup (servers.json first, then the shared sources).
+        // The offline copies live in the data root of this process, and the files are watched: a
+        // test builds its provider without either.
+        // The passwords a user chose to remember for them are kept beside, never in the settings.
+        services.AddSingleton(_ => SharedSessionSecretStore.ForDataRoot());
+        services.AddSingleton<ISharedSessionProvider>(sp => new SharedSessionProvider(
+            sp.GetRequiredService<LocalizationManager>(),
+            SharedSessionSourceCache.ForDataRoot(),
+            watchSourceFiles: true,
+            secrets: sp.GetRequiredService<SharedSessionSecretStore>()));
+        services.AddSingleton(sp => new SharedCredentialApplier(
+            sp.GetRequiredService<SharedSessionSecretStore>(),
+            sp.GetRequiredService<IDialogService>(),
+            sp.GetRequiredService<LocalizationManager>()));
+        services.AddSingleton<IProfileLookup, ProfileLookup>();
         services.AddSingleton<SessionHealthMonitor>();
         services.AddSingleton<NetworkScannerService>();
         services.AddSingleton<ToolsTabPopulationService>();

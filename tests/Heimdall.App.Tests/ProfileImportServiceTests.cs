@@ -123,6 +123,37 @@ public sealed class ProfileImportServiceTests
         Assert.False(AdHocProfileIds.IsAdHoc(stored.Id));
     }
 
+    // The shared session namespace is reserved the same way: a file carrying such an identifier
+    // would otherwise stand in for a shared session, and the configuration manager refuses it as
+    // an arrival, failing the whole import over one entry.
+    [Theory]
+    [InlineData("shared-teamfile1-0123456789abcdef")]
+    [InlineData("shared-anything")]
+    public async Task ImportFromPathAsync_Json_RemintsAnIdentifierInTheSharedSessionNamespace(
+        string reservedId)
+    {
+        using ProfileImportFixture fixture = new();
+        string path = await fixture.WriteJsonAsync("servers.json",
+        [
+            new ServerProfileDto
+            {
+                Id = reservedId,
+                DisplayName = "Lab",
+                ConnectionType = "RDP",
+                RemoteServer = "lab.example",
+                RemotePort = 3389
+            }
+        ]);
+
+        var result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+        var servers = await fixture.ConfigManager.LoadServersAsync();
+
+        Assert.True(result.HasChanges);
+        var stored = Assert.Single(servers);
+        Assert.Equal("Lab", stored.DisplayName);
+        Assert.False(SharedSessionIds.IsShared(stored.Id));
+    }
+
     // The control that keeps the assertions above meaningful: an ordinary identifier IS preserved,
     // so the reminting measures the reservation and not a service that remints everything.
     [Fact]

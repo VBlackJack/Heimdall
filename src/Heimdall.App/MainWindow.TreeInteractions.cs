@@ -907,6 +907,17 @@ public partial class MainWindow
             vm.ServerList.SelectionCount,
             IsInlineRenameEditorSource(e.OriginalSource as DependencyObject));
 
+        // A selection holding a shared session is refused here, aloud. Left unhandled, the press
+        // would reach the window-level shortcut, which deletes the one selected session.
+        if (deleteHandled && deleteSelection && vm.ServerList.SelectionHasShared)
+        {
+            e.Handled = true;
+            vm.StatusText = vm.ServerList.DescribeSharedRefusal(
+                vm.ServerList.SelectedItems.Count(item => item.IsShared),
+                vm.ServerList.SelectionCount);
+            return;
+        }
+
         if (!deleteHandled
             || (deleteSelection && !vm.ServerList.DeleteSelectedCommand.CanExecute(null)))
         {
@@ -1132,6 +1143,20 @@ public partial class MainWindow
         if (node is not IInlineRenameNode editableNode)
         {
             return false;
+        }
+
+        // F2 on a shared row or folder is answered, not ignored: a key that does nothing reads as
+        // a broken key.
+        if (SessionTreeInlineRename.IsReadOnly(node))
+        {
+            if (DataContext is MainViewModel readOnlyViewModel)
+            {
+                readOnlyViewModel.StatusText = node is FolderViewModel
+                    ? readOnlyViewModel.Localize("StatusSharedFolderReadOnly")
+                    : readOnlyViewModel.Localize("StatusSharedSessionReadOnly");
+            }
+
+            return true;
         }
 
         if (_inlineRenameNode is not null && !ReferenceEquals(_inlineRenameNode, editableNode))
@@ -1546,6 +1571,19 @@ public partial class MainWindow
 
         try
         {
+            // A shared row or folder never leaves its source; the refusal is said once, as the
+            // drag would have started.
+            if (!TreeInteractionState.CanStartDrag(
+                    sourceItem,
+                    sourceItem is ServerItemViewModel pressed ? vm.ServerList.ResolveDragSelection(pressed) : null))
+            {
+                _treeState.ResetDrag();
+                vm.StatusText = sourceItem is FolderViewModel
+                    ? vm.Localize("StatusSharedFolderReadOnly")
+                    : vm.Localize("StatusSharedSessionMoveRefused");
+                return;
+            }
+
             // DoDragDrop runs its own loop until the drop: the drop zone shows for exactly that long.
             vm.ServerList.IsTreeDragInProgress = true;
             switch (sourceItem)
@@ -2042,6 +2080,12 @@ public partial class MainWindow
         ArgumentNullException.ThrowIfNull(folder);
         if (DataContext is not MainViewModel vm)
         {
+            return;
+        }
+
+        if (folder.IsShared || ServerListViewModel.IsSharedFolderKey(targetParentPath))
+        {
+            vm.StatusText = vm.Localize("StatusSharedFolderReadOnly");
             return;
         }
 

@@ -30,6 +30,11 @@
     "plinkPortCheckIntervalMs": 2000,
     "plinkKillGracePeriodMs": 2000,
     "sftpUploadDebounceMs": 2000,
+    "sharedSourceReloadDebounceMs": 1500,
+    "sharedSourceReloadRetryCount": 5,
+    "sharedSourceReloadRetryDelayMs": 1000,
+    "sharedReportGatewayMajorityPercent": 60,
+    "sharedReportGatewayMinFolderSessions": 3,
     "serverShutdownTimeoutMs": 2000,
     "sleepPreventionIntervalSeconds": 60,
     "fileLoggerFlushIntervalMs": 2000,
@@ -98,6 +103,11 @@
     "treeExpandedNodes": [],
     "tunnelGridColumnWidths": null,
     "emptyGroups": [],
+    "mobaXtermUserVariables": {
+        "DAS": "%USERNAME%"
+    },
+    "sharedSessionSources": [],
+    "sharedPostConnectApprovals": {},
     "scheduledTasks": [],
     "groupDefaults": {},
     "sshGateways": [],

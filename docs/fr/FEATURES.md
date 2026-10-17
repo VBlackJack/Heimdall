@@ -326,7 +326,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 041 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 166 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -374,6 +374,101 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 ### Import et migration
 - Migration depuis Heimdall v1 (identifiants chiffrés DPAPI préservés)
 - Import depuis JSON, MobaXterm (.mxtsessions / .ini), mRemoteNG (.xml), RDCMan (.rdg) et fichiers .rdp
+- Fichiers de sessions MobaXterm (Paramètres > Import) :
+  - Les sessions SSH et RDP sont importées. Tout autre type de session MobaXterm (FTP, SFTP, VNC,
+    Telnet, WSL et autres) est signalé comme non pris en charge dans le résumé d'import, avec sa
+    section INI et le nom de la session ; aucune ligne n'est écartée sans avertissement
+  - Les champs de rebond d'une session (hôte, port et utilisateur de passerelle) deviennent une
+    passerelle SSH. Les sessions qui partagent un rebond partagent une passerelle, et une passerelle
+    locale de même hôte, port et utilisateur est réutilisée au lieu d'être dupliquée. Une session
+    sans rebond se connecte en direct
+  - Les variables comme `[DAS]` dans un champ utilisateur sont résolues depuis le réglage
+    `MobaXtermUserVariables` (par défaut `DAS` = `%USERNAME%`, variables d'environnement
+    développées), modifiable dans Paramètres > Général > Variables d'import MobaXterm, qui affiche
+    ce que devient chaque valeur. Une variable non résolue est conservée telle quelle et signalée
+    dans le résumé d'import
+  - La commande de connexion (par exemple `sudo su - www`) devient une étape post-connexion. Le
+    profil est importé avec `ExecutionConfirmed = false`, donc Heimdall demande confirmation avant
+    de la saisir dans la session
+  - Le commentaire de la session devient les étiquettes du profil, séparées par des virgules
+  - Les chemins de clé SSH ne sont jamais importés : ils appartiennent à la machine qui a écrit le
+    fichier, et un chemin UNC ferait s'authentifier cette machine auprès d'un serveur de fichiers
+    distant à la lecture de la clé
+  - Les identifiants des profils et des passerelles sont dérivés du fichier (dossier et nom de
+    session ; hôte, port et utilisateur), donc réimporter le même fichier remplace les profils créés
+    la fois précédente, y compris les modifications locales qui leur ont été apportées
+  - Les mots de passe enregistrés par MobaXterm ne sont pas importés (chiffrement propriétaire) ; le
+    résumé d'import les compte
+- Sources de sessions MobaXterm partagées (Paramètres > Général > Sources de sessions partagées) ;
+  un guide pas à pas pour les équipes qui viennent de MobaXterm est dans
+  [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md) :
+  - Une source est un nom et le chemin d'un fichier `.mxtsessions`, en général sur un partage
+    d'équipe ou un dossier synchronisé ; les variables d'environnement sont acceptées
+    (`%OneDriveCommercial%\...`). Chaque source activée est lue au démarrage et apparaît dans
+    l'arborescence des sessions comme une racine à part, sous les dossiers locaux, avec sa propre
+    icône. Ses dossiers MobaXterm se rangent dessous, et un dossier local du même nom n'est jamais
+    fusionné avec un dossier partagé
+  - Les sessions partagées sont en lecture seule dans Heimdall et continuent d'être modifiées dans
+    MobaXterm : elles se connectent, s'ouvrent en vue scindée, copient leur hôte et affichent leur
+    état comme toute autre session, mais ne peuvent être ni modifiées, ni renommées, ni dupliquées,
+    ni déplacées, ni réordonnées, ni supprimées, ni mises en favori, et rien ne se glisse hors d'un
+    dossier partagé ni dedans. Un cadenas sur la ligne nomme la source. Une sélection qui contient
+    une session partagée garde Connecter et refuse les autres actions groupées, en disant combien de
+    sessions partagées elle contient
+  - Une source illisible (fichier absent, illisible ou trop volumineux) garde sa racine dans
+    l'arborescence avec une marque d'erreur et la raison au survol, et n'affiche aucune session
+  - La carte des paramètres indique ce que chaque source contient après sa dernière lecture.
+    **Recharger** relit les sources enregistrées et actualise l'arborescence sans redémarrage ;
+    enregistrer une modification des sources ou des variables d'import MobaXterm les recharge aussi
+  - Les commandes post-connexion d'une session partagée s'approuvent par utilisateur : Heimdall
+    demande avant de les saisir, retient l'approbation pour ces commandes exactes, et redemande quand
+    le fichier partagé les change. Les approbations sont une confiance personnelle : elles ne sont
+    jamais exportées ni importées avec les paramètres, et **Valeurs par défaut** les efface tout en
+    conservant les sources elles-mêmes
+  - L'en-tête de session nomme la passerelle partagée par laquelle passe une session partagée
+  - Rechargement automatique : le fichier de chaque source activée est surveillé (y compris les
+    enregistrements atomiques des éditeurs et des clients de synchronisation, qui écrivent un fichier
+    temporaire puis le renomment par-dessus l'original). Une fois le fichier resté calme pendant
+    `SharedSourceReloadDebounceMs` (1500 ms par défaut), cette source seule est relue et
+    l'arborescence suit, en gardant les dossiers dépliés et la sélection ; la ligne d'état indique
+    "Sessions partagées mises à jour : <nom>, N sessions". Un fichier verrouillé ou à moitié écrit
+    est relu jusqu'à `SharedSourceReloadRetryCount` fois (5 par défaut), à
+    `SharedSourceReloadRetryDelayMs` d'intervalle (1000 ms par défaut). S'il reste illisible, ne se
+    lit pas comme un fichier de sessions ou ne contient soudain plus aucune session, les sessions
+    précédentes sont conservées et la source dit pourquoi : une source qui fonctionne n'est jamais
+    remplacée par une source vide. Un rechargement ne touche jamais aux sessions ouvertes ; si une
+    session disparaît du fichier pendant qu'elle est ouverte, elle reste ouverte, et une reconnexion
+    ultérieure indique que le profil est introuvable
+  - Copie hors ligne : après chaque lecture réussie, le fichier brut et sa provenance (chemin, heure,
+    SHA-256) sont conservés dans `SharedSessionCache` sous le dossier de données, avec les mêmes ACL
+    restreintes que les fichiers de configuration. Quand le fichier est absent ou illisible, les
+    sessions sont lues depuis cette copie, par le même analyseur et le même filtrage que le fichier
+    lui-même. La racine de la source affiche alors "copie hors ligne du <date>", avec la raison au
+    survol, et la carte des paramètres indique la même chose. Supprimer une source supprime sa
+    copie ; les copies ne sont jamais écrites dans servers.json, dans un export des paramètres ni
+    dans le dépôt
+  - Rapport d'import : chaque lecture réussie d'une source produit un rapport de ce que son fichier
+    contient et que ses responsables voudront peut-être corriger. Il est informatif : il n'empêche
+    jamais une session de se charger et n'en modifie aucune. Il liste, avec le dossier, la session
+    et une courte explication :
+    - les sessions ignorées et pourquoi (type non pris en charge, hôte absent, passerelle
+      inutilisable, nom en double dans un dossier, ligne mal formée, ou refus par le filtrage des
+      sessions partagées)
+    - les variables `[NOM]` non résolues
+    - nom et hôte différents : le nom de la session n'est ni l'hôte ni le premier élément de l'hôte
+      (ce qui précède le premier point), sans tenir compte de la casse ; un hôte donné par une adresse
+      IP n'est pas vérifié
+    - passerelles inhabituelles : dans un dossier d'au moins `SharedReportGatewayMinFolderSessions`
+      sessions (3 par défaut) où un même chemin (une passerelle, ou une connexion directe) est pris
+      par au moins `SharedReportGatewayMajorityPercent` pour cent d'entre elles (60 par défaut), les
+      sessions qui prennent un autre chemin ; un dossier sans telle majorité n'en a aucune
+    - hôtes en double : deux sessions ou plus d'un même dossier qui joignent le même hôte
+  - La racine de la source dans l'arborescence affiche le nombre de problèmes à côté de son nom, et
+    son menu contextuel propose **Afficher le rapport d'import** ; la carte des paramètres a un
+    bouton **Rapport** sur chaque source qui a des constats. Les deux ouvrent la même fenêtre en
+    lecture seule : le nombre de constats par vérification, puis les constats par vérification, avec
+    **Copier** (texte brut) et **Exporter en CSV** (chaque cellule neutralisée contre l'injection de
+    formules). Quand un rechargement change le nombre de problèmes, la ligne d'état l'indique
 - Les imports de sessions JSON ne contiennent que des profils de serveurs. Les définitions de passerelles SSH vivent dans `settings.json`
   (`AppSettings.SshGateways`), si bien que des jeux de test comme `Heimdall-TestEnv` doivent injecter la
   passerelle correspondante dans la configuration de build d'exécution exacte avant que les sessions tunnelisées puissent la résoudre.

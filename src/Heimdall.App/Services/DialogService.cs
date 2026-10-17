@@ -97,6 +97,25 @@ public interface IDialogService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Shows the password input dialog with a choice to remember the password on this computer.
+    /// </summary>
+    /// <param name="title">Dialog title.</param>
+    /// <param name="prompt">Descriptive prompt label.</param>
+    /// <param name="rememberLabel">The label of the remember choice.</param>
+    /// <param name="cancellationToken">Cancellation token checked before showing the dialog.</param>
+    /// <returns>The entered password and the choice, or null if the user cancelled.</returns>
+    /// <remarks>A test double that only answers the plain prompt never remembers.</remarks>
+    async Task<PasswordPromptResult?> ShowPasswordInputWithRememberAsync(
+        string title,
+        string prompt,
+        string rememberLabel,
+        CancellationToken cancellationToken = default)
+    {
+        string? password = await ShowPasswordInputAsync(title, prompt, cancellationToken).ConfigureAwait(false);
+        return password is null ? null : new PasswordPromptResult(password, Remember: false);
+    }
+
+    /// <summary>
     /// Shows the server add/edit dialog.
     /// </summary>
     /// <param name="editVm">Pre-populated ViewModel for edit mode, or null for add mode.</param>
@@ -195,6 +214,16 @@ public interface IDialogService
     Task ShowTrustedHostKeyDetailsAsync(TrustedHostKeyDetailsDialogViewModel viewModel);
 
     /// <summary>
+    /// Shows the read-only import report of a shared session source. Returns once it is closed.
+    /// </summary>
+    /// <remarks>A test double that does not show dialogs has nothing to show it in.</remarks>
+    Task ShowSharedSessionImportReportAsync(SharedSessionImportReportDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Shows known_hosts import conflicts and returns the user's resolution,
     /// or <c>null</c> when the dialog is cancelled.
     /// </summary>
@@ -272,3 +301,8 @@ public interface IDialogService
     /// <param name="message">Warning details.</param>
     void ShowWarning(string title, string message);
 }
+
+/// <summary>A password typed in the password input dialog, and whether to remember it.</summary>
+/// <param name="Password">The password; may be empty.</param>
+/// <param name="Remember">Whether the user chose to remember it on this computer.</param>
+public sealed record PasswordPromptResult(string Password, bool Remember);

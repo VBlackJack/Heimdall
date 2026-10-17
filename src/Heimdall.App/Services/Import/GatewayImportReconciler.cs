@@ -77,7 +77,17 @@ internal static class GatewayImportReconciler
                 continue;
             }
 
-            string finalId = !string.IsNullOrWhiteSpace(originalId) && !usedIds.Contains(originalId)
+            // An identifier from the shared session namespace is never kept: the configuration
+            // manager refuses it as an arrival, and a gateway holding one would stand in for a
+            // shared gateway.
+            if (SharedSessionIds.IsShared(originalId))
+            {
+                Core.Logging.FileLogger.Warn(SharedSessionIds.DescribeRemint(originalId));
+            }
+
+            string finalId = !string.IsNullOrWhiteSpace(originalId)
+                && !usedIds.Contains(originalId)
+                && !SharedSessionIds.IsShared(originalId)
                 ? originalId
                 : CreateUniqueId(newIdFactory, usedIds);
 

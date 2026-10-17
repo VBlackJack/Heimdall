@@ -142,6 +142,9 @@
     <!-- Ring width of a status dot that shows a reachability verdict rather than an open session. -->
     <sys:Double x:Key="SessionTreeStatusRingThickness">1.5</sys:Double>
     <sys:Double x:Key="SessionTreeGatewayBadgeMaxWidth">140</sys:Double>
+    <sys:Double x:Key="SessionTreeBadgeMinWidth">28</sys:Double>
+    <sys:Double x:Key="SharedReportStatusMaxWidth">420</sys:Double>
+    <sys:Double x:Key="SessionTreeGatewayBadgeMinWidth">56</sys:Double>
     <sys:Double x:Key="SessionTreeFilterChipMaxWidth">160</sys:Double>
     <sys:Double x:Key="SessionTreeDropHintMaxWidth">380</sys:Double>
     <!-- Hover delays, in milliseconds: the row's summary, then the status dot's own verdict. -->
@@ -156,6 +159,7 @@
     <sys:Double x:Key="SessionTreeFolderRowMinHeight">26</sys:Double>
     <sys:Double x:Key="SessionTreeServerRowMinHeight">24</sys:Double>
     <sys:Double x:Key="SessionTreeFolderIconSize">13</sys:Double>
+    <sys:Double x:Key="SessionTreeReadOnlyIconSize">10</sys:Double>
     <!-- The "all open tabs" button over the right end of an overflowing session tab strip. -->
     <sys:Double x:Key="SessionTabListButtonWidth">32</sys:Double>
     <!-- Close button of a tab neither hovered nor selected. 0.3 measured 2.37:1 against the strip

@@ -323,6 +323,34 @@ public class MigrationServiceTests : IDisposable
         Assert.False(AdHocProfileIds.IsAdHoc(stored.Id));
     }
 
+    // The same door for the shared session namespace: without the remint the configuration
+    // manager refuses the identifier as an arrival and the whole migration rolls back.
+    [Fact]
+    public async Task ImportFromLegacyAsync_RemintsAnIdentifierInTheSharedSessionNamespace()
+    {
+        const string ReservedId = "shared-teamfile1-0123456789abcdef";
+        WriteLegacyFile(Path.Combine("config", "settings.json"), "{}");
+        WriteLegacyFile(Path.Combine("config", "servers.json"),
+            $$"""
+            [
+              {
+                "Id": "{{ReservedId}}",
+                "DisplayName": "Prod",
+                "RemoteServer": "prod.example",
+                "RemotePort": 3389,
+                "ConnectionType": "RDP"
+              }
+            ]
+            """);
+
+        var result = await _service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.True(result.Success);
+        var stored = Assert.Single(await _configManager.LoadServersAsync());
+        Assert.Equal("Prod", stored.DisplayName);
+        Assert.False(SharedSessionIds.IsShared(stored.Id));
+    }
+
     [Fact]
     public async Task ImportFromLegacyAsync_PreservesEncryptedSshPasswordAndMacAddressExactly()
     {

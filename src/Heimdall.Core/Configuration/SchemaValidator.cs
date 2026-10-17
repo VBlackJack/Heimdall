@@ -424,6 +424,14 @@ public static partial class SchemaValidator
     }
 
     /// <summary>
+    /// Whether <paramref name="host"/> is a hostname, an FQDN, an IPv4 or an IPv6 address, by the
+    /// rule the inventory applies to its own hosts. It never starts with a dash and holds no space,
+    /// so a value read from a file cannot pass for an option of a local client.
+    /// </summary>
+    public static bool IsValidHost(string? host) =>
+        !string.IsNullOrWhiteSpace(host) && HostnameRegex().IsMatch(host);
+
+    /// <summary>
     /// Matches valid hostnames, FQDNs, IPv4, and IPv6 addresses.
     /// </summary>
     [GeneratedRegex(@"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$|^\d{1,3}(?:\.\d{1,3}){3}$|^\[?[0-9a-fA-F:]+\]?$")]

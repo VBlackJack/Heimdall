@@ -89,25 +89,37 @@ public sealed class ContextMenuFactory
         }
         menu.Items.Add(CreateConnectAsMenu(vm, server));
         menu.Items.Add(CreateOpenInSplitMenu(vm, server));
-        var renameItem = new MenuItem
+
+        // A shared session is edited in MobaXterm: every entry that would write it is left out
+        // rather than offered and refused, and one line says why they are missing.
+        if (server.IsShared)
         {
-            Header = vm.Localize("TreeCtxRename"),
-            InputGestureText = vm.Localize("TreeCtxGestureRename")
-        };
-        renameItem.Click += (_, _) => callbacks.BeginInlineRename(server);
-        menu.Items.Add(renameItem);
-        menu.Items.Add(CreateMenuItem(
-            vm.Localize("TreeCtxEdit"),
-            vm.ServerList.EditServerCommand,
-            server,
-            inputGestureText: vm.Localize("TreeCtxGestureEdit")));
-        menu.Items.Add(CreateMenuItem(
-            vm.Localize("TreeCtxDuplicate"),
-            vm.ServerList.DuplicateServerCommand,
-            server));
-        menu.Items.Add(CreateFavoriteMenuItem(vm, [server]));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(CreateMoveToGroupMenu(vm, server));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateReadOnlyNoticeItem(server.SharedReadOnlyText));
+        }
+        else
+        {
+            var renameItem = new MenuItem
+            {
+                Header = vm.Localize("TreeCtxRename"),
+                InputGestureText = vm.Localize("TreeCtxGestureRename")
+            };
+            renameItem.Click += (_, _) => callbacks.BeginInlineRename(server);
+            menu.Items.Add(renameItem);
+            menu.Items.Add(CreateMenuItem(
+                vm.Localize("TreeCtxEdit"),
+                vm.ServerList.EditServerCommand,
+                server,
+                inputGestureText: vm.Localize("TreeCtxGestureEdit")));
+            menu.Items.Add(CreateMenuItem(
+                vm.Localize("TreeCtxDuplicate"),
+                vm.ServerList.DuplicateServerCommand,
+                server));
+            menu.Items.Add(CreateFavoriteMenuItem(vm, [server]));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateMoveToGroupMenu(vm, server));
+        }
+
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem(
             vm.Localize("TreeCtxCopyHostname"),
@@ -175,16 +187,35 @@ public sealed class ContextMenuFactory
             menu.Items.Add(detectedToolsMenu);
         }
 
-        menu.Items.Add(new Separator());
-        var deleteItem = CreateMenuItem(
-            vm.Localize("TreeCtxDelete"),
-            vm.ServerList.DeleteServerCommand,
-            server,
-            inputGestureText: vm.Localize("TreeCtxGestureDelete"));
-        ApplyDestructiveForeground(deleteItem);
-        menu.Items.Add(deleteItem);
+        if (!server.IsShared)
+        {
+            menu.Items.Add(new Separator());
+            var deleteItem = CreateMenuItem(
+                vm.Localize("TreeCtxDelete"),
+                vm.ServerList.DeleteServerCommand,
+                server,
+                inputGestureText: vm.Localize("TreeCtxGestureDelete"));
+            ApplyDestructiveForeground(deleteItem);
+            menu.Items.Add(deleteItem);
+        }
 
         return menu;
+    }
+
+    /// <summary>
+    /// A disabled line saying a shared session or folder is read-only, standing where the entries
+    /// that would change it are left out.
+    /// </summary>
+    private static MenuItem CreateReadOnlyNoticeItem(string notice)
+    {
+        var item = new MenuItem
+        {
+            Header = notice,
+            IsEnabled = false,
+            FontStyle = FontStyles.Italic
+        };
+        System.Windows.Automation.AutomationProperties.SetName(item, notice);
+        return item;
     }
 
     /// <summary>
@@ -211,13 +242,31 @@ public sealed class ContextMenuFactory
             string.Format(vm.Localize("TreeCtxConnectSelected"), connectableCount),
             vm.ServerList.ConnectSelectedCommand,
             isEnabled: connectableCount > 0));
-        menu.Items.Add(CreateMenuItem(
+
+        // A selection holding a shared session cannot be changed as a whole: the entries stay
+        // where the user expects them, disabled, each saying why, and the selection still connects.
+        int sharedCount = bulkContext.Items.Count(item => item.IsShared);
+        string? sharedReason = sharedCount == 0
+            ? null
+            : vm.ServerList.DescribeSharedRefusal(sharedCount, selectionCount);
+        if (sharedReason is not null)
+        {
+            menu.Items.Add(CreateReadOnlyNoticeItem(sharedReason));
+        }
+
+        List<MenuItem> writeEntries = [];
+        writeEntries.Add(CreateMenuItem(
             vm.Localize("TreeCtxBulkDuplicate"),
             vm.ServerList.DuplicateSelectedCommand));
-        menu.Items.Add(CreateBulkEditMenu(vm, bulkContext));
-        menu.Items.Add(CreateFavoriteMenuItem(vm, bulkContext.Items));
+        writeEntries.Add(CreateBulkEditMenu(vm, bulkContext));
+        writeEntries.Add(CreateFavoriteMenuItem(vm, bulkContext.Items));
+        menu.Items.Add(writeEntries[0]);
+        menu.Items.Add(writeEntries[1]);
+        menu.Items.Add(writeEntries[2]);
         menu.Items.Add(new Separator());
-        menu.Items.Add(CreateBulkMoveToGroupMenu(vm, bulkContext));
+        MenuItem moveMenu = CreateBulkMoveToGroupMenu(vm, bulkContext);
+        writeEntries.Add(moveMenu);
+        menu.Items.Add(moveMenu);
         menu.Items.Add(new Separator());
 
         var deleteItem = CreateMenuItem(
@@ -225,7 +274,18 @@ public sealed class ContextMenuFactory
             vm.ServerList.DeleteSelectedCommand,
             inputGestureText: vm.Localize("TreeCtxGestureDelete"));
         ApplyDestructiveForeground(deleteItem);
+        writeEntries.Add(deleteItem);
         menu.Items.Add(deleteItem);
+
+        if (sharedReason is not null)
+        {
+            foreach (MenuItem entry in writeEntries)
+            {
+                // A command-bound entry is disabled by its command; the rest are disabled here.
+                entry.IsEnabled = false;
+                ExplainDisabled(entry, sharedReason);
+            }
+        }
 
         return menu;
     }
@@ -550,6 +610,35 @@ public sealed class ContextMenuFactory
             await vm.ServerList.ConnectServersBulkCoreAsync(plan, CancellationToken.None);
         };
         menu.Items.Add(connectAllItem);
+
+        // A shared folder is the file's: nothing can be added to it, renamed, recoloured, moved
+        // or deleted here. A source that could not be read says why instead.
+        if (folder.IsShared)
+        {
+            // The import report of the source: what its file holds that its maintainers may want
+            // to fix. A source that could not be read has none, and says why instead.
+            if (folder.IsSharedRoot)
+            {
+                MenuItem reportItem = new()
+                {
+                    Header = vm.Localize("TreeCtxShowImportReport"),
+                    IsEnabled = !folder.HasError,
+                };
+                if (folder.HasError)
+                {
+                    ExplainDisabled(reportItem, folder.ErrorMessage!);
+                }
+
+                string sourceId = folder.SharedSourceId;
+                reportItem.Click += async (_, _) => await vm.ServerList.ShowSharedImportReportAsync(sourceId);
+                menu.Items.Add(reportItem);
+            }
+
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateReadOnlyNoticeItem(
+                folder.HasError ? folder.ErrorMessage! : folder.SharedReadOnlyText));
+            return menu;
+        }
 
         menu.Items.Add(new Separator());
 

@@ -22,6 +22,7 @@ using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Extensions;
 using Heimdall.App.Services;
 using Heimdall.App.Services.PostConnect;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.Views;
 using Heimdall.Core.Codecs;
 using Heimdall.Core.Configuration;
@@ -69,6 +70,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     private readonly MainViewModel _main;
     private readonly LocalizationManager _localizer;
     private readonly IConfigManager _configManager;
+
+    /// <summary>Null only on the test-only instance built without a configuration manager.</summary>
+    private readonly SharedPostConnectTrust? _sharedPostConnectTrust;
     private readonly IEmbeddedSessionManager _embeddedSessionManager;
     private readonly IPostConnectSequenceRunner _postConnectSequenceRunner;
     private readonly IPostConnectStepResolver _postConnectStepResolver;
@@ -154,6 +158,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _embeddedSessionManager = embeddedSessionManager;
         _postConnectSequenceRunner = postConnectSequenceRunner;
         _postConnectStepResolver = postConnectStepResolver;
+        _sharedPostConnectTrust = configManager is null ? null : new SharedPostConnectTrust(configManager);
         _uiDispatcher = uiDispatcher;
 
         if (!wireUpCallbacks)
@@ -985,8 +990,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         ISessionResult session)
     {
         // Resolve tunnel chain route for visual display in session header
-        // (uses sessionId - correct for state machine lookup)
-        tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId);
+        // (uses sessionId - correct for state machine lookup; the profile names a shared gateway)
+        tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId, originalServerId);
 
         _main.StatusText = string.Equals(connectionType, "RDP", StringComparison.OrdinalIgnoreCase)
             ? _localizer.Format("StatusEmbeddedRdpOpening", displayName)
@@ -1062,7 +1067,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         // much, and a failed session is not counted as live either way.
         tab.Status = statusText;
         tab.FailureDetails = diagnostic;
-        tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId);
+        tab.TunnelRoute = _main.Tunnels.ResolveRoute(sessionId, originalServerId);
         _main.StatusText = statusText;
     }
 
@@ -1495,8 +1500,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
-            IReadOnlyList<ServerProfileDto> servers = await _configManager.LoadServersAsync();
-            if (!servers.Any(server => string.Equals(server.Id, serverId, StringComparison.Ordinal)))
+            if (await _main.ServerList.ProfileLookup.FindAsync(serverId) is null)
             {
                 _main.StatusText = _localizer["ErrorServerNotFound"];
                 return;
@@ -1789,9 +1793,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     {
         try
         {
-            var servers = await _configManager.LoadServersAsync();
-            var server = servers.FirstOrDefault(
-                s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
+            IProfileLookup lookup = _main.ServerList.ProfileLookup;
+            var server = await lookup.FindAsync(serverId);
 
             if (server is null || string.IsNullOrEmpty(server.SshUsername))
             {
@@ -1804,7 +1807,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             var sftpProfile = CreateCompanionSftpProfile(server, sftpSessionId);
 
             var sftpResult = await _main.ServerList.ConnectionService
-                .ConnectSftpAsync(sftpProfile, _main.CurrentSettings!, ct)
+                .ConnectSftpAsync(sftpProfile, lookup.EffectiveSettingsFor(server, _main.CurrentSettings!), ct)
                 .ConfigureAwait(false);
 
             if (!sftpResult.Success || sftpResult.Session is null)
@@ -1978,8 +1981,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     {
         try
         {
-            var servers = await _configManager.LoadServersAsync().ConfigureAwait(false);
-            var server = servers.FirstOrDefault(s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
+            var server = await _main.ServerList.ProfileLookup.FindAsync(serverId).ConfigureAwait(false);
             if (server is null || server.PostConnectSteps.Count == 0)
             {
                 return;
@@ -2007,18 +2009,10 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
-            if (ProfileExecutionTrust.RequiresPostConnectConfirmation(server))
+            if (!await AuthorizePostConnectAsync(server, runnableSteps).ConfigureAwait(false))
             {
-                bool approved = await ConfirmOnUiThreadAsync(
-                        () => _main.ServerList.ConfirmAndTrustPostConnectAsync(server, runnableSteps))
-                    .ConfigureAwait(false);
-
-                if (!approved)
-                {
-                    FileLogger.Info(
-                        $"Post-connect skipped for {displayName}: unconfirmed imported commands.");
-                    return;
-                }
+                FileLogger.Info($"Post-connect skipped for {displayName}: commands not approved.");
+                return;
             }
 
             SetPostConnectStateOnUiThread(
@@ -2051,6 +2045,38 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         {
             ClearPostConnectStateOnUiThread(tab);
         }
+    }
+
+    /// <summary>
+    /// Whether the post-connect commands of <paramref name="server"/> may run.
+    /// </summary>
+    /// <remarks>
+    /// A shared profile is approved against its commands, never through the profile flag: asked
+    /// the first time, and again whenever the shared file changes them. A local profile keeps the
+    /// confirmation imported commands have always had.
+    /// </remarks>
+    internal async Task<bool> AuthorizePostConnectAsync(ServerProfileDto server, int runnableSteps)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+
+        if (SharedSessionIds.IsSharedProfile(server))
+        {
+            return _sharedPostConnectTrust is not null
+                && await _sharedPostConnectTrust.AuthorizeAsync(
+                        server,
+                        () => ConfirmOnUiThreadAsync(
+                            () => _main.ServerList.ConfirmSharedPostConnectAsync(server, runnableSteps)))
+                    .ConfigureAwait(false);
+        }
+
+        if (!ProfileExecutionTrust.RequiresPostConnectConfirmation(server))
+        {
+            return true;
+        }
+
+        return await ConfirmOnUiThreadAsync(
+                () => _main.ServerList.ConfirmAndTrustPostConnectAsync(server, runnableSteps))
+            .ConfigureAwait(false);
     }
 
     internal void ClearPostConnectStateOnUiThread(SessionTabViewModel tab)

@@ -237,7 +237,7 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
     /// </summary>
     private async Task PopulateServersAsync(ScheduledTaskDialogViewModel vm)
     {
-        var servers = await _configManager.LoadServersAsync();
+        var servers = await _main.ServerList.ProfileLookup.GetAllAsync();
         var options = servers
             .OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
             .Select(s => new ServerOption(
@@ -299,6 +299,16 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject, IDisposa
             s => s.Id,
             s => s.DisplayName,
             out ScheduledTaskResolution resolution);
+
+        // The tree lists the shared sessions of the loaded sources, so the identifier and the name
+        // rules above already reach them. A task that runs before the tree is loaded, or names a
+        // session of a source reloaded since, still finds it by identifier through the lookup.
+        if (server is null
+            && !string.IsNullOrEmpty(task.ServerId)
+            && await _main.ServerList.FindSharedServerItemAsync(task.ServerId) is { } shared)
+        {
+            server = shared;
+        }
 
         if (server is null)
         {

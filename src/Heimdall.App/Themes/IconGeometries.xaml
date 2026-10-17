@@ -110,6 +110,12 @@
     <!-- Group: two stacked folder outlines -->
     <Geometry x:Key="Geo.Tree.Group">M3,1 L7,1 L8,3 L14,3 L14,9 L3,9 Z M1,5 L3,5 M1,5 L1,13 L12,13 L12,10 M3,9 L3,13</Geometry>
 
+    <!-- Shared source: folder with a share mark cut out -->
+    <Geometry x:Key="Geo.Tree.SharedSource">M1,3 L6,3 L7,5 L15,5 L15,14 L1,14 Z M4.1,9.5 A1.4,1.4 0 1 1 6.9,9.5 A1.4,1.4 0 1 1 4.1,9.5 Z M9.1,7.2 A1.4,1.4 0 1 1 11.9,7.2 A1.4,1.4 0 1 1 9.1,7.2 Z M9.1,11.8 A1.4,1.4 0 1 1 11.9,11.8 A1.4,1.4 0 1 1 9.1,11.8 Z M6.94,9.27 L9.4,8.15 L9.06,7.43 L6.6,8.55 Z M6.6,10.45 L9.06,11.57 L9.4,10.85 L6.94,9.73 Z</Geometry>
+
+    <!-- Read-only: padlock with keyhole -->
+    <Geometry x:Key="Geo.Tree.ReadOnly">M3,7 L13,7 L13,15 L3,15 Z M4.5,7 L4.5,5 A3.5,3.5 0 0 1 11.5,5 L11.5,7 L10,7 L10,5 A2,2 0 0 0 6,5 L6,7 Z M7.2,10.5 A0.8,0.8 0 1 1 8.8,10.5 A0.8,0.8 0 1 1 7.2,10.5 Z</Geometry>
+
     <!-- Broadcast: antenna with signal arcs -->
     <Geometry x:Key="Geo.Tree.Broadcast">M7,8 L9,8 L9.5,14 L6.5,14 Z M8,7 A0.5,0.5 0 1 1 8,8 A0.5,0.5 0 1 1 8,7 Z M5,5 A4,4 0 0 1 11,5 M3,3 A6.5,6.5 0 0 1 13,3</Geometry>
 

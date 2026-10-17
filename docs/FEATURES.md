@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,041 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,166 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -374,6 +374,88 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 ### Import and Migration
 - Migration from Heimdall v1 (DPAPI-encrypted credentials preserved)
 - Import from JSON, MobaXterm (.mxtsessions / .ini), mRemoteNG (.xml), RDCMan (.rdg), and .rdp files
+- MobaXterm session files (Settings > Import):
+  - SSH and RDP sessions are imported. Every other MobaXterm session type (FTP, SFTP, VNC, Telnet,
+    WSL and others) is listed as unsupported in the import summary, with its INI section and
+    session name; no line is skipped without a warning
+  - The jump host fields of a session (gateway host, port and user) become an SSH gateway.
+    Sessions that share a jump host share one gateway, and a local gateway with the same host, port
+    and user is reused instead of duplicated. A session without a jump host connects directly
+  - Variables such as `[DAS]` in a user field are resolved from the `MobaXtermUserVariables`
+    setting (default `DAS` = `%USERNAME%`, environment variables expanded), edited in Settings >
+    General > MobaXterm import variables, which shows what each value resolves to. An unresolved
+    variable is kept as written and reported in the import summary
+  - The login command (for example `sudo su - www`) becomes a post-connect step. The profile is
+    imported with `ExecutionConfirmed = false`, so Heimdall asks for confirmation before typing it
+    into the session
+  - The session comment becomes the profile's tags, comma-separated
+  - SSH key paths are never imported: they belong to the machine that wrote the file, and a UNC
+    path would make this machine authenticate to a remote file server when the key is read
+  - Profile and gateway identifiers are derived from the file (folder and session name; host, port
+    and user), so importing the same file again replaces the profiles it created before, including
+    any local edits made to them
+  - Passwords stored by MobaXterm are not imported (proprietary encryption); the import summary
+    counts them
+- Shared MobaXterm session sources (Settings > General > Shared session sources); a step-by-step
+  guide for teams coming from MobaXterm is in [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md):
+  - A source is a name and the path of a `.mxtsessions` file, typically on a team share or a
+    synchronized folder; environment variables are allowed (`%OneDriveCommercial%\...`). Each
+    enabled source is read at startup and appears in the session tree as a root of its own, below
+    the local folders, with its own icon. Its MobaXterm folders sit underneath it, and a local folder
+    with the same name is never merged with a shared one
+  - Shared sessions are read-only in Heimdall and keep being edited in MobaXterm: they connect,
+    connect in a split, copy their host and show their health like any other session, but they
+    cannot be edited, renamed, duplicated, moved, reordered, deleted or marked favorite, and nothing
+    can be dragged out of or onto a shared folder. A lock on the row names the source. A selection
+    that holds a shared session keeps Connect and refuses the other bulk actions, saying how many
+    shared sessions it holds
+  - A source that cannot be read (file missing, unreadable or too large) keeps its root in the
+    tree with an error mark and the reason on hover, and lists no sessions
+  - The settings card shows what each source holds after its last read. **Reload** reads the saved
+    sources again and refreshes the tree without a restart; saving a change to the sources or to the
+    MobaXterm import variables reloads them too
+  - Post-connect commands of a shared session are approved per user: Heimdall asks before typing
+    them, remembers the approval for those exact commands, and asks again when the shared file
+    changes them. The approvals are personal trust: they are never exported or imported with the
+    settings, and **Reset defaults** clears them, while it keeps the sources themselves
+  - The session header names the shared gateway a shared session goes through
+  - Automatic reload: each enabled source file is watched (including the atomic saves of editors
+    and sync clients, which write a temporary file and rename it over the original). Once the file
+    has been quiet for `SharedSourceReloadDebounceMs` (default 1500 ms), that source alone is read
+    again and the tree follows, keeping expanded folders and the selection; the status line says
+    "Shared sessions updated: <name>, N sessions". A file that is locked or half written is read
+    again up to `SharedSourceReloadRetryCount` times (default 5), `SharedSourceReloadRetryDelayMs`
+    apart (default 1000 ms). If it still cannot be read, does not parse, or suddenly holds no
+    session, the previous sessions are kept and the source says why: a working source is never
+    replaced by an empty one. Open sessions are never touched by a reload; if a session disappears
+    from the file while it is open, it stays open, and a later reconnect says the profile was not
+    found
+  - Offline copy: after each successful read, the raw file and where it came from (path, time,
+    SHA-256) are kept in `SharedSessionCache` under the data directory, with the same restricted
+    ACL as the configuration files. When the file is missing or unreadable, the sessions are read
+    from that copy instead, through the same parser and the same sanitizer as the file itself. The
+    source root then shows "offline copy from <date>", with the reason on hover, and the Settings
+    card says the same. Removing a source deletes its copy; the copies are never written to
+    servers.json, to a settings export or to the repository
+  - Import report: every successful read of a source builds a report of what its file holds that
+    its maintainers may want to fix. It is informational: it never stops a session from loading and
+    never changes one. It lists, with the folder, the session and a short explanation:
+    - skipped sessions and why (unsupported type, missing host, unusable gateway, duplicate name in
+      a folder, malformed line, or refused by the shared-session filter)
+    - unresolved `[NAME]` variables
+    - name and host mismatch: the session name is neither the host nor the host's first label (what
+      precedes the first dot), compared case-insensitively; a host given as an IP address is not
+      checked
+    - gateway outliers: in a folder of at least `SharedReportGatewayMinFolderSessions` sessions
+      (default 3) where one route (a gateway, or a direct connection) is taken by at least
+      `SharedReportGatewayMajorityPercent` percent of them (default 60), the sessions taking another
+      route; a folder without such a majority has none
+    - duplicate hosts: two or more sessions of the same folder reaching the same host
+  - The source root in the tree shows the number of issues next to its name, and its context menu
+    has **Show import report**; the Settings card has a **Report** button on each source with
+    findings. Both open the same read-only dialog: the count of each check, then the findings by
+    check, with **Copy** (plain text) and **Export CSV** (every cell neutralized against formula
+    injection). When a reload changes the number of issues, the status line says so
 - JSON session imports contain server profiles only. SSH gateway definitions live in `settings.json`
   (`AppSettings.SshGateways`), so test fixtures such as `Heimdall-TestEnv` must inject the
   matching gateway into the exact runtime build configuration before tunneled sessions can resolve it.

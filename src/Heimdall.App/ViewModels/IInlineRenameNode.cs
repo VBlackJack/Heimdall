@@ -39,7 +39,7 @@ internal static class SessionTreeInlineRename
 {
     public static bool TryBeginEdit(object? node)
     {
-        if (node is FolderViewModel { FullPath.Length: 0 })
+        if (node is FolderViewModel { FullPath.Length: 0 } || IsReadOnly(node))
         {
             return false;
         }
@@ -52,6 +52,13 @@ internal static class SessionTreeInlineRename
         editableNode.BeginInlineEdit();
         return true;
     }
+
+    /// <summary>
+    /// Whether <paramref name="node"/> belongs to a shared source, whose names are the file's and
+    /// are never renamed here.
+    /// </summary>
+    public static bool IsReadOnly(object? node) =>
+        node is ServerItemViewModel { IsShared: true } or FolderViewModel { IsShared: true };
 
     public static void CompleteEdit(
         IInlineRenameNode node,

@@ -3545,6 +3545,319 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportConfigCommand_MobaXtermGateways_PersistedBeforeServersAndReused()
+    {
+        const string localGatewayId = "local-gw1";
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings
+            {
+                MobaXtermUserVariables = new Dictionary<string, string> { ["DAS"] = "jdoe" },
+                SshGateways =
+                [
+                    new SshGatewayDto
+                    {
+                        Id = localGatewayId,
+                        Name = "Corporate bastion",
+                        Host = "gw1.example.test",
+                        Port = 22,
+                        User = "jdoe",
+                    },
+                ],
+            },
+        };
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        string importRoot = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-settings-import-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(importRoot);
+        string importPath = Path.Combine(importRoot, "shared.mxtsessions");
+        const string content = """
+            [Bookmarks_1]
+            SubRep=PROD
+            ImgNum=41
+            srv-db01=#126#0%srv-db01.example.test%22%[DAS]%%0%-1%sudo su - www%gw1.example.test%22%[DAS]%-1#MobaFont%10#0#database
+            srv-db02=#126#0%srv-db02.example.test%22%[DAS]%%0%-1%%gw1.example.test%22%[DAS]%-1#MobaFont%10#0#database
+            srv-hap01=#117#0%srv-hap01.example.test%22%[DAS]%%0%-1%%gw2.example.test%2222%[DAS]%-1#MobaFont%10#0#ha-proxy
+            browser=#126#999%srv-web.example.test%8080%%
+            [SharedSettings]
+            AllowedEditors=editor-a
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(importPath, content);
+            viewModel.ImportFilePathProvider = () => importPath;
+
+            await viewModel.ImportConfigCommand.ExecuteAsync(null);
+
+            Assert.Equal(new[] { "settings", "servers" }, config.PersistenceCalls);
+
+            Assert.Equal(2, config.Settings.SshGateways.Count);
+            SshGatewayDto created = Assert.Single(
+                config.Settings.SshGateways,
+                gateway => gateway.Host == "gw2.example.test");
+            Assert.Equal(2222, created.Port);
+            Assert.Equal("jdoe", created.User);
+
+            Assert.NotNull(config.SavedServers);
+            Assert.Equal(3, config.SavedServers.Count);
+            Assert.All(config.SavedServers, server => Assert.Equal("jdoe", server.SshUsername));
+            Assert.Equal(localGatewayId, config.SavedServers.Single(s => s.DisplayName == "srv-db01").SshGatewayId);
+            Assert.Equal(localGatewayId, config.SavedServers.Single(s => s.DisplayName == "srv-db02").SshGatewayId);
+            Assert.Equal(created.Id, config.SavedServers.Single(s => s.DisplayName == "srv-hap01").SshGatewayId);
+            Assert.False(config.SavedServers.Single(s => s.DisplayName == "srv-db01").ExecutionConfirmed);
+
+            (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
+            Assert.Contains("1 issue was found in the file:", warning.Message, StringComparison.Ordinal);
+            Assert.Contains(
+                "[Bookmarks_1] browser: session type 999 is not supported; not imported.",
+                warning.Message,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(importRoot))
+            {
+                Directory.Delete(importRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ImportConfigCommand_MobaXtermOnlySkippedSessions_ShowsWhyInsteadOfNothingFound()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        string importRoot = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-settings-import-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(importRoot);
+        string importPath = Path.Combine(importRoot, "shared.mxtsessions");
+        const string content = """
+            [Bookmarks]
+            SubRep=
+            ImgNum=42
+            WSL-Dev-box=#151#14%Dev-box-daemon%
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(importPath, content);
+            viewModel.ImportFilePathProvider = () => importPath;
+
+            await viewModel.ImportConfigCommand.ExecuteAsync(null);
+
+            Assert.Empty(config.PersistenceCalls);
+            Assert.Empty(dialog.ConfirmCalls);
+            (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
+            Assert.Contains("session type 14 is not supported", warning.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(importRoot))
+            {
+                Directory.Delete(importRoot, recursive: true);
+            }
+        }
+    }
+
+    // --- MobaXterm import variables ---
+
+    [Fact]
+    public void MobaXtermVariables_FreshSettings_ShowTheDasRowResolvedLikeTheImport()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+
+        viewModel.LoadFromSettings(config.Settings);
+
+        MobaXtermVariableItemViewModel row = Assert.Single(viewModel.MobaXtermUserVariables);
+        Assert.Equal("DAS", row.Name);
+        Assert.Equal("%USERNAME%", row.Value);
+        Assert.True(row.IsValid);
+        Assert.Equal(
+            MobaXtermVariableResolver.FromVariables(config.Settings.MobaXtermUserVariables)("DAS"),
+            row.ResolvedValue);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public void MobaXtermVariables_Preview_FollowsTheSharedResolver()
+    {
+        string environmentName = "HEIMDALL_SETTINGS_MOBA_" + Guid.NewGuid().ToString("N");
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        MobaXtermVariableItemViewModel row = Assert.Single(viewModel.MobaXtermUserVariables);
+
+        Environment.SetEnvironmentVariable(environmentName, "corp-id-7");
+        try
+        {
+            row.Value = $"%{environmentName}%";
+
+            Assert.Equal("corp-id-7", row.ResolvedValue);
+            Assert.Equal(MobaXtermVariableResolver.ResolveValue(row.Value), row.ResolvedValue);
+            Assert.True(row.IsResolved);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(environmentName, null);
+        }
+
+        row.Value = $"%{environmentName}_MISSING%";
+
+        Assert.Null(row.ResolvedValue);
+        Assert.False(row.IsResolved);
+    }
+
+    [Theory]
+    [InlineData("DA-S")]
+    [InlineData("DA S")]
+    [InlineData("1DAS")]
+    [InlineData("[DAS]")]
+    public async Task MobaXtermVariables_NameOutsideTheTokenSyntax_IsRejected(string name)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        MobaXtermVariableItemViewModel row = Assert.Single(viewModel.MobaXtermUserVariables);
+        row.Name = name;
+
+        Assert.Equal(localizer["SettingsMobaXtermVariableNameInvalid"], row.NameError);
+        Assert.False(row.IsValid);
+        Assert.True(viewModel.HasInvalidMobaXtermVariables);
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_DuplicateNamesInAnyCase_FlagBothRows()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.AddMobaXtermVariableCommand.Execute(null);
+        MobaXtermVariableItemViewModel added = viewModel.MobaXtermUserVariables[^1];
+        added.Name = "das";
+        added.Value = "someone";
+
+        Assert.All(
+            viewModel.MobaXtermUserVariables,
+            row => Assert.Equal(localizer["SettingsMobaXtermVariableNameDuplicate"], row.NameError));
+
+        added.Name = "OTHER";
+
+        Assert.All(viewModel.MobaXtermUserVariables, row => Assert.Null(row.NameError));
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_EmptyNameOrValue_IsRequired()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        MobaXtermVariableItemViewModel row = Assert.Single(viewModel.MobaXtermUserVariables);
+
+        row.Value = "   ";
+        row.Name = string.Empty;
+
+        Assert.Equal(localizer["SettingsMobaXtermVariableValueRequired"], row.ValueError);
+        Assert.Equal(localizer["SettingsMobaXtermVariableNameRequired"], row.NameError);
+    }
+
+    [Fact]
+    public void MobaXtermVariables_AddAndRemove_ChangeTheRowsAndArmSave()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.AddMobaXtermVariableCommand.Execute(null);
+
+        Assert.Equal(2, viewModel.MobaXtermUserVariables.Count);
+        Assert.True(viewModel.IsDirty);
+        Assert.False(viewModel.MobaXtermUserVariables[^1].IsValid);
+
+        MobaXtermVariableItemViewModel dasRow = viewModel.MobaXtermUserVariables[0];
+        viewModel.RemoveMobaXtermVariableCommand.Execute(dasRow);
+
+        MobaXtermVariableItemViewModel remaining = Assert.Single(viewModel.MobaXtermUserVariables);
+        Assert.NotSame(dasRow, remaining);
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_InvalidRow_RefusesTheSaveAndWritesNothing()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        viewModel.AddMobaXtermVariableCommand.Execute(null);
+        viewModel.MobaXtermUserVariables[^1].Name = "BAD-NAME";
+        viewModel.MobaXtermUserVariables[^1].Value = "x";
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.False(saved);
+        Assert.Equal(0, config.MergeSettingCallCount);
+        Assert.Equal(localizer["ValidationMobaXtermVariablesInvalid"], viewModel.ValidationSummary);
+
+        // Fixing the row withdraws the banner the refused save raised.
+        viewModel.MobaXtermUserVariables[^1].Name = "APP";
+        Assert.Null(viewModel.ValidationSummary);
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_ValidRows_ArePersistedTrimmed()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.MobaXtermUserVariables[0].Value = "  jdoe  ";
+        viewModel.AddMobaXtermVariableCommand.Execute(null);
+        viewModel.MobaXtermUserVariables[^1].Name = " APP_USER ";
+        viewModel.MobaXtermUserVariables[^1].Value = "app_prod";
+
+        bool saved = await viewModel.TrySaveAsync();
+
+        Assert.True(saved);
+        Assert.Equal(
+            new Dictionary<string, string> { ["DAS"] = "jdoe", ["APP_USER"] = "app_prod" },
+            config.Settings.MobaXtermUserVariables);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public async Task MobaXtermVariables_RemovingEveryRow_PersistsAnEmptySet()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        viewModel.RemoveMobaXtermVariableCommand.Execute(viewModel.MobaXtermUserVariables[0]);
+
+        Assert.True(await viewModel.TrySaveAsync());
+        Assert.Empty(config.Settings.MobaXtermUserVariables);
+    }
+
+    [Fact]
     public async Task ImportCitrixApps_VaultDisabled_PreservesHistoricPlaintextPath()
     {
         const string launchToken = "-qlaunch app=LegacyCalculator";
@@ -3934,7 +4247,9 @@ public sealed partial class SettingsViewModelTests : IDisposable
         IUpdateService? updateService = null,
         IAppVersionProvider? appVersionProvider = null,
         IUpdateInstallFlow? installFlow = null,
-        IBrowserLauncher? browserLauncher = null)
+        IBrowserLauncher? browserLauncher = null,
+        Heimdall.App.Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
+        Heimdall.App.Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null)
     {
         localizer ??= new LocalizationManager();
         dialog ??= new FakeDialogService();
@@ -3969,7 +4284,9 @@ public sealed partial class SettingsViewModelTests : IDisposable
             appVersionProvider,
             installFlow,
             browserLauncher,
-            profileImportService);
+            profileImportService,
+            sharedSessions: sharedSessions,
+            sharedSecrets: sharedSecrets);
     }
 
     /// <summary>
@@ -4546,6 +4863,14 @@ public sealed partial class SettingsViewModelTests : IDisposable
 
     private sealed class FakeDialogService : IDialogService
     {
+        public List<SharedSessionImportReportDialogViewModel> SharedReports { get; } = [];
+
+        public Task ShowSharedSessionImportReportAsync(SharedSessionImportReportDialogViewModel viewModel)
+        {
+            SharedReports.Add(viewModel);
+            return Task.CompletedTask;
+        }
+
         public bool ConfirmResult { get; set; }
 
         public bool? SaveDiscardResult { get; set; }

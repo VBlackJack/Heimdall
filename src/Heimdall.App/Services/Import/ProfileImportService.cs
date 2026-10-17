@@ -516,6 +516,7 @@ public sealed class ProfileImportService(
     {
         if (!string.IsNullOrWhiteSpace(candidateId) &&
             !AdHocProfileIds.IsAdHoc(candidateId) &&
+            !SharedSessionIds.IsShared(candidateId) &&
             inventory.All(server => !string.Equals(server.Id, candidateId, StringComparison.OrdinalIgnoreCase)))
         {
             return candidateId;
@@ -524,6 +525,11 @@ public sealed class ProfileImportService(
         if (AdHocProfileIds.IsAdHoc(candidateId))
         {
             Core.Logging.FileLogger.Warn(AdHocProfileIds.DescribeRemint(candidateId));
+        }
+
+        if (SharedSessionIds.IsShared(candidateId))
+        {
+            Core.Logging.FileLogger.Warn(SharedSessionIds.DescribeRemint(candidateId));
         }
 
         return Guid.NewGuid().ToString();

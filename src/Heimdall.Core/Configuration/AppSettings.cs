@@ -404,6 +404,69 @@ public sealed class AppSettings
     /// </summary>
     public List<string> EmptyGroups { get; set; } = new();
 
+    /// <summary>
+    /// Values for the <c>[NAME]</c> variables MobaXterm session files carry in their login fields.
+    /// Key: the variable name without brackets, matched case-insensitively. Value: the login,
+    /// with environment variables such as <c>%USERNAME%</c> expanded when the file is read.
+    /// </summary>
+    /// <remarks>
+    /// The default mirrors settings.default.json, so an installation whose settings were written
+    /// before this field existed resolves the same variable as a new one.
+    /// </remarks>
+    public Dictionary<string, string> MobaXtermUserVariables { get; set; } = new()
+    {
+        ["DAS"] = "%USERNAME%",
+    };
+
+    /// <summary>
+    /// MobaXterm session files read at startup as read-only sources of shared sessions. Their
+    /// profiles and gateways are held in memory and never written to servers.json or to
+    /// <see cref="SshGateways"/>.
+    /// </summary>
+    public List<SharedSessionSourceDto> SharedSessionSources { get; set; } = new();
+
+    /// <summary>
+    /// How long a shared source file must stay quiet after a change before it is read again. Sync
+    /// clients and editors write a file in several steps; reading after the first one would read
+    /// half a file.
+    /// </summary>
+    [SettingRange(250, 30000)]
+    public int SharedSourceReloadDebounceMs { get; set; } = 1500;
+
+    /// <summary>
+    /// How many more times a changed shared source file is read when it is locked or cannot be
+    /// read, before the previous version is kept.
+    /// </summary>
+    [SettingRange(0, 20)]
+    public int SharedSourceReloadRetryCount { get; set; } = 5;
+
+    /// <summary>The wait between two reads of a changed shared source file that failed.</summary>
+    [SettingRange(100, 30000)]
+    public int SharedSourceReloadRetryDelayMs { get; set; } = 1000;
+
+    /// <summary>
+    /// The share of a folder's sessions, in percent, that must go through one gateway for the
+    /// shared import report to call it the folder's gateway and list the sessions that do not.
+    /// </summary>
+    [SettingRange(51, 100)]
+    public int SharedReportGatewayMajorityPercent { get; set; } = 60;
+
+    /// <summary>The fewest sessions a folder needs before the import report looks for a gateway outlier in it.</summary>
+    [SettingRange(2, 1000)]
+    public int SharedReportGatewayMinFolderSessions { get; set; } = 3;
+
+    /// <summary>
+    /// The post-connect commands of shared sessions the user allowed to run. Key: the shared
+    /// profile identifier. Value: the <see cref="PostConnectFingerprint"/> of the commands that
+    /// were allowed, so a change to them in the shared file asks again.
+    /// </summary>
+    /// <remarks>
+    /// Kept here rather than as <see cref="ServerProfileDto.ExecutionConfirmed"/> on the profile:
+    /// a shared profile is rebuilt from a file other people edit, and a flag on it would approve
+    /// whatever that file says next.
+    /// </remarks>
+    public Dictionary<string, string> SharedPostConnectApprovals { get; set; } = new();
+
     // SSH host key trust store (TOFU - persisted across restarts)
     // Key: "host:port", Value: "SHA256:<base64-no-padding>"
     public Dictionary<string, string> TrustedHostKeys { get; set; } = new();

@@ -357,6 +357,11 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             AppSettings currentSettings = await LoadSettingsInternalAsync(
                 requireSupportedSchemaForWrite: true).ConfigureAwait(false);
             AppSettings settingsToSave = CloneSettings(settings);
+            RejectSharedIdentifierArrivals(
+                SettingsDocumentName,
+                GatewaysCollectionName,
+                currentSettings.SshGateways.Select(gateway => gateway.Id),
+                settingsToSave.SshGateways.Select(gateway => gateway.Id));
             MergeExtensionData(currentSettings.ExtensionData, settingsToSave.ExtensionData);
             settingsToSave.SchemaVersion = AppSettings.CurrentSchemaVersion;
             NormalizeCollections(settingsToSave);
@@ -476,7 +481,13 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
         {
             settings = await LoadSettingsInternalAsync(
                 requireSupportedSchemaForWrite: true).ConfigureAwait(false);
+            List<string> originalGatewayIds = settings.SshGateways.Select(gateway => gateway.Id).ToList();
             mutate(settings);
+            RejectSharedIdentifierArrivals(
+                SettingsDocumentName,
+                GatewaysCollectionName,
+                originalGatewayIds,
+                (settings.SshGateways ?? []).Select(gateway => gateway.Id));
             settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
             NormalizeCollections(settings);
             NormalizeTrustedHostKeys(settings);
@@ -567,7 +578,13 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
                 // stale by exactly the window in which another writer can persist a trust decision.
                 AppSettings settings = await LoadSettingsInternalAsync(
                     requireSupportedSchemaForWrite: true).ConfigureAwait(false);
+                List<string> originalGatewayIds = settings.SshGateways.Select(gateway => gateway.Id).ToList();
                 applySettingsMutation(settings);
+                RejectSharedIdentifierArrivals(
+                    SettingsDocumentName,
+                    GatewaysCollectionName,
+                    originalGatewayIds,
+                    settings.SshGateways.Select(gateway => gateway.Id));
                 settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
                 NormalizeCollections(settings);
                 NormalizeTrustedHostKeys(settings);
@@ -587,7 +604,13 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
                 Dictionary<string, IReadOnlyDictionary<string, JsonElement>> extensionData =
                     CaptureServerExtensionData(servers);
                 string originalJson = JsonSerializer.Serialize(servers, JsonOptions);
+                List<string> originalServerIds = servers.Select(server => server.Id).ToList();
                 applyServersMutation(servers);
+                RejectSharedIdentifierArrivals(
+                    ServersDocumentName,
+                    ServersCollectionName,
+                    originalServerIds,
+                    servers.Select(server => server.Id));
                 FreezeCredentialReferencesAcrossRenames(credentialReferences, servers);
                 PreserveServerExtensionData(extensionData, servers);
                 string mutatedJson = JsonSerializer.Serialize(servers, JsonOptions);
@@ -773,7 +796,46 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
         }
     }
 
-    private static AppSettings CloneSettings(AppSettings settings)
+    private const string ServersDocumentName = "servers.json";
+    private const string SettingsDocumentName = "settings.json";
+    private const string ServersCollectionName = "Servers";
+    private const string GatewaysCollectionName = "SshGateways";
+
+    /// <summary>
+    /// Refuses a write that brings an identifier from the shared session namespace into a
+    /// collection that did not already hold it.
+    /// </summary>
+    /// <remarks>
+    /// <para>The door, rather than each caller: shared profiles and gateways are held in memory by
+    /// the shared session provider, and a connection hands a settings copy holding the shared
+    /// gateways down the pipeline, so any writer that persisted what it was given - a whole-object
+    /// save of that copy, an import of a profile carrying such an identifier - would otherwise turn
+    /// a read-only shared entry into a local one.</para>
+    /// <para>Arrivals only. An identifier already on disk is a resident: refusing every write that
+    /// still carried one would make the whole file unwritable over an entry nobody can remove from
+    /// inside the application.</para>
+    /// </remarks>
+    internal static void RejectSharedIdentifierArrivals(
+        string documentName,
+        string collectionName,
+        IEnumerable<string?> before,
+        IEnumerable<string?> after)
+    {
+        HashSet<string> residents = before.OfType<string>().ToHashSet(StringComparer.Ordinal);
+        List<string> errors = after
+            .OfType<string>()
+            .Where(id => SharedSessionIds.IsShared(id) && !residents.Contains(id))
+            .Distinct(StringComparer.Ordinal)
+            .Select(id => $"{collectionName}: '{id}' is reserved for shared sessions, which are never saved.")
+            .ToList();
+
+        if (errors.Count > 0)
+        {
+            throw new ConfigurationValidationException(documentName, errors);
+        }
+    }
+
+    internal static AppSettings CloneSettings(AppSettings settings)
     {
         string json = JsonSerializer.Serialize(settings, JsonOptions);
         return JsonSerializer.Deserialize<AppSettings>(json, ReadOptions)
@@ -1059,7 +1121,13 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             Dictionary<string, IReadOnlyDictionary<string, JsonElement>> extensionData =
                 CaptureServerExtensionData(servers);
             string originalJson = JsonSerializer.Serialize(servers, JsonOptions);
+            List<string> originalIds = servers.Select(server => server.Id).ToList();
             TResult result = mutate(servers);
+            RejectSharedIdentifierArrivals(
+                ServersDocumentName,
+                ServersCollectionName,
+                originalIds,
+                servers.Select(server => server.Id));
             FreezeCredentialReferencesAcrossRenames(credentialReferences, servers);
             PreserveServerExtensionData(extensionData, servers);
             string mutatedJson = JsonSerializer.Serialize(servers, JsonOptions);
@@ -1247,6 +1315,11 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             ServerInventoryDocument currentDocument = await LoadServerInventoryInternalAsync(
                 requireSupportedSchemaForWrite: true).ConfigureAwait(false);
             List<ServerProfileDto> currentServers = currentDocument.Servers;
+            RejectSharedIdentifierArrivals(
+                ServersDocumentName,
+                ServersCollectionName,
+                currentServers.Select(server => server.Id),
+                servers.Select(server => server.Id));
             Dictionary<string, CredentialReferenceSnapshot> credentialReferences =
                 CaptureCredentialReferences(currentServers);
             Dictionary<string, IReadOnlyDictionary<string, JsonElement>> extensionData =
