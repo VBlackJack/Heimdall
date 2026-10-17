@@ -266,6 +266,26 @@ public class ConnectionStateMachineTests
     }
 
     [Fact]
+    public void Teardown_ThenReuseOfTheSameKey_KeepsRevisionsIncreasing()
+    {
+        // A pane reconnect runs again under the key it was torn down from. Consumers drop every
+        // change whose revision is not above the last one they saw for that key, so a new entry
+        // that counted from 1 again had all its changes taken for late ones.
+        List<long> revisions = [];
+        _sm.StateChanged += change => revisions.Add(change.Revision);
+        TransitionSshToConnected(_sm, "server-1");
+        _sm.Teardown("server-1");
+        long lastRevisionOfTheEndedEntry = revisions[^1];
+
+        Assert.True(_sm.TryTransition("server-1", ConnectionState.Initializing));
+
+        Assert.True(revisions[^1] > lastRevisionOfTheEndedEntry);
+        Assert.True(
+            Assert.IsType<ConnectionStateData>(_sm.GetStateData("server-1")).Revision
+                > lastRevisionOfTheEndedEntry);
+    }
+
+    [Fact]
     public void Teardown_RepeatedDistinctSessionCyclesKeepTrackingBounded()
     {
         const int CycleCount = 500;

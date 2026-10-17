@@ -29,6 +29,12 @@ public sealed class ConnectionStateMachine
     private readonly object _lock = new();
     private bool _isPublishingStateChanges;
 
+    // One counter for every entry rather than one per entry. A pane reconnect runs again under
+    // the key its torn-down entry used, and consumers drop every change whose revision is not
+    // above the last one they saw for that key: an entry that counted from 1 again had its whole
+    // connection taken for late changes of the one before.
+    private long _lastRevision;
+
     private static readonly Dictionary<ConnectionState, HashSet<ConnectionState>> ValidTransitions = new()
     {
         [ConnectionState.Disconnected] = [ConnectionState.Initializing, ConnectionState.Error],
@@ -367,7 +373,7 @@ public sealed class ConnectionStateMachine
         data.PreviousState = previousState;
         data.CurrentState = newState;
         data.LastTransitionUtc = DateTime.UtcNow;
-        long revision = ++data.Revision;
+        long revision = NextRevision(data);
 
         if (newState == ConnectionState.Initializing)
         {
@@ -406,7 +412,7 @@ public sealed class ConnectionStateMachine
         data.CurrentState = ConnectionState.Error;
         data.ErrorMessage = errorMessage;
         data.LastTransitionUtc = DateTime.UtcNow;
-        long revision = ++data.Revision;
+        long revision = NextRevision(data);
         EnqueueStateChange(
             new ConnectionStateChange(
                 serverId,
@@ -416,6 +422,8 @@ public sealed class ConnectionStateMachine
                 revision));
         return true;
     }
+
+    private long NextRevision(ConnectionStateData data) => data.Revision = ++_lastRevision;
 
     private ConnectionStateData GetOrCreate(string serverId)
     {
@@ -438,7 +446,7 @@ public sealed class ConnectionStateMachine
             data.PreviousState = previousState;
             data.CurrentState = ConnectionState.Disconnecting;
             data.LastTransitionUtc = DateTime.UtcNow;
-            long revision = ++data.Revision;
+            long revision = NextRevision(data);
             EnqueueStateChange(
                 new ConnectionStateChange(
                     serverId,
@@ -457,7 +465,7 @@ public sealed class ConnectionStateMachine
         data.TunnelLeaseId = null;
         data.ConnectedAtUtc = null;
         data.LastTransitionUtc = DateTime.UtcNow;
-        long finalRevision = ++data.Revision;
+        long finalRevision = NextRevision(data);
         EnqueueStateChange(
             new ConnectionStateChange(
                 serverId,
@@ -580,6 +588,8 @@ public sealed class ConnectionStateData
     public long? TunnelLeaseId { get; set; }
     public DateTime? ConnectedAtUtc { get; set; }
     public DateTime LastTransitionUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Revision of the last applied transition; see <see cref="ConnectionStateChange.Revision"/>.</summary>
     public long Revision { get; set; }
 
     /// <summary>
@@ -606,7 +616,10 @@ public sealed class ConnectionStateData
 /// <param name="PreviousState">State before the transition.</param>
 /// <param name="NewState">State after the transition.</param>
 /// <param name="ErrorMessage">Optional error associated with the transition.</param>
-/// <param name="Revision">Monotonic revision within this connection lifecycle.</param>
+/// <param name="Revision">
+/// Revision of the transition, increasing across every entry of the machine: it stays increasing
+/// for a key whose entry was torn down and created again.
+/// </param>
 public sealed record ConnectionStateChange(
     string ServerId,
     ConnectionState PreviousState,
