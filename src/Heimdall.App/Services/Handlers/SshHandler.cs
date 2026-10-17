@@ -418,7 +418,9 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     $"SSH.NET auth failed ({failure.Code}), falling back to Plink: {failure.Message}");
                 SetStatusText?.Invoke(_localizer[SshLocalizationKeys.StatusSshRetryingViaPlink]);
 
-                return await ConnectSshViaPlinkAsync(
+                // Whatever the retry returns, the refusal it retried travels with it: a remembered
+                // password the server just refused must be dropped even when Plink then starts.
+                ConnectionResult fallback = await ConnectSshViaPlinkAsync(
                         server,
                         settings,
                         targetHost,
@@ -429,6 +431,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         localizedFailure.Message,
                         tunnelLeaseId: tunnelLeaseId)
                     .ConfigureAwait(false);
+                return fallback with { FallbackFrom = failure.Code };
             }
 
             _connectionSm.SetError(server.Id, localizedFailure.Message);

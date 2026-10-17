@@ -31,12 +31,18 @@ namespace Heimdall.App.Services;
 /// <param name="Session">Typed session result on success; null on failure.</param>
 /// <param name="Failure">Optional structured failure details when the connection fails.</param>
 /// <param name="Warning">Optional non-fatal warning to display on a successful connection.</param>
+/// <param name="FallbackFrom">
+/// The refusal the embedded SSH client met before the connection retried through Plink; null when
+/// no such retry ran. A Plink terminal reports success once its process started, so without this
+/// a password the server had just refused would read as a working connection.
+/// </param>
 public sealed record ConnectionResult(
     bool Success,
     string? ErrorMessage,
     ISessionResult? Session,
     SessionDiagnostic? Failure = null,
-    string? Warning = null);
+    string? Warning = null,
+    SshFailureCode? FallbackFrom = null);
 
 /// <summary>Wraps a <see cref="ServerProfileDto"/> for embedded RDP sessions.</summary>
 /// <param name="Server">The profile the session runs on.</param>

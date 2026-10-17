@@ -40,7 +40,9 @@ namespace Heimdall.App.Services.SharedSessions;
 /// signed in, not when a Plink terminal merely started. A remembered password is dropped when the
 /// server it was sent to rejected the credentials: a bastion's when the connection failed at the
 /// bastion, a session's when it failed at the session, so a wrong session password never costs
-/// the user the bastion's.</para>
+/// the user the bastion's. A session's is dropped too when the SSH client was refused it and the
+/// connection then went on through Plink: the terminal starting says nothing of the password, the
+/// refusal before it does.</para>
 /// </remarks>
 public sealed class SharedCredentialApplier
 {
@@ -310,8 +312,25 @@ public sealed class SharedCredentialApplier
         /// </param>
         /// <param name="failureCode">The failure code of a connection that failed.</param>
         /// <param name="failedAtGateway">Whether the connection failed while dialling a bastion.</param>
-        public async Task SettleAsync(bool succeeded, bool sessionAuthenticated, int? failureCode, bool failedAtGateway)
+        /// <param name="fallbackFrom">
+        /// The refusal the SSH client met at the session before the connection retried through
+        /// Plink; null when no such retry ran.
+        /// </param>
+        public async Task SettleAsync(
+            bool succeeded,
+            bool sessionAuthenticated,
+            int? failureCode,
+            bool failedAtGateway,
+            SshFailureCode? fallbackFrom = null)
         {
+            // The session refused its password, then Plink took over. A Plink terminal reports
+            // success once its process started, so the outcome says nothing more of the password:
+            // the refusal is the last word on it. The bastion was crossed to reach that refusal.
+            if (IsCredentialRejection((int?)fallbackFrom))
+            {
+                await ForgetUsedAsync(SharedSecretKind.Session).ConfigureAwait(false);
+            }
+
             if (succeeded)
             {
                 foreach ((SecretTarget target, string sealedSecret) in Pending)
@@ -332,8 +351,12 @@ public sealed class SharedCredentialApplier
                 return;
             }
 
+            await ForgetUsedAsync(failedAtGateway ? SharedSecretKind.Gateway : SharedSecretKind.Session).ConfigureAwait(false);
+        }
+
+        private async Task ForgetUsedAsync(SharedSecretKind rejected)
+        {
             // Not logged: whether a password was remembered is itself credential data.
-            SharedSecretKind rejected = failedAtGateway ? SharedSecretKind.Gateway : SharedSecretKind.Session;
             foreach (SecretTarget target in Used.Where(target => target.Kind == rejected))
             {
                 await _store.ForgetAsync(target.Kind, target.SourceId, target.Key).ConfigureAwait(false);
