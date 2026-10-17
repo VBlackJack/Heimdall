@@ -242,7 +242,6 @@
                         <TextBox x:Name="TxtResult"
                                  IsReadOnly="True"
                                  TabIndex="12"
-                                 AutomationProperties.LiveSetting="Polite"
                                  FontFamily="Consolas" FontSize="{StaticResource FontSizeBodyLarge}"
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"

@@ -1,0 +1,25 @@
+# Live regions under src/Heimdall.App that declare AutomationProperties.LiveSetting without
+# behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated, because code raises LiveRegionChanged for
+# them. See LiveRegionCensusGuardTests for the rule.
+#
+# Frozen 2026-10-17 at 10 entries. This list may only SHRINK. Moving a site onto the behavior, or
+# deleting its LiveSetting, means deleting its line here, and
+# TheBaselineHoldsNothingThatIsNoLongerABareLiveRegion fails while a line describes nothing.
+#
+# Format: <xaml file>|<x:Name>|<code file>|<member signature>|<guarding condition, or empty>|<raising statement>
+# Every path is relative to src/Heimdall.App. The raising statement is read through
+# ViewSource.IsStatementOfTheMethodBody, inside the guarding condition when one is given.
+#
+# Why these stay off the behavior: the RDP regions announce through RdpLiveRegion, two of them
+# behind a latch that drops repeats; the behavior would add a second announcement on every load
+# and every reappearance. The two others are raised at the one place their text is written.
+Controls\SessionPropertiesView.xaml|Spv_CopyNotice|Controls\SessionPropertiesView.xaml.cs|private void OnCopyValueClick(||UIElementAutomationPeer.FromElement(Spv_CopyNotice)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+MainWindow.xaml|Mw_SettingsExtProvStatus|MainWindow.xaml.cs|private async void OnRescanExternalToolsClick(||Views.EmbeddedRdp.RdpLiveRegion.Announce(Mw_SettingsExtProvStatus);
+Views\EmbeddedRdpView.xaml|TransientToast|Views\EmbeddedRdpView.xaml.cs|private void ShowTransientToast(||_ = RdpLiveRegion.Announce(TransientToast);
+Views\EmbeddedRdpView.xaml|AutofillStatusText|Views\EmbeddedRdpView.xaml.cs|private void UpdateAutofillState(||_ = RdpLiveRegion.Announce(AutofillStatusText);
+Views\EmbeddedRdpView.xaml|ConnectionPhaseStepper|Views\EmbeddedRdpView.xaml.cs|private void UpdatePhaseStepperAutomationName(||_ = RdpLiveRegion.Announce(ConnectionPhaseStepper);
+Views\EmbeddedRdpView.xaml|HealthDot|Views\EmbeddedRdpView.xaml.cs|private void UpdateHealthDot(|if (_healthDotAnnouncements.ShouldAnnounce(label))|_ = RdpLiveRegion.Announce(HealthDot);
+Views\EmbeddedRdpView.xaml|RedirectionIndicatorsPanel|Views\EmbeddedRdpView.xaml.cs|private void UpdateRedirectionIndicators(||_ = RdpLiveRegion.Announce(RedirectionIndicatorsPanel);
+Views\EmbeddedRdpView.xaml|CertificatePromptMessageText|Views\EmbeddedRdpView.xaml.cs|private void ShowCertificatePrompt(||_ = RdpLiveRegion.Announce(CertificatePromptMessageText);
+Views\EmbeddedRdpView.xaml|StatusTextBlock|Views\EmbeddedRdpView.xaml.cs|private void SetStatusText(|if (_statusAnnouncements.ShouldAnnounce(text))|_ = RdpLiveRegion.Announce(StatusTextBlock);
+Views\EmbeddedRdpView.xaml|ReconnectMessageText|Views\EmbeddedRdpView.xaml.cs|private void ShowReconnectOverlay(||_ = RdpLiveRegion.Announce(ReconnectMessageText);

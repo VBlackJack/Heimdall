@@ -193,7 +193,6 @@
                                   RowBackground="Transparent"
                                   AlternatingRowBackground="{DynamicResource SurfaceBrush}"
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
-                                  AutomationProperties.LiveSetting="Polite"
                                   TabIndex="3"
                                   ItemsSource="{Binding CronEntries}"
                                   SelectedItem="{Binding SelectedCronEntry, Mode=TwoWay}">
@@ -329,7 +328,6 @@
                                   RowBackground="Transparent"
                                   AlternatingRowBackground="{DynamicResource SurfaceBrush}"
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
-                                  AutomationProperties.LiveSetting="Polite"
                                   TabIndex="5"
                                   ItemsSource="{Binding TaskEntries}">
                             <DataGrid.RowStyle>

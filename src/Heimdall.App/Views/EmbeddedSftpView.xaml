@@ -730,13 +730,14 @@
                     MaxWidth="{StaticResource SftpEmptyStateMaxWidth}"
                     Visibility="{Binding ShowEmptyDirectory, Converter={StaticResource BoolToVisibilityConverter}}">
             <TextBlock x:Name="EmptyDirectoryText"
-                       Text="{Binding EmptyStateText}"
+                       Text="{Binding EmptyStateText, NotifyOnTargetUpdated=True}"
                        HorizontalAlignment="Center"
                        TextAlignment="Center"
                        TextWrapping="Wrap"
                        FontSize="{StaticResource FontSizeBodyLarge}"
                        Foreground="{DynamicResource TextSecondaryBrush}"
-                       AutomationProperties.LiveSetting="Polite"/>
+                       AutomationProperties.LiveSetting="Polite"
+                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
             <Button x:Name="EmptyStateActionButton"
                     Content="{Binding EmptyStateActionText}"
                     Command="{Binding RunEmptyStateActionCommand}"
@@ -827,8 +828,7 @@
                                    Text="{Binding TransferStatusText}"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    TextTrimming="CharacterEllipsis"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                   AutomationProperties.LiveSetting="Polite"/>
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
                         <ProgressBar x:Name="TransferProgressBar"
                                      Value="{Binding TransferProgressValue}"
                                      IsIndeterminate="{Binding IsTransferIndeterminate}"
@@ -974,11 +974,12 @@
                            Margin="0,0,4,0"
                            Visibility="{Binding IsErrorStatus, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <TextBlock x:Name="StatusBarText"
-                           Text="{Binding StatusText}"
+                           Text="{Binding StatusText, NotifyOnTargetUpdated=True}"
                            ToolTip="{Binding StatusText}"
                            FontSize="{StaticResource FontSizeCaption}"
                            TextTrimming="CharacterEllipsis"
-                           AutomationProperties.LiveSetting="Polite">
+                           AutomationProperties.LiveSetting="Polite"
+                           behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>

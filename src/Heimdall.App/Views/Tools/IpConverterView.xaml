@@ -156,8 +156,7 @@
                         BorderBrush="{DynamicResource BorderBrush}"
                         BorderThickness="1"
                         CornerRadius="{StaticResource CornerRadiusSm}"
-                        Padding="{StaticResource PaddingSectionCard}"
-                        AutomationProperties.LiveSetting="Polite">
+                        Padding="{StaticResource PaddingSectionCard}">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed" />

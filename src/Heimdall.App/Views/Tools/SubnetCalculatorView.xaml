@@ -105,8 +105,7 @@
                         Background="{DynamicResource CardBrush}"
                         BorderBrush="{DynamicResource BorderBrush}"
                         BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
-                        Padding="{StaticResource PaddingSectionCard}"
-                        AutomationProperties.LiveSetting="Polite">
+                        Padding="{StaticResource PaddingSectionCard}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>

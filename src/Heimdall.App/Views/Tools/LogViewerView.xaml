@@ -188,7 +188,7 @@
                 Margin="{StaticResource SpacingSm}"
                 Padding="0">
             <RichTextBox x:Name="LogViewer"
-                         IsReadOnly="True" AutomationProperties.LiveSetting="Polite"
+                         IsReadOnly="True"
                          FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
                          Background="{DynamicResource CardBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"

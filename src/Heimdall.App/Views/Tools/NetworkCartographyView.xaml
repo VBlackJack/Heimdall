@@ -180,7 +180,6 @@
             <DataGrid x:Name="ResultsGrid"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
-                      AutomationProperties.LiveSetting="Polite"
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal"
                       CanUserSortColumns="True"

@@ -238,7 +238,6 @@
                              BorderBrush="{DynamicResource BorderBrush}"
                          VerticalAlignment="Center"
                          AutomationProperties.AutomationId="HmacGenerator.OutputField"
-                         AutomationProperties.LiveSetting="Polite"
                          AutomationProperties.Name="{loc:Translate ToolHmacOutputLabel}"/>
                 </DockPanel>
 

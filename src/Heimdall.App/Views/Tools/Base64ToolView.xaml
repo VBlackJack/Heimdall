@@ -216,7 +216,6 @@
                              BorderBrush="{DynamicResource BorderBrush}"
                              BorderThickness="1"
                              Padding="{StaticResource PaddingInput}"
-                             AutomationProperties.LiveSetting="Polite"
                              AutomationProperties.Name="{loc:Translate ToolBase64OutputLabel}" />
                 </Border>
             </Grid>

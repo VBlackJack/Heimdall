@@ -191,8 +191,7 @@
 
                 <!-- Results -->
                 <Border x:Name="ResultsPanel"
-                        Style="{StaticResource ToolResultsCardStyle}"
-                        AutomationProperties.LiveSetting="Polite">
+                        Style="{StaticResource ToolResultsCardStyle}">
                     <StackPanel>
                         <DockPanel Margin="{StaticResource MarginStackItem}">
                             <Button x:Name="BtnCopyResults"

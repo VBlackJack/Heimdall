@@ -111,9 +111,20 @@ public static class LiveRegionBehavior
         object sender,
         DependencyPropertyChangedEventArgs e)
     {
-        if (sender is FrameworkElement element && (bool)e.NewValue)
+        if (sender is not FrameworkElement element)
+        {
+            return;
+        }
+
+        if ((bool)e.NewValue)
         {
             QueueAnnouncement(element);
+        }
+        else
+        {
+            // A region that leaves the screen is heard again when it comes back, even with the
+            // same text: the disconnect overlay says the same words on every disconnect.
+            element.ClearValue(LastAnnouncedTextProperty);
         }
     }
 

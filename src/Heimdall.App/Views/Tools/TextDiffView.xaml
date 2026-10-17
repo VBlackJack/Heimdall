@@ -285,8 +285,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Auto">
                     <ItemsControl x:Name="DiffOutput"
-                                  ItemsSource="{Binding DiffLines}"
-                                  AutomationProperties.LiveSetting="Polite">
+                                  ItemsSource="{Binding DiffLines}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:DiffLineDisplay}">
                                 <Grid>

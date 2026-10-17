@@ -139,7 +139,6 @@
                      IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                      VerticalScrollBarVisibility="Auto"
                      HorizontalScrollBarVisibility="Auto"
-                     AutomationProperties.LiveSetting="Polite"
                      Background="{DynamicResource BackgroundBrush}"
                      Foreground="{DynamicResource TextPrimaryBrush}"
                      BorderThickness="0"/>

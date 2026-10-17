@@ -211,8 +211,7 @@
                       HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
                       ColumnHeaderStyle="{StaticResource ThemedDataGridColumnHeaderStyle}"
                       CellStyle="{StaticResource ThemedDataGridCellStyle}"
-                      TabIndex="9"
-                      AutomationProperties.LiveSetting="Polite">
+                      TabIndex="9">
                 <DataGrid.RowStyle>
                     <Style TargetType="{x:Type DataGridRow}"
                            BasedOn="{StaticResource ThemedDataGridRowStyle}">

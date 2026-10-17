@@ -130,8 +130,7 @@
                             Background="{DynamicResource CardBrush}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
-                            Padding="{StaticResource PaddingSectionCard}"
-                            AutomationProperties.LiveSetting="Polite">
+                            Padding="{StaticResource PaddingSectionCard}">
                         <StackPanel>
                             <TextBlock x:Name="TxtCardIdentity" Text=""
                                        FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"
@@ -202,8 +201,7 @@
                             Background="{DynamicResource CardBrush}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
-                            Padding="{StaticResource PaddingSectionCard}"
-                            AutomationProperties.LiveSetting="Polite">
+                            Padding="{StaticResource PaddingSectionCard}">
                         <StackPanel>
                             <TextBlock x:Name="TxtCardProtocol" Text=""
                                        FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"
@@ -261,8 +259,7 @@
                             Background="{DynamicResource CardBrush}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
-                            Padding="{StaticResource PaddingSectionCard}"
-                            AutomationProperties.LiveSetting="Polite">
+                            Padding="{StaticResource PaddingSectionCard}">
                         <StackPanel>
                             <TextBlock x:Name="TxtCardFindings" Text=""
                                        FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"

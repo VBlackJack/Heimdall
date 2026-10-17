@@ -77,8 +77,7 @@
 
         <!-- Content -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="{StaticResource SpacingLg}">
-            <StackPanel MaxWidth="{StaticResource ToolContentMaxWidth}"
-                        AutomationProperties.LiveSetting="Polite">
+            <StackPanel MaxWidth="{StaticResource ToolContentMaxWidth}">
 
                 <!-- Input -->
                 <TextBlock Text="{loc:Translate ToolDateTimeInputLabel}"

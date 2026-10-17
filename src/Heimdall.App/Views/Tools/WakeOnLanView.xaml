@@ -195,7 +195,6 @@
                                  Padding="{StaticResource PaddingInput}"
                                  MaxHeight="200"
                                  AcceptsReturn="True"
-                                 AutomationProperties.LiveSetting="Polite"
                                  Background="{DynamicResource CardBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
                                  FontFamily="Consolas"

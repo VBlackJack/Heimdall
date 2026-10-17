@@ -286,6 +286,7 @@
                         Padding="{StaticResource SpacingLg}"
                         AutomationProperties.Name="{loc:Translate A11yUpdateBanner}"
                         AutomationProperties.LiveSetting="Polite"
+                        behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                         Visibility="{Binding Update.IsBannerShown, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Border.InputBindings>
                         <KeyBinding Key="Escape" Command="{Binding Update.LaterCommand}"/>
@@ -343,6 +344,7 @@
                         Padding="{StaticResource SpacingLg}"
                         AutomationProperties.Name="{loc:Translate A11ySessionLoadNotice}"
                         AutomationProperties.LiveSetting="Polite"
+                        behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                         Visibility="{Binding Connection.IsSessionLoadNoticeShown, Converter={StaticResource BoolToVisibilityConverter}}">
                     <DockPanel LastChildFill="True">
                         <Button x:Name="Mw_SessionLoadBannerDismiss" DockPanel.Dock="Right"
@@ -6583,14 +6585,15 @@
                                TextWrapping="Wrap"
                                Margin="0,0,0,24"/>
 
-                    <TextBlock Text="{Binding CompletionErrorText}"
+                    <TextBlock Text="{Binding CompletionErrorText, NotifyOnTargetUpdated=True}"
                                Visibility="{Binding CompletionErrorText, Converter={StaticResource NullToVisibilityConverter}}"
                                Foreground="{DynamicResource ErrorTextBrush}"
                                FontSize="{StaticResource FontSizeBody}"
                                HorizontalAlignment="Center" TextAlignment="Center"
                                TextWrapping="Wrap"
                                Margin="{StaticResource MarginStackItem}"
-                               AutomationProperties.LiveSetting="Assertive"/>
+                               AutomationProperties.LiveSetting="Assertive"
+                               behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
 
                     <!-- Navigation buttons -->
                     <DockPanel HorizontalAlignment="Stretch"

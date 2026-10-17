@@ -726,9 +726,10 @@
                                     Padding="{StaticResource PaddingButtonPrimary}"
                                     FontSize="{StaticResource FontSizeBody}"
                                     HorizontalAlignment="Right"/>
-                            <TextBlock Text="{Binding BroadcastStatus}"
+                            <TextBlock Text="{Binding BroadcastStatus, NotifyOnTargetUpdated=True}"
                                        Visibility="{Binding HasBroadcastStatus, Converter={StaticResource BoolToVisibilityConverter}}"
                                        AutomationProperties.LiveSetting="Polite"
+                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="{StaticResource FontSizeCaption}"
                                        TextWrapping="Wrap"

@@ -16,6 +16,7 @@
 <UserControl x:Class="Heimdall.App.Views.Tools.SecNumCloudAuditView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
              Background="{DynamicResource BackgroundBrush}">
     <Grid>
         <Grid.RowDefinitions>
@@ -181,7 +182,8 @@
                     <TextBlock x:Name="TxtCompliancePercent" Text=""
                                FontSize="{StaticResource FontSizeHeadline}" FontWeight="Bold"
                                VerticalAlignment="Center"
-                               AutomationProperties.LiveSetting="Polite"/>
+                               AutomationProperties.LiveSetting="Polite"
+                               behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                     <TextBlock x:Name="LblCompliance" Text=""
                                FontSize="{StaticResource FontSizeSubtitle}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
@@ -190,11 +192,10 @@
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <!-- Retained non-token trailing 12px gaps: no exact token matches this horizontal metric summary spacing. -->
                     <TextBlock x:Name="TxtPassCount" Text="" FontSize="{StaticResource FontSizeBody}"
-                               Margin="0,0,12,0" AutomationProperties.LiveSetting="Polite"/>
+                               Margin="0,0,12,0"/>
                     <TextBlock x:Name="TxtWarnCount" Text="" FontSize="{StaticResource FontSizeBody}"
-                               Margin="0,0,12,0" AutomationProperties.LiveSetting="Polite"/>
-                    <TextBlock x:Name="TxtFailCount" Text="" FontSize="{StaticResource FontSizeBody}"
-                               AutomationProperties.LiveSetting="Polite"/>
+                               Margin="0,0,12,0"/>
+                    <TextBlock x:Name="TxtFailCount" Text="" FontSize="{StaticResource FontSizeBody}"/>
                 </StackPanel>
             </DockPanel>
         </Border>

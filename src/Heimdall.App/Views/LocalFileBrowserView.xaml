@@ -1,6 +1,7 @@
 <UserControl x:Class="Heimdall.App.Views.LocalFileBrowserView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:conv="clr-namespace:Heimdall.App.Converters"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
@@ -268,11 +269,12 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="StatusBarText"
-                       Text="{Binding StatusText}"
+                       Text="{Binding StatusText, NotifyOnTargetUpdated=True}"
                        ToolTip="{Binding StatusText}"
                        FontSize="{StaticResource FontSizeCaption}"
                        TextTrimming="CharacterEllipsis"
-                       AutomationProperties.LiveSetting="Polite">
+                       AutomationProperties.LiveSetting="Polite"
+                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
                         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>

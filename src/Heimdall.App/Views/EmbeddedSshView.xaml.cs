@@ -1864,6 +1864,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             if (!string.IsNullOrWhiteSpace(securityDisconnectMessage))
             {
                 ReconnectMessageText.Text = securityDisconnectMessage;
+                Behaviors.LiveRegionBehavior.Announce(ReconnectMessageText);
                 SetReconnectDetail(null);
                 UpdateStatus(SessionStatusTokens.Error);
                 SessionEnded?.Invoke(securityDisconnectMessage);
@@ -1875,11 +1876,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             if (disconnectInfo.IsClean)
             {
                 ReconnectMessageText.Text = L("SshSessionEndedMessage");
+                Behaviors.LiveRegionBehavior.Announce(ReconnectMessageText);
                 SetReconnectDetail(null);
             }
             else
             {
                 ReconnectMessageText.Text = L("SshDisconnectedMessage");
+                Behaviors.LiveRegionBehavior.Announce(ReconnectMessageText);
                 SetReconnectDetail(errorMessage);
             }
 
@@ -1938,6 +1941,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             }
 
             ReconnectMessageText.Text = message;
+            Behaviors.LiveRegionBehavior.Announce(ReconnectMessageText);
             string securityText = $"\r\n\x1b[91m{message}\x1b[0m\r\n";
             QueueOutput(Encoding.UTF8.GetBytes(securityText));
         });
@@ -2584,6 +2588,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (ReconnectOverlay.Visibility != Visibility.Visible)
         {
             ReconnectMessageText.Text = L("SshDisconnectedMessage");
+            Behaviors.LiveRegionBehavior.Announce(ReconnectMessageText);
         }
 
         OverlayViewOutputButton.Content = L("BtnViewOutputOverlay");
@@ -2952,6 +2957,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             _ => status
         };
         StatusTextBlock.Text = displayText;
+        Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
 
         var isDisconnected = string.Equals(status, SessionStatusTokens.Disconnected, StringComparison.OrdinalIgnoreCase)
             || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase);

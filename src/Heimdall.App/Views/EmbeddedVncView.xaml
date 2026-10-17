@@ -114,7 +114,8 @@
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
-                               AutomationProperties.LiveSetting="Polite"/>
+                               AutomationProperties.LiveSetting="Polite"
+                               behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                 </StackPanel>
             </DockPanel>
         </Border>

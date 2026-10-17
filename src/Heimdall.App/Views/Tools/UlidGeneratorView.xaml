@@ -117,7 +117,6 @@
                              Padding="{StaticResource PaddingInput}"
                              IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolUlidResult}"
-                             AutomationProperties.LiveSetting="Polite"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource AccentBrush}"
                              BorderBrush="{DynamicResource BorderBrush}" />
@@ -169,7 +168,6 @@
                                  Padding="{StaticResource PaddingInput}"
                                  MaxHeight="300"
                                  IsReadOnly="True"
-                                 AutomationProperties.LiveSetting="Polite"
                                  AcceptsReturn="True"
                                  TextWrapping="NoWrap"
                                  VerticalScrollBarVisibility="Auto"

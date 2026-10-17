@@ -264,7 +264,6 @@
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource AccentBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
-                             AutomationProperties.LiveSetting="Polite"
                              AutomationProperties.Name="{loc:Translate ToolTextCaseOutputLabel}" />
                 </DockPanel>
             </StackPanel>
