@@ -45,9 +45,9 @@ namespace Heimdall.App.Tests;
 
 public sealed partial class SessionCoordinatorPreMountTests
 {
-    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+    internal static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
 
-    private static ConnectionResult SuccessWithTerminalSession()
+    internal static ConnectionResult SuccessWithTerminalSession()
     {
         return new ConnectionResult(true, null, new TerminalSessionResult(new FakeTerminalSession()));
     }
@@ -208,7 +208,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         }
     }
 
-    private sealed class TestHarness : IDisposable
+    internal sealed class TestHarness : IDisposable
     {
         private readonly string _rootPath;
 
@@ -261,7 +261,8 @@ public sealed partial class SessionCoordinatorPreMountTests
             ITunnelsViewModelFactory? tunnelsFactory = null,
             ISessionRestoreCoordinator? sessionRestore = null,
             ICommandPaletteViewModelFactory? paletteFactory = null,
-            Func<IConfigManager, IProfileLookup>? profileLookupFactory = null)
+            Func<IConfigManager, IProfileLookup>? profileLookupFactory = null,
+            Func<string, LocalizationManager, SharedCredentialApplier>? sharedCredentialsFactory = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -323,7 +324,8 @@ public sealed partial class SessionCoordinatorPreMountTests
                 new FakeRdpImportService(),
                 new PuttySessionImporter(new FakePuttySessionRegistrySource(), configManager),
                 new Heimdall.App.Services.Import.KnownHostsImporter(configManager, hostKeyStore),
-                profileLookup: profileLookup);
+                profileLookup: profileLookup,
+                sharedCredentials: sharedCredentialsFactory?.Invoke(rootPath, localizer));
             // A real trusted-host-keys view model rather than null!: the shell's own load
             // sequence runs LoadFromSettings, which refreshes it, so the null stood between this
             // harness and every assertion about what loading the shell does.
@@ -483,7 +485,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         }
     }
 
-    private sealed class ControlledProtocolHandler(string protocol) : IProtocolHandler
+    internal sealed class ControlledProtocolHandler(string protocol) : IProtocolHandler
     {
         public string Protocol { get; } = protocol;
 
@@ -511,6 +513,9 @@ public sealed partial class SessionCoordinatorPreMountTests
         /// </summary>
         public ServerProfileDto? LastServer { get; private set; }
 
+        /// <summary>The settings instance the last connection attempt was handed, kept by reference.</summary>
+        public AppSettings? LastSettings { get; private set; }
+
         /// <summary>The RDP mode the last connection attempt was asked to run under.</summary>
         public RdpModeOverride LastRdpModeOverride { get; private set; } = RdpModeOverride.UseProfile;
 
@@ -521,13 +526,14 @@ public sealed partial class SessionCoordinatorPreMountTests
             RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
         {
             LastServer = server;
+            LastSettings = settings;
             LastRdpModeOverride = rdpModeOverride;
             Started.TrySetResult(ct);
             return Result.Task.WaitAsync(ct);
         }
     }
 
-    private sealed class FakeEmbeddedSessionManager : IEmbeddedSessionManager
+    internal sealed class FakeEmbeddedSessionManager : IEmbeddedSessionManager
     {
         /// <summary>Unused here: nothing in these tests broadcasts to other sessions.</summary>
         public Func<IReadOnlyList<SessionTabViewModel>>? ActiveSessionsProvider { get; set; }
@@ -756,7 +762,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         }
     }
 
-    private sealed class FakeDialogService : IDialogService
+    internal sealed class FakeDialogService : IDialogService
     {
         public List<SharedSessionImportReportDialogViewModel> SharedReports { get; } = [];
 
@@ -940,7 +946,7 @@ public sealed partial class SessionCoordinatorPreMountTests
     /// which is exactly how a user gesture reached the silent path in the first place.
     /// </para>
     /// </remarks>
-    private sealed class RecordingPaneCloseArbiter : IPaneCloseArbiter
+    internal sealed class RecordingPaneCloseArbiter : IPaneCloseArbiter
     {
         private readonly PaneCloseArbiter _inner = new();
         private readonly List<CloseRequest> _polled = [];
