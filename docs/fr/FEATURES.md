@@ -469,6 +469,22 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     lecture seule : le nombre de constats par vérification, puis les constats par vérification, avec
     **Copier** (texte brut) et **Exporter en CSV** (chaque cellule neutralisée contre l'injection de
     formules). Quand un rechargement change le nombre de problèmes, la ligne d'état l'indique
+  - Les mots de passe sont personnels : un fichier partagé n'en fournit jamais. Quand l'agent SSH ne
+    propose aucune clé, le mot de passe d'un bastion partagé et celui d'une session SSH partagée
+    sont demandés avant la connexion, avec **Mémoriser ce mot de passe sur cet ordinateur** (décoché
+    par défaut). Un mot de passe mémorisé est gardé une fois que le serveur l'a accepté, dans
+    `shared-session-secrets.json` sous le dossier de données, scellé avec DPAPI pour le compte
+    Windows, et rangé sous l'hôte, le port et l'identifiant du bastion, ou sous la session, son
+    hôte, son port et son identifiant : un fichier qui envoie une session vers un autre hôte ou un
+    autre identifiant fait redemander. Un mot de passe que le serveur refuse est oublié, comme celui
+    que cet ordinateur ne peut plus ouvrir. Il n'est jamais exporté ni importé, jamais écrit dans le
+    fichier partagé, la copie hors ligne ou servers.json, et **Valeurs par défaut** le garde. Chaque
+    source de la carte des paramètres a **Oublier les mots de passe enregistrés**, et supprimer une
+    source oublie ses mots de passe. La réouverture des sessions au démarrage et **Tout connecter**
+    utilisent les mots de passe mémorisés sans jamais demander ; le mot de passe du fournisseur
+    d'identifiants externe passe en premier, et Windows Hello est demandé avant toute lecture d'un
+    mot de passe mémorisé. Le panneau SFTP ouvert à côté d'une session SSH partagée se connecte avec
+    les mêmes mots de passe
 - Les imports de sessions JSON ne contiennent que des profils de serveurs. Les définitions de passerelles SSH vivent dans `settings.json`
   (`AppSettings.SshGateways`), si bien que des jeux de test comme `Heimdall-TestEnv` doivent injecter la
   passerelle correspondante dans la configuration de build d'exécution exacte avant que les sessions tunnelisées puissent la résoudre.
