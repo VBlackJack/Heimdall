@@ -85,17 +85,20 @@ public partial class RegexTesterView : UserControl, IToolView
         var groupBrush = TryFindResource("WarningBrush") is SolidColorBrush warning
             ? new SolidColorBrush(warning.Color) { Opacity = 100.0 / 255.0 }
             : null;
-        var foreground = TryFindResource("TextPrimaryBrush") as Brush;
-        var document = new FlowDocument { FontFamily = (System.Windows.Media.FontFamily)FindResource("FontFamilyMonospace"), FontSize = (double)FindResource("FontSizeBody"), PagePadding = new Thickness(0) };
+        var document = new FlowDocument
+        {
+            FontFamily = (System.Windows.Media.FontFamily)FindResource("FontFamilyMonospace"),
+            FontSize = (double)FindResource("FontSizeBodyLarge"),
+            PagePadding = new Thickness(0),
+        };
         var paragraph = new Paragraph { Margin = new Thickness(0) };
 
         foreach (var segment in _vm.HighlightSegments)
         {
-            var run = new Run(segment.Text);
-            if (foreground is not null)
+            var run = new Run(segment.Text)
             {
-                run.Foreground = foreground;
-            }
+                Foreground = Brushes.Transparent,
+            };
 
             run.Background = segment.Kind switch
             {

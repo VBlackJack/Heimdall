@@ -39,6 +39,9 @@ public partial class MainWindow
     /// <summary>Tolerance, in device-independent pixels, before the strip counts as overflowing.</summary>
     private const double TabStripOverflowTolerance = 0.5;
 
+    /// <summary>The space between the list button and the quick connect button (their markup gap).</summary>
+    internal const double TabStripButtonGap = 2;
+
     private ScrollViewer? _tabStripScroller;
 
     private void OnSessionTabStripLoaded(object sender, RoutedEventArgs e)
@@ -103,17 +106,46 @@ public partial class MainWindow
             return;
         }
 
-        double reserved = _tabStripScroller.Margin.Right;
-        bool overflowing = _tabStripScroller.ExtentWidth
-            > _tabStripScroller.ViewportWidth + reserved + TabStripOverflowTolerance;
+        TabStripReserve reserve = ComputeTabStripReserve(
+            _tabStripScroller.ExtentWidth,
+            _tabStripScroller.ViewportWidth,
+            _tabStripScroller.Margin.Right,
+            Mw_SessionTabQuickAddButton.Width,
+            Mw_SessionTabListButton.Width);
 
-        Mw_SessionTabListButton.Visibility = overflowing ? Visibility.Visible : Visibility.Collapsed;
-        double wanted = overflowing ? Mw_SessionTabListButton.Width : 0;
-        if (!wanted.Equals(reserved))
+        Mw_SessionTabListButton.Visibility = reserve.Overflowing ? Visibility.Visible : Visibility.Collapsed;
+        if (!reserve.RightMargin.Equals(_tabStripScroller.Margin.Right))
         {
-            _tabStripScroller.Margin = new Thickness(0, 0, wanted, 0);
+            _tabStripScroller.Margin = new Thickness(0, 0, reserve.RightMargin, 0);
             ScrollSelectedTabIntoView();
         }
+    }
+
+    /// <summary>Whether the tabs overflow, and the room the strip leaves at its right end.</summary>
+    internal readonly record struct TabStripReserve(bool Overflowing, double RightMargin);
+
+    /// <summary>
+    /// Decides the strip's right margin: the quick connect button always, the list button while
+    /// the tabs overflow. Overflow is judged with the list button's share of the current margin
+    /// added back, so taking the room does not undo the decision that took it.
+    /// </summary>
+    /// <param name="extentWidth">The width the tabs need.</param>
+    /// <param name="viewportWidth">The width the strip shows.</param>
+    /// <param name="currentRightMargin">The margin the strip has now.</param>
+    /// <param name="quickAddWidth">The quick connect button's width.</param>
+    /// <param name="listButtonWidth">The list button's width.</param>
+    internal static TabStripReserve ComputeTabStripReserve(
+        double extentWidth,
+        double viewportWidth,
+        double currentRightMargin,
+        double quickAddWidth,
+        double listButtonWidth)
+    {
+        double quickAdd = double.IsNaN(quickAddWidth) ? 0 : quickAddWidth;
+        double listShare = Math.Max(0, currentRightMargin - quickAdd);
+        bool overflowing = extentWidth > viewportWidth + listShare + TabStripOverflowTolerance;
+        double margin = quickAdd + (overflowing ? listButtonWidth + TabStripButtonGap : 0);
+        return new TabStripReserve(overflowing, margin);
     }
 
     // The strip has no vertical extent, so the wheel scrolls it sideways.
