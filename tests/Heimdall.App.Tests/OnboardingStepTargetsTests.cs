@@ -16,7 +16,8 @@
 
 using System.IO;
 using System.Text.Json;
-using System.Text.RegularExpressions;
+using System.Xml.Linq;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.App.ViewModels.Onboarding;
 using Heimdall.App.ViewModels.Shell;
 
@@ -43,7 +44,9 @@ public sealed class OnboardingStepTargetsTests
     [Fact]
     public void EveryTargetedStep_NamesAnElementThatExists()
     {
-        string xaml = ReadMainWindowXaml();
+        // Parsed rather than matched as text, so a target left behind in an XML comment does not
+        // count as existing.
+        XDocument xaml = XDocument.Load(MainWindowXamlPath());
 
         foreach (OnboardingFlowViewModel.Step step in OnboardingFlowViewModel.Steps)
         {
@@ -53,10 +56,133 @@ public sealed class OnboardingStepTargetsTests
             }
 
             Assert.True(
-                Regex.IsMatch(xaml, $@"x:Name\s*=\s*""{Regex.Escape(step.TargetElementName)}"""),
+                xaml.Descendants().Count(e => (string?)e.Attribute(XamlNamespace + "Name") == step.TargetElementName) == 1,
                 $"Onboarding step targets '{step.TargetElementName}', which no longer exists in "
                 + "MainWindow.xaml. The step would show a centred card and teach nothing.");
         }
+    }
+
+    /// <summary>
+    /// Existing is not enough: the target also has to be on screen when its step is shown.
+    /// </summary>
+    /// <remarks>
+    /// The first three steps named controls that existed and still drew no ring on a fresh
+    /// profile, from the day the spotlight shipped: they live in the sidebar's session list, the
+    /// shipped settings open that sidebar on its Tools tab, and the step only opened the shell's
+    /// Sessions tab. So every visibility gate between a target and the window is read from the
+    /// XAML, and each one must be a gate the step declares it opens. A gate the tour does not know
+    /// how to open fails here rather than as a centred card nobody reports.
+    /// </remarks>
+    [Fact]
+    public void EveryTargetedStep_OpensEveryGateThatCanHideItsTarget()
+    {
+        XDocument xaml = XDocument.Load(MainWindowXamlPath());
+
+        foreach (OnboardingFlowViewModel.Step step in OnboardingFlowViewModel.Steps)
+        {
+            if (step.TargetElementName is null)
+            {
+                continue;
+            }
+
+            foreach (string gate in GatesAbove(xaml, step.TargetElementName))
+            {
+                bool opened = gate switch
+                {
+                    SessionSidebarGate => step.InSessionSidebar,
+                    SessionsShellTabGate => string.Equals(step.ShellTab, ShellTab.Sessions, StringComparison.Ordinal),
+                    ToolsShellTabGate => string.Equals(step.ShellTab, ShellTab.Tools, StringComparison.Ordinal),
+                    _ => false,
+                };
+
+                Assert.True(
+                    opened,
+                    $"Onboarding step '{step.TitleKey}' targets '{step.TargetElementName}', which "
+                    + $"is hidden behind {gate} and the step does not open it. The step would show a "
+                    + "centred card and teach nothing.");
+            }
+        }
+    }
+
+    // Keeps the walk above from passing by finding nothing: the session list is behind both
+    // sidebar gates, the sidebar switch and the column Ctrl+B collapses, and the walk has to see
+    // each of them. A renamed switch or column would otherwise drop its gate without a sound.
+    [Fact]
+    public void TheGateWalk_SeesBothWaysTheSessionListIsHidden()
+    {
+        XDocument xaml = XDocument.Load(MainWindowXamlPath());
+
+        IReadOnlyList<string> gates = GatesAbove(xaml, "SessionTreeView");
+
+        Assert.Contains(SessionsShellTabGate, gates);
+        Assert.Equal(2, gates.Count(g => g == SessionSidebarGate));
+    }
+
+    [Fact]
+    public void TheSessionListSteps_AreTheOnesThatOpenTheSidebar()
+    {
+        string[] inSidebar = OnboardingFlowViewModel.Steps
+            .Where(s => s.InSessionSidebar)
+            .Select(s => s.TargetElementName!)
+            .ToArray();
+
+        Assert.Equal(["SessionTreeView", "AddButton", "Mw_FilterBox"], inSidebar);
+    }
+
+    [Theory]
+    [InlineData(false, 1, 0)]
+    [InlineData(true, 1, 1)]
+    public void ASessionListStep_OpensTheSessionsSidebarAndShowsAHiddenSidebar(
+        bool sidebarHidden, int expectedTabOpens, int expectedShows)
+    {
+        int tabOpens = 0;
+        int shows = 0;
+
+        MainWindow.RevealOnboardingSessionSidebar(
+            OnboardingFlowViewModel.Steps[0], sidebarHidden, () => tabOpens++, () => shows++);
+
+        Assert.Equal(expectedTabOpens, tabOpens);
+
+        // Showing is a toggle underneath, so a visible sidebar must be left alone: toggling it
+        // would hide the very list the step is about to point at.
+        Assert.Equal(expectedShows, shows);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AStepOutsideTheSessionList_LeavesTheSidebarAsTheUserSetIt(bool sidebarHidden)
+    {
+        OnboardingFlowViewModel.Step toolbarStep = Assert.Single(
+            OnboardingFlowViewModel.Steps, s => s.TargetElementName == "QuickConnectButton");
+        int calls = 0;
+
+        MainWindow.RevealOnboardingSessionSidebar(toolbarStep, sidebarHidden, () => calls++, () => calls++);
+        MainWindow.RevealOnboardingSessionSidebar(null, sidebarHidden, () => calls++, () => calls++);
+
+        Assert.Equal(0, calls);
+    }
+
+    // The reveal has to run before the spotlight is measured, or the first measure still finds the
+    // list collapsed and the step falls back to the centred card.
+    [Fact]
+    public void TheShell_RevealsTheSidebarBeforeMeasuringTheTarget()
+    {
+        string logic = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(File.ReadAllText(
+                Path.Combine(RepoRoot(), "src", "Heimdall.App", "MainWindow.xaml.cs"))),
+            ApplyStepMember);
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(logic, RevealStatement),
+            "revealing the session sidebar is not a step of ApplyOnboardingStep");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(logic, MeasureStatement),
+            "measuring the target is not a step of ApplyOnboardingStep");
+        Assert.True(
+            logic.IndexOf(RevealStatement, StringComparison.Ordinal)
+                < logic.IndexOf(MeasureStatement, StringComparison.Ordinal),
+            "ApplyOnboardingStep measures the target before it reveals the session sidebar.");
     }
 
     [Fact]
@@ -110,8 +236,85 @@ public sealed class OnboardingStepTargetsTests
         Assert.Contains(OnboardingFlowViewModel.Steps, s => s.TargetElementName is not null);
     }
 
-    private static string ReadMainWindowXaml() =>
-        File.ReadAllText(Path.Combine(RepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
+    private const string SessionSidebarGate = "the session sidebar";
+    private const string SessionsShellTabGate = "the Sessions tab";
+    private const string ToolsShellTabGate = "the Tools tab";
+
+    private const string ApplyStepMember = "private void ApplyOnboardingStep()";
+    private const string RevealStatement = "RevealOnboardingSessionSidebar(";
+    private const string MeasureStatement =
+        "Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => SpotlightOnboardingTarget(step)));";
+
+    private static readonly XNamespace XamlNamespace = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+    /// <summary>
+    /// Every gate that can collapse the named element: a bound or fixed Visibility on it or on any
+    /// ancestor, and the sidebar column that Ctrl+B collapses to zero width.
+    /// </summary>
+    private static IReadOnlyList<string> GatesAbove(XDocument xaml, string elementName)
+    {
+        XElement target = Assert.Single(
+            xaml.Descendants(), e => (string?)e.Attribute(XamlNamespace + "Name") == elementName);
+        List<string> gates = [];
+
+        // Property elements such as <Grid.ColumnDefinitions> are not part of the visual chain.
+        foreach (XElement element in target.AncestorsAndSelf().Where(e => !e.Name.LocalName.Contains('.')))
+        {
+            if ((string?)element.Attribute("Visibility") is { } visibility
+                && !string.Equals(visibility, "Visible", StringComparison.Ordinal))
+            {
+                gates.Add(ClassifyVisibility(visibility));
+            }
+
+            if (IsInSessionTreeColumn(element))
+            {
+                gates.Add(SessionSidebarGate);
+            }
+        }
+
+        return gates;
+    }
+
+    private static string ClassifyVisibility(string visibility)
+    {
+        if (visibility.Contains("ElementName=SidebarTabSessions", StringComparison.Ordinal))
+        {
+            return SessionSidebarGate;
+        }
+
+        if (visibility.Contains("IsSessionsTabSelected", StringComparison.Ordinal))
+        {
+            return SessionsShellTabGate;
+        }
+
+        if (visibility.Contains("IsToolsTabSelected", StringComparison.Ordinal))
+        {
+            return ToolsShellTabGate;
+        }
+
+        // Unknown to the tour, so no step can declare it opens it.
+        return $"Visibility=\"{visibility}\"";
+    }
+
+    private static bool IsInSessionTreeColumn(XElement element)
+    {
+        if (element.Parent is not { } grid || grid.Name.LocalName != "Grid")
+        {
+            return false;
+        }
+
+        XElement[] columns = grid
+            .Elements(grid.Name.Namespace + "Grid.ColumnDefinitions")
+            .Elements()
+            .ToArray();
+        int column = int.TryParse((string?)element.Attribute("Grid.Column"), out int parsed) ? parsed : 0;
+
+        return column < columns.Length
+            && (string?)columns[column].Attribute(XamlNamespace + "Name") == "SessionTreeColumn";
+    }
+
+    private static string MainWindowXamlPath() =>
+        Path.Combine(RepoRoot(), "src", "Heimdall.App", "MainWindow.xaml");
 
     private static JsonDocument ReadLocale(string locale) =>
         JsonDocument.Parse(

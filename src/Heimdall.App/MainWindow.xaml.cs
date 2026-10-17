@@ -2655,9 +2655,43 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             }
         }
 
+        RevealOnboardingSessionSidebar(
+            step,
+            _uiState.IsSidebarHidden,
+            () => (DataContext as MainViewModel)?.Sidebar.SetActiveTab(isTools: false),
+            ToggleSidebar);
+
         // Let the layout settle after a tab switch, otherwise the target is measured at the
         // position it had before the switch, or at zero size because it has not been arranged yet.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => SpotlightOnboardingTarget(step)));
+    }
+
+    /// <summary>
+    /// Shows the session list when the step points into it.
+    /// </summary>
+    /// <remarks>
+    /// The sidebar has its own Sessions / Tools switch and can be hidden with Ctrl+B, and the
+    /// shipped settings open it on Tools. Opening the Sessions tab of the shell therefore left the
+    /// first three steps measuring a collapsed control, so they fell back to the centred card on
+    /// every fresh profile. Showing is a toggle underneath, so a visible sidebar is left alone.
+    /// </remarks>
+    internal static void RevealOnboardingSessionSidebar(
+        OnboardingFlowViewModel.Step? step,
+        bool sidebarHidden,
+        Action openSessionsSidebarTab,
+        Action showSidebar)
+    {
+        if (step is not { InSessionSidebar: true })
+        {
+            return;
+        }
+
+        openSessionsSidebarTab();
+
+        if (sidebarHidden)
+        {
+            showSidebar();
+        }
     }
 
     private void SpotlightOnboardingTarget(OnboardingFlowViewModel.Step? step)
