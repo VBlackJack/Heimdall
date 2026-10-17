@@ -21,6 +21,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using Heimdall.App.Services;
+using Heimdall.App.Theming;
 using Heimdall.Core.Discovery;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -54,9 +55,6 @@ public partial class DiagramEditorView : UserControl, IToolView
 
     private const string PngExtension = ".png";
     private const string SvgExtension = ".svg";
-
-    /// <summary>Luminance below which the current Heimdall background counts as dark.</summary>
-    private const byte DarkBackgroundThreshold = 128;
 
     private readonly DiagramDocumentState _document = new();
     private readonly DiagramDraftStore _drafts = new();
@@ -184,17 +182,10 @@ public partial class DiagramEditorView : UserControl, IToolView
     {
         var locale = _localizer?.CurrentLocale ?? "en";
         var language = locale.Split('-')[0].ToLowerInvariant();
-        var theme = IsDarkTheme() ? DarkTheme : LightTheme;
+        var theme = ThemeLuminance.IsCurrentThemeDark() ? DarkTheme : LightTheme;
 
         return $"https://{VirtualHost}/{HostPagePath}?lang={Uri.EscapeDataString(language)}"
             + $"&theme={Uri.EscapeDataString(theme)}";
-    }
-
-    private static bool IsDarkTheme()
-    {
-        return Application.Current?.TryFindResource("BackgroundBrush")
-            is System.Windows.Media.SolidColorBrush background
-            && background.Color.R < DarkBackgroundThreshold;
     }
 
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
