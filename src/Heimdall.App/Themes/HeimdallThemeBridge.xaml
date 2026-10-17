@@ -19,7 +19,7 @@
 
     <!-- Generic themed brushes -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundColor}" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource BackgroundColor}" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource SurfaceColor}" />
     <SolidColorBrush x:Key="CardBrush" Color="{DynamicResource SurfaceAltColor}" />
     <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}" />
     <SolidColorBrush x:Key="AccentHoverBrush" Color="{DynamicResource AccentHoverColor}" />
@@ -27,10 +27,10 @@
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimaryColor}" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondaryColor}" />
     <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource TextSecondaryColor}" />
-    <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextSecondaryColor}" />
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextSecondaryColor}" Opacity="0.55" />
     <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="{DynamicResource TextSecondaryColor}" />
-    <SolidColorBrush x:Key="HighlightBrush" Color="{DynamicResource SurfaceAltColor}" />
+    <SolidColorBrush x:Key="HighlightBrush" Color="{DynamicResource SelectionColor}" />
     <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}" />
     <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}" />
     <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}" />
@@ -41,9 +41,9 @@
     <SolidColorBrush x:Key="BadgeTextBrush" Color="{DynamicResource BackgroundColor}" />
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="{DynamicResource BackgroundColor}" />
     <SolidColorBrush x:Key="FocusIndicatorBrush" Color="{DynamicResource CyanColor}" />
-    <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="{DynamicResource TextSecondaryColor}" />
+    <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="{DynamicResource TextSecondaryColor}" Opacity="0.70" />
     <SolidColorBrush x:Key="ScrollBarTrackBrush" Color="{DynamicResource BackgroundColor}" />
-    <SolidColorBrush x:Key="TreeViewIndentGuideBrush" Color="{DynamicResource BorderColor}" Opacity="0.35" />
+    <SolidColorBrush x:Key="TreeViewIndentGuideBrush" Color="{DynamicResource BorderColor}" Opacity="0.50" />
     <!-- Session tree row states. Hover keeps HighlightBrush; a selected row and a drop target each
          get their own tint, so the three never read as one state. -->
     <SolidColorBrush x:Key="TreeRowSelectedBrush" Color="{DynamicResource AccentColor}" Opacity="0.18" />

@@ -26,6 +26,8 @@ internal static class WindowThemeHelper
 {
     private const int DwmUseImmersiveDarkMode = 20;
     private const int DwmUseImmersiveDarkModeLegacy = 19;
+    private const int DwmCaptionColor = 35;
+    private const int DwmTextColor = 36;
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(
@@ -66,20 +68,46 @@ internal static class WindowThemeHelper
 
         _ = DwmSetWindowAttribute(hwnd, DwmUseImmersiveDarkMode, ref useDarkMode, size);
         _ = DwmSetWindowAttribute(hwnd, DwmUseImmersiveDarkModeLegacy, ref useDarkMode, size);
+
+        if (TryResolveBrushColor(window, "SurfaceBrush", out System.Windows.Media.Color captionColor)
+            || TryResolveBrushColor(window, "BackgroundBrush", out captionColor))
+        {
+            int captionColorRef = ToColorRef(captionColor);
+            _ = DwmSetWindowAttribute(hwnd, DwmCaptionColor, ref captionColorRef, size);
+        }
+
+        if (TryResolveBrushColor(window, "TextPrimaryBrush", out System.Windows.Media.Color textColor))
+        {
+            int textColorRef = ToColorRef(textColor);
+            _ = DwmSetWindowAttribute(hwnd, DwmTextColor, ref textColorRef, size);
+        }
     }
 
-    private static bool ShouldUseDarkTitleBar(FrameworkElement element)
+    private static bool TryResolveBrushColor(FrameworkElement element, string resourceKey, out System.Windows.Media.Color color)
     {
-        var resource = element.TryFindResource("BackgroundBrush")
-            ?? Application.Current.TryFindResource("BackgroundBrush");
+        var resource = element.TryFindResource(resourceKey)
+            ?? Application.Current?.TryFindResource(resourceKey);
 
         if (resource is SolidColorBrush brush)
         {
-            var luminance = ((0.299 * brush.Color.R)
-                + (0.587 * brush.Color.G)
-                + (0.114 * brush.Color.B)) / 255.0;
+            color = brush.Color;
+            return true;
+        }
 
-            return luminance < 0.5;
+        color = default;
+        return false;
+    }
+
+    /// <summary>A colour as the COLORREF DWM expects: 0x00BBGGRR.</summary>
+    internal static int ToColorRef(System.Windows.Media.Color color)
+        => color.R | (color.G << 8) | (color.B << 16);
+
+    private static bool ShouldUseDarkTitleBar(FrameworkElement element)
+    {
+        if (TryResolveBrushColor(element, "SurfaceBrush", out System.Windows.Media.Color color)
+            || TryResolveBrushColor(element, "BackgroundBrush", out color))
+        {
+            return ThemeLuminance.IsDark(color);
         }
 
         return true;
