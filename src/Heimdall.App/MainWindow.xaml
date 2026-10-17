@@ -1528,6 +1528,7 @@
                                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                             <Setter Property="Visibility"
                                                     Value="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
                                             <Setter Property="Padding" Value="1,1"/>
                                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                         </Style>
