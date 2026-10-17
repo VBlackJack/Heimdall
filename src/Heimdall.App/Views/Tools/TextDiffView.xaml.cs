@@ -31,6 +31,7 @@ namespace Heimdall.App.Views.Tools;
 public partial class TextDiffView : UserControl, IToolView
 {
     private readonly TextDiffViewModel _vm;
+    private HeimdallThemeService? _themeService;
     private LocalizationManager? _localizer;
     private bool _disposed;
 
@@ -49,6 +50,11 @@ public partial class TextDiffView : UserControl, IToolView
         if (_localizer is not null) { _localizer.LocaleChanged -= OnLocaleChanged; }
         _localizer = localizer;
         if (_localizer is not null) { _localizer.LocaleChanged += OnLocaleChanged; }
+
+        if (_themeService is not null) { _themeService.ThemeChanged -= OnThemeChanged; }
+        _themeService = (Application.Current as App)?.Services?.GetService<HeimdallThemeService>();
+        if (_themeService is not null) { _themeService.ThemeChanged += OnThemeChanged; }
+
         _vm.Initialize(localizer);
         _vm.ApplyPrefill(context?.Argument);
         _vm.MarkInitialized();
@@ -64,6 +70,7 @@ public partial class TextDiffView : UserControl, IToolView
         OriginalText.PreviewKeyDown -= OnDiffInputPreviewKeyDown;
         ModifiedText.PreviewKeyDown -= OnDiffInputPreviewKeyDown;
         if (_localizer is not null) { _localizer.LocaleChanged -= OnLocaleChanged; }
+        if (_themeService is not null) { _themeService.ThemeChanged -= OnThemeChanged; }
         _vm.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -91,6 +98,7 @@ public partial class TextDiffView : UserControl, IToolView
     private void OnHelpClick(object sender, RoutedEventArgs e) { UpdateHelpText(); HelpPanel.Visibility = HelpPanel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible; }
     private void OnCloseHelpClick(object sender, RoutedEventArgs e) => HelpPanel.Visibility = Visibility.Collapsed;
     private void OnLocaleChanged(string _) { if (HelpPanel.Visibility == Visibility.Visible) { UpdateHelpText(); } }
+    private void OnThemeChanged(string _) => BuildDerivedBrushes();
     private void UpdateHelpText() => TxtHelpContent.Text = L("ToolHelpDIFF").Replace("\\n", "\n", StringComparison.Ordinal);
     private string L(string key) => _localizer?[key] ?? key;
 

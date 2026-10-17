@@ -65,7 +65,9 @@ public partial class LogViewerView : UserControl, IToolView
     /// </summary>
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         ApplyLocalization();
         ClearErrorState();
         UpdateViewerState();
@@ -259,7 +261,7 @@ public partial class LogViewerView : UserControl, IToolView
     private void AppendLines(string content)
     {
         var lines = content.Split('\n');
-        _highlightBrush ??= TryFindResource("AccentBrush") as Brush ?? Brushes.Yellow;
+        _highlightBrush = TryFindResource("AccentBrush") as Brush ?? Brushes.Yellow;
 
         foreach (var rawLine in lines)
         {
@@ -296,6 +298,7 @@ public partial class LogViewerView : UserControl, IToolView
     private void HighlightMatches(Paragraph para, string line, Regex regex)
     {
         var lastIndex = 0;
+        var highlightForeground = TryFindResource("TextOnAccentBrush") as Brush;
         foreach (Match match in regex.Matches(line))
         {
             if (match.Index > lastIndex)
@@ -307,6 +310,10 @@ public partial class LogViewerView : UserControl, IToolView
             {
                 Background = _highlightBrush
             };
+            if (highlightForeground is not null)
+            {
+                highlighted.Foreground = highlightForeground;
+            }
             para.Inlines.Add(highlighted);
             lastIndex = match.Index + match.Length;
         }
@@ -517,8 +524,19 @@ public partial class LogViewerView : UserControl, IToolView
 
     private string L(string key) => _localizer?[key] ?? key;
 
+    private void OnLocaleChanged(string _)
+    {
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpLOGVIEW").Replace("\\n", "\n");
+        }
+        UpdateViewerState();
+    }
+
     public void Dispose()
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         StopTail();
         _fileStream?.Dispose();
         _fileStream = null;

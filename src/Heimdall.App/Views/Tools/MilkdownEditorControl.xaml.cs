@@ -39,6 +39,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
         AppContext.BaseDirectory, "Assets", "milkdown", "index.html");
 
     private readonly IBrowserLauncher _browserLauncher;
+    private HeimdallThemeService? _themeService;
     private bool _initialized;
     private bool _editorReady;
     private bool _disposed;
@@ -106,6 +107,10 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
         }
 
         _initialized = true;
+
+        if (_themeService is not null) _themeService.ThemeChanged -= OnThemeChanged;
+        _themeService = (Application.Current as App)?.Services?.GetService<HeimdallThemeService>();
+        if (_themeService is not null) _themeService.ThemeChanged += OnThemeChanged;
 
         try
         {
@@ -279,10 +284,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
                     _editorReady = true;
                     LoadingPanel.Visibility = Visibility.Collapsed;
 
-                    // Apply the current Heimdall theme
-                    var isDark = Application.Current?.TryFindResource("BackgroundBrush") is
-                        System.Windows.Media.SolidColorBrush bg && bg.Color.R < 128;
-                    SetTheme(isDark ? "dark" : "light");
+                    ApplyCurrentTheme();
 
                     if (_pendingReadOnly is { } readOnly)
                     {
@@ -384,6 +386,27 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
         return Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Loaded).Task;
     }
 
+    private void OnThemeChanged(string _)
+    {
+        if (_disposed || !_editorReady)
+        {
+            return;
+        }
+
+        ApplyCurrentTheme();
+    }
+
+    /// <summary>
+    /// Gives the editor the light or dark look of the current Heimdall theme. One decision for
+    /// the first paint and for a theme changed while the editor is open.
+    /// </summary>
+    private void ApplyCurrentTheme()
+    {
+        var isDark = Application.Current?.TryFindResource("BackgroundBrush") is
+            System.Windows.Media.SolidColorBrush bg && bg.Color.R < 128;
+        SetTheme(isDark ? "dark" : "light");
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -393,6 +416,12 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
 
         _disposed = true;
         _editorReady = false;
+
+        if (_themeService is not null)
+        {
+            _themeService.ThemeChanged -= OnThemeChanged;
+            _themeService = null;
+        }
 
         if (EditorWebView.CoreWebView2 is { } core)
         {

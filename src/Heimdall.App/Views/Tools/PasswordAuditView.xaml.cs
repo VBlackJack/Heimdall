@@ -109,13 +109,26 @@ public partial class PasswordAuditView : UserControl, IToolView
     /// </summary>
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         ApplyLocalization();
 
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
         {
             PwdInput.Focus();
         });
+    }
+
+    private void OnLocaleChanged(string _)
+    {
+        if (_disposed) return;
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpPWDAUDIT").Replace("\\n", "\n");
+        }
+        RunAnalysis();
     }
 
     // ── Localization ────────────────────────────────────────────────────
@@ -140,12 +153,13 @@ public partial class PasswordAuditView : UserControl, IToolView
 
         UpdateToggleButtonLabel();
 
-        // Populate policy ComboBox
+        // Populate policy ComboBox while preserving current selection
+        int selectedIndex = CmbPolicy.SelectedIndex >= 0 ? CmbPolicy.SelectedIndex : 0;
         CmbPolicy.Items.Clear();
         CmbPolicy.Items.Add(L("ToolPwdAuditPolicyNist"));
         CmbPolicy.Items.Add(L("ToolPwdAuditPolicyAnssi"));
         CmbPolicy.Items.Add(L("ToolPwdAuditPolicyCustom"));
-        CmbPolicy.SelectedIndex = 0;
+        CmbPolicy.SelectedIndex = selectedIndex;
     }
 
     private void UpdateToggleButtonLabel()
@@ -565,17 +579,17 @@ public partial class PasswordAuditView : UserControl, IToolView
         StrengthBarEmptyColumn.Width = new GridLength(100 - score, GridUnitType.Star);
 
         // Color gradient: red → orange → yellow → green
-        Brush barBrush = score switch
+        string barBrushKey = score switch
         {
-            < 25 => FindBrush("ErrorBrush"),
-            < 50 => FindBrush("WarningBrush"),
-            < 75 => FindBrush("WarningTextBrush"),
-            _ => FindBrush("SuccessBrush"),
+            < 25 => "ErrorBrush",
+            < 50 => "WarningBrush",
+            < 75 => "WarningTextBrush",
+            _ => "SuccessBrush",
         };
-        StrengthBar.Background = barBrush;
+        StrengthBar.SetResourceReference(Border.BackgroundProperty, barBrushKey);
 
         StrengthScoreLabel.Text = $"{score}/100 - {L(analysis.ScoreLabelKey)}";
-        StrengthScoreLabel.Foreground = barBrush;
+        StrengthScoreLabel.SetResourceReference(TextBlock.ForegroundProperty, barBrushKey);
     }
 
     private void UpdateCriteriaDisplay(PasswordAnalysis analysis)
@@ -593,11 +607,11 @@ public partial class PasswordAuditView : UserControl, IToolView
                 VerticalAlignment = VerticalAlignment.Center,
                 Width = 20,
                 Text = criterion.Passed ? "\uE73E" : "\uE711", // Checkmark or X
-                Foreground = criterion.Passed
-                    ? FindBrush("SuccessBrush")
-                    : FindBrush("ErrorBrush"),
             };
             iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontFamilyIcons");
+            iconBlock.SetResourceReference(
+                TextBlock.ForegroundProperty,
+                criterion.Passed ? "SuccessBrush" : "ErrorBrush");
             row.Children.Add(iconBlock);
 
             // Detail text (right-aligned)
@@ -616,11 +630,11 @@ public partial class PasswordAuditView : UserControl, IToolView
             var detailBlock = new TextBlock
             {
                 FontSize = (double)FindResource("FontSizeCaption"),
-                Foreground = FindBrush("TextSecondaryBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
                 TextTrimming = TextTrimming.CharacterEllipsis,
             };
+            detailBlock.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
             detailBlock.Text = detailText;
             DockPanel.SetDock(detailBlock, Dock.Right);
             row.Children.Add(detailBlock);
@@ -630,19 +644,14 @@ public partial class PasswordAuditView : UserControl, IToolView
             {
                 Text = L(criterion.LabelKey),
                 FontSize = (double)FindResource("FontSizeBody"),
-                Foreground = FindBrush("TextPrimaryBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 8, 0),
             };
+            labelBlock.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
             row.Children.Add(labelBlock);
 
             PanelCriteria.Children.Add(row);
         }
-    }
-
-    private Brush FindBrush(string key)
-    {
-        return TryFindResource(key) as Brush ?? Brushes.Gray;
     }
 
     private string L(string key) => _localizer?[key] ?? key;
@@ -653,6 +662,7 @@ public partial class PasswordAuditView : UserControl, IToolView
     {
         if (_disposed) return;
         _disposed = true;
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         PwdInput.Clear();
         TxtPasswordVisible.Clear();
         GC.SuppressFinalize(this);

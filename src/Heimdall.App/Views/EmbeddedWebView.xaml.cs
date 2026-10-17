@@ -47,6 +47,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
     private SessionTabViewModel? _sessionTab;
     private LocalizationManager? _localizer;
     private SessionPaneModel? _ownerPane;
+    private bool _localeChangeSubscribed;
     private bool _connectedRaised;
     private bool _disposed;
 
@@ -115,10 +116,30 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         _sessionTab = sessionTab;
         _localizer = localizer;
 
+        if (_localizer is not null && !_localeChangeSubscribed)
+        {
+            _localizer.LocaleChanged += OnLocaleChanged;
+            _localeChangeSubscribed = true;
+        }
+
         SessionTitleText.Text = displayName;
         AddressTextBlock.Text = session.Address.AbsoluteUri;
         StatusTextBlock.Text = Text("StatusWebConnecting");
 
+        // Behind a gateway the console is only reachable through the tunnel, which an external
+        // program would not use: the way out is not offered where it cannot lead anywhere.
+        Visibility external = session.CanOpenExternally ? Visibility.Visible : Visibility.Collapsed;
+        OpenExternallyButton.Visibility = external;
+        FallbackOpenExternallyButton.Visibility = external;
+        FallbackOldConsoleHint.Visibility = external;
+
+        ApplyLocalization();
+
+        await InitializeWebViewAsync();
+    }
+
+    private void ApplyLocalization()
+    {
         ReloadButton.ToolTip = Text("TooltipWebReload");
         BackButton.ToolTip = Text("TooltipWebBack");
         SplitButton.ToolTip = Text("TooltipSplitSession");
@@ -129,20 +150,29 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         System.Windows.Automation.AutomationProperties.SetName(OpenExternallyButton, Text("TooltipWebOpenExternally"));
         System.Windows.Automation.AutomationProperties.SetName(FallbackOpenExternallyButton, Text("BtnWebOpenExternally"));
 
-        // Behind a gateway the console is only reachable through the tunnel, which an external
-        // program would not use: the way out is not offered where it cannot lead anywhere.
-        Visibility external = session.CanOpenExternally ? Visibility.Visible : Visibility.Collapsed;
-        OpenExternallyButton.Visibility = external;
-        FallbackOpenExternallyButton.Visibility = external;
-        FallbackOldConsoleHint.Visibility = external;
         FallbackTitleText.Text = Text("WebFallbackTitle");
         System.Windows.Automation.AutomationProperties.SetName(ReloadButton, Text("TooltipWebReload"));
         System.Windows.Automation.AutomationProperties.SetName(BackButton, Text("TooltipWebBack"));
         System.Windows.Automation.AutomationProperties.SetName(SplitButton, Text("A11ySplitSession"));
         System.Windows.Automation.AutomationProperties.SetName(FallbackRetryButton, Text("BtnWebRetry"));
-        System.Windows.Automation.AutomationProperties.SetName(StatusTextBlock, Text("A11yConnectionStatus"));
+        System.Windows.Automation.AutomationProperties.SetHelpText(StatusTextBlock, Text("A11yConnectionStatus"));
+    }
 
-        await InitializeWebViewAsync();
+    private void OnLocaleChanged(string locale)
+    {
+        if (_disposed) return;
+
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnLocaleChanged(locale));
+            return;
+        }
+
+        ApplyLocalization();
+        if (_connectedRaised && FallbackPanel.Visibility != Visibility.Visible)
+        {
+            StatusTextBlock.Text = Text("StatusWebConnected");
+        }
     }
 
     private async Task InitializeWebViewAsync()
@@ -601,6 +631,12 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         }
 
         _disposed = true;
+
+        if (_localeChangeSubscribed && _localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+            _localeChangeSubscribed = false;
+        }
 
         if (CertificateTrust is not null)
         {
