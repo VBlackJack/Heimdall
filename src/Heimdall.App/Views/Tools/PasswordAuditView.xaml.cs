@@ -589,7 +589,6 @@ public partial class PasswordAuditView : UserControl, IToolView
             // Pass/fail icon
             var iconBlock = new TextBlock
             {
-                FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"),
                 FontSize = (double)FindResource("FontSizeBody"),
                 VerticalAlignment = VerticalAlignment.Center,
                 Width = 20,
@@ -598,6 +597,7 @@ public partial class PasswordAuditView : UserControl, IToolView
                     ? FindBrush("SuccessBrush")
                     : FindBrush("ErrorBrush"),
             };
+            iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontFamilyIcons");
             row.Children.Add(iconBlock);
 
             // Detail text (right-aligned)

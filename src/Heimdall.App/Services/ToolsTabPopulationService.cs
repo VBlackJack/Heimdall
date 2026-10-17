@@ -550,7 +550,6 @@ public sealed class ToolsTabPopulationService
         var pinBtn = new Button
         {
             Content = isFav ? "\uE735" : "\uE734",
-            FontFamily = new FontFamily("Segoe MDL2 Assets"),
             FontSize = 12,
             Style = (Style)Application.Current.FindResource("GhostButtonStyle"),
             Padding = new Thickness(2),
@@ -560,6 +559,7 @@ public sealed class ToolsTabPopulationService
             Tag = descriptor.Id,
             ToolTip = isFav ? vm.Localize("ToolsUnpinTooltip") : vm.Localize("ToolsPinTooltip")
         };
+        pinBtn.SetResourceReference(Control.FontFamilyProperty, "FontFamilyIcons");
         pinBtn.SetResourceReference(Control.ForegroundProperty,
             isFav ? "WarningBrush" : "TextSecondaryBrush");
         AutomationProperties.SetName(pinBtn,

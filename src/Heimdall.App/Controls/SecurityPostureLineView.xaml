@@ -36,7 +36,7 @@
         </Grid.ColumnDefinitions>
         <TextBlock x:Name="Spl_Icon"
                    Grid.Column="0"
-                   FontFamily="Segoe MDL2 Assets"
+                   FontFamily="{StaticResource FontFamilyIcons}"
                    FontSize="{DynamicResource FontSizeCaption}"
                    VerticalAlignment="Top"
                    Margin="0,2,8,0">
