@@ -1583,8 +1583,34 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        if (message == WebViewFocusRelease.Message)
+        {
+            ReleaseFocusToHeader();
+            return;
+        }
+
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSSH dropped unknown WebView2 terminal message: {DescribeWebViewText(message)}");
+    }
+
+    /// <summary>
+    /// Hands the keyboard back to the session header: the first action the header offers in the
+    /// current state, Split when the session has neither.
+    /// </summary>
+    private void ReleaseFocusToHeader()
+    {
+        if (DisconnectButton.Visibility == Visibility.Visible && DisconnectButton.IsEnabled)
+        {
+            DisconnectButton.Focus();
+        }
+        else if (ReconnectButton.Visibility == Visibility.Visible && ReconnectButton.IsEnabled)
+        {
+            ReconnectButton.Focus();
+        }
+        else
+        {
+            SplitButton.Focus();
+        }
     }
 
     internal static bool TryDecodeCurrentDirectoryPayload(

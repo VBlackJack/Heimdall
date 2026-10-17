@@ -565,6 +565,13 @@
                         return true;
                     }
 
+                    // Ctrl+Alt+Home, as on RDP: hand the keyboard back to the session header (WCAG 2.1.2)
+                    if (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey && event.key === 'Home') {
+                        event.preventDefault();
+                        postMessage('release-focus:');
+                        return false;
+                    }
+
                     // Ctrl+Shift+C: explicit copy
                     if (event.ctrlKey && event.shiftKey && event.code === 'KeyC') {
                         var sel = term.getSelection();

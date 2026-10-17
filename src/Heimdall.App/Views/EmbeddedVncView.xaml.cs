@@ -171,6 +171,19 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         await InitializeWebViewAsync().ConfigureAwait(false);
     }
 
+    /// <summary>Hands the keyboard back to the session header: Disconnect while connected, else Split.</summary>
+    private void ReleaseFocusToHeader()
+    {
+        if (DisconnectButton.Visibility == Visibility.Visible && DisconnectButton.IsEnabled)
+        {
+            DisconnectButton.Focus();
+        }
+        else
+        {
+            SplitButton.Focus();
+        }
+    }
+
     private async Task InitializeWebViewAsync()
     {
         try
@@ -260,6 +273,12 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         {
             _webViewReady = true;
             SendConnectCommand();
+            return;
+        }
+
+        if (message == WebViewFocusRelease.Message)
+        {
+            Dispatcher.Invoke(ReleaseFocusToHeader);
             return;
         }
 
