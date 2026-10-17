@@ -350,6 +350,16 @@
                     }
                 });
 
+                window.addEventListener('keydown', function (event) {
+                    // Ctrl+Alt+Home, as on RDP: hand the keyboard back to the session header (WCAG 2.1.2).
+                    // Captured on the window so noVNC never forwards it to the remote desktop.
+                    if (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey && event.key === 'Home') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        postMessage('release-focus:');
+                    }
+                }, true);
+
                 postMessage('ready:');
             }
         }());

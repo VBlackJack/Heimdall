@@ -17,6 +17,7 @@
 using System.Security.Cryptography.X509Certificates;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
@@ -77,10 +78,23 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
     {
         InitializeComponent();
 
+        // The console is a page Heimdall does not author, so the release gesture is caught on
+        // its way to the page: WebView2 hands accelerator keys to WPF before the page sees them.
+        ConsoleWebView.PreviewKeyDown += OnConsoleWebViewPreviewKeyDown;
+
         if (TryFindResource("BackgroundColor") is System.Windows.Media.Color themeColor)
         {
             ConsoleWebView.DefaultBackgroundColor =
                 System.Drawing.Color.FromArgb(themeColor.A, themeColor.R, themeColor.G, themeColor.B);
+        }
+    }
+
+    private void OnConsoleWebViewPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (WebViewFocusRelease.IsGesture(e.Key, e.SystemKey, Keyboard.Modifiers))
+        {
+            e.Handled = true;
+            ReloadButton.Focus();
         }
     }
 
@@ -593,6 +607,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
             CertificateTrust.CertificateRemoved -= OnCertificateRemoved;
         }
 
+        ConsoleWebView.PreviewKeyDown -= OnConsoleWebViewPreviewKeyDown;
         ConsoleWebView.ZoomFactorChanged -= OnZoomFactorChanged;
 
         if (ConsoleWebView.CoreWebView2 is { } core)
