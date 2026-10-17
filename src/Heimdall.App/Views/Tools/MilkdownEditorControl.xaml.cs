@@ -20,6 +20,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using Heimdall.App.Services;
+using Heimdall.App.Theming;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.WebView2.Core;
 
@@ -402,9 +403,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
     /// </summary>
     private void ApplyCurrentTheme()
     {
-        var isDark = Application.Current?.TryFindResource("BackgroundBrush") is
-            System.Windows.Media.SolidColorBrush bg && bg.Color.R < 128;
-        SetTheme(isDark ? "dark" : "light");
+        SetTheme(ThemeLuminance.IsCurrentThemeDark() ? "dark" : "light");
     }
 
     public void Dispose()
