@@ -53,7 +53,7 @@ When your agent offers no key, Heimdall asks for the password of the bastion, th
 
 A remembered password is yours alone. It stays on this computer, encrypted for your Windows account, in `shared-session-secrets.json` in the Heimdall data folder. It is never written to the shared file, to the offline copy, to `servers.json` or to the settings, an export of the settings or of the profiles never carries it, and **Reset defaults** does not delete it.
 
-A remembered password belongs to one bastion (its host, port and login) or to one session (the session, its host, port and login). If the shared file sends a session to another host or another login, Heimdall asks again instead of sending the old password. When a server refuses a remembered password, Heimdall forgets it and asks again next time.
+A remembered password belongs to one bastion (its host, port and login) or to one session (the session, its host, port and login). If the shared file sends a session to another host or another login, Heimdall asks again instead of sending the old password. When a server refuses a remembered password, Heimdall forgets it and asks again next time. One exception: if a remembered password is wrong and the connection falls back to Plink, it is not forgotten automatically; use **Forget saved passwords** on the source.
 
 - If you use an external credential provider, its password comes first: a remembered password only fills what it leaves empty.
 - When **Windows Hello** is required to connect, it is asked before any remembered password is used.
