@@ -30,6 +30,7 @@
                         ToolTip="{loc:Translate TooltipDisconnectSession}"
                         AutomationProperties.Name="{loc:Translate A11yDisconnectSession}"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"/>
@@ -41,6 +42,7 @@
                         ToolTip="{loc:Translate TooltipReconnectSession}"
                         AutomationProperties.Name="{loc:Translate A11yReconnectSession}"
                         Style="{DynamicResource PrimaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"

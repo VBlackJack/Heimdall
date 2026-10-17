@@ -28,6 +28,7 @@
              names it, drawn as the plain text it was, underlined while pointed at or focused. -->
         <Style x:Key="SpvCopyValueStyle" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinHeight" Value="{StaticResource TargetMinSize}"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Background" Value="Transparent"/>
