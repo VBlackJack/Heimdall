@@ -25,7 +25,7 @@ namespace Heimdall.App.ViewModels;
 /// shows [accent dot] [category name] [count badge] and nests the child tool
 /// items. User-driven expansion state is persisted by stable category key.
 /// </summary>
-public sealed partial class SidebarToolCategoryViewModel : ObservableObject
+public sealed partial class SidebarToolCategoryViewModel : ObservableObject, IAccessibleItemViewModel
 {
     /// <summary>Stable i18n category key used to persist expansion state.</summary>
     public required string CategoryKey { get; init; }
@@ -50,12 +50,21 @@ public sealed partial class SidebarToolCategoryViewModel : ObservableObject
     /// <summary>Hide the category header entirely when no child passes the filter.</summary>
     [ObservableProperty]
     private bool _isVisible = true;
+
+    /// <summary>
+    /// The category name, which the tree container announces. Without it the container fell
+    /// back to <c>ToString()</c> and a screen reader read out the view model's type name.
+    /// </summary>
+    public string AccessibleName => CategoryName;
+
+    /// <inheritdoc/>
+    public string? AccessibleHelpText => null;
 }
 
 /// <summary>
 /// Lightweight view-model for a single tool leaf in the sidebar Tools tab.
 /// </summary>
-public sealed partial class SidebarToolItemViewModel : ObservableObject
+public sealed partial class SidebarToolItemViewModel : ObservableObject, IAccessibleItemViewModel
 {
     /// <summary>Registry id, e.g. "PING". Used to resolve the descriptor on click.</summary>
     public required string Id { get; init; }
@@ -86,4 +95,10 @@ public sealed partial class SidebarToolItemViewModel : ObservableObject
     /// children so the value is a no-op visually.
     /// </summary>
     public bool IsExpanded { get; set; }
+
+    /// <summary>The tool's name, which the tree container announces.</summary>
+    public string AccessibleName => Name;
+
+    /// <inheritdoc/>
+    public string? AccessibleHelpText => null;
 }
