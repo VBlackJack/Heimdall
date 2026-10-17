@@ -12,6 +12,79 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-17: shared MobaXterm session files, with passwords each person keeps (v2026.101701)
+
+### Shared MobaXterm sessions
+
+- **Read-only shared session sources** (#600). Settings > General > Shared session sources lists
+  `.mxtsessions` files (environment variables allowed). Each enabled source is a root of its own
+  in the tree; its profiles and gateways go through an allowlist sanitizer and live in a reserved
+  `shared-` id namespace that every configuration write refuses. Edit, rename, duplicate, move,
+  delete, favorite and drag-drop are refused with a status message; post-connect commands are
+  approved per user against a fingerprint, never exported, cleared by Reset defaults. Source files
+  are watched (atomic saves included) and reloaded with a debounce and bounded retries; a failed or
+  emptied file keeps the previous sessions; an ACL-protected offline copy, re-parsed and
+  re-sanitized, stands in when the file is missing. Every read builds an import report (skipped
+  sessions, unresolved variables, name and host mismatches, gateway outliers, duplicate hosts),
+  shown on the tree root and in Settings, with copy and sanitized CSV export. Guide:
+  `docs/MOBAXTERM-SHARED-SESSIONS.md`, in English and French.
+- **Per-user remembered passwords** (#600). `SharedSessionSecretStore` keeps DPAPI-sealed secrets
+  in `shared-session-secrets.json` under the data root, apart from the settings: never exported or
+  imported, untouched by Reset defaults. Keys: a bastion by host, port and resolved login; a
+  session by shared profile id, host, port and login, since the profile id alone follows a session
+  moved to another host. `SharedCredentialApplier` runs after the Windows Hello gate and the
+  external credential provider, asks only when the SSH agent offers no key, and settles after the
+  connection: a session password is kept only when SSH.NET signed in, a rejected one is forgotten
+  at the hop that rejected it, an unreadable one is forgotten and asked again. Restore and Connect
+  all use remembered passwords and never ask. The password dialog gained an unticked remember
+  choice; each Settings source row has Forget saved passwords; a removed source loses its secrets.
+- **A password refused before the Plink fallback is forgotten** (#601). The SSH.NET credential
+  rejection that triggers the Plink retry is carried to the connect outcome, so the remembered
+  session password is dropped even though the Plink terminal reports success.
+- **The companion SFTP pane of a shared session uses the connection's credentials** (#602)
+  instead of a fresh profile lookup that never carried them.
+
+### MobaXterm import
+
+- The session type is read from the field after the icon, not from the icon number; jump hosts
+  become SSH gateways; `[NAME]` variables resolve from `MobaXtermUserVariables`; the login command
+  becomes a post-connect step; key paths are never imported (#600). **Behavior change:** only SSH
+  and RDP sessions are imported; FTP, SFTP, VNC and Telnet sessions are listed as unsupported.
+
+### Sessions
+
+- **SSH and SFTP panes that disconnect end their own state entry** (#604). `EmbeddedSshView` and
+  `EmbeddedSftpView` only wrote the pane status, so the tree's aggregate stayed Connected until the
+  tab closed. The auto-opened SFTP pane now counts for the row.
+- **A pane reconnect brings the tree row back** (#606). `ConnectionStateMachine` keeps one revision
+  counter for the whole machine, so a reconnect under the pane's existing key is no longer dropped
+  as a late change of the ended connection.
+- **One Disconnected overlay on an SFTP pane** (#605): `SessionPaneControl` exempts the SFTP view
+  from the generic overlay, as it does the RDP and SSH views.
+
+### VNC
+
+- **View only reaches noVNC** (#596): `vnc.html` sets `rfb.viewOnly` from the `connect:` message;
+  it read only the URL, the password and the text before.
+- **Display controls in the session header** (#597, carrying #595 by @Anghios, issue #594). The
+  view no longer throws `NullReferenceException` on construction: `SelectionChanged` raised inside
+  `InitializeComponent` reached a WebView2 not created yet.
+- **Quality presets set the JPEG level** (#598) as well as the zlib compression level.
+
+### Onboarding
+
+- **The tour's first three steps spotlight their target again** (#603). They target controls inside
+  the Sessions sidebar content, collapsed on a fresh profile that opens the sidebar on Tools; the
+  step now switches the sidebar to Sessions before measuring.
+
+### Reliability
+
+- **Config files are replaced with a POSIX rename** (#592), so a reader holding the destination
+  with delete sharing no longer fails a save with `UnauthorizedAccessException`.
+- Test fixes: the git sync fixture names the lockfile holder (#587); the FTP disconnect bound test
+  runs off the thread pool (#593).
+- System.Security.Cryptography.ProtectedData 10.0.12 -> 10.0.13 (#599).
+
 ## 2026-10-15: a separate data directory for test runs, and clearer build failures (v2026.101501)
 
 ### Testing and tooling

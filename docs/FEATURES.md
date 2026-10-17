@@ -456,6 +456,19 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     findings. Both open the same read-only dialog: the count of each check, then the findings by
     check, with **Copy** (plain text) and **Export CSV** (every cell neutralized against formula
     injection). When a reload changes the number of issues, the status line says so
+  - Passwords are personal: a shared file never provides one. When the SSH agent offers no key,
+    the password of a shared bastion and of a shared SSH session is asked before connecting, with
+    **Remember this password on this computer** (unticked by default). A remembered password is
+    kept once the server accepted it, in `shared-session-secrets.json` under the data directory,
+    sealed with DPAPI for the Windows account, and keyed by the bastion's host, port and login, or
+    by the session, its host, port and login: a file that moves a session to another host or login
+    asks again. A password the server refuses is forgotten, and so is one this computer can no
+    longer open. It is never exported or imported, never written to the shared file, the offline
+    copy or servers.json, and **Reset defaults** keeps it. Each source in the Settings card has
+    **Forget saved passwords**, and removing a source forgets its passwords. Reopening sessions at
+    startup and **Connect all** use remembered passwords but never ask; the external credential
+    provider's password comes first, and the Windows Hello gate runs before any remembered password
+    is read. The SFTP pane opened beside a shared SSH session signs in with the same passwords
 - JSON session imports contain server profiles only. SSH gateway definitions live in `settings.json`
   (`AppSettings.SshGateways`), so test fixtures such as `Heimdall-TestEnv` must inject the
   matching gateway into the exact runtime build configuration before tunneled sessions can resolve it.
