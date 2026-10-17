@@ -60,11 +60,18 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
     /// flow navigated AFTER a step was completed, which is why its text described tabs the user
     /// was not looking at while they read it.
     /// </param>
+    /// <param name="InSessionSidebar">
+    /// True when the target lives in the session list of the sidebar. Opening the Sessions tab is
+    /// not enough to see it: the sidebar has its own Sessions / Tools switch, persisted, and the
+    /// shipped default opens it on Tools; it can also be hidden with Ctrl+B. Either one collapses
+    /// the target, so the shell shows the session list before measuring.
+    /// </param>
     public sealed record Step(
         string TitleKey,
         string BodyKey,
         string? TargetElementName,
-        string? ShellTab);
+        string? ShellTab,
+        bool InSessionSidebar);
 
     /// <summary>
     /// The tour, in order.
@@ -81,14 +88,14 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
     /// </remarks>
     public static readonly IReadOnlyList<Step> Steps =
     [
-        new("OnboardingStep1Title", "OnboardingStep1Desc", "SessionTreeView", ShellTab.Sessions),
-        new("OnboardingStepAddTitle", "OnboardingStepAddDesc", "AddButton", ShellTab.Sessions),
-        new("OnboardingStepSearchTitle", "OnboardingStepSearchDesc", "Mw_FilterBox", ShellTab.Sessions),
-        new("OnboardingStep2Title", "OnboardingStep2Desc", "TabTools", null),
+        new("OnboardingStep1Title", "OnboardingStep1Desc", "SessionTreeView", ShellTab.Sessions, InSessionSidebar: true),
+        new("OnboardingStepAddTitle", "OnboardingStepAddDesc", "AddButton", ShellTab.Sessions, InSessionSidebar: true),
+        new("OnboardingStepSearchTitle", "OnboardingStepSearchDesc", "Mw_FilterBox", ShellTab.Sessions, InSessionSidebar: true),
+        new("OnboardingStep2Title", "OnboardingStep2Desc", "TabTools", null, InSessionSidebar: false),
         // Points at the magnifier rather than only naming the shortcut: a step that teaches a
         // keystroke and nothing else leaves anyone who misses it with no way in.
-        new("OnboardingStep3Title", "OnboardingStep3Desc", "QuickConnectButton", null),
-        new("OnboardingStepSettingsTitle", "OnboardingStepSettingsDesc", "TabSettings", null),
+        new("OnboardingStep3Title", "OnboardingStep3Desc", "QuickConnectButton", null, InSessionSidebar: false),
+        new("OnboardingStepSettingsTitle", "OnboardingStepSettingsDesc", "TabSettings", null, InSessionSidebar: false),
     ];
 
     /// <summary>Total number of steps in the onboarding flow.</summary>
