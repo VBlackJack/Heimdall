@@ -78,6 +78,9 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
     private string _filterText = "";
 
     [ObservableProperty]
+    private bool _showHidden = true;
+
+    [ObservableProperty]
     private string _emptyFolderText = "";
 
     [ObservableProperty]
@@ -535,10 +538,11 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Pastes files and directories from the supplied source paths into the current directory.
+    /// Pastes files and directories from the supplied source paths into the current or target directory.
     /// </summary>
-    /// <param name="sourcePaths">The clipboard file paths provided by the view.</param>
-    public async Task PasteFilesAsync(IReadOnlyList<string> sourcePaths)
+    /// <param name="sourcePaths">The clipboard or dropped file paths provided by the view.</param>
+    /// <param name="targetDirectoryOverride">Optional target folder override when dropping onto a directory row.</param>
+    public async Task PasteFilesAsync(IReadOnlyList<string> sourcePaths, string? targetDirectoryOverride = null)
     {
         if (sourcePaths.Count == 0 || !TryGetDialogService(out IDialogService dialogService))
         {
@@ -546,7 +550,9 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         }
 
         string title = L10n("FileBrowserPasteOverwriteTitle");
-        string targetDirectory = CurrentPath;
+        string targetDirectory = string.IsNullOrWhiteSpace(targetDirectoryOverride)
+            ? CurrentPath
+            : targetDirectoryOverride;
 
         // Planned off the UI thread: the walk probes every entry of the source tree, and on a big
         // tree or a slow share it froze the window for its whole duration.
@@ -782,6 +788,12 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
         UpdateStatusText();
     }
 
+    partial void OnShowHiddenChanged(bool value)
+    {
+        ApplyFilter();
+        UpdateStatusText();
+    }
+
     private async Task LoadDirectoryCoreAsync(string path, bool pushToHistory)
     {
         int generation = ++_loadGeneration;
@@ -834,7 +846,8 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
             try
             {
                 DirectoryInfo info = new DirectoryInfo(directoryPath);
-                entries.Add(new LocalFileEntry(info.Name, info.FullName, true, 0, info.LastWriteTime));
+                bool isHidden = (info.Attributes & FileAttributes.Hidden) != 0 || info.Name.StartsWith('.');
+                entries.Add(new LocalFileEntry(info.Name, info.FullName, true, 0, info.LastWriteTime, isHidden));
             }
             catch (Exception ex)
             {
@@ -847,7 +860,8 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
             try
             {
                 FileInfo info = new FileInfo(filePath);
-                entries.Add(new LocalFileEntry(info.Name, info.FullName, false, info.Length, info.LastWriteTime));
+                bool isHidden = (info.Attributes & FileAttributes.Hidden) != 0 || info.Name.StartsWith('.');
+                entries.Add(new LocalFileEntry(info.Name, info.FullName, false, info.Length, info.LastWriteTime, isHidden));
             }
             catch (Exception ex)
             {
@@ -916,9 +930,14 @@ public sealed partial class LocalFileBrowserViewModel : ObservableObject
     {
         var filter = FilterText.Trim();
 
-        var source = string.IsNullOrEmpty(filter)
+        IEnumerable<LocalFileEntry> source = ShowHidden
             ? _allFiles
-            : _allFiles.Where(entry => entry.Name.Contains(filter, StringComparison.OrdinalIgnoreCase));
+            : _allFiles.Where(entry => !entry.IsHidden);
+
+        if (!string.IsNullOrEmpty(filter))
+        {
+            source = source.Where(entry => entry.Name.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        }
 
         Files.ReplaceAll(OrderEntries(source, SortColumn, SortDirection).ToList());
 
@@ -986,7 +1005,8 @@ public sealed record LocalFileEntry(
     string FullPath,
     bool IsDirectory,
     long Size,
-    DateTime LastModified);
+    DateTime LastModified,
+    bool IsHidden = false);
 
 internal enum LocalRenameCollisionAction
 {

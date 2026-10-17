@@ -538,6 +538,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             view.SessionLoggingOverride = citrix.SessionLoggingOverride;
             view.InitializeSession(citrix, sessionTab, displayName, _localizer, _dialogService);
             view.SetConnectionInfo(citrix.StoreFrontUrl, citrix.AppName, citrix.Mode);
+            view.RequestSplit += (_) => SplitRequestedCallback?.Invoke(sessionTab);
             view.CloseRequested += () => RequestHostClose(sessionTab, view.OwningPane);
             return view;
         }

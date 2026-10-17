@@ -104,6 +104,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgCwd = "cwd:";
     private const string MsgClipboardWrite = "clipboard-write:";
     private const string MsgClipboardRead = "clipboard-read:";
+    private const string MsgReleaseFocus = "release-focus:";
     private const string TerminalPageMessageSource = "about:blank";
     private const int LoggedWebViewTextLimit = 256;
     internal const int MaxPendingTerminalMessageBytes = 4 * 1024 * 1024;
@@ -1583,8 +1584,36 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        if (message == MsgReleaseFocus)
+        {
+            ReleaseFocusToHeader();
+            return;
+        }
+
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSSH dropped unknown WebView2 terminal message: {DescribeWebViewText(message)}");
+    }
+
+    private void ReleaseFocusToHeader()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            BeginInvokeIfAvailable(ReleaseFocusToHeader);
+            return;
+        }
+
+        if (DisconnectButton.Visibility == Visibility.Visible && DisconnectButton.IsEnabled)
+        {
+            DisconnectButton.Focus();
+        }
+        else if (ReconnectButton.Visibility == Visibility.Visible && ReconnectButton.IsEnabled)
+        {
+            ReconnectButton.Focus();
+        }
+        else
+        {
+            SplitButton.Focus();
+        }
     }
 
     internal static bool TryDecodeCurrentDirectoryPayload(
@@ -2934,10 +2963,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         DisconnectButton.Visibility = isDisconnected ? Visibility.Collapsed : Visibility.Visible;
         ReconnectButton.Visibility = isDisconnected ? Visibility.Visible : Visibility.Collapsed;
 
-        StatusTextBlock.Foreground = forceErrorBrush
-            || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase)
-            ? GetBrush("ErrorBrush", Brushes.IndianRed)
-            : GetBrush("TextPrimaryBrush", Brushes.White);
+        StatusTextBlock.SetResourceReference(
+            TextBlock.ForegroundProperty,
+            forceErrorBrush || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase)
+                ? "ErrorBrush"
+                : "TextPrimaryBrush");
     }
 
     private Brush GetBrush(string resourceKey, Brush fallback)

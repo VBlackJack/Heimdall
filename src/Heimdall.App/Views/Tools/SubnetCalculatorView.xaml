@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Copyright 2026 Julien Bombled
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,7 +47,7 @@
         <Border x:Name="HelpPanel" Grid.Row="1" Style="{StaticResource ToolHelpPanelStyle}">
             <DockPanel>
                 <Button x:Name="BtnCloseHelp" DockPanel.Dock="Right" Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                        FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
                         TabIndex="10"

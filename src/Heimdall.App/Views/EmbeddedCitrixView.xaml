@@ -1,4 +1,4 @@
-<UserControl x:Class="Heimdall.App.Views.EmbeddedCitrixView"
+﻿<UserControl x:Class="Heimdall.App.Views.EmbeddedCitrixView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -26,6 +26,7 @@
                         DockPanel.Dock="Right"
                         Click="OnTerminateClick"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"
@@ -34,6 +35,7 @@
                         DockPanel.Dock="Right"
                         Click="OnCloseTabClick"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"
@@ -43,16 +45,30 @@
                         DockPanel.Dock="Right"
                         Click="OnBringToFrontClick"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="4,0,0,0"
                         Visibility="Collapsed"
                         AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}"/>
+                <Button x:Name="SplitButton"
+                        DockPanel.Dock="Right"
+                        Content="&#xE8A9;"
+                        FontFamily="{StaticResource FontFamilyIcons}"
+                        Click="OnSplitClick"
+                        Style="{DynamicResource GhostButtonStyle}"
+                        MinWidth="{StaticResource SessionHeaderMinTarget}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
+                        Padding="6,2"
+                        FontSize="{StaticResource FontSizeBody}"
+                        Margin="4,0"/>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="SessionTitleText"
                                FontSize="{StaticResource FontSizeBody}"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="{StaticResource SessionHeaderTitleMaxWidth}"
                                VerticalAlignment="Center"/>
                     <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
@@ -64,7 +80,8 @@
                     <TextBlock x:Name="StatusTextBlock"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
-                               VerticalAlignment="Center"/>
+                               VerticalAlignment="Center"
+                               AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -121,7 +138,7 @@
                 HorizontalAlignment="Center">
             <StackPanel MaxWidth="460">
                 <TextBlock Text="&#xE753;"
-                           FontFamily="Segoe MDL2 Assets"
+                           FontFamily="{StaticResource FontFamilyIcons}"
                            FontSize="{StaticResource IconSizeXLarge}"
                            Foreground="{DynamicResource InfoBrush}"
                            HorizontalAlignment="Center"

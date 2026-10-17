@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Copyright 2026 Julien Bombled
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,7 +71,7 @@
                        
                         Content="&#xE711;"
                         Command="{Binding ToggleHelpCommand}"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
                         VerticalAlignment="Top"

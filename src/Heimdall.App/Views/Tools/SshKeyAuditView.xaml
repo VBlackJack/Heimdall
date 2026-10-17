@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Copyright 2026 Julien Bombled
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,8 +38,7 @@
                         Click="OnHelpClick"
                         Style="{DynamicResource ToolHelpButtonStyle}"
                         Padding="{StaticResource PaddingButtonHelp}" FontSize="{StaticResource FontSizeBody}" FontWeight="Bold"
-                        Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="5"/>
+                        Margin="{StaticResource MarginInlineControl}"/>
                 <TextBlock x:Name="HeaderTitle"
                            FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimaryBrush}"
@@ -51,11 +50,10 @@
         <Border x:Name="HelpPanel" Grid.Row="1" Style="{StaticResource ToolHelpPanelStyle}">
             <DockPanel>
                 <Button x:Name="BtnCloseHelp" DockPanel.Dock="Right" Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                        FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
-                        VerticalAlignment="Top"
-                        TabIndex="6"/>
+                        VerticalAlignment="Top"/>
                 <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
                     <TextBlock x:Name="TxtHelpContent" Text="" TextWrapping="Wrap"
                                FontSize="{StaticResource FontSizeBody}"
@@ -66,7 +64,8 @@
         </Border>
 
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="{StaticResource SpacingLg}">
-            <Grid>
+            <Grid MaxWidth="{StaticResource ToolContentMaxWidth}"
+                  HorizontalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>

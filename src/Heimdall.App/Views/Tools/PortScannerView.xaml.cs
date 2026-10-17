@@ -66,7 +66,9 @@ public partial class PortScannerView : UserControl, IToolView
     /// </summary>
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         _openToolAction = ToolContextMenuHelper.GetOpenToolAction(context);
         _setBusy = context?.SetBusyAction;
         _vm.Initialize(localizer);
@@ -554,6 +556,17 @@ public partial class PortScannerView : UserControl, IToolView
         _vm.ShowError = true;
     }
 
+    private void OnLocaleChanged(string _)
+    {
+        if (_disposed) return;
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpPORTSCAN").Replace("\\n", "\n");
+        }
+        RefreshUiFromVm();
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -562,6 +575,7 @@ public partial class PortScannerView : UserControl, IToolView
         }
 
         _disposed = true;
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _routeSelector?.Dispose();
         _vm.PropertyChanged -= OnVmPropertyChanged;
         TxtHost.KeyDown -= OnHostKeyDown;

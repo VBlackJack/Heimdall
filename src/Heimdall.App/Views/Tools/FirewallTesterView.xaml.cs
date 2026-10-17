@@ -237,11 +237,11 @@ public partial class FirewallTesterView : UserControl, IToolView
         var results = _vm.GetAllResults();
         var lookup = results.ToDictionary(result => (result.Host, result.Port));
 
-        var successBrush = FindResource("SuccessBrush") as Brush ?? Brushes.Green;
-        var errorBrush = FindResource("ErrorBrush") as Brush ?? Brushes.Red;
-        var disabledBrush = FindResource("TextDisabledBrush") as Brush ?? Brushes.Gray;
-        var textPrimary = FindResource("TextPrimaryBrush") as Brush ?? Brushes.White;
-        var textSecondary = FindResource("TextSecondaryBrush") as Brush ?? Brushes.Gray;
+        var successBrush = FindResource("SuccessBrush") as Brush ?? System.Windows.SystemColors.HighlightBrush;
+        var errorBrush = FindResource("ErrorBrush") as Brush ?? System.Windows.SystemColors.ControlTextBrush;
+        var disabledBrush = FindResource("TextDisabledBrush") as Brush ?? System.Windows.SystemColors.GrayTextBrush;
+        var textPrimary = FindResource("TextPrimaryBrush") as Brush ?? System.Windows.SystemColors.ControlTextBrush;
+        var textSecondary = FindResource("TextSecondaryBrush") as Brush ?? System.Windows.SystemColors.GrayTextBrush;
 
         HeatmapGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
         foreach (var _ in ports)
@@ -326,14 +326,36 @@ public partial class FirewallTesterView : UserControl, IToolView
                     _ => L("ToolFwStatusTimeout"),
                 };
 
+                var cellSymbol = result?.Status switch
+                {
+                    ProbeStatus.Open => "\u2713",
+                    ProbeStatus.Closed => "\u2717",
+                    ProbeStatus.Timeout => "\u2013",
+                    _ => "\u2013",
+                };
+
+                var symbolText = new TextBlock
+                {
+                    Text = cellSymbol,
+                    FontSize = (double)FindResource("FontSizeCaption"),
+                    FontWeight = FontWeights.SemiBold,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    IsHitTestVisible = false,
+                };
+                symbolText.SetResourceReference(TextBlock.ForegroundProperty, "BadgeTextBrush");
+
                 var cell = new Border
                 {
                     Background = cellBrush,
-                    CornerRadius = new CornerRadius(2),
+                    CornerRadius = (CornerRadius)FindResource("CornerRadiusXs"),
                     Margin = new Thickness(1),
                     MinHeight = 24,
                     MinWidth = 24,
+                    Focusable = true,
+                    FocusVisualStyle = TryFindResource("AppFocusVisualStyle") as Style,
                     ToolTip = tooltipText,
+                    Child = symbolText,
                 };
                 System.Windows.Automation.AutomationProperties.SetName(
                     cell,
@@ -449,7 +471,7 @@ public partial class FirewallTesterView : UserControl, IToolView
         else
         {
             BtnTest.Content = L("ToolFwBtnTest");
-            BtnTest.Foreground = (Brush)FindResource("TextPrimaryBrush");
+            BtnTest.ClearValue(Button.ForegroundProperty);
             BtnTest.Style = (Style)FindResource("PrimaryButtonStyle");
             System.Windows.Automation.AutomationProperties.SetName(BtnTest, L("ToolFwBtnTest"));
             ProgressPanel.Visibility = Visibility.Collapsed;

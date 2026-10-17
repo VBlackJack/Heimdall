@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Copyright 2026 Julien Bombled
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -70,7 +70,7 @@
                         DockPanel.Dock="Right"
                        
                        
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         Content="&#xE711;"
                         Command="{Binding ToggleHelpCommand}"

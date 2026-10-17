@@ -54,7 +54,7 @@ public partial class MacroEditorDialog : Window
             ?? "Delete this macro? This cannot be undone.";
         var yes = _localizer?["BtnDelete"] ?? "Delete";
         var no = _localizer?["BtnCancel"] ?? "Cancel";
-        if (!MessageDialog.ShowConfirm(this, title, message, "warning", yes, no))
+        if (!MessageDialog.ShowConfirm(this, title, message, "warning", yes, no, primaryIsDefault: false))
         {
             return;
         }

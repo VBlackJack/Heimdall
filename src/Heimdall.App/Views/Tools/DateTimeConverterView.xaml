@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Copyright 2026 Julien Bombled
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,7 +60,7 @@
             <DockPanel>
                 <Button x:Name="BtnCloseHelp" DockPanel.Dock="Right" Content="&#xE711;"
                         AutomationProperties.AutomationId="DateTime.CloseHelpButton"
-                        FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                        FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
                         VerticalAlignment="Top"

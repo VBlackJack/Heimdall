@@ -1,4 +1,4 @@
-<Window x:Class="Heimdall.App.Views.Dialogs.MessageDialog"
+﻿<Window x:Class="Heimdall.App.Views.Dialogs.MessageDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title=""
@@ -28,7 +28,7 @@
         <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="True">
             <TextBlock x:Name="IconText"
                        DockPanel.Dock="Left"
-                       FontFamily="Segoe MDL2 Assets"
+                       FontFamily="{StaticResource FontFamilyIcons}"
                        FontSize="{StaticResource FontSizeHeadline}"
                        VerticalAlignment="Center"
                        Margin="0,0,12,0"/>

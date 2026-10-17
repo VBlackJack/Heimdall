@@ -23,12 +23,14 @@
                         Content="{loc:Translate EditorBtnSave}"
                         AutomationProperties.Name="{loc:Translate EditorBtnSave}"
                         Style="{DynamicResource PrimaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="12,3" FontSize="{StaticResource FontSizeCaption}" Margin="4,0,0,0"/>
                 <Button x:Name="BtnClose" DockPanel.Dock="Right"
                         Click="OnCloseClick"
                         Content="{loc:Translate EditorBtnClose}"
                         AutomationProperties.Name="{loc:Translate EditorBtnClose}"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="4,0,0,0"/>
                 <TextBlock Text="{Binding DisplayTitle}"
                            FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"

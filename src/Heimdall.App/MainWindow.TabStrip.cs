@@ -103,12 +103,14 @@ public partial class MainWindow
             return;
         }
 
+        double quickAddWidth = Mw_SessionTabQuickAddButton?.Width is double w && !double.IsNaN(w) ? w + 2 : 0;
         double reserved = _tabStripScroller.Margin.Right;
+        double overflowReserved = System.Math.Max(0, reserved - quickAddWidth);
         bool overflowing = _tabStripScroller.ExtentWidth
-            > _tabStripScroller.ViewportWidth + reserved + TabStripOverflowTolerance;
+            > _tabStripScroller.ViewportWidth + overflowReserved + TabStripOverflowTolerance;
 
         Mw_SessionTabListButton.Visibility = overflowing ? Visibility.Visible : Visibility.Collapsed;
-        double wanted = overflowing ? Mw_SessionTabListButton.Width : 0;
+        double wanted = quickAddWidth + (overflowing ? Mw_SessionTabListButton.Width + 2 : 0);
         if (!wanted.Equals(reserved))
         {
             _tabStripScroller.Margin = new Thickness(0, 0, wanted, 0);

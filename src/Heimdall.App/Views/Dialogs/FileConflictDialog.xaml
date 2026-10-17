@@ -64,23 +64,19 @@
                        Foreground="{DynamicResource TextSecondaryBrush}"/>
             <Button Content="{Binding ApplyAllSkipText}"
                     Command="{Binding ApplyAllSkipCommand}"
-                    AutomationProperties.LabeledBy="{Binding ElementName=ApplyToAllLabel}"
                     Style="{DynamicResource GhostButtonStyle}"
                     Margin="0,0,6,0"/>
             <Button Content="{Binding ApplyAllReplaceText}"
                     Command="{Binding ApplyAllReplaceCommand}"
-                    AutomationProperties.LabeledBy="{Binding ElementName=ApplyToAllLabel}"
                     Style="{DynamicResource GhostButtonStyle}"
                     Margin="0,0,6,0"/>
             <Button Content="{Binding ApplyAllAutoRenameText}"
                     Command="{Binding ApplyAllAutoRenameCommand}"
-                    AutomationProperties.LabeledBy="{Binding ElementName=ApplyToAllLabel}"
                     Style="{DynamicResource GhostButtonStyle}"
                     Margin="0,0,6,0"/>
             <Button x:Name="ReplaceIfNewerButton"
                     Content="{Binding ApplyAllReplaceIfNewerText}"
                     Command="{Binding ApplyAllReplaceIfNewerCommand}"
-                    AutomationProperties.LabeledBy="{Binding ElementName=ApplyToAllLabel}"
                     Style="{DynamicResource GhostButtonStyle}"
                     Visibility="{Binding HasComparison, Converter={StaticResource BoolToVisibilityConverter}}"/>
         </StackPanel>

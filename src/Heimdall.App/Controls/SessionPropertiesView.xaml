@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Copyright 2026 Julien Bombled
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,8 +28,10 @@
              names it, drawn as the plain text it was, underlined while pointed at or focused. -->
         <Style x:Key="SpvCopyValueStyle" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinHeight" Value="{StaticResource TargetMinSize}"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="Transparent"/>
             <!-- The value in full, then how to copy it: a long value ends in an ellipsis at the
                  sidebar's narrowest, and the hint alone left no way to read it. -->
@@ -361,7 +363,7 @@
                            Margin="0,2,12,2" VerticalAlignment="Center"
                            Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <TextBlock Grid.Row="9" Grid.Column="1"
-                           Text="&#xE735;" FontFamily="Segoe MDL2 Assets"
+                           Text="&#xE735;" FontFamily="{StaticResource FontFamilyIcons}"
                            FontSize="{StaticResource FontSizeBody}"
                            Foreground="{DynamicResource WarningTextBrush}"
                            Margin="0,2,0,2"

@@ -203,7 +203,7 @@
                                                     Background="{DynamicResource WarningBrush}"
                                                     Visibility="{Binding HasPasswordBlob, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding PasswordText}"
-                                                           Foreground="{DynamicResource BackgroundBrush}"
+                                                           Foreground="{DynamicResource TextOnAccentBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <Border Margin="0,0,6,4"
@@ -212,7 +212,7 @@
                                                     Background="{DynamicResource AccentBrush}"
                                                     Visibility="{Binding HasNameConflict, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding ConflictText}"
-                                                           Foreground="{DynamicResource BackgroundBrush}"
+                                                           Foreground="{DynamicResource TextOnAccentBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <Border Margin="0,0,6,4"
@@ -221,7 +221,7 @@
                                                     Background="{DynamicResource WarningBrush}"
                                                     Visibility="{Binding HasGateway, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding GatewayText}"
-                                                           Foreground="{DynamicResource BackgroundBrush}"
+                                                           Foreground="{DynamicResource TextOnAccentBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <Border Margin="0,0,6,4"
@@ -230,7 +230,7 @@
                                                     Background="{DynamicResource TextSecondaryBrush}"
                                                     Visibility="{Binding HasUnknownKeys, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding UnknownKeysText}"
-                                                           Foreground="{DynamicResource BackgroundBrush}"
+                                                           Foreground="{DynamicResource TextOnAccentBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <Border Margin="0,0,6,4"
@@ -239,7 +239,7 @@
                                                     Background="{DynamicResource TextDisabledBrush}"
                                                     Visibility="{Binding HasSkippedMappings, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding SkippedMappingsText}"
-                                                           Foreground="{DynamicResource BackgroundBrush}"
+                                                           Foreground="{DynamicResource TextOnAccentBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                         </WrapPanel>

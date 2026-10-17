@@ -1440,7 +1440,7 @@
                                         <TextBlock x:Name="DlgSrv_RdpOptionsTitle" Style="{StaticResource DialogSectionTitleStyle}"/>
                                         <TextBlock x:Name="DlgSrv_RdpOptionsDesc"
                                                    Style="{StaticResource DialogSectionDescriptionStyle}"/>
-                                        <CheckBox x:Name="DlgSrv_GlobalDefaultsCb" TabIndex="75" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RdpUseGlobalDefaults}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,16,0,0"/>
+                                        <CheckBox x:Name="DlgSrv_GlobalDefaultsCb" TabIndex="59" AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}" IsChecked="{Binding RdpUseGlobalDefaults}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,16,0,0"/>
                                         <TextBlock Text="{loc:Translate ServerDialogRdpUsingGlobalDefaultsBanner}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource DialogHintTextStyle}">

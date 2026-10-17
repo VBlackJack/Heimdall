@@ -126,7 +126,7 @@ public sealed class OnboardingStepTargetsTests
             .Select(s => s.TargetElementName!)
             .ToArray();
 
-        Assert.Equal(["SessionTreeView", "AddButton", "Mw_FilterBox"], inSidebar);
+        Assert.Equal(["SessionTreeView", "AddButton", "Mw_FilterBox", "SidebarTabTools"], inSidebar);
     }
 
     [Theory]

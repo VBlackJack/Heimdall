@@ -79,6 +79,7 @@
             <TextBlock Text="{Binding ErrorMessage}"
                        Foreground="{DynamicResource ErrorTextBrush}"
                        FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Assertive"
                        Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}"/>
             <StackPanel Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,4,0,0">
                 <TextBlock Text="{Binding BusyMessage}" Foreground="{DynamicResource TextSecondaryBrush}"
@@ -92,11 +93,11 @@
         <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="CancelBtn" Content="{loc:Translate BtnCancel}"
                     AutomationProperties.Name="{loc:Translate BtnCancel}"
-                    IsCancel="True" TabIndex="3" MinWidth="80" Margin="0,0,8,0"
+                    IsCancel="True" TabIndex="2" MinWidth="80" Margin="0,0,8,0"
                     Style="{DynamicResource SecondaryButtonStyle}" Click="OnCancelClick"/>
             <Button x:Name="EnableBtn" Content="{loc:Translate VaultEnableConfirmBtn}"
                     AutomationProperties.Name="{loc:Translate VaultEnableConfirmBtn}"
-                    IsDefault="True" TabIndex="2" MinWidth="80"
+                    IsDefault="True" TabIndex="3" MinWidth="80"
                     IsEnabled="{Binding CanSubmit, FallbackValue=False}"
                     Style="{DynamicResource PrimaryButtonStyle}" Click="OnEnableClick"/>
         </StackPanel>

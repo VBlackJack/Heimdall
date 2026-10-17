@@ -39,6 +39,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     private SessionTabViewModel? _sessionTab;
     private WebSocketVncProxy? _proxy;
     private LocalizationManager? _localizer;
+    private bool _localeChangeSubscribed;
     private bool _webViewReady;
     private bool _disposed;
 
@@ -139,30 +140,16 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
         SessionTitleText.Text = displayName;
         EndpointTextBlock.Text = $"{session.Host}:{session.Port}";
-        StatusTextBlock.Text = localizer?["StatusVncConnecting"] ?? "Connecting...";
+        StatusTextBlock.Text = L10n("StatusVncConnecting");
         VncLoadingBar.Visibility = System.Windows.Visibility.Visible;
 
-        // Localize static UI elements
-        DisconnectButton.Content = localizer?["BtnDisconnectSession"] ?? "Disconnect";
-        ReconnectButton.Content = localizer?["BtnReconnectSession"] ?? "Reconnect";
-        ReconnectMessageText.Text = localizer?["VncDisconnectedOverlay"] ?? "VNC session disconnected";
-        OverlayReconnectButton.Content = localizer?["BtnReconnectSession"] ?? "Reconnect";
-        OverlayCloseButton.Content = localizer?["BtnCloseOverlay"] ?? "Close";
-        FallbackTitleText.Text = localizer?["VncFallbackTitle"] ?? "Embedded VNC viewer unavailable";
-        FallbackMessageText.Text = localizer?["VncFallbackMessage"] ?? "WebView2 could not be initialized on this machine.";
+        if (_localizer is not null && !_localeChangeSubscribed)
+        {
+            _localizer.LocaleChanged += OnLocaleChanged;
+            _localeChangeSubscribed = true;
+        }
 
-        // Tooltips
-        DisconnectButton.ToolTip = localizer?["TooltipDisconnectSession"] ?? "Disconnect session";
-        ReconnectButton.ToolTip = localizer?["TooltipReconnectSession"] ?? "Reconnect session";
-        SplitButton.ToolTip = localizer?["TooltipSplitSession"] ?? "Split session";
-
-        // Accessibility
-        System.Windows.Automation.AutomationProperties.SetName(DisconnectButton, localizer?["A11yDisconnectSession"] ?? "Disconnect session");
-        System.Windows.Automation.AutomationProperties.SetName(ReconnectButton, localizer?["A11yReconnectSession"] ?? "Reconnect session");
-        System.Windows.Automation.AutomationProperties.SetName(SplitButton, localizer?["A11ySplitSession"] ?? "Split session view");
-        System.Windows.Automation.AutomationProperties.SetName(OverlayReconnectButton, localizer?["A11yReconnectSession"] ?? "Reconnect session");
-        System.Windows.Automation.AutomationProperties.SetName(OverlayCloseButton, localizer?["A11yCloseOverlay"] ?? "Close overlay");
-        System.Windows.Automation.AutomationProperties.SetName(StatusTextBlock, localizer?["A11yConnectionStatus"] ?? "Connection status");
+        ApplyLocalization();
 
         // Start the WebSocket-to-TCP proxy
         _proxy = new WebSocketVncProxy(session.Host, session.Port);
@@ -171,14 +158,63 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         await InitializeWebViewAsync().ConfigureAwait(false);
     }
 
+    private string L10n(string key) => _localizer?[key] ?? key;
+
+    private void ApplyLocalization()
+    {
+        // Localize static UI elements
+        DisconnectButton.Content = L10n("BtnDisconnectSession");
+        ReconnectButton.Content = L10n("BtnReconnectSession");
+        if (ReconnectOverlay.Visibility != Visibility.Visible)
+        {
+            ReconnectMessageText.Text = L10n("VncDisconnectedOverlay");
+        }
+        OverlayReconnectButton.Content = L10n("BtnReconnectSession");
+        OverlayCloseButton.Content = L10n("BtnCloseOverlay");
+        FallbackTitleText.Text = L10n("VncFallbackTitle");
+        if (FallbackPanel.Visibility != Visibility.Visible)
+        {
+            FallbackMessageText.Text = L10n("VncFallbackMessage");
+        }
+
+        // Tooltips
+        DisconnectButton.ToolTip = L10n("TooltipDisconnectSession");
+        ReconnectButton.ToolTip = L10n("TooltipReconnectSession");
+        SplitButton.ToolTip = L10n("TooltipSplitSession");
+
+        // Accessibility
+        System.Windows.Automation.AutomationProperties.SetName(DisconnectButton, L10n("A11yDisconnectSession"));
+        System.Windows.Automation.AutomationProperties.SetName(ReconnectButton, L10n("A11yReconnectSession"));
+        System.Windows.Automation.AutomationProperties.SetName(SplitButton, L10n("A11ySplitSession"));
+        System.Windows.Automation.AutomationProperties.SetName(OverlayReconnectButton, L10n("A11yReconnectSession"));
+        System.Windows.Automation.AutomationProperties.SetName(OverlayCloseButton, L10n("A11yCloseOverlay"));
+        System.Windows.Automation.AutomationProperties.SetHelpText(StatusTextBlock, L10n("A11yConnectionStatus"));
+    }
+
+    private void OnLocaleChanged(string locale)
+    {
+        if (_disposed) return;
+
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnLocaleChanged(locale));
+            return;
+        }
+
+        ApplyLocalization();
+        if (_eventConnectEmitted && !_eventDisconnectEmitted)
+        {
+            StatusTextBlock.Text = L10n("StatusVncConnected");
+        }
+    }
+
     private async Task InitializeWebViewAsync()
     {
         try
         {
             if (!Services.WebView2Helper.IsAvailable)
             {
-                var msg = _localizer?["ErrorWebView2NotFound"]
-                    ?? "WebView2 Runtime not found. Place a Fixed Version Runtime in runtimes/webview2/ or install the Evergreen Runtime.";
+                var msg = L10n("ErrorWebView2NotFound");
                 ShowFallback(msg);
                 if (_session?.ServerId is not null)
                 {
@@ -222,7 +258,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             }
             else
             {
-                var msg = _localizer?["VncViewerNotFound"] ?? "VNC viewer HTML not found.";
+                var msg = L10n("VncViewerNotFound");
                 ShowFallback(msg);
                 if (_session?.ServerId is not null)
                 {
@@ -263,11 +299,27 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             return;
         }
 
+        if (message == "release-focus:")
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (DisconnectButton.Visibility == Visibility.Visible && DisconnectButton.IsEnabled)
+                {
+                    DisconnectButton.Focus();
+                }
+                else
+                {
+                    SplitButton.Focus();
+                }
+            });
+            return;
+        }
+
         if (message == "connected:")
         {
             Dispatcher.Invoke(() =>
             {
-                StatusTextBlock.Text = _localizer?["StatusVncConnected"] ?? "Connected";
+                StatusTextBlock.Text = L10n("StatusVncConnected");
                 VncLoadingBar.Visibility = Visibility.Collapsed;
             });
             if (_session?.ServerId is not null)
@@ -319,7 +371,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
             Dispatcher.Invoke(() =>
             {
-                StatusTextBlock.Text = _localizer?["StatusVncDisconnected"] ?? "Disconnected";
+                StatusTextBlock.Text = L10n("StatusVncDisconnected");
                 ShowReconnectOverlay();
             });
             return;
@@ -337,7 +389,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             Dispatcher.Invoke(() =>
             {
                 StatusTextBlock.Text = _localizer?.Format("ErrorVncConnectionFailed", errorMsg)
-                    ?? $"VNC error: {errorMsg}";
+                    ?? errorMsg;
             });
 
             if (_session?.ServerId is not null)
@@ -615,7 +667,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         // Disconnected state so the overlay's Reconnect/Close actions keep
         // working. The noVNC "disconnected:" round-trip also shows the overlay,
         // but set it directly so a wedged WebView cannot leave the user stuck.
-        StatusTextBlock.Text = _localizer?["StatusVncDisconnected"] ?? "Disconnected";
+        StatusTextBlock.Text = L10n("StatusVncDisconnected");
         ShowReconnectOverlay();
     }
 
@@ -704,6 +756,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             // of ZIndex, so the surface must be collapsed for the overlay to
             // render. Mirrors ShowFallback().
             VncWebView.Visibility = Visibility.Collapsed;
+            OverlayReconnectButton.Focus();
         });
     }
 
@@ -750,6 +803,12 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
         _disposed = true;
         _webViewReady = false;
+
+        if (_localeChangeSubscribed && _localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+            _localeChangeSubscribed = false;
+        }
 
         if (VncWebView.CoreWebView2 is not null)
         {

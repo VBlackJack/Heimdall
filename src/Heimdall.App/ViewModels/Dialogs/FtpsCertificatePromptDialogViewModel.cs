@@ -100,6 +100,10 @@ public partial class FtpsCertificatePromptDialogViewModel(
 
     public bool AcceptIsDefault => _wording.AcceptIsDefault;
 
+    public bool RejectIsDefault => !_wording.AcceptIsDefault;
+
+    public bool IsWarning => !_wording.AcceptIsDefault;
+
     public FtpsCertificateDecision? Decision { get; private set; }
 
     public event Action<bool>? CloseRequested;

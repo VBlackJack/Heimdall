@@ -118,6 +118,7 @@ public partial class LocalFileBrowserView : UserControl
         ApplyLocalization();
         UpdateColumnHeaders();
         Loaded += OnViewLoaded;
+        Unloaded += OnViewUnloaded;
     }
 
     /// <summary>
@@ -151,6 +152,31 @@ public partial class LocalFileBrowserView : UserControl
     private void OnViewLoaded(object sender, RoutedEventArgs e)
     {
         _viewModel.SetDialogService((Application.Current as App)?.Services?.GetService<IDialogService>());
+        if (_localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+            _localizer.LocaleChanged += OnLocaleChanged;
+        }
+    }
+
+    private void OnViewUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+        }
+    }
+
+    private void OnLocaleChanged(string locale)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnLocaleChanged(locale));
+            return;
+        }
+
+        ApplyLocalization();
+        UpdateColumnHeaders();
     }
 
     private void OnFileListSizeChanged(object sender, SizeChangedEventArgs e)
@@ -262,6 +288,11 @@ public partial class LocalFileBrowserView : UserControl
         }
 
         e.Handled = true;
+    }
+
+    private void OnClearFilterClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel.FilterText = string.Empty;
     }
 
     private void OnColumnHeaderClick(object sender, RoutedEventArgs e)
@@ -631,12 +662,14 @@ public partial class LocalFileBrowserView : UserControl
     }
 
     /// <summary>
-    /// Only entries dragged out of a remote list are accepted: they are downloaded into the folder
-    /// under the pointer, or into the one shown.
+    /// Accepts entries dragged out of a remote SFTP list (downloaded into the target folder)
+    /// as well as local file drops from Windows Explorer (copied via PasteFilesAsync).
     /// </summary>
     private void OnDragOver(object sender, System.Windows.DragEventArgs e)
     {
-        if (SftpRemoteDragPayload.From(e.Data) is null)
+        bool hasRemotePayload = SftpRemoteDragPayload.From(e.Data) is not null;
+        bool hasFileDrop = !hasRemotePayload && e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop);
+        if (!hasRemotePayload && !hasFileDrop)
         {
             SetDropHighlight(null);
             e.Effects = System.Windows.DragDropEffects.None;
@@ -655,21 +688,35 @@ public partial class LocalFileBrowserView : UserControl
     private async void OnDrop(object sender, System.Windows.DragEventArgs e)
     {
         SetDropHighlight(null);
-        if (SftpRemoteDragPayload.From(e.Data) is not { } payload)
+        LocalFileEntry? hovered = HitTestRow(e.GetPosition(FileListView));
+        string targetFolder = hovered is { IsDirectory: true } ? hovered.FullPath : _viewModel.CurrentPath;
+
+        if (SftpRemoteDragPayload.From(e.Data) is { } payload)
         {
+            try
+            {
+                await payload.Source.DownloadFilesAsync(payload.Entries, targetFolder);
+                await _viewModel.Refresh();
+            }
+            catch (Exception ex)
+            {
+                Heimdall.Core.Logging.FileLogger.Warn($"[LocalFileBrowser] drop download failed: {ex.Message}");
+            }
             return;
         }
 
-        LocalFileEntry? hovered = HitTestRow(e.GetPosition(FileListView));
-        string targetFolder = hovered is { IsDirectory: true } ? hovered.FullPath : _viewModel.CurrentPath;
-        try
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) &&
+            e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] droppedPaths &&
+            droppedPaths.Length > 0)
         {
-            await payload.Source.DownloadFilesAsync(payload.Entries, targetFolder);
-            await _viewModel.Refresh();
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn($"[LocalFileBrowser] drop download failed: {ex.Message}");
+            try
+            {
+                await _viewModel.PasteFilesAsync(droppedPaths, targetFolder);
+            }
+            catch (Exception ex)
+            {
+                Heimdall.Core.Logging.FileLogger.Warn($"[LocalFileBrowser] local file drop failed: {ex.Message}");
+            }
         }
     }
 

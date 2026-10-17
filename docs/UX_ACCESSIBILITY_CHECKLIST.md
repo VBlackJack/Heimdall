@@ -11,6 +11,8 @@ Use this checklist for every new tool and during significant UX refactors.
 - `Enter` or `Ctrl+Enter` is wired when the tool has a clear main action.
 - The tab order is explicit when the layout is dense or non-linear.
 - Icon-only buttons have a tooltip and an automation name.
+- Compact header and toolbar icon buttons meet the WCAG 2.2 SC 2.5.8 minimum target size (`24x24` px via `SessionHeaderMinTarget`).
+- Embedded `WebView2` surfaces (SSH terminal, VNC, Web session) handle `Ctrl+Alt+Home` in `AcceleratorKeyPressed` to return keyboard focus to the session header bar (WCAG 2.1.2 No Keyboard Trap).
 
 ## Async Behavior
 
@@ -22,6 +24,7 @@ Use this checklist for every new tool and during significant UX refactors.
 ## Feedback States
 
 - Validation errors are shown inline.
+- Inline error and security warning banners declare `AutomationProperties.LiveSetting="Assertive"` with `LiveRegionBehavior.AnnounceWhenVisible="True"` so screen readers announce dynamic changes immediately (WCAG 4.1.3 Status Messages).
 - Empty states are explicit and localized.
 - Results surfaces stay hidden until there is meaningful content.
 - Filtered-no-result states are different from first-use empty states when relevant.
@@ -45,6 +48,10 @@ Use this checklist for every new tool and during significant UX refactors.
 
 - Buttons, glyphs, and indicators painted on `AccentBrush` use `TextOnAccentBrush` (per-theme dark on light-accent variants, white on dark-accent variants). Direct `#FFFFFF` `Foreground` over an accent fill is a regression - the contrast collapses to ~2:1 on the 7 light-pastel-accent Dracula variants (DraculaPro, Drakula, Blade, Buffy, Bathory, Lincoln, VanHelsing, Morbius).
 - Semantic status text (Success / Warning / Error / Info) uses `SuccessTextBrush` / `WarningTextBrush` / `ErrorTextBrush` for `Foreground`. The plain `*Brush` keys remain reserved for borders, badge fills, and icon backgrounds - they are too saturated for text on the 5 light themes (Alucard, Carmilla, Helsing, Nosferatu, Renfield).
+- Elevated surfaces (`SurfaceBrush` -> `BackgroundElevatedColor`) remain visually distinct from the base canvas (`BackgroundBrush` -> `BackgroundColor`), and text hierarchy uses the three distinct tokens `TextSecondaryBrush`, `TextTertiaryBrush`, and `TextDisabledBrush`.
+- Form inputs (`TextBox`, `PasswordBox`, `ComboBox`) use `InputBorderBrush` to preserve non-text boundary contrast (WCAG 2.2 SC 1.4.11).
+- Native Win32/DWM window chrome (`DWMWA_USE_IMMERSIVE_DARK_MODE`, `DWMWA_CAPTION_COLOR`, `DWMWA_TEXT_COLOR`) is synchronized with `SurfaceBrush` and `TextPrimaryBrush` via `WindowThemeHelper.ApplyCurrentTheme`.
+- Glyph icons reference `{StaticResource FontFamilyIcons}` (`Segoe Fluent Icons, Segoe MDL2 Assets`) rather than hardcoding a font family name.
 - Theme-aware brush converters follow the dual `IValueConverter` + `IMultiValueConverter` pattern with a `ThemeRevision` trigger so a runtime theme swap re-evaluates colors without a rebind.
 
 ## Localization

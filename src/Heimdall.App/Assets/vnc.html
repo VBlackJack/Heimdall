@@ -350,6 +350,14 @@
                     }
                 });
 
+                window.addEventListener('keydown', function (event) {
+                    if (event.ctrlKey && event.altKey && event.key === 'Home') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        postMessage('release-focus:');
+                    }
+                }, true);
+
                 postMessage('ready:');
             }
         }());

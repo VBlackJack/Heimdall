@@ -67,6 +67,7 @@
                    HorizontalAlignment="Center"
                    Margin="0,8,0,0"
                    TextWrapping="Wrap"
+                   AutomationProperties.LiveSetting="Assertive"
                    Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}"/>
 
         <!-- Busy indicator (unlock / migration resume) -->
@@ -98,7 +99,8 @@
                        Foreground="{DynamicResource WarningTextBrush}"
                        FontSize="{StaticResource FontSizeBody}"
                        TextWrapping="Wrap"
-                       HorizontalAlignment="Center"/>
+                       HorizontalAlignment="Center"
+                       AutomationProperties.LiveSetting="Assertive"/>
         </Border>
 
         <!-- Buttons -->
@@ -112,7 +114,7 @@
                     Command="{Binding UnlockWithHelloCommand}"
                     Visibility="{Binding ShowHelloUnlock, Converter={StaticResource BoolToVisibilityConverter}}"
                     IsEnabled="{Binding CanUnlockWithHello}"
-                    TabIndex="3"
+                    TabIndex="1"
                     MinWidth="80"
                     Height="35"
                     Margin="0,0,8,0"
@@ -141,7 +143,7 @@
                     Content="{loc:Translate BtnUnlock}"
                     AutomationProperties.Name="{loc:Translate BtnUnlock}"
                     IsDefault="True"
-                    TabIndex="1"
+                    TabIndex="3"
                     MinWidth="80"
                     Click="OnUnlockClick"
                     IsEnabled="{Binding CanSubmit, FallbackValue=True}"

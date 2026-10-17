@@ -565,6 +565,13 @@
                         return true;
                     }
 
+                    // Ctrl+Alt+Home: release keyboard focus to the host session header toolbar (WCAG 2.1.2)
+                    if (event.ctrlKey && event.altKey && event.key === 'Home') {
+                        event.preventDefault();
+                        postMessage('release-focus:');
+                        return false;
+                    }
+
                     // Ctrl+Shift+C: explicit copy
                     if (event.ctrlKey && event.shiftKey && event.code === 'KeyC') {
                         var sel = term.getSelection();

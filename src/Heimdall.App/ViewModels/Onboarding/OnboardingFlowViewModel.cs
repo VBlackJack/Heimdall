@@ -91,7 +91,7 @@ public sealed partial class OnboardingFlowViewModel : ObservableObject
         new("OnboardingStep1Title", "OnboardingStep1Desc", "SessionTreeView", ShellTab.Sessions, InSessionSidebar: true),
         new("OnboardingStepAddTitle", "OnboardingStepAddDesc", "AddButton", ShellTab.Sessions, InSessionSidebar: true),
         new("OnboardingStepSearchTitle", "OnboardingStepSearchDesc", "Mw_FilterBox", ShellTab.Sessions, InSessionSidebar: true),
-        new("OnboardingStep2Title", "OnboardingStep2Desc", "TabTools", null, InSessionSidebar: false),
+        new("OnboardingStep2Title", "OnboardingStep2Desc", "SidebarTabTools", ShellTab.Sessions, InSessionSidebar: true),
         // Points at the magnifier rather than only naming the shortcut: a step that teaches a
         // keystroke and nothing else leaves anyone who misses it with no way in.
         new("OnboardingStep3Title", "OnboardingStep3Desc", "QuickConnectButton", null, InSessionSidebar: false),

@@ -917,12 +917,13 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 **Problem**: Runtime theme swapping across 17 ThemeForge palettes must keep every Heimdall surface in sync - including app-specific brushes, converters that resolve brushes at convert time (server icons, status dots), the AvalonEdit file editor, and the DWM title-bar chrome.
 
-**Solution**: `Services/HeimdallThemeService.cs` is Heimdall's compatibility wrapper around `ThemeForge.Theme.ThemeService`.
+**Solution**: `Services/HeimdallThemeService.cs` is Heimdall's compatibility wrapper around `ThemeForge.Theme.ThemeService` (the legacy `TwinShell.Core` `ThemeService` / `IThemeService` was removed).
 
 - **Package source**: Heimdall consumes `ThemeForge.Theme` from the public nuget.org feed (anonymous restore; no token). ThemeForge owns the 17 palette dictionaries and injects the active palette into `Application.Resources.MergedDictionaries`.
 - **Singleton DI**: registered once in `App.xaml.cs`, injected into `MainWindow`, `MainViewModel`, and `EmbeddedEditorView`.
-- **`ApplyTheme(string? themeName)`**: resolves the persisted value to a ThemeForge id. Unknown values fall back to `Drakul` and are persisted via `ConfigManager.MergeSettingAsync`. The swap itself is delegated to ThemeForge, then Heimdall reapplies the DWM title-bar mode on every open `Window` via `WindowThemeHelper.ApplyCurrentTheme`.
-- **Bridge refresh**: `Themes/HeimdallThemeBridge.xaml` maps 74 Heimdall brush keys onto ThemeForge color slots. `RefreshHeimdallBridge` re-merges this dictionary after each ThemeForge swap because a shared `SolidColorBrush` resource does not live-update its `DynamicResource` `Color`.
+- **`ApplyTheme(string? themeName)`**: resolves the persisted value to a ThemeForge id. Unknown values fall back to `Drakul` and are persisted via `ConfigManager.MergeSettingAsync`. The swap itself is delegated to ThemeForge, then Heimdall reapplies the DWM title-bar mode (`DWMWA_USE_IMMERSIVE_DARK_MODE`) and synchronizes native Windows 11 caption/text colors (`DWMWA_CAPTION_COLOR` mapped to `SurfaceBrush`, `DWMWA_TEXT_COLOR` mapped to `TextPrimaryBrush`) on every open `Window` via `WindowThemeHelper.ApplyCurrentTheme`.
+- **Bridge refresh**: `Themes/HeimdallThemeBridge.xaml` maps Heimdall brush keys onto ThemeForge color slots, maintaining distinct elevated surfaces (`SurfaceBrush` -> `BackgroundElevatedColor` vs `BackgroundBrush` -> `BackgroundColor`), a three-tier text hierarchy (`TextSecondaryBrush`, `TextTertiaryBrush` at `0.72` opacity, `TextDisabledBrush` at `0.45` opacity), and `InputBorderBrush` (`BorderFocusColor` at `0.55` opacity) for WCAG 2.2 SC 1.4.11 control boundary contrast. `RefreshHeimdallBridge` re-merges this dictionary after each ThemeForge swap because a shared `SolidColorBrush` resource does not live-update its `DynamicResource` `Color`.
+- **Syntax palette adaptation**: `Themes/DraculaSyntaxPalette.cs` inspects active background luminance and switches syntax highlighting tokens between Dracula (dark themes) and Alucard (light themes) automatically.
 - **`ThemeRevision` counter**: exposed through the wrapper from ThemeForge. XAML `MultiBinding`s that depend on brush-resolving converters add `DataContext.ThemeRevision` (`ElementName=MainWindowRoot`) as a trailing trigger value to force WPF to re-run the converter on each swap. `ElementName` (not `RelativeSource AncestorType=Window`) is required so the binding resolves from inside the Command Palette `Popup`, whose content has its own visual root.
 - **`event Action<string> ThemeChanged`**: translated from ThemeForge's event shape and consumed by downstream views that rebuild brush caches (`EmbeddedEditorView.ApplyTheme` re-reads AvalonEdit chrome colors from the active dictionary) and by `MainViewModel` to mirror the revision into XAML bindings.
 
@@ -960,13 +961,13 @@ The Notes tool (#34) provides a local-first Markdown editing experience inspired
 
 **External tools refresh**: `ToolRegistry.ExternalToolsChanged` invalidates `_sidebarToolsPopulated` and rebuilds immediately if the sidebar Tools tab is currently active; lazy rebuild on next switch otherwise.
 
-### Dedicated Tools Tab (full-page)
+### Tools Catalog & Onboarding
 
-Full-page browser on the main navigation rail, independent of the sidebar Tools tab. Contains 3 sections - Favorites (pinned tools, persisted in `AppSettings.FavoriteToolIds`), Recently Used (`_recentToolIds`, max 5), and All Tools by category. Cards are 280px wide with pin/unpin button and category-colored icon background. Search filters across name, aliases, and descriptions.
+Primary tool discovery is consolidated into the sidebar `SidebarTabTools` (`Ctrl+Shift+T`) and the Command Palette (`Ctrl+K`), while the full-page `ToolsTabPopulationService` surface remains available for categorized card browsing (Favorites, Recently Used, and All Tools by category).
 
 **Launch flow**: `OnToolsTabCardClick` → `vm.OpenToolTabAsync` → `EmbeddedSessionManager.CreateToolControl` → `ToolRegistry.CreateView` (factory lambda) → `view.Initialize(context, localizer)`. Non-network tools use singleton tab behavior. Network tools pass selected server as `TargetHost` directly (no intermediate prompt). `OpenToolTabAsync` cleans up orphaned tabs on `CreateToolControl` failure.
 
-**Onboarding**: 3-step first-launch overlay (`OnboardingOverlay`, `Panel.ZIndex=500`). Steps: Connect to Servers → Built-in Tools → Quick Connect. Each step navigates to the relevant UI area (Servers tab → Settings tab → switches the sidebar to the Tools tab). Keyboard accessible (Escape, Tab cycle, focus management). Persisted via `AppSettings.OnboardingCompleted`.
+**Onboarding**: 3-step first-launch overlay (`OnboardingOverlay`, `Panel.ZIndex=500`). Steps: Connect to Servers (`SidebarServersContent`) → Built-in Tools (`SidebarTabTools`) → Quick Connect (`QuickConnectBar`). Keyboard accessible (Escape, Tab cycle, focus management). Persisted via `AppSettings.OnboardingCompleted`.
 
 **NetworkCartography responsive**: Columns use proportional (`*`) widths with `MinWidth`. `SizeChanged` handler hides detail columns below 1100px and secondary columns below 800px for split pane support.
 
@@ -1004,7 +1005,7 @@ Full-page browser on the main navigation rail, independent of the sidebar Tools 
 
 **Solution**: Unified to two tiers:
 1. **Tier 1 - Vector Geometries** (`IconGeometries.xaml`): Named `Geo.<Category>.<Name>` resources (Protocol.Rdp, Status.Connected, Tool.Ping, Tree.Group, etc.). Consumed via `Path` elements + `ConnectionTypeToGeometryConverter` / `ConnectionStateToGeometryConverter`.
-2. **Tier 2 - Segoe MDL2 Assets**: Inline in XAML for standard UI chrome (toolbar, navigation, menus). Not centralized - used as `TextBlock` with font-family.
+2. **Tier 2 - Fluent / MDL2 Font Glyphs** (`FontFamilyIcons` in `CommonControls.xaml`): Centralized font family stack `"Segoe Fluent Icons, Segoe MDL2 Assets"` referenced via `{StaticResource FontFamilyIcons}` in XAML and `TryFindResource("FontFamilyIcons")` in C#. Renders modern rounded Fluent glyphs on Windows 11 with automatic fallback to Segoe MDL2 Assets on Windows 10.
 
 **Key changes**: `ToolRegistry` stores `Geo.Tool.*` keys per tool with `FrozenDictionary` lookups. Converters resolve `TOOL:*` connection types via `ToolRegistry.GetGeometryKey()` / `GetCategoryBrushKey()`. TreeView uses 2 converter bindings instead of ~180 lines of DataTriggers.
 

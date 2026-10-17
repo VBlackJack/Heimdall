@@ -100,6 +100,7 @@ public sealed class SettingsLayoutOrderGuardTests
     [InlineData("Mw_SettingsTrustedHostKeysTitle", "SettingsSavedImmediately")]
     [InlineData("Mw_SettingsTrustedRdpCertificatesTitle", "SettingsSavedImmediately")]
     [InlineData("Mw_SettingsAppearanceTitle", "SettingsAppliesImmediately")]
+    [InlineData("Mw_SettingsFileTitle", "SettingsSavedImmediately")]
     [InlineData("Mw_SettingsRdpDefaultsTitle", "SettingsAppliesToNewConnections")]
     public void ASectionThatDoesNotWaitForSaveSaysWhenItApplies(string title, string key)
     {

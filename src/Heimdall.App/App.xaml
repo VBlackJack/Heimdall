@@ -8,6 +8,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/HeimdallThemeBridge.xaml"/>
                 <ResourceDictionary Source="Themes/CommonControls.xaml"/>
+                <ResourceDictionary Source="Themes/DialogCommonStyles.xaml"/>
                 <ResourceDictionary Source="Themes/IconGeometries.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 

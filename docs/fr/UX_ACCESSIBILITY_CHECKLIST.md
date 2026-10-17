@@ -11,6 +11,8 @@ Appliquez cette checklist à chaque nouvel outil, ainsi qu'à l'occasion des ref
 - `Enter` ou `Ctrl+Enter` est câblé dès lors que l'outil possède une action principale évidente.
 - L'ordre de tabulation est explicite lorsque la mise en page est dense ou non linéaire.
 - Les boutons réduits à une icône disposent d'une infobulle et d'un nom d'automatisation.
+- Les boutons d'action compacts des en-têtes et barres d'outils respectent la taille minimale de cible de pointeur WCAG 2.2 SC 2.5.8 (`24x24` px via `SessionHeaderMinTarget`).
+- Les surfaces `WebView2` embarquées (terminal SSH, VNC, session Web) interceptent `Ctrl+Alt+Home` dans `AcceleratorKeyPressed` pour redonner le focus clavier à la barre d'en-tête de session (WCAG 2.1.2 Pas de piège au clavier).
 
 ## Comportement asynchrone
 
@@ -22,6 +24,7 @@ Appliquez cette checklist à chaque nouvel outil, ainsi qu'à l'occasion des ref
 ## États de retour
 
 - Les erreurs de validation sont affichées en ligne.
+- Les bannières d'erreur de validation et d'alerte de sécurité déclarent `AutomationProperties.LiveSetting="Assertive"` avec `LiveRegionBehavior.AnnounceWhenVisible="True"` afin que les lecteurs d'écran annoncent immédiatement les changements dynamiques (WCAG 4.1.3 Messages d'état).
 - Les états vides sont explicites et localisés.
 - Les zones de résultats restent masquées tant qu'il n'y a pas de contenu pertinent.
 - L'état "filtre sans résultat" se distingue de l'état vide de première utilisation lorsque c'est pertinent.
@@ -45,6 +48,10 @@ Appliquez cette checklist à chaque nouvel outil, ainsi qu'à l'occasion des ref
 
 - Les boutons, glyphes et indicateurs peints sur `AccentBrush` utilisent `TextOnAccentBrush` (par thème : sombre sur les variantes à accent clair, blanc sur les variantes à accent sombre). Un `Foreground` `#FFFFFF` appliqué directement sur un aplat d'accentuation constitue une régression - le contraste s'effondre à environ 2:1 sur les 7 variantes Dracula à accent pastel clair (DraculaPro, Drakula, Blade, Buffy, Bathory, Lincoln, VanHelsing, Morbius).
 - Le texte de statut sémantique (Success / Warning / Error / Info) utilise `SuccessTextBrush` / `WarningTextBrush` / `ErrorTextBrush` pour son `Foreground`. Les clés `*Brush` simples restent réservées aux bordures, aux remplissages de badges et aux fonds d'icônes - elles sont trop saturées pour du texte sur les 5 thèmes clairs (Alucard, Carmilla, Helsing, Nosferatu, Renfield).
+- Les surfaces élevées (`SurfaceBrush` -> `BackgroundElevatedColor`) restent visuellement distinctes du canevas de fond (`BackgroundBrush` -> `BackgroundColor`), et la hiérarchie typographique s'appuie sur les trois jetons distincts `TextSecondaryBrush`, `TextTertiaryBrush` et `TextDisabledBrush`.
+- Les contrôles de saisie (`TextBox`, `PasswordBox`, `ComboBox`) utilisent `InputBorderBrush` pour préserver le contraste non textuel des bordures (WCAG 2.2 SC 1.4.11).
+- Le chrome de fenêtre natif Win32/DWM (`DWMWA_USE_IMMERSIVE_DARK_MODE`, `DWMWA_CAPTION_COLOR`, `DWMWA_TEXT_COLOR`) est synchronisé avec `SurfaceBrush` et `TextPrimaryBrush` via `WindowThemeHelper.ApplyCurrentTheme`.
+- Les icônes de glyphes référencent `{StaticResource FontFamilyIcons}` (`Segoe Fluent Icons, Segoe MDL2 Assets`) au lieu de coder en dur un nom de police.
 - Les convertisseurs de brosses sensibles au thème suivent le double patron `IValueConverter` + `IMultiValueConverter` avec un déclencheur `ThemeRevision`, de sorte qu'un changement de thème à l'exécution réévalue les couleurs sans nouvelle liaison.
 
 ## Localisation

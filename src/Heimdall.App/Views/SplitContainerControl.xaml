@@ -16,7 +16,9 @@
                       ShowsPreview="True"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch"
-                      AutomationProperties.Name="{loc:Translate A11yGridSplitter}">
+                      FocusVisualStyle="{StaticResource AppFocusVisualStyle}"
+                      AutomationProperties.Name="{loc:Translate A11ySplitPaneResizer}"
+                      AutomationProperties.HelpText="{loc:Translate A11yGridSplitter}">
             <GridSplitter.Style>
                 <Style TargetType="GridSplitter">
                     <Style.Triggers>

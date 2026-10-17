@@ -2453,7 +2453,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// </remarks>
     private void OnEmptyExploreToolsClick(object sender, RoutedEventArgs e)
     {
-        TabTools.IsChecked = true;
+        if (_uiState.IsSidebarHidden)
+        {
+            ToggleSidebar();
+        }
+
+        SidebarTabTools.IsChecked = true;
+        (DataContext as MainViewModel)?.Sidebar.SetActiveTab(isTools: true);
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => Mw_SidebarToolsFilter.Focus()));
     }
 
     // ── Sidebar Tools tab - view-layer glue (state lives in SidebarViewModel) ──
@@ -4514,6 +4521,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         Dispatcher.BeginInvoke(() =>
         {
+            WindowThemeHelper.ApplyCurrentTheme(this);
             if (DataContext is not MainViewModel vm) return;
             if (!string.Equals(vm.SelectedTab, ShellTab.Tools, StringComparison.Ordinal)) return;
 

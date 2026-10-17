@@ -12,6 +12,25 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased: UI/UX modernization, theme hierarchy, and WCAG 2.2 AA accessibility
+
+### Shell & Design System modernization
+
+- **Native DWM title bar synchronization & Command Center header**: `WindowThemeHelper` now sets `DWMWA_CAPTION_COLOR` (`SurfaceBrush`) and `DWMWA_TEXT_COLOR` (`TextPrimaryBrush`) alongside `DWMWA_USE_IMMERSIVE_DARK_MODE`, keeping the native Windows 11 window frame in sync across all 17 ThemeForge palettes (including live runtime theme swaps). The top bar Quick Connect button is styled as an elevated Command Center pill with a keyboard shortcut badge (`Ctrl+N` / `Ctrl+K`).
+- **Elevated surface hierarchy & 3-tier typography**: `HeimdallThemeBridge.xaml` maps `SurfaceBrush` to `BackgroundElevatedColor` while keeping `BackgroundBrush` on `BackgroundColor`, restoring visual depth between cards, headers, sidebars, and the base canvas. `TextSecondaryBrush`, `TextTertiaryBrush` (`0.72` opacity), and `TextDisabledBrush` (`0.45` opacity) are now distinct, and form inputs use a dedicated `InputBorderBrush` (`BorderFocusColor` at `0.55` opacity) with focus-ring feedback.
+- **Session tab strip & quick-add button**: `ThemedTabItemStyle` uses subtle card borders, hover elevation, and a rounded accent indicator bar (`3` px). A quick-add `+` button (`Mw_SessionTabQuickAddButton`) sits immediately after the tab headers and is accounted for in `MainWindow.TabStrip.cs` width reservation.
+- **Session tree visual hierarchy**: `ThemedTreeViewItemStyle` renders rounded selection pills (`CornerRadiusSm`), clearer vertical indentation guides (`TreeViewIndentGuideBrush` at `0.50` opacity), and pill-framed child count badges on folders.
+- **Interactive Launchpad empty states**: the empty inventory and no-selection states in `MainWindow.xaml` are presented as elevated cards with circular icon medallions, direct action buttons (Add Server, Quick Connect, Import), and a keyboard shortcut hint pill.
+- **Fluent iconography & status bar pills**: `FontFamilyIcons` in `CommonControls.xaml` now prioritizes `"Segoe Fluent Icons, Segoe MDL2 Assets"` and replaces 77 hardcoded `"Segoe MDL2 Assets"` references across XAML and C# code-behind. Status bar indicators (tunnels, broadcast mode, server counters) use pill styles (`StatusBarPillButtonStyle`, `StatusBarPillBorderStyle`).
+- **Consolidated tools navigation & Settings apply-scope badges**: primary tool discovery is unified in the sidebar `SidebarTabTools` (`Ctrl+Shift+T`), removing the duplicate top-bar Tools tab and updating Onboarding Step 2 to spotlight `SidebarTabTools`. Settings apply-scope badges now use `BadgePillStyle` with icon + localized label (`11` px), and the unused `TwinShell.Core` `ThemeService` / `IThemeService` was removed.
+
+### WCAG 2.2 AA accessibility & light-theme contrast
+
+- **Light-mode syntax highlighting**: `DraculaSyntaxPalette` inspects active background luminance and automatically switches syntax tokens between Dracula (dark palettes) and Alucard (light palettes) across JSON, XML/HTML, SQL, and Regex views.
+- **No keyboard trap in embedded WebView2 sessions (WCAG 2.1.2)**: `EmbeddedSshView`, `EmbeddedVncView`, and `EmbeddedWebView` intercept `Ctrl+Alt+Home` in `AcceleratorKeyPressed` to return keyboard focus to the session header bar, matching the existing RDP escape gesture.
+- **Minimum pointer target size (WCAG 2.5.8)**: compact session header icon buttons across `EmbeddedRdpView`, `EmbeddedSshView`, `EmbeddedVncView`, `EmbeddedWebView`, and `EmbeddedCitrixView` enforce a `24x24` px minimum hit target via `SessionHeaderMinTarget`.
+- **Screen reader live regions & keyboard operation (WCAG 4.1.3 / 2.1.1)**: inline validation and security warning banners in `ServerDialog`, `HostKeyPromptDialog`, and `FtpsCertificatePromptDialog` declare `AutomationProperties.LiveSetting="Assertive"` with `LiveRegionBehavior.AnnounceWhenVisible="True"`. Split pane splitters (`SplitContainerControl`), SFTP column headers, and tool canvases (`DiagramEditorView`, `NetworkCartographyView`, `FirewallTesterView`) expose keyboard increments and `AutomationProperties.Name`.
+
 ## 2026-10-17: shared MobaXterm session files, with passwords each person keeps (v2026.101701)
 
 ### Shared MobaXterm sessions

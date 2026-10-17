@@ -399,7 +399,7 @@ public partial class ServerDialog : Window
             var yes = dirtyVm.Localizer?["BtnYes"] ?? _localizer?["BtnYes"] ?? "Yes";
             var no = dirtyVm.Localizer?["BtnNo"] ?? _localizer?["BtnNo"] ?? "No";
 
-            var discard = MessageDialog.ShowConfirm(this, title, message, "warning", yes, no);
+            var discard = MessageDialog.ShowConfirm(this, title, message, "warning", yes, no, primaryIsDefault: false);
             if (!discard)
             {
                 e.Cancel = true;

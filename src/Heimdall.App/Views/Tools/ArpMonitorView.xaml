@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Copyright 2026 Julien Bombled
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,7 +56,7 @@
         <Border x:Name="HelpPanel" Grid.Row="1" Style="{StaticResource ToolHelpPanelStyle}">
             <DockPanel>
                 <Button x:Name="BtnCloseHelp" DockPanel.Dock="Right" Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                        FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
                         VerticalAlignment="Top"
@@ -115,7 +115,7 @@
                 CornerRadius="{StaticResource CornerRadiusSm}">
             <DockPanel>
                 <Button x:Name="BtnDismissAlert" DockPanel.Dock="Right"
-                        Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"
+                        Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeCaption}"
                         Command="{Binding DismissAlertCommand}"
                         Style="{DynamicResource SecondaryButtonStyle}"
                         Padding="{StaticResource PaddingButtonHelp}" Margin="{StaticResource MarginInlineControl}"

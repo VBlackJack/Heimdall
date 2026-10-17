@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Copyright 2026 Julien Bombled
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -68,7 +68,7 @@
                         DockPanel.Dock="Right"
                         AutomationProperties.AutomationId="Regex.CloseHelpButton"
                         Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
@@ -178,16 +178,17 @@
                                  AutomationProperties.AutomationId="Regex.HighlightDisplay"
                                  IsReadOnly="True"
                                  IsHitTestVisible="False"
+                                 Focusable="False"
                                  Visibility="Collapsed"
-                                 Background="{DynamicResource SurfaceBrush}"
-                                 Foreground="{DynamicResource TextPrimaryBrush}"
-                                 BorderBrush="{DynamicResource BorderBrush}"
+                                 Background="Transparent"
+                                 Foreground="Transparent"
+                                 BorderBrush="Transparent"
                                  BorderThickness="1"
                                  Padding="{StaticResource PaddingInput}"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBodyLarge}"
-                                 VerticalScrollBarVisibility="Auto"
-                                 HorizontalScrollBarVisibility="Auto"
+                                 VerticalScrollBarVisibility="Hidden"
+                                 HorizontalScrollBarVisibility="Hidden"
                                  AutomationProperties.Name="{loc:Translate ToolRegexHighlightLabel}" />
                 </Grid>
             </Grid>

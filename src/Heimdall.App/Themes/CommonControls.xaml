@@ -125,7 +125,7 @@
 
     <!-- Design Tokens: Font Family                                -->
     <FontFamily x:Key="FontFamilyMonospace">Consolas, Courier New, monospace</FontFamily>
-    <FontFamily x:Key="FontFamilyIcons">Segoe MDL2 Assets</FontFamily>
+    <FontFamily x:Key="FontFamilyIcons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
     <!-- Design Tokens: Corner Radius                              -->
     <CornerRadius x:Key="CornerRadiusXs">2</CornerRadius>
@@ -387,6 +387,59 @@
            BasedOn="{StaticResource GhostButtonStyle}">
         <Setter Property="Padding" Value="16,8"/>
         <Setter Property="MinWidth" Value="0"/>
+    </Style>
+
+    <!-- Compact status bar pill button and read-only badge container -->
+    <Style x:Key="StatusBarPillButtonStyle" TargetType="{x:Type Button}"
+           BasedOn="{StaticResource GhostButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="8,2"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="{StaticResource SessionHeaderMinTarget}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{StaticResource CornerRadiusSm}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="StatusBarPillBorderStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusSm}"/>
+        <Setter Property="Padding" Value="8,2"/>
+        <Setter Property="MinHeight" Value="{StaticResource SessionHeaderMinTarget}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
     <!-- Toolbar visual separator. Used to group toolbar buttons by family
@@ -1132,7 +1185,7 @@
         <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="Padding" Value="14,8"/>
         <Setter Property="Margin" Value="0,0,4,0"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -1140,7 +1193,7 @@
                     <Border x:Name="TabBorder"
                             Background="{TemplateBinding Background}"
                             BorderBrush="Transparent"
-                            BorderThickness="0"
+                            BorderThickness="1,1,1,0"
                             CornerRadius="8,8,0,0"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
@@ -1153,28 +1206,30 @@
                                     Height="3"
                                     VerticalAlignment="Bottom"
                                     Background="Transparent"
-                                    CornerRadius="1"/>
+                                    CornerRadius="2,2,0,0"/>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource CardBrush}"/>
+                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
                             <Setter TargetName="Underline" Property="Background" Value="{DynamicResource AccentBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                         <Trigger Property="IsFocused" Value="True">
                             <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                            <Setter TargetName="TabBorder" Property="BorderThickness" Value="0,0,0,2"/>
+                            <Setter TargetName="TabBorder" Property="BorderThickness" Value="1,1,1,2"/>
                         </Trigger>
                         <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
                             <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                             <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                            <Setter TargetName="TabBorder" Property="BorderThickness" Value="2,0,0,0"/>
+                            <Setter TargetName="TabBorder" Property="BorderThickness" Value="2,1,1,0"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="TabBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
@@ -1401,24 +1456,43 @@
                                 Background="Transparent"
                                 BorderBrush="Transparent"
                                 BorderThickness="3,0,0,0"
-                                CornerRadius="0">
+                                CornerRadius="{StaticResource CornerRadiusSm}">
                             <ContentPresenter x:Name="HeaderHost"
                                               ContentSource="Header"
                                               HorizontalAlignment="Stretch"/>
                         </Border>
-                        <ItemsPresenter x:Name="ItemsHost"
-                                        Grid.Row="1"
-                                        Grid.Column="1"
-                                        Grid.ColumnSpan="2"
-                                        Margin="2,1,0,0"/>
+                        <Grid x:Name="ChildrenHost"
+                              Grid.Row="1"
+                              Grid.Column="1"
+                              Grid.ColumnSpan="2"
+                              Margin="0,1,0,0">
+                            <Border x:Name="IndentGuide"
+                                    Width="1"
+                                    HorizontalAlignment="Left"
+                                    Margin="1,0,0,0"
+                                    Background="{DynamicResource TreeViewIndentGuideBrush}"
+                                    Visibility="Collapsed"/>
+                            <ItemsPresenter x:Name="ItemsHost"
+                                            Margin="2,1,0,0"/>
+                        </Grid>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="HasItems" Value="False">
                             <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
+                            <Setter TargetName="ChildrenHost" Property="Margin" Value="0"/>
+                            <Setter TargetName="IndentGuide" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
                         <Trigger Property="IsExpanded" Value="False">
                             <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="IndentGuide" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="HasItems" Value="True"/>
+                                <Condition Property="IsExpanded" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="IndentGuide" Property="Visibility" Value="Visible"/>
+                        </MultiTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                         </Trigger>
@@ -2287,6 +2361,8 @@
                             SnapsToDevicePixels="True">
                         <Grid>
                             <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="0"
+                                          Padding="{TemplateBinding Padding}"
                                           Focusable="False"
                                           HorizontalScrollBarVisibility="Hidden"
                                           VerticalScrollBarVisibility="Hidden"/>
@@ -2303,14 +2379,14 @@
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="Text" Value=""/>
-                                <Condition Property="IsFocused" Value="False"/>
+                                <Condition Property="IsKeyboardFocused" Value="False"/>
                             </MultiTrigger.Conditions>
                             <Setter TargetName="Watermark" Property="Visibility" Value="Visible"/>
                         </MultiTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                         </Trigger>
-                        <Trigger Property="IsFocused" Value="True">
+                        <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -2348,7 +2424,7 @@
     </Style>
 
     <Style x:Key="ToolEmptyStateIconStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyIcons}"/>
         <Setter Property="FontSize" Value="{StaticResource IconSizeEmptyState}"/>
         <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>

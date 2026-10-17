@@ -19,10 +19,12 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Tools;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 
 namespace Heimdall.App.Views.Tools;
@@ -38,6 +40,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
     private const string KeyFileFilterKey = "ToolSshAuditKeyFileFilter";
 
     private LocalizationManager? _localizer;
+    private HeimdallThemeService? _themeService;
     private readonly SshKeyAuditViewModel _vm;
     private DispatcherTimer? _debounceTimer;
 
@@ -60,7 +63,14 @@ public partial class SshKeyAuditView : UserControl, IToolView
     /// <inheritdoc/>
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
+
+        if (_themeService is not null) _themeService.ThemeChanged -= OnThemeChanged;
+        _themeService = (Application.Current as App)?.Services?.GetService<HeimdallThemeService>();
+        if (_themeService is not null) _themeService.ThemeChanged += OnThemeChanged;
+
         _vm.Initialize(localizer);
         ApplyLocalization();
 
@@ -256,9 +266,35 @@ public partial class SshKeyAuditView : UserControl, IToolView
 
     private string L(string key) => _localizer?[key] ?? key;
 
+    private void OnLocaleChanged(string _)
+    {
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpSSHAUDIT").Replace("\\n", "\n");
+        }
+        if (_vm.ShowResults)
+        {
+            UpdateBadgeBrushes();
+            UpdateResultDisplay();
+            ProjectFindings();
+        }
+    }
+
+    private void OnThemeChanged(string _)
+    {
+        if (_vm.ShowResults)
+        {
+            UpdateBadgeBrushes();
+            ProjectFindings();
+        }
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
+        if (_themeService is not null) _themeService.ThemeChanged -= OnThemeChanged;
         _vm.PropertyChanged -= OnVmPropertyChanged;
 
         if (_debounceTimer is not null)

@@ -67,6 +67,7 @@
                    HorizontalAlignment="Center"
                    Margin="0,8,0,0"
                    TextWrapping="Wrap"
+                   AutomationProperties.LiveSetting="Assertive"
                    Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}"/>
 
         <!-- Lockout message (visible when locked out) -->
@@ -80,7 +81,8 @@
                        Foreground="{DynamicResource WarningTextBrush}"
                        FontSize="{StaticResource FontSizeBody}"
                        TextWrapping="Wrap"
-                       HorizontalAlignment="Center"/>
+                       HorizontalAlignment="Center"
+                       AutomationProperties.LiveSetting="Assertive"/>
         </Border>
 
         <!-- Buttons -->
@@ -92,7 +94,7 @@
                     Content="{loc:Translate BtnCancel}"
                     AutomationProperties.Name="{loc:Translate BtnCancel}"
                     IsCancel="True"
-                    TabIndex="2"
+                    TabIndex="1"
                     MinWidth="80"
                     Margin="0,0,8,0"
                     Style="{DynamicResource SecondaryButtonStyle}"
@@ -101,7 +103,7 @@
                     Content="{loc:Translate BtnUnlock}"
                     AutomationProperties.Name="{loc:Translate BtnUnlock}"
                     IsDefault="True"
-                    TabIndex="1"
+                    TabIndex="2"
                     MinWidth="80"
                     Click="OnUnlockClick"
                     IsEnabled="{Binding IsLockedOut, Converter={StaticResource InvertBoolConverter}, FallbackValue=True}"

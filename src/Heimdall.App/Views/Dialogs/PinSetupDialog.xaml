@@ -116,6 +116,7 @@
                    Foreground="{DynamicResource ErrorTextBrush}"
                    FontSize="{StaticResource FontSizeBody}"
                    TextWrapping="Wrap"
+                   AutomationProperties.LiveSetting="Assertive"
                    Margin="0,0,0,16"/>
 
         <StackPanel Grid.Row="5"
@@ -125,7 +126,7 @@
             <Button x:Name="RemoveBtn"
                     Content="{loc:Translate PinSetupBtnRemove}"
                     AutomationProperties.Name="{loc:Translate PinSetupBtnRemove}"
-                    TabIndex="5"
+                    TabIndex="3"
                     MinWidth="96"
                     Margin="0,0,8,0"
                     Style="{DynamicResource SecondaryButtonStyle}"
@@ -144,7 +145,7 @@
                     Content="{loc:Translate PinSetupBtnSave}"
                     AutomationProperties.Name="{loc:Translate PinSetupBtnSave}"
                     IsDefault="True"
-                    TabIndex="3"
+                    TabIndex="5"
                     MinWidth="80"
                     Style="{DynamicResource PrimaryButtonStyle}"
                     Click="OnSaveClick"/>

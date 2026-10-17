@@ -53,7 +53,6 @@ public partial class SplitContainerControl : UserControl
             _model.PropertyChanged += OnModelPropertyChanged;
         }
 
-        ApplyLocalization();
         SyncContent();
         ApplyLayout();
     }
@@ -205,17 +204,6 @@ public partial class SplitContainerControl : UserControl
             Grid.SetRow(SecondPresenter, 0);
             Grid.SetColumn(SecondPresenter, 2);
         }
-    }
-
-    private void ApplyLocalization()
-    {
-        System.Windows.Automation.AutomationProperties.SetName(Splitter, L("A11ySplitPaneResizer"));
-    }
-
-    private string L(string key)
-    {
-        var vm = MainViewModelLocator.FindCurrent();
-        return vm?.GetLocalizer()[key] ?? key;
     }
 
     /// <summary>
