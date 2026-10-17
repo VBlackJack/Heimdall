@@ -16,6 +16,7 @@
 
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Controls;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Localization;
@@ -44,7 +45,10 @@ public partial class FtpsCertificatePromptDialog : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         ApplyAutomationNames();
-        AcceptButton.Focus();
+
+        // A focused button answers Enter whatever IsDefault says, so the focus follows the default.
+        Button first = _viewModel?.RejectIsDefault == true ? RejectButton : AcceptButton;
+        first.Focus();
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)

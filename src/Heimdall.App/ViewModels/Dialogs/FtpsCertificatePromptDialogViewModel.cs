@@ -100,6 +100,16 @@ public partial class FtpsCertificatePromptDialogViewModel(
 
     public bool AcceptIsDefault => _wording.AcceptIsDefault;
 
+    /// <summary>
+    /// On a certificate that replaces a trusted one Reject answers Enter and takes the focus,
+    /// as the host-key prompt does on a changed key. Before, nothing was the default there but
+    /// Accept held the focus, so Enter still trusted what may be an interception.
+    /// </summary>
+    public bool RejectIsDefault => !_wording.AcceptIsDefault;
+
+    /// <summary>Whether the prompt is drawn as an alert rather than a first-use question.</summary>
+    public bool IsWarning => !_wording.AcceptIsDefault;
+
     public FtpsCertificateDecision? Decision { get; private set; }
 
     public event Action<bool>? CloseRequested;
