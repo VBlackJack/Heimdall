@@ -58,7 +58,7 @@ public partial class CommandActionDialog : Window
         var yes = vm.Localizer?["BtnYes"] ?? "Yes";
         var no = vm.Localizer?["BtnNo"] ?? "No";
 
-        var discard = MessageDialog.ShowConfirm(this, title, message, "warning", yes, no);
+        var discard = MessageDialog.ShowDestructiveConfirm(this, title, message, yes, no);
         if (!discard)
         {
             e.Cancel = true;

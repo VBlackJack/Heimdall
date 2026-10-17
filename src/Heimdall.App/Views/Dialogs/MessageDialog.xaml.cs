@@ -154,6 +154,37 @@ public partial class MessageDialog : Window
         return dialog.Result;
     }
 
+    /// <summary>
+    /// Whether Enter accepts a question whose yes throws work away: no. Kept beside the
+    /// overload that applies it, so the rule is pinned where it is used.
+    /// </summary>
+    internal const bool DestructivePrimaryIsDefault = false;
+
+    /// <summary>
+    /// Asks before throwing work away (unsaved edits, a stored item). Enter and Escape both
+    /// keep it, so only a deliberate click or the access key destroys anything.
+    /// </summary>
+    /// <param name="owner">The window the question belongs to.</param>
+    /// <param name="title">The dialog title.</param>
+    /// <param name="message">What would be lost.</param>
+    /// <param name="destroyLabel">The label of the button that throws the work away.</param>
+    /// <param name="keepLabel">The label of the button that keeps it.</param>
+    /// <returns><see langword="true"/> when the user chose to throw the work away.</returns>
+    public static bool ShowDestructiveConfirm(
+        Window? owner,
+        string title,
+        string message,
+        string destroyLabel,
+        string keepLabel) =>
+        ShowConfirm(
+            owner,
+            title,
+            message,
+            "warning",
+            destroyLabel,
+            keepLabel,
+            primaryIsDefault: DestructivePrimaryIsDefault);
+
     private static void ApplySeverityStyle(MessageDialog dialog, string severity)
     {
         // Icon glyph + color from Segoe MDL2 Assets
