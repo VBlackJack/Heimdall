@@ -185,8 +185,7 @@
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="{StaticResource CornerRadiusSm}">
-                        <ItemsControl ItemsSource="{Binding CheckResults}"
-                                      AutomationProperties.LiveSetting="Polite">
+                        <ItemsControl ItemsSource="{Binding CheckResults}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Margin="0,4"

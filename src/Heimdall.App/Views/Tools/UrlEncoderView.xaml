@@ -124,8 +124,7 @@
                          Foreground="{DynamicResource TextPrimaryBrush}"
                          BorderThickness="1"
                          Tag="{loc:Translate ToolWatermarkUrlToEncode}"
-                         AutomationProperties.Name="{loc:Translate ToolUrlEncDecodedLabel}"
-                         AutomationProperties.LiveSetting="Polite">
+                         AutomationProperties.Name="{loc:Translate ToolUrlEncDecodedLabel}">
                     <TextBox.Style>
                         <Style TargetType="TextBox">
                             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
@@ -173,8 +172,7 @@
                          BorderBrush="{DynamicResource BorderBrush}"
                          BorderThickness="1"
                          Tag="{loc:Translate ToolWatermarkEncodedUrl}"
-                         AutomationProperties.Name="{loc:Translate ToolUrlEncEncodedLabel}"
-                         AutomationProperties.LiveSetting="Polite" />
+                         AutomationProperties.Name="{loc:Translate ToolUrlEncEncodedLabel}"/>
 
                 <CheckBox x:Name="ChkComponentEncoding"
                           AutomationProperties.AutomationId="UrlEncoder.ComponentEncodingCheck"

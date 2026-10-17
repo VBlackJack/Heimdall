@@ -183,7 +183,6 @@
                          IsReadOnly="True" TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Disabled"
                          TabIndex="5"
-                         AutomationProperties.LiveSetting="Polite"
                          AutomationProperties.Name="{loc:Translate ToolTcpPingTitle}"/>
             </ScrollViewer>
         </Border>

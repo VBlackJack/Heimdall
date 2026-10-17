@@ -207,8 +207,7 @@
                             Background="{DynamicResource CardBrush}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
-                            Padding="{StaticResource PaddingSectionCard}"
-                            AutomationProperties.LiveSetting="Polite">
+                            Padding="{StaticResource PaddingSectionCard}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -365,8 +364,7 @@
                                Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
 
                     <!-- Stacked certificate cards -->
-                    <ItemsControl x:Name="ScanResultsList"
-                                  AutomationProperties.LiveSetting="Polite">
+                    <ItemsControl x:Name="ScanResultsList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="{DynamicResource CardBrush}"

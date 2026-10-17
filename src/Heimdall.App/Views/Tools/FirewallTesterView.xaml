@@ -194,8 +194,7 @@
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Auto"
                           Padding="{StaticResource SpacingSm}">
-                <Grid x:Name="HeatmapGrid"
-                      AutomationProperties.LiveSetting="Polite"/>
+                <Grid x:Name="HeatmapGrid"/>
             </ScrollViewer>
         </Border>
 

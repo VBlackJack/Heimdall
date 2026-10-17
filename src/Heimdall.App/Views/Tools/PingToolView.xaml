@@ -228,8 +228,7 @@
                     <TextBlock x:Name="TxtLog" Text=""
                                FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                                Foreground="{DynamicResource TextPrimaryBrush}"
-                               TextWrapping="Wrap"
-                               AutomationProperties.LiveSetting="Polite"/>
+                               TextWrapping="Wrap"/>
                 </ScrollViewer>
             </Border>
         </Grid>

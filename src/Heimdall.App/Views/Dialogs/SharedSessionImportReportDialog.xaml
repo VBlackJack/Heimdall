@@ -116,13 +116,14 @@
         </Grid>
 
         <DockPanel Grid.Row="3" Margin="0,16,0,0" LastChildFill="True">
-            <TextBlock Text="{Binding StatusText}"
+            <TextBlock Text="{Binding StatusText, NotifyOnTargetUpdated=True}"
                        DockPanel.Dock="Left"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        VerticalAlignment="Center"
                        TextTrimming="CharacterEllipsis"
                        MaxWidth="{StaticResource SharedReportStatusMaxWidth}"
-                       AutomationProperties.LiveSetting="Polite"/>
+                       AutomationProperties.LiveSetting="Polite"
+                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="{loc:Translate SharedReportCopy}"
                         Command="{Binding CopyCommand}"

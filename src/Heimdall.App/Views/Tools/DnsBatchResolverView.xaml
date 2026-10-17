@@ -165,8 +165,7 @@
                       IsReadOnly="True"
                       ItemsSource="{Binding Results}"
                       RowBackground="Transparent"
-                      TabIndex="2"
-                      AutomationProperties.LiveSetting="Polite">
+                      TabIndex="2">
                 <DataGrid.RowStyle>
                     <Style TargetType="{x:Type DataGridRow}"
                            BasedOn="{StaticResource ThemedDataGridRowStyle}">

@@ -268,7 +268,6 @@
                          BorderThickness="1"
                          FontFamily="Consolas"
                          FontSize="{StaticResource FontSizeBodyLarge}"
-                         AutomationProperties.LiveSetting="Polite"
                          AutomationProperties.Name="{loc:Translate ToolRegexMatchesLabel}">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:MatchDisplayItem}">

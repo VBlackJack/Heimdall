@@ -179,8 +179,7 @@
                              BorderThickness="0"
                              Background="Transparent"
                              Foreground="{DynamicResource JwtHeaderBrush}"
-                             AutomationProperties.Name="{loc:Translate ToolJwtHeaderLabel}"
-                             AutomationProperties.LiveSetting="Polite"/>
+                             AutomationProperties.Name="{loc:Translate ToolJwtHeaderLabel}"/>
                 </Border>
 
                 <DockPanel Margin="0,4,0,4">
@@ -218,8 +217,7 @@
                              BorderThickness="0"
                              Background="Transparent"
                              Foreground="{DynamicResource JwtPayloadBrush}"
-                             AutomationProperties.Name="{loc:Translate ToolJwtPayloadLabel}"
-                             AutomationProperties.LiveSetting="Polite"/>
+                             AutomationProperties.Name="{loc:Translate ToolJwtPayloadLabel}"/>
                 </Border>
 
                 <DockPanel Margin="0,4,0,4">
@@ -256,8 +254,7 @@
                              BorderThickness="0"
                              Background="Transparent"
                              Foreground="{DynamicResource JwtSignatureBrush}"
-                             AutomationProperties.Name="{loc:Translate ToolJwtSignatureLabel}"
-                             AutomationProperties.LiveSetting="Polite"/>
+                             AutomationProperties.Name="{loc:Translate ToolJwtSignatureLabel}"/>
                 </Border>
 
                 <Border Background="{DynamicResource CardBrush}"

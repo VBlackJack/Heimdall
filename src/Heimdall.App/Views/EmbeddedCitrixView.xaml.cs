@@ -237,6 +237,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         if (_captureInProgress)
         {
             CaptureLoadingText.Text = L10n("CitrixCaptureSearching");
+            Behaviors.LiveRegionBehavior.Announce(CaptureLoadingText);
         }
     }
 
@@ -355,6 +356,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
                 await Dispatcher.InvokeAsync(() =>
                 {
                     CaptureLoadingText.Text = L10n("CitrixCaptureSearchingExtended");
+                    Behaviors.LiveRegionBehavior.Announce(CaptureLoadingText);
                 });
             }
 
@@ -409,6 +411,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
             await Dispatcher.InvokeAsync(() =>
             {
                 CaptureLoadingText.Text = L10n("CitrixAuthSignInHint");
+                Behaviors.LiveRegionBehavior.Announce(CaptureLoadingText);
 
                 // Recorded before embedding: the sign-in shell is the ONE window embedded without
                 // a session handle, and naming it here is what keeps the existence-only liveness

@@ -114,12 +114,15 @@ public sealed class EmbeddedSftpViewMarkupTests
         XDocument markup = Markup();
         List<XElement> statusTexts = markup
             .Descendants(Presentation + "TextBlock")
-            .Where(text => ((string?)text.Attribute("Text") ?? string.Empty).Contains("{Binding StatusText}", StringComparison.Ordinal))
+            .Where(text => ((string?)text.Attribute("Text") ?? string.Empty).Contains("{Binding StatusText,", StringComparison.Ordinal))
             .ToList();
 
         XElement bar = Assert.Single(statusTexts);
         Assert.Equal("StatusBarText", (string?)bar.Attribute(Xaml + "Name"));
         Assert.Equal("Polite", (string?)bar.Attribute("AutomationProperties.LiveSetting"));
+        Assert.Equal(
+            "True",
+            bar.Attributes().FirstOrDefault(a => a.Name.LocalName == "LiveRegionBehavior.AnnounceOnTargetUpdated")?.Value);
         Assert.Contains(
             "Assertive",
             bar.ToString(),

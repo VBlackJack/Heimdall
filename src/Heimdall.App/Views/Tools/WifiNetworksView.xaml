@@ -114,8 +114,7 @@
                       CellStyle="{StaticResource ThemedDataGridCellStyle}"
                       TabIndex="1"
                       ItemsSource="{Binding Networks}"
-                      AutomationProperties.Name="{loc:Translate ToolWifiTitle}"
-                      AutomationProperties.LiveSetting="Polite">
+                      AutomationProperties.Name="{loc:Translate ToolWifiTitle}">
                 <DataGrid.RowStyle>
                     <Style TargetType="{x:Type DataGridRow}"
                            BasedOn="{StaticResource ThemedDataGridRowStyle}">

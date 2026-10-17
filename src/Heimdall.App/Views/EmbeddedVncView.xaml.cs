@@ -141,6 +141,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         SessionTitleText.Text = displayName;
         EndpointTextBlock.Text = $"{session.Host}:{session.Port}";
         StatusTextBlock.Text = L10n("StatusVncConnecting");
+        Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
         VncLoadingBar.Visibility = System.Windows.Visibility.Visible;
 
         if (_localizer is not null && !_localeChangeSubscribed)
@@ -218,6 +219,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         if (_eventConnectEmitted && !_eventDisconnectEmitted)
         {
             StatusTextBlock.Text = L10n("StatusVncConnected");
+            Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
         }
     }
 
@@ -323,6 +325,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             Dispatcher.Invoke(() =>
             {
                 StatusTextBlock.Text = L10n("StatusVncConnected");
+                Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
                 VncLoadingBar.Visibility = Visibility.Collapsed;
             });
             if (_session?.ServerId is not null)
@@ -375,6 +378,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             Dispatcher.Invoke(() =>
             {
                 StatusTextBlock.Text = L10n("StatusVncDisconnected");
+                Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
                 ShowReconnectOverlay();
             });
             return;
@@ -393,6 +397,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             {
                 StatusTextBlock.Text = _localizer?.Format("ErrorVncConnectionFailed", errorMsg)
                     ?? errorMsg;
+                Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
             });
 
             if (_session?.ServerId is not null)
@@ -454,6 +459,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         {
             PostWebMessage("disconnect:");
             StatusTextBlock.Text = text;
+            Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
             ShowReconnectOverlay(text);
         });
 
@@ -671,6 +677,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         // working. The noVNC "disconnected:" round-trip also shows the overlay,
         // but set it directly so a wedged WebView cannot leave the user stuck.
         StatusTextBlock.Text = L10n("StatusVncDisconnected");
+        Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
         ShowReconnectOverlay();
     }
 

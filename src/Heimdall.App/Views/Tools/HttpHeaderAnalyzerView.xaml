@@ -182,8 +182,7 @@
                             BorderThickness="1"
                             CornerRadius="{StaticResource CornerRadiusSm}">
                         <ItemsControl x:Name="SecurityHeadersList"
-                                      ItemsSource="{Binding SecurityHeaders}"
-                                      AutomationProperties.LiveSetting="Polite">
+                                      ItemsSource="{Binding SecurityHeaders}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <DockPanel Margin="0,4">
@@ -231,8 +230,7 @@
                             BorderThickness="1"
                             CornerRadius="{StaticResource CornerRadiusSm}">
                         <ItemsControl x:Name="DisclosureHeadersList"
-                                      ItemsSource="{Binding DisclosureHeaders}"
-                                      AutomationProperties.LiveSetting="Polite">
+                                      ItemsSource="{Binding DisclosureHeaders}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <DockPanel Margin="0,4">
@@ -282,7 +280,6 @@
                             <TextBox x:Name="TxtRawHeaders"
                                      MaxHeight="300"
                                      AcceptsReturn="True"
-                                     AutomationProperties.LiveSetting="Polite"
                                      Background="Transparent"
                                      BorderThickness="0"
                                      FontFamily="Consolas"

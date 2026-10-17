@@ -18,6 +18,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Heimdall.App.Services;
@@ -487,6 +488,13 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         TxtWarnCount.Foreground = (Brush)FindResource("WarningBrush");
         TxtFailCount.Text = $"{L("ToolAuditFail")}: {failChecks}";
         TxtFailCount.Foreground = (Brush)FindResource("ErrorBrush");
+
+        // The percentage is the live region, and it speaks for the whole badge: four regions
+        // updated together would queue four announcements for one audit.
+        AutomationProperties.SetName(
+            TxtCompliancePercent,
+            $"{L("ToolAuditCompliance")}: {TxtCompliancePercent.Text} ({TxtPassCount.Text}, {TxtWarnCount.Text}, {TxtFailCount.Text})");
+        Behaviors.LiveRegionBehavior.Announce(TxtCompliancePercent);
 
         // Chapters as Expanders
         foreach (var chapter in report.Chapters)

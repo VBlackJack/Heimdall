@@ -168,7 +168,6 @@
                                  BorderThickness="0"
                                  MaxHeight="500"
                                  TabIndex="3"
-                                 AutomationProperties.LiveSetting="Polite"
                                  AutomationProperties.Name="{loc:Translate ToolWhoisResults}"/>
                     </StackPanel>
                 </Border>

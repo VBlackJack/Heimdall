@@ -125,6 +125,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         SessionTitleText.Text = displayName;
         AddressTextBlock.Text = session.Address.AbsoluteUri;
         StatusTextBlock.Text = Text("StatusWebConnecting");
+        Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
 
         // Behind a gateway the console is only reachable through the tunnel, which an external
         // program would not use: the way out is not offered where it cannot lead anywhere.
@@ -172,6 +173,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         if (_connectedRaised && FallbackPanel.Visibility != Visibility.Visible)
         {
             StatusTextBlock.Text = Text("StatusWebConnected");
+            Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
         }
     }
 
@@ -297,6 +299,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         {
             AddressTextBlock.Text = ConsoleWebView.CoreWebView2?.Source ?? AddressTextBlock.Text;
             StatusTextBlock.Text = Text("StatusWebConnected");
+            Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
             if (!_connectedRaised)
             {
                 _connectedRaised = true;
@@ -317,6 +320,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
                 StatusTextBlock.Text = e.HttpStatusCode > 0
                     ? _localizer?.Format("StatusWebHttpError", e.HttpStatusCode) ?? e.HttpStatusCode.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     : reason;
+                Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
             }
 
             if (e.HttpStatusCode > 0 && !_connectedRaised)
@@ -515,6 +519,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         {
             LoadingBar.Visibility = Visibility.Collapsed;
             StatusTextBlock.Text = message;
+            Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
             FallbackMessageText.Text = message;
             FallbackPanel.Visibility = Visibility.Visible;
 
@@ -555,6 +560,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         }
 
         StatusTextBlock.Text = Text("StatusWebConnecting");
+        Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
 
         // After a failure the browser still shows the error page of the address that failed;
         // reloading it would retry the error page, so the console's own address is opened again.
@@ -582,6 +588,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         if (startInfo is null)
         {
             StatusTextBlock.Text = Text(errorKey ?? "ErrorWebExternalLaunchFailed");
+            Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
             return;
         }
 
@@ -593,6 +600,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         {
             FileLogger.Warn($"Web console external open failed: {ex.Message}");
             StatusTextBlock.Text = _localizer?.Format("ErrorWebExternalLaunchFailed", ex.Message) ?? ex.Message;
+            Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
         }
     }
 

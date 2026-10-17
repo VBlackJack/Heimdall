@@ -16,6 +16,7 @@
 <UserControl x:Class="Heimdall.App.Views.Tools.ArpMonitorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
              xmlns:converters="clr-namespace:Heimdall.App.Converters"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
              Background="{DynamicResource BackgroundBrush}">
@@ -126,10 +127,11 @@
                     <TextBlock x:Name="TxtAlertTitle" Text="{Binding AlertTitle}"
                                FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
                                Foreground="{DynamicResource BackgroundBrush}"/>
-                    <TextBlock x:Name="TxtAlertMessage" Text="{Binding AlertMessage}"
+                    <TextBlock x:Name="TxtAlertMessage" Text="{Binding AlertMessage, NotifyOnTargetUpdated=True}"
                                FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap"
                                Foreground="{DynamicResource BackgroundBrush}"
-                               AutomationProperties.LiveSetting="Assertive"/>
+                               AutomationProperties.LiveSetting="Assertive"
+                               behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -177,7 +179,6 @@
                       HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
                       ColumnHeaderStyle="{DynamicResource ThemedDataGridColumnHeaderStyle}"
                       CellStyle="{DynamicResource ThemedDataGridCellStyle}"
-                      AutomationProperties.LiveSetting="Polite"
                       TabIndex="4">
                 <DataGrid.RowStyle>
                     <Style TargetType="{x:Type DataGridRow}"

@@ -149,8 +149,7 @@
                       HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
                       TabIndex="4"
                       ItemsSource="{Binding DisplayedServices}"
-                      AutomationProperties.Name="{loc:Translate ToolServicesTitle}"
-                      AutomationProperties.LiveSetting="Polite">
+                      AutomationProperties.Name="{loc:Translate ToolServicesTitle}">
                 <DataGrid.RowStyle>
                     <Style TargetType="{x:Type DataGridRow}"
                            BasedOn="{StaticResource ThemedDataGridRowStyle}">

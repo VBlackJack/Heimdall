@@ -189,8 +189,7 @@
                             CornerRadius="{StaticResource CornerRadiusSm}"
                             Padding="{StaticResource PaddingAlertBanner}"
                             Margin="{StaticResource MarginStackItem}">
-                        <ItemsControl ItemsSource="{Binding Results}"
-                                      AutomationProperties.LiveSetting="Polite">
+                        <ItemsControl ItemsSource="{Binding Results}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <DockPanel Margin="0,3,0,3">

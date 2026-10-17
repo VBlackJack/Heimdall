@@ -154,7 +154,7 @@ public partial class TlsAuditView : UserControl, IToolView
         AutomationProperties.SetName(TxtPort, L("ToolTlsAuditPortLabel"));
         AutomationProperties.SetName(BtnCopy, L("ToolTlsAuditBtnCopy"));
         AutomationProperties.SetName(AuditProgress, L("ToolTlsAuditA11yProgress"));
-        AutomationProperties.SetName(TxtGrade, L("ToolTlsAuditGrade"));
+        AutomationProperties.SetName(TxtGrade, GradeAccessibleName());
 
         BtnHelp.ToolTip = L("ToolHelpTooltip");
         AutomationProperties.SetName(BtnHelp, L("ToolHelpTooltip"));
@@ -290,6 +290,8 @@ public partial class TlsAuditView : UserControl, IToolView
     private void ProjectResults()
     {
         TxtGrade.Text = TlsAuditEngine.GradeToString(_vm.Grade);
+        AutomationProperties.SetName(TxtGrade, GradeAccessibleName());
+        Behaviors.LiveRegionBehavior.Announce(TxtGrade);
         GradeBadge.Background = GetGradeBrush(_vm.Grade);
 
         ProtocolList.ItemsSource = _vm.Protocols.Select(protocol => new ProtocolDisplayItem
@@ -347,12 +349,22 @@ public partial class TlsAuditView : UserControl, IToolView
         }
     }
 
+    /// <summary>
+    /// The grade's live region announces its name, so the name carries the grade: a name that
+    /// only said "Grade" was read once and never again.
+    /// </summary>
+    private string GradeAccessibleName() =>
+        string.IsNullOrEmpty(TxtGrade.Text)
+            ? L("ToolTlsAuditGrade")
+            : $"{L("ToolTlsAuditGrade")}: {TxtGrade.Text}";
+
     private void ClearProjectedResults()
     {
         ProtocolList.ItemsSource = null;
         CipherList.ItemsSource = null;
         FindingsList.ItemsSource = null;
         TxtGrade.Text = string.Empty;
+        AutomationProperties.SetName(TxtGrade, GradeAccessibleName());
         TxtCertSubject.Text = string.Empty;
         TxtCertIssuer.Text = string.Empty;
         TxtCertExpiry.Text = string.Empty;

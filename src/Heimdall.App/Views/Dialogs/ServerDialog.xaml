@@ -1174,8 +1174,7 @@
                                                    Text="{Binding WebAddressPreview}"
                                                    Style="{StaticResource DialogHintTextStyle}"
                                                    TextWrapping="Wrap"
-                                                   Margin="0,8,0,0"
-                                                   AutomationProperties.LiveSetting="Polite"/>
+                                                   Margin="0,8,0,0"/>
                                         <TextBlock Text="{loc:Translate ServerDialogWebSignInTitle}" Style="{StaticResource DialogSectionTitleStyle}" Margin="0,18,0,0"/>
                                         <TextBlock Text="{loc:Translate ServerDialogWebSignInDesc}"
                                                    Style="{StaticResource DialogSectionDescriptionStyle}"/>

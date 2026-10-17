@@ -210,7 +210,6 @@
                              Background="{DynamicResource SurfaceBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              AutomationProperties.Name="{loc:Translate ToolJsonOutputLabel}"
-                             AutomationProperties.LiveSetting="Polite"
                              BorderBrush="{DynamicResource BorderBrush}"
                              BorderThickness="1"
                              Padding="{StaticResource PaddingInput}" />
