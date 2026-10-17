@@ -1836,6 +1836,10 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             AppSettings settings = sharedConnection?.Settings
                 ?? lookup.EffectiveSettingsFor(server, _main.CurrentSettings!);
 
+            // The companion is a connection of the SSH session's own row: while it is connected the
+            // row is, whatever the terminal pane does.
+            _main.ServerList.BeginAttributedSession(sftpSessionId, serverId);
+
             var sftpResult = await _main.ServerList.ConnectionService
                 .ConnectSftpAsync(sftpProfile, settings, ct)
                 .ConfigureAwait(false);

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -113,6 +114,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     private readonly Dictionary<string, Dictionary<string, SessionStateRevision>> _sessionStatesByInventoryId =
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, TerminalSessionRevision> _lastTerminalSessionRevisionByInventoryId =
+        new(StringComparer.Ordinal);
+
+    // Written by the connecting thread before the session's first transition, read on the UI
+    // thread when its changes arrive. Kept after the session ends: a pane reconnect connects again
+    // under the same key. One entry per companion pane opened, each key minted once.
+    private readonly ConcurrentDictionary<string, string> _inventoryIdBySessionId =
         new(StringComparer.Ordinal);
     private AppSettings? _currentSettings;
     private readonly HashSet<string> _expandedNodes = new(StringComparer.OrdinalIgnoreCase);
@@ -2674,6 +2681,26 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         return string.IsNullOrWhiteSpace(groupName) ? noGroupLabel : groupName;
     }
 
+    /// <summary>
+    /// Starts a connection that belongs to <paramref name="inventoryId"/>'s row under a key that
+    /// does not say so, and takes the first step every protocol handler expects.
+    /// </summary>
+    /// <remarks>
+    /// The SFTP pane opened beside an SSH session is keyed <c>sftp-&lt;ssh key&gt;-&lt;guid&gt;</c>, which
+    /// nothing can read a profile back from, and it went straight to its handler, whose first
+    /// transition the machine only accepts from Initializing. Its whole connection was refused
+    /// without a word and never reached the row: the row followed the terminal pane alone, and
+    /// went dark when the terminal was disconnected while the file pane still worked.
+    /// </remarks>
+    internal void BeginAttributedSession(string sessionId, string inventoryId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(inventoryId);
+
+        _inventoryIdBySessionId[sessionId] = inventoryId;
+        _connectionSm.TryTransition(sessionId, ConnectionState.Initializing);
+    }
+
     private void OnConnectionStateChanged(ConnectionStateChange change)
     {
         // State machine events may fire from background threads; marshal to UI thread.
@@ -2691,7 +2718,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             {
                 var trackedProfile = _sessionStatesByInventoryId.FirstOrDefault(entry =>
                     entry.Value.ContainsKey(serverId));
-                if (trackedProfile.Value is not null)
+                if (_inventoryIdBySessionId.TryGetValue(serverId, out string? attributedInventoryId))
+                {
+                    inventoryId = attributedInventoryId;
+                }
+                else if (trackedProfile.Value is not null)
                 {
                     inventoryId = trackedProfile.Key;
                 }

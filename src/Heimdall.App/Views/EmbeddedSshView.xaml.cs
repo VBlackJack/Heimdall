@@ -386,6 +386,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// </summary>
     internal event Action? TerminalProcessExited;
 
+    /// <summary>
+    /// Raised on the UI thread when the hosted session ends while the pane stays open, with the
+    /// reason the pane reports when it was lost, or null when it ended cleanly or on request.
+    /// </summary>
+    internal event Action<string?>? SessionEnded;
+
     internal SessionPaneModel? OwningPane => _ownerPane;
 
     public void SetOwningPane(SessionPaneModel pane)
@@ -1834,6 +1840,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 ReconnectMessageText.Text = securityDisconnectMessage;
                 SetReconnectDetail(null);
                 UpdateStatus(SessionStatusTokens.Error);
+                SessionEnded?.Invoke(securityDisconnectMessage);
                 ShowReconnectOverlay();
                 return;
             }
@@ -1851,6 +1858,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             }
 
             UpdateStatus(SessionStatusTokens.Disconnected);
+
+            // The pane's status is not the connection state: the session tree, its connected
+            // filter and the status bar count read the state machine, and kept this session
+            // connected until the tab closed.
+            SessionEnded?.Invoke(_userInitiatedDisconnect || disconnectInfo.IsClean
+                ? null
+                : markerWritten ? errorMessage : L("SshDisconnectedMessage"));
 
             if (_userInitiatedDisconnect)
             {

@@ -862,6 +862,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         WireBroadcast(view);
         WireSplitRequested(view, sessionTab);
         WireReconnectRequested(view, sessionTab);
+        WireSessionEnded(view, sessionTab);
 
         return view;
     }
@@ -933,6 +934,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         WireBroadcast(view);
         WireSplitRequested(view, tab);
         WireReconnectRequested(view, tab);
+        WireSessionEnded(view, tab);
         return view;
     }
 
@@ -977,6 +979,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         WireBroadcast(view);
         WireSplitRequested(view, tab);
         WireReconnectRequested(view, tab);
+        WireSessionEnded(view, tab);
         if (trackWinRmLifecycle)
         {
             WireWinRmTerminalProcessExited(view, tab);
@@ -1078,7 +1081,46 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
 
         WireSplitRequested(view, tab);
         WireReconnectRequested(view, tab);
+        WireSessionEnded(view, tab);
         return view;
+    }
+
+    private void WireSessionEnded(EmbeddedSshView view, SessionTabViewModel tab)
+    {
+        view.SessionEnded += reason => EndPaneSession(tab, view.OwningPane, reason);
+    }
+
+    private void WireSessionEnded(EmbeddedSftpView view, SessionTabViewModel tab)
+    {
+        view.SessionEnded += reason => EndPaneSession(tab, view.OwningPane, reason);
+    }
+
+    /// <summary>
+    /// Moves the session of a terminal or file pane out of Connected when it ends while the pane
+    /// stays open, as the VNC, RDP and Web hosts already did for theirs.
+    /// </summary>
+    /// <remarks>
+    /// Only the pane's own session moves: the row of a split whose other pane is still connected
+    /// stays connected, which the session tree's aggregate decides from the remaining entries.
+    /// Left in Connected, the tree, its connected filter and the status bar count kept a session
+    /// whose pane said Disconnected until the tab was closed.
+    /// </remarks>
+    private void EndPaneSession(SessionTabViewModel tab, SessionPaneModel? owningPane, string? reason)
+    {
+        // A host not yet given its pane can only be the single pane of its tab: in a split it
+        // cannot be told apart from its siblings, and ending one of them would be a guess.
+        SessionPaneModel? pane = owningPane ?? (tab.IsSplit ? null : tab.PrimaryPane);
+        if (pane is null || string.IsNullOrEmpty(pane.ServerId))
+        {
+            return;
+        }
+
+        if (_connectionSm.TryEndSession(pane.ServerId, reason))
+        {
+            Core.Logging.FileLogger.Info(
+                $"Session ended with its pane open: {pane.ServerId} " +
+                $"({(reason is null ? ConnectionState.Disconnected : ConnectionState.Error)}).");
+        }
     }
 
     private void WireReconnectRequested(EmbeddedSshView view, SessionTabViewModel tab)

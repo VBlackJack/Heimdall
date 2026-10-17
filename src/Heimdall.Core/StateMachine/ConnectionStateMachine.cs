@@ -123,45 +123,12 @@ public sealed class ConnectionStateMachine
     /// <returns>True if the transition was valid and applied.</returns>
     public bool TryTransition(string serverId, ConnectionState newState)
     {
-        ConnectionState previousState;
-        long revision;
-
         lock (_lock)
         {
-            ConnectionStateData data = GetOrCreate(serverId);
-            if (!IsValidTransition(data.CurrentState, newState))
+            if (!TryTransitionLocked(serverId, GetOrCreate(serverId), newState))
             {
                 return false;
             }
-
-            previousState = data.CurrentState;
-            data.PreviousState = previousState;
-            data.CurrentState = newState;
-            data.LastTransitionUtc = DateTime.UtcNow;
-            revision = ++data.Revision;
-
-            if (newState == ConnectionState.Initializing)
-            {
-                data.ConnectedAtUtc = null;
-            }
-
-            if (newState == ConnectionState.Connected
-                || newState == ConnectionState.RemoteSessionHandedOff)
-            {
-                data.ConnectedAtUtc = DateTime.UtcNow;
-            }
-
-            if (newState == ConnectionState.Disconnected)
-            {
-                data.ErrorMessage = null;
-                data.TunnelLocalPort = null;
-                data.TunnelProcessId = null;
-                data.TunnelLeaseId = null;
-                data.ConnectedAtUtc = null;
-            }
-
-            EnqueueStateChange(
-                new ConnectionStateChange(serverId, previousState, newState, null, revision));
         }
 
         PublishPendingStateChanges();
@@ -175,30 +142,47 @@ public sealed class ConnectionStateMachine
     /// </summary>
     public bool SetError(string serverId, string errorMessage)
     {
-        ConnectionState previousState;
-        long revision;
-
         lock (_lock)
         {
-            ConnectionStateData data = GetOrCreate(serverId);
-            if (!IsValidTransition(data.CurrentState, ConnectionState.Error))
+            if (!SetErrorLocked(serverId, GetOrCreate(serverId), errorMessage))
+            {
+                return false;
+            }
+        }
+
+        PublishPendingStateChanges();
+        return true;
+    }
+
+    /// <summary>
+    /// Records that the session a pane hosts has ended while its pane stays open: Disconnected
+    /// when it ended cleanly or on request, Error carrying the reason when it was lost.
+    /// </summary>
+    /// <remarks>
+    /// Only a tracked session that has not already ended moves. An untracked one stays untracked:
+    /// the pane's close or a process exit may have torn it down first, on another thread, and
+    /// <see cref="TryTransition"/> or <see cref="SetError"/> would bring it back as a fresh entry
+    /// nothing removes. An ended one keeps the state it ended in, so a later, generic report of
+    /// the same end cannot replace the reason the first one carried.
+    /// </remarks>
+    /// <returns>True when the session moved.</returns>
+    public bool TryEndSession(string serverId, string? errorMessage)
+    {
+        lock (_lock)
+        {
+            if (!_connections.TryGetValue(serverId, out ConnectionStateData? data)
+                || data.CurrentState is ConnectionState.Disconnected or ConnectionState.Error)
             {
                 return false;
             }
 
-            previousState = data.CurrentState;
-            data.PreviousState = previousState;
-            data.CurrentState = ConnectionState.Error;
-            data.ErrorMessage = errorMessage;
-            data.LastTransitionUtc = DateTime.UtcNow;
-            revision = ++data.Revision;
-            EnqueueStateChange(
-                new ConnectionStateChange(
-                    serverId,
-                    previousState,
-                    ConnectionState.Error,
-                    errorMessage,
-                    revision));
+            bool applied = string.IsNullOrWhiteSpace(errorMessage)
+                ? TryTransitionLocked(serverId, data, ConnectionState.Disconnected)
+                : SetErrorLocked(serverId, data, errorMessage);
+            if (!applied)
+            {
+                return false;
+            }
         }
 
         PublishPendingStateChanges();
@@ -370,6 +354,67 @@ public sealed class ConnectionStateMachine
     public static StateMetadata GetMetadata(ConnectionState state)
     {
         return Metadata[state];
+    }
+
+    private bool TryTransitionLocked(string serverId, ConnectionStateData data, ConnectionState newState)
+    {
+        if (!IsValidTransition(data.CurrentState, newState))
+        {
+            return false;
+        }
+
+        ConnectionState previousState = data.CurrentState;
+        data.PreviousState = previousState;
+        data.CurrentState = newState;
+        data.LastTransitionUtc = DateTime.UtcNow;
+        long revision = ++data.Revision;
+
+        if (newState == ConnectionState.Initializing)
+        {
+            data.ConnectedAtUtc = null;
+        }
+
+        if (newState == ConnectionState.Connected
+            || newState == ConnectionState.RemoteSessionHandedOff)
+        {
+            data.ConnectedAtUtc = DateTime.UtcNow;
+        }
+
+        if (newState == ConnectionState.Disconnected)
+        {
+            data.ErrorMessage = null;
+            data.TunnelLocalPort = null;
+            data.TunnelProcessId = null;
+            data.TunnelLeaseId = null;
+            data.ConnectedAtUtc = null;
+        }
+
+        EnqueueStateChange(
+            new ConnectionStateChange(serverId, previousState, newState, null, revision));
+        return true;
+    }
+
+    private bool SetErrorLocked(string serverId, ConnectionStateData data, string errorMessage)
+    {
+        if (!IsValidTransition(data.CurrentState, ConnectionState.Error))
+        {
+            return false;
+        }
+
+        ConnectionState previousState = data.CurrentState;
+        data.PreviousState = previousState;
+        data.CurrentState = ConnectionState.Error;
+        data.ErrorMessage = errorMessage;
+        data.LastTransitionUtc = DateTime.UtcNow;
+        long revision = ++data.Revision;
+        EnqueueStateChange(
+            new ConnectionStateChange(
+                serverId,
+                previousState,
+                ConnectionState.Error,
+                errorMessage,
+                revision));
+        return true;
     }
 
     private ConnectionStateData GetOrCreate(string serverId)
