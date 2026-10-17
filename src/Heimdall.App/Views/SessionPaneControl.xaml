@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
+             xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
              mc:Ignorable="d"
              d:DesignHeight="300"
              d:DesignWidth="400">
@@ -71,7 +72,9 @@
                            Foreground="{DynamicResource TextPrimaryBrush}"
                            HorizontalAlignment="Center"
                            TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding Status, Converter={StaticResource SessionStatusToDisplayConverter}}"
+                <TextBlock Text="{Binding Status, Converter={StaticResource SessionStatusToDisplayConverter}, NotifyOnTargetUpdated=True}"
+                           AutomationProperties.LiveSetting="Polite"
+                           behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                            FontSize="{StaticResource FontSizeCaption}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"

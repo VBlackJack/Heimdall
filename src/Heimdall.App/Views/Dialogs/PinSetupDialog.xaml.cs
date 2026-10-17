@@ -63,12 +63,20 @@ public partial class PinSetupDialog : Window
 
         if (e.NewValue is PinSetupDialogViewModel viewModel)
         {
-            ErrorText.Text = MapError(viewModel.Error);
+            ShowError(MapError(viewModel.Error));
         }
         else
         {
-            ErrorText.Text = string.Empty;
+            ShowError(string.Empty);
         }
+    }
+
+    private void ShowError(string text)
+    {
+        ErrorText.Text = text;
+
+        // Written from code, so no binding raises TargetUpdated for the live region.
+        Behaviors.LiveRegionBehavior.Announce(ErrorText);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -87,7 +95,7 @@ public partial class PinSetupDialog : Window
 
         if (e.PropertyName == nameof(PinSetupDialogViewModel.Error))
         {
-            ErrorText.Text = MapError(viewModel.Error);
+            ShowError(MapError(viewModel.Error));
         }
     }
 

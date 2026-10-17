@@ -326,6 +326,17 @@ public partial class FirewallTesterView : UserControl, IToolView
                     _ => L("ToolFwStatusTimeout"),
                 };
 
+                var symbolText = new TextBlock
+                {
+                    Text = StatusSymbol(result?.Status),
+                    FontSize = (double)FindResource("FontSizeCaption"),
+                    FontWeight = FontWeights.SemiBold,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    IsHitTestVisible = false,
+                };
+                symbolText.SetResourceReference(TextBlock.ForegroundProperty, "BadgeTextBrush");
+
                 var cell = new Border
                 {
                     Background = cellBrush,
@@ -334,6 +345,7 @@ public partial class FirewallTesterView : UserControl, IToolView
                     MinHeight = 24,
                     MinWidth = 24,
                     ToolTip = tooltipText,
+                    Child = symbolText,
                 };
                 System.Windows.Automation.AutomationProperties.SetName(
                     cell,
@@ -346,6 +358,18 @@ public partial class FirewallTesterView : UserControl, IToolView
 
         _viewState.ShowResults();
     }
+
+    /// <summary>
+    /// The mark drawn in a heatmap cell, so open and closed differ by shape as well as by
+    /// colour: green and red are the pair a red-green colour deficiency cannot tell apart.
+    /// </summary>
+    /// <param name="status">The probe outcome, or <see langword="null"/> when none was recorded.</param>
+    internal static string StatusSymbol(ProbeStatus? status) => status switch
+    {
+        ProbeStatus.Open => "✓",
+        ProbeStatus.Closed => "✗",
+        _ => "-",
+    };
 
     private void OnGatewaySelected(SshGatewayDto? gateway)
     {

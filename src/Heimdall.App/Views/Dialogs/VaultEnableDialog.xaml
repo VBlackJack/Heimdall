@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:Heimdall.App.Converters"
         xmlns:loc="clr-namespace:Heimdall.App.Localization"
+        xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
         d:DataContext="{d:DesignInstance Type=vm:VaultEnableDialogViewModel}"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -76,7 +77,9 @@
 
         <!-- Error + busy -->
         <StackPanel Grid.Row="7" Margin="0,8,0,0">
-            <TextBlock Text="{Binding ErrorMessage}"
+            <TextBlock Text="{Binding ErrorMessage, NotifyOnTargetUpdated=True}"
+                       AutomationProperties.LiveSetting="Assertive"
+                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                        Foreground="{DynamicResource ErrorTextBrush}"
                        FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap"
                        Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}"/>

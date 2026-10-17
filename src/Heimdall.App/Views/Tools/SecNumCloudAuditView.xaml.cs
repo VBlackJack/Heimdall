@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows;
@@ -503,7 +504,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
         var passLabel = new TextBlock
         {
-            Text = $"{chapter.PassCount}",
+            Text = CountLabel(PassSymbol, chapter.PassCount),
             Foreground = (Brush)FindResource("SuccessBrush"),
             FontWeight = FontWeights.SemiBold,
             FontSize = (double)FindResource("FontSizeBody"),
@@ -515,7 +516,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
         var warnLabel = new TextBlock
         {
-            Text = $"{chapter.WarnCount}",
+            Text = CountLabel(WarnSymbol, chapter.WarnCount),
             Foreground = (Brush)FindResource("WarningBrush"),
             FontWeight = FontWeights.SemiBold,
             FontSize = (double)FindResource("FontSizeBody"),
@@ -527,7 +528,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
         var failLabel = new TextBlock
         {
-            Text = $"{chapter.FailCount}",
+            Text = CountLabel(FailSymbol, chapter.FailCount),
             Foreground = (Brush)FindResource("ErrorBrush"),
             FontWeight = FontWeights.SemiBold,
             FontSize = (double)FindResource("FontSizeBody"),
@@ -885,6 +886,16 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         TxtError.Text = message;
         TxtError.Visibility = Visibility.Visible;
     }
+
+    // A chapter's three counts differ by mark as well as by colour, so a reader who cannot
+    // tell the success green from the failure red still tells the counts apart.
+    internal const string PassSymbol = "✓";
+    internal const string WarnSymbol = "⚠";
+    internal const string FailSymbol = "✗";
+
+    /// <summary>The text of one count in a chapter header: its mark, then the count.</summary>
+    internal static string CountLabel(string symbol, int count) =>
+        string.Create(CultureInfo.CurrentCulture, $"{symbol} {count}");
 
     /// <inheritdoc />
     public void Dispose()
