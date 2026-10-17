@@ -509,9 +509,14 @@ public sealed class EmbeddedSftpTransferQueueTests
         await viewModel.UploadEntriesAsync([file], "/srv");
         Assert.Empty(browser.Uploads);
 
+        // Taken while the queue is parked. Once it resumes, the pump removes the finished job
+        // from TransferJobs on its own thread (the test dispatcher runs inline), and enumerating
+        // the live list inside WhenAll threw "Collection was modified" when it lost that race.
+        SftpTransferJob parked = Assert.Single(viewModel.TransferJobs);
+
         viewModel.IsTransferInProgress = false;
         viewModel.ResumeTransferQueue();
-        await Task.WhenAll(viewModel.TransferJobs.Select(job => job.Completion.WaitAsync(Patience)));
+        await parked.Completion.WaitAsync(Patience);
 
         Assert.Equal(["/srv/f.txt"], browser.Uploads.Select(call => call.Remote));
     }
