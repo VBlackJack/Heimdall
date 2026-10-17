@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Configuration;
+
 namespace Heimdall.App.ViewModels;
 
 /// <summary>
@@ -50,10 +52,23 @@ public static class SessionTabHeaderStates
     /// that is not a token is a failure reason written as free text.
     /// </summary>
     public static SessionTabHeaderState From(string? status, bool hasFailureDetails)
+        => From(status, hasFailureDetails, connectionType: null);
+
+    /// <summary>
+    /// The header state for a status value on a pane of the given connection type. A tool pane
+    /// is not a session: its status is free text by design ("Ready"), which must not read as a
+    /// failure reason, so a tool tab is marked only by a recorded failure.
+    /// </summary>
+    public static SessionTabHeaderState From(string? status, bool hasFailureDetails, string? connectionType)
     {
         if (hasFailureDetails)
         {
             return SessionTabHeaderState.Failed;
+        }
+
+        if (ConnectionTypeCatalog.IsToolConnectionType(connectionType))
+        {
+            return SessionTabHeaderState.Established;
         }
 
         if (string.IsNullOrWhiteSpace(status)
