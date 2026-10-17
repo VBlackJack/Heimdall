@@ -61,6 +61,38 @@ public sealed class SessionTabHeaderStateTests
             SessionTabHeaderStates.ResolveKey(SessionTabHeaderState.Failed, "free text reason"));
     }
 
+    /// <summary>
+    /// A tool pane's status is free text by design ("Ready"), and free text on a session reads as
+    /// a failure reason, so every tool tab carried the failure mark and was announced as an error.
+    /// </summary>
+    [Fact]
+    public void From_AToolPaneIsNotMarkedForItsFreeTextStatus()
+    {
+        Assert.Equal(
+            SessionTabHeaderState.Established,
+            SessionTabHeaderStates.From("Ready", hasFailureDetails: false, connectionType: "TOOL:REGEX"));
+        Assert.Equal(
+            SessionTabHeaderState.Failed,
+            SessionTabHeaderStates.From("Ready", hasFailureDetails: false, connectionType: "SSH"));
+    }
+
+    [Fact]
+    public void From_AToolPaneWithARecordedFailureIsStillMarked()
+    {
+        Assert.Equal(
+            SessionTabHeaderState.Failed,
+            SessionTabHeaderStates.From("Ready", hasFailureDetails: true, connectionType: "TOOL:REGEX"));
+    }
+
+    [Fact]
+    public void HeaderState_AnOpenToolTabIsNeitherMarkedNorAnnounced()
+    {
+        SessionTabViewModel tab = new() { Title = "Regex Tester", ConnectionType = "TOOL:REGEX", Status = "Ready" };
+
+        Assert.Equal(SessionTabHeaderState.Established, tab.HeaderState);
+        Assert.Null(SessionTabHeaderStates.ResolveKey(tab.HeaderState, tab.Status));
+    }
+
     [Fact]
     public void HeaderState_FollowsAStatusWrittenOnThePrimaryPane()
     {

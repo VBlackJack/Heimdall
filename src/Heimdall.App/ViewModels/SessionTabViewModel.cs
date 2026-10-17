@@ -322,7 +322,7 @@ public partial class SessionTabViewModel : ObservableObject
     public string ConnectionType
     {
         get => PrimaryPane.ConnectionType;
-        set { PrimaryPane.ConnectionType = value; OnPropertyChanged(); }
+        set { PrimaryPane.ConnectionType = value; OnPropertyChanged(); OnPropertyChanged(nameof(HeaderState)); }
     }
 
     public string Status
@@ -332,7 +332,7 @@ public partial class SessionTabViewModel : ObservableObject
     }
 
     /// <summary>The condition the tab header marks, folded from <see cref="Status"/>.</summary>
-    public SessionTabHeaderState HeaderState => SessionTabHeaderStates.From(Status, HasFailureDetails);
+    public SessionTabHeaderState HeaderState => SessionTabHeaderStates.From(Status, HasFailureDetails, ConnectionType);
 
     public string EnvironmentColor
     {
