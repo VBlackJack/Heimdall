@@ -1173,11 +1173,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
             if (sharedCredentials is not null)
             {
-                await sharedCredentials.SettleAsync(
-                    outcome.Status == BulkConnectOutcomeStatus.Success,
-                    outcome.Authenticated,
-                    outcome.Failure?.Code,
-                    outcome.Failure?.Stage == Core.SessionDiagnostics.SessionFailureStage.SshGateway);
+                await SettleSharedCredentialsAsync(sharedCredentials, outcome);
             }
 
             return outcome.Status switch
@@ -1211,6 +1207,20 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             _connectingServerIds.Remove(server.Id);
         }
     }
+
+    /// <summary>
+    /// Keeps or drops the shared passwords a connection used, from how it ended. One reading for
+    /// the single connect and the batch, so the two cannot drift apart.
+    /// </summary>
+    internal static Task SettleSharedCredentialsAsync(
+        SharedCredentialApplier.SharedCredentialPlan plan,
+        BulkConnectOutcome outcome) =>
+        plan.SettleAsync(
+            outcome.Status == BulkConnectOutcomeStatus.Success,
+            outcome.Authenticated,
+            outcome.Failure?.Code,
+            outcome.Failure?.Stage == SessionFailureStage.SshGateway,
+            outcome.FallbackFrom);
 
     internal async Task<bool> EnforceCredentialGuardAsync(
         ServerProfileDto server,
@@ -1390,7 +1400,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 return new BulkConnectOutcome(
                     BulkConnectOutcomeStatus.Success,
                     null,
-                    Authenticated: result.Session is SshSessionResult);
+                    Authenticated: result.Session is SshSessionResult,
+                    FallbackFrom: result.FallbackFrom);
             }
 
             server.ConnectionState = "Error";
@@ -1403,7 +1414,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return new BulkConnectOutcome(
                 BulkConnectOutcomeStatus.ConnectionFailed,
                 result.ErrorMessage ?? _localizer["ErrorConnectionFailed"],
-                result.Failure);
+                result.Failure,
+                FallbackFrom: result.FallbackFrom);
         }
         catch (OperationCanceledException)
         {
@@ -2873,8 +2885,14 @@ internal enum ConnectFailureReport
 /// terminal returns once the process started, before it signed in, so its success says nothing of
 /// the password.
 /// </param>
+/// <param name="FallbackFrom">
+/// The refusal the embedded SSH client met before the attempt retried through Plink; null when no
+/// such retry ran. Set on a success too: the Plink terminal started, the refused password is still
+/// wrong.
+/// </param>
 internal readonly record struct BulkConnectOutcome(
     BulkConnectOutcomeStatus Status,
     string? ErrorMessage,
     SessionDiagnostic? Failure = null,
-    bool Authenticated = false);
+    bool Authenticated = false,
+    Ssh.SshFailureCode? FallbackFrom = null);

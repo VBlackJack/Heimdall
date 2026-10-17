@@ -93,6 +93,69 @@ public sealed class SharedSessionPasswordConnectTests : IDisposable
     }
 
     [Fact]
+    public async Task Connect_RefusedThenStartedThroughPlink_TheSessionPasswordIsForgotten_AndAskedAgain()
+    {
+        await using SharedSessionConnectTests.Fixture fixture = await SharedSessionConnectTests.Fixture.CreateAsync(rememberSharedPasswords: true);
+        await RememberBothAsync(fixture);
+        fixture.Handler.Answer = () => StartedThroughPlinkAfter(SshFailureCode.PasswordRejected);
+
+        await ConnectAsync(fixture);
+
+        Assert.Equal(1, fixture.Secrets!.CountFor(SharedSessionTestData.SourceId));
+        Assert.Null(fixture.Secrets.Find(SharedSecretKind.Session, SharedSessionTestData.SourceId, SessionKey(fixture)));
+        Assert.NotNull(fixture.Secrets.Find(SharedSecretKind.Gateway, SharedSessionTestData.SourceId, GatewayKey(fixture)));
+
+        int asked = fixture.Prompts!.Prompts.Count;
+        fixture.Prompts.Answers.Enqueue(new PasswordPromptResult(SessionPassword, Remember: false));
+        await ConnectAsync(fixture);
+
+        Assert.Equal(asked + 1, fixture.Prompts.Prompts.Count);
+    }
+
+    [Fact]
+    public async Task Connect_RefusedThenThePlinkRetryFailed_TheSessionPasswordIsForgotten()
+    {
+        await using SharedSessionConnectTests.Fixture fixture = await SharedSessionConnectTests.Fixture.CreateAsync(rememberSharedPasswords: true);
+        await RememberBothAsync(fixture);
+        fixture.Handler.Answer = () => Rejected(SshFailureCode.Unknown) with { FallbackFrom = SshFailureCode.PasswordRejected };
+
+        await ConnectAsync(fixture);
+
+        Assert.Equal(1, fixture.Secrets!.CountFor(SharedSessionTestData.SourceId));
+        Assert.Null(fixture.Secrets.Find(SharedSecretKind.Session, SharedSessionTestData.SourceId, SessionKey(fixture)));
+    }
+
+    [Fact]
+    public async Task Connect_TypedAndRemembered_RefusedThenStartedThroughPlink_OnlyTheBastionIsRemembered()
+    {
+        await using SharedSessionConnectTests.Fixture fixture = await SharedSessionConnectTests.Fixture.CreateAsync(rememberSharedPasswords: true);
+        AnswerBoth(fixture, remember: true);
+        fixture.Handler.Answer = () => StartedThroughPlinkAfter(SshFailureCode.PasswordRejected);
+
+        await ConnectAsync(fixture);
+
+        Assert.Equal(1, fixture.Secrets!.CountFor(SharedSessionTestData.SourceId));
+        Assert.NotNull(fixture.Secrets.Find(SharedSecretKind.Gateway, SharedSessionTestData.SourceId, GatewayKey(fixture)));
+    }
+
+    [Fact]
+    public async Task BulkConnect_RefusedThenStartedThroughPlink_TheSessionPasswordIsForgotten()
+    {
+        await using SharedSessionConnectTests.Fixture fixture = await SharedSessionConnectTests.Fixture.CreateAsync(rememberSharedPasswords: true);
+        await RememberBothAsync(fixture);
+        fixture.Handler.Answer = () => StartedThroughPlinkAfter(SshFailureCode.PasswordRejected);
+        fixture.ViewModel.LoadServers(
+            [fixture.Shared.Profile.CloneFaithfully()],
+            await fixture.ConfigManager.LoadSettingsAsync());
+
+        await fixture.ViewModel.ConnectServersBulkCoreAsync([.. fixture.ViewModel.Servers], CancellationToken.None);
+
+        Assert.Equal(1, fixture.Secrets!.CountFor(SharedSessionTestData.SourceId));
+        Assert.Null(fixture.Secrets.Find(SharedSecretKind.Session, SharedSessionTestData.SourceId, SessionKey(fixture)));
+        Assert.NotNull(fixture.Secrets.Find(SharedSecretKind.Gateway, SharedSessionTestData.SourceId, GatewayKey(fixture)));
+    }
+
+    [Fact]
     public async Task Restore_UsesTheRememberedPasswords_AndNeverAsks()
     {
         await using SharedSessionConnectTests.Fixture fixture = await SharedSessionConnectTests.Fixture.CreateAsync(rememberSharedPasswords: true);
@@ -222,6 +285,13 @@ public sealed class SharedSessionPasswordConnectTests : IDisposable
 
     internal static ConnectionResult Rejected(SshFailureCode code) =>
         new(false, "rejected", null, SshSessionDiagnosticFactory.FromClassifiedFailure(new SshFailureInfo(code, "rejected", false)));
+
+    /// <summary>
+    /// What the SSH handler returns when the embedded client was refused and the Plink retry
+    /// started: a success, with the refusal it retried.
+    /// </summary>
+    private static ConnectionResult StartedThroughPlinkAfter(SshFailureCode refusal) =>
+        new(true, null, new TerminalSessionResult(new Heimdall.Terminal.PipeModeSession()), FallbackFrom: refusal);
 
     internal static Task ConnectAsync(SharedSessionConnectTests.Fixture fixture) =>
         ConnectRowAsync(fixture, fixture.Shared.Profile.Id);

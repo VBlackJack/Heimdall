@@ -251,6 +251,70 @@ public sealed class SharedCredentialApplierTests : IDisposable
         Assert.Equal(2, harness.Store.CountFor(SourceId));
     }
 
+    // --- Refused, then retried through Plink ---
+
+    [Theory]
+    [InlineData(SshFailureCode.PasswordRejected)]
+    [InlineData(SshFailureCode.AuthRejected)]
+    public async Task PlinkStartedAfterTheSessionRefusedItsPassword_ForgetsTheSessionPassword_KeepsTheBastion(SshFailureCode code)
+    {
+        // The terminal started, so the outcome is a success; the refusal before it is what says
+        // the remembered password is wrong.
+        Harness harness = await Harness.CreateAsync(this);
+        await harness.RememberBothAsync();
+
+        (ServerProfileDto profile, AppSettings settings) = await harness.ConnectionCopiesAsync();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: false, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: true, sessionAuthenticated: false, failureCode: null, failedAtGateway: false, fallbackFrom: code);
+
+        Assert.Equal(1, harness.Store.CountFor(SourceId));
+        Assert.NotNull(harness.Store.Find(SharedSecretKind.Gateway, SourceId, SharedSessionSecretStore.GatewayKey("gw1.example.test", 22, Login)));
+    }
+
+    [Fact]
+    public async Task PlinkFailedAfterTheSessionRefusedItsPassword_ForgetsTheSessionPassword()
+    {
+        Harness harness = await Harness.CreateAsync(this);
+        await harness.RememberBothAsync();
+
+        (ServerProfileDto profile, AppSettings settings) = await harness.ConnectionCopiesAsync();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: false, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: false, sessionAuthenticated: false, failureCode: (int)SshFailureCode.Unknown, failedAtGateway: false, fallbackFrom: SshFailureCode.PasswordRejected);
+
+        Assert.Equal(1, harness.Store.CountFor(SourceId));
+        Assert.NotNull(harness.Store.Find(SharedSecretKind.Gateway, SourceId, SharedSessionSecretStore.GatewayKey("gw1.example.test", 22, Login)));
+    }
+
+    [Theory]
+    [InlineData(SshFailureCode.KeyboardInteractiveUnsupportedPrompt)]
+    [InlineData(SshFailureCode.KeyRejected)]
+    public async Task PlinkStartedAfterARefusalThatBlamesNoPassword_ForgetsNothing(SshFailureCode code)
+    {
+        // A second-factor question or a refused key says nothing against the password.
+        Harness harness = await Harness.CreateAsync(this);
+        await harness.RememberBothAsync();
+
+        (ServerProfileDto profile, AppSettings settings) = await harness.ConnectionCopiesAsync();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: false, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: true, sessionAuthenticated: false, failureCode: null, failedAtGateway: false, fallbackFrom: code);
+
+        Assert.Equal(2, harness.Store.CountFor(SourceId));
+    }
+
+    [Fact]
+    public async Task TypedAndRemembered_PlinkStartedAfterTheSessionRefusedIt_KeepsTheBastionOnly()
+    {
+        Harness harness = await Harness.CreateAsync(this);
+        harness.AnswerBoth(remember: true);
+
+        (ServerProfileDto profile, AppSettings settings) = await harness.ConnectionCopiesAsync();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: true, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: true, sessionAuthenticated: false, failureCode: null, failedAtGateway: false, fallbackFrom: SshFailureCode.PasswordRejected);
+
+        Assert.Equal(1, harness.Store.CountFor(SourceId));
+        Assert.NotNull(harness.Store.Find(SharedSecretKind.Gateway, SourceId, SharedSessionSecretStore.GatewayKey("gw1.example.test", 22, Login)));
+    }
+
     // --- When nothing is asked ---
 
     [Fact]

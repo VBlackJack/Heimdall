@@ -1522,11 +1522,7 @@ public partial class ServerListViewModel
 
                 if (sharedCredentials is not null)
                 {
-                    await sharedCredentials.SettleAsync(
-                        outcome.Status == BulkConnectOutcomeStatus.Success,
-                        outcome.Authenticated,
-                        outcome.Failure?.Code,
-                        outcome.Failure?.Stage == Core.SessionDiagnostics.SessionFailureStage.SshGateway);
+                    await SettleSharedCredentialsAsync(sharedCredentials, outcome);
                 }
 
                 switch (outcome.Status)
