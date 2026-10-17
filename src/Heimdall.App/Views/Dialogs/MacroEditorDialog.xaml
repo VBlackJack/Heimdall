@@ -134,7 +134,7 @@
                                             Orientation="Horizontal"
                                             VerticalAlignment="Bottom">
                                     <Button Content="&#xE74A;"
-                                            FontFamily="Segoe MDL2 Assets"
+                                            FontFamily="{StaticResource FontFamilyIcons}"
                                             Width="30"
                                             Height="30"
                                             Margin="0,0,4,0"
@@ -144,7 +144,7 @@
                                             ToolTip="{loc:Translate MacroEditorMoveUp}"
                                             Style="{DynamicResource GhostButtonStyle}"/>
                                     <Button Content="&#xE74B;"
-                                            FontFamily="Segoe MDL2 Assets"
+                                            FontFamily="{StaticResource FontFamilyIcons}"
                                             Width="30"
                                             Height="30"
                                             Margin="0,0,4,0"
@@ -154,7 +154,7 @@
                                             ToolTip="{loc:Translate MacroEditorMoveDown}"
                                             Style="{DynamicResource GhostButtonStyle}"/>
                                     <Button Content="&#xE711;"
-                                            FontFamily="Segoe MDL2 Assets"
+                                            FontFamily="{StaticResource FontFamilyIcons}"
                                             Width="30"
                                             Height="30"
                                             Command="{Binding DataContext.DeleteEntryCommand, RelativeSource={RelativeSource AncestorType=Window}}"

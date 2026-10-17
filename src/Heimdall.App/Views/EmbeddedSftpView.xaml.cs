@@ -1295,12 +1295,16 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
         menu.IsOpen = true;
     }
 
-    private static TextBlock CreateBookmarkIcon() => new()
+    private static TextBlock CreateBookmarkIcon()
     {
-        FontFamily = new System.Windows.Media.FontFamily(SftpViewMetrics.IconFontFamilyName),
-        Text = SftpViewMetrics.FolderGlyph,
-        FontSize = SftpViewMetrics.MenuIconFontSize
-    };
+        TextBlock icon = new()
+        {
+            Text = SftpViewMetrics.FolderGlyph,
+            FontSize = SftpViewMetrics.MenuIconFontSize
+        };
+        icon.SetResourceReference(TextBlock.FontFamilyProperty, SftpViewMetrics.IconFontFamilyKey);
+        return icon;
+    }
 
     // ------------------------------------------------------------------
     // File operations

@@ -46,8 +46,8 @@ public static class SftpViewMetrics
     /// <summary>The size of the glyph in a bookmark menu entry.</summary>
     public const double MenuIconFontSize = 14;
 
-    /// <summary>The icon font the glyphs of this view are drawn with.</summary>
-    public const string IconFontFamilyName = "Segoe MDL2 Assets";
+    /// <summary>The resource key of the icon font the glyphs of this view are drawn with.</summary>
+    public const string IconFontFamilyKey = "FontFamilyIcons";
 
     /// <summary>The glyph of a folder, shown on a bookmark.</summary>
     public const string FolderGlyph = "";

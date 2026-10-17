@@ -160,7 +160,7 @@
                                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogParamType}"
                                               SelectedValue="{Binding Type}" Margin="0,0,4,0"
                                               FontSize="{StaticResource FontSizeCaption}"/>
-                                    <Button Grid.Column="3" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                    <Button Grid.Column="3" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                                             FontSize="10" Width="20" Height="20"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                         Command="{Binding DataContext.RemoveWindowsParameterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -281,7 +281,7 @@
                                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogParamType}"
                                               SelectedValue="{Binding Type}" Margin="0,0,4,0"
                                               FontSize="{StaticResource FontSizeCaption}"/>
-                                    <Button Grid.Column="3" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                    <Button Grid.Column="3" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                                             FontSize="10" Width="20" Height="20"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                         Command="{Binding DataContext.RemoveLinuxParameterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -397,7 +397,7 @@
                                         <ComboBoxItem Tag="{x:Static enums:Platform.Both}"
                                                       Content="{Binding DataContext.PlatformOptions[2], RelativeSource={RelativeSource AncestorType=Window}}"/>
                                     </ComboBox>
-                                    <Button Grid.Column="2" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                    <Button Grid.Column="2" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                                             FontSize="10" Width="20" Height="20"
                                             AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                             Command="{Binding DataContext.RemoveExampleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -452,7 +452,7 @@
                                          Background="{DynamicResource CardBrush}"
                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                          BorderBrush="{DynamicResource BorderBrush}"/>
-                                <Button Grid.Column="2" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                <Button Grid.Column="2" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                                         FontSize="10" Width="20" Height="20"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                         Command="{Binding DataContext.RemoveLinkCommand, RelativeSource={RelativeSource AncestorType=Window}}"

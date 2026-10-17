@@ -46,7 +46,7 @@
         <Border x:Name="HelpPanel" Grid.Row="1" Style="{StaticResource ToolHelpPanelStyle}">
             <DockPanel>
                 <Button x:Name="BtnCloseHelp" DockPanel.Dock="Right" Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                        FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
                         VerticalAlignment="Top"
@@ -71,7 +71,7 @@
                         BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
                         Margin="{StaticResource MarginSectionBottom}" Visibility="Collapsed">
                     <DockPanel>
-                        <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets"
+                        <TextBlock Text="&#xE7BA;" FontFamily="{StaticResource FontFamilyIcons}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
                                    Foreground="{DynamicResource WarningTextBrush}"
                                    VerticalAlignment="Center" Margin="{StaticResource MarginInlineSm}"
@@ -179,7 +179,7 @@
                         BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
                         Visibility="Collapsed">
                     <DockPanel>
-                        <TextBlock x:Name="TxtStatusIcon" FontFamily="Segoe MDL2 Assets"
+                        <TextBlock x:Name="TxtStatusIcon" FontFamily="{StaticResource FontFamilyIcons}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
                                    VerticalAlignment="Center" Margin="{StaticResource MarginInlineSm}"
                                    Focusable="False"/>

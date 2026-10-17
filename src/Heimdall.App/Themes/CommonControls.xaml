@@ -125,7 +125,9 @@
 
     <!-- Design Tokens: Font Family                                -->
     <FontFamily x:Key="FontFamilyMonospace">Consolas, Courier New, monospace</FontFamily>
-    <FontFamily x:Key="FontFamilyIcons">Segoe MDL2 Assets</FontFamily>
+    <!-- Segoe Fluent Icons ships with Windows 11 and keeps the MDL2 code points; Windows 10 has
+         only MDL2, which the fallback reaches. Every icon glyph names this token, never a font. -->
+    <FontFamily x:Key="FontFamilyIcons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
     <!-- Design Tokens: Corner Radius                              -->
     <CornerRadius x:Key="CornerRadiusXs">2</CornerRadius>
@@ -2348,7 +2350,7 @@
     </Style>
 
     <Style x:Key="ToolEmptyStateIconStyle" TargetType="{x:Type TextBlock}">
-        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyIcons}"/>
         <Setter Property="FontSize" Value="{StaticResource IconSizeEmptyState}"/>
         <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>

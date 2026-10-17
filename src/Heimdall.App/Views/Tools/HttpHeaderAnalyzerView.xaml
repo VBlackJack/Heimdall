@@ -68,7 +68,7 @@
                        
                         Content="&#xE711;"
                         Click="OnCloseHelpClick"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
                         TabIndex="6"

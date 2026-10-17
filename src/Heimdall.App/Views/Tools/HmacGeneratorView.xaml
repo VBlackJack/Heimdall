@@ -67,7 +67,7 @@
                         AutomationProperties.AutomationId="HmacGenerator.CloseHelpButton"
                         AutomationProperties.Name="{loc:Translate BtnClose}"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         VerticalAlignment="Top"/>
                 <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
@@ -121,7 +121,7 @@
                             AutomationProperties.AutomationId="HmacGenerator.ToggleKeyVisibilityButton"
                             AutomationProperties.Name="{loc:Translate ToolHmacToggleKeyVisibility}"
                             Style="{DynamicResource SecondaryButtonStyle}"
-                            FontFamily="Segoe MDL2 Assets"
+                            FontFamily="{StaticResource FontFamilyIcons}"
                             FontSize="{StaticResource FontSizeSubtitle}"/>
                     <Grid>
                         <PasswordBox x:Name="PwdKey"

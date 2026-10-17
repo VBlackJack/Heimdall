@@ -84,7 +84,7 @@
                 <Button x:Name="SplitButton"
                         DockPanel.Dock="Right"
                         Content="&#xE8A9;"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         Click="OnSplitClick"
                         Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>

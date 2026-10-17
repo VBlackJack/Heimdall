@@ -61,7 +61,7 @@
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
                         MaxWidth="280">
                 <TextBlock Text="&#xE711;"
-                           FontFamily="Segoe MDL2 Assets"
+                           FontFamily="{StaticResource FontFamilyIcons}"
                            FontSize="{StaticResource FontSizeHeadline}"
                            Foreground="{DynamicResource ErrorTextBrush}"
                            HorizontalAlignment="Center"

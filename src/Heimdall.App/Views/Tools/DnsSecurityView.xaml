@@ -72,7 +72,7 @@
                         DockPanel.Dock="Right"
                        
                        
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         Content="&#xE711;"
                         Command="{Binding ToggleHelpCommand}"

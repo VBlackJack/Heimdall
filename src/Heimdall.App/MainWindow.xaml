@@ -193,7 +193,7 @@
                             ToolTip="{loc:Translate BtnLockWorkspace}"
                             AutomationProperties.Name="{loc:Translate BtnLockWorkspace}">
                         <TextBlock Text="&#xE72E;"
-                                   FontFamily="Segoe MDL2 Assets"
+                                   FontFamily="{StaticResource FontFamilyIcons}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Center"/>
@@ -227,7 +227,7 @@
                             </MultiBinding>
                         </Button.ToolTip>
                         <TextBlock Text="&#xE72D;"
-                                   FontFamily="Segoe MDL2 Assets"
+                                   FontFamily="{StaticResource FontFamilyIcons}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Center"/>
@@ -243,7 +243,7 @@
                             ToolTip="{loc:Translate QuickConnectShortcut}"
                             AutomationProperties.Name="{loc:Translate QuickConnectShortcut}">
                         <TextBlock Text="&#xE71E;"
-                                   FontFamily="Segoe MDL2 Assets"
+                                   FontFamily="{StaticResource FontFamilyIcons}"
                                    FontSize="{StaticResource FontSizeBody}"
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Center"/>
@@ -382,7 +382,7 @@
                             <Button x:Name="ToggleSidebarButton"
                                     DockPanel.Dock="Right"
                                     Content="&#xE89F;"
-                                    FontFamily="Segoe MDL2 Assets"
+                                    FontFamily="{StaticResource FontFamilyIcons}"
                                     Click="OnToggleSidebarClick"
                                     Style="{DynamicResource SecondaryButtonStyle}"
                                     Padding="6,6" FontSize="{StaticResource FontSizeBody}"
@@ -444,7 +444,7 @@
                                                      AutomationProperties.Name="{loc:Translate A11ySearchAndFilter}"/>
                                             <Button x:Name="Mw_FilterClearBtn"
                                                     Content="&#xE711;"
-                                                    FontFamily="Segoe MDL2 Assets"
+                                                    FontFamily="{StaticResource FontFamilyIcons}"
                                                     FontSize="{StaticResource FontSizeSmallCaption}"
                                                     HorizontalAlignment="Right" VerticalAlignment="Center"
                                                     Margin="0,0,4,0"
@@ -467,7 +467,7 @@
                                                 AutomationProperties.Name="{loc:Translate FilterButtonAutomationName}">
                                             <Grid>
                                                 <TextBlock Text="&#xE71C;"
-                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontFamily="{StaticResource FontFamilyIcons}"
                                                            FontSize="{StaticResource FontSizeBody}"/>
                                                 <Ellipse Width="6"
                                                          Height="6"
@@ -545,7 +545,7 @@
                                                 Margin="2,0,0,0"
                                                 ToolTip="{loc:Translate TooltipAddMenu}"
                                                 AutomationProperties.Name="{loc:Translate TooltipAddMenu}">
-                                            <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"/>
+                                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"/>
                                             <Button.ContextMenu>
                                                 <ContextMenu x:Name="AddMenu"
                                                              DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
@@ -567,7 +567,7 @@
                                                 Margin="2,0,0,0"
                                                 ToolTip="{loc:Translate TooltipSidebarOverflow}"
                                                 AutomationProperties.Name="{loc:Translate TooltipSidebarOverflow}">
-                                            <TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"/>
+                                            <TextBlock Text="&#xE712;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"/>
                                             <Button.ContextMenu>
                                                 <ContextMenu x:Name="SidebarOverflowMenu"
                                                              DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
@@ -1018,7 +1018,7 @@
                                                     <!-- Favorite mark. The spoken row name carries "favorite" itself;
                                                          the glyph is for the eye. -->
                                                     <TextBlock Text="&#xE735;"
-                                                               FontFamily="Segoe MDL2 Assets"
+                                                               FontFamily="{StaticResource FontFamilyIcons}"
                                                                FontSize="{StaticResource FontSizeSmallCaption}"
                                                                Foreground="{DynamicResource WarningBrush}"
                                                                Margin="6,0,0,0"
@@ -1249,7 +1249,7 @@
                                         <Button x:Name="Mw_PropertiesPanelCloseBtn"
                                                 DockPanel.Dock="Right"
                                                 Content="&#xE711;"
-                                                FontFamily="Segoe MDL2 Assets"
+                                                FontFamily="{StaticResource FontFamilyIcons}"
                                                 FontSize="{StaticResource FontSizeCaption}"
                                                 Click="OnPropertiesPanelCloseClick"
                                                 Style="{DynamicResource GhostButtonStyle}"
@@ -1543,7 +1543,7 @@
                     <GridSplitter.Template>
                         <ControlTemplate TargetType="GridSplitter">
                             <Border Background="{TemplateBinding Background}">
-                                <TextBlock Text="&#xE784;" FontFamily="Segoe MDL2 Assets"
+                                <TextBlock Text="&#xE784;" FontFamily="{StaticResource FontFamilyIcons}"
                                            FontSize="{StaticResource FontSizeSmallCaption}" Foreground="{DynamicResource TextSecondaryBrush}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"
                                            RenderTransformOrigin="0.5,0.5">
@@ -1562,7 +1562,7 @@
                         HorizontalAlignment="Left"
                         VerticalAlignment="Top"
                         Content="&#xE76C;"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         Click="OnToggleSidebarClick"
                         Style="{DynamicResource SecondaryButtonStyle}"
                         Padding="4,6" FontSize="{StaticResource FontSizeCaption}"
@@ -1687,7 +1687,7 @@
                                                                    VerticalAlignment="Center"
                                                                    TextTrimming="CharacterEllipsis" MaxWidth="{StaticResource SessionTabGroupLabelMaxWidth}"/>
                                                         <TextBlock x:Name="TabGroupChipChevron" Text="&#xE70D;"
-                                                                   FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource SessionTabChevronFontSize}"
+                                                                   FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource SessionTabChevronFontSize}"
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    VerticalAlignment="Center" Margin="5,0,0,0"/>
                                                     </StackPanel>
@@ -1701,7 +1701,7 @@
                                                 <Button x:Name="TabCloseButton" DockPanel.Dock="Right"
                                                         Width="20" Height="20" Margin="6,0,0,0" Padding="2"
                                                         Focusable="False" Content="&#xE711;"
-                                                        FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeSmallCaption}"
+                                                        FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeSmallCaption}"
                                                         Opacity="{StaticResource TabCloseButtonIdleOpacity}" IsHitTestVisible="True"
                                                         Command="{Binding DataContext.Connection.CloseSessionCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
                                                         CommandParameter="{Binding}"
@@ -1739,7 +1739,7 @@
                                                                 BorderThickness="1"
                                                                 BorderBrush="{DynamicResource BorderBrush}"
                                                                 Background="Transparent">
-                                                            <TextBlock Text="&#xE73E;" FontFamily="Segoe MDL2 Assets"
+                                                            <TextBlock Text="&#xE73E;" FontFamily="{StaticResource FontFamilyIcons}"
                                                                        FontSize="{StaticResource SessionTabBroadcastGlyphFontSize}"
                                                                        HorizontalAlignment="Center"
                                                                        VerticalAlignment="Center"
@@ -1786,7 +1786,7 @@
                                                             </Ellipse.Style>
                                                         </Ellipse>
                                                     </Grid>
-                                                    <TextBlock x:Name="TabPinGlyph" Text="&#xE718;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource SessionTabPinGlyphFontSize}"
+                                                    <TextBlock x:Name="TabPinGlyph" Text="&#xE718;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource SessionTabPinGlyphFontSize}"
                                                                Foreground="{DynamicResource AccentBrush}"
                                                                VerticalAlignment="Center" Margin="0,0,4,0"
                                                                Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -1836,7 +1836,7 @@
                                                                  Visibility="Collapsed"/>
                                                         <TextBlock x:Name="TabStateFailedGlyph"
                                                                    Text="{StaticResource SessionTabFailedGlyph}"
-                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontFamily="{StaticResource FontFamilyIcons}"
                                                                    FontSize="{StaticResource SessionTabStateGlyphFontSize}"
                                                                    Foreground="{DynamicResource ErrorTextBrush}"
                                                                    Visibility="Collapsed"/>
@@ -1952,7 +1952,7 @@
                             <!-- The icon font sits on the glyph alone: the tab list menu takes its font
                                  from the button it opens from, and drew every title as empty boxes. -->
                             <TextBlock Text="&#xE70D;"
-                                       FontFamily="Segoe MDL2 Assets"
+                                       FontFamily="{StaticResource FontFamilyIcons}"
                                        FontSize="{StaticResource FontSizeSmallCaption}"/>
                         </Button>
 
@@ -2086,7 +2086,7 @@
                             <!-- Show empty state overlay when no servers exist -->
                             <StackPanel Visibility="{Binding ServerList.HasNoInventory, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="&#xE774;"
-                                           FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeHero}"
+                                           FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeHero}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            HorizontalAlignment="Center" Opacity="0.5"
                                            Margin="0,0,0,16"/>
@@ -2134,7 +2134,7 @@
                                 <StackPanel HorizontalAlignment="Center"
                                             VerticalAlignment="Center">
                                     <TextBlock Text="&#xE8B7;"
-                                               FontFamily="Segoe MDL2 Assets"
+                                               FontFamily="{StaticResource FontFamilyIcons}"
                                                FontSize="48"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                HorizontalAlignment="Center"
@@ -2183,7 +2183,7 @@
                                 <DockPanel>
                                     <Button x:Name="Mw_TunnelPanelCollapseBtn" DockPanel.Dock="Right"
                                             Content="&#xE70D;"
-                                            FontFamily="Segoe MDL2 Assets"
+                                            FontFamily="{StaticResource FontFamilyIcons}"
                                             FontSize="{StaticResource FontSizeCaption}"
                                             Command="{Binding Tunnels.TogglePanelCommand}"
                                             Style="{DynamicResource GhostButtonStyle}"
@@ -2204,7 +2204,7 @@
                                             Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="4,0,0,0"
                                             AutomationProperties.Name="{loc:Translate A11yCloseAllTunnels}"/>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets"
+                                        <TextBlock Text="&#xE945;" FontFamily="{StaticResource FontFamilyIcons}"
                                                    FontSize="{StaticResource FontSizeBody}" Margin="0,0,6,0"
                                                    Foreground="{DynamicResource AccentBrush}"
                                                    VerticalAlignment="Center"/>
@@ -2303,7 +2303,7 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Button Content="&#xE711;"
-                                                            FontFamily="Segoe MDL2 Assets"
+                                                            FontFamily="{StaticResource FontFamilyIcons}"
                                                             FontSize="{StaticResource FontSizeCaption}"
                                                             Command="{Binding DataContext.Tunnels.CloseCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                             CommandParameter="{Binding}"
@@ -5420,7 +5420,7 @@
                         <StackPanel>
                             <StackPanel HorizontalAlignment="Center" Margin="0,0,0,16">
                                 <TextBlock Text="&#xE7F4;"
-                                           FontFamily="Segoe MDL2 Assets"
+                                           FontFamily="{StaticResource FontFamilyIcons}"
                                            FontSize="{StaticResource IconSizeHero}"
                                            Foreground="{DynamicResource AccentBrush}"
                                            HorizontalAlignment="Center"
@@ -5598,7 +5598,7 @@
                         Width="42"
                         Height="32"
                         Content="&#xE799;"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBodyLarge}"
                         Click="OnExitFullscreenClick"
                         Cursor="Hand"
@@ -5649,7 +5649,7 @@
             <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center">
                 <TextBlock Text="&#xE8B7;"
-                           FontFamily="Segoe MDL2 Assets"
+                           FontFamily="{StaticResource FontFamilyIcons}"
                            FontSize="40"
                            Foreground="{DynamicResource AccentBrush}"
                            HorizontalAlignment="Center"/>
@@ -5712,7 +5712,7 @@
                                     ToolTip="{loc:Translate CtxMenuCopy}"
                                     AutomationProperties.Name="{loc:Translate CtxMenuCopy}">
                                 <TextBlock Text="&#xE8C8;"
-                                           FontFamily="Segoe MDL2 Assets"
+                                           FontFamily="{StaticResource FontFamilyIcons}"
                                            FontSize="{StaticResource FontSizeCaption}"/>
                             </Button>
                         </StackPanel>
@@ -5747,7 +5747,7 @@
                             AutomationProperties.Name="{loc:Translate A11yToggleTunnelPanel}">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets"
+                                <TextBlock Text="&#xE945;" FontFamily="{StaticResource FontFamilyIcons}"
                                            FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center" Margin="0,0,3,0"/>
                                 <TextBlock VerticalAlignment="Center">
                                     <Run Text="{Binding Tunnels.Count, Mode=OneWay}"/>
@@ -5763,7 +5763,7 @@
                             AutomationProperties.Name="{loc:Translate A11yToggleBroadcast}">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE704;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"
+                                <TextBlock Text="&#xE704;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeCaption}"
                                            VerticalAlignment="Center" Margin="0,0,3,0"/>
                                 <TextBlock x:Name="Mw_BroadcastLabel" Text="{loc:Translate BroadcastBadgeLabel}" FontWeight="SemiBold" FontSize="{StaticResource FontSizeCaption}"
                                            VerticalAlignment="Center"/>
@@ -5789,7 +5789,7 @@
                             AutomationProperties.Name="{loc:Translate A11yBroadcastScope}">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE71D;" FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeCaption}"
+                                <TextBlock Text="&#xE71D;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeCaption}"
                                            VerticalAlignment="Center" Margin="0,0,3,0"/>
                                 <TextBlock Text="{Binding Session.BroadcastScopeLabel}" FontSize="{StaticResource FontSizeCaption}"
                                            VerticalAlignment="Center"/>
@@ -6299,7 +6299,7 @@
                                                             Orientation="Horizontal"
                                                             VerticalAlignment="Top">
                                                     <Button Content="&#xE724;"
-                                                            FontFamily="Segoe MDL2 Assets"
+                                                            FontFamily="{StaticResource FontFamilyIcons}"
                                                             Command="{Binding DataContext.CommandPalette.SendSnippetExampleCommand, ElementName=MainWindowRoot}"
                                                             CommandParameter="{Binding}"
                                                             Style="{DynamicResource GhostButtonStyle}"
@@ -6309,7 +6309,7 @@
                                                             Padding="2"
                                                             Focusable="False"/>
                                                     <Button Content="&#xE8C8;"
-                                                            FontFamily="Segoe MDL2 Assets"
+                                                            FontFamily="{StaticResource FontFamilyIcons}"
                                                             Command="{Binding DataContext.CommandPalette.CopySnippetExampleCommand, ElementName=MainWindowRoot}"
                                                             CommandParameter="{Binding}"
                                                             Style="{DynamicResource GhostButtonStyle}"

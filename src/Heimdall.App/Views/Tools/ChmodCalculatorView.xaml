@@ -76,7 +76,7 @@
                         Click="OnCloseHelpClick"
                         AutomationProperties.Name="{loc:Translate BtnClose}"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         VerticalAlignment="Top" />
                 <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">

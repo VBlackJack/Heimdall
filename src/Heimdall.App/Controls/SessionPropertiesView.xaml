@@ -361,7 +361,7 @@
                            Margin="0,2,12,2" VerticalAlignment="Center"
                            Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <TextBlock Grid.Row="9" Grid.Column="1"
-                           Text="&#xE735;" FontFamily="Segoe MDL2 Assets"
+                           Text="&#xE735;" FontFamily="{StaticResource FontFamilyIcons}"
                            FontSize="{StaticResource FontSizeBody}"
                            Foreground="{DynamicResource WarningTextBrush}"
                            Margin="0,2,0,2"

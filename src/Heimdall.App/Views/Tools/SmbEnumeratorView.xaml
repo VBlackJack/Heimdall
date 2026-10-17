@@ -55,7 +55,7 @@
         <Border x:Name="HelpPanel" Grid.Row="1" Style="{StaticResource ToolHelpPanelStyle}">
             <DockPanel>
                 <Button x:Name="BtnCloseHelp" DockPanel.Dock="Right" Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                        FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
                         VerticalAlignment="Top"/>
@@ -278,7 +278,7 @@
                                         <DockPanel Margin="0,2,0,2" LastChildFill="True">
                                             <TextBlock DockPanel.Dock="Left"
                                                        Text="{Binding Severity, Converter={StaticResource SmbSeverityIcon}}"
-                                                       FontFamily="Segoe MDL2 Assets"
+                                                       FontFamily="{StaticResource FontFamilyIcons}"
                                                        FontSize="{StaticResource FontSizeBody}"
                                                        Foreground="{Binding Severity, Converter={StaticResource SmbSeverityBrush}}"
                                                        Margin="0,0,8,0"

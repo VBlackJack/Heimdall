@@ -60,7 +60,7 @@
             <DockPanel>
                 <Button DockPanel.Dock="Right"
                         Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets"
+                        FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         Command="{Binding ToggleHelpCommand}"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"

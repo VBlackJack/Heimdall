@@ -129,7 +129,7 @@ public sealed class RdpCertificatePromptSurfaceTests
         XElement overlay = ViewSource.NamedElement(Overlay);
         XElement glyph = Assert.Single(
             overlay.Descendants(),
-            e => (string?)e.Attribute("FontFamily") == "Segoe MDL2 Assets");
+            e => (string?)e.Attribute("FontFamily") == "{StaticResource FontFamilyIcons}");
 
         string name = ViewSource.AutomationAttribute(glyph, "Name") ?? string.Empty;
 

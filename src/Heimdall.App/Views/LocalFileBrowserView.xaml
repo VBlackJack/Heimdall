@@ -54,26 +54,26 @@
                      Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay={x:Static local:SftpViewMetrics.FilterInputDelayMilliseconds}}"
                       AutomationProperties.Name="{loc:Translate A11yTxtSearchFiles}"/>
             <StackPanel Orientation="Horizontal">
-                <Button Content="&#xE72B;" FontFamily="Segoe MDL2 Assets"
+                <Button Content="&#xE72B;" FontFamily="{StaticResource FontFamilyIcons}"
                         x:Name="BtnBack" Click="OnBackClick"
                         ToolTip="{loc:Translate TooltipNavigateBack}"
                         Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}"
                         IsEnabled="{Binding CanGoBack}"
                         AutomationProperties.Name="{loc:Translate A11yNavigateBack}"/>
-                <Button x:Name="BtnUp" Content="&#xE74A;" FontFamily="Segoe MDL2 Assets"
+                <Button x:Name="BtnUp" Content="&#xE74A;" FontFamily="{StaticResource FontFamilyIcons}"
                         Click="OnUpClick"
                         ToolTip="{loc:Translate TooltipNavigateUp}"
                         Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="3,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yNavigateUp}"/>
-                <Button x:Name="BtnHome" Content="&#xE80F;" FontFamily="Segoe MDL2 Assets"
+                <Button x:Name="BtnHome" Content="&#xE80F;" FontFamily="{StaticResource FontFamilyIcons}"
                         Click="OnHomeClick"
                         ToolTip="{loc:Translate TooltipNavigateHome}"
                         Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="3,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yNavigateHome}"/>
-                <Button x:Name="BtnRefresh" Content="&#xE72C;" FontFamily="Segoe MDL2 Assets"
+                <Button x:Name="BtnRefresh" Content="&#xE72C;" FontFamily="{StaticResource FontFamilyIcons}"
                         Click="OnRefreshClick"
                         ToolTip="{loc:Translate TooltipRefreshDirectory}"
                         Style="{DynamicResource GhostButtonStyle}"
@@ -127,7 +127,7 @@
                                     <TextBlock x:Name="Icon"
                                                Text="{Binding Name, Converter={StaticResource FileIconConverter}}"
                                                Foreground="{Binding Name, Converter={StaticResource FileIconColorConverter}}"
-                                               FontFamily="Segoe MDL2 Assets" FontSize="{StaticResource FontSizeBody}"
+                                               FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                                                Margin="0,0,5,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                                 </StackPanel>

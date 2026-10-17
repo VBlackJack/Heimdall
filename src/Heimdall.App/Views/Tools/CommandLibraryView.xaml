@@ -49,7 +49,7 @@
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="15"/>
                 <Button DockPanel.Dock="Right"
-                        Content="&#xE81C;" FontFamily="Segoe MDL2 Assets"
+                        Content="&#xE81C;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding ToggleHistoryCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnHistory}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnHistory}"
@@ -59,7 +59,7 @@
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="14"/>
                 <Button DockPanel.Dock="Right"
-                        Content="&#xE895;" FontFamily="Segoe MDL2 Assets"
+                        Content="&#xE895;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding SyncCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnSync}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnSync}"
@@ -70,7 +70,7 @@
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="13"/>
                 <Button DockPanel.Dock="Right"
-                        Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                        Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding CancelSyncCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnCancelSync}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCancelSync}"
@@ -81,7 +81,7 @@
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="13"/>
                 <Button DockPanel.Dock="Right"
-                        Content="&#xE8B5;" FontFamily="Segoe MDL2 Assets"
+                        Content="&#xE8B5;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding ImportCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnImport}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnImport}"
@@ -91,7 +91,7 @@
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="12"/>
                 <Button DockPanel.Dock="Right"
-                        Content="&#xEDE1;" FontFamily="Segoe MDL2 Assets"
+                        Content="&#xEDE1;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding ExportCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnExport}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnExport}"
@@ -101,7 +101,7 @@
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="11"/>
                 <Button DockPanel.Dock="Right"
-                        Content="&#xE710;" FontFamily="Segoe MDL2 Assets"
+                        Content="&#xE710;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding AddActionCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnAdd}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnAdd}"
@@ -130,7 +130,7 @@
                 Visibility="{Binding IsHelpVisible, Converter={StaticResource BoolToVisibilityConverter}}">
             <DockPanel>
                 <Button DockPanel.Dock="Right"
-                        Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                        Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                         FontSize="{StaticResource FontSizeBody}"
                         Command="{Binding ToggleHelpCommand}"
                         AutomationProperties.Name="{loc:Translate BtnClose}"
@@ -171,7 +171,7 @@
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
                              TabIndex="0"/>
-                    <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                    <Button Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                             FontSize="{StaticResource FontSizeSmallCaption}"
                             HorizontalAlignment="Right" VerticalAlignment="Center"
                             Margin="{StaticResource MarginInlineXs}" Padding="4"
@@ -364,7 +364,7 @@
                 Style="{StaticResource ToolEmptyStateStyle}"
                 Visibility="{Binding IsEmptyStateVisible, Converter={StaticResource BoolToVisibilityConverter}}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets"
+                <TextBlock Text="&#xE8F1;" FontFamily="{StaticResource FontFamilyIcons}"
                            Style="{StaticResource ToolEmptyStateIconStyle}"
                            Focusable="False"/>
                 <TextBlock Text="{Binding EmptyStateMessage}"
@@ -536,7 +536,7 @@
                                                     </StackPanel>
                                                 </Button>
                                                 <Button Grid.Column="1"
-                                                        Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
+                                                        Content="&#xE8C8;" FontFamily="{StaticResource FontFamilyIcons}"
                                                         Command="{Binding DataContext.CopyExampleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding Command}"
                                                         Style="{DynamicResource GhostButtonStyle}"
@@ -571,7 +571,7 @@
                 <DockPanel Grid.Row="1" Margin="12,0,12,12">
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
                         <Button Command="{Binding EditSelectedCommand}"
-                                Content="&#xE70F;" FontFamily="Segoe MDL2 Assets"
+                                Content="&#xE70F;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Visibility="{Binding CanEditSelected, Converter={StaticResource BoolToVisibilityConverter}}"
                                 ToolTip="{loc:Translate ToolCmdLibBtnEdit}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibBtnEdit}"
@@ -583,7 +583,7 @@
                              shipped action into your own library is the only way to get a
                              variant of one, since they cannot be edited. -->
                         <Button Command="{Binding DuplicateSelectedCommand}"
-                                Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
+                                Content="&#xE8C8;" FontFamily="{StaticResource FontFamilyIcons}"
                                 ToolTip="{loc:Translate ToolCmdLibDuplicate}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibDuplicate}"
                                 Style="{DynamicResource GhostButtonStyle}"
@@ -591,7 +591,7 @@
                                 Padding="4"
                                 Margin="{StaticResource MarginInlineXs}" TabIndex="9"/>
                         <Button Command="{Binding DeleteSelectedCommand}"
-                                Content="&#xE74D;" FontFamily="Segoe MDL2 Assets"
+                                Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Visibility="{Binding CanEditSelected, Converter={StaticResource BoolToVisibilityConverter}}"
                                 ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
@@ -634,7 +634,7 @@
                         <ToggleButton x:Name="BtnBroadcastToggle"
                                       IsChecked="{Binding IsBroadcastPanelOpen, Mode=TwoWay}"
                                       Visibility="{Binding CanOfferBroadcast, Converter={StaticResource BoolToVisibilityConverter}}"
-                                      Content="&#xE8A7;" FontFamily="Segoe MDL2 Assets"
+                                      Content="&#xE8A7;" FontFamily="{StaticResource FontFamilyIcons}"
                                       ToolTip="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"
                                       AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"
                                       Style="{DynamicResource ToolbarToggleButtonStyle}"
@@ -750,7 +750,7 @@
             <DockPanel>
                 <DockPanel DockPanel.Dock="Top" Margin="12,8,12,4">
                     <Button DockPanel.Dock="Right"
-                            Content="&#xE74D;" FontFamily="Segoe MDL2 Assets"
+                            Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
                             Command="{Binding ClearHistoryCommand}"
                             ToolTip="{loc:Translate ToolCmdLibHistoryClear}"
                             AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryClear}"
@@ -816,7 +816,7 @@
                                      increasing commitment: put it back in the generator, or
                                      just take the text. -->
                                 <Button DockPanel.Dock="Right"
-                                        Content="&#xE72C;" FontFamily="Segoe MDL2 Assets"
+                                        Content="&#xE72C;" FontFamily="{StaticResource FontFamilyIcons}"
                                         Command="{Binding DataContext.ReplayHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}"
                                         Visibility="{Binding CanReplay, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -827,7 +827,7 @@
                                         Padding="2" VerticalAlignment="Center"
                                         Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <Button DockPanel.Dock="Right"
-                                        Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
+                                        Content="&#xE8C8;" FontFamily="{StaticResource FontFamilyIcons}"
                                         Command="{Binding DataContext.CopyHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding GeneratedCommand}"
                                         Visibility="{Binding IsReadable, Converter={StaticResource BoolToVisibilityConverter}}"
