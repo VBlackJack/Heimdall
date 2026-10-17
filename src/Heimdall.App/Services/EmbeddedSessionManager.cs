@@ -230,6 +230,16 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         };
     }
 
+    /// <summary>
+    /// The header actions of a Citrix view: Split goes to the split the tab menu uses, Close to
+    /// the shared pane lifecycle.
+    /// </summary>
+    private void WireCitrixView(EmbeddedCitrixView view, SessionTabViewModel sessionTab)
+    {
+        view.RequestSplit += (_) => SplitRequestedCallback?.Invoke(sessionTab);
+        view.CloseRequested += () => RequestHostClose(sessionTab, view.OwningPane);
+    }
+
     public object CreateHostControl(
         SessionTabViewModel sessionTab,
         string displayName,
@@ -538,7 +548,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             view.SessionLoggingOverride = citrix.SessionLoggingOverride;
             view.InitializeSession(citrix, sessionTab, displayName, _localizer, _dialogService);
             view.SetConnectionInfo(citrix.StoreFrontUrl, citrix.AppName, citrix.Mode);
-            view.CloseRequested += () => RequestHostClose(sessionTab, view.OwningPane);
+            WireCitrixView(view, sessionTab);
             return view;
         }
 

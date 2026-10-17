@@ -51,6 +51,13 @@
                         Margin="4,0,0,0"
                         Visibility="Collapsed"
                         AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}"/>
+                <Button x:Name="SplitButton"
+                        DockPanel.Dock="Right"
+                        Content="&#xE8A9;"
+                        FontFamily="{StaticResource FontFamilyIcons}"
+                        Click="OnSplitClick"
+                        Style="{DynamicResource GhostButtonStyle}"
+                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="SessionTitleText"
                                FontSize="{StaticResource FontSizeBody}"

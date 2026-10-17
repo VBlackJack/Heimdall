@@ -226,11 +226,13 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         TerminateButton.ToolTip = L10n("TooltipDisconnectSession");
         BringToFrontButton.ToolTip = L10n("TooltipBringToFront");
         CloseTabButton.ToolTip = L10n("TooltipCloseSessionTab");
+        SplitButton.ToolTip = L10n("TooltipSplitSession");
 
         // Accessibility
         System.Windows.Automation.AutomationProperties.SetName(TerminateButton, L10n("A11yDisconnectSession"));
         System.Windows.Automation.AutomationProperties.SetName(BringToFrontButton, L10n("A11yBringToFront"));
         System.Windows.Automation.AutomationProperties.SetName(CloseTabButton, L10n("A11yCloseSessionTab"));
+        System.Windows.Automation.AutomationProperties.SetName(SplitButton, L10n("A11ySplitSession"));
 
         if (_captureInProgress)
         {
@@ -898,6 +900,19 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     {
         ArgumentNullException.ThrowIfNull(pane);
         _ownerPane = pane;
+    }
+
+    /// <summary>Raised when the user asks to split the pane holding this session.</summary>
+    public event Action<SessionTabViewModel?>? RequestSplit;
+
+    private void OnSplitClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        RequestSplit?.Invoke(_sessionTab);
     }
 
     private void OnCloseTabClick(object sender, RoutedEventArgs e)
