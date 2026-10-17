@@ -98,11 +98,15 @@
                                FontSize="{StaticResource FontSizeBody}"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="{StaticResource SessionHeaderTitleMaxWidth}"
                                VerticalAlignment="Center"/>
                     <TextBlock x:Name="EndpointTextBlock"
                                Margin="8,0,0,0"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="{StaticResource SessionHeaderTitleMaxWidth}"
                                VerticalAlignment="Center"/>
                     <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
