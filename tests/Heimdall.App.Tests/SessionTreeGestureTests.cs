@@ -185,11 +185,14 @@ public sealed class SessionTreeGestureTests
             };
             window.Show();
             window.UpdateLayout();
+            // A Shift held on the machine must not swallow the gestures the test raises.
+            HoldShiftInThisThreadsKeyState();
             int matches = 1;
             int pendingApplied = 0;
             int cleared = 0;
             int focused = 0;
             int connected = 0;
+            ModifierKeys modifiers = ModifierKeys.None;
             MainWindow.AttachSessionFilterKeys(box, new MainWindow.SessionFilterKeyTarget(
                 MatchCount: () => matches,
                 ApplyPendingFilter: () => pendingApplied++,
@@ -199,7 +202,8 @@ public sealed class SessionTreeGestureTests
                     focused++;
                     return true;
                 },
-                ConnectOnlyMatch: () => connected++));
+                ConnectOnlyMatch: () => connected++,
+                Modifiers: () => modifiers));
 
             try
             {
@@ -220,6 +224,13 @@ public sealed class SessionTreeGestureTests
                 box.Text = "";
                 Assert.False(RaiseKey(box, Key.Escape));
                 Assert.Equal(1, cleared);
+
+                // The modifiers come from the target, not from the thread's key state.
+                box.Text = "web";
+                matches = 1;
+                modifiers = ModifierKeys.Control;
+                Assert.False(RaiseKey(box, Key.Enter));
+                Assert.Equal(1, connected);
             }
             finally
             {
@@ -241,6 +252,28 @@ public sealed class SessionTreeGestureTests
         Assert.Contains(localizer["TreeCtxDeleteGroup"], refusal, StringComparison.Ordinal);
         Assert.Null(MainWindow.DescribeRefusedTreeDeletion(null, key => localizer[key]));
     }
+
+    private const byte KeyDownBit = 0x80;
+    private const int KeyStateLength = 256;
+
+    // VK_SHIFT, the side-neutral Shift that Win32 keeps beside the left and right keys.
+    private const int VirtualKeyShift = 0x10;
+
+    /// <summary>
+    /// Marks Shift as held in the calling thread's keyboard state, which is what
+    /// <see cref="Keyboard.Modifiers"/> reads. A key held on the machine reaches it the same way,
+    /// so a gesture that consults it depends on whoever touches the keyboard during the run.
+    /// </summary>
+    private static void HoldShiftInThisThreadsKeyState()
+    {
+        byte[] state = new byte[KeyStateLength];
+        state[KeyInterop.VirtualKeyFromKey(Key.LeftShift)] = KeyDownBit;
+        state[VirtualKeyShift] = KeyDownBit;
+        Assert.True(SetKeyboardState(state));
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetKeyboardState(byte[] lpKeyState);
 
     private static bool RaiseKey(UIElement target, Key key)
     {

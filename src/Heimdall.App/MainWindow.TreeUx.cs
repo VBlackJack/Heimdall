@@ -69,12 +69,14 @@ public partial class MainWindow
     /// <param name="Clear">Empties the search.</param>
     /// <param name="FocusFirstSession">Moves focus to the first visible session row.</param>
     /// <param name="ConnectOnlyMatch">Opens the one remaining session.</param>
+    /// <param name="Modifiers">The modifier keys held with the key; the window reads the keyboard.</param>
     internal sealed record SessionFilterKeyTarget(
         Func<int> MatchCount,
         Action ApplyPendingFilter,
         Action Clear,
         Func<bool> FocusFirstSession,
-        Action ConnectOnlyMatch);
+        Action ConnectOnlyMatch,
+        Func<ModifierKeys> Modifiers);
 
     /// <summary>
     /// Resolves a filter-box gesture without reading global keyboard state.
@@ -127,7 +129,7 @@ public partial class MainWindow
 
             SessionFilterGesture gesture = ResolveSessionFilterGesture(
                 e.Key,
-                Keyboard.Modifiers,
+                target.Modifiers(),
                 !string.IsNullOrEmpty(box.Text),
                 target.MatchCount());
             switch (gesture)
@@ -173,7 +175,8 @@ public partial class MainWindow
                         target => OpenSessionTreeToolTab(vm, target),
                         target => ConnectSessionTreeServer(vm, target));
                 }
-            }));
+            },
+            Modifiers: () => Keyboard.Modifiers));
     }
 
     private bool FocusFirstVisibleSessionRow()
