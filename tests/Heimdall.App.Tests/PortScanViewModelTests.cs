@@ -23,6 +23,9 @@ namespace Heimdall.App.Tests;
 
 public class PortScanViewModelTests
 {
+    // Upper bound on each hand-off of the parked-update test; it fails the test, it never paces it.
+    private static readonly TimeSpan ParkBound = TimeSpan.FromSeconds(10);
+
     [Fact]
     public async Task Scan_EmptyHost_SetsError()
     {
@@ -84,6 +87,57 @@ public class PortScanViewModelTests
         Assert.Equal(3, vm.GetAllResults().Count);
         Assert.Equal(2, vm.OpenCount);
         Assert.Equal(1, vm.ClosedCount);
+    }
+
+    [Fact]
+    public async Task Scan_ProgressUpdateParkedAcrossTheFinalTotals_DoesNotOverwriteThem()
+    {
+        // Progress<T> posts each update to the captured context, here a pool thread. The update
+        // for port 22 reads one open port and is parked just before it writes that count; the
+        // service then returns all three results. The counters must end on the final totals,
+        // not on the parked update's stale count.
+        var updateParked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseUpdate = new ManualResetEventSlim();
+        var staleCountWritten = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new ParkingScanService(updateParked.Task)
+        {
+            Reported = new PortProbeResult(22, true, "SSH", "5 ms", null),
+            ScanResult =
+            [
+                new PortProbeResult(22, true, "SSH", "5 ms", null),
+                new PortProbeResult(80, true, "HTTP", "10 ms", null),
+                new PortProbeResult(443, false, "HTTPS", "-", null),
+            ],
+        };
+        var vm = new PortScanViewModel(service);
+        vm.Initialize(null);
+        var testThread = Environment.CurrentManagedThreadId;
+        vm.PropertyChanging += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PortScanViewModel.OpenCount)
+                && Environment.CurrentManagedThreadId != testThread
+                && !updateParked.Task.IsCompleted)
+            {
+                updateParked.TrySetResult();
+                releaseUpdate.Wait(ParkBound);
+            }
+        };
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PortScanViewModel.OpenCount) && vm.OpenCount == 1)
+            {
+                staleCountWritten.TrySetResult();
+            }
+        };
+
+        var scan = vm.ScanAsync("10.0.0.1", [22, 80, 443]);
+        releaseUpdate.Set();
+        await staleCountWritten.Task.WaitAsync(ParkBound);
+        await scan.WaitAsync(ParkBound);
+
+        Assert.Equal(2, vm.OpenCount);
+        Assert.Equal(1, vm.ClosedCount);
+        Assert.Equal(3, vm.Completed);
     }
 
     [Fact]
@@ -217,6 +271,36 @@ public class PortScanViewModelTests
         public void SetGateway(SshGatewayDto? gateway)
         {
             LastGateway = gateway;
+        }
+    }
+
+    /// <summary>
+    /// Reports one update, then holds its return until the view model's progress callback for
+    /// that update is parked, so the final totals are written while the update is in flight.
+    /// </summary>
+    private sealed class ParkingScanService(Task updateParked) : IPortScanService
+    {
+        public required PortProbeResult Reported { get; init; }
+        public required IReadOnlyList<PortProbeResult> ScanResult { get; init; }
+
+        public Task<IReadOnlyList<PortProbeResult>> ScanAsync(
+            string host,
+            IReadOnlyList<int> ports,
+            Action<PortScanProgress>? onProgress,
+            CancellationToken ct)
+        {
+            onProgress?.Invoke(new PortScanProgress
+            {
+                Completed = 1,
+                Total = ports.Count,
+                LatestResult = Reported,
+            });
+            updateParked.Wait(ParkBound);
+            return Task.FromResult(ScanResult);
+        }
+
+        public void SetGateway(SshGatewayDto? gateway)
+        {
         }
     }
 
