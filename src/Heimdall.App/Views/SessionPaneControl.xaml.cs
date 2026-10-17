@@ -127,6 +127,32 @@ public partial class SessionPaneControl : UserControl
         }
     }
 
+    /// <summary>
+    /// Whether the pane's generic Disconnected overlay covers its host: either a failed connection
+    /// without hosted content, or an established pane whose host later reports disconnection or an
+    /// error.
+    /// </summary>
+    internal static bool ShowsDisconnectedOverlay(object? hostControl, bool hasFailureDetails, string? status)
+    {
+        if (HostHandlesFailureOverlay(hostControl))
+        {
+            return false;
+        }
+
+        return hasFailureDetails
+            || (hostControl is not null
+                && (string.Equals(status, nameof(ConnectionState.Disconnected), StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(status, nameof(ConnectionState.Error), StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>
+    /// Whether the hosted view draws its own failure overlay, with its own Reconnect, Edit profile
+    /// and Close routed through this pane. The generic overlay drawn over it would stack a second
+    /// set of the same buttons on top of the first.
+    /// </summary>
+    internal static bool HostHandlesFailureOverlay(object? hostControl)
+        => hostControl is EmbeddedRdpView or EmbeddedSshView or EmbeddedSftpView;
+
     private void UpdateOverlays()
     {
         if (!IsLoaded) return;
@@ -140,22 +166,13 @@ public partial class SessionPaneControl : UserControl
 
         var hasContent = _model.HostControl is not null;
         var hasFailureDetails = _model.HasFailureDetails;
-        var hostHandlesFailureOverlay = _model.HostControl is EmbeddedRdpView or EmbeddedSshView;
-        var status = _model.Status ?? "";
 
         // Loading: pane exists but host control not yet assigned (connection in progress)
         LoadingOverlay.Visibility = !hasContent && !hasFailureDetails
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        // Disconnected: show either a failed connection without hosted content,
-        // or an established pane whose host later reports disconnection/error.
-        DisconnectedOverlay.Visibility = !hostHandlesFailureOverlay
-            && (hasFailureDetails
-                || (hasContent
-                    && (string.Equals(status, nameof(ConnectionState.Disconnected), StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(status, nameof(ConnectionState.Error), StringComparison.OrdinalIgnoreCase))
-                    ))
+        DisconnectedOverlay.Visibility = ShowsDisconnectedOverlay(_model.HostControl, hasFailureDetails, _model.Status)
             ? Visibility.Visible
             : Visibility.Collapsed;
 
