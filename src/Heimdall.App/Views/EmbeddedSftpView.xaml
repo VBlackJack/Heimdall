@@ -6,6 +6,7 @@
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:conv="clr-namespace:Heimdall.App.Converters"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
+             xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
              xmlns:local="clr-namespace:Heimdall.App.Views"
              mc:Ignorable="d"
              d:DesignHeight="540"
@@ -758,7 +759,9 @@
                            HorizontalAlignment="Center"
                            FontSize="{StaticResource FontSizeBodyLarge}"
                            FontWeight="SemiBold"
-                           Foreground="{DynamicResource ErrorBrush}"/>
+                           Foreground="{DynamicResource ErrorBrush}"
+                           AutomationProperties.LiveSetting="Assertive"
+                           behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                 <TextBlock Text="{loc:Translate SftpDisconnectedOverlayMessage}"
                            HorizontalAlignment="Center"
                            TextAlignment="Center"

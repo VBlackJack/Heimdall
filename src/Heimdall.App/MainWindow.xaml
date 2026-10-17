@@ -1529,7 +1529,8 @@
                               VerticalAlignment="Stretch"
                               Background="{DynamicResource CardBrush}"
                               Cursor="SizeWE"
-                              ShowsPreview="True">
+                              ShowsPreview="True"
+                              AutomationProperties.Name="{loc:Translate A11yGridSplitter}">
                     <GridSplitter.Style>
                         <Style TargetType="GridSplitter">
                             <Style.Triggers>
@@ -2165,6 +2166,7 @@
                                   VerticalAlignment="Center"
                                   Background="{DynamicResource CardBrush}"
                                   ShowsPreview="True"
+                                  AutomationProperties.Name="{loc:Translate A11yGridSplitter}"
                                   Visibility="{Binding Tunnels.IsPanelOpen, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                     <Border Grid.Row="2"
@@ -6489,6 +6491,8 @@
              HWND leaks through; this WPF overlay then blocks all other interaction. -->
         <Border Grid.Row="0" Grid.RowSpan="3" Panel.ZIndex="1000"
                 Background="{DynamicResource BackgroundBrush}"
+                KeyboardNavigation.TabNavigation="Cycle"
+                KeyboardNavigation.DirectionalNavigation="Cycle"
                 Visibility="{Binding IsWorkspaceLocked, Converter={StaticResource BoolToVisibilityConverter}}">
             <Border Width="400" VerticalAlignment="Center" HorizontalAlignment="Center"
                     Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}"
@@ -6513,15 +6517,19 @@
                                  CaretBrush="{DynamicResource TextPrimaryBrush}"
                                  IsVisibleChanged="OnLockOverlayVisibleChanged"
                                  KeyDown="OnLockOverlayPasswordKeyDown"/>
-                    <TextBlock Text="{Binding ErrorMessage}"
+                    <TextBlock Text="{Binding ErrorMessage, NotifyOnTargetUpdated=True}"
                                Foreground="{DynamicResource ErrorTextBrush}"
                                FontSize="{StaticResource FontSizeBody}" HorizontalAlignment="Center"
-                               Margin="0,8,0,0" TextWrapping="Wrap"/>
+                               Margin="0,8,0,0" TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Assertive"
+                               behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                     <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="{StaticResource CornerRadiusSm}"
                             Padding="12,8" Margin="0,12,0,0"
                             Visibility="{Binding IsLockedOut, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="{Binding LockoutMessage}" Foreground="{DynamicResource WarningTextBrush}"
-                                   FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding LockoutMessage, NotifyOnTargetUpdated=True}" Foreground="{DynamicResource WarningTextBrush}"
+                                   FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" HorizontalAlignment="Center"
+                                   AutomationProperties.LiveSetting="Assertive"
+                                   behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                     </Border>
                     <Button x:Name="Mw_LockOverlayUnlockBtn"
                             Content="{loc:Translate BtnUnlock}"

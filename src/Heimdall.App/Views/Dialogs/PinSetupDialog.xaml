@@ -18,6 +18,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:Heimdall.App.Converters"
         xmlns:loc="clr-namespace:Heimdall.App.Localization"
+        xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
         d:DataContext="{d:DesignInstance Type=vm:PinSetupDialogViewModel}"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -111,6 +112,8 @@
         </StackPanel>
 
         <TextBlock x:Name="ErrorText"
+                   AutomationProperties.LiveSetting="Assertive"
+                   behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                    Grid.Row="4"
                    Text=""
                    Foreground="{DynamicResource ErrorTextBrush}"

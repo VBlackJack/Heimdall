@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:Heimdall.App.Converters"
         xmlns:loc="clr-namespace:Heimdall.App.Localization"
+        xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
         d:DataContext="{d:DesignInstance Type=vm:PinDialogViewModel}"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -61,7 +62,9 @@
 
         <!-- Error message (visible when non-empty) -->
         <TextBlock Grid.Row="2"
-                   Text="{Binding ErrorMessage}"
+                   Text="{Binding ErrorMessage, NotifyOnTargetUpdated=True}"
+                   AutomationProperties.LiveSetting="Assertive"
+                   behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                    Foreground="{DynamicResource ErrorTextBrush}"
                    FontSize="{StaticResource FontSizeBody}"
                    HorizontalAlignment="Center"
@@ -76,7 +79,9 @@
                 Padding="12,8"
                 Margin="0,12,0,0"
                 Visibility="{Binding IsLockedOut, Converter={StaticResource BoolToVisibilityConverter}}">
-            <TextBlock Text="{Binding LockoutMessage}"
+            <TextBlock Text="{Binding LockoutMessage, NotifyOnTargetUpdated=True}"
+                       AutomationProperties.LiveSetting="Assertive"
+                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                        Foreground="{DynamicResource WarningTextBrush}"
                        FontSize="{StaticResource FontSizeBody}"
                        TextWrapping="Wrap"
