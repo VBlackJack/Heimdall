@@ -4514,6 +4514,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         Dispatcher.BeginInvoke(() =>
         {
+            // The title bar is drawn by DWM from colours handed over once; a theme change has to
+            // hand them over again or the frame keeps the previous theme.
+            WindowThemeHelper.ApplyCurrentTheme(this);
             if (DataContext is not MainViewModel vm) return;
             if (!string.Equals(vm.SelectedTab, ShellTab.Tools, StringComparison.Ordinal)) return;
 
