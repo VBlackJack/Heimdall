@@ -85,6 +85,14 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// </summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, EmbeddedSshView> _connectingSshViews =
         new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The detached profile and settings a shared SSH connection is being made with, by session
+    /// id, from SessionStarting until the session is ready or the attempt failed. Their companion
+    /// SFTP pane signs in with the same passwords: remembered, typed or from the vault.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SshConnectionInputs> _sharedSshConnectionInputs =
+        new(StringComparer.Ordinal);
     private readonly Dictionary<string, ReconnectChainState> _reconnectChainsBySessionId = [];
     private readonly HashSet<ReconnectChainState> _activeReconnectChains = [];
     private readonly AsyncLocal<ReconnectChainState?> _currentReconnectChain = new AsyncLocal<ReconnectChainState?>();
@@ -760,6 +768,12 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         tab.HostControl = connectingView;
         _connectingSshViews[sessionId] = connectingView;
 
+        // Only a shared profile: a local companion pane reads its profile again, as it always did.
+        if (SharedSessionIds.IsSharedProfile(server))
+        {
+            _sharedSshConnectionInputs[sessionId] = new SshConnectionInputs(server, settings);
+        }
+
         // The view's Cancel button ends the attempt through the same token a tab close would.
         if (connectingView is not null)
         {
@@ -791,6 +805,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         bool cancellationRequested = ReleaseConnectingCancellation(sessionId);
         _connectingSshViews.TryRemove(sessionId, out _);
+        _sharedSshConnectionInputs.TryRemove(sessionId, out _);
         ReconnectChainState? reconnectChain = RemoveReconnectChainSession(sessionId);
         if (reconnectChain is not null)
         {
@@ -997,12 +1012,15 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             ? _localizer.Format("StatusEmbeddedRdpOpening", displayName)
             : _localizer.Format("StatusConnected", displayName);
 
+        // Taken whether or not a pane opens: the passwords are not kept past this session's start.
+        _sharedSshConnectionInputs.TryRemove(sessionId, out SshConnectionInputs? sharedConnection);
+
         // Auto-open SFTP alongside SSH - use original server ID for inventory lookup
         if (string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase)
             && _main.CurrentSettings?.SftpBrowserEnabled == true
             && _main.CurrentSettings?.SftpAutoOpenOnSsh == true)
         {
-            AutoOpenSftpAsync(tab, originalServerId, _main.Split.GetSessionToken(tab))
+            AutoOpenSftpAsync(tab, originalServerId, sharedConnection, _main.Split.GetSessionToken(tab))
                 .SafeFireAndForget();
         }
 
@@ -1789,12 +1807,22 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// <see cref="ServerListViewModel.ConnectionService.ConnectSftpAsync"/>
     /// runs on a background thread.
     /// </summary>
-    private async Task AutoOpenSftpAsync(SessionTabViewModel tab, string serverId, CancellationToken ct = default)
+    /// <param name="sharedConnection">
+    /// The copies a shared SSH session was connected with, or null for a local profile, which is
+    /// read again from the lookup. A shared session's own copies hold the passwords it was given
+    /// after the Windows Hello gate and the vault; a profile read again holds none, and the pane
+    /// would never ask for them (a companion pane asks nothing).
+    /// </param>
+    private async Task AutoOpenSftpAsync(
+        SessionTabViewModel tab,
+        string serverId,
+        SshConnectionInputs? sharedConnection,
+        CancellationToken ct = default)
     {
         try
         {
             IProfileLookup lookup = _main.ServerList.ProfileLookup;
-            var server = await lookup.FindAsync(serverId);
+            var server = sharedConnection?.Server ?? await lookup.FindAsync(serverId);
 
             if (server is null || string.IsNullOrEmpty(server.SshUsername))
             {
@@ -1805,9 +1833,11 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
             var sftpSessionId = BuildCompanionSftpSessionId(tab.ServerId);
             var sftpProfile = CreateCompanionSftpProfile(server, sftpSessionId);
+            AppSettings settings = sharedConnection?.Settings
+                ?? lookup.EffectiveSettingsFor(server, _main.CurrentSettings!);
 
             var sftpResult = await _main.ServerList.ConnectionService
-                .ConnectSftpAsync(sftpProfile, lookup.EffectiveSettingsFor(server, _main.CurrentSettings!), ct)
+                .ConnectSftpAsync(sftpProfile, settings, ct)
                 .ConfigureAwait(false);
 
             if (!sftpResult.Success || sftpResult.Session is null)
@@ -1874,6 +1904,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             FileLogger.Warn($"SFTP auto-open error for {serverId}: {ex.Message}");
         }
     }
+
+    /// <summary>The detached profile and settings one SSH connection was made with.</summary>
+    private sealed record SshConnectionInputs(ServerProfileDto Server, AppSettings Settings);
 
     private static string BuildCompanionSftpSessionId(string sshSessionId)
     {
@@ -2254,6 +2287,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             cancellation.Dispose();
         }
         _connectingCancellations.Clear();
+        _sharedSshConnectionInputs.Clear();
 
         lock (_reconnectChainGate)
         {
