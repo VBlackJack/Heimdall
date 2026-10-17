@@ -21,7 +21,9 @@
             <conv:FileIconConverter x:Key="FileIconConverter"/>
             <conv:FileIconColorConverter x:Key="FileIconColorConverter"/>
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <conv:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
             <sys:Double x:Key="LocalFilterBoxWidth">160</sys:Double>
+            <sys:Double x:Key="LocalFilterClearSize">24</sys:Double>
             <Style x:Key="LocalFileRowStyle" TargetType="ListViewItem" BasedOn="{StaticResource FileBrowserRowStyle}">
                 <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
             </Style>
@@ -42,22 +44,49 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,0,1">
             <DockPanel LastChildFill="True">
-            <TextBox x:Name="FilterTextBox"
-                     DockPanel.Dock="Right"
-                     Width="{StaticResource LocalFilterBoxWidth}"
-                     Style="{DynamicResource SearchTextBoxStyle}"
-                     Tag=""
-                     FontSize="{StaticResource FontSizeCaption}"
-                     VerticalContentAlignment="Center"
-                     Margin="8,0,0,0"
-                     KeyDown="OnFilterKeyDown"
-                     Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay={x:Static local:SftpViewMetrics.FilterInputDelayMilliseconds}}"
-                      AutomationProperties.Name="{loc:Translate A11yTxtSearchFiles}"/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Grid Width="{StaticResource LocalFilterBoxWidth}" Margin="8,0,0,0">
+                    <TextBox x:Name="FilterTextBox"
+                             Style="{DynamicResource SearchTextBoxStyle}"
+                             Tag=""
+                             FontSize="{StaticResource FontSizeCaption}"
+                             VerticalContentAlignment="Center"
+                             Padding="6,2,28,2"
+                             KeyDown="OnFilterKeyDown"
+                             Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay={x:Static local:SftpViewMetrics.FilterInputDelayMilliseconds}}"
+                             AutomationProperties.Name="{loc:Translate A11yTxtSearchFiles}"/>
+                    <Button x:Name="FilterClearButton"
+                            Content="&#xE711;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            FontSize="{StaticResource FontSizeSmallCaption}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            MinWidth="{StaticResource LocalFilterClearSize}"
+                            MinHeight="{StaticResource LocalFilterClearSize}"
+                            Padding="0"
+                            Click="OnClearFilterClick"
+                            ToolTip="{loc:Translate SftpEmptyClearFilter}"
+                            AutomationProperties.Name="{loc:Translate SftpEmptyClearFilter}"
+                            Visibility="{Binding Text, ElementName=FilterTextBox, Converter={StaticResource NullToVisibilityConverter}}"/>
+                </Grid>
+                <CheckBox x:Name="ToggleHiddenCheckBox"
+                          Content="{loc:Translate SftpToggleHiddenLabel}"
+                          VerticalAlignment="Center"
+                          Foreground="{DynamicResource TextSecondaryBrush}"
+                          FontSize="{StaticResource FontSizeCaption}"
+                          Margin="8,0,0,0"
+                          IsChecked="{Binding ShowHidden}"
+                          ToolTip="{loc:Translate SftpToggleHidden}"
+                          AutomationProperties.Name="{loc:Translate SftpToggleHidden}"/>
+            </StackPanel>
             <StackPanel Orientation="Horizontal">
                 <Button Content="&#xE72B;" FontFamily="{StaticResource FontFamilyIcons}"
                         x:Name="BtnBack" Click="OnBackClick"
                         ToolTip="{loc:Translate TooltipNavigateBack}"
                         Style="{DynamicResource GhostButtonStyle}"
+                        MinWidth="{StaticResource SessionHeaderMinTarget}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}"
                         IsEnabled="{Binding CanGoBack}"
                         AutomationProperties.Name="{loc:Translate A11yNavigateBack}"/>
@@ -65,18 +94,24 @@
                         Click="OnUpClick"
                         ToolTip="{loc:Translate TooltipNavigateUp}"
                         Style="{DynamicResource GhostButtonStyle}"
+                        MinWidth="{StaticResource SessionHeaderMinTarget}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="3,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yNavigateUp}"/>
                 <Button x:Name="BtnHome" Content="&#xE80F;" FontFamily="{StaticResource FontFamilyIcons}"
                         Click="OnHomeClick"
                         ToolTip="{loc:Translate TooltipNavigateHome}"
                         Style="{DynamicResource GhostButtonStyle}"
+                        MinWidth="{StaticResource SessionHeaderMinTarget}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="3,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yNavigateHome}"/>
                 <Button x:Name="BtnRefresh" Content="&#xE72C;" FontFamily="{StaticResource FontFamilyIcons}"
                         Click="OnRefreshClick"
                         ToolTip="{loc:Translate TooltipRefreshDirectory}"
                         Style="{DynamicResource GhostButtonStyle}"
+                        MinWidth="{StaticResource SessionHeaderMinTarget}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="6,2" FontSize="{StaticResource FontSizeCaption}" Margin="3,0,0,0"
                         AutomationProperties.Name="{loc:Translate A11yRefreshDirectory}"/>
             </StackPanel>

@@ -53,6 +53,9 @@ public partial class LocalFileBrowserView : UserControl
     private readonly LocalizationManager? _localizer;
     private readonly LocalFileBrowserViewModel _viewModel;
     private readonly FileListDragSource? _dragSource;
+
+    // Stamped on this list's own drags, so a drop knows whether it came from here.
+    private readonly string _dragOriginId = Guid.NewGuid().ToString("N");
     private System.Windows.Controls.ListViewItem? _highlightedDropRow;
 
     /// <summary>
@@ -288,6 +291,12 @@ public partial class LocalFileBrowserView : UserControl
         }
 
         e.Handled = true;
+    }
+
+    private void OnClearFilterClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel.FilterText = string.Empty;
+        FilterTextBox.Focus();
     }
 
     private void OnColumnHeaderClick(object sender, RoutedEventArgs e)
@@ -646,6 +655,7 @@ public partial class LocalFileBrowserView : UserControl
 
         System.Windows.DataObject data = new();
         data.SetData(System.Windows.DataFormats.FileDrop, paths);
+        data.SetData(LocalBrowserDrop.OriginFormat, _dragOriginId);
         try
         {
             System.Windows.DragDrop.DoDragDrop(FileListView, data, System.Windows.DragDropEffects.Copy);
@@ -657,12 +667,14 @@ public partial class LocalFileBrowserView : UserControl
     }
 
     /// <summary>
-    /// Only entries dragged out of a remote list are accepted: they are downloaded into the folder
-    /// under the pointer, or into the one shown.
+    /// Entries dragged out of a remote list are downloaded, and files dragged from Explorer or
+    /// another local list are copied, into the folder under the pointer or the one shown. A drag
+    /// that started in this list is refused: released over itself it would copy files onto
+    /// themselves.
     /// </summary>
     private void OnDragOver(object sender, System.Windows.DragEventArgs e)
     {
-        if (SftpRemoteDragPayload.From(e.Data) is null)
+        if (LocalBrowserDrop.Classify(e.Data, _dragOriginId) == LocalBrowserDropKind.None)
         {
             SetDropHighlight(null);
             e.Effects = System.Windows.DragDropEffects.None;
@@ -681,7 +693,8 @@ public partial class LocalFileBrowserView : UserControl
     private async void OnDrop(object sender, System.Windows.DragEventArgs e)
     {
         SetDropHighlight(null);
-        if (SftpRemoteDragPayload.From(e.Data) is not { } payload)
+        LocalBrowserDropKind kind = LocalBrowserDrop.Classify(e.Data, _dragOriginId);
+        if (kind == LocalBrowserDropKind.None)
         {
             return;
         }
@@ -690,12 +703,19 @@ public partial class LocalFileBrowserView : UserControl
         string targetFolder = hovered is { IsDirectory: true } ? hovered.FullPath : _viewModel.CurrentPath;
         try
         {
-            await payload.Source.DownloadFilesAsync(payload.Entries, targetFolder);
-            await _viewModel.Refresh();
+            if (kind == LocalBrowserDropKind.RemoteDownload && SftpRemoteDragPayload.From(e.Data) is { } payload)
+            {
+                await payload.Source.DownloadFilesAsync(payload.Entries, targetFolder);
+                await _viewModel.Refresh();
+            }
+            else if (e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] dropped)
+            {
+                await _viewModel.PasteFilesAsync(dropped, targetFolder);
+            }
         }
         catch (Exception ex)
         {
-            Heimdall.Core.Logging.FileLogger.Warn($"[LocalFileBrowser] drop download failed: {ex.Message}");
+            Heimdall.Core.Logging.FileLogger.Warn($"[LocalFileBrowser] drop failed: {ex.Message}");
         }
     }
 
