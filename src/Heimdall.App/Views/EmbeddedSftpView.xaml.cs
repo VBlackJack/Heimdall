@@ -206,6 +206,12 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
     /// </summary>
     public event Action? CloseRequested;
 
+    /// <summary>
+    /// Raised on the UI thread when the connection ends while the pane stays open, with the error
+    /// the pane shows when it was lost, or null when it ended cleanly or on request.
+    /// </summary>
+    internal event Action<string?>? SessionEnded;
+
     public void SetOwningPane(SessionPaneModel pane)
     {
         ArgumentNullException.ThrowIfNull(pane);
@@ -2378,6 +2384,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
         if (!_disposed && ReferenceEquals(_browser, browser))
         {
             UpdateStatus(L("SftpStatusDisconnected"));
+            SessionEnded?.Invoke(null);
         }
     }
 
@@ -2432,16 +2439,19 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
             {
                 _pendingBrowserSecurityStatus = null;
                 ShowError(securityStatus);
+                SessionEnded?.Invoke(securityStatus);
             }
             else if (string.IsNullOrWhiteSpace(errorMessage))
             {
                 UpdateStatus(status);
+                SessionEnded?.Invoke(null);
             }
             else
             {
                 // A session that died on an error is an error: shown with the icon and the colour
                 // of one, not as a neutral status that reads like "Ready".
                 ShowError(status);
+                SessionEnded?.Invoke(status);
             }
         });
     }
@@ -2477,7 +2487,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
             {
                 if (!_disposed)
                 {
-                    ShowError(L("SftpStatusHealthCheckFailed"));
+                    string status = L("SftpStatusHealthCheckFailed");
+                    ShowError(status);
+                    SessionEnded?.Invoke(status);
                 }
             });
 
