@@ -33,6 +33,7 @@
                         AutomationProperties.Name="{loc:Translate A11yReconnectSession}"
                         Visibility="Collapsed"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"/>
@@ -45,6 +46,7 @@
                         AutomationProperties.Name="{loc:Translate A11yDisconnectSession}"
                         Visibility="Collapsed"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"/>
@@ -57,6 +59,7 @@
                         AutomationProperties.Name="{loc:Translate A11yCancelReconnect}"
                         Visibility="Collapsed"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"/>
@@ -69,6 +72,7 @@
                         AutomationProperties.Name="{loc:Translate A11yCancelConnect}"
                         Visibility="Collapsed"
                         Style="{DynamicResource SecondaryButtonStyle}"
+                        MinHeight="{StaticResource SessionHeaderMinTarget}"
                         Padding="8,2"
                         FontSize="{StaticResource FontSizeCaption}"
                         Margin="8,0,0,0"/>
