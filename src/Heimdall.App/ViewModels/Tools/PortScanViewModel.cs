@@ -107,31 +107,54 @@ public sealed partial class PortScanViewModel : ObservableObject, IDisposable
         ProgressPercent = 0;
         ProgressCountText = string.Format(Lk("ToolPortScanProgressCount"), 0, ports.Count);
 
+        // Progress<T> applies each update later, on the captured context, which may be a pool
+        // thread. Every update is counted when the service reports it, which happens before the
+        // service task completes; the scan holds one count of its own. The final totals are
+        // written only once every counted update has been applied, so a late update can never
+        // overwrite them with the count it read before the scan finished.
+        var pendingUpdates = 1;
+        var updatesApplied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void ReleaseUpdate()
+        {
+            if (Interlocked.Decrement(ref pendingUpdates) == 0)
+            {
+                updatesApplied.TrySetResult();
+            }
+        }
+
         try
         {
-            var progress = new Progress<PortScanProgress>(update =>
+            IProgress<PortScanProgress> progress = new Progress<PortScanProgress>(update =>
             {
-                Completed = update.Completed;
-                Total = update.Total;
-                ProgressPercent = update.Total > 0 ? (int)(update.Completed * 100.0 / update.Total) : 0;
-                ProgressCountText = string.Format(Lk("ToolPortScanProgressCount"), update.Completed, update.Total);
-
-                if (update.LatestResult is { } probe)
+                try
                 {
-                    lock (_lock)
-                    {
-                        if (!_allResults.Contains(probe))
-                        {
-                            _allResults.Add(probe);
-                        }
-                    }
+                    ApplyProgress(update);
                 }
-
-                OpenCount = GetAllResults().Count(result => result.IsOpen);
-                ClosedCount = GetAllResults().Count(result => !result.IsOpen);
+                finally
+                {
+                    ReleaseUpdate();
+                }
             });
 
-            var results = await _service.ScanAsync(host, ports, ((IProgress<PortScanProgress>)progress).Report, _cts.Token);
+            IReadOnlyList<PortProbeResult> results;
+            try
+            {
+                results = await _service.ScanAsync(
+                    host,
+                    ports,
+                    update =>
+                    {
+                        Interlocked.Increment(ref pendingUpdates);
+                        progress.Report(update);
+                    },
+                    _cts.Token);
+            }
+            finally
+            {
+                ReleaseUpdate();
+                await updatesApplied.Task;
+            }
 
             lock (_lock)
             {
@@ -158,6 +181,28 @@ public sealed partial class PortScanViewModel : ObservableObject, IDisposable
         {
             IsScanning = false;
         }
+    }
+
+    private void ApplyProgress(PortScanProgress update)
+    {
+        Completed = update.Completed;
+        Total = update.Total;
+        ProgressPercent = update.Total > 0 ? (int)(update.Completed * 100.0 / update.Total) : 0;
+        ProgressCountText = string.Format(Lk("ToolPortScanProgressCount"), update.Completed, update.Total);
+
+        if (update.LatestResult is { } probe)
+        {
+            lock (_lock)
+            {
+                if (!_allResults.Contains(probe))
+                {
+                    _allResults.Add(probe);
+                }
+            }
+        }
+
+        OpenCount = GetAllResults().Count(result => result.IsOpen);
+        ClosedCount = GetAllResults().Count(result => !result.IsOpen);
     }
 
     public void CancelScan()
