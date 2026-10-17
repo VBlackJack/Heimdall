@@ -2399,6 +2399,19 @@
                                 </Setter>
                             </Style>
                         </DataGrid.RowStyle>
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{loc:Translate TunnelCtxClose}"
+                                          Command="{Binding Tunnels.CloseCommand}"
+                                          CommandParameter="{Binding Tunnels.SelectedItem}"/>
+                                <MenuItem Header="{loc:Translate TunnelCtxCopyPort}"
+                                          Command="{Binding Tunnels.CopyPortCommand}"
+                                          CommandParameter="{Binding Tunnels.SelectedItem}"/>
+                                <Separator/>
+                                <MenuItem Header="{loc:Translate TunnelCtxCloseAll}"
+                                          Command="{Binding Tunnels.CloseAllCommand}"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="" Width="28">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -2432,6 +2445,23 @@
                             <DataGridTextColumn x:Name="Mw_TunnelsColRemoteHost" Header="{loc:Translate TunnelsColRemoteHost}" Binding="{Binding RemoteHost}" Width="*"/>
                             <DataGridTextColumn x:Name="Mw_TunnelsColRemotePort" Header="{loc:Translate TunnelsColRemotePort}" Binding="{Binding RemotePort}" Width="90"/>
                             <DataGridTextColumn x:Name="Mw_TunnelsColStarted" Header="{loc:Translate TunnelsColStarted}" Binding="{Binding StartedAt, StringFormat=HH:mm:ss}" Width="80"/>
+                            <DataGridTemplateColumn Header="" Width="28">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="&#xE711;"
+                                                FontFamily="{StaticResource FontFamilyIcons}"
+                                                FontSize="{StaticResource FontSizeCaption}"
+                                                Command="{Binding DataContext.Tunnels.CloseCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{DynamicResource GhostButtonStyle}"
+                                                Padding="2" Margin="0"
+                                                ToolTip="{loc:Translate TunnelCtxClose}"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Center"
+                                                AutomationProperties.Name="{loc:Translate A11yCloseTunnel}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
 
