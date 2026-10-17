@@ -88,7 +88,11 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     private Task? _authWatchTask;
     private bool _embedded;
     private bool _captureInProgress;
+    private bool _localeChangeSubscribed;
     private bool _disposed;
+    private string? _lastStoreFrontUrl;
+    private string? _lastAppName;
+    private CitrixLaunchMode _lastLaunchMode = CitrixLaunchMode.Unknown;
 
     // Title fallback for the event log when neither application name nor StoreFront URL is known.
     // Language-neutral token (the NDJSON event log carries no localized content).
@@ -180,28 +184,19 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         _localizer = localizer;
         _dialogService = dialogService;
 
+        if (_localizer is not null && !_localeChangeSubscribed)
+        {
+            _localizer.LocaleChanged += OnLocaleChanged;
+            _localeChangeSubscribed = true;
+        }
+
         // Baseline event host/title; refined by SetConnectionInfo once StoreFront/app metadata is known.
         _eventHost = string.Empty;
         _eventTitle = string.IsNullOrWhiteSpace(displayName) ? EventTitleFallback : displayName;
 
-        TerminateButton.Content = localizer?["BtnTerminateSession"] ?? "Terminate";
-        BringToFrontButton.Content = localizer?["BtnBringToFront"] ?? "Bring to Front";
-        CancelCaptureButton.Content = localizer?["CitrixCancelCapture"] ?? "Cancel";
-        CloseTabButton.Content = localizer?["BtnClose"] ?? "Close";
-
-        // Tooltips
-        TerminateButton.ToolTip = localizer?["TooltipDisconnectSession"] ?? "Disconnect session";
-        BringToFrontButton.ToolTip = localizer?["TooltipBringToFront"] ?? "Bring to front";
-        CloseTabButton.ToolTip = localizer?["TooltipCloseSessionTab"] ?? "Close tab";
-
-        // Accessibility
-        System.Windows.Automation.AutomationProperties.SetName(TerminateButton, localizer?["A11yDisconnectSession"] ?? "Disconnect session");
-        System.Windows.Automation.AutomationProperties.SetName(BringToFrontButton, localizer?["A11yBringToFront"] ?? "Bring to front");
-        System.Windows.Automation.AutomationProperties.SetName(CloseTabButton, localizer?["A11yCloseSessionTab"] ?? "Close session tab");
-
         SessionTitleText.Text = displayName;
         TitleText.Text = displayName;
-        CaptureLoadingText.Text = localizer?["CitrixCaptureSearching"] ?? "Locating Citrix session window...";
+        ApplyLocalization();
         CaptureLoadingPanel.Visibility = Visibility.Visible;
         InfoPanel.Visibility = Visibility.Collapsed;
         EmbeddedContainer.Visibility = Visibility.Collapsed;
@@ -218,6 +213,46 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         _ = TryCaptureWindowAsync();
     }
 
+    private string L10n(string key) => _localizer?[key] ?? key;
+
+    private void ApplyLocalization()
+    {
+        TerminateButton.Content = L10n("BtnTerminateSession");
+        BringToFrontButton.Content = L10n("BtnBringToFront");
+        CancelCaptureButton.Content = L10n("CitrixCancelCapture");
+        CloseTabButton.Content = L10n("BtnClose");
+
+        // Tooltips
+        TerminateButton.ToolTip = L10n("TooltipDisconnectSession");
+        BringToFrontButton.ToolTip = L10n("TooltipBringToFront");
+        CloseTabButton.ToolTip = L10n("TooltipCloseSessionTab");
+
+        // Accessibility
+        System.Windows.Automation.AutomationProperties.SetName(TerminateButton, L10n("A11yDisconnectSession"));
+        System.Windows.Automation.AutomationProperties.SetName(BringToFrontButton, L10n("A11yBringToFront"));
+        System.Windows.Automation.AutomationProperties.SetName(CloseTabButton, L10n("A11yCloseSessionTab"));
+
+        if (_captureInProgress)
+        {
+            CaptureLoadingText.Text = L10n("CitrixCaptureSearching");
+        }
+    }
+
+    private void OnLocaleChanged(string locale)
+    {
+        if (_disposed) return;
+
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnLocaleChanged(locale));
+            return;
+        }
+
+        ApplyLocalization();
+        UpdateConnectionInfoLabels();
+        UpdateStatus(!_eventDisconnectEmitted);
+    }
+
     /// <summary>
     /// Populates the info panel with StoreFront URL and application name.
     /// </summary>
@@ -226,6 +261,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         string? appName,
         CitrixLaunchMode mode = CitrixLaunchMode.Unknown)
     {
+        _lastStoreFrontUrl = storeFrontUrl;
+        _lastAppName = appName;
+        _lastLaunchMode = mode;
+
         // Capture the event host/title: host = StoreFront URL (the factory strips any user@; these
         // URLs can embed credentials), title = application name, falling back to the URL then to a
         // non-empty constant.
@@ -234,19 +273,24 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
             ? appName
             : (!string.IsNullOrWhiteSpace(storeFrontUrl) ? storeFrontUrl : EventTitleFallback);
 
-        StoreFrontText.Text = !string.IsNullOrWhiteSpace(storeFrontUrl)
-            ? _localizer?.Format("CitrixStoreFrontLabel", storeFrontUrl) ?? $"StoreFront: {storeFrontUrl}"
+        UpdateConnectionInfoLabels();
+    }
+
+    private void UpdateConnectionInfoLabels()
+    {
+        StoreFrontText.Text = !string.IsNullOrWhiteSpace(_lastStoreFrontUrl)
+            ? _localizer?.Format("CitrixStoreFrontLabel", _lastStoreFrontUrl) ?? _lastStoreFrontUrl
             : string.Empty;
 
-        AppNameText.Text = !string.IsNullOrWhiteSpace(appName)
-            ? _localizer?.Format("CitrixAppNameLabel", appName) ?? $"Application: {appName}"
+        AppNameText.Text = !string.IsNullOrWhiteSpace(_lastAppName)
+            ? _localizer?.Format("CitrixAppNameLabel", _lastAppName) ?? _lastAppName
             : string.Empty;
 
-        ActiveModeText.Text = mode switch
+        ActiveModeText.Text = _lastLaunchMode switch
         {
-            CitrixLaunchMode.SelfServiceCache => _localizer?["CitrixModeCacheLaunch"] ?? "Mode: SelfService cache",
-            CitrixLaunchMode.IcaFile => _localizer?["CitrixModeIcaFile"] ?? "Mode: ICA file",
-            CitrixLaunchMode.StoreFront => _localizer?["CitrixModeStoreFront"] ?? "Mode: StoreFront",
+            CitrixLaunchMode.SelfServiceCache => L10n("CitrixModeCacheLaunch"),
+            CitrixLaunchMode.IcaFile => L10n("CitrixModeIcaFile"),
+            CitrixLaunchMode.StoreFront => L10n("CitrixModeStoreFront"),
             _ => string.Empty
         };
     }
@@ -308,8 +352,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
                 extendedMessageShown = true;
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    CaptureLoadingText.Text = _localizer?["CitrixCaptureSearchingExtended"]
-                        ?? "Still searching... (this can take up to 30 seconds)";
+                    CaptureLoadingText.Text = L10n("CitrixCaptureSearchingExtended");
                 });
             }
 
@@ -363,7 +406,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
                 $"Citrix: Workspace sign-in window is foreground; embedding it inline hwnd=0x{authHwnd.ToInt64():X}");
             await Dispatcher.InvokeAsync(() =>
             {
-                CaptureLoadingText.Text = _localizer?["CitrixAuthSignInHint"] ?? "Sign in to Citrix...";
+                CaptureLoadingText.Text = L10n("CitrixAuthSignInHint");
 
                 // Recorded before embedding: the sign-in shell is the ONE window embedded without
                 // a session handle, and naming it here is what keeps the existence-only liveness
@@ -668,7 +711,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         }
 
         BringToFrontButton.Visibility = Visibility.Visible;
-        StatusTextBlock.Text = _localizer?["CitrixStatusExternal"] ?? "External window";
+        StatusTextBlock.Text = L10n("CitrixStatusExternal");
 
         // EmitConnect is idempotent, so a prior embed success is not double-counted.
         EmitConnect();
@@ -1006,11 +1049,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     {
         if (isRunning)
         {
-            HealthDot.Fill = Application.Current.TryFindResource("SuccessBrush") as Brush
-                             ?? Brushes.LimeGreen;
+            HealthDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "SuccessBrush");
             StatusTextBlock.Text = _embedded
-                ? (_localizer?["CitrixStatusEmbedded"] ?? "Embedded")
-                : (_localizer?["CitrixStatusConnected"] ?? "Connected");
+                ? (_localizer?["CitrixStatusEmbedded"] ?? string.Empty)
+                : (_localizer?["CitrixStatusConnected"] ?? string.Empty);
             // The ICA owner, not the launcher: showing the launcher's id named a process the user
             // cannot act on and which is usually already gone.
             SessionInfoText.Text = _sessionHandle is { OwnerProcessId: > 0 } liveHandle
@@ -1022,9 +1064,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         }
         else
         {
-            HealthDot.Fill = Application.Current.TryFindResource("ErrorBrush") as Brush
-                             ?? Brushes.Red;
-            StatusTextBlock.Text = _localizer?["CitrixStatusDisconnected"] ?? "Disconnected";
+            HealthDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "ErrorBrush");
+            StatusTextBlock.Text = _localizer?["CitrixStatusDisconnected"] ?? string.Empty;
             SessionInfoText.Text = string.Empty;
             BringToFrontButton.IsEnabled = false;
             TerminateButton.IsEnabled = false;
@@ -1082,6 +1123,13 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         EmitDisconnect("teardown");
 
         _disposed = true;
+
+        if (_localeChangeSubscribed && _localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+            _localeChangeSubscribed = false;
+        }
+
         StopAuthWatch();
 
         if (_healthTimer is not null)

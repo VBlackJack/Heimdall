@@ -81,7 +81,9 @@ public partial class DiagramEditorView : UserControl, IToolView
     /// <inheritdoc />
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         _openSession = ToolContextMenuHelper.GetOpenSessionAction(context);
         ApplyLocalization();
 
@@ -933,8 +935,26 @@ public partial class DiagramEditorView : UserControl, IToolView
         BtnDuplicate.ToolTip = L("BtnDuplicate");
         BtnDelete.ToolTip = L("BtnDelete");
 
-        SetToolbarEnabled(false);
+        SetToolbarEnabled(_editorReady);
         UpdateDocumentIndicator();
+    }
+
+    private void OnLocaleChanged(string _)
+    {
+        if (_disposed) return;
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpDIAGRAM").Replace("\\n", "\n");
+        }
+        if (_editorReady)
+        {
+            PostWebMessage("labels:" + JsonSerializer.Serialize(
+                new Dictionary<string, string>
+                {
+                    ["openSession"] = L("ToolDiagramCtxOpenSession")
+                }));
+        }
     }
 
     private void SetToolbarEnabled(bool enabled)
@@ -967,6 +987,8 @@ public partial class DiagramEditorView : UserControl, IToolView
     {
         if (_disposed) return;
         _disposed = true;
+
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
 
         try
         {

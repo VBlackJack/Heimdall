@@ -95,7 +95,9 @@ public partial class NetworkCartographyView : UserControl, IToolView
     /// <inheritdoc />
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         _openToolAction = ToolContextMenuHelper.GetOpenToolAction(context);
         _openSessionAction = ToolContextMenuHelper.GetOpenSessionAction(context);
         _addServerAction = ToolContextMenuHelper.GetAddServerAction(context);
@@ -816,6 +818,17 @@ public partial class NetworkCartographyView : UserControl, IToolView
         _vm.StatusText = message;
     }
 
+    private void OnLocaleChanged(string _)
+    {
+        if (_disposed) return;
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpNETMAP").Replace("\\n", "\n");
+        }
+        RefreshUiFromVm();
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -825,6 +838,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         }
 
         _disposed = true;
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _routeSelector?.Dispose();
         TxtSubnet.KeyDown -= OnSubnetKeyDown;
         ResultsGrid.PreviewMouseRightButtonDown -= ToolContextMenuHelper.SelectRowOnRightClick;

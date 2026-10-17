@@ -94,7 +94,9 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     /// </summary>
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         PopulateComboBoxes();
         ApplyLocalization();
         RebuildPresetList();
@@ -1467,8 +1469,23 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         _clipboardClearTimer.Start();
     }
 
+    private void OnLocaleChanged(string _)
+    {
+        if (!_viewInitialized) return;
+        ApplyLocalization();
+        RebuildPresetList();
+        UpdateModeDescription();
+        UpdateSyllableUiHints();
+        SylTotalLengthText.Text = string.Format(L("ToolPwdGenTotalLength"), _vm.SyllableTotalLength);
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpPASSWORD").Replace("\\n", "\n");
+        }
+    }
+
     public void Dispose()
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _vm.SettingsChanged -= OnSettingsChanged;
         _clipboardClearTimer?.Stop();

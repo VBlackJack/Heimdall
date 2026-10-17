@@ -53,7 +53,6 @@ public partial class SessionPaneControl : UserControl
             _model.PropertyChanged -= OnModelPropertyChanged;
             _model.PropertyChanged += OnModelPropertyChanged;
         }
-        ApplyLocalization();
         SyncContent();
         UpdateOverlays();
     }
@@ -310,18 +309,6 @@ public partial class SessionPaneControl : UserControl
             && !string.IsNullOrEmpty(session.ProfileLookupServerId);
 
         EditProfileButton.Visibility = editable ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void ApplyLocalization()
-    {
-        ReconnectButton.ToolTip = L("TooltipReconnectPane");
-        ClosePaneButton.ToolTip = L("TooltipClosePane");
-        EditProfileButton.ToolTip = L("TooltipEditProfileOverlay");
-        CopyErrorButton.ToolTip = L("TooltipCopyErrorOverlay");
-        System.Windows.Automation.AutomationProperties.SetName(ReconnectButton, L("A11yReconnectPane"));
-        System.Windows.Automation.AutomationProperties.SetName(ClosePaneButton, L("A11yClosePane"));
-        System.Windows.Automation.AutomationProperties.SetName(EditProfileButton, L("A11yEditProfileOverlay"));
-        System.Windows.Automation.AutomationProperties.SetName(CopyErrorButton, L("A11yCopyErrorOverlay"));
     }
 
     private string L(string key)

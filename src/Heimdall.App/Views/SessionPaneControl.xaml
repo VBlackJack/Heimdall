@@ -144,9 +144,9 @@
                 <WrapPanel HorizontalAlignment="Center">
                     <Button x:Name="ReconnectButton"
                             Style="{DynamicResource PrimaryButtonStyle}"
-                            AutomationProperties.Name="{loc:Translate SplitReconnectSecondary}"
+                            AutomationProperties.Name="{loc:Translate A11yReconnectPane}"
                             Content="{loc:Translate SessionPaneBtnReconnectShort}"
-                            ToolTip="{loc:Translate SplitReconnectSecondary}"
+                            ToolTip="{loc:Translate TooltipReconnectPane}"
                             Margin="3,3"
                             MinWidth="108"
                             Padding="10,5"/>
@@ -174,9 +174,9 @@
                             Padding="10,5"/>
                     <Button x:Name="ClosePaneButton"
                             Style="{DynamicResource SecondaryButtonStyle}"
-                            AutomationProperties.Name="{loc:Translate SplitCloseSecondary}"
+                            AutomationProperties.Name="{loc:Translate A11yClosePane}"
                             Content="{loc:Translate SessionPaneBtnCloseShort}"
-                            ToolTip="{loc:Translate SplitCloseSecondary}"
+                            ToolTip="{loc:Translate TooltipClosePane}"
                             Margin="3,3"
                             MinWidth="108"
                             Padding="10,5"/>

@@ -20,11 +20,13 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Tools;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.Views.Tools;
 
@@ -61,6 +63,7 @@ public partial class TlsAuditView : UserControl, IToolView
 
     private readonly TlsAuditViewModel _vm;
     private LocalizationManager? _localizer;
+    private HeimdallThemeService? _themeService;
     private bool _disposed;
     private Action<bool>? _setBusy;
     private GatewayRouteSelector? _routeSelector;
@@ -78,7 +81,14 @@ public partial class TlsAuditView : UserControl, IToolView
 
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
+
+        if (_themeService is not null) _themeService.ThemeChanged -= OnThemeChanged;
+        _themeService = (Application.Current as App)?.Services?.GetService<HeimdallThemeService>();
+        if (_themeService is not null) _themeService.ThemeChanged += OnThemeChanged;
+
         _setBusy = context?.SetBusyAction;
         _vm.Initialize(localizer);
         ApplyLocalization();
@@ -269,7 +279,7 @@ public partial class TlsAuditView : UserControl, IToolView
         }
 
         BtnAudit.Content = L("ToolTlsAuditBtnAudit");
-        BtnAudit.Foreground = (Brush)FindResource("TextPrimaryBrush");
+        BtnAudit.ClearValue(Button.ForegroundProperty);
         BtnAudit.Style = (Style)FindResource("PrimaryButtonStyle");
         AutomationProperties.SetName(BtnAudit, L("ToolTlsAuditBtnAudit"));
         TxtHost.IsReadOnly = false;
@@ -415,12 +425,31 @@ public partial class TlsAuditView : UserControl, IToolView
         _vm.ShowError = true;
     }
 
+    private void OnLocaleChanged(string _)
+    {
+        if (_disposed) return;
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpTLSAUDIT").Replace("\\n", "\n", StringComparison.Ordinal);
+        }
+        RefreshUiFromVm();
+    }
+
+    private void OnThemeChanged(string _)
+    {
+        if (_disposed) return;
+        RefreshUiFromVm();
+    }
+
     public void Dispose()
     {
         if (_disposed)
             return;
 
         _disposed = true;
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
+        if (_themeService is not null) _themeService.ThemeChanged -= OnThemeChanged;
         _routeSelector?.Dispose();
         _setBusy?.Invoke(false);
         _vm.PropertyChanged -= OnVmPropertyChanged;

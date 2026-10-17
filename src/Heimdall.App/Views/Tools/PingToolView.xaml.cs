@@ -60,7 +60,9 @@ public partial class PingToolView : UserControl, IToolView
     /// </summary>
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         _setBusy = context?.SetBusyAction;
         _vm.Initialize(localizer);
         ApplyLocalization();
@@ -210,7 +212,7 @@ public partial class PingToolView : UserControl, IToolView
     {
         _setBusy?.Invoke(false);
         BtnToggle.Content = L("ToolPingBtnStart");
-        BtnToggle.Foreground = (Brush)FindResource("TextPrimaryBrush");
+        BtnToggle.ClearValue(Button.ForegroundProperty);
         BtnToggle.Style = (Style)FindResource("PrimaryButtonStyle");
         System.Windows.Automation.AutomationProperties.SetName(BtnToggle, L("ToolPingBtnStart"));
         TxtHost.IsReadOnly = false;
@@ -537,6 +539,16 @@ public partial class PingToolView : UserControl, IToolView
         _vm.ShowError = true;
     }
 
+    private void OnLocaleChanged(string _)
+    {
+        if (_disposed) return;
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpPING").Replace("\\n", "\n");
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -545,6 +557,7 @@ public partial class PingToolView : UserControl, IToolView
         }
 
         _disposed = true;
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _routeSelector?.Dispose();
         TxtHost.KeyDown -= OnHostKeyDown;
         _vm.PropertyChanged -= OnVmPropertyChanged;

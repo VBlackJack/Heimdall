@@ -118,6 +118,7 @@ public partial class LocalFileBrowserView : UserControl
         ApplyLocalization();
         UpdateColumnHeaders();
         Loaded += OnViewLoaded;
+        Unloaded += OnViewUnloaded;
     }
 
     /// <summary>
@@ -151,6 +152,31 @@ public partial class LocalFileBrowserView : UserControl
     private void OnViewLoaded(object sender, RoutedEventArgs e)
     {
         _viewModel.SetDialogService((Application.Current as App)?.Services?.GetService<IDialogService>());
+        if (_localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+            _localizer.LocaleChanged += OnLocaleChanged;
+        }
+    }
+
+    private void OnViewUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+        }
+    }
+
+    private void OnLocaleChanged(string locale)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnLocaleChanged(locale));
+            return;
+        }
+
+        ApplyLocalization();
+        UpdateColumnHeaders();
     }
 
     private void OnFileListSizeChanged(object sender, SizeChangedEventArgs e)

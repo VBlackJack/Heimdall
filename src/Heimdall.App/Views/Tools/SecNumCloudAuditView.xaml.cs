@@ -73,7 +73,9 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
     /// <inheritdoc />
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _localizer = localizer;
+        if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         _setBusy = context?.SetBusyAction;
         ApplyLocalization();
 
@@ -505,36 +507,36 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         var passLabel = new TextBlock
         {
             Text = CountLabel(PassSymbol, chapter.PassCount),
-            Foreground = (Brush)FindResource("SuccessBrush"),
             FontWeight = FontWeights.SemiBold,
             FontSize = (double)FindResource("FontSizeBody"),
             Margin = new Thickness(8, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
         };
+        passLabel.SetResourceReference(TextBlock.ForegroundProperty, "SuccessBrush");
         System.Windows.Automation.AutomationProperties.SetName(passLabel, $"{L("ToolAuditPass")}: {chapter.PassCount}");
         countsPanel.Children.Add(passLabel);
 
         var warnLabel = new TextBlock
         {
             Text = CountLabel(WarnSymbol, chapter.WarnCount),
-            Foreground = (Brush)FindResource("WarningBrush"),
             FontWeight = FontWeights.SemiBold,
             FontSize = (double)FindResource("FontSizeBody"),
             Margin = new Thickness(4, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
         };
+        warnLabel.SetResourceReference(TextBlock.ForegroundProperty, "WarningBrush");
         System.Windows.Automation.AutomationProperties.SetName(warnLabel, $"{L("ToolAuditWarn")}: {chapter.WarnCount}");
         countsPanel.Children.Add(warnLabel);
 
         var failLabel = new TextBlock
         {
             Text = CountLabel(FailSymbol, chapter.FailCount),
-            Foreground = (Brush)FindResource("ErrorBrush"),
             FontWeight = FontWeights.SemiBold,
             FontSize = (double)FindResource("FontSizeBody"),
             Margin = new Thickness(4, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
         };
+        failLabel.SetResourceReference(TextBlock.ForegroundProperty, "ErrorBrush");
         System.Windows.Automation.AutomationProperties.SetName(failLabel, $"{L("ToolAuditFail")}: {chapter.FailCount}");
         countsPanel.Children.Add(failLabel);
 
@@ -545,9 +547,9 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
             Text = $"{chapter.Name} ({chapter.SecNumCloudRef})",
             FontSize = (double)FindResource("FontSizeBodyLarge"),
             FontWeight = FontWeights.SemiBold,
-            Foreground = (Brush)FindResource("TextPrimaryBrush"),
             VerticalAlignment = VerticalAlignment.Center,
         };
+        titleText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
         headerPanel.Children.Add(titleText);
 
         // Content: stacked check cards
@@ -897,11 +899,22 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
     internal static string CountLabel(string symbol, int count) =>
         string.Create(CultureInfo.CurrentCulture, $"{symbol} {count}");
 
+    private void OnLocaleChanged(string _)
+    {
+        if (_disposed) return;
+        ApplyLocalization();
+        if (HelpPanel.Visibility == Visibility.Visible)
+        {
+            TxtHelpContent.Text = L("ToolHelpSECNUMCLOUD").Replace("\\n", "\n");
+        }
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         _routeSelector?.Dispose();
         StopAudit();
         GC.SuppressFinalize(this);

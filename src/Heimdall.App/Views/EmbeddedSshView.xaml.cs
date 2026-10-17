@@ -2960,10 +2960,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         DisconnectButton.Visibility = isDisconnected ? Visibility.Collapsed : Visibility.Visible;
         ReconnectButton.Visibility = isDisconnected ? Visibility.Visible : Visibility.Collapsed;
 
-        StatusTextBlock.Foreground = forceErrorBrush
-            || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase)
-            ? GetBrush("ErrorBrush", Brushes.IndianRed)
-            : GetBrush("TextPrimaryBrush", Brushes.White);
+        StatusTextBlock.SetResourceReference(
+            TextBlock.ForegroundProperty,
+            forceErrorBrush || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase)
+                ? "ErrorBrush"
+                : "TextPrimaryBrush");
     }
 
     private Brush GetBrush(string resourceKey, Brush fallback)
