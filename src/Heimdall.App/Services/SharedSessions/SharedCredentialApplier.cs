@@ -43,6 +43,10 @@ namespace Heimdall.App.Services.SharedSessions;
 /// the user the bastion's. A session's is dropped too when the SSH client was refused it and the
 /// connection then went on through Plink: the terminal starting says nothing of the password, the
 /// refusal before it does.</para>
+/// <para>A bastion or a session left to the SSH agent, whose server then refused the agent's keys,
+/// is asked for its password from then on, for as long as Heimdall runs: the agent still offers
+/// the same keys, and leaving it to them again would refuse every later attempt without ever
+/// asking.</para>
 /// </remarks>
 public sealed class SharedCredentialApplier
 {
@@ -55,12 +59,22 @@ public sealed class SharedCredentialApplier
         (int)SshFailureCode.TooManyAuthFailures,
     ];
 
+    /// <summary>The refusals that blame the keys an SSH agent offered.</summary>
+    private static readonly HashSet<int> AgentKeyRejections =
+    [
+        .. CredentialRejections,
+        (int)SshFailureCode.KeyRejected,
+    ];
+
     private readonly SharedSessionSecretStore _store;
     private readonly IDialogService _dialogService;
     private readonly LocalizationManager _localizer;
     private readonly Func<AppSettings, int> _offerableAgentIdentities;
     private readonly Func<string, string> _seal;
     private readonly Func<string, bool> _isReadable;
+
+    /// <summary>The targets whose server refused the agent's keys; asked for a password from then on.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<SecretTarget, byte> _agentRefused = new();
 
     /// <param name="store">Where the remembered passwords are kept.</param>
     /// <param name="dialogService">Asks for a password.</param>
@@ -106,7 +120,7 @@ public sealed class SharedCredentialApplier
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var plan = new SharedCredentialPlan(_store);
+        var plan = new SharedCredentialPlan(_store, _agentRefused);
         if (!SharedSessionIds.IsSharedProfile(profile))
         {
             return plan;
@@ -141,8 +155,14 @@ public sealed class SharedCredentialApplier
                 continue;
             }
 
-            if (!allowPrompt || await AgentHasKeysAsync().ConfigureAwait(false))
+            if (!allowPrompt)
             {
+                continue;
+            }
+
+            if (!_agentRefused.ContainsKey(target) && await AgentHasKeysAsync().ConfigureAwait(false))
+            {
+                plan.LeftToTheAgent.Add(target);
                 continue;
             }
 
@@ -183,7 +203,11 @@ public sealed class SharedCredentialApplier
                 profile.SshPasswordEncrypted = remembered;
                 plan.Used.Add(target);
             }
-            else if (allowPrompt && !await AgentHasKeysAsync().ConfigureAwait(false))
+            else if (allowPrompt && !_agentRefused.ContainsKey(target) && await AgentHasKeysAsync().ConfigureAwait(false))
+            {
+                plan.LeftToTheAgent.Add(target);
+            }
+            else if (allowPrompt)
             {
                 PasswordPromptResult? answer = await AskAsync(
                         _localizer.Format("DialogSshPasswordPromptMessage", profile.SshUsername + "@" + profile.RemoteServer),
@@ -283,6 +307,13 @@ public sealed class SharedCredentialApplier
     internal static bool IsCredentialRejection(int? failureCode) =>
         failureCode is int code && CredentialRejections.Contains(code);
 
+    /// <summary>
+    /// Whether a connection that failed with <paramref name="failureCode"/> was refused for the
+    /// keys the SSH agent offered, when the agent was what it signed in with.
+    /// </summary>
+    internal static bool IsAgentKeyRejection(int? failureCode) =>
+        failureCode is int code && AgentKeyRejections.Contains(code);
+
     /// <summary>What a remembered password is filed under.</summary>
     internal sealed record SecretTarget(SharedSecretKind Kind, string SourceId, string Key);
 
@@ -290,11 +321,18 @@ public sealed class SharedCredentialApplier
     public sealed class SharedCredentialPlan
     {
         private readonly SharedSessionSecretStore _store;
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<SecretTarget, byte> _agentRefused;
 
-        internal SharedCredentialPlan(SharedSessionSecretStore store)
+        internal SharedCredentialPlan(
+            SharedSessionSecretStore store,
+            System.Collections.Concurrent.ConcurrentDictionary<SecretTarget, byte> agentRefused)
         {
             _store = store;
+            _agentRefused = agentRefused;
         }
+
+        /// <summary>The targets that got no password because the SSH agent offered keys.</summary>
+        internal List<SecretTarget> LeftToTheAgent { get; } = [];
 
         internal List<SecretTarget> Used { get; } = [];
 
@@ -331,6 +369,11 @@ public sealed class SharedCredentialApplier
                 await ForgetUsedAsync(SharedSecretKind.Session).ConfigureAwait(false);
             }
 
+            if (IsAgentKeyRejection((int?)fallbackFrom))
+            {
+                MarkAgentRefused(SharedSecretKind.Session);
+            }
+
             if (succeeded)
             {
                 foreach ((SecretTarget target, string sealedSecret) in Pending)
@@ -346,12 +389,26 @@ public sealed class SharedCredentialApplier
                 return;
             }
 
+            SharedSecretKind rejected = failedAtGateway ? SharedSecretKind.Gateway : SharedSecretKind.Session;
+            if (IsAgentKeyRejection(failureCode))
+            {
+                MarkAgentRefused(rejected);
+            }
+
             if (!IsCredentialRejection(failureCode))
             {
                 return;
             }
 
-            await ForgetUsedAsync(failedAtGateway ? SharedSecretKind.Gateway : SharedSecretKind.Session).ConfigureAwait(false);
+            await ForgetUsedAsync(rejected).ConfigureAwait(false);
+        }
+
+        private void MarkAgentRefused(SharedSecretKind rejected)
+        {
+            foreach (SecretTarget target in LeftToTheAgent.Where(target => target.Kind == rejected))
+            {
+                _agentRefused.TryAdd(target, 0);
+            }
         }
 
         private async Task ForgetUsedAsync(SharedSecretKind rejected)

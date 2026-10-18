@@ -404,8 +404,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
   [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md) :
   - Une source est un nom et le chemin d'un fichier `.mxtsessions`, en général sur un partage
     d'équipe ou un dossier synchronisé ; les variables d'environnement sont acceptées
-    (`%OneDriveCommercial%\...`). Chaque source activée est lue au démarrage et apparaît dans
-    l'arborescence des sessions comme une racine à part, sous les dossiers locaux, avec sa propre
+    (`%OneDriveCommercial%\...`). Chaque source activée est lue au démarrage, à côté de
+    l'arborescence locale, qui ne l'attend pas (un partage injoignable met le délai réseau à
+    échouer), et apparaît dans l'arborescence des sessions comme une racine à part, sous les dossiers locaux, avec sa propre
     icône. Ses dossiers MobaXterm se rangent dessous, et un dossier local du même nom n'est jamais
     fusionné avec un dossier partagé
   - Les sessions partagées sont en lecture seule dans Heimdall et continuent d'être modifiées dans
@@ -438,7 +439,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     précédentes sont conservées et la source dit pourquoi : une source qui fonctionne n'est jamais
     remplacée par une source vide. Un rechargement ne touche jamais aux sessions ouvertes ; si une
     session disparaît du fichier pendant qu'elle est ouverte, elle reste ouverte, et une reconnexion
-    ultérieure indique que le profil est introuvable
+    ultérieure indique que le profil est introuvable. Une source dont le dossier n'existe pas encore
+    (un partage monté plus tard) ou dont le système a abandonné la surveillance (une coupure
+    réseau) est réessayée toutes les 30 secondes, et relue dès qu'elle est de nouveau surveillée
   - Copie hors ligne : après chaque lecture réussie, le fichier brut et sa provenance (chemin, heure,
     SHA-256) sont conservés dans `SharedSessionCache` sous le dossier de données, avec les mêmes ACL
     restreintes que les fichiers de configuration. Quand le fichier est absent ou illisible, les
@@ -470,8 +473,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     **Copier** (texte brut) et **Exporter en CSV** (chaque cellule neutralisée contre l'injection de
     formules). Quand un rechargement change le nombre de problèmes, la ligne d'état l'indique
   - Les mots de passe sont personnels : un fichier partagé n'en fournit jamais. Quand l'agent SSH ne
-    propose aucune clé, le mot de passe d'un bastion partagé et celui d'une session SSH partagée
-    sont demandés avant la connexion, avec **Mémoriser ce mot de passe sur cet ordinateur** (décoché
+    propose aucune clé, ou une fois que le serveur a refusé celles qu'il propose (jusqu'à la
+    fermeture de Heimdall), le mot de passe d'un bastion partagé et celui d'une session SSH
+    partagée sont demandés avant la connexion, avec **Mémoriser ce mot de passe sur cet ordinateur** (décoché
     par défaut). Un mot de passe mémorisé est gardé une fois que le serveur l'a accepté, dans
     `shared-session-secrets.json` sous le dossier de données, scellé avec DPAPI pour le compte
     Windows, et rangé sous l'hôte, le port et l'identifiant du bastion, ou sous la session, son

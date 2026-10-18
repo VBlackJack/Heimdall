@@ -113,10 +113,23 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task LoadAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// Runs on the thread pool whatever thread calls it. Checking that a file exists and opening it
+    /// are synchronous calls, and on a network share that cannot be reached they wait out the SMB
+    /// timeout: called from the interface at startup, before any real await, they froze the window.
+    /// </remarks>
+    public Task LoadAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
+        return Task.Run(() => LoadCoreAsync(settings, cancellationToken), cancellationToken);
+    }
+
+    /// <summary>Reads a source file; replaced by tests to observe where and how it is read.</summary>
+    internal Func<string, CancellationToken, Task<byte[]?>> SourceFileReader { get; set; } = ReadSourceFileAsync;
+
+    private async Task LoadCoreAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
         await _loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -477,7 +490,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
 
             try
             {
-                byte[]? content = await ReadSourceFileAsync(path, cancellationToken).ConfigureAwait(false);
+                byte[]? content = await SourceFileReader(path, cancellationToken).ConfigureAwait(false);
                 return content is null
                     ? new ReadOutcome(null, new FileTooLargeException())
                     : new ReadOutcome(content, null);

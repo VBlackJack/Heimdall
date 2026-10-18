@@ -46,6 +46,12 @@ public partial class ServerListViewModel
     private bool _sharedSessionsSubscribed;
 
     /// <summary>
+    /// The shared session the previous run left selected, when the tree was loaded before its
+    /// source was read; selected by the first refresh of the shared rows, then dropped.
+    /// </summary>
+    private string? _pendingSharedSelectionId;
+
+    /// <summary>
     /// What the shared sources were last read with: the sources and the MobaXterm variables. Null
     /// until the inventory is first loaded.
     /// </summary>
@@ -263,7 +269,9 @@ public partial class ServerListViewModel
 
         RebuildHealthServerIndex();
         RebuildStableTreeProjection();
-        ApplyFilter(EffectiveSelectedServerId);
+        string? selection = EffectiveSelectedServerId ?? _pendingSharedSelectionId;
+        _pendingSharedSelectionId = null;
+        ApplyFilter(selection);
         OnPropertyChanged(nameof(HasNoInventory));
         OnPropertyChanged(nameof(SharedServerCount));
     }

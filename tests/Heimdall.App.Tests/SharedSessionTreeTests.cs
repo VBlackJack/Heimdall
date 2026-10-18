@@ -397,6 +397,27 @@ public sealed partial class SharedSessionConnectTests
     }
 
     [Fact]
+    public async Task TreeLoadedBeforeTheSources_SelectsTheSharedSessionLeftSelected_OnceTheyAreRead()
+    {
+        // At startup the local tree no longer waits for the shared sources.
+        StubSharedSessionProvider? provider = null;
+        await using Fixture fixture = await Fixture.CreateAsync(_ => provider = new StubSharedSessionProvider([], [], []));
+        string sharedId = fixture.Shared.Profile.Id;
+        await fixture.ConfigManager.MergeSettingAsync(settings => settings.LastSelectedServerId = sharedId);
+        await LoadTreeAsync(fixture, LocalProfile(LocalInSharedFolderId, SharedSessionTestData.SharedFolder));
+        Assert.Null(fixture.ViewModel.EffectiveSelectedServerId);
+
+        provider!.SetContents(
+            [fixture.Shared.Profile, fixture.Shared.DirectProfile],
+            [fixture.Shared.Gateway],
+            [StubSharedSessionProvider.Loaded(SharedSessionTestData.SourceId, TeamSourceName, 2)]);
+        await provider.LoadAsync(new AppSettings());
+
+        // Its folder starts closed, so the selection is held back as a start holds any other.
+        Assert.Equal(sharedId, fixture.ViewModel.EffectiveSelectedServerId);
+    }
+
+    [Fact]
     public async Task SettingsChange_RereadsTheSources_OnlyWhenTheSourcesOrVariablesChanged()
     {
         StubSharedSessionProvider? provider = null;
