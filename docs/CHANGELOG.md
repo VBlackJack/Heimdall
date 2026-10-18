@@ -12,6 +12,64 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-18: external password vaults that work as expected, and a refreshed look (v2026.101801)
+
+### External credential provider (#635-#638)
+
+- **Pipes in UTF-8, OEM as the fallback.** Heimdall has no console, so redirected pipes took the
+  ANSI code page: accented passwords came back mangled and an accented unlock secret did not open a
+  KeePassXC database (measured with keepassxc-cli 2.7 from a console-less process). stdin, stdout and
+  stderr are UTF-8 without BOM; output that is not valid UTF-8 is read in the system OEM code page
+  (KPScript, .bat wrappers).
+- **The value as stored.** Only the line breaks around the output are removed, spaces stay. In first
+  line mode a KPScript status line is no password.
+- **Distinct failures.** The command's own timeout raises `CredentialProviderTimeoutException`, a
+  tool that cannot start `CredentialProviderLaunchException`; neither is a cancellation any more,
+  which had ended a connect silently, stopped a bulk connect and a restore, and escaped "Connect all"
+  as an unhandled exception. A quiet failure (restore, failed tab's Reconnect) goes to the status
+  line, after the connection's own message.
+- **Arguments.** Known vault tools (keepassxc-cli, KPScript, bw, op, pass, gopass) receive every
+  character of a placeholder value but `"` and line breaks; trailing backslashes before a closing
+  quote are doubled (cmd targets included); placeholders are expanded in one pass; the process tree
+  is killed on timeout.
+- **SSH.** Key profiles get the vault password as optional (SSH.NET sends both); the SSH username is
+  optional in the server dialog when the vault supplies it.
+- **Bulk connect** asks the vault one server at a time (a parallel version, briefly merged in #636,
+  was reverted in #637: concurrent KDF unlocks ran past the timeout).
+- **Settings.** Test button looks up a typed entry, for both providers, coloured result with value
+  shape; preset selector shows the saved command's preset and confirms before replacing a custom
+  command; KPScript and pass presets turn first line only on, KPScript gets `-FailIfNoEntry`,
+  1Password uses `op item get`; KPScript hint only for KPScript; "Custom" localized. Vault entry name
+  moves to an External vault card on the server dialog's General tab.
+
+### Shared MobaXterm sessions (#632-#634)
+
+- Vault lookup by host for shared profiles; shared sources flagged in settings import.
+- Sources load off the UI thread, dropped watches are re-armed, a refused agent key leads to the
+  password question.
+- Report thresholds and reload debounce apply without a restart; refusal reasons in the report;
+  approvals of a removed source pruned; source read bounded at 16 MB.
+
+### Look and feel (#609, #614, #615, #620-#622, #628)
+
+- One icon font token (Segoe Fluent Icons, MDL2 fallback); surface depth, hover tint and a title bar
+  that follows the theme; refreshed tab strip, tree, status bar and launchpad; light syntax palette
+  and readable Dracula comments; views follow a runtime language or theme change; one luminance rule
+  decides dark or light; unused TwinShell ThemeService removed.
+
+### Accessibility (#610-#613, #626, #627, #629)
+
+- Live regions raised (or no longer declared); Ctrl+Alt+Home leaves SSH, VNC and web sessions;
+  24 px targets; named splitters; sidebar tools read their names; destructive confirmations keep
+  the work on Enter; findings of a UI Automation event pass.
+
+### Also (#616-#619, #623-#625, #630, #631)
+
+- SFTP local list: hidden files toggle and Explorer drops. Tunnels tab row menu and close button.
+  Citrix split from its header. Tool tabs no longer marked as failed. WinRM check box labels wrap.
+- Tests: WPF types initialised on one thread before any test (BAML lock-order deadlock), and three
+  timing races fixed (SFTP parked job, port scan totals, filter box modifiers).
+
 ## 2026-10-17: shared MobaXterm session files, with passwords each person keeps (v2026.101701)
 
 ### Shared MobaXterm sessions
