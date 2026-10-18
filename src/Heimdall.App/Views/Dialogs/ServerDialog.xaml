@@ -685,26 +685,31 @@
                                                          HorizontalAlignment="Left"
                                                          Text="{Binding EndpointPort, UpdateSourceTrigger=PropertyChanged}"
                                                          Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                                <!-- The port column is 150 px wide: a label set as plain Content does not wrap, and
+                                                     "Skip certificate validation (insecure)" was cut to "Skip certificate vali". The text is
+                                                     written into the TextBlock by ApplyLocalization: written as Content, a string replaces it. -->
                                                 <CheckBox x:Name="DlgSrv_WinRmSslCb"
                                                           TabIndex="4"
-                                                          Content="{loc:Translate ServerDialogWinRmUseSsl}"
                                                           AutomationProperties.Name="{loc:Translate ServerDialogWinRmUseSsl}"
                                                           AutomationProperties.HelpText="{Binding WinRmUseSslHelpText}"
                                                           IsChecked="{Binding WinRmUseSsl}"
                                                           IsEnabled="{Binding CanUseWinRmSsl}"
                                                           Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}"
                                                           Style="{StaticResource DialogFormCheckBoxStyle}"
-                                                          Margin="0,8,0,0"/>
+                                                          Margin="0,8,0,0">
+                                                    <TextBlock x:Name="DlgSrv_WinRmSslText" TextWrapping="Wrap"/>
+                                                </CheckBox>
                                                 <CheckBox x:Name="DlgSrv_WinRmSkipCertCb"
                                                           TabIndex="5"
-                                                          Content="{loc:Translate ServerDialogWinRmSkipCertCheck}"
                                                           AutomationProperties.Name="{loc:Translate ServerDialogWinRmSkipCertCheck}"
                                                           AutomationProperties.HelpText="{Binding WinRmSkipCertificateHintText}"
                                                           IsChecked="{Binding WinRmSkipCertificateCheck}"
                                                           IsEnabled="{Binding CanSkipWinRmCertificate}"
                                                           Visibility="{Binding IsWinRmConnection, Converter={StaticResource BoolToVisibilityConverter}}"
                                                           Style="{StaticResource DialogFormCheckBoxStyle}"
-                                                          Margin="0,8,0,0"/>
+                                                          Margin="0,8,0,0">
+                                                    <TextBlock x:Name="DlgSrv_WinRmSkipCertText" TextWrapping="Wrap"/>
+                                                </CheckBox>
                                             </StackPanel>
                                             <!-- Inline validation: Server address -->
                                             <TextBlock Grid.Row="5" Grid.Column="0"
