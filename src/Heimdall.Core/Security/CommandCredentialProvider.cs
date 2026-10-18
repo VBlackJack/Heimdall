@@ -64,6 +64,10 @@ public sealed class CommandCredentialProvider : ICredentialProvider
         "gopass",
     };
 
+    /// <summary>The prefixes of KPScript's status lines, printed after the value.</summary>
+    private const string KpScriptOkPrefix = "OK: ";
+    private const string KpScriptErrorPrefix = "E: ";
+
     private readonly TimeSpan _commandTimeout;
 
     private readonly string? _commandTemplate;
@@ -323,7 +327,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             // Only the line terminator the tool appends is removed. A password may begin or end
             // with a space, and keepassxc-cli prints it so; trimming handed the server a different
             // password from the one in the vault.
-            string output = _firstLineOnly ? FirstNonEmptyLine(stdout) : StripFinalLineTerminator(stdout);
+            string output = _firstLineOnly ? FirstNonEmptyLine(stdout) : StripLineBreaks(stdout);
             if (string.IsNullOrWhiteSpace(output))
             {
                 Logging.FileLogger.Warn("CommandCredentialProvider: command returned empty output");
@@ -530,6 +534,11 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     /// terminator, or an empty string when every line is blank. Used by the "first line only"
     /// output mode. Spaces inside the line are part of the value and are kept.
     /// </summary>
+    /// <remarks>
+    /// A first line that is KPScript's own status line is no value: KPScript prints its value,
+    /// then "OK: ..." (or "E: ..." on an error), and for an entry whose field is empty the value
+    /// line is blank, so skipping it handed the status line over as the password.
+    /// </remarks>
     private static string FirstNonEmptyLine(string text)
     {
         foreach (var line in text.Split('\n'))
@@ -537,26 +546,24 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             var value = line.TrimEnd('\r');
             if (!string.IsNullOrWhiteSpace(value))
             {
-                return value;
+                return IsKpScriptStatusLine(value) ? string.Empty : value;
             }
         }
 
         return string.Empty;
     }
 
-    /// <summary>
-    /// Removes the one line terminator (<c>\r\n</c> or <c>\n</c>) a tool prints after its value,
-    /// and nothing else.
-    /// </summary>
-    private static string StripFinalLineTerminator(string text)
-    {
-        if (text.EndsWith("\r\n", StringComparison.Ordinal))
-        {
-            return text[..^2];
-        }
+    private static bool IsKpScriptStatusLine(string line) =>
+        line.StartsWith(KpScriptOkPrefix, StringComparison.Ordinal)
+        || line.StartsWith(KpScriptErrorPrefix, StringComparison.Ordinal);
 
-        return text.EndsWith('\n') ? text[..^1] : text;
-    }
+    /// <summary>
+    /// Removes the line breaks around the value, and only them: spaces and tabs at its edges are
+    /// part of a password. Removing a single final terminator was too little, since a wrapper
+    /// script that prints a blank line before or after the value then handed it over with the
+    /// line break inside.
+    /// </summary>
+    private static string StripLineBreaks(string text) => text.Trim('\r', '\n');
 
     /// <summary>
     /// Attempts to kill a process that has timed out.

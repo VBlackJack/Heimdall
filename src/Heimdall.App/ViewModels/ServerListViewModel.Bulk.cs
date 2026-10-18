@@ -1418,10 +1418,9 @@ public partial class ServerListViewModel
             admitted.Add(new BulkConnectCandidate(server, serverDto));
         }
 
-        // The vault lookups run side by side, a few at a time. One after the other, a batch of
-        // twenty KeePassXC entries waited for twenty database unlocks in a row before the first
-        // session opened. Each lookup writes only its own profile copy and shows no dialog here.
-        bool[] skippedForCredentials = await ResolveExternalCredentialsInParallelAsync(
+        // The vault lookups run after every guard, in selection order, one at a time (see
+        // ResolveExternalCredentialsInOrderAsync for why not side by side).
+        bool[] skippedForCredentials = await ResolveExternalCredentialsInOrderAsync(
             admitted, settings, cancellationToken);
 
         for (int index = 0; index < admitted.Count; index++)
@@ -1451,42 +1450,32 @@ public partial class ServerListViewModel
     }
 
     /// <summary>
-    /// How many external credential lookups a bulk connect runs at once. Enough to overlap the
-    /// key derivation of a few database unlocks; few enough that a vault tool is not started
-    /// once per server of a large selection at the same moment.
+    /// Runs <see cref="TryResolveExternalCredentialsAsync"/> for every candidate, one after the
+    /// other, and returns, in candidate order, whether each one is to be skipped.
     /// </summary>
-    internal const int MaxParallelVaultLookups = 4;
-
-    /// <summary>
-    /// Runs <see cref="TryResolveExternalCredentialsAsync"/> for every candidate, at most
-    /// <see cref="MaxParallelVaultLookups"/> at a time, and returns, in candidate order, whether
-    /// each one is to be skipped.
-    /// </summary>
-    private async Task<bool[]> ResolveExternalCredentialsInParallelAsync(
+    /// <remarks>
+    /// One at a time on purpose. Run four at once, each KeePassXC unlock shares the processor and
+    /// memory its key derivation was tuned to fill alone, so four slow unlocks each ran past the
+    /// command timeout and all four servers were skipped where one after the other would have
+    /// passed; with pass or gopass, three lookups waited behind the first one's passphrase prompt
+    /// until they timed out.
+    /// </remarks>
+    private async Task<bool[]> ResolveExternalCredentialsInOrderAsync(
         IReadOnlyList<BulkConnectCandidate> candidates,
         AppSettings settings,
         CancellationToken cancellationToken)
     {
-        using var gate = new SemaphoreSlim(MaxParallelVaultLookups);
-
-        async Task<bool> ResolveOneAsync(BulkConnectCandidate candidate)
+        var skipped = new bool[candidates.Count];
+        for (int index = 0; index < candidates.Count; index++)
         {
-            await gate.WaitAsync(cancellationToken).ConfigureAwait(true);
-            try
-            {
-                return await TryResolveExternalCredentialsAsync(
-                    candidate.ServerDto,
-                    settings,
-                    cancellationToken,
-                    skipOnFailure: true).ConfigureAwait(true);
-            }
-            finally
-            {
-                gate.Release();
-            }
+            skipped[index] = await TryResolveExternalCredentialsAsync(
+                candidates[index].ServerDto,
+                settings,
+                cancellationToken,
+                skipOnFailure: true).ConfigureAwait(true);
         }
 
-        return await Task.WhenAll(candidates.Select(ResolveOneAsync)).ConfigureAwait(true);
+        return skipped;
     }
 
     internal async Task ConnectServersBulkCoreAsync(

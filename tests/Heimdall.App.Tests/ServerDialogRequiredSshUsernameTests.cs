@@ -70,6 +70,83 @@ public sealed class ServerDialogRequiredSshUsernameTests
         Assert.DoesNotContain("*", vm.SshUsernameLabel, StringComparison.Ordinal);
     }
 
+    // Measured in the app: with a vault username command set, the dialog still refused an SSH
+    // profile without a login name, so the command could never apply to one made here.
+    [Theory]
+    [InlineData("SSH")]
+    [InlineData("SFTP")]
+    public void VaultUsernameCommand_MakesTheFieldOptional(string connectionType)
+    {
+        ServerDialogViewModel vm = Profile(connectionType);
+        vm.Settings = new Heimdall.Core.Configuration.AppSettings
+        {
+            UseExternalCredentialProvider = true,
+            CredentialProviderUsernameCommand = "keepassxc-cli show -s -q -a UserName \"{Database}\" \"{Title}\""
+        };
+        vm.SshUsername = "";
+
+        vm.ValidateCommand.Execute(null);
+
+        Assert.False(vm.RequiresSshUsername);
+        Assert.DoesNotContain("*", vm.SshUsernameLabel, StringComparison.Ordinal);
+        Assert.Null(vm.SshUsernameError);
+    }
+
+    [Fact]
+    public void CredentialManager_MakesTheFieldOptional()
+    {
+        // The Credential Manager stores a username with every entry.
+        ServerDialogViewModel vm = Profile("SSH");
+        vm.Settings = new Heimdall.Core.Configuration.AppSettings
+        {
+            UseExternalCredentialProvider = true,
+            CredentialProviderType = Heimdall.Core.Configuration.CredentialProviderKind.WindowsCredentialManager
+        };
+
+        Assert.False(vm.RequiresSshUsername);
+    }
+
+    [Theory]
+    [InlineData(false, "keepassxc-cli show -a UserName")]  // provider off: its command is not used
+    [InlineData(true, "")]                                  // provider on, password only
+    [InlineData(true, "   ")]
+    public void WithoutAVaultUsername_TheFieldStaysRequired(bool providerOn, string usernameCommand)
+    {
+        ServerDialogViewModel vm = Profile("SSH");
+        vm.Settings = new Heimdall.Core.Configuration.AppSettings
+        {
+            UseExternalCredentialProvider = providerOn,
+            CredentialProviderUsernameCommand = usernameCommand
+        };
+
+        Assert.True(vm.RequiresSshUsername);
+    }
+
+    [Fact]
+    public void SshAuthHint_WithTheProviderOn_SaysTheVaultSuppliesThePassword()
+    {
+        // It said "the connection will rely on Pageant" while the vault was about to supply it.
+        ServerDialogViewModel vm = Profile("SSH");
+        Assert.Equal("ServerDialogSshAuthHintAgent", vm.SshAuthHint);
+
+        vm.Settings = new Heimdall.Core.Configuration.AppSettings { UseExternalCredentialProvider = true };
+
+        Assert.Equal("ServerDialogSshAuthHintCredentialProvider", vm.SshAuthHint);
+    }
+
+    [Theory]
+    [InlineData(false, "", false)]
+    [InlineData(true, "", true)]
+    [InlineData(false, "prod-db", true)]  // a saved entry name is never hidden
+    public void VaultEntryName_IsShownWhenTheProviderIsOnOrANameIsSaved(bool providerOn, string entryName, bool expected)
+    {
+        ServerDialogViewModel vm = Profile("SSH");
+        vm.VaultEntryName = entryName;
+        vm.Settings = new Heimdall.Core.Configuration.AppSettings { UseExternalCredentialProvider = providerOn };
+
+        Assert.Equal(expected, vm.ShowsVaultEntryName);
+    }
+
     [Theory]
     [InlineData("RDP")]
     [InlineData("WINRM")]

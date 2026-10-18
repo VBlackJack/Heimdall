@@ -219,6 +219,31 @@ public class CommandCredentialProviderTests
     }
 
     [Fact]
+    public async Task GetCredentialAsync_RemovesBlankLinesAroundTheValue()
+    {
+        // A wrapper script that prints a blank line before or after the value handed it over with
+        // the line break inside when only the final terminator was removed. `sort` puts the empty
+        // line first.
+        var provider = CreateProvider("cmd.exe /c sort", unlockSecret: "\n pw ");
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal(" pw ", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_FirstLineOnly_KpScriptStatusLineIsNoPassword()
+    {
+        // KPScript on an entry whose field is empty: a blank value line, then its status line.
+        // Skipping the blank line handed "OK: ..." over as the password.
+        var provider = CreateProvider(
+            "cmd.exe /c echo.& echo OK: Operation completed successfully.", firstLineOnly: true);
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task GetCredentialAsync_BlankOutput_ReturnsNull()
     {
         var provider = CreateProvider("cmd.exe /c sort", unlockSecret: "   ");

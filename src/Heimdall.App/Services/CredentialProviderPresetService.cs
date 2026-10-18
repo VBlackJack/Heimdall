@@ -71,5 +71,28 @@ public sealed class CredentialProviderPresetService
         return true;
     }
 
+    /// <summary>
+    /// The selector index of the preset whose command is <paramref name="command"/>, or 0 (the
+    /// "Custom" entry) when it is blank or no preset matches it.
+    /// </summary>
+    public int IndexOfCommand(string? command)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return 0;
+        }
+
+        string trimmed = command.Trim();
+        for (int index = 1; index < Presets.Length; index++)
+        {
+            if (string.Equals(Presets[index].Command, trimmed, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return 0;
+    }
+
     private sealed record CredentialProviderPreset(string? Label, string Command, bool FirstLineOnly);
 }

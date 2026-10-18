@@ -45,10 +45,10 @@ public sealed class ServerListCredentialTargetTests
     [Theory]
     [InlineData("SSH")]
     [InlineData("SFTP")]
-    public void GetCredentialTarget_SshProfileWithAKey_AsksNothing(string connectionType)
+    public void GetCredentialTarget_SshProfileWithAKey_TargetsThePasswordAsOptional(string connectionType)
     {
-        // A key profile needs no password, and the connect path asks for none: the vault was
-        // unlocked on every connect for nothing, and warned "no password" when it held no entry.
+        // The SSH.NET path sends the key and the password together, so the vault's password is a
+        // fallback; leaving key profiles out removed it. Optional: a miss is not reported.
         var dto = new ServerProfileDto
         {
             ConnectionType = connectionType,
@@ -56,12 +56,14 @@ public sealed class ServerListCredentialTargetTests
             SshPasswordEncrypted = null
         };
 
-        Assert.Null(ServerListViewModel.GetCredentialTarget(dto));
-        Assert.Null(dto.SshPasswordEncrypted);
+        var target = ServerListViewModel.GetCredentialTarget(dto);
+
+        Assert.NotNull(target);
+        Assert.True(target!.Value.PasswordOptional);
     }
 
     [Fact]
-    public void GetCredentialTarget_SshProfileWithABlankKeyPath_StillTargetsThePassword()
+    public void GetCredentialTarget_SshProfileWithABlankKeyPath_NeedsThePassword()
     {
         var dto = new ServerProfileDto
         {
@@ -70,7 +72,10 @@ public sealed class ServerListCredentialTargetTests
             SshPasswordEncrypted = null
         };
 
-        Assert.NotNull(ServerListViewModel.GetCredentialTarget(dto));
+        var target = ServerListViewModel.GetCredentialTarget(dto);
+
+        Assert.NotNull(target);
+        Assert.False(target!.Value.PasswordOptional);
     }
 
     [Fact]

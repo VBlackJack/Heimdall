@@ -243,8 +243,13 @@ pour une connexion. Le résultat dit si le mot de passe a été trouvé (et le n
 si une commande de nom d'utilisateur est renseignée), si l'outil est introuvable, ou si la
 commande a dépassé le délai.
 
-Un profil SSH ou SFTP qui se connecte par une clé n'interroge pas le coffre : il n'a pas besoin
-de mot de passe.
+Un profil SSH ou SFTP qui se connecte par une clé interroge quand même le coffre, sans bruit : le
+mot de passe part avec la clé pour un serveur qui demande les deux, et une entrée absente n'est
+pas signalée. Avec une commande de nom d'utilisateur (ou le Gestionnaire d'identifiants), le nom
+d'utilisateur SSH d'un profil devient facultatif, puisque le coffre le fournit. Le nom de l'entrée
+du coffre d'un profil se trouve dans son onglet Général, sous **Coffre externe**. Quand une
+restauration ou le bouton Reconnecter d'un onglet n'obtient pas le mot de passe, la raison
+s'affiche dans la barre d'état plutôt que dans une fenêtre.
 
 ## RDP et mémoire
 
