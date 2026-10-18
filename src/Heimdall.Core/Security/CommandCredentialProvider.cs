@@ -47,6 +47,10 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     /// </summary>
     private static readonly Encoding PipeEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
+    /// <summary>UTF-8 that refuses invalid bytes, so that output in another code page is noticed.</summary>
+    private static readonly Encoding StrictUtf8 = new UTF8Encoding(
+        encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
     /// <summary>
     /// Password manager command-line tools that are known to parse their own arguments and never
     /// hand them to a shell. Their placeholder values keep every character a vault entry name can
@@ -289,7 +293,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
                     }
                 }
 
-                stdout = await process.StandardOutput.ReadToEndAsync(linkedCts.Token)
+                stdout = await ReadOutputAsync(process.StandardOutput.BaseStream, linkedCts.Token)
                     .ConfigureAwait(false);
                 await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
             }
@@ -324,8 +328,8 @@ public sealed class CommandCredentialProvider : ICredentialProvider
                 return null;
             }
 
-            // Only the line terminator the tool appends is removed. A password may begin or end
-            // with a space, and keepassxc-cli prints it so; trimming handed the server a different
+            // Only the line breaks around the value are removed. A password may begin or end with
+            // a space, and keepassxc-cli prints it so; trimming handed the server a different
             // password from the one in the vault.
             string output = _firstLineOnly ? FirstNonEmptyLine(stdout) : StripLineBreaks(stdout);
             if (string.IsNullOrWhiteSpace(output))
@@ -350,6 +354,52 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             return null;
         }
     }
+
+    /// <summary>
+    /// Reads the whole output and decodes it as UTF-8, or, when the bytes are not valid UTF-8,
+    /// in the console's OEM code page.
+    /// </summary>
+    /// <remarks>
+    /// keepassxc-cli, bw, op and gopass write UTF-8. A console program of the .NET Framework
+    /// (KPScript), a .bat wrapper or cmd's own echo write in the OEM code page instead (850 or 437
+    /// in Western Europe), where an accented letter is one byte that is never valid UTF-8 on its
+    /// own. Decoded as UTF-8 it became a replacement character, and as ANSI before that another
+    /// wrong letter. Valid UTF-8 from an OEM tool is ASCII, which reads the same either way.
+    /// </remarks>
+    internal static async Task<string> ReadOutputAsync(Stream output, CancellationToken ct)
+    {
+        using var buffer = new MemoryStream();
+        await output.CopyToAsync(buffer, ct).ConfigureAwait(false);
+        return DecodeOutput(buffer.ToArray());
+    }
+
+    /// <summary>Decodes tool output: strict UTF-8 first, the OEM code page as the fallback.</summary>
+    internal static string DecodeOutput(byte[] bytes)
+    {
+        try
+        {
+            return StrictUtf8.GetString(bytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            return OemEncoding().GetString(bytes);
+        }
+    }
+
+    private static Encoding OemEncoding()
+    {
+        // The OEM code pages live in the code-pages provider on .NET; registering it again is
+        // harmless, and the application registers it at startup anyway. The console code page of
+        // a child is the system's OEM code page, not the one of the user's culture.
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        int codePage = OperatingSystem.IsWindows()
+            ? (int)GetOEMCP()
+            : System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage;
+        return Encoding.GetEncoding(codePage);
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern uint GetOEMCP();
 
     /// <summary>
     /// The start parameters of a credential command: no window, no shell, every pipe it uses
@@ -383,8 +433,8 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     /// The path placeholders (<c>{Database}</c>, <c>{KeyFile}</c>) use a path-aware
     /// sanitizer for non-shell targets so legitimate path characters survive, and so do every
     /// placeholder of a known password manager tool (see <see cref="KnownVaultTools"/>).
-    /// For non-shell targets, a value that ends in backslashes right before a closing double
-    /// quote has them doubled, so the quote still closes the argument (MSVC CRT rules).
+    /// For non-shell targets and cmd, a value that ends in backslashes right before a closing
+    /// double quote has them doubled, so the quote still closes the argument (MSVC CRT rules).
     /// </summary>
     internal string ExpandTemplate(
         string template,
@@ -410,40 +460,67 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             ("{KeyFile}", sanitizePath(_keyFilePath)),
         };
 
-        string expanded = template;
-        foreach (var (token, value) in placeholders)
-        {
-            expanded = ReplacePlaceholder(expanded, token, value, protectClosingQuote: !shellTarget);
-        }
-
-        return expanded;
+        // cmd hands a quoted argument to the program it starts unchanged, and that program parses
+        // it by the CRT rules, so the closing quote needs the same protection there.
+        bool protectClosingQuote = !shellTarget || IsCmdTarget(executable);
+        return ExpandPlaceholders(template, placeholders, protectClosingQuote);
     }
 
     /// <summary>
-    /// Replaces every occurrence of <paramref name="token"/>. When the occurrence is followed by
-    /// a double quote and <paramref name="protectClosingQuote"/> is set, trailing backslashes of
-    /// the value are doubled: an entry named <c>share\</c> would otherwise turn the closing quote
-    /// into a literal one and merge the following arguments into it.
+    /// Replaces every placeholder of the template in one pass over the template only, so a value
+    /// is never expanded again: a host or entry name that contains <c>{KeyFile}</c> used to be
+    /// replaced by the local key file path. When an occurrence is followed by a double quote and
+    /// <paramref name="protectClosingQuote"/> is set, trailing backslashes of the value are
+    /// doubled: an entry named <c>share\</c> would otherwise turn the closing quote into a
+    /// literal one and merge the following arguments into it.
     /// </summary>
-    private static string ReplacePlaceholder(string text, string token, string value, bool protectClosingQuote)
+    private static string ExpandPlaceholders(
+        string template,
+        IReadOnlyList<(string Token, string Value)> placeholders,
+        bool protectClosingQuote)
     {
-        var builder = new StringBuilder(text.Length);
+        var builder = new StringBuilder(template.Length);
         int position = 0;
-        while (true)
+        while (position < template.Length)
         {
-            int index = text.IndexOf(token, position, StringComparison.OrdinalIgnoreCase);
-            if (index < 0)
+            (string Token, string Value)? match = null;
+            if (template[position] == '{')
             {
-                builder.Append(text, position, text.Length - position);
-                return builder.ToString();
+                foreach (var placeholder in placeholders)
+                {
+                    if (string.Compare(template, position, placeholder.Token, 0, placeholder.Token.Length,
+                            StringComparison.OrdinalIgnoreCase) == 0)
+                    {
+                        match = placeholder;
+                        break;
+                    }
+                }
             }
 
-            builder.Append(text, position, index - position);
-            int after = index + token.Length;
-            bool closedByQuote = after < text.Length && text[after] == '"';
-            builder.Append(protectClosingQuote && closedByQuote ? DoubleTrailingBackslashes(value) : value);
+            if (match is not { } found)
+            {
+                builder.Append(template[position]);
+                position++;
+                continue;
+            }
+
+            int after = position + found.Token.Length;
+            bool closedByQuote = after < template.Length && template[after] == '"';
+            builder.Append(protectClosingQuote && closedByQuote ? DoubleTrailingBackslashes(found.Value) : found.Value);
             position = after;
         }
+
+        return builder.ToString();
+    }
+
+    /// <summary>Whether the executable is cmd.exe or a batch file that cmd runs.</summary>
+    private static bool IsCmdTarget(string executable)
+    {
+        string name = Path.GetFileName(executable.Trim().TrimEnd('.', ' '));
+        return name.Equals("cmd", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("cmd.exe", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".bat", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string DoubleTrailingBackslashes(string value)

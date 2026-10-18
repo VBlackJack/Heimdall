@@ -1018,6 +1018,77 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task TestCredentialProvider_Success_IsMarkedAndSaysAValueOverSeveralLines()
+    {
+        // A success and a failure looked the same, and a value carrying a tool's extra lines
+        // passed as a plain success until the next login failed.
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.CredentialProviderCommand = "cmd.exe /c echo thepass& echo OK: done";
+        viewModel.CredentialProviderTestEntry = "prod-db";
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.CredentialProviderTestSucceeded);
+        Assert.Equal(
+            localizer.Format("CredProvTestSuccess", "prod-db") + " " + localizer.Format("CredProvTestShapeMultiline", 2),
+            viewModel.CredentialProviderTestResult);
+    }
+
+    [Fact]
+    public async Task TestCredentialProvider_SingleLineValue_IsAPlainSuccess()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.CredentialProviderCommand = "cmd.exe /c echo thepass";
+        viewModel.CredentialProviderTestEntry = "prod-db";
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.CredentialProviderTestSucceeded);
+        Assert.Equal(localizer.Format("CredProvTestSuccess", "prod-db"), viewModel.CredentialProviderTestResult);
+    }
+
+    [Fact]
+    public async Task TestCredentialProvider_NoResult_IsMarkedAsAFailure()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.CredentialProviderCommand = "cmd.exe /c exit 1";
+        viewModel.CredentialProviderTestEntry = "prod-db";
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.CredentialProviderTestSucceeded);
+    }
+
+    [Theory]
+    [InlineData("KPScript.exe -c:GetEntryString \"{Database}\" -Field:Password", true)]
+    [InlineData("keepassxc-cli show -s -q -a Password \"{Database}\" \"{Title}\"", false)]
+    [InlineData("", false)]
+    public void KpScriptHint_IsShownOnlyForAKpScriptCommand(string command, bool expected)
+    {
+        var viewModel = CreateViewModel(new FakeConfigManager());
+
+        viewModel.CredentialProviderCommand = command;
+
+        Assert.Equal(expected, viewModel.ShowsKpScriptHint);
+    }
+
+    [Fact]
+    public void KpScriptHint_FollowsTheCommandAsItChanges()
+    {
+        // A computed property bound in XAML is tested by its notification, not its getter.
+        var viewModel = CreateViewModel(new FakeConfigManager());
+        var raised = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        viewModel.CredentialProviderCommand = "KPScript.exe -c:GetEntryString";
+
+        Assert.Contains(nameof(SettingsViewModel.ShowsKpScriptHint), raised);
+    }
+
+    [Fact]
     public async Task TestCredentialProvider_MissingTool_NamesTheExecutable()
     {
         var localizer = await CreateLocalizerAsync();

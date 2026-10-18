@@ -3786,6 +3786,8 @@
   "CredProvTestNoResult": "No password for \"{0}\": the command failed or printed nothing. Check the entry name, the unlock secret and the database path.",
   "CredProvTestTimeout": "The command did not answer within {0} ms. Check that the CLI tool is installed and responsive.",
   "CredProvTestError": "Test failed: {0}",
+  "CredProvTestShapeMultiline": "The value read spans {0} lines: if the tool prints more than the password, turn on \"Use only the first line of output\".",
+  "CredProvTestShapeEdgeSpace": "The value read begins or ends with a space: it is sent as is.",
   "ServerDialogVaultTitle": "External vault",
   "ServerDialogSshAuthHintCredentialProvider": "No password stored here - the external credential provider supplies it when you connect.",
   "StatusCredentialProviderLookup": "Reading the password for \"{0}\" from the external vault...",
@@ -4016,7 +4018,7 @@
   "SettingsLabelCredProviderTimeout": "Command timeout",
   "SettingsCredProviderTimeoutHint": "How long the password command may run before Heimdall gives up on it. Raise it for a vault that asks for confirmation.",
   "SettingsCredProviderUnlockPlaceholder": "Database master password or GPG passphrase",
-  "SettingsCredProviderUnlockHelp": "Sent to the command's standard input for tools that prompt to unlock (e.g. keepassxc-cli or pass). Stored encrypted; leave empty if not required.",
+  "SettingsCredProviderUnlockHelp": "Sent to the command's standard input for tools that read their unlock secret there (e.g. keepassxc-cli). pass and gopass ask gpg-agent instead, through its own prompt or cache. Stored encrypted; leave empty if not required.",
 
   "SettingsSectionExternalToolsList": "External Tools",
   "SettingsSectionFileSharing": "File sharing",

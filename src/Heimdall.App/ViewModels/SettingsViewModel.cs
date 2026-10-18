@@ -854,7 +854,17 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsKpScriptHint))]
     private string _credentialProviderCommand = "";
+
+    /// <summary>
+    /// Whether the KeePass2 hint is shown: only for a KPScript command. Shown for every setup, it
+    /// warned KeePassXC users about a tool they do not use, under the very field they had filled.
+    /// </summary>
+    public bool ShowsKpScriptHint =>
+        CredentialProviderCommand.Contains(KpScriptExecutableName, StringComparison.OrdinalIgnoreCase);
+
+    private const string KpScriptExecutableName = "kpscript";
 
     [ObservableProperty]
     private string _credentialProviderDatabase = "";
@@ -3767,6 +3777,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string? _credentialProviderTestResult;
 
     /// <summary>
+    /// How the last test ended: true when a password was read, false when it failed, null while
+    /// it runs or before one. A success and a failure looked the same, small grey italic text.
+    /// </summary>
+    [ObservableProperty]
+    private bool? _credentialProviderTestSucceeded;
+
+    /// <summary>
     /// The vault entry the Test button looks up. Not saved. The test used to look up an entry
     /// called "TestEntry", which no vault holds, so it reported a failure for every working setup
     /// and could not tell a wrong unlock secret from a wrong command.
@@ -3940,6 +3957,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // The Credential Manager has no command to check: only the entry name is needed. The
         // button used to sit with the command fields alone, so that provider could not be tested.
         bool commandProvider = !IsWindowsCredentialManagerProvider;
+        CredentialProviderTestSucceeded = null;
         if (commandProvider && string.IsNullOrWhiteSpace(CredentialProviderCommand))
         {
             CredentialProviderTestResult = _localizer["CredProvTestNoCommand"];
@@ -3988,19 +4006,23 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             var result = await provider.GetCredentialAsync(
                 entry, Heimdall.Core.Models.DefaultPorts.Ssh, null, entry, cancellationToken);
 
+            CredentialProviderTestSucceeded = result is not null;
             CredentialProviderTestResult = result switch
             {
                 null => _localizer.Format("CredProvTestNoResult", entry),
-                { Username.Length: > 0 } => _localizer.Format("CredProvTestSuccessWithUser", entry, result.Username),
-                _ => _localizer.Format("CredProvTestSuccess", entry),
+                { Username.Length: > 0 } => _localizer.Format("CredProvTestSuccessWithUser", entry, result.Username)
+                    + DescribeTestValueShape(result.Password),
+                _ => _localizer.Format("CredProvTestSuccess", entry) + DescribeTestValueShape(result.Password),
             };
         }
         catch (Core.Security.CredentialProviderTimeoutException)
         {
+            CredentialProviderTestSucceeded = false;
             CredentialProviderTestResult = _localizer.Format("CredProvTestTimeout", CredentialProviderTimeoutMs);
         }
         catch (Core.Security.CredentialProviderLaunchException ex)
         {
+            CredentialProviderTestSucceeded = false;
             CredentialProviderTestResult = _localizer.Format("CredProvTestNotFound", ex.Executable);
         }
         catch (OperationCanceledException)
@@ -4009,8 +4031,27 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
         catch (Exception ex)
         {
+            CredentialProviderTestSucceeded = false;
             CredentialProviderTestResult = _localizer.Format("CredProvTestError", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// What a test says about the shape of the value it read, never the value itself: a value
+    /// over several lines (a tool printing more than the password) or with a space at an edge
+    /// (sent as is) looked like a plain success, and failed only at the next login.
+    /// </summary>
+    private string DescribeTestValueShape(string password)
+    {
+        int lines = password.Split('\n').Length;
+        if (lines > 1)
+        {
+            return " " + _localizer.Format("CredProvTestShapeMultiline", lines);
+        }
+
+        bool edgeSpace = password.Length > 0
+            && (char.IsWhiteSpace(password[0]) || char.IsWhiteSpace(password[^1]));
+        return edgeSpace ? " " + _localizer["CredProvTestShapeEdgeSpace"] : string.Empty;
     }
 
     partial void OnDefaultThemeChanged(string value)

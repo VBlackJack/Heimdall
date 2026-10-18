@@ -3786,6 +3786,8 @@
   "CredProvTestNoResult": "No hay contrase\u00f1a para \"{0}\": el comando fall\u00f3 o no mostr\u00f3 nada. Comprueba el nombre de la entrada, el secreto de desbloqueo y la ruta de la base de datos.",
   "CredProvTestTimeout": "El comando no respondi\u00f3 en {0} ms. Comprueba que la herramienta CLI est\u00e9 instalada y responda.",
   "CredProvTestError": "Falló la prueba: {0}",
+  "CredProvTestShapeMultiline": "El valor le\u00eddo ocupa {0} l\u00edneas: si la herramienta muestra m\u00e1s que la contrase\u00f1a, activa \"Usar solo la primera l\u00ednea de la salida\".",
+  "CredProvTestShapeEdgeSpace": "El valor le\u00eddo empieza o termina con un espacio: se env\u00eda tal cual.",
   "ServerDialogVaultTitle": "Almac\u00e9n externo",
   "ServerDialogSshAuthHintCredentialProvider": "No hay contrase\u00f1a guardada aqu\u00ed: el proveedor de credenciales externo la proporciona al conectar.",
   "StatusCredentialProviderLookup": "Leyendo la contrase\u00f1a de \"{0}\" en el almac\u00e9n externo...",
@@ -4016,7 +4018,7 @@
   "SettingsLabelCredProviderTimeout": "Tiempo de espera del comando",
   "SettingsCredProviderTimeoutHint": "Cuánto tiempo puede ejecutarse el comando de contraseña antes de que Heimdall lo abandone. Auméntalo para un almacén que pide confirmación.",
   "SettingsCredProviderUnlockPlaceholder": "Contraseña maestra de la base de datos o frase de contraseña GPG",
-  "SettingsCredProviderUnlockHelp": "Se envía a la entrada estándar del comando para herramientas que piden desbloquear (por ejemplo, keepassxc-cli o pass). Se almacena cifrado; déjalo vacío si no es necesario.",
+  "SettingsCredProviderUnlockHelp": "Se env\u00eda a la entrada est\u00e1ndar del comando para herramientas que leen ah\u00ed su secreto de desbloqueo (por ejemplo, keepassxc-cli). pass y gopass se lo piden a gpg-agent, con su propia ventana o su cach\u00e9. Se almacena cifrado; d\u00e9jalo vac\u00edo si no es necesario.",
 
   "SettingsSectionExternalToolsList": "Herramientas externas",
   "SettingsSectionFileSharing": "Compartición de archivos",
