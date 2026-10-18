@@ -1001,6 +1001,23 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task TestCredentialProvider_CredentialManager_LooksTheEntryUpWithoutACommand()
+    {
+        // The Credential Manager needs no command. The test used to insist on one, so that
+        // provider could not be tested at all. A name no store holds proves the lookup ran.
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.IsWindowsCredentialManagerProvider = true;
+        viewModel.CredentialProviderCommand = "";
+        string entry = $"heimdall-test-absent-{Guid.NewGuid():N}";
+        viewModel.CredentialProviderTestEntry = entry;
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer.Format("CredProvTestNoResult", entry), viewModel.CredentialProviderTestResult);
+    }
+
+    [Fact]
     public async Task TestCredentialProvider_MissingTool_NamesTheExecutable()
     {
         var localizer = await CreateLocalizerAsync();

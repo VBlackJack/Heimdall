@@ -4856,6 +4856,12 @@
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderTimeoutMs]}"/>
                                             <TextBlock Text="{loc:Translate SettingsCredProviderTimeoutHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
+                                        <CheckBox x:Name="Mw_SettingsCredProvFirstLineOnly" Content="{loc:Translate SettingsLabelCredProviderFirstLineOnly}" IsChecked="{Binding Settings.CredentialProviderFirstLineOnly}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,16,0,0"
+                                                  AutomationProperties.HelpText="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}"/>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderFirstLineOnly]}"/>
+                                        <TextBlock x:Name="Mw_SettingsCredProvFirstLineOnlyHint" Text="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        <TextBlock x:Name="Mw_SettingsCredProvKeePass2Hint" Text="{loc:Translate SettingsCredProviderKeePass2Hint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        </StackPanel>
                                         <StackPanel Margin="0,16,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProvTestEntryLabel" Text="{loc:Translate CredProvTestEntryLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <Grid>
@@ -4871,12 +4877,6 @@
                                             <TextBlock x:Name="Mw_SettingsCredProvTestResult" Text="{Binding Settings.CredentialProviderTestResult, NotifyOnTargetUpdated=True}"
                                                        AutomationProperties.LiveSetting="Polite"
                                                        behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                        </StackPanel>
-                                        <CheckBox x:Name="Mw_SettingsCredProvFirstLineOnly" Content="{loc:Translate SettingsLabelCredProviderFirstLineOnly}" IsChecked="{Binding Settings.CredentialProviderFirstLineOnly}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,16,0,0"
-                                                  AutomationProperties.HelpText="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}"/>
-                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderFirstLineOnly]}"/>
-                                        <TextBlock x:Name="Mw_SettingsCredProvFirstLineOnlyHint" Text="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                        <TextBlock x:Name="Mw_SettingsCredProvKeePass2Hint" Text="{loc:Translate SettingsCredProviderKeePass2Hint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

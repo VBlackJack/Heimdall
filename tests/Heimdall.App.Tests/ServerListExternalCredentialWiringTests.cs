@@ -354,6 +354,33 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
         Assert.Equal(1, skip.Value);
     }
 
+    [Fact]
+    public async Task BulkPlan_LooksTheVaultUpSideBySide_AtMostTheCapAtOnce()
+    {
+        // One after the other, a batch waited for one database unlock per server in a row.
+        var provider = new ConcurrencyProbeProvider(ServerListViewModel.MaxParallelVaultLookups);
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var servers = Enumerable.Range(1, ServerListViewModel.MaxParallelVaultLookups + 2)
+            .Select(index =>
+            {
+                var dto = CreateSshServer(passwordEncrypted: null);
+                dto.Id = $"srv-ssh-{index}";
+                dto.DisplayName = $"SSH Box {index}";
+                return dto;
+            })
+            .ToArray();
+        await fixture.SeedAsync(servers);
+
+        var plan = await fixture.ViewModel.PrepareBulkConnectPlanAsync(
+            fixture.ViewModel.Servers.ToList(), CancellationToken.None);
+
+        Assert.Equal(ServerListViewModel.MaxParallelVaultLookups, provider.MaxConcurrent);
+        Assert.Equal(servers.Length, plan.ConnectableCount);
+        Assert.Equal(
+            servers.Select(server => server.Id),
+            plan.Candidates.Select(candidate => candidate.ServerDto.Id));
+    }
+
     private static AppSettings EnabledSettings() => new()
     {
         UseExternalCredentialProvider = true,
@@ -513,6 +540,59 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
             }
 
             return Task.FromResult(Result);
+        }
+    }
+
+    /// <summary>
+    /// Holds every lookup until <c>expected</c> run at once (or a fallback delay passes), and
+    /// records the highest number seen running together.
+    /// </summary>
+    private sealed class ConcurrencyProbeProvider(int expected) : ICredentialProvider
+    {
+        private static readonly TimeSpan Fallback = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan Hold = TimeSpan.FromMilliseconds(300);
+        private readonly TaskCompletionSource _reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _running;
+        private int _maxConcurrent;
+
+        public string Name => "Probe";
+
+        public bool IsAvailable => true;
+
+        public int MaxConcurrent => Volatile.Read(ref _maxConcurrent);
+
+        public async Task<CredentialResult?> GetCredentialAsync(
+            string serverHost,
+            int port,
+            string? username,
+            string? title,
+            CancellationToken ct = default)
+        {
+            int running = Interlocked.Increment(ref _running);
+            int seen;
+            while ((seen = Volatile.Read(ref _maxConcurrent)) < running
+                   && Interlocked.CompareExchange(ref _maxConcurrent, running, seen) != seen)
+            {
+            }
+
+            if (running >= expected)
+            {
+                _reached.TrySetResult();
+            }
+
+            try
+            {
+                await Task.WhenAny(_reached.Task, Task.Delay(Fallback, ct));
+
+                // Held a moment past the release, so a lookup started beyond the cap would be
+                // seen running together with the others rather than after them.
+                await Task.Delay(Hold, ct);
+                return new CredentialResult("", "s3cr3t");
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _running);
+            }
         }
     }
 

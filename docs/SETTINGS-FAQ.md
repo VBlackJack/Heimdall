@@ -190,7 +190,9 @@ typically a password manager CLI such as KeePassXC, Bitwarden or 1Password.
 
 **Username command (optional)** - this one is easy to miss and it answers a common complaint.
 Without it, only the *password* comes from the vault and the username stays whatever the
-profile says. Fill it in and the username is fetched too, by a second command.
+profile says. Fill it in and the username is fetched too, by a second command - but only for a
+profile that has no username of its own: a profile that names one keeps it, and the command does
+not run. When it does run, the vault is unlocked a second time for that connection.
 
 **Unlock secret** - passed on the command's standard input, for vaults that need to be unlocked
 first. Bitwarden and 1Password additionally need a session established outside Heimdall

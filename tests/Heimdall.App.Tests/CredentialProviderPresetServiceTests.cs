@@ -70,6 +70,16 @@ public sealed class CredentialProviderPresetServiceTests
         Assert.Contains("--reveal", command);
     }
 
+    [Fact]
+    public void TryGetPreset_KpScriptFailsOnAMissingEntry()
+    {
+        // Without -FailIfNoEntry a missing entry is not an error, and the status line left on
+        // line 1 would be read as the password.
+        Assert.True(_service.TryGetPreset(IndexOf("KeePass2 (KPScript)"), out string command, out _));
+
+        Assert.Contains("-FailIfNoEntry", command);
+    }
+
     private int IndexOf(string label)
     {
         int index = _service.GetPresetLabels(key => key).ToList().IndexOf(label);
