@@ -350,6 +350,76 @@ public sealed class SharedSessionReloadTests : IDisposable
     }
 
     [Fact]
+    public async Task Watcher_FolderMissingAtStart_IsWatchedOnceItAppears_AndTheSourceIsReadAgain()
+    {
+        // A share mounted after the start, a sync client that has not created the folder yet.
+        var clock = new FakeTimeProvider();
+        List<string> reported = [];
+        string later = Path.Combine(_directory, "mounted-later", "team.mxtsessions");
+        var watcher = Track(new SharedSessionSourceWatcher(
+            sourceId =>
+            {
+                lock (reported)
+                {
+                    reported.Add(sourceId);
+                }
+
+                return Task.CompletedTask;
+            },
+            clock));
+        watcher.Update(new Dictionary<string, string> { [SourceId] = later }, TimeSpan.FromSeconds(1));
+
+        Assert.Empty(watcher.WatchedPaths);
+        Assert.Equal(new[] { SourceId }, watcher.PendingPaths.Keys);
+
+        clock.Advance(SharedSessionSourceWatcher.RewatchInterval);
+        Assert.Empty(watcher.WatchedPaths);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(later)!);
+        File.WriteAllText(later, TwoSessions);
+        clock.Advance(SharedSessionSourceWatcher.RewatchInterval);
+
+        Assert.Equal(new[] { SourceId }, watcher.WatchedPaths.Keys);
+        Assert.Empty(watcher.PendingPaths);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitUntilAsync(() =>
+        {
+            lock (reported)
+            {
+                return reported.Count >= 1;
+            }
+        });
+    }
+
+    [Fact]
+    public async Task Watcher_AfterAWatchError_IsWatchedAgain_AndTheSourceIsReadAgain()
+    {
+        // A network disconnection or an overflowing buffer: the watcher reports once, then nothing.
+        WriteSource(TwoSessions);
+        var clock = new FakeTimeProvider();
+        int reports = 0;
+        var watcher = Track(new SharedSessionSourceWatcher(
+            _ =>
+            {
+                Interlocked.Increment(ref reports);
+                return Task.CompletedTask;
+            },
+            clock));
+        watcher.Update(new Dictionary<string, string> { [SourceId] = SourcePath }, TimeSpan.FromSeconds(1));
+        Assert.Equal(new[] { SourceId }, watcher.WatchedPaths.Keys);
+
+        watcher.OnWatchFailed(SourceId, failed: null, "The network name is no longer available.");
+
+        Assert.Empty(watcher.WatchedPaths);
+        Assert.Equal(new[] { SourceId }, watcher.PendingPaths.Keys);
+
+        clock.Advance(SharedSessionSourceWatcher.RewatchInterval);
+        Assert.Equal(new[] { SourceId }, watcher.WatchedPaths.Keys);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitUntilAsync(() => Volatile.Read(ref reports) >= 1);
+    }
+
+    [Fact]
     public async Task Watcher_DetectsAnAtomicSave_AndAnInPlaceWrite()
     {
         WriteSource(TwoSessions);

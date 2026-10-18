@@ -88,6 +88,40 @@ public sealed class SharedSessionProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadAsync_ReadsTheFilesOffTheCallersThread()
+    {
+        // The interface calls LoadAsync at startup. A source on a share that cannot be reached
+        // waits out the SMB timeout in synchronous calls, so they must not run on its thread.
+        string path = WriteSource("team.mxtsessions");
+        SharedSessionProvider provider = new(await LocalizerAsync());
+        SynchronizationContext? readUnder = null;
+        Func<string, CancellationToken, Task<byte[]?>> realReader = provider.SourceFileReader;
+        provider.SourceFileReader = (file, token) =>
+        {
+            readUnder = SynchronizationContext.Current;
+            return realReader(file, token);
+        };
+
+        var callersContext = new SynchronizationContext();
+        SynchronizationContext? previous = SynchronizationContext.Current;
+        Task load;
+        SynchronizationContext.SetSynchronizationContext(callersContext);
+        try
+        {
+            load = provider.LoadAsync(Settings(Source(SourceId, path)));
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        await load;
+
+        Assert.NotSame(callersContext, readUnder);
+        Assert.Equal(2, provider.Profiles.Count);
+    }
+
+    [Fact]
     public async Task LoadAsync_MissingFile_IsReportedAndTheOtherSourcesStillLoad()
     {
         LocalizationManager localizer = await LocalizerAsync();

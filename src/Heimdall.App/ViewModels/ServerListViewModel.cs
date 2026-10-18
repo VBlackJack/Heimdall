@@ -635,6 +635,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         ApplyPersistedViewPreferences(settings);
         RebuildStableTreeProjection();
         ApplyFilter(selectedServerId);
+
+        // A shared session left selected may not be read yet: the sources load beside the tree.
+        _pendingSharedSelectionId = EffectiveSelectedServerId is null && SharedSessionIds.IsShared(selectedServerId)
+            ? selectedServerId
+            : null;
     }
 
     public IReadOnlyList<ProjectTarget> GetProjectTargets(bool includeNoProject)

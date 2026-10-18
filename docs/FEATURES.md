@@ -400,8 +400,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
   guide for teams coming from MobaXterm is in [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md):
   - A source is a name and the path of a `.mxtsessions` file, typically on a team share or a
     synchronized folder; environment variables are allowed (`%OneDriveCommercial%\...`). Each
-    enabled source is read at startup and appears in the session tree as a root of its own, below
-    the local folders, with its own icon. Its MobaXterm folders sit underneath it, and a local folder
+    enabled source is read at startup, beside the local tree, which does not wait for it (a share
+    out of reach takes the network timeout to fail), and appears in the session tree as a root of
+    its own, below the local folders, with its own icon. Its MobaXterm folders sit underneath it, and a local folder
     with the same name is never merged with a shared one
   - Shared sessions are read-only in Heimdall and keep being edited in MobaXterm: they connect,
     connect in a split, copy their host and show their health like any other session, but they
@@ -429,7 +430,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     session, the previous sessions are kept and the source says why: a working source is never
     replaced by an empty one. Open sessions are never touched by a reload; if a session disappears
     from the file while it is open, it stays open, and a later reconnect says the profile was not
-    found
+    found. A source whose folder does not exist yet (a share mounted later) or whose watch the
+    system dropped (a network disconnection) is tried again every 30 seconds, and read again once
+    it is watched
   - Offline copy: after each successful read, the raw file and where it came from (path, time,
     SHA-256) are kept in `SharedSessionCache` under the data directory, with the same restricted
     ACL as the configuration files. When the file is missing or unreadable, the sessions are read
@@ -456,8 +459,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     findings. Both open the same read-only dialog: the count of each check, then the findings by
     check, with **Copy** (plain text) and **Export CSV** (every cell neutralized against formula
     injection). When a reload changes the number of issues, the status line says so
-  - Passwords are personal: a shared file never provides one. When the SSH agent offers no key,
-    the password of a shared bastion and of a shared SSH session is asked before connecting, with
+  - Passwords are personal: a shared file never provides one. When the SSH agent offers no key, or
+    once the server refused the keys it offered (until Heimdall closes), the password of a shared
+    bastion and of a shared SSH session is asked before connecting, with
     **Remember this password on this computer** (unticked by default). A remembered password is
     kept once the server accepted it, in `shared-session-secrets.json` under the data directory,
     sealed with DPAPI for the Windows account, and keyed by the bastion's host, port and login, or

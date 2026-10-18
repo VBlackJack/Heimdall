@@ -329,6 +329,63 @@ public sealed class SharedCredentialApplierTests : IDisposable
         Assert.True(string.IsNullOrEmpty(profile.SshPasswordEncrypted));
     }
 
+    [Theory]
+    [InlineData(SshFailureCode.AuthRejected)]
+    [InlineData(SshFailureCode.KeyRejected)]
+    public async Task AgentKeysRefusedByTheBastion_TheNextAttemptAsksTheBastionPassword_NotTheSession(SshFailureCode code)
+    {
+        Harness harness = await Harness.CreateAsync(this, agentKeys: 1);
+
+        (ServerProfileDto profile, AppSettings settings) = await harness.ConnectionCopiesAsync();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: true, CancellationToken.None))!;
+        Assert.Empty(harness.Prompts.Prompts);
+        await plan.SettleAsync(succeeded: false, sessionAuthenticated: false, failureCode: (int)code, failedAtGateway: true);
+
+        // The agent's keys were refused: asking nothing again would refuse the next attempt too.
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(GatewayPassword, Remember: false));
+        (ServerProfileDto again, AppSettings againSettings) = await harness.ConnectionCopiesAsync();
+        Assert.NotNull(await harness.Applier.ApplyAsync(again, againSettings, allowPrompt: true, CancellationToken.None));
+
+        Assert.Equal(harness.Localizer.Format("DialogSharedGatewayPasswordPromptMessage", Login, "gw1.example.test"), Assert.Single(harness.Prompts.Prompts));
+        Assert.Equal(GatewayPassword, CredentialProtector.Unprotect(Gateway(againSettings).SshPasswordEncrypted));
+        Assert.True(string.IsNullOrEmpty(again.SshPasswordEncrypted));
+    }
+
+    [Fact]
+    public async Task AgentKeysRefusedBySession_TheNextAttemptAsksTheSessionPassword_NotTheBastion()
+    {
+        Harness harness = await Harness.CreateAsync(this, agentKeys: 1);
+
+        (ServerProfileDto profile, AppSettings settings) = await harness.ConnectionCopiesAsync();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: true, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: false, sessionAuthenticated: false, failureCode: (int)SshFailureCode.AuthRejected, failedAtGateway: false);
+
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(SessionPassword, Remember: false));
+        (ServerProfileDto again, AppSettings againSettings) = await harness.ConnectionCopiesAsync();
+        Assert.NotNull(await harness.Applier.ApplyAsync(again, againSettings, allowPrompt: true, CancellationToken.None));
+
+        Assert.Single(harness.Prompts.Prompts);
+        Assert.Equal(SessionPassword, CredentialProtector.Unprotect(again.SshPasswordEncrypted));
+        Assert.True(string.IsNullOrEmpty(Gateway(againSettings).SshPasswordEncrypted));
+    }
+
+    [Theory]
+    [InlineData(SshFailureCode.NetworkTimedOut)]
+    [InlineData(SshFailureCode.HostKeyMismatch)]
+    public async Task AgentKeys_AFailureThatIsNotARefusal_StillAsksNothing(SshFailureCode code)
+    {
+        Harness harness = await Harness.CreateAsync(this, agentKeys: 1);
+
+        (ServerProfileDto profile, AppSettings settings) = await harness.ConnectionCopiesAsync();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: true, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: false, sessionAuthenticated: false, failureCode: (int)code, failedAtGateway: true);
+
+        (ServerProfileDto again, AppSettings againSettings) = await harness.ConnectionCopiesAsync();
+        Assert.NotNull(await harness.Applier.ApplyAsync(again, againSettings, allowPrompt: true, CancellationToken.None));
+
+        Assert.Empty(harness.Prompts.Prompts);
+    }
+
     [Fact]
     public async Task PromptNotAllowed_UsesTheRememberedPasswords_AndAsksNothing()
     {

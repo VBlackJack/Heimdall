@@ -657,9 +657,11 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             var settings = await _configManager.LoadSettingsAsync();
             var servers = await _configManager.LoadServersAsync();
 
-            // Before the session restore below, which may reconnect a shared session. A source that
-            // cannot be read is reported in its own state, never thrown here.
-            await ServerList.ProfileLookup.SharedSessions.LoadAsync(settings, cancellationToken);
+            // Started now and awaited just before the session restore below, which may reconnect a
+            // shared session. The local tree does not wait for it: a source on a share out of reach
+            // takes the SMB timeout to fail, and the tree follows the provider once it is read. A
+            // source that cannot be read is reported in its own state, never thrown here.
+            Task sharedSessionsLoad = ServerList.ProfileLookup.SharedSessions.LoadAsync(settings, cancellationToken);
 
             ServerCount = servers.Count;
             Tunnels.RefreshList();
@@ -679,6 +681,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             await Settings.RefreshVaultStatusAsync();
             Scheduled.Load(settings);
 
+            await sharedSessionsLoad;
             await _sessionRestore.RestoreAsync(ServerList, cancellationToken);
 
             // OperationScope.Dispose() handles the Ready transition
