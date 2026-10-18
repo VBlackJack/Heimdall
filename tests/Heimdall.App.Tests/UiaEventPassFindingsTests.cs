@@ -98,10 +98,12 @@ public sealed class UiaEventPassFindingsTests
         Assert.True(
             ViewSource.IsStatementOfTheMethodBody(
                 ControllerMethod("public void Begin("),
-                "_focusedBeforeRun = Array.Find(_controlsToDisable, control => control.IsKeyboardFocusWithin);"),
-            "Begin does not remember the focused control");
+                "_focusedBeforeRun ??= Array.Find(_controlsToDisable, control => control.IsKeyboardFocusWithin);"),
+            "Begin does not remember the focused control, or a repeated Begin forgets it");
         Assert.True(ViewSource.IsStatementOfTheMethodBody(ControllerMethod("public void End("), "RestoreFocusAfterRun();"), "End does not restore focus");
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(ControllerMethod("private void RestoreFocusAfterRun("), "previous.Focus();"), "the restore never focuses");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(ControllerMethod("private void RestoreFocusAfterRun("), "FocusWhenEnabled(previous);"), "the restore never focuses");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(ControllerMethod("private static void FocusWhenEnabled("), "FocusIfItFellBack(previous);"), "an enabled control is not focused");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(ControllerMethod("private static void FocusIfItFellBack("), "previous.Focus();"), "the restore never focuses");
     }
 
     [Fact]

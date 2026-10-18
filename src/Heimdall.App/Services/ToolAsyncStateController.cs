@@ -95,7 +95,9 @@ internal sealed class ToolAsyncStateController
     public void Begin(string? status = null)
     {
         _setBusy?.Invoke(true);
-        _focusedBeforeRun = Array.Find(_controlsToDisable, control => control.IsKeyboardFocusWithin);
+        // Views call Begin again on every property change of a running job, after the first call
+        // has already disabled the controls: only the first call still sees where focus was.
+        _focusedBeforeRun ??= Array.Find(_controlsToDisable, control => control.IsKeyboardFocusWithin);
         SetControlsEnabled(false);
 
         if (_errorText is not null)
@@ -187,7 +189,38 @@ internal sealed class ToolAsyncStateController
     {
         WpfControl? previous = _focusedBeforeRun;
         _focusedBeforeRun = null;
-        if (previous is null || !FocusFellBackFrom(Keyboard.FocusedElement as DependencyObject, previous))
+        if (previous is null)
+        {
+            return;
+        }
+
+        FocusWhenEnabled(previous);
+    }
+
+    /// <summary>
+    /// A button bound to a command stays disabled after <see cref="End"/> re-enables it, until the
+    /// command's CanExecute is read again: focus waits for that instead of failing on the spot.
+    /// </summary>
+    private static void FocusWhenEnabled(WpfControl previous)
+    {
+        if (!previous.IsEnabled)
+        {
+            DependencyPropertyChangedEventHandler? handler = null;
+            handler = (_, _) =>
+            {
+                previous.IsEnabledChanged -= handler;
+                FocusWhenEnabled(previous);
+            };
+            previous.IsEnabledChanged += handler;
+            return;
+        }
+
+        FocusIfItFellBack(previous);
+    }
+
+    private static void FocusIfItFellBack(WpfControl previous)
+    {
+        if (!FocusFellBackFrom(Keyboard.FocusedElement as DependencyObject, previous))
         {
             return;
         }
