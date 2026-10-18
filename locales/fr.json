@@ -3783,6 +3783,8 @@
   "CredProvTestNoResult": "Aucun mot de passe pour \"{0}\" : la commande a \u00e9chou\u00e9 ou n'a rien affich\u00e9. V\u00e9rifiez le nom de l'entr\u00e9e, le secret de d\u00e9verrouillage et le chemin de la base.",
   "CredProvTestTimeout": "La commande n'a pas r\u00e9pondu en {0} ms. V\u00e9rifiez que l'outil CLI est install\u00e9 et r\u00e9actif.",
   "CredProvTestError": "\u00c9chec du test : {0}",
+  "CredProvTestShapeMultiline": "La valeur lue tient sur {0} lignes : si l'outil affiche plus que le mot de passe, activez \"Utiliser uniquement la première ligne de sortie\".",
+  "CredProvTestShapeEdgeSpace": "La valeur lue commence ou finit par une espace : elle est envoy\u00e9e telle quelle.",
   "ServerDialogVaultTitle": "Coffre externe",
   "ServerDialogSshAuthHintCredentialProvider": "Aucun mot de passe enregistr\u00e9 ici - le fournisseur d'identifiants externe le fournit \u00e0 la connexion.",
   "StatusCredentialProviderLookup": "Lecture du mot de passe de \"{0}\" dans le coffre externe...",
@@ -4013,7 +4015,7 @@
   "SettingsLabelCredProviderTimeout": "D\u00e9lai d'expiration de la commande",
   "SettingsCredProviderTimeoutHint": "Dur\u00e9e pendant laquelle la commande de mot de passe peut s'ex\u00e9cuter avant que Heimdall y renonce. Augmentez-la pour un coffre qui demande une confirmation.",
   "SettingsCredProviderUnlockPlaceholder": "Mot de passe ma\u00eetre de la base ou phrase secr\u00e8te GPG",
-  "SettingsCredProviderUnlockHelp": "Envoy\u00e9 \u00e0 l'entr\u00e9e standard de la commande pour les outils qui demandent un d\u00e9verrouillage (p. ex. keepassxc-cli ou pass). Stock\u00e9 chiffr\u00e9 ; laissez vide si inutile.",
+  "SettingsCredProviderUnlockHelp": "Envoy\u00e9 \u00e0 l'entr\u00e9e standard de la commande pour les outils qui y lisent leur secret de d\u00e9verrouillage (p. ex. keepassxc-cli). pass et gopass le demandent \u00e0 gpg-agent, par sa propre fen\u00eatre ou son cache. Stock\u00e9 chiffr\u00e9 ; laissez vide si inutile.",
 
   "SettingsSectionExternalToolsList": "Outils externes",
   "SettingsSectionFileSharing": "Partage de fichiers",

@@ -4860,7 +4860,7 @@
                                                   AutomationProperties.HelpText="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderFirstLineOnly]}"/>
                                         <TextBlock x:Name="Mw_SettingsCredProvFirstLineOnlyHint" Text="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                        <TextBlock x:Name="Mw_SettingsCredProvKeePass2Hint" Text="{loc:Translate SettingsCredProviderKeePass2Hint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        <TextBlock x:Name="Mw_SettingsCredProvKeePass2Hint" Text="{loc:Translate SettingsCredProviderKeePass2Hint}" Visibility="{Binding Settings.ShowsKpScriptHint, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                         </StackPanel>
                                         <StackPanel Margin="0,16,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
                                             <TextBlock x:Name="Mw_SettingsCredProvTestEntryLabel" Text="{loc:Translate CredProvTestEntryLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
@@ -4876,7 +4876,24 @@
                                             </Grid>
                                             <TextBlock x:Name="Mw_SettingsCredProvTestResult" Text="{Binding Settings.CredentialProviderTestResult, NotifyOnTargetUpdated=True}"
                                                        AutomationProperties.LiveSetting="Polite"
-                                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                                        <Setter Property="FontStyle" Value="Italic"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Settings.CredentialProviderTestSucceeded}" Value="True">
+                                                                <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
+                                                                <Setter Property="FontStyle" Value="Normal"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Settings.CredentialProviderTestSucceeded}" Value="False">
+                                                                <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
+                                                                <Setter Property="FontStyle" Value="Normal"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

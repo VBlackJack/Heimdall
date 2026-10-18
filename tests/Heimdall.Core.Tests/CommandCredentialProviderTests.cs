@@ -274,6 +274,68 @@ public class CommandCredentialProviderTests
     }
 
     [Fact]
+    public async Task GetCredentialAsync_OutputInTheOemCodePage_IsReadInIt()
+    {
+        // KPScript and .bat wrappers write in the console's OEM code page, where an accented
+        // letter is one byte (0x82 is e acute in both 850 and 437) that is never valid UTF-8.
+        // `type` copies the bytes untouched.
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-oem-{Guid.NewGuid():N}.txt");
+        await File.WriteAllBytesAsync(path, [.. "motdepass"u8, 0x82, (byte)'\r', (byte)'\n']);
+        try
+        {
+            var provider = CreateProvider("cmd.exe /c type \"{Database}\"", databasePath: path);
+            var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+            Assert.NotNull(result);
+            Assert.Equal("motdepass\u00e9", result.Password);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void DecodeOutput_ValidUtf8_IsReadAsUtf8()
+    {
+        Assert.Equal("motdepass\u00e9", CommandCredentialProvider.DecodeOutput("motdepass\u00e9"u8.ToArray()));
+    }
+
+    [Fact]
+    public void ExpandTemplate_AValueHoldingAPlaceholder_IsNotExpandedAgain()
+    {
+        // The template was expanded token by token, so an entry name holding "{KeyFile}" was
+        // replaced by the local key file path.
+        var provider = CreateProvider(
+            "keepassxc-cli show -k \"{KeyFile}\" \"{Title}\"", keyFilePath: @"C:\vault\company.keyx");
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli show -k \"{KeyFile}\" \"{Title}\"", "host", 22, "user", "a{KeyFile}b");
+        Assert.Equal(@"keepassxc-cli show -k ""C:\vault\company.keyx"" ""a{KeyFile}b""", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_CmdTarget_TrailingBackslashBeforeAClosingQuote_IsDoubled()
+    {
+        // cmd hands the quoted argument to the program it starts unchanged; that program parses
+        // it by the CRT rules, where "share\" ends in an escaped quote.
+        var provider = CreateProvider("cmd.exe /c keepassxc-cli show \"{Title}\" -a Password");
+        var expanded = provider.ExpandTemplate(
+            "cmd.exe /c keepassxc-cli show \"{Title}\" -a Password", "host", 22, "user", @"share\");
+        Assert.Equal(@"cmd.exe /c keepassxc-cli show ""share\\"" -a Password", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_PowerShellTarget_LeavesBackslashesAlone()
+    {
+        // PowerShell does not parse its own arguments by the CRT rules; doubling there would
+        // change the value.
+        var provider = CreateProvider("pwsh.exe -c Get-Secret \"{Title}\"");
+        var expanded = provider.ExpandTemplate(
+            "pwsh.exe -c Get-Secret \"{Title}\"", "host", 22, "user", @"share\");
+        Assert.Equal(@"pwsh.exe -c Get-Secret ""share\""", expanded);
+    }
+
+    [Fact]
     public void BuildStartInfo_EveryRedirectedPipeIsUtf8WithoutAByteOrderMark()
     {
         // The test host has a console and Heimdall has none, so a round trip through a child

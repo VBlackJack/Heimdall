@@ -231,7 +231,9 @@ retiré : un mot de passe qui commence ou finit par une espace la garde.
 
 **Délai d'expiration de la commande** - combien de temps la commande de mot de passe peut tourner
 avant que Heimdall y renonce, de 1000 à 120000 ms. Augmentez-le pour un coffre qui vous demande de
-confirmer chaque requête.
+confirmer chaque requête. Quand il expire, Heimdall arrête la commande et tous les processus qu'elle
+a lancés : un `gpg-agent` démarré par `pass` ou `gopass` pour cette recherche est arrêté aussi, avec
+la phrase de passe qu'il gardait en cache.
 
 L'entrée du coffre est cherchée par le **Nom d'entrée du coffre** du profil si vous en
 renseignez un, et par le nom affiché du profil sinon. Renseignez-le quand l'entrée de votre

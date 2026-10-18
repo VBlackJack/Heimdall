@@ -204,7 +204,9 @@ turn it on themselves. Leave it off if your password legitimately contains a new
 only the final line break is removed: a password that begins or ends with a space keeps it.
 
 **Command timeout** - how long the password command may run before Heimdall gives up on it, from
-1000 to 120000 ms. Raise it for a vault that asks you to confirm each request.
+1000 to 120000 ms. Raise it for a vault that asks you to confirm each request. When it runs out,
+Heimdall stops the command and every process it started: a `gpg-agent` that `pass` or `gopass`
+started for that lookup is stopped too, and the passphrase it had cached with it.
 
 The vault entry is looked up by the profile's **Vault entry name** if you set one, and by the
 profile's display name otherwise. Set it when the entry in your vault is not named exactly like
