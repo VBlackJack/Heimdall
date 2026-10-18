@@ -17,12 +17,17 @@
 using System.IO;
 using Heimdall.App.Services.SharedSessions;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests;
 
 public sealed class SharedPostConnectTrustTests : IAsyncLifetime
 {
+    private const string RemovedSourceId = "removedsource";
+
+    private const string KeptSourceId = "keptsource";
+
     private readonly string _rootPath = Path.Combine(
         Path.GetTempPath(), "heimdall-shared-trust", Guid.NewGuid().ToString("N"));
 
@@ -120,6 +125,59 @@ public sealed class SharedPostConnectTrustTests : IAsyncLifetime
 
         Assert.False(allowed);
         Assert.Empty((await _configManager.LoadSettingsAsync()).SharedPostConnectApprovals);
+    }
+
+    [Fact]
+    public async Task RemovingASource_ForgetsTheApprovalsOfItsSessions_AndKeepsEveryOther()
+    {
+        string removed = SharedSessionIds.PrefixFor(RemovedSourceId) + "srv-db01";
+        string kept = SharedSessionIds.PrefixFor(KeptSourceId) + "srv-db01";
+        const string notShared = "local-profile";
+        await _configManager.MergeSettingAsync(settings =>
+        {
+            settings.SharedSessionSources = [Source(RemovedSourceId), Source(KeptSourceId)];
+            settings.SharedPostConnectApprovals[removed] = "fingerprint-removed";
+            settings.SharedPostConnectApprovals[kept] = "fingerprint-kept";
+            settings.SharedPostConnectApprovals[notShared] = "fingerprint-local";
+        });
+        using SharedSessionProvider provider = new(await LocalizerAsync(), approvals: _trust);
+        await provider.LoadAsync(await _configManager.LoadSettingsAsync());
+        Assert.Equal(3, (await _configManager.LoadSettingsAsync()).SharedPostConnectApprovals.Count);
+
+        await _configManager.MergeSettingAsync(settings => settings.SharedSessionSources = [Source(KeptSourceId)]);
+        await provider.LoadAsync(await _configManager.LoadSettingsAsync());
+
+        Dictionary<string, string> approvals = (await _configManager.LoadSettingsAsync()).SharedPostConnectApprovals;
+        Assert.False(approvals.ContainsKey(removed));
+        Assert.Equal("fingerprint-kept", approvals[kept]);
+        Assert.Equal("fingerprint-local", approvals[notShared]);
+    }
+
+    [Fact]
+    public async Task ForgetAllExcept_KeepsASourceTheSavedSettingsListSinceTheLoadStarted()
+    {
+        // The kept list comes from the settings a load started with; a source added and approved
+        // since is in the saved settings, and its approvals stay.
+        string addedSince = SharedSessionIds.PrefixFor(KeptSourceId) + "srv-db01";
+        await _configManager.MergeSettingAsync(settings =>
+        {
+            settings.SharedSessionSources = [Source(KeptSourceId)];
+            settings.SharedPostConnectApprovals[addedSince] = "fingerprint";
+        });
+
+        await _trust.ForgetAllExceptAsync(new HashSet<string>(StringComparer.Ordinal));
+
+        Assert.Equal("fingerprint", (await _configManager.LoadSettingsAsync()).SharedPostConnectApprovals[addedSince]);
+    }
+
+    private static SharedSessionSourceDto Source(string id) =>
+        new() { Id = id, Name = id, Path = Path.Combine(Path.GetTempPath(), id + ".mxtsessions"), Enabled = false };
+
+    private static async Task<LocalizationManager> LocalizerAsync()
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        return localizer;
     }
 
     private Task<bool> Confirm()

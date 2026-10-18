@@ -66,4 +66,53 @@ public sealed class SharedPostConnectTrust
         FileLogger.Info($"Post-connect commands of shared session {profileId} approved ({fingerprint}).");
         return true;
     }
+
+    /// <summary>
+    /// Forgets the approvals of the sessions of every source other than <paramref name="keptSourceIds"/>;
+    /// writes the settings only when there is one to forget.
+    /// </summary>
+    /// <remarks>
+    /// A source the saved settings list at the time of the write is kept too, whatever
+    /// <paramref name="keptSourceIds"/> says: the list was taken from the settings a load started
+    /// with, and a source added since must not lose what was approved for it meanwhile. An
+    /// approval whose key is not a shared identifier names no source and is left alone.
+    /// </remarks>
+    public async Task ForgetAllExceptAsync(IReadOnlySet<string> keptSourceIds)
+    {
+        ArgumentNullException.ThrowIfNull(keptSourceIds);
+
+        AppSettings settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
+        if (ForgottenApprovals(settings, keptSourceIds).Count == 0)
+        {
+            return;
+        }
+
+        int forgotten = 0;
+        await _configManager.MergeSettingAsync(current =>
+        {
+            foreach (string profileId in ForgottenApprovals(current, keptSourceIds))
+            {
+                current.SharedPostConnectApprovals.Remove(profileId);
+                forgotten++;
+            }
+        }).ConfigureAwait(false);
+        FileLogger.Info($"Post-connect approvals of {forgotten} shared session(s) of removed sources forgotten.");
+    }
+
+    private static List<string> ForgottenApprovals(AppSettings settings, IReadOnlySet<string> keptSourceIds)
+    {
+        if (settings.SharedPostConnectApprovals is not { Count: > 0 } approvals)
+        {
+            return [];
+        }
+
+        HashSet<string> listed = (settings.SharedSessionSources ?? [])
+            .Where(source => source is not null)
+            .Select(source => source.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        return [.. approvals.Keys.Where(profileId =>
+            SharedSessionIds.SourceIdOf(profileId) is { } sourceId
+            && !keptSourceIds.Contains(sourceId)
+            && !listed.Contains(sourceId))];
+    }
 }

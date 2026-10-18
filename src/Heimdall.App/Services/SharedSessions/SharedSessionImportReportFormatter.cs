@@ -155,14 +155,32 @@ public sealed class SharedSessionImportReportFormatter
     private string RouteLabel(string route) =>
         string.IsNullOrEmpty(route) ? _localizer["SharedReportDirectConnection"] : route;
 
-    private string ExplainSkip(SharedSessionReportEntry entry) => entry.SkipReason switch
+    private string ExplainSkip(SharedSessionReportEntry entry)
     {
-        MobaXtermImportWarningKind.MalformedSessionLine => _localizer["SharedReportSkipMalformed"],
-        MobaXtermImportWarningKind.UnsupportedSessionType => _localizer.Format("SharedReportSkipUnsupportedType", entry.Detail),
-        MobaXtermImportWarningKind.MissingHost => _localizer["SharedReportSkipMissingHost"],
-        MobaXtermImportWarningKind.InvalidGatewayHost => _localizer.Format("SharedReportSkipInvalidGateway", entry.Detail),
-        MobaXtermImportWarningKind.DuplicateSession => _localizer["SharedReportSkipDuplicate"],
-        MobaXtermImportWarningKind.ParseError => _localizer.Format("SharedReportSkipParseError", entry.Detail),
+        if (entry.Refusal is { } refusal)
+        {
+            return ExplainRefusal(refusal, entry.Detail);
+        }
+
+        return entry.SkipReason switch
+        {
+            MobaXtermImportWarningKind.MalformedSessionLine => _localizer["SharedReportSkipMalformed"],
+            MobaXtermImportWarningKind.UnsupportedSessionType => _localizer.Format("SharedReportSkipUnsupportedType", entry.Detail),
+            MobaXtermImportWarningKind.MissingHost => _localizer["SharedReportSkipMissingHost"],
+            MobaXtermImportWarningKind.InvalidGatewayHost => _localizer.Format("SharedReportSkipInvalidGateway", entry.Detail),
+            MobaXtermImportWarningKind.DuplicateSession => _localizer["SharedReportSkipDuplicate"],
+            MobaXtermImportWarningKind.ParseError => _localizer.Format("SharedReportSkipParseError", entry.Detail),
+            _ => _localizer["SharedReportSkipRefused"],
+        };
+    }
+
+    private string ExplainRefusal(SharedProfileRefusal refusal, string detail) => refusal switch
+    {
+        SharedProfileRefusal.ForeignId => _localizer["SharedReportRefusedForeignId"],
+        SharedProfileRefusal.UnsupportedProtocol => _localizer.Format("SharedReportRefusedProtocol", detail),
+        SharedProfileRefusal.InvalidHost => _localizer.Format("SharedReportRefusedHost", detail),
+        SharedProfileRefusal.ForeignGateway => _localizer.Format("SharedReportRefusedForeignGateway", detail),
+        SharedProfileRefusal.UnknownGateway => _localizer.Format("SharedReportRefusedUnknownGateway", detail),
         _ => _localizer["SharedReportSkipRefused"],
     };
 }

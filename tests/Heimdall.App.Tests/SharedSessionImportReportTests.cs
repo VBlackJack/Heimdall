@@ -205,18 +205,80 @@ public sealed class SharedSessionImportReportTests : IDisposable
         ];
         ServerProfileDto refused = Session("vnc01", "Old/PROD", null, host: "vnc01.example.test");
 
-        SharedSessionImportReport report = Build(SourceId, SourceName, content, warnings, [], [], [refused], new Options(60, 3));
+        SharedSessionImportReport report = Build(
+            SourceId,
+            SourceName,
+            content,
+            warnings,
+            [],
+            [],
+            [new SharedRefusedSession(refused, SharedProfileRefusal.UnsupportedProtocol, "VNC")],
+            new Options(60, 3));
 
         Assert.Equal(3, report.CountOf(SharedSessionReportCheck.SkippedSession));
         Assert.Equal(1, report.CountOf(SharedSessionReportCheck.UnresolvedVariable));
         Assert.Equal("Old/PROD", report.Entries.Single(entry => entry.SessionName == "tel01").FolderPath);
         Assert.Equal("Old/PROD", report.Entries.Single(entry => entry.SessionName == "app05").FolderPath);
         Assert.Equal(string.Empty, report.Entries.Single(entry => entry.SessionName == "lost").FolderPath);
-        Assert.Null(report.Entries.Single(entry => entry.SessionName == "vnc01").SkipReason);
+        SharedSessionReportEntry vnc = report.Entries.Single(entry => entry.SessionName == "vnc01");
+        Assert.Null(vnc.SkipReason);
+        Assert.Equal(SharedProfileRefusal.UnsupportedProtocol, vnc.Refusal);
+        Assert.Equal("VNC", vnc.Detail);
         Assert.Equal(MobaXtermImportWarningKind.UnsupportedSessionType, report.Entries.Single(entry => entry.SessionName == "tel01").SkipReason);
     }
 
+    [Fact]
+    public async Task Explain_NamesWhyTheSharedFilterRefusedASession_ForEveryReason()
+    {
+        LocalizationManager localizer = await LocalizerAsync();
+        var formatter = new SharedSessionImportReportFormatter(localizer);
+        Dictionary<SharedProfileRefusal, string> expected = new()
+        {
+            [SharedProfileRefusal.ForeignId] = localizer["SharedReportRefusedForeignId"],
+            [SharedProfileRefusal.UnsupportedProtocol] = localizer.Format("SharedReportRefusedProtocol", "value"),
+            [SharedProfileRefusal.InvalidHost] = localizer.Format("SharedReportRefusedHost", "value"),
+            [SharedProfileRefusal.ForeignGateway] = localizer.Format("SharedReportRefusedForeignGateway", "value"),
+            [SharedProfileRefusal.UnknownGateway] = localizer.Format("SharedReportRefusedUnknownGateway", "value"),
+        };
+
+        Assert.Equal(Enum.GetValues<SharedProfileRefusal>().Order(), expected.Keys.Order());
+        foreach ((SharedProfileRefusal refusal, string text) in expected)
+        {
+            var entry = new SharedSessionReportEntry(SharedSessionReportCheck.SkippedSession, "PROD", "srv01", "value", Refusal: refusal);
+            Assert.Equal(text, formatter.Explain(entry));
+            Assert.NotEqual(localizer["SharedReportSkipRefused"], text);
+        }
+
+        Assert.Equal(expected.Count, expected.Values.Distinct(StringComparer.Ordinal).Count());
+    }
+
     // --- A real file through the provider ---
+
+    [Fact]
+    public async Task Load_ASessionTheSharedFilterRefusesForItsHost_IsReportedWithThatHost()
+    {
+        const string content = """
+            [Bookmarks]
+            SubRep=
+            ImgNum=42
+            [Bookmarks_1]
+            SubRep=PROD
+            ImgNum=41
+            app01=#109#0%app01.example.test%22%jdoe%%0%-1%%%%%-1#MobaFont%10#0#
+            bad01=#109#0%-oProxyCommand=calc%22%jdoe%%0%-1%%%%%-1#MobaFont%10#0#
+            """;
+        LocalizationManager localizer = await LocalizerAsync();
+        SharedSessionProvider provider = await LoadedProviderAsync(content);
+
+        SharedSessionImportReport report = Assert.Single(provider.Sources).Report!;
+        SharedSessionReportEntry refused = Assert.Single(report.Entries, entry => entry.Check == SharedSessionReportCheck.SkippedSession);
+        Assert.Equal("bad01", refused.SessionName);
+        Assert.Equal(SharedProfileRefusal.InvalidHost, refused.Refusal);
+        Assert.Equal(
+            localizer.Format("SharedReportRefusedHost", "-oProxyCommand=calc"),
+            new SharedSessionImportReportFormatter(localizer).Explain(refused));
+        Assert.Equal("app01", Assert.Single(provider.Profiles).DisplayName);
+    }
 
     [Fact]
     public async Task Load_ReportsOneCaseOfEachCheck_InCheckOrder()

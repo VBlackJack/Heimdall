@@ -179,13 +179,17 @@ public sealed class SharedProfileSanitizerTests
     }
 
     [Theory]
-    [InlineData("local-profile", "SSH", null)]
-    [InlineData("SHARED", "SSH", null)]
-    [InlineData(null, "LOCAL", null)]
-    [InlineData(null, "WEB", null)]
-    [InlineData(null, "SFTP", null)]
-    [InlineData(null, "SSH", "local-gateway")]
-    public void Sanitize_Profile_RefusesAProfileThatCannotBeShared(string? id, string connectionType, string? gatewayId)
+    [InlineData("local-profile", "SSH", null, SharedProfileRefusal.ForeignId)]
+    [InlineData("SHARED", "SSH", null, SharedProfileRefusal.ForeignId)]
+    [InlineData(null, "LOCAL", null, SharedProfileRefusal.UnsupportedProtocol)]
+    [InlineData(null, "WEB", null, SharedProfileRefusal.UnsupportedProtocol)]
+    [InlineData(null, "SFTP", null, SharedProfileRefusal.UnsupportedProtocol)]
+    [InlineData(null, "SSH", "local-gateway", SharedProfileRefusal.ForeignGateway)]
+    public void Sanitize_Profile_RefusesAProfileThatCannotBeShared_AndSaysWhy(
+        string? id,
+        string connectionType,
+        string? gatewayId,
+        SharedProfileRefusal expected)
     {
         var source = new ServerProfileDto
         {
@@ -196,6 +200,7 @@ public sealed class SharedProfileSanitizerTests
         };
 
         Assert.Null(SharedProfileSanitizer.Sanitize(source));
+        Assert.Equal(expected, SharedProfileSanitizer.RefusalOf(source));
     }
 
     // A shared file is read without review: a host the inventory would refuse is refused here
@@ -211,6 +216,7 @@ public sealed class SharedProfileSanitizerTests
         var source = new ServerProfileDto { Id = SharedProfileId, ConnectionType = "SSH", RemoteServer = host };
 
         Assert.Null(SharedProfileSanitizer.Sanitize(source));
+        Assert.Equal(SharedProfileRefusal.InvalidHost, SharedProfileSanitizer.RefusalOf(source));
     }
 
     [Theory]
@@ -223,6 +229,7 @@ public sealed class SharedProfileSanitizerTests
         var source = new ServerProfileDto { Id = SharedProfileId, ConnectionType = "SSH", RemoteServer = host };
 
         Assert.Equal(host, SharedProfileSanitizer.Sanitize(source)?.RemoteServer);
+        Assert.Null(SharedProfileSanitizer.RefusalOf(source));
     }
 
     [Theory]

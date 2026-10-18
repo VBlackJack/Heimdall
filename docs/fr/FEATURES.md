@@ -326,7 +326,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 169 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 174 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -417,15 +417,19 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     une session partagée garde Connecter et refuse les autres actions groupées, en disant combien de
     sessions partagées elle contient
   - Une source illisible (fichier absent, illisible ou trop volumineux) garde sa racine dans
-    l'arborescence avec une marque d'erreur et la raison au survol, et n'affiche aucune session
+    l'arborescence avec une marque d'erreur et la raison au survol, et n'affiche aucune session. Un
+    fichier de plus de 16 Mo est trop volumineux, comme celui qui dépasse 16 Mo pendant sa lecture :
+    la lecture s'arrête là
   - La carte des paramètres indique ce que chaque source contient après sa dernière lecture.
     **Recharger** relit les sources enregistrées et actualise l'arborescence sans redémarrage ;
-    enregistrer une modification des sources ou des variables d'import MobaXterm les recharge aussi
+    enregistrer une modification des sources, des variables d'import MobaXterm ou des seuils du
+    rapport les recharge aussi. Une modification de `SharedSourceReloadDebounceMs` atteint la
+    surveillance des fichiers aussitôt, sans relire aucun fichier
   - Les commandes post-connexion d'une session partagée s'approuvent par utilisateur : Heimdall
     demande avant de les saisir, retient l'approbation pour ces commandes exactes, et redemande quand
     le fichier partagé les change. Les approbations sont une confiance personnelle : elles ne sont
     jamais exportées ni importées avec les paramètres, et **Valeurs par défaut** les efface tout en
-    conservant les sources elles-mêmes
+    conservant les sources elles-mêmes. Retirer une source oublie les approbations de ses sessions
   - L'en-tête de session nomme la passerelle partagée par laquelle passe une session partagée
   - Rechargement automatique : le fichier de chaque source activée est surveillé (y compris les
     enregistrements atomiques des éditeurs et des clients de synchronisation, qui écrivent un fichier
@@ -455,8 +459,10 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     jamais une session de se charger et n'en modifie aucune. Il liste, avec le dossier, la session
     et une courte explication :
     - les sessions ignorées et pourquoi (type non pris en charge, hôte absent, passerelle
-      inutilisable, nom en double dans un dossier, ligne mal formée, ou refus par le filtrage des
-      sessions partagées)
+      inutilisable, nom en double dans un dossier, ligne mal formée), et les sessions que le filtrage
+      des sessions partagées refuse, chacune avec sa raison : un protocole autre que SSH ou RDP, un
+      hôte qui n'est ni un nom d'hôte ni une adresse valide, une passerelle hors de la source, ou une
+      passerelle que le fichier ne définit pas (ou définit avec un hôte refusé)
     - les variables `[NOM]` non résolues
     - nom et hôte différents : le nom de la session n'est ni l'hôte ni le premier élément de l'hôte
       (ce qui précède le premier point), sans tenir compte de la casse ; un hôte donné par une adresse

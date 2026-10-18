@@ -55,4 +55,9 @@ public sealed class EmptySharedSessionProvider : ISharedSessionProvider
 
     /// <inheritdoc />
     public Task LoadAsync(AppSettings settings, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public void ApplyReloadDebounce(AppSettings settings)
+    {
+    }
 }

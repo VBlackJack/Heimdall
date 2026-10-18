@@ -159,6 +159,33 @@ public sealed class SharedSessionProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadBoundedAsync_AFileThatGrowsPastTheLimitWhileRead_IsTooLarge_AndIsNotReadToItsEnd()
+    {
+        // The length is checked before the file is opened, and the file stays open for writing to
+        // every other process: what is read is bounded by the read itself.
+        const long limit = 1000;
+        const long grownTo = 4L * 1024 * 1024;
+        using var growing = new GrowingStream(grownTo);
+
+        byte[]? content = await SharedSessionProvider.ReadBoundedAsync(growing, limit, CancellationToken.None);
+
+        Assert.Null(content);
+        Assert.True(growing.Served < growing.Capacity, $"read {growing.Served} bytes of {growing.Capacity}");
+    }
+
+    [Fact]
+    public async Task ReadBoundedAsync_AFileOfExactlyTheLimit_IsReadWhole()
+    {
+        const int limit = 1000;
+        byte[] bytes = [.. Enumerable.Range(0, limit).Select(index => (byte)index)];
+        using var stream = new MemoryStream(bytes);
+
+        byte[]? content = await SharedSessionProvider.ReadBoundedAsync(stream, limit, CancellationToken.None);
+
+        Assert.Equal(bytes, content);
+    }
+
+    [Fact]
     public async Task LoadAsync_DisabledSource_ReadsNothing()
     {
         SharedSessionProvider provider = new(await LocalizerAsync());
@@ -271,5 +298,48 @@ public sealed class SharedSessionProviderTests : IDisposable
         LocalizationManager localizer = new();
         await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
         return localizer;
+    }
+
+    /// <summary>
+    /// A file another process keeps appending to: no length to ask, and bytes until
+    /// <see cref="Capacity"/>, far past any limit a test sets.
+    /// </summary>
+    private sealed class GrowingStream(long capacity) : Stream
+    {
+        public long Capacity { get; } = capacity;
+
+        public long Served { get; private set; }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => Served;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int served = (int)Math.Min(count, Capacity - Served);
+            Array.Fill(buffer, (byte)'x', offset, served);
+            Served += served;
+            return served;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }

@@ -909,12 +909,14 @@ public partial class App : System.Windows.Application
         // The offline copies live in the data root of this process, and the files are watched: a
         // test builds its provider without either.
         // The passwords a user chose to remember for them are kept beside, never in the settings.
+        // Removing a source forgets both its passwords and the post-connect approvals of its sessions.
         services.AddSingleton(_ => SharedSessionSecretStore.ForDataRoot());
         services.AddSingleton<ISharedSessionProvider>(sp => new SharedSessionProvider(
             sp.GetRequiredService<LocalizationManager>(),
             SharedSessionSourceCache.ForDataRoot(),
             watchSourceFiles: true,
-            secrets: sp.GetRequiredService<SharedSessionSecretStore>()));
+            secrets: sp.GetRequiredService<SharedSessionSecretStore>(),
+            approvals: new SharedPostConnectTrust(sp.GetRequiredService<IConfigManager>())));
         services.AddSingleton(sp => new SharedCredentialApplier(
             sp.GetRequiredService<SharedSessionSecretStore>(),
             sp.GetRequiredService<IDialogService>(),

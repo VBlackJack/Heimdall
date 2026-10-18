@@ -126,6 +126,33 @@ public sealed class SharedSessionSourceWatcher : IDisposable
         }
     }
 
+    /// <summary>How long a file must stay quiet before it is reported.</summary>
+    internal TimeSpan Debounce
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _debounce;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Changes how long a file must stay quiet before it is reported, for the changes that come
+    /// next; the watches themselves are left as they are.
+    /// </summary>
+    public void SetDebounce(TimeSpan debounce)
+    {
+        lock (_gate)
+        {
+            if (!_disposed)
+            {
+                _debounce = debounce;
+            }
+        }
+    }
+
     /// <summary>
     /// Re-arms the timer of <paramref name="sourceId"/>: the source is reported once nothing else
     /// happened to its file for the debounce delay.

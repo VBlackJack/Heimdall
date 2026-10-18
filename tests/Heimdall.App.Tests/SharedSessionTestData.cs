@@ -120,6 +120,9 @@ internal sealed class StubSharedSessionProvider(
 
     public int LoadCount { get; private set; }
 
+    /// <summary>The reload debounces handed over without a load, in order.</summary>
+    public List<int> AppliedReloadDebounces { get; } = [];
+
     /// <summary>The settings the last load was asked to read.</summary>
     public AppSettings? LastLoadedSettings { get; private set; }
 
@@ -151,6 +154,9 @@ internal sealed class StubSharedSessionProvider(
         Changed?.Invoke();
         return Task.CompletedTask;
     }
+
+    public void ApplyReloadDebounce(AppSettings settings) =>
+        AppliedReloadDebounces.Add(settings.SharedSourceReloadDebounceMs);
 
     /// <summary>Raises the reload of one source, as the provider does after a file changed.</summary>
     public void RaiseSourceReloaded(SharedSessionSourceState state, int previousIssueCount = 0)

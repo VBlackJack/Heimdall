@@ -45,6 +45,12 @@ public interface ISharedSessionProvider
     /// </summary>
     Task LoadAsync(AppSettings settings, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Takes the reload debounce of <paramref name="settings"/> for the file watch, reading no file.
+    /// A later <see cref="LoadAsync"/> takes it too; whichever of the two is called last wins.
+    /// </summary>
+    void ApplyReloadDebounce(AppSettings settings);
+
     /// <summary>Raised after a load replaced what is held.</summary>
     event Action? Changed;
 
