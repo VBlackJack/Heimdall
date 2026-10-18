@@ -6171,6 +6171,7 @@
   "_comment_ux_a11y": "",
   "A11yShareFolder": "Share folder",
   "A11ySearchAndFilter": "Search and filter sessions",
+  "A11ySearchAndFilterTools": "Search and filter tools",
   "A11yClearSearchFilter": "Clear search filter",
   "A11yToggleToolsPanel": "Toggle tools panel",
   "SidebarTabSessions": "Sessions",

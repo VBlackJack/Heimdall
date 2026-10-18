@@ -399,7 +399,7 @@
                                     Margin="4,0,0,0"
                                     ToolTip="{loc:Translate TooltipHideSidebar}"
                                     AutomationProperties.Name="{loc:Translate TooltipHideSidebar}"/>
-                            <UniformGrid Columns="2">
+                            <UniformGrid Columns="2" KeyboardNavigation.TabNavigation="Local">
                                 <RadioButton x:Name="SidebarTabSessions"
                                              GroupName="SidebarTabs"
                                              IsChecked="{Binding Sidebar.IsToolsTabActive, Converter={StaticResource InvertBoolConverter}, Mode=OneWay, FallbackValue=True}"
@@ -1427,7 +1427,7 @@
                                              Tag="{loc:Translate ToolsPanelFilterPlaceholder}"
                                              Padding="10,6,28,6"
                                              Text="{Binding Sidebar.FilterText, UpdateSourceTrigger=PropertyChanged}"
-                                             AutomationProperties.Name="{loc:Translate A11ySidebarTabTools}"/>
+                                             AutomationProperties.Name="{loc:Translate A11ySearchAndFilterTools}"/>
                                 </Grid>
                                 <TextBlock x:Name="Mw_SidebarToolsContextText"
                                            DockPanel.Dock="Top"

@@ -6170,6 +6170,7 @@
   "_comment_ux_a11y": "",
   "A11yShareFolder": "Partager le dossier",
   "A11ySearchAndFilter": "Rechercher et filtrer les sessions",
+  "A11ySearchAndFilterTools": "Rechercher et filtrer les outils",
   "A11yClearSearchFilter": "Effacer le filtre de recherche",
   "A11yToggleToolsPanel": "Afficher/masquer le panneau d'outils",
   "SidebarTabSessions": "Sessions",

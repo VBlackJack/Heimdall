@@ -30,7 +30,11 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <ContentPresenter x:Name="HostPresenter" ClipToBounds="True"/>
+            <!-- A hosted view numbers its fields from TabIndex 0: scoped here, those numbers order the
+                 view alone instead of interleaving with the shell's, which sent Tab from a tool's
+                 first field out to the sidebar and back. -->
+            <ContentPresenter x:Name="HostPresenter" ClipToBounds="True"
+                              KeyboardNavigation.TabNavigation="Local"/>
         </Border>
 
         <!-- Loading overlay (visible while HostControl is null during connection) -->
