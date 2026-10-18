@@ -223,7 +223,9 @@ qui doivent d'abord être déverrouillés. Bitwarden et 1Password exigent en plu
 
 **N'utiliser que la première ligne de la sortie** - désactivé par défaut. Certains CLI
 (KeePass2 KPScript, `pass`) impriment le secret suivi d'autres champs : activez-le pour ceux-là.
-Laissez-le désactivé si votre mot de passe contient légitimement un saut de ligne.
+Les préréglages KPScript et `pass` l'activent d'eux-mêmes. Laissez-le désactivé si votre mot de
+passe contient légitimement un saut de ligne. Dans les deux cas, seul le saut de ligne final est
+retiré : un mot de passe qui commence ou finit par une espace la garde.
 
 **Délai d'expiration de la commande** - combien de temps la commande de mot de passe peut tourner
 avant que Heimdall y renonce, de 1000 à 120000 ms. Augmentez-le pour un coffre qui vous demande de
@@ -232,6 +234,15 @@ confirmer chaque requête.
 L'entrée du coffre est cherchée par le **Nom d'entrée du coffre** du profil si vous en
 renseignez un, et par le nom affiché du profil sinon. Renseignez-le quand l'entrée de votre
 coffre ne porte pas exactement le même nom que celle de Heimdall.
+
+**Tester** - saisissez le nom d'une entrée de votre coffre dans **Entrée du coffre à
+rechercher**, puis cliquez sur **Tester** : la commande est exécutée pour cette entrée, comme
+pour une connexion. Le résultat dit si le mot de passe a été trouvé (et le nom d'utilisateur,
+si une commande de nom d'utilisateur est renseignée), si l'outil est introuvable, ou si la
+commande a dépassé le délai.
+
+Un profil SSH ou SFTP qui se connecte par une clé n'interroge pas le coffre : il n'a pas besoin
+de mot de passe.
 
 ## RDP et mémoire
 

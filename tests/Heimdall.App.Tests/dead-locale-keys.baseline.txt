@@ -277,7 +277,6 @@ ErrorConPtyNotAvailable
 ErrorConfigFileUnreadableMessage
 ErrorConfigFileUnreadableTitle
 ErrorCredentialGuardRequired
-ErrorCredentialProviderTimeout
 ErrorCriticalSettingsLoad
 ErrorCsvWriteFailed
 ErrorDaysOfWeekRequired

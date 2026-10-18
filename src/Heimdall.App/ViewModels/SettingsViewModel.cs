@@ -3766,6 +3766,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private string? _credentialProviderTestResult;
 
+    /// <summary>
+    /// The vault entry the Test button looks up. Not saved. The test used to look up an entry
+    /// called "TestEntry", which no vault holds, so it reported a failure for every working setup
+    /// and could not tell a wrong unlock secret from a wrong command.
+    /// </summary>
+    [ObservableProperty]
+    private string _credentialProviderTestEntry = "";
+
     [RelayCommand]
     private async Task ConfigurePinAsync()
     {
@@ -3944,6 +3952,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             return;
         }
 
+        string entry = CredentialProviderTestEntry.Trim();
+        if (entry.Length == 0)
+        {
+            CredentialProviderTestResult = _localizer["CredProvTestNoEntry"];
+            return;
+        }
+
         CredentialProviderTestResult = _localizer["CredProvTestRunning"];
 
         try
@@ -3962,16 +3977,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                     ? null
                     : CredentialProviderKeyFile.Trim());
 
+            // The entry stands in for the host too, so a template keyed on {Host} is tested with
+            // the name typed. No username hint: the username command, when there is one, runs.
             var result = await provider.GetCredentialAsync(
-                "test.example.com", 22, "testuser", "TestEntry", cancellationToken);
+                entry, Heimdall.Core.Models.DefaultPorts.Ssh, null, entry, cancellationToken);
 
-            CredentialProviderTestResult = result is not null
-                ? _localizer["CredProvTestSuccess"]
-                : _localizer["CredProvTestNoResult"];
+            CredentialProviderTestResult = result switch
+            {
+                null => _localizer.Format("CredProvTestNoResult", entry),
+                { Username.Length: > 0 } => _localizer.Format("CredProvTestSuccessWithUser", entry, result.Username),
+                _ => _localizer.Format("CredProvTestSuccess", entry),
+            };
+        }
+        catch (Core.Security.CredentialProviderTimeoutException)
+        {
+            CredentialProviderTestResult = _localizer.Format("CredProvTestTimeout", CredentialProviderTimeoutMs);
+        }
+        catch (Core.Security.CredentialProviderLaunchException ex)
+        {
+            CredentialProviderTestResult = _localizer.Format("CredProvTestNotFound", ex.Executable);
         }
         catch (OperationCanceledException)
         {
-            CredentialProviderTestResult = _localizer["CredProvTestTimeout"];
+            CredentialProviderTestResult = _localizer["CredProvTestCancelled"];
         }
         catch (Exception ex)
         {

@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Text;
 
 namespace Heimdall.Core.Security;
 
@@ -32,10 +34,36 @@ namespace Heimdall.Core.Security;
 ///   <item><c>{Database}</c> - Configured database path</item>
 ///   <item><c>{KeyFile}</c> - Path to the key file (replaces <c>{KeyFile}</c>)</item>
 /// </list>
-/// The command's stdout is captured and trimmed as the password.
+/// The command's stdout is captured as the password, less its final line terminator.
 /// </remarks>
 public sealed class CommandCredentialProvider : ICredentialProvider
 {
+    /// <summary>
+    /// The encoding of every pipe to the credential tool. Without it the pipes take the console
+    /// code page, and Heimdall has no console: they fell back to the ANSI code page, so every
+    /// accented letter of a password came back from keepassxc-cli as two wrong characters, and an
+    /// unlock secret with an accent failed to open the database. keepassxc-cli, bw, op and gopass all
+    /// speak UTF-8. No byte order mark: one at the head of stdin would become part of the secret.
+    /// </summary>
+    private static readonly Encoding PipeEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
+    /// <summary>
+    /// Password manager command-line tools that are known to parse their own arguments and never
+    /// hand them to a shell. Their placeholder values keep every character a vault entry name can
+    /// hold: an entry called "Srv R&amp;D" was looked up as "Srv RD" and never found. Any other
+    /// non-shell executable keeps the relaxed stripping, since what it does with an argument is
+    /// not known.
+    /// </summary>
+    private static readonly HashSet<string> KnownVaultTools = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "keepassxc-cli",
+        "kpscript",
+        "bw",
+        "op",
+        "pass",
+        "gopass",
+    };
+
     private readonly TimeSpan _commandTimeout;
 
     private readonly string? _commandTemplate;
@@ -123,7 +151,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             password = await RunCommandAsync(_commandTemplate, serverHost, port, username, title, ct)
                 .ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (CredentialProviderTimeoutException)
         {
             Logging.FileLogger.Warn("CommandCredentialProvider: command timed out");
             throw;
@@ -168,26 +196,33 @@ public sealed class CommandCredentialProvider : ICredentialProvider
 
             if (!string.IsNullOrWhiteSpace(resolved))
             {
-                return resolved;
+                // A username has no meaningful edge whitespace, unlike a password.
+                return resolved.Trim();
             }
 
             // Empty/failed username command (already logged by RunCommandAsync): fall back to the hint.
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (CredentialProviderTimeoutException)
         {
-            // The username command hit its own timeout (the caller's token is not cancelled).
-            // This must not fail the whole call: fall back to the hint. Never log the value.
+            // The username command hit its own timeout. This must not fail the whole call: fall
+            // back to the hint. Never log the value.
             Logging.FileLogger.Warn("CommandCredentialProvider: username command timed out");
+        }
+        catch (CredentialProviderLaunchException)
+        {
+            // Already logged by RunCommandAsync. The password was found, so the call stands.
         }
 
         return username ?? string.Empty;
     }
 
     /// <summary>
-    /// Executes a single credential command and returns its trimmed stdout, or null when the
-    /// command produced empty output, exited non-zero, or failed to launch. Applies the configured
-    /// timeout and unlock-secret stdin injection, drains stderr, and kills a hung process on
-    /// timeout/cancellation. Throws <see cref="OperationCanceledException"/> on timeout/cancellation.
+    /// Executes a single credential command and returns its stdout less the final line terminator,
+    /// or null when the command produced blank output or exited non-zero. Applies the configured
+    /// timeout and unlock-secret stdin injection, drains stderr, and kills a hung process tree on
+    /// timeout/cancellation. Throws <see cref="CredentialProviderTimeoutException"/> when the
+    /// configured timeout elapses, <see cref="OperationCanceledException"/> when the caller cancels,
+    /// and <see cref="CredentialProviderLaunchException"/> when the executable cannot be started.
     /// </summary>
     private async Task<string?> RunCommandAsync(
         string template,
@@ -209,18 +244,18 @@ public sealed class CommandCredentialProvider : ICredentialProvider
         try
         {
             using var process = new Process();
-            process.StartInfo = new ProcessStartInfo
-            {
-                FileName = executable,
-                Arguments = arguments,
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                RedirectStandardInput = injectUnlockSecret
-            };
+            process.StartInfo = BuildStartInfo(executable, arguments, injectUnlockSecret);
 
-            process.Start();
+            try
+            {
+                process.Start();
+            }
+            catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+            {
+                Logging.FileLogger.Warn(
+                    $"CommandCredentialProvider: failed to start '{executable}': {ex.Message}");
+                throw new CredentialProviderLaunchException(executable, ex);
+            }
 
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             linkedCts.CancelAfter(_commandTimeout);
@@ -260,6 +295,13 @@ public sealed class CommandCredentialProvider : ICredentialProvider
                 // kill the external process before `using` disposes it (Dispose does not terminate the
                 // process), otherwise a hung credential tool is left orphaned holding its database lock.
                 TryKillProcess(process);
+
+                if (!ct.IsCancellationRequested)
+                {
+                    // Only the linked timeout fired: the vault failed, the caller did not cancel.
+                    throw new CredentialProviderTimeoutException(_commandTimeout);
+                }
+
                 throw;
             }
             finally
@@ -278,8 +320,11 @@ public sealed class CommandCredentialProvider : ICredentialProvider
                 return null;
             }
 
-            string output = _firstLineOnly ? FirstNonEmptyLine(stdout) : stdout.Trim();
-            if (string.IsNullOrEmpty(output))
+            // Only the line terminator the tool appends is removed. A password may begin or end
+            // with a space, and keepassxc-cli prints it so; trimming handed the server a different
+            // password from the one in the vault.
+            string output = _firstLineOnly ? FirstNonEmptyLine(stdout) : StripFinalLineTerminator(stdout);
+            if (string.IsNullOrWhiteSpace(output))
             {
                 Logging.FileLogger.Warn("CommandCredentialProvider: command returned empty output");
                 return null;
@@ -287,9 +332,11 @@ public sealed class CommandCredentialProvider : ICredentialProvider
 
             return output;
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) when (ex is OperationCanceledException
+            or CredentialProviderTimeoutException
+            or CredentialProviderLaunchException)
         {
-            // Propagate to the caller, which decides whether a timeout fails the whole lookup
+            // Propagate to the caller, which decides whether the failure ends the whole lookup
             // (password command) or falls back to the hint (username command).
             throw;
         }
@@ -301,6 +348,27 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     }
 
     /// <summary>
+    /// The start parameters of a credential command: no window, no shell, every pipe it uses
+    /// redirected and in <see cref="PipeEncoding"/>.
+    /// </summary>
+    internal static ProcessStartInfo BuildStartInfo(string executable, string arguments, bool redirectStandardInput)
+    {
+        return new ProcessStartInfo
+        {
+            FileName = executable,
+            Arguments = arguments,
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            RedirectStandardInput = redirectStandardInput,
+            StandardOutputEncoding = PipeEncoding,
+            StandardErrorEncoding = PipeEncoding,
+            StandardInputEncoding = redirectStandardInput ? PipeEncoding : null
+        };
+    }
+
+    /// <summary>
     /// Replaces placeholders in the command template with actual values.
     /// Sanitization is context-aware: the executable is extracted from the
     /// raw template to determine whether a shell interpreter is the target.
@@ -309,7 +377,10 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     /// stripping that preserves parentheses, single quotes, and percent signs
     /// in legitimate values (double quotes are always stripped).
     /// The path placeholders (<c>{Database}</c>, <c>{KeyFile}</c>) use a path-aware
-    /// sanitizer for non-shell targets so legitimate path characters survive.
+    /// sanitizer for non-shell targets so legitimate path characters survive, and so do every
+    /// placeholder of a known password manager tool (see <see cref="KnownVaultTools"/>).
+    /// For non-shell targets, a value that ends in backslashes right before a closing double
+    /// quote has them doubled, so the quote still closes the argument (MSVC CRT rules).
     /// </summary>
     internal string ExpandTemplate(
         string template,
@@ -320,16 +391,73 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     {
         var (executable, _) = SplitCommand(template);
         bool shellTarget = InputValidator.IsShellTarget(executable);
-        Func<string?, string> sanitize = shellTarget ? SanitizeStrict : SanitizeRelaxed;
         Func<string?, string> sanitizePath = shellTarget ? SanitizeStrict : SanitizePathValue;
+        Func<string?, string> sanitize = shellTarget
+            ? SanitizeStrict
+            : IsKnownVaultTool(executable) ? SanitizePathValue : SanitizeRelaxed;
 
-        return template
-            .Replace("{Host}", sanitize(host), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Port}", port.ToString(), StringComparison.OrdinalIgnoreCase)
-            .Replace("{User}", sanitize(username), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Title}", sanitize(title), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Database}", sanitizePath(_databasePath), StringComparison.OrdinalIgnoreCase)
-            .Replace("{KeyFile}", sanitizePath(_keyFilePath), StringComparison.OrdinalIgnoreCase);
+        var placeholders = new (string Token, string Value)[]
+        {
+            ("{Host}", sanitize(host)),
+            ("{Port}", port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            ("{User}", sanitize(username)),
+            ("{Title}", sanitize(title)),
+            ("{Database}", sanitizePath(_databasePath)),
+            ("{KeyFile}", sanitizePath(_keyFilePath)),
+        };
+
+        string expanded = template;
+        foreach (var (token, value) in placeholders)
+        {
+            expanded = ReplacePlaceholder(expanded, token, value, protectClosingQuote: !shellTarget);
+        }
+
+        return expanded;
+    }
+
+    /// <summary>
+    /// Replaces every occurrence of <paramref name="token"/>. When the occurrence is followed by
+    /// a double quote and <paramref name="protectClosingQuote"/> is set, trailing backslashes of
+    /// the value are doubled: an entry named <c>share\</c> would otherwise turn the closing quote
+    /// into a literal one and merge the following arguments into it.
+    /// </summary>
+    private static string ReplacePlaceholder(string text, string token, string value, bool protectClosingQuote)
+    {
+        var builder = new StringBuilder(text.Length);
+        int position = 0;
+        while (true)
+        {
+            int index = text.IndexOf(token, position, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+            {
+                builder.Append(text, position, text.Length - position);
+                return builder.ToString();
+            }
+
+            builder.Append(text, position, index - position);
+            int after = index + token.Length;
+            bool closedByQuote = after < text.Length && text[after] == '"';
+            builder.Append(protectClosingQuote && closedByQuote ? DoubleTrailingBackslashes(value) : value);
+            position = after;
+        }
+    }
+
+    private static string DoubleTrailingBackslashes(string value)
+    {
+        int trailing = 0;
+        while (trailing < value.Length && value[value.Length - 1 - trailing] == '\\')
+        {
+            trailing++;
+        }
+
+        return trailing == 0 ? value : value + new string('\\', trailing);
+    }
+
+    /// <summary>Whether the executable is one of <see cref="KnownVaultTools"/>.</summary>
+    private static bool IsKnownVaultTool(string executable)
+    {
+        string stem = Path.GetFileNameWithoutExtension(executable.Trim().TrimEnd('.', ' '));
+        return KnownVaultTools.Contains(stem);
     }
 
     /// <summary>
@@ -398,21 +526,36 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     }
 
     /// <summary>
-    /// Returns the first non-empty, trimmed line of the supplied text, or an empty string
-    /// when every line is blank. Used by the "first line only" output mode.
+    /// Returns the first line of the supplied text that is not blank, without its line
+    /// terminator, or an empty string when every line is blank. Used by the "first line only"
+    /// output mode. Spaces inside the line are part of the value and are kept.
     /// </summary>
     private static string FirstNonEmptyLine(string text)
     {
         foreach (var line in text.Split('\n'))
         {
-            var trimmed = line.Trim();
-            if (trimmed.Length > 0)
+            var value = line.TrimEnd('\r');
+            if (!string.IsNullOrWhiteSpace(value))
             {
-                return trimmed;
+                return value;
             }
         }
 
         return string.Empty;
+    }
+
+    /// <summary>
+    /// Removes the one line terminator (<c>\r\n</c> or <c>\n</c>) a tool prints after its value,
+    /// and nothing else.
+    /// </summary>
+    private static string StripFinalLineTerminator(string text)
+    {
+        if (text.EndsWith("\r\n", StringComparison.Ordinal))
+        {
+            return text[..^2];
+        }
+
+        return text.EndsWith('\n') ? text[..^1] : text;
     }
 
     /// <summary>
@@ -424,7 +567,9 @@ public sealed class CommandCredentialProvider : ICredentialProvider
         {
             if (!process.HasExited)
             {
-                process.Kill();
+                // The whole tree: a template run through cmd /c or wsl leaves the vault tool as a
+                // child, and killing only the parent left it holding the database lock.
+                process.Kill(entireProcessTree: true);
             }
         }
         catch

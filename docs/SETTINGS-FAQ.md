@@ -197,8 +197,9 @@ first. Bitwarden and 1Password additionally need a session established outside H
 (`BW_SESSION`, `op signin`); Heimdall does not establish those for you.
 
 **Use only the first line of output** - off by default. Some CLIs (KeePass2 KPScript, `pass`)
-print the secret followed by other fields: turn it on for those. Leave it off if your password
-legitimately contains a newline.
+print the secret followed by other fields: turn it on for those. The KPScript and `pass` presets
+turn it on themselves. Leave it off if your password legitimately contains a newline. Either way
+only the final line break is removed: a password that begins or ends with a space keeps it.
 
 **Command timeout** - how long the password command may run before Heimdall gives up on it, from
 1000 to 120000 ms. Raise it for a vault that asks you to confirm each request.
@@ -206,6 +207,13 @@ legitimately contains a newline.
 The vault entry is looked up by the profile's **Vault entry name** if you set one, and by the
 profile's display name otherwise. Set it when the entry in your vault is not named exactly like
 the entry in Heimdall.
+
+**Test** - type the name of an entry of your vault in **Vault entry to look up**, then click
+**Test**: the command runs for that entry, as it would for a connection. The result says whether
+the password was found (and the username, when a username command is set), whether the tool
+could not be started, or whether the command ran past the timeout.
+
+An SSH or SFTP profile that signs in with a key does not ask the vault: it needs no password.
 
 ## RDP and memory
 

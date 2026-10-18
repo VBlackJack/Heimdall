@@ -1117,12 +1117,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             // Resolve credentials from external provider if configured and server
             // has no stored password. The retrieved password is DPAPI-encrypted into
             // the DTO so all downstream code (ConnectionService, EmbeddedRdpView) works
-            // without modification.
+            // without modification. A connection that may not ask the user anything - a restore
+            // reconnecting on its own - may not show the vault's failure either: one modal per
+            // restored session arrived unbidden. It goes on without the password, as before.
             _ = await TryResolveExternalCredentialsAsync(
                 serverDto,
                 settings,
                 cancellationToken,
-                skipOnFailure: false);
+                skipOnFailure: !allowCredentialPrompt || failureReport != ConnectFailureReport.Dialog);
 
             // After the gate and after the vault: a shared session takes the passwords its user
             // chose to remember, and is asked for the ones it needs and has no other way to get.
@@ -1471,7 +1473,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         var connType = dto.ConnectionType?.ToUpperInvariant();
 
-        if (connType is "SSH" or "SFTP" && string.IsNullOrEmpty(dto.SshPasswordEncrypted))
+        // A profile that signs in with a key needs no password: the connect path asks for none
+        // (SshHandler.ShouldPromptForPlinkPassword), so the vault was unlocked on every connect for
+        // nothing, and a key profile with no vault entry got a "no password" warning each time.
+        if (connType is "SSH" or "SFTP"
+            && string.IsNullOrEmpty(dto.SshPasswordEncrypted)
+            && string.IsNullOrWhiteSpace(dto.SshKeyPath))
         {
             return new CredentialTarget(
                 dto.SshPort, dto.SshUsername,
@@ -1656,7 +1663,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
         catch (OperationCanceledException)
         {
-            // Propagate cancellation
+            // Propagate cancellation. The provider's own timeout is not one: it arrives below as a
+            // CredentialProviderTimeoutException.
             throw;
         }
         catch (Exception ex)
@@ -1670,9 +1678,25 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
             _dialogService.ShowError(
                 _localizer["ErrorConnectionTitle"],
-                _localizer.Format("ErrorCredentialProviderFailed", ex.Message));
+                DescribeCredentialProviderFailure(ex, serverDto.DisplayName, settings));
             return false;
         }
+    }
+
+    /// <summary>The message a failed external credential lookup is reported with.</summary>
+    internal string DescribeCredentialProviderFailure(Exception failure, string displayName, AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return failure switch
+        {
+            CredentialProviderTimeoutException =>
+                _localizer.Format("ErrorCredentialProviderTimeout", displayName, settings.CredentialProviderTimeoutMs),
+            CredentialProviderLaunchException launch =>
+                _localizer.Format("ErrorCredentialProviderNotFound", launch.Executable),
+            _ => _localizer.Format("ErrorCredentialProviderFailed", failure.Message),
+        };
     }
 
     /// <summary>

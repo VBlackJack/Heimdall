@@ -971,6 +971,51 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task TestCredentialProvider_NoEntryName_AsksForOneWithoutLaunching()
+    {
+        // The test used to look up a fixed "TestEntry", which no vault holds. With no entry
+        // typed there is nothing to look up, so it must say so instead of reporting a failure.
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.CredentialProviderCommand = "cmd.exe /c echo {Title}";
+        viewModel.CredentialProviderTestEntry = "   ";
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer["CredProvTestNoEntry"], viewModel.CredentialProviderTestResult);
+    }
+
+    [Fact]
+    public async Task TestCredentialProvider_LooksUpTheEntryTyped()
+    {
+        // The command fails unless its {Title} is the entry typed, so a success proves the
+        // typed name reached the command rather than a fixed placeholder.
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.CredentialProviderCommand = "cmd.exe /c if {Title}==prod-db (echo found) else (exit 1)";
+        viewModel.CredentialProviderTestEntry = "prod-db";
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.Equal(localizer.Format("CredProvTestSuccess", "prod-db"), viewModel.CredentialProviderTestResult);
+    }
+
+    [Fact]
+    public async Task TestCredentialProvider_MissingTool_NamesTheExecutable()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.CredentialProviderCommand = "heimdall-missing-vault-tool-xyz show \"{Title}\"";
+        viewModel.CredentialProviderTestEntry = "prod-db";
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.Equal(
+            localizer.Format("CredProvTestNotFound", "heimdall-missing-vault-tool-xyz"),
+            viewModel.CredentialProviderTestResult);
+    }
+
+    [Fact]
     public void CollapseTunnelsPanelByDefault_LoadFromSettings_DefaultIsTrue()
     {
         var viewModel = CreateViewModel(new FakeConfigManager());
