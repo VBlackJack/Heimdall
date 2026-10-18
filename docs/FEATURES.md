@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,167 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,169 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -348,7 +348,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Path traversal prevention on local file browser rename/new folder operations
 - ConfigManager concurrency-safe writes via SemaphoreSlim
 - Each write of `settings.json` and `servers.json` is flushed to disk before it replaces the file, and keeps the document it replaces as a last good copy (`settings.json.bak`, `servers.json.bak`, same restricted ACL). A file that is no longer readable JSON is loaded from that copy at startup, and Heimdall says which file was restored and that later changes may be missing
-- Settings import lists first, in full, the settings that decide what runs on this computer: the credential provider and its commands, the tool paths, the external tools (with their executable and whether they run as administrator) and the Git sync address. An export takes any `user:token@` out of the Git sync address
+- Settings import lists first, in full, the settings that decide what runs on this computer: the credential provider and its commands, the tool paths, the external tools (with their executable and whether they run as administrator), the Git sync address and the shared session sources (each with the file it reads). An export takes any `user:token@` out of the Git sync address
 - WebView2 Content Security Policy (CSP) and navigation blocking
 - Embedded WebView documents (Milkdown notes editor, VNC view) enforce an exact scheme/host/port/path origin for accepted `postMessage` traffic and navigation - a substring-style trust match is not used, so a foreign document cannot post into or navigate the host
 - Pageant IPC hardened with self-only DACL on the shared file mapping, cryptographic random suffix in the mapping name (64 bits of entropy), trusted Pageant process whitelist before any agent traffic, and empty-agent preflight check
@@ -467,8 +467,9 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     copy or servers.json, and **Reset defaults** keeps it. Each source in the Settings card has
     **Forget saved passwords**, and removing a source forgets its passwords. Reopening sessions at
     startup and **Connect all** use remembered passwords but never ask; the external credential
-    provider's password comes first, and the Windows Hello gate runs before any remembered password
-    is read. The SFTP pane opened beside a shared SSH session signs in with the same passwords
+    provider's password comes first, looked up by the session's host rather than its name (both
+    come from the shared file, and a lookup by name would hand one machine's entry to a session
+    pointing elsewhere), and the Windows Hello gate runs before any remembered password is read. The SFTP pane opened beside a shared SSH session signs in with the same passwords
 - JSON session imports contain server profiles only. SSH gateway definitions live in `settings.json`
   (`AppSettings.SshGateways`), so test fixtures such as `Heimdall-TestEnv` must inject the
   matching gateway into the exact runtime build configuration before tunneled sessions can resolve it.

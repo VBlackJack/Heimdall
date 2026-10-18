@@ -815,6 +815,8 @@
   "SettingsImportPreviewSensitive": "Check these first: they decide what Heimdall runs on this computer.",
   "SettingsImportValueTool": "{0} ({1})",
   "SettingsImportValueToolAdmin": "{0} ({1}, as administrator)",
+  "SettingsImportValueSharedSource": "{0} ({1})",
+  "SettingsImportValueSharedSourceDisabled": "{0} ({1}, disabled)",
   "SettingsImportValueOn": "On",
   "SettingsImportValueOff": "Off",
   "SettingsImportValueEmpty": "(empty)",

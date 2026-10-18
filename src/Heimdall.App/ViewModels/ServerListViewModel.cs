@@ -1616,9 +1616,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         try
         {
-            var vaultTitle = string.IsNullOrWhiteSpace(serverDto.VaultEntryName)
-                ? serverDto.DisplayName
-                : serverDto.VaultEntryName;
+            var vaultTitle = CredentialLookupTitle(serverDto);
 
             var credential = await provider.GetCredentialAsync(
                 serverDto.RemoteServer, credTarget.Value.Port,
@@ -1670,6 +1668,29 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 _localizer.Format("ErrorCredentialProviderFailed", ex.Message));
             return false;
         }
+    }
+
+    /// <summary>
+    /// The entry name the external credential provider looks the password up by.
+    /// </summary>
+    /// <remarks>
+    /// A shared profile is looked up by its host. Its display name and its host both come from a
+    /// file other people edit, so a lookup by name would hand the vault entry of one machine to a
+    /// session that names it and points at another. Keyed by host, a vault entry only ever reaches
+    /// the host it is filed under, the rule the remembered shared passwords follow too.
+    /// </remarks>
+    internal static string CredentialLookupTitle(ServerProfileDto serverDto)
+    {
+        ArgumentNullException.ThrowIfNull(serverDto);
+
+        if (SharedSessionIds.IsSharedProfile(serverDto))
+        {
+            return serverDto.RemoteServer;
+        }
+
+        return string.IsNullOrWhiteSpace(serverDto.VaultEntryName)
+            ? serverDto.DisplayName
+            : serverDto.VaultEntryName;
     }
 
     private bool ShowConnectionError(string title, string message)

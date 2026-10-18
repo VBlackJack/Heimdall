@@ -214,6 +214,26 @@ public sealed class SettingsTransferTests
         Assert.Contains(@"Helper (\\share\x.exe, as administrator)", preview, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ThePreview_ShowsASharedSourceFirst_WithTheFileItReads()
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync("en");
+        JsonArray sources = new(
+            new JsonObject { ["Id"] = "a1", ["Name"] = "Team", ["Path"] = @"\\share\team.mxtsessions", ["Enabled"] = true },
+            new JsonObject { ["Id"] = "b2", ["Name"] = "Old", ["Path"] = @"C:\old.mxtsessions", ["Enabled"] = false });
+        List<SettingsTransferChange> changes = Enumerable.Range(0, 21)
+            .Select(index => new SettingsTransferChange(nameof(AppSettings.TerminalFontSize), JsonValue.Create(index), JsonValue.Create(index + 1)))
+            .Append(new SettingsTransferChange(nameof(AppSettings.SharedSessionSources), new JsonArray(), sources))
+            .ToList();
+
+        string preview = SettingsImportPreview.Compose(localizer, changes);
+
+        // A file read at every start, from a path that may be a share the file's author owns.
+        Assert.StartsWith(localizer["SettingsImportPreviewSensitive"], preview, StringComparison.Ordinal);
+        Assert.Contains(@"Team (\\share\team.mxtsessions)", preview, StringComparison.Ordinal);
+        Assert.Contains(@"Old (C:\old.mxtsessions, disabled)", preview, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("https://alice:ghp_secret@github.com/team/commands.git", "https://github.com/team/commands.git")]
     [InlineData("https://github.com/team/commands.git", "https://github.com/team/commands.git")]
