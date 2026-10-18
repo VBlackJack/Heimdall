@@ -521,7 +521,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         Mw_SettingsCredProvPreset.Items.Clear();
 
-        foreach (var label in _credentialProviderPresetService.GetPresetLabels())
+        foreach (var label in _credentialProviderPresetService.GetPresetLabels(LocalizeWindowString))
         {
             Mw_SettingsCredProvPreset.Items.Add(label);
         }
@@ -2965,14 +2965,16 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
-        if (!_credentialProviderPresetService.TryGetCommand(
+        if (!_credentialProviderPresetService.TryGetPreset(
                 Mw_SettingsCredProvPreset.SelectedIndex,
-                out var command))
+                out var command,
+                out var firstLineOnly))
         {
             return;
         }
 
         vm.Settings.CredentialProviderCommand = command;
+        vm.Settings.CredentialProviderFirstLineOnly = firstLineOnly;
         vm.Settings.IsDirty = true;
     }
 

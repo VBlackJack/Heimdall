@@ -42,6 +42,37 @@ public sealed class ServerListCredentialTargetTests
         Assert.Null(dto.RdpPasswordEncrypted);
     }
 
+    [Theory]
+    [InlineData("SSH")]
+    [InlineData("SFTP")]
+    public void GetCredentialTarget_SshProfileWithAKey_AsksNothing(string connectionType)
+    {
+        // A key profile needs no password, and the connect path asks for none: the vault was
+        // unlocked on every connect for nothing, and warned "no password" when it held no entry.
+        var dto = new ServerProfileDto
+        {
+            ConnectionType = connectionType,
+            SshKeyPath = @"C:\keys\id_ed25519",
+            SshPasswordEncrypted = null
+        };
+
+        Assert.Null(ServerListViewModel.GetCredentialTarget(dto));
+        Assert.Null(dto.SshPasswordEncrypted);
+    }
+
+    [Fact]
+    public void GetCredentialTarget_SshProfileWithABlankKeyPath_StillTargetsThePassword()
+    {
+        var dto = new ServerProfileDto
+        {
+            ConnectionType = "SSH",
+            SshKeyPath = "   ",
+            SshPasswordEncrypted = null
+        };
+
+        Assert.NotNull(ServerListViewModel.GetCredentialTarget(dto));
+    }
+
     [Fact]
     public void GetCredentialTarget_RdpWithoutStoredPassword_TargetsRdpFields()
     {

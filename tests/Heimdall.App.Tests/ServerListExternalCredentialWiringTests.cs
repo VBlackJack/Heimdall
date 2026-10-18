@@ -226,6 +226,134 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
         Assert.Equal("vault-entry", provider.LastTitle);
     }
 
+    [Fact]
+    public async Task ResolveCredentials_ProviderTimesOut_NoSkip_ShowsTheTimeoutNotACancellation()
+    {
+        // A vault timeout used to arrive as an OperationCanceledException: the connect ended
+        // without a word, as if the user had cancelled it.
+        var provider = new StubCredentialProvider
+        {
+            Exception = new CredentialProviderTimeoutException(TimeSpan.FromMilliseconds(4321))
+        };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var settings = EnabledSettings();
+        settings.CredentialProviderTimeoutMs = 4321;
+
+        var result = await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            CreateSshServer(passwordEncrypted: null), settings, CancellationToken.None, skipOnFailure: false);
+
+        Assert.False(result);
+        Assert.Equal(1, fixture.Dialog.ErrorCount);
+        Assert.Equal(
+            fixture.Localizer.Format("ErrorCredentialProviderTimeout", "SSH Box", 4321),
+            fixture.Dialog.LastErrorMessage);
+    }
+
+    [Fact]
+    public async Task ResolveCredentials_ProviderTimesOut_SkipOnFailure_SkipsTheServer()
+    {
+        // The bulk path: one slow entry is skipped, it does not end the batch.
+        var provider = new StubCredentialProvider
+        {
+            Exception = new CredentialProviderTimeoutException(TimeSpan.FromSeconds(1))
+        };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+
+        var result = await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            CreateSshServer(passwordEncrypted: null), EnabledSettings(), CancellationToken.None, skipOnFailure: true);
+
+        Assert.True(result);
+        Assert.Equal(0, fixture.Dialog.ErrorCount);
+    }
+
+    [Fact]
+    public async Task ResolveCredentials_ToolMissing_NamesTheExecutable()
+    {
+        var provider = new StubCredentialProvider
+        {
+            Exception = new CredentialProviderLaunchException(
+                "keepassxc-cli", new System.ComponentModel.Win32Exception(2))
+        };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            CreateSshServer(passwordEncrypted: null), EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+
+        Assert.Equal(
+            fixture.Localizer.Format("ErrorCredentialProviderNotFound", "keepassxc-cli"),
+            fixture.Dialog.LastErrorMessage);
+    }
+
+    [Fact]
+    public async Task ResolveCredentials_SshProfileWithAKey_NeverRunsTheVaultCommand()
+    {
+        var provider = new StubCredentialProvider { Result = null };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.SshKeyPath = @"C:\keys\id_ed25519";
+
+        var result = await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+
+        Assert.False(result);
+        Assert.Equal(0, provider.CallCount);
+        Assert.Equal(0, fixture.Dialog.WarningCount);
+    }
+
+    [Fact]
+    public async Task Restore_VaultHasNoEntry_RaisesNoModal()
+    {
+        // A restore reconnects on its own, several sessions at launch: the vault's "no password"
+        // warning arrived as one modal per restored session.
+        var provider = new StubCredentialProvider { Result = null };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        await fixture.SeedAsync(CreateSshServer(passwordEncrypted: null));
+
+        await fixture.ViewModel.RestoreServerAsync(
+            "srv-ssh", CancellationToken.None, failureReport: ConnectFailureReport.FailedTabOnly);
+
+        Assert.Equal(1, provider.CallCount);
+        Assert.Equal(0, fixture.Dialog.WarningCount);
+    }
+
+    [Fact]
+    public async Task Connect_VaultHasNoEntry_StillWarnsTheUserWhoAsked()
+    {
+        // Control for the test above: the same profile, connected by hand, keeps its warning.
+        var provider = new StubCredentialProvider { Result = null };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        await fixture.SeedAsync(CreateSshServer(passwordEncrypted: null));
+
+        await fixture.ViewModel.ConnectCommand.ExecuteAsync(fixture.ViewModel.Servers[0]);
+
+        Assert.Equal(1, provider.CallCount);
+        Assert.Equal(1, fixture.Dialog.WarningCount);
+    }
+
+    [Fact]
+    public async Task BulkPlan_VaultTimesOutOnOneServer_SkipsItAndKeepsTheOthers()
+    {
+        var provider = new StubCredentialProvider
+        {
+            ExceptionForTitle = ("SSH Box", new CredentialProviderTimeoutException(TimeSpan.FromSeconds(1))),
+            Result = new CredentialResult("", "s3cr3t")
+        };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var slow = CreateSshServer(passwordEncrypted: null);
+        var fast = CreateSshServer(passwordEncrypted: null);
+        fast.Id = "srv-ssh-2";
+        fast.DisplayName = "SSH Box 2";
+        await fixture.SeedAsync(slow, fast);
+
+        var plan = await fixture.ViewModel.PrepareBulkConnectPlanAsync(
+            fixture.ViewModel.Servers.ToList(), CancellationToken.None);
+
+        Assert.Equal(1, plan.ConnectableCount);
+        var skip = Assert.Single(plan.Skips.Occurred);
+        Assert.Equal(BulkConnectSkipReason.ExternalCredentialsUnresolved, skip.Key);
+        Assert.Equal(1, skip.Value);
+    }
+
     private static AppSettings EnabledSettings() => new()
     {
         UseExternalCredentialProvider = true,
@@ -248,16 +376,42 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
     {
         private readonly string _rootPath;
 
-        private Fixture(string rootPath, ServerListViewModel viewModel, RecordingDialogService dialog)
+        private Fixture(
+            string rootPath,
+            ServerListViewModel viewModel,
+            RecordingDialogService dialog,
+            ConfigManager configManager,
+            LocalizationManager localizer)
         {
             _rootPath = rootPath;
             ViewModel = viewModel;
             Dialog = dialog;
+            ConfigManager = configManager;
+            Localizer = localizer;
         }
 
         public ServerListViewModel ViewModel { get; }
 
         public RecordingDialogService Dialog { get; }
+
+        public ConfigManager ConfigManager { get; }
+
+        public LocalizationManager Localizer { get; }
+
+        /// <summary>Saves the profiles, enables the provider and loads the list.</summary>
+        public async Task SeedAsync(params ServerProfileDto[] servers)
+        {
+            await ConfigManager.SaveServersAsync([.. servers]);
+            await ConfigManager.MergeSettingAsync(settings =>
+            {
+                settings.UseExternalCredentialProvider = true;
+                settings.CredentialProviderCommand = "ignored-by-fake-factory";
+            });
+
+            ViewModel.LoadServers(
+                await ConfigManager.LoadServersAsync(),
+                await ConfigManager.LoadSettingsAsync());
+        }
 
         public static async Task<Fixture> CreateAsync(ICredentialProviderFactory factory)
         {
@@ -289,7 +443,7 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
                 knownHostsImporter,
                 credentialProviderFactory: factory);
 
-            return new Fixture(rootPath, viewModel, dialog);
+            return new Fixture(rootPath, viewModel, dialog, configManager, localizer);
         }
 
         public ValueTask DisposeAsync()
@@ -332,7 +486,12 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
 
         public Exception? Exception { get; init; }
 
+        /// <summary>An exception thrown only for the entry of that title.</summary>
+        public (string Title, Exception Exception)? ExceptionForTitle { get; init; }
+
         public string? LastTitle { get; private set; }
+
+        public int CallCount { get; private set; }
 
         public Task<CredentialResult?> GetCredentialAsync(
             string serverHost,
@@ -342,6 +501,12 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
             CancellationToken ct = default)
         {
             LastTitle = title;
+            CallCount++;
+            if (ExceptionForTitle is { } scoped && scoped.Title == title)
+            {
+                return Task.FromException<CredentialResult?>(scoped.Exception);
+            }
+
             if (Exception is not null)
             {
                 return Task.FromException<CredentialResult?>(Exception);
@@ -392,9 +557,15 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
 
         public int ErrorCount { get; private set; }
 
+        public string? LastErrorMessage { get; private set; }
+
         public void ShowWarning(string title, string message) => WarningCount++;
 
-        public void ShowError(string title, string message) => ErrorCount++;
+        public void ShowError(string title, string message)
+        {
+            ErrorCount++;
+            LastErrorMessage = message;
+        }
 
         public void ShowInfo(string title, string message)
         {

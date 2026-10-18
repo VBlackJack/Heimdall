@@ -196,14 +196,75 @@ public class CommandCredentialProviderTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public async Task GetCredentialAsync_TrimsWhitespaceFromOutput()
+    public async Task GetCredentialAsync_StripsOnlyTheFinalLineTerminator()
     {
-        // cmd.exe /c echo adds a trailing newline; verify it's trimmed
-        var provider = CreateProvider("cmd.exe /c echo   padded-output  ");
+        // cmd.exe /c echo appends CRLF; that terminator, and only it, is removed.
+        var provider = CreateProvider("cmd.exe /c echo padded-output");
         var result = await provider.GetCredentialAsync("host", 22, "user", "title");
 
         Assert.NotNull(result);
         Assert.Equal("padded-output", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_KeepsSpacesAtTheEdgesOfThePassword()
+    {
+        // keepassxc-cli prints a password that begins or ends with a space as it is; trimming
+        // the output handed the server another password. `sort` echoes stdin back unchanged.
+        var provider = CreateProvider("cmd.exe /c sort", unlockSecret: "  pw with spaces  ");
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal("  pw with spaces  ", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_BlankOutput_ReturnsNull()
+    {
+        var provider = CreateProvider("cmd.exe /c sort", unlockSecret: "   ");
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_DecodesTheToolOutputAsUtf8()
+    {
+        // `type` copies a file's bytes to stdout untouched, so the bytes are UTF-8 whatever the
+        // console code page is, as keepassxc-cli's are.
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-utf8-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(path, "motdepassé\r\n", new System.Text.UTF8Encoding(false));
+        try
+        {
+            var provider = CreateProvider("cmd.exe /c type \"{Database}\"", databasePath: path);
+            var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+            Assert.NotNull(result);
+            Assert.Equal("motdepassé", result.Password);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void BuildStartInfo_EveryRedirectedPipeIsUtf8WithoutAByteOrderMark()
+    {
+        // The test host has a console and Heimdall has none, so a round trip through a child
+        // process here cannot show the default Heimdall gets (the ANSI code page). The decision
+        // itself is asserted instead.
+        var startInfo = CommandCredentialProvider.BuildStartInfo("tool.exe", "args", redirectStandardInput: true);
+
+        foreach (var encoding in new[]
+                 {
+                     startInfo.StandardOutputEncoding, startInfo.StandardErrorEncoding, startInfo.StandardInputEncoding
+                 })
+        {
+            Assert.NotNull(encoding);
+            Assert.Equal(65001, encoding.CodePage);
+            Assert.Empty(encoding.GetPreamble());
+        }
     }
 
     // ---------------------------------------------------------------
@@ -250,6 +311,35 @@ public class CommandCredentialProviderTests
             () => provider.GetCredentialAsync("host", 22, "user", "title", cts.Token));
     }
 
+    [Fact]
+    public async Task GetCredentialAsync_OwnTimeout_ThrowsTimeoutNotCancellation()
+    {
+        // The configured timeout is a vault failure, not the caller cancelling: callers report
+        // or skip it, and treat only a real cancellation as one.
+        var provider = new CommandCredentialProvider("cmd.exe /c ping -n 30 127.0.0.1", null, timeoutMs: 500);
+
+        var exception = await Assert.ThrowsAsync<CredentialProviderTimeoutException>(
+            () => provider.GetCredentialAsync("host", 22, "user", "title"));
+
+        Assert.Equal(TimeSpan.FromMilliseconds(500), exception.Timeout);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_UsernameCommandTimesOut_FallsBackToHint()
+    {
+        var provider = new CommandCredentialProvider(
+            "cmd.exe /c echo secret",
+            null,
+            timeoutMs: 3000,
+            usernameCommandTemplate: "cmd.exe /c ping -n 30 127.0.0.1");
+
+        var result = await provider.GetCredentialAsync("host", 22, null, "title");
+
+        Assert.NotNull(result);
+        Assert.Equal(string.Empty, result.Username);
+        Assert.Equal("secret", result.Password);
+    }
+
     // ---------------------------------------------------------------
     // CancellationToken respected
     // ---------------------------------------------------------------
@@ -271,13 +361,34 @@ public class CommandCredentialProviderTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public async Task GetCredentialAsync_InvalidExecutable_ReturnsNull()
+    public async Task GetCredentialAsync_InvalidExecutable_ThrowsLaunchFailure()
     {
+        // Reported apart from "no password": the advice for a missing tool is not the advice
+        // for a wrong entry name.
         var provider = CreateProvider(
             "nonexistent-binary-xyz --get-password");
-        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
 
-        Assert.Null(result);
+        var exception = await Assert.ThrowsAsync<CredentialProviderLaunchException>(
+            () => provider.GetCredentialAsync("host", 22, "user", "title"));
+
+        Assert.Equal("nonexistent-binary-xyz", exception.Executable);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_UsernameCommandMissing_FallsBackToHint()
+    {
+        var provider = CreateProvider(
+            "cmd.exe /c echo secret",
+            usernameCommandTemplate: "nonexistent-binary-xyz --get-user");
+
+        var result = await provider.GetCredentialAsync("host", 22, "hint", "title");
+        Assert.NotNull(result);
+        Assert.Equal("hint", result.Username);
+
+        var unhinted = await provider.GetCredentialAsync("host", 22, null, "title");
+        Assert.NotNull(unhinted);
+        Assert.Equal(string.Empty, unhinted.Username);
+        Assert.Equal("secret", unhinted.Password);
     }
 
     // ---------------------------------------------------------------
@@ -363,12 +474,84 @@ public class CommandCredentialProviderTests
     }
 
     [Fact]
-    public void ExpandTemplate_RegularExe_StillStripsSemicolon()
+    public void ExpandTemplate_UnknownRegularExe_StillStripsSemicolon()
     {
-        var provider = CreateProvider("op.exe get {Host}");
+        // An executable that is not a known password manager keeps the relaxed stripping:
+        // what it does with an argument is not known.
+        var provider = CreateProvider("mytool.exe get {Host}");
         var expanded = provider.ExpandTemplate(
-            "op.exe get {Host}", "host;injected", 22, "user", "title");
-        Assert.Equal("op.exe get hostinjected", expanded);
+            "mytool.exe get {Host}", "host;injected", 22, "user", "title");
+        Assert.Equal("mytool.exe get hostinjected", expanded);
+    }
+
+    [Theory]
+    [InlineData("keepassxc-cli")]
+    [InlineData("keepassxc-cli.exe")]
+    [InlineData(@"C:\Program Files\KeePassXC\keepassxc-cli.exe")]
+    [InlineData("KPScript.exe")]
+    [InlineData("bw")]
+    [InlineData("op.exe")]
+    [InlineData("pass")]
+    [InlineData("gopass")]
+    public void ExpandTemplate_KnownVaultTool_KeepsEveryCharacterOfTheEntryName(string executable)
+    {
+        // An entry called "Srv R&D" was looked up as "Srv RD" and never found (measured with
+        // keepassxc-cli 2.7). These tools take their arguments from the process, no shell.
+        string template = executable.Contains(' ') ? $"\"{executable}\" show \"{{Title}}\"" : $"{executable} show \"{{Title}}\"";
+        var provider = CreateProvider(template);
+
+        var expanded = provider.ExpandTemplate(template, "host", 22, "user", "Srv R&D; $x|y<z>`w");
+
+        Assert.EndsWith("show \"Srv R&D; $x|y<z>`w\"", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_KnownVaultTool_StillStripsDoubleQuoteAndNewlines()
+    {
+        var provider = CreateProvider("keepassxc-cli show \"{Title}\"");
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli show \"{Title}\"", "host", 22, "user", "a\"b\r\nc");
+        Assert.Equal("keepassxc-cli show \"abc\"", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_TrailingBackslashBeforeAClosingQuote_IsDoubled()
+    {
+        // "share\" would read as an escaped quote and merge the arguments that follow.
+        var provider = CreateProvider("keepassxc-cli show \"{Title}\" -a Password");
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli show \"{Title}\" -a Password", "host", 22, "user", @"share\");
+        Assert.Equal(@"keepassxc-cli show ""share\\"" -a Password", expanded);
+    }
+
+    [Fact]
+    public void ExpandTemplate_TrailingBackslashNotBeforeAQuote_IsLeftAlone()
+    {
+        var provider = CreateProvider("keepassxc-cli show {Title} -a Password");
+        var expanded = provider.ExpandTemplate(
+            "keepassxc-cli show {Title} -a Password", "host", 22, "user", @"share\");
+        Assert.Equal(@"keepassxc-cli show share\ -a Password", expanded);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_TrailingBackslashEntry_ReachesTheToolAsOneArgument()
+    {
+        // End to end through the CRT argument parser of a real child: findstr receives the
+        // value as one argument only if the closing quote survived the backslash.
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-bs-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(path, "line with share\\ inside\r\n");
+        try
+        {
+            var finder = CreateProvider("findstr.exe /l /c:\"{Title}\" \"{Database}\"", databasePath: path);
+            var result = await finder.GetCredentialAsync("host", 22, "user", @"share\");
+
+            Assert.NotNull(result);
+            Assert.Equal(@"line with share\ inside", result.Password);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -493,6 +676,18 @@ public class CommandCredentialProviderTests
 
         Assert.NotNull(result);
         Assert.Equal("realvalue", result.Password);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_FirstLineOnly_KeepsSpacesAtTheEdgesOfTheLine()
+    {
+        // `sort` puts the line starting with a space first, then the status line.
+        var provider = CreateProvider(
+            "cmd.exe /c sort", unlockSecret: " pw \nOK: done", firstLineOnly: true);
+        var result = await provider.GetCredentialAsync("host", 22, "user", "title");
+
+        Assert.NotNull(result);
+        Assert.Equal(" pw ", result.Password);
     }
 
     [Fact]

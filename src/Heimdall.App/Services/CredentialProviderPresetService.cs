@@ -21,40 +21,53 @@ namespace Heimdall.App.Services;
 /// </summary>
 public sealed class CredentialProviderPresetService
 {
+    /// <summary>The locale key of the first entry, which applies no preset.</summary>
+    internal const string CustomLabelKey = "CredProvPresetCustom";
+
+    // Product names are not translated; only the "Custom" entry is, through CustomLabelKey.
+    // 1Password: "op read op://{Title}/password" named a vault called {Title} and an item called
+    // "password", with no field, which op rejects; "op item get" looks the item up by name.
+    // KPScript prints an "OK: ..." status line after the value and pass prints the notes after
+    // the password, so both presets turn "first line only" on.
     private static readonly CredentialProviderPreset[] Presets =
     [
-        new("Custom", ""),
-        new("KeePassXC", "keepassxc-cli show -s -q -a Password \"{Database}\" \"{Title}\""),
-        new("KeePassXC (key file)", "keepassxc-cli show -s -q -k \"{KeyFile}\" -a Password \"{Database}\" \"{Title}\""),
-        new("KeePassXC (key file only)", "keepassxc-cli show -s -q --no-password -k \"{KeyFile}\" -a Password \"{Database}\" \"{Title}\""),
-        new("KeePass2 (KPScript)", "KPScript.exe -c:GetEntryString \"{Database}\" -Field:Password -ref-Title:\"{Title}\""),
-        new("Bitwarden CLI", "bw get password \"{Title}\""),
-        new("1Password CLI", "op read \"op://{Title}/password\""),
-        new("pass (GPG)", "pass show \"{Title}\""),
+        new(null, "", FirstLineOnly: false),
+        new("KeePassXC", "keepassxc-cli show -s -q -a Password \"{Database}\" \"{Title}\"", FirstLineOnly: false),
+        new("KeePassXC (key file)", "keepassxc-cli show -s -q -k \"{KeyFile}\" -a Password \"{Database}\" \"{Title}\"", FirstLineOnly: false),
+        new("KeePassXC (key file only)", "keepassxc-cli show -s -q --no-password -k \"{KeyFile}\" -a Password \"{Database}\" \"{Title}\"", FirstLineOnly: false),
+        new("KeePass2 (KPScript)", "KPScript.exe -c:GetEntryString \"{Database}\" -Field:Password -ref-Title:\"{Title}\"", FirstLineOnly: true),
+        new("Bitwarden CLI", "bw get password \"{Title}\"", FirstLineOnly: false),
+        new("1Password CLI", "op item get \"{Title}\" --fields label=password --reveal", FirstLineOnly: false),
+        new("pass (GPG)", "pass show \"{Title}\"", FirstLineOnly: true),
     ];
 
     /// <summary>
     /// Gets the labels shown in the preset selector, preserving display order.
     /// </summary>
-    public IReadOnlyList<string> GetPresetLabels()
+    /// <param name="localize">Resolves the locale key of the "Custom" entry.</param>
+    public IReadOnlyList<string> GetPresetLabels(Func<string, string> localize)
     {
-        return Presets.Select(static preset => preset.Label).ToArray();
+        ArgumentNullException.ThrowIfNull(localize);
+        return Presets.Select(preset => preset.Label ?? localize(CustomLabelKey)).ToArray();
     }
 
     /// <summary>
-    /// Resolves a preset command by its selector index.
+    /// Resolves a preset by its selector index: its command and whether its tool prints more
+    /// than the value, so that only the first line is to be read.
     /// </summary>
-    public bool TryGetCommand(int selectedIndex, out string command)
+    public bool TryGetPreset(int selectedIndex, out string command, out bool firstLineOnly)
     {
         if (selectedIndex <= 0 || selectedIndex >= Presets.Length)
         {
             command = string.Empty;
+            firstLineOnly = false;
             return false;
         }
 
         command = Presets[selectedIndex].Command;
+        firstLineOnly = Presets[selectedIndex].FirstLineOnly;
         return true;
     }
 
-    private sealed record CredentialProviderPreset(string Label, string Command);
+    private sealed record CredentialProviderPreset(string? Label, string Command, bool FirstLineOnly);
 }

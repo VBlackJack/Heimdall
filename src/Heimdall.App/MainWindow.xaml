@@ -4856,12 +4856,22 @@
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderTimeoutMs]}"/>
                                             <TextBlock Text="{loc:Translate SettingsCredProviderTimeoutHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmallCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                        <DockPanel Margin="0,16,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
-                                            <Button x:Name="Mw_SettingsCredProvTestBtn" DockPanel.Dock="Right" Content="{loc:Translate CredProvBtnTest}" Command="{Binding Settings.TestCredentialProviderCommand}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,4" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate CredProvBtnTest}"/>
+                                        <StackPanel Margin="0,16,0,0" IsEnabled="{Binding Settings.UseExternalCredentialProvider}" AutomationProperties.HelpText="{Binding Settings.CredProvHelpText}">
+                                            <TextBlock x:Name="Mw_SettingsCredProvTestEntryLabel" Text="{loc:Translate CredProvTestEntryLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" x:Name="Mw_SettingsCredProvTestEntry" Text="{Binding Settings.CredentialProviderTestEntry, UpdateSourceTrigger=PropertyChanged}" Tag="{loc:Translate CredProvTestEntryPlaceholder}"
+                                                         AutomationProperties.LabeledBy="{x:Reference Mw_SettingsCredProvTestEntryLabel}"
+                                                         AutomationProperties.HelpText="{loc:Translate CredProvTestEntryPlaceholder}"/>
+                                                <Button Grid.Column="1" x:Name="Mw_SettingsCredProvTestBtn" Content="{loc:Translate CredProvBtnTest}" Command="{Binding Settings.TestCredentialProviderCommand}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,4" Margin="4,0,0,0" FontSize="{StaticResource FontSizeCaption}" AutomationProperties.Name="{loc:Translate CredProvBtnTest}"/>
+                                            </Grid>
                                             <TextBlock x:Name="Mw_SettingsCredProvTestResult" Text="{Binding Settings.CredentialProviderTestResult, NotifyOnTargetUpdated=True}"
                                                        AutomationProperties.LiveSetting="Polite"
-                                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" FontStyle="Italic" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                        </DockPanel>
+                                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsCredProvFirstLineOnly" Content="{loc:Translate SettingsLabelCredProviderFirstLineOnly}" IsChecked="{Binding Settings.CredentialProviderFirstLineOnly}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,16,0,0"
                                                   AutomationProperties.HelpText="{loc:Translate SettingsCredProviderFirstLineOnlyHelp}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CredentialProviderFirstLineOnly]}"/>
