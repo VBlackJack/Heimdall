@@ -35,9 +35,11 @@ internal static class SettingsImportPreview
     private const string Ellipsis = "...";
 
     /// <summary>
-    /// Settings that decide what runs on this computer: commands, executables and where code is
-    /// fetched from. A settings file is shared between people, and these are the lines an author
-    /// with bad intent would hide among harmless ones.
+    /// Settings that decide what runs on this computer: commands, executables, where code is
+    /// fetched from, and the shared session files read at every start (a session file names hosts
+    /// and the commands typed into them, and a network path is opened with the user's Windows
+    /// sign-in). A settings file is shared between people, and these are the lines an author with
+    /// bad intent would hide among harmless ones.
     /// </summary>
     internal static readonly IReadOnlySet<string> SensitiveKeys = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -57,6 +59,7 @@ internal static class SettingsImportPreview
         "NirSoftPath",
         "NanaRunPath",
         "CmdLibGitSyncUrl",
+        "SharedSessionSources",
     };
 
     private const string ListSeparator = ", ";
@@ -127,19 +130,26 @@ internal static class SettingsImportPreview
         return localizer.Format(
             "SettingsImportPreviewLine",
             name,
-            fullLength ? DescribeFullValue(localizer, change.Before) : DescribeValue(localizer, change.Before),
-            fullLength ? DescribeFullValue(localizer, change.After) : DescribeValue(localizer, change.After));
+            fullLength ? DescribeFullValue(localizer, change.Before, change.Key) : DescribeValue(localizer, change.Before),
+            fullLength ? DescribeFullValue(localizer, change.After, change.Key) : DescribeValue(localizer, change.After));
     }
 
-    /// <summary>A sensitive value as the preview shows it: never cut, a tool list tool by tool.</summary>
-    internal static string DescribeFullValue(LocalizationManager localizer, JsonNode? value)
+    /// <summary>
+    /// A sensitive value as the preview shows it: never cut, a tool list tool by tool, a list of
+    /// shared session sources source by source.
+    /// </summary>
+    /// <param name="key">The setting the value belongs to; it decides how a list of entries reads.</param>
+    internal static string DescribeFullValue(LocalizationManager localizer, JsonNode? value, string? key = null)
     {
         ArgumentNullException.ThrowIfNull(localizer);
 
         switch (value)
         {
             case JsonArray array when array.Count > 0 && array.All(item => item is JsonObject):
-                return string.Join(ListSeparator, array.Select(item => DescribeTool(localizer, (JsonObject)item!)));
+                Func<JsonObject, string> describe = string.Equals(key, "SharedSessionSources", StringComparison.Ordinal)
+                    ? source => DescribeSharedSource(localizer, source)
+                    : tool => DescribeTool(localizer, tool);
+                return string.Join(ListSeparator, array.Select(item => describe((JsonObject)item!)));
             case JsonValue scalar when scalar.GetValueKind() == JsonValueKind.String
                 && !string.IsNullOrEmpty(scalar.GetValue<string>()):
                 return scalar.GetValue<string>();
@@ -154,6 +164,18 @@ internal static class SettingsImportPreview
         string executable = ReadString(tool, "ExecutablePath");
         bool elevated = tool["RunAsAdministrator"]?.GetValueKind() == JsonValueKind.True;
         return localizer.Format(elevated ? "SettingsImportValueToolAdmin" : "SettingsImportValueTool", name, executable);
+    }
+
+    /// <summary>A shared session source: its name and the file it reads, and whether it is off.</summary>
+    private static string DescribeSharedSource(LocalizationManager localizer, JsonObject source)
+    {
+        string name = ReadString(source, "Name");
+        string path = ReadString(source, "Path");
+        bool disabled = source["Enabled"]?.GetValueKind() == JsonValueKind.False;
+        return localizer.Format(
+            disabled ? "SettingsImportValueSharedSourceDisabled" : "SettingsImportValueSharedSource",
+            name,
+            path);
     }
 
     private static string ReadString(JsonObject obj, string property)

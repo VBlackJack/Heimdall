@@ -55,7 +55,7 @@ A remembered password is yours alone. It stays on this computer, encrypted for y
 
 A remembered password belongs to one bastion (its host, port and login) or to one session (the session, its host, port and login). If the shared file sends a session to another host or another login, Heimdall asks again instead of sending the old password. When a server refuses a remembered password, Heimdall forgets it and asks again next time.
 
-- If you use an external credential provider, its password comes first: a remembered password only fills what it leaves empty.
+- If you use an external credential provider, its password comes first: a remembered password only fills what it leaves empty. For a shared session the provider is asked for the entry named after the session's **host**, not after the session's name: file your vault entries under the host name (for example `srv-app-01.corp.example`).
 - When **Windows Hello** is required to connect, it is asked before any remembered password is used.
 - Reopening sessions at startup and **Connect all** use remembered passwords but never ask: a session without one asks when you open it alone.
 - An RDP session asks for its password in the RDP window, which Heimdall does not remember. The password of its bastion is remembered like any other.

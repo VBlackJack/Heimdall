@@ -55,7 +55,7 @@ Un mot de passe mémorisé n'appartient qu'à vous. Il reste sur cet ordinateur,
 
 Un mot de passe mémorisé appartient à un bastion (son hôte, son port et son identifiant) ou à une session (la session, son hôte, son port et son identifiant). Si le fichier partagé envoie une session vers un autre hôte ou un autre identifiant, Heimdall redemande au lieu d'envoyer l'ancien mot de passe. Quand un serveur refuse un mot de passe mémorisé, Heimdall l'oublie et redemande la fois suivante.
 
-- Si vous utilisez un fournisseur d'identifiants externe, son mot de passe passe en premier : un mot de passe mémorisé ne complète que ce qu'il laisse vide.
+- Si vous utilisez un fournisseur d'identifiants externe, son mot de passe passe en premier : un mot de passe mémorisé ne complète que ce qu'il laisse vide. Pour une session partagée, le fournisseur reçoit l'entrée nommée d'après l'**hôte** de la session, pas d'après son nom : rangez vos entrées de coffre sous le nom d'hôte (par exemple `srv-app-01.corp.example`).
 - Quand **Windows Hello** est exigé pour se connecter, il est demandé avant qu'aucun mot de passe mémorisé ne soit utilisé.
 - La réouverture des sessions au démarrage et **Tout connecter** utilisent les mots de passe mémorisés mais ne demandent jamais rien : une session qui n'en a pas le demande quand vous l'ouvrez seule.
 - Une session RDP demande son mot de passe dans la fenêtre RDP, que Heimdall ne mémorise pas. Le mot de passe de son bastion est mémorisé comme les autres.

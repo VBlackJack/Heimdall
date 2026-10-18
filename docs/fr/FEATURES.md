@@ -326,7 +326,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 167 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 169 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -348,7 +348,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - Prévention de la traversée de chemins sur les opérations de renommage et de création de dossier du navigateur de fichiers local
 - Écritures de ConfigManager sûres en concurrence via SemaphoreSlim
 - Chaque écriture de `settings.json` et `servers.json` est vidée sur le disque avant de remplacer le fichier, et garde le document qu'elle remplace comme dernière copie valide (`settings.json.bak`, `servers.json.bak`, avec la même ACL restrictive). Un fichier qui n'est plus du JSON lisible est chargé depuis cette copie au démarrage, et Heimdall indique quel fichier a été restauré et que des changements ultérieurs peuvent manquer
-- L'import des paramètres liste d'abord, en entier, les réglages qui décident de ce qui s'exécute sur cet ordinateur : le fournisseur d'identifiants et ses commandes, les chemins d'outils, les outils externes (avec leur exécutable et s'ils s'exécutent en administrateur) et l'adresse de synchronisation Git. Un export retire tout `user:token@` de l'adresse de synchronisation Git
+- L'import des paramètres liste d'abord, en entier, les réglages qui décident de ce qui s'exécute sur cet ordinateur : le fournisseur d'identifiants et ses commandes, les chemins d'outils, les outils externes (avec leur exécutable et s'ils s'exécutent en administrateur), l'adresse de synchronisation Git et les sources de sessions partagées (chacune avec le fichier qu'elle lit). Un export retire tout `user:token@` de l'adresse de synchronisation Git
 - Content Security Policy (CSP) et blocage de navigation pour WebView2
 - Les documents WebView embarqués (éditeur de notes Milkdown, vue VNC) imposent une origine exacte schéma/hôte/port/chemin pour le trafic `postMessage` accepté et pour la navigation - aucune correspondance de confiance par sous-chaîne n'est utilisée, si bien qu'un document étranger ne peut ni poster vers l'hôte ni le faire naviguer
 - IPC Pageant durcie : DACL réservée à soi-même sur le mappage de fichier partagé, suffixe aléatoire cryptographique dans le nom du mappage (64 bits d'entropie), liste blanche des processus Pageant de confiance avant tout trafic d'agent, et vérification préalable d'agent vide
@@ -482,7 +482,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     source de la carte des paramètres a **Oublier les mots de passe enregistrés**, et supprimer une
     source oublie ses mots de passe. La réouverture des sessions au démarrage et **Tout connecter**
     utilisent les mots de passe mémorisés sans jamais demander ; le mot de passe du fournisseur
-    d'identifiants externe passe en premier, et Windows Hello est demandé avant toute lecture d'un
+    d'identifiants externe passe en premier, cherché par l'hôte de la session et non par son nom
+    (les deux viennent du fichier partagé, et une recherche par nom donnerait l'entrée d'une
+    machine à une session qui pointe ailleurs), et Windows Hello est demandé avant toute lecture d'un
     mot de passe mémorisé. Le panneau SFTP ouvert à côté d'une session SSH partagée se connecte avec
     les mêmes mots de passe
 - Les imports de sessions JSON ne contiennent que des profils de serveurs. Les définitions de passerelles SSH vivent dans `settings.json`

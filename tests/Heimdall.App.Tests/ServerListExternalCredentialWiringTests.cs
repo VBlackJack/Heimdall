@@ -189,6 +189,43 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
         Assert.Equal(0, fixture.Dialog.WarningCount);
     }
 
+    [Fact]
+    public async Task ResolveCredentials_SharedProfile_LooksTheVaultUpByHostNotByName()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+
+        // The shared file names the session after a machine and points it at another.
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.Id = SharedSessionIds.PrefixFor("teamsource") + "0123abcd";
+        dto.DisplayName = "prod-db";
+        dto.RemoteServer = "elsewhere.example.com";
+        dto.VaultEntryName = "prod-db";
+
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+
+        Assert.Equal("elsewhere.example.com", provider.LastTitle);
+    }
+
+    [Fact]
+    public async Task ResolveCredentials_LocalProfile_LooksTheVaultUpByEntryNameThenDisplayName()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+
+        var named = CreateSshServer(passwordEncrypted: null);
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            named, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+        Assert.Equal("SSH Box", provider.LastTitle);
+
+        var referenced = CreateSshServer(passwordEncrypted: null);
+        referenced.VaultEntryName = "vault-entry";
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            referenced, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+        Assert.Equal("vault-entry", provider.LastTitle);
+    }
+
     private static AppSettings EnabledSettings() => new()
     {
         UseExternalCredentialProvider = true,
@@ -295,6 +332,8 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
 
         public Exception? Exception { get; init; }
 
+        public string? LastTitle { get; private set; }
+
         public Task<CredentialResult?> GetCredentialAsync(
             string serverHost,
             int port,
@@ -302,6 +341,7 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
             string? title,
             CancellationToken ct = default)
         {
+            LastTitle = title;
             if (Exception is not null)
             {
                 return Task.FromException<CredentialResult?>(Exception);
