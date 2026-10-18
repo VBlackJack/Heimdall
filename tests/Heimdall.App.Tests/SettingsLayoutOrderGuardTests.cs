@@ -71,9 +71,12 @@ public sealed class SettingsLayoutOrderGuardTests
         Assert.True(
             general.IndexOf(Named("Mw_SettingsAppearanceTitle")) < general.IndexOf(Named("Mw_SettingsOnboardingTitle")),
             "Appearance comes before the welcome tour on General");
-        XElement cards = Named("Mw_SettingsAppearanceTitle").Ancestors().First(element => element.Name.LocalName == "Border").Parent!;
-        XElement lastCard = cards.Elements().Last(element => element.Name.LocalName == "Border");
-        Assert.Contains(lastCard.Descendants(), element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsOnboardingTitle");
+        // General opens on its first rail section, so Appearance leads the rail and the tour closes it.
+        List<XElement> sections = Named("Mw_SettingsGeneralSubTabControl").Elements()
+            .Where(element => element.Name.LocalName == "TabItem")
+            .ToList();
+        Assert.Contains(sections[0].Descendants(), element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsAppearanceTitle");
+        Assert.Contains(sections[^1].Descendants(), element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsOnboardingTitle");
 
         foreach (string security in new[] { "Mw_SettingsRdpNla", "Mw_SettingsRdpStrictServerAuth" })
         {
@@ -85,6 +88,26 @@ public sealed class SettingsLayoutOrderGuardTests
         XElement autoLock = Named("Mw_SettingsAutoLockPanel");
         Assert.Null(autoLock.Attribute("Visibility"));
         Assert.Equal("{Binding Settings.IsVaultEnabled}", autoLock.Attribute("IsEnabled")?.Value);
+    }
+
+    /// <summary>
+    /// The section rail is one stop for Tab, like a tab strip.
+    /// </summary>
+    /// <remarks>
+    /// Its first build hosted the sections in a plain StackPanel, so Tab walked through every
+    /// section name before it reached a setting. A TabPanel is a single stop and the arrow keys
+    /// move inside it; the rail has to say the same thing itself.
+    /// </remarks>
+    [Fact]
+    public void TheSectionRailIsASingleTabStop()
+    {
+        XDocument theme = XDocument.Load(
+            Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "Themes", "CommonControls.xaml"));
+        XElement style = theme.Descendants().Single(element => element.Attribute(Xaml + "Key")?.Value == "SettingsRailTabControlStyle");
+        XElement host = style.Descendants().Single(element => element.Attribute("IsItemsHost")?.Value == "True");
+
+        Assert.Equal("Once", host.Attribute("KeyboardNavigation.TabNavigation")?.Value);
+        Assert.Equal("Cycle", host.Attribute("KeyboardNavigation.DirectionalNavigation")?.Value);
     }
 
     /// <summary>

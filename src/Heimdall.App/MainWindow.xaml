@@ -2919,8 +2919,14 @@
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
+                        <TabControl x:Name="Mw_SettingsGeneralSubTabControl"
+                                    AutomationProperties.Name="{loc:Translate SettingsTabGeneral}"
+                                    Style="{StaticResource SettingsRailTabControlStyle}">
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabAppearance"
+                                     Header="{loc:Translate SettingsGeneralSubTabAppearance}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsAppearanceTitle" Text="{loc:Translate SettingsSectionAppearance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3021,6 +3027,14 @@
                                                   AutomationProperties.HelpText="{loc:Translate FilterShowGatewayBadgeAutomationName}"/>
                                     </StackPanel>
                                 </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabBehavior"
+                                     Header="{loc:Translate SettingsGeneralSubTabBehavior}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsBehaviorTitle" Text="{loc:Translate SettingsSectionBehavior}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3043,7 +3057,14 @@
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CollapseTunnelsPanelByDefault]}"/>
                                     </StackPanel>
                                 </Border>
-
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabUpdates"
+                                     Header="{loc:Translate SettingsGeneralSubTabUpdates}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsUpdatesTitle" Text="{loc:Translate SettingsSectionUpdates}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3131,7 +3152,14 @@
                                                    Visibility="{Binding Settings.LegacyMigrationReofferAvailable, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
                                     </StackPanel>
                                 </Border>
-
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabFiles"
+                                     Header="{loc:Translate SettingsGeneralSubTabFiles}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Settings file: preferences out and in, never secrets. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -3263,7 +3291,14 @@
                                         </ItemsControl>
                                     </StackPanel>
                                 </Border>
-
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabSharedSources"
+                                     Header="{loc:Translate SettingsGeneralSubTabSharedSources}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Shared session sources: MobaXterm files other people edit, listed read-only in the
                                      tree. The status column says what the last read found. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -3425,7 +3460,14 @@
                                         </ItemsControl>
                                     </StackPanel>
                                 </Border>
-
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabOnboarding"
+                                     Header="{loc:Translate SettingsGeneralSubTabOnboarding}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Replaying the tour is the only way back into it. One reflex
                                      Escape used to end it permanently: Skip and Escape both call
                                      CompleteAsync, which persists OnboardingCompleted, and that
@@ -3460,9 +3502,10 @@
                                                 AutomationProperties.HelpText="{loc:Translate SettingsOnboardingReplayHint}"/>
                                     </StackPanel>
                                 </Border>
-
-                            </StackPanel>
-                        </ScrollViewer>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
                     </TabItem>
 
                     <!-- ═══════ TERMINAL ═══════ -->
@@ -3573,10 +3616,10 @@
                         </TabItem.Header>
                         <TabControl x:Name="Mw_SettingsSshSubTabControl"
                                     AutomationProperties.Name="{loc:Translate SettingsTabSshSftp}"
-                                    Style="{StaticResource SegmentedTabControlStyle}">
+                                    Style="{StaticResource SettingsRailTabControlStyle}">
                             <TabItem x:Name="Mw_SettingsSshSubTabConnection"
                                      Header="{loc:Translate SettingsSshSubTabConnection}"
-                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -3668,7 +3711,7 @@
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSshSubTabSession"
                                      Header="{loc:Translate SettingsSshSubTabSession}"
-                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -3737,7 +3780,7 @@
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSshSubTabSftpX11"
                                      Header="{loc:Translate SettingsSshSubTabSftpX11}"
-                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -3784,7 +3827,7 @@
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSshSubTabHostKeys"
                                      Header="{loc:Translate SettingsSshSubTabHostKeys}"
-                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -3967,7 +4010,7 @@
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSshSubTabGateways"
                                      Header="{loc:Translate SettingsSshSubTabGateways}"
-                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
@@ -4057,10 +4100,10 @@
                             <TabControl x:Name="Mw_SettingsRdpSubTabControl"
                                     AutomationProperties.Name="{loc:Translate SettingsTabRdp}"
                                         Grid.Row="0"
-                                        Style="{StaticResource SegmentedTabControlStyle}">
+                                        Style="{StaticResource SettingsRailTabControlStyle}">
                                 <TabItem x:Name="Mw_SettingsRdpSubTabDisplayAudio"
                                          Header="{loc:Translate SettingsRdpSubTabDisplayAudio}"
-                                         Style="{StaticResource SegmentedTabItemStyle}">
+                                         Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
@@ -4161,7 +4204,7 @@
 
                                 <TabItem x:Name="Mw_SettingsRdpSubTabDevices"
                                          Header="{loc:Translate SettingsRdpSubTabDevices}"
-                                         Style="{StaticResource SegmentedTabItemStyle}">
+                                         Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
@@ -4192,7 +4235,7 @@
 
                                 <TabItem x:Name="Mw_SettingsRdpSubTabPerformance"
                                          Header="{loc:Translate SettingsRdpSubTabPerformance}"
-                                         Style="{StaticResource SegmentedTabItemStyle}">
+                                         Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
@@ -4244,7 +4287,7 @@
 
                                 <TabItem x:Name="Mw_SettingsRdpSubTabBehavior"
                                          Header="{loc:Translate SettingsRdpSubTabBehavior}"
-                                         Style="{StaticResource SegmentedTabItemStyle}">
+                                         Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
@@ -4366,7 +4409,7 @@
                                 </TabItem>
                                 <TabItem x:Name="Mw_SettingsRdpSubTabCertificates"
                                          Header="{loc:Translate SettingsRdpSubTabCertificates}"
-                                         Style="{StaticResource SegmentedTabItemStyle}">
+                                         Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Connection security sits with the certificate trust it governs, not under
@@ -4600,8 +4643,14 @@
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
+                        <TabControl x:Name="Mw_SettingsSecuritySubTabControl"
+                                    AutomationProperties.Name="{loc:Translate SettingsTabSecurity}"
+                                    Style="{StaticResource SettingsRailTabControlStyle}">
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabOverview"
+                                     Header="{loc:Translate SettingsSecuritySubTabOverview}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Security posture: the security-relevant choices of the whole panel, one
                                      line each, as they stand now including unsaved edits. Which state is
                                      risky is decided in SecurityPosture, not here. One row per line rather
@@ -4652,7 +4701,14 @@
                                         <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[KnownHostsSync]}"/>
                                     </StackPanel>
                                 </Border>
-
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabVault"
+                                     Header="{loc:Translate SettingsSecuritySubTabVault}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsPinTitle" Text="{loc:Translate SettingsSectionPin}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -4771,7 +4827,14 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
-
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabCredentialProvider"
+                                     Header="{loc:Translate SettingsSecuritySubTabCredentialProvider}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsCredProviderTitle" Text="{loc:Translate SettingsSectionCredentialProvider}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -4897,6 +4960,14 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabConnectionChecks"
+                                     Header="{loc:Translate SettingsSecuritySubTabConnectionChecks}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsConnectionChecksTitle" Text="{loc:Translate SettingsSectionConnectionChecks}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -4927,7 +4998,14 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
-
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabWebCertificates"
+                                     Header="{loc:Translate SettingsSecuritySubTabWebCertificates}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Web console certificates: the pins "Trust certificate" leaves behind, and the
                                      only way to take one back short of editing settings.json. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
@@ -5066,7 +5144,14 @@
                                                    Visibility="{Binding Settings.TrustedWebCertificates.HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
                                 </Border>
-
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabFileSharing"
+                                     Header="{loc:Translate SettingsSecuritySubTabFileSharing}"
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- File Sharing -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
@@ -5085,8 +5170,10 @@
                                                    TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
-                            </StackPanel>
-                        </ScrollViewer>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
                     </TabItem>
 
                     <!-- ═══════ ADVANCED ═══════ -->
@@ -5111,10 +5198,10 @@
                         </TabItem.Header>
                         <TabControl x:Name="Mw_SettingsAdvancedSubTabControl"
                                     AutomationProperties.Name="{loc:Translate SettingsTabAdvanced}"
-                                    Style="{StaticResource SegmentedTabControlStyle}">
+                                    Style="{StaticResource SettingsRailTabControlStyle}">
                             <TabItem x:Name="Mw_SettingsAdvancedSubTabDiagnostics"
                                      Header="{loc:Translate SettingsAdvancedSubTabDiagnostics}"
-                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Logging -->
@@ -5266,7 +5353,7 @@
 
                             <TabItem x:Name="Mw_SettingsAdvancedSubTabTools"
                                      Header="{loc:Translate SettingsAdvancedSubTabTools}"
-                                     Style="{StaticResource SegmentedTabItemStyle}">
+                                     Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
