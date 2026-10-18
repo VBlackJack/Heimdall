@@ -1,7 +1,8 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib"
-                    xmlns:theming="clr-namespace:Heimdall.App.Theming">
+                    xmlns:theming="clr-namespace:Heimdall.App.Theming"
+                    xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors">
 
     <!-- ========================================================= -->
     <!-- Design Tokens: Typography                                 -->
@@ -2406,6 +2407,9 @@
         <Setter Property="TextWrapping" Value="Wrap"/>
         <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
         <Setter Property="Visibility" Value="Collapsed"/>
+        <!-- Written from code and shown on failure: heard when it appears (LiveRegionBehavior). -->
+        <Setter Property="AutomationProperties.LiveSetting" Value="Assertive"/>
+        <Setter Property="behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated" Value="True"/>
     </Style>
 
     <Style x:Key="ToolLoadingBarStyle" TargetType="{x:Type ProgressBar}">

@@ -645,7 +645,10 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
+                                            <!-- Top: the port column beside it grows with the WinRM SSL boxes, and a stretched
+                                                 one-line box grew with it, to 84 px. -->
                                             <TextBox x:Name="DlgSrv_RemoteServerBox" Grid.Row="4" Grid.Column="0"
+                                                     VerticalAlignment="Top"
                                                      TabIndex="2"
                                                      AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_ServerLabel}"
                                                      Text="{Binding RemoteServer, UpdateSourceTrigger=PropertyChanged}">

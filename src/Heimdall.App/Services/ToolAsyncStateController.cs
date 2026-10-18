@@ -15,6 +15,9 @@
  */
 
 using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using Heimdall.App.Behaviors;
 using WpfControl = System.Windows.Controls.Control;
 using WpfProgressBar = System.Windows.Controls.ProgressBar;
 using WpfTextBlock = System.Windows.Controls.TextBlock;
@@ -25,6 +28,12 @@ namespace Heimdall.App.Services;
 /// Small controller that keeps async tool shell states consistent:
 /// loading, inline error, empty state, results visibility, and busy button state.
 /// </summary>
+/// <remarks>
+/// Disabling the controls for a run takes keyboard focus away from the one that held it, and WPF
+/// leaves it on the scroll viewer around them: a keyboard or screen reader user was left on an
+/// unnamed pane after every lookup. The control that held focus gets it back when the run ends,
+/// unless the user has moved on in the meantime.
+/// </remarks>
 internal sealed class ToolAsyncStateController
 {
     private readonly Action<bool>? _setBusy;
@@ -34,6 +43,7 @@ internal sealed class ToolAsyncStateController
     private readonly UIElement? _results;
     private readonly WpfTextBlock? _statusText;
     private readonly WpfControl[] _controlsToDisable;
+    private WpfControl? _focusedBeforeRun;
 
     public ToolAsyncStateController(
         Action<bool>? setBusy,
@@ -85,6 +95,9 @@ internal sealed class ToolAsyncStateController
     public void Begin(string? status = null)
     {
         _setBusy?.Invoke(true);
+        // Views call Begin again on every property change of a running job, after the first call
+        // has already disabled the controls: only the first call still sees where focus was.
+        _focusedBeforeRun ??= Array.Find(_controlsToDisable, control => control.IsKeyboardFocusWithin);
         SetControlsEnabled(false);
 
         if (_errorText is not null)
@@ -122,11 +135,7 @@ internal sealed class ToolAsyncStateController
                 : (showEmptyState ? Visibility.Visible : Visibility.Collapsed);
         }
 
-        if (_errorText is not null)
-        {
-            _errorText.Text = message;
-            _errorText.Visibility = Visibility.Visible;
-        }
+        WriteError(message);
 
         if (_statusText is not null && status is not null)
         {
@@ -156,11 +165,84 @@ internal sealed class ToolAsyncStateController
     {
         _setBusy?.Invoke(false);
         SetControlsEnabled(true);
+        RestoreFocusAfterRun();
 
         if (_loadingBar is not null)
         {
             _loadingBar.Visibility = Visibility.Collapsed;
         }
+    }
+
+    private void WriteError(string message)
+    {
+        if (_errorText is null)
+        {
+            return;
+        }
+
+        _errorText.Text = message;
+        _errorText.Visibility = Visibility.Visible;
+        LiveRegionBehavior.Announce(_errorText);
+    }
+
+    private void RestoreFocusAfterRun()
+    {
+        WpfControl? previous = _focusedBeforeRun;
+        _focusedBeforeRun = null;
+        if (previous is null)
+        {
+            return;
+        }
+
+        FocusWhenEnabled(previous);
+    }
+
+    /// <summary>
+    /// A button bound to a command stays disabled after <see cref="End"/> re-enables it, until the
+    /// command's CanExecute is read again: focus waits for that instead of failing on the spot.
+    /// </summary>
+    private static void FocusWhenEnabled(WpfControl previous)
+    {
+        if (!previous.IsEnabled)
+        {
+            DependencyPropertyChangedEventHandler? handler = null;
+            handler = (_, _) =>
+            {
+                previous.IsEnabledChanged -= handler;
+                FocusWhenEnabled(previous);
+            };
+            previous.IsEnabledChanged += handler;
+            return;
+        }
+
+        FocusIfItFellBack(previous);
+    }
+
+    private static void FocusIfItFellBack(WpfControl previous)
+    {
+        if (!FocusFellBackFrom(Keyboard.FocusedElement as DependencyObject, previous))
+        {
+            return;
+        }
+
+        previous.Focus();
+    }
+
+    /// <summary>
+    /// True when focus is nowhere, or sits on a container of <paramref name="previous"/>: where WPF
+    /// puts it when the focused control is disabled. Focus anywhere else is the user's own move.
+    /// </summary>
+    internal static bool FocusFellBackFrom(DependencyObject? focused, DependencyObject previous)
+    {
+        if (focused is null)
+        {
+            return true;
+        }
+
+        return !ReferenceEquals(focused, previous)
+            && focused is Visual container
+            && previous is Visual control
+            && control.IsDescendantOf(container);
     }
 
     private void SetControlsEnabled(bool enabled)
