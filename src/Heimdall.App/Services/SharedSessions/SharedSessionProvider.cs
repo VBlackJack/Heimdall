@@ -50,11 +50,19 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     private readonly LocalizationManager _localizer;
     private readonly SharedSessionSourceCache? _cache;
     private readonly SharedSessionSecretStore? _secrets;
+    private readonly SharedPostConnectTrust? _approvals;
     private readonly TimeProvider _timeProvider;
     private readonly SharedSessionSourceWatcher? _watcher;
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private readonly Dictionary<string, SourceLoad> _lastGood = new(StringComparer.Ordinal);
     private volatile Snapshot _snapshot = Snapshot.Empty;
+
+    /// <summary>
+    /// The reload debounce, in ticks, of the settings last handed to <see cref="LoadAsync"/> or
+    /// <see cref="ApplyReloadDebounce"/>. Recorded on the caller's thread, in the order of the
+    /// calls, so a load that only gets to its watches later does not bring back an older value.
+    /// </summary>
+    private long _reloadDebounceTicks;
     private AppSettings? _settings;
     private bool _disposed;
 
@@ -65,16 +73,21 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     /// <param name="secrets">
     /// The passwords remembered for shared sessions, forgotten with their source; null keeps none.
     /// </param>
+    /// <param name="approvals">
+    /// The post-connect approvals of shared sessions, forgotten with their source; null forgets none.
+    /// </param>
     public SharedSessionProvider(
         LocalizationManager localizer,
         SharedSessionSourceCache? cache = null,
         TimeProvider? timeProvider = null,
         bool watchSourceFiles = false,
-        SharedSessionSecretStore? secrets = null)
+        SharedSessionSecretStore? secrets = null,
+        SharedPostConnectTrust? approvals = null)
     {
         _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
         _cache = cache;
         _secrets = secrets;
+        _approvals = approvals;
         _timeProvider = timeProvider ?? TimeProvider.System;
         if (watchSourceFiles)
         {
@@ -122,8 +135,23 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
+        Interlocked.Exchange(ref _reloadDebounceTicks, ReloadDebounceOf(settings).Ticks);
         return Task.Run(() => LoadCoreAsync(settings, cancellationToken), cancellationToken);
     }
+
+    /// <inheritdoc />
+    public void ApplyReloadDebounce(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        TimeSpan debounce = ReloadDebounceOf(settings);
+        Interlocked.Exchange(ref _reloadDebounceTicks, debounce.Ticks);
+        _watcher?.SetDebounce(debounce);
+    }
+
+    private static TimeSpan ReloadDebounceOf(AppSettings settings) =>
+        TimeSpan.FromMilliseconds(
+            SettingRanges.Of(nameof(AppSettings.SharedSourceReloadDebounceMs)).Clamp(settings.SharedSourceReloadDebounceMs));
 
     /// <summary>Reads a source file; replaced by tests to observe where and how it is read.</summary>
     internal Func<string, CancellationToken, Task<byte[]?>> SourceFileReader { get; set; } = ReadSourceFileAsync;
@@ -151,7 +179,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
 
             _snapshot = Snapshot.From(loads);
             await ForgetRemovedSourcesAsync(settings).ConfigureAwait(false);
-            UpdateWatches(settings, loads);
+            UpdateWatches(loads);
         }
         finally
         {
@@ -446,14 +474,25 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         }
 
         List<ServerProfileDto> profiles = [];
-        List<ServerProfileDto> refused = [];
+        List<SharedRefusedSession> refused = [];
         foreach (ServerProfileDto parsedProfile in result.Servers)
         {
             ServerProfileDto? profile = SharedProfileSanitizer.Sanitize(parsedProfile);
-            if (profile is null
-                || (SshGatewayRoute.IsAssigned(profile.SshGatewayId) && !gatewaysById.ContainsKey(profile.SshGatewayId!)))
+            if (profile is null)
             {
-                refused.Add(parsedProfile);
+                SharedProfileRefusal reason = SharedProfileSanitizer.RefusalOf(parsedProfile) ?? SharedProfileRefusal.ForeignId;
+                refused.Add(new SharedRefusedSession(parsedProfile, reason, RefusedValue(parsedProfile, reason)));
+                continue;
+            }
+
+            if (SshGatewayRoute.IsAssigned(profile.SshGatewayId) && !gatewaysById.ContainsKey(profile.SshGatewayId!))
+            {
+                // The parser defines every gateway it references; one missing here was dropped by
+                // the sanitizer for its host, which is what the report names.
+                string gateway = result.Gateways
+                    .FirstOrDefault(candidate => string.Equals(candidate.Id, profile.SshGatewayId, StringComparison.Ordinal))?.Host
+                    ?? profile.SshGatewayId!;
+                refused.Add(new SharedRefusedSession(parsedProfile, SharedProfileRefusal.UnknownGateway, gateway));
                 continue;
             }
 
@@ -469,6 +508,15 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
             refused.Count,
             SharedSessionImportReportBuilder.Build(sourceId, sourceName, text, result.Warnings, profiles, gateways, refused, reportOptions));
     }
+
+    /// <summary>The value of <paramref name="profile"/> the shared filter refused it for.</summary>
+    private static string RefusedValue(ServerProfileDto profile, SharedProfileRefusal reason) => reason switch
+    {
+        SharedProfileRefusal.UnsupportedProtocol => profile.ConnectionType ?? string.Empty,
+        SharedProfileRefusal.InvalidHost => profile.RemoteServer ?? string.Empty,
+        SharedProfileRefusal.ForeignGateway => profile.SshGatewayId ?? string.Empty,
+        _ => profile.Id ?? string.Empty,
+    };
 
     /// <summary>
     /// Reads the file up to <paramref name="attempts"/> times, waiting <paramref name="retryDelay"/>
@@ -520,8 +568,8 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     };
 
     /// <summary>
-    /// Drops what is remembered of a source no longer in the settings, its offline copy and the
-    /// passwords saved for it included.
+    /// Drops what is remembered of a source no longer in the settings, its offline copy, the
+    /// passwords saved for it and the post-connect approvals of its sessions included.
     /// </summary>
     private async Task ForgetRemovedSourcesAsync(AppSettings settings)
     {
@@ -539,10 +587,23 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         {
             await _secrets.ForgetAllExceptAsync(kept).ConfigureAwait(false);
         }
+
+        if (_approvals is not null)
+        {
+            try
+            {
+                await _approvals.ForgetAllExceptAsync(kept).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // The sessions are loaded already; an approval left behind is tried again at the next load.
+                FileLogger.Warn($"Shared sessions: the post-connect approvals of removed sources could not be forgotten: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>Watches the file of every enabled source that has one, and nothing else.</summary>
-    private void UpdateWatches(AppSettings settings, IReadOnlyList<SourceLoad> loads)
+    private void UpdateWatches(IReadOnlyList<SourceLoad> loads)
     {
         if (_watcher is null)
         {
@@ -555,10 +616,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
                 && load.State.ExpandedPath.Length > 0)
             .GroupBy(load => load.State.SourceId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First().State.ExpandedPath, StringComparer.Ordinal);
-        _watcher.Update(
-            watched,
-            TimeSpan.FromMilliseconds(
-                SettingRanges.Of(nameof(AppSettings.SharedSourceReloadDebounceMs)).Clamp(settings.SharedSourceReloadDebounceMs)));
+        _watcher.Update(watched, TimeSpan.FromTicks(Interlocked.Read(ref _reloadDebounceTicks)));
     }
 
     private static SourceLoad Failed(SharedSessionSourceDto source, string name, string path, string message)
@@ -603,8 +661,35 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
             FileShare.ReadWrite | FileShare.Delete,
             ReadBufferSize,
             useAsync: true);
+        return await ReadBoundedAsync(stream, MaxSourceFileBytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads <paramref name="stream"/> to its end, or null as soon as it holds more than
+    /// <paramref name="maxBytes"/>.
+    /// </summary>
+    /// <remarks>
+    /// The length checked before opening is only what the file was then: the file stays open for
+    /// writing to every other process, and one that keeps appending to it would otherwise be read
+    /// into memory however far it grows.
+    /// </remarks>
+    internal static async Task<byte[]?> ReadBoundedAsync(Stream stream, long maxBytes, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
         using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+        byte[] chunk = new byte[ReadBufferSize];
+        int read;
+        while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            if (buffer.Length + read > maxBytes)
+            {
+                return null;
+            }
+
+            buffer.Write(chunk, 0, read);
+        }
+
         return buffer.ToArray();
     }
 

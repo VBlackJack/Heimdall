@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,169 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,174 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -411,14 +411,17 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     that holds a shared session keeps Connect and refuses the other bulk actions, saying how many
     shared sessions it holds
   - A source that cannot be read (file missing, unreadable or too large) keeps its root in the
-    tree with an error mark and the reason on hover, and lists no sessions
+    tree with an error mark and the reason on hover, and lists no sessions. A file over 16 MB is too
+    large, and so is one that grows past 16 MB while it is read: the read stops there
   - The settings card shows what each source holds after its last read. **Reload** reads the saved
-    sources again and refreshes the tree without a restart; saving a change to the sources or to the
-    MobaXterm import variables reloads them too
+    sources again and refreshes the tree without a restart; saving a change to the sources, to the
+    MobaXterm import variables or to the report thresholds reloads them too. A change to
+    `SharedSourceReloadDebounceMs` reaches the file watch at once, without reading any file
   - Post-connect commands of a shared session are approved per user: Heimdall asks before typing
     them, remembers the approval for those exact commands, and asks again when the shared file
     changes them. The approvals are personal trust: they are never exported or imported with the
-    settings, and **Reset defaults** clears them, while it keeps the sources themselves
+    settings, and **Reset defaults** clears them, while it keeps the sources themselves. Removing a
+    source forgets the approvals of its sessions
   - The session header names the shared gateway a shared session goes through
   - Automatic reload: each enabled source file is watched (including the atomic saves of editors
     and sync clients, which write a temporary file and rename it over the original). Once the file
@@ -444,7 +447,10 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     its maintainers may want to fix. It is informational: it never stops a session from loading and
     never changes one. It lists, with the folder, the session and a short explanation:
     - skipped sessions and why (unsupported type, missing host, unusable gateway, duplicate name in
-      a folder, malformed line, or refused by the shared-session filter)
+      a folder, malformed line), and the sessions the shared-session filter refused, each with its
+      reason: a protocol other than SSH or RDP, a host that is neither a valid host name nor a valid
+      address, a gateway outside the source, or a gateway the file does not define (or defines with
+      a refused host)
     - unresolved `[NAME]` variables
     - name and host mismatch: the session name is neither the host nor the host's first label (what
       precedes the first dot), compared case-insensitively; a host given as an IP address is not

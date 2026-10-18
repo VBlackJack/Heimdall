@@ -52,8 +52,8 @@ public partial class ServerListViewModel
     private string? _pendingSharedSelectionId;
 
     /// <summary>
-    /// What the shared sources were last read with: the sources and the MobaXterm variables. Null
-    /// until the inventory is first loaded.
+    /// What the shared sources were last read with: the sources, the MobaXterm variables and the
+    /// report thresholds. Null until the inventory is first loaded.
     /// </summary>
     private string? _sharedSourcesSignature;
 
@@ -62,8 +62,13 @@ public partial class ServerListViewModel
 
     /// <summary>
     /// The part of <paramref name="settings"/> the shared sources are read from, as one comparable
-    /// string: the sources, and the variables their user fields resolve against.
+    /// string: the sources, the variables their user fields resolve against, and the thresholds
+    /// their import reports are built with.
     /// </summary>
+    /// <remarks>
+    /// The reload debounce is not part of it: it changes how the files are watched, not what they
+    /// hold, and reaches the provider without a read.
+    /// </remarks>
     internal static string SharedSourcesSignature(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -76,19 +81,22 @@ public partial class ServerListViewModel
             Variables = (settings.MobaXtermUserVariables ?? [])
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => new { pair.Key, pair.Value }),
+            Report = new { settings.SharedReportGatewayMajorityPercent, settings.SharedReportGatewayMinFolderSessions },
         });
     }
 
     /// <summary>
     /// Reads the shared sources again when a settings change touched what they are read from: a
     /// save of the settings card, an import, a reset. Anything else leaves them alone, so an
-    /// unrelated save does not reread files on a network share.
+    /// unrelated save does not reread files on a network share; the reload debounce is handed to
+    /// the file watch either way, which reads nothing.
     /// </summary>
     private void ReloadSharedSessionsIfSourcesChanged(AppSettings settings)
     {
         string signature = SharedSourcesSignature(settings);
         if (string.Equals(signature, _sharedSourcesSignature, StringComparison.Ordinal))
         {
+            _profileLookup.SharedSessions.ApplyReloadDebounce(settings);
             return;
         }
 

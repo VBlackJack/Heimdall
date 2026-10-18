@@ -80,14 +80,12 @@ public static class SharedProfileSanitizer
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        string? connectionType = NormalizeConnectionType(source.ConnectionType);
-        if (!SharedSessionIds.IsShared(source.Id)
-            || connectionType is null
-            || !SchemaValidator.IsValidHost(source.RemoteServer)
-            || (SshGatewayRoute.IsAssigned(source.SshGatewayId) && !SharedSessionIds.IsShared(source.SshGatewayId)))
+        if (RefusalOf(source) is not null)
         {
             return null;
         }
+
+        string connectionType = NormalizeConnectionType(source.ConnectionType)!;
 
         var profile = new ServerProfileDto
         {
@@ -114,6 +112,37 @@ public static class SharedProfileSanitizer
         }
 
         return profile;
+    }
+
+    /// <summary>
+    /// Why <see cref="Sanitize(ServerProfileDto)"/> refuses <paramref name="source"/>, or null when
+    /// it accepts it. The first reason in the order of <see cref="SharedProfileRefusal"/> wins.
+    /// </summary>
+    public static SharedProfileRefusal? RefusalOf(ServerProfileDto source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (!SharedSessionIds.IsShared(source.Id))
+        {
+            return SharedProfileRefusal.ForeignId;
+        }
+
+        if (NormalizeConnectionType(source.ConnectionType) is null)
+        {
+            return SharedProfileRefusal.UnsupportedProtocol;
+        }
+
+        if (!SchemaValidator.IsValidHost(source.RemoteServer))
+        {
+            return SharedProfileRefusal.InvalidHost;
+        }
+
+        if (SshGatewayRoute.IsAssigned(source.SshGatewayId) && !SharedSessionIds.IsShared(source.SshGatewayId))
+        {
+            return SharedProfileRefusal.ForeignGateway;
+        }
+
+        return null;
     }
 
     /// <summary>

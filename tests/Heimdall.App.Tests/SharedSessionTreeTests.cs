@@ -440,6 +440,42 @@ public sealed partial class SharedSessionConnectTests
         Assert.Equal(baseline + 2, provider.LoadCount);
     }
 
+    [Fact]
+    public async Task SettingsChange_ToTheReportThresholds_RereadsTheSources()
+    {
+        // The report of a source is built when its file is read: a new threshold shows only once
+        // the file is read again.
+        StubSharedSessionProvider? provider = null;
+        await using Fixture fixture = await Fixture.CreateAsync(shared => provider = LoadedTeamProvider(shared));
+        await LoadTreeAsync(fixture);
+        int baseline = provider!.LoadCount;
+
+        await fixture.ConfigManager.MergeSettingAsync(settings => settings.SharedReportGatewayMajorityPercent = 75);
+        await fixture.ViewModel.SharedSessionReload;
+        Assert.Equal(baseline + 1, provider.LoadCount);
+        Assert.Equal(75, provider.LastLoadedSettings!.SharedReportGatewayMajorityPercent);
+
+        await fixture.ConfigManager.MergeSettingAsync(settings => settings.SharedReportGatewayMinFolderSessions = 5);
+        await fixture.ViewModel.SharedSessionReload;
+        Assert.Equal(baseline + 2, provider.LoadCount);
+        Assert.Equal(5, provider.LastLoadedSettings!.SharedReportGatewayMinFolderSessions);
+    }
+
+    [Fact]
+    public async Task SettingsChange_ToTheReloadDebounce_ReachesTheProvider_WithoutARead()
+    {
+        StubSharedSessionProvider? provider = null;
+        await using Fixture fixture = await Fixture.CreateAsync(shared => provider = LoadedTeamProvider(shared));
+        await LoadTreeAsync(fixture);
+        int baseline = provider!.LoadCount;
+
+        await fixture.ConfigManager.MergeSettingAsync(settings => settings.SharedSourceReloadDebounceMs = 4000);
+        await fixture.ViewModel.SharedSessionReload;
+        Assert.Equal(4000, provider.AppliedReloadDebounces.LastOrDefault());
+
+        Assert.Equal(baseline, provider.LoadCount);
+    }
+
     // --- Live reload ---
 
     [Fact]

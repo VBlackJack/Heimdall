@@ -493,6 +493,68 @@ public sealed class SharedSessionReloadTests : IDisposable
         Assert.Equal(3, provider.Profiles.Count);
     }
 
+    [Fact]
+    public async Task Provider_ApplyReloadDebounce_ReachesTheWatch_WithoutReadingAFile()
+    {
+        WriteSource(TwoSessions);
+        SharedSessionProvider provider = Track(new SharedSessionProvider(
+            await LocalizerAsync(),
+            new SharedSessionSourceCache(CacheDirectory),
+            watchSourceFiles: true));
+        int reads = 0;
+        Func<string, CancellationToken, Task<byte[]?>> realReader = provider.SourceFileReader;
+        provider.SourceFileReader = (path, token) =>
+        {
+            Interlocked.Increment(ref reads);
+            return realReader(path, token);
+        };
+        AppSettings settings = Settings();
+        settings.SharedSourceReloadDebounceMs = 1500;
+        await provider.LoadAsync(settings);
+        Assert.Equal(TimeSpan.FromMilliseconds(1500), provider.Watcher!.Debounce);
+        int readsAfterLoad = Volatile.Read(ref reads);
+
+        settings.SharedSourceReloadDebounceMs = 4000;
+        provider.ApplyReloadDebounce(settings);
+
+        Assert.Equal(TimeSpan.FromMilliseconds(4000), provider.Watcher.Debounce);
+        Assert.Equal(readsAfterLoad, Volatile.Read(ref reads));
+    }
+
+    [Fact]
+    public async Task Provider_ADebounceAppliedWhileALoadIsUnderway_IsNotUndoneByThatLoad()
+    {
+        // The settings card saves the sources (a load starts, reading a share) and then only the
+        // debounce: the load, getting to its watches last, must not bring back its own value.
+        WriteSource(TwoSessions);
+        SharedSessionProvider provider = Track(new SharedSessionProvider(
+            await LocalizerAsync(),
+            new SharedSessionSourceCache(CacheDirectory),
+            watchSourceFiles: true));
+        await provider.LoadAsync(Settings());
+        var reading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Func<string, CancellationToken, Task<byte[]?>> realReader = provider.SourceFileReader;
+        provider.SourceFileReader = async (path, token) =>
+        {
+            reading.TrySetResult();
+            await release.Task;
+            return await realReader(path, token);
+        };
+        AppSettings loaded = Settings();
+        loaded.SharedSourceReloadDebounceMs = 1000;
+        Task load = provider.LoadAsync(loaded);
+        await reading.Task.WaitAsync(TimeSpan.FromSeconds(15));
+
+        AppSettings applied = Settings();
+        applied.SharedSourceReloadDebounceMs = 5000;
+        provider.ApplyReloadDebounce(applied);
+        release.SetResult();
+        await load.WaitAsync(TimeSpan.FromSeconds(15));
+
+        Assert.Equal(TimeSpan.FromMilliseconds(5000), provider.Watcher!.Debounce);
+    }
+
     // --- Helpers ---
 
     private void WriteSource(string content)

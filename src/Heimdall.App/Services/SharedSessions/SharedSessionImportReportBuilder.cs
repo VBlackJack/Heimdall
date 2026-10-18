@@ -72,7 +72,7 @@ public static class SharedSessionImportReportBuilder
     /// <param name="warnings">The parser's warnings.</param>
     /// <param name="loaded">The sessions loaded, sanitized.</param>
     /// <param name="gateways">The gateways loaded, sanitized.</param>
-    /// <param name="refused">The parsed sessions the shared filter refused.</param>
+    /// <param name="refused">The parsed sessions the shared filter refused, with why.</param>
     /// <param name="options">The thresholds.</param>
     public static SharedSessionImportReport Build(
         string sourceId,
@@ -81,7 +81,7 @@ public static class SharedSessionImportReportBuilder
         IReadOnlyList<MobaXtermImportWarning> warnings,
         IReadOnlyList<ServerProfileDto> loaded,
         IReadOnlyList<SshGatewayDto> gateways,
-        IReadOnlyList<ServerProfileDto> refused,
+        IReadOnlyList<SharedRefusedSession> refused,
         Options options)
     {
         ArgumentNullException.ThrowIfNull(warnings);
@@ -101,13 +101,14 @@ public static class SharedSessionImportReportBuilder
                 : new SharedSessionReportEntry(SharedSessionReportCheck.SkippedSession, folder, warning.SessionName, warning.Detail, SkipReason: warning.Kind));
         }
 
-        foreach (ServerProfileDto profile in refused)
+        foreach (SharedRefusedSession session in refused)
         {
             entries.Add(new SharedSessionReportEntry(
                 SharedSessionReportCheck.SkippedSession,
-                FolderOf(profile),
-                profile.DisplayName ?? string.Empty,
-                profile.RemoteServer ?? string.Empty));
+                FolderOf(session.Profile),
+                session.Profile.DisplayName ?? string.Empty,
+                session.Detail,
+                Refusal: session.Reason));
         }
 
         entries.AddRange(NameHostMismatches(loaded));

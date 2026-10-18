@@ -50,14 +50,22 @@ public enum SharedSessionReportCheck
 /// What the finding is measured against, when there is something: the folder's usual gateway for an
 /// outlier, the other sessions on the same host for a duplicate. Empty otherwise.
 /// </param>
-/// <param name="SkipReason">Why a skipped session was skipped; null when the shared filter refused it.</param>
+/// <param name="SkipReason">Why the parser skipped a session; null when the shared filter refused it.</param>
+/// <param name="Refusal">Why the shared filter refused a session; null when the parser skipped it.</param>
 public sealed record SharedSessionReportEntry(
     SharedSessionReportCheck Check,
     string FolderPath,
     string SessionName,
     string Detail,
     string Context = "",
-    MobaXtermImportWarningKind? SkipReason = null);
+    MobaXtermImportWarningKind? SkipReason = null,
+    SharedProfileRefusal? Refusal = null);
+
+/// <summary>A session of the file the shared filter refused, and why.</summary>
+/// <param name="Profile">The session as the parser read it.</param>
+/// <param name="Reason">Why it was refused.</param>
+/// <param name="Detail">The value refused: the protocol, the host or the gateway.</param>
+public sealed record SharedRefusedSession(ServerProfileDto Profile, SharedProfileRefusal Reason, string Detail);
 
 /// <summary>
 /// What a shared source's file holds that its maintainers may want to fix, as of its last
