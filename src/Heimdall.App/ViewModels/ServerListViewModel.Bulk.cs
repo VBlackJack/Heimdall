@@ -1372,6 +1372,7 @@ public partial class ServerListViewModel
         var serverDtos = await _profileLookup.GetAllAsync();
         var dtoMap = serverDtos.ToDictionary(dto => dto.Id, StringComparer.Ordinal);
         var candidates = new List<BulkConnectCandidate>(selectedServers.Count);
+        var admitted = new List<BulkConnectCandidate>(selectedServers.Count);
         BulkConnectSkipTally skips = new BulkConnectSkipTally();
         var credentialGuardMessageShown = false;
 
@@ -1414,21 +1415,26 @@ public partial class ServerListViewModel
             }
 
             Core.Configuration.GroupDefaultsDto.ApplyInherited(serverDto, settings.GroupDefaults);
+            admitted.Add(new BulkConnectCandidate(server, serverDto));
+        }
 
-            var skippedForCredentials = await TryResolveExternalCredentialsAsync(
-                serverDto,
-                settings,
-                cancellationToken,
-                skipOnFailure: true);
-            if (skippedForCredentials)
+        // The vault lookups run side by side, a few at a time. One after the other, a batch of
+        // twenty KeePassXC entries waited for twenty database unlocks in a row before the first
+        // session opened. Each lookup writes only its own profile copy and shows no dialog here.
+        bool[] skippedForCredentials = await ResolveExternalCredentialsInParallelAsync(
+            admitted, settings, cancellationToken);
+
+        for (int index = 0; index < admitted.Count; index++)
+        {
+            if (skippedForCredentials[index])
             {
                 skips.Add(BulkConnectSkipReason.ExternalCredentialsUnresolved);
                 Core.Logging.FileLogger.Info(
-                    $"ConnectServersBulkCoreAsync skipped '{server.DisplayName}' because credentials could not be resolved silently.");
+                    $"ConnectServersBulkCoreAsync skipped '{admitted[index].Server.DisplayName}' because credentials could not be resolved silently.");
                 continue;
             }
 
-            candidates.Add(new BulkConnectCandidate(server, serverDto));
+            candidates.Add(admitted[index]);
         }
 
         // One settings instance serves the whole batch. When it holds a shared session, it is a
@@ -1442,6 +1448,45 @@ public partial class ServerListViewModel
             : _profileLookup.EffectiveSettingsFor(sharedCandidate, settings);
 
         return new BulkConnectPlan(planSettings, candidates, skips);
+    }
+
+    /// <summary>
+    /// How many external credential lookups a bulk connect runs at once. Enough to overlap the
+    /// key derivation of a few database unlocks; few enough that a vault tool is not started
+    /// once per server of a large selection at the same moment.
+    /// </summary>
+    internal const int MaxParallelVaultLookups = 4;
+
+    /// <summary>
+    /// Runs <see cref="TryResolveExternalCredentialsAsync"/> for every candidate, at most
+    /// <see cref="MaxParallelVaultLookups"/> at a time, and returns, in candidate order, whether
+    /// each one is to be skipped.
+    /// </summary>
+    private async Task<bool[]> ResolveExternalCredentialsInParallelAsync(
+        IReadOnlyList<BulkConnectCandidate> candidates,
+        AppSettings settings,
+        CancellationToken cancellationToken)
+    {
+        using var gate = new SemaphoreSlim(MaxParallelVaultLookups);
+
+        async Task<bool> ResolveOneAsync(BulkConnectCandidate candidate)
+        {
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            try
+            {
+                return await TryResolveExternalCredentialsAsync(
+                    candidate.ServerDto,
+                    settings,
+                    cancellationToken,
+                    skipOnFailure: true).ConfigureAwait(true);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        return await Task.WhenAll(candidates.Select(ResolveOneAsync)).ConfigureAwait(true);
     }
 
     internal async Task ConnectServersBulkCoreAsync(

@@ -28,14 +28,16 @@ public sealed class CredentialProviderPresetService
     // 1Password: "op read op://{Title}/password" named a vault called {Title} and an item called
     // "password", with no field, which op rejects; "op item get" looks the item up by name.
     // KPScript prints an "OK: ..." status line after the value and pass prints the notes after
-    // the password, so both presets turn "first line only" on.
+    // the password, so both presets turn "first line only" on. KPScript also takes
+    // -FailIfNoEntry (documented on keepass.info, not measured here): without it a missing entry
+    // is not an error, and the status line left on line 1 would be read as the password.
     private static readonly CredentialProviderPreset[] Presets =
     [
         new(null, "", FirstLineOnly: false),
         new("KeePassXC", "keepassxc-cli show -s -q -a Password \"{Database}\" \"{Title}\"", FirstLineOnly: false),
         new("KeePassXC (key file)", "keepassxc-cli show -s -q -k \"{KeyFile}\" -a Password \"{Database}\" \"{Title}\"", FirstLineOnly: false),
         new("KeePassXC (key file only)", "keepassxc-cli show -s -q --no-password -k \"{KeyFile}\" -a Password \"{Database}\" \"{Title}\"", FirstLineOnly: false),
-        new("KeePass2 (KPScript)", "KPScript.exe -c:GetEntryString \"{Database}\" -Field:Password -ref-Title:\"{Title}\"", FirstLineOnly: true),
+        new("KeePass2 (KPScript)", "KPScript.exe -c:GetEntryString \"{Database}\" -Field:Password -ref-Title:\"{Title}\" -FailIfNoEntry", FirstLineOnly: true),
         new("Bitwarden CLI", "bw get password \"{Title}\"", FirstLineOnly: false),
         new("1Password CLI", "op item get \"{Title}\" --fields label=password --reveal", FirstLineOnly: false),
         new("pass (GPG)", "pass show \"{Title}\"", FirstLineOnly: true),

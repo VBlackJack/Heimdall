@@ -3937,7 +3937,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [RelayCommand]
     private async Task TestCredentialProviderAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(CredentialProviderCommand))
+        // The Credential Manager has no command to check: only the entry name is needed. The
+        // button used to sit with the command fields alone, so that provider could not be tested.
+        bool commandProvider = !IsWindowsCredentialManagerProvider;
+        if (commandProvider && string.IsNullOrWhiteSpace(CredentialProviderCommand))
         {
             CredentialProviderTestResult = _localizer["CredProvTestNoCommand"];
             return;
@@ -3945,7 +3948,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         // A {KeyFile} template (KeePassXC key-file presets) requires a key file path;
         // launching with an empty path would fail opaquely, so warn and stop here.
-        if (CredentialProviderCommand.Contains("{KeyFile}", StringComparison.OrdinalIgnoreCase)
+        if (commandProvider
+            && CredentialProviderCommand.Contains("{KeyFile}", StringComparison.OrdinalIgnoreCase)
             && string.IsNullOrWhiteSpace(CredentialProviderKeyFile))
         {
             CredentialProviderTestResult = _localizer["CredProvTestNoKeyFile"];
@@ -3963,19 +3967,21 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
         try
         {
-            var provider = new Core.Security.CommandCredentialProvider(
-                CredentialProviderCommand, CredentialProviderDatabase,
-                CredentialProviderTimeoutMs,
-                string.IsNullOrEmpty(CredentialProviderUnlockSecret)
-                    ? null
-                    : CredentialProviderUnlockSecret,
-                string.IsNullOrWhiteSpace(CredentialProviderUsernameCommand)
-                    ? null
-                    : CredentialProviderUsernameCommand,
-                CredentialProviderFirstLineOnly,
-                string.IsNullOrWhiteSpace(CredentialProviderKeyFile)
-                    ? null
-                    : CredentialProviderKeyFile.Trim());
+            Core.Security.ICredentialProvider provider = commandProvider
+                ? new Core.Security.CommandCredentialProvider(
+                    CredentialProviderCommand, CredentialProviderDatabase,
+                    CredentialProviderTimeoutMs,
+                    string.IsNullOrEmpty(CredentialProviderUnlockSecret)
+                        ? null
+                        : CredentialProviderUnlockSecret,
+                    string.IsNullOrWhiteSpace(CredentialProviderUsernameCommand)
+                        ? null
+                        : CredentialProviderUsernameCommand,
+                    CredentialProviderFirstLineOnly,
+                    string.IsNullOrWhiteSpace(CredentialProviderKeyFile)
+                        ? null
+                        : CredentialProviderKeyFile.Trim())
+                : new Core.Security.WindowsCredentialManagerProvider();
 
             // The entry stands in for the host too, so a template keyed on {Host} is tested with
             // the name typed. No username hint: the username command, when there is one, runs.

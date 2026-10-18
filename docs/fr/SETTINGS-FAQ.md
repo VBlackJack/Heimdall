@@ -215,7 +215,9 @@ en exécutant une commande, typiquement le CLI d'un gestionnaire comme KeePassXC
 **Commande de nom d'utilisateur (facultatif)** - celle-ci passe facilement inaperçue et elle
 répond à une plainte fréquente. Sans elle, seul le *mot de passe* vient du coffre et le nom
 d'utilisateur reste celui du profil. Renseignez-la et le nom est récupéré aussi, par une
-seconde commande.
+seconde commande - mais seulement pour un profil qui n'a pas de nom d'utilisateur à lui : un
+profil qui en nomme un le garde, et la commande ne tourne pas. Quand elle tourne, le coffre est
+déverrouillé une seconde fois pour cette connexion.
 
 **Secret de déverrouillage** - transmis sur l'entrée standard de la commande, pour les coffres
 qui doivent d'abord être déverrouillés. Bitwarden et 1Password exigent en plus une session
