@@ -1120,11 +1120,19 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             // without modification. A connection that may not ask the user anything - a restore
             // reconnecting on its own - may not show the vault's failure either: one modal per
             // restored session arrived unbidden. It goes on without the password, as before.
+            // What it says still reaches the status line, so the cause is on screen.
+            string? quietVaultFailure = null;
             _ = await TryResolveExternalCredentialsAsync(
                 serverDto,
                 settings,
                 cancellationToken,
-                skipOnFailure: !allowCredentialPrompt || failureReport != ConnectFailureReport.Dialog);
+                skipOnFailure: !allowCredentialPrompt || failureReport != ConnectFailureReport.Dialog,
+                reportQuietly: message =>
+                {
+                    quietVaultFailure = message;
+                    StatusMessageRequested?.Invoke(message);
+                },
+                announceLookup: true);
 
             // After the gate and after the vault: a shared session takes the passwords its user
             // chose to remember, and is asked for the ones it needs and has no other way to get.
@@ -1190,7 +1198,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 await SettleSharedCredentialsAsync(sharedCredentials, outcome);
             }
 
-            return outcome.Status switch
+            bool connected = outcome.Status switch
             {
                 BulkConnectOutcomeStatus.Success => true,
                 BulkConnectOutcomeStatus.PreflightFailed => ReportConnectFailure(
@@ -1215,6 +1223,16 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 BulkConnectOutcomeStatus.UnsupportedType => false,
                 _ => false
             };
+
+            // The connection that went ahead without the vault's password failed in turn, and its
+            // own message ("connection refused", "authentication failed") replaced the vault's on
+            // the status line. The vault failure is the cause, so it has the last word.
+            if (!connected && quietVaultFailure is not null)
+            {
+                StatusMessageRequested?.Invoke(quietVaultFailure);
+            }
+
+            return connected;
         }
         finally
         {
@@ -1473,17 +1491,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         var connType = dto.ConnectionType?.ToUpperInvariant();
 
-        // A profile that signs in with a key needs no password: the connect path asks for none
-        // (SshHandler.ShouldPromptForPlinkPassword), so the vault was unlocked on every connect for
-        // nothing, and a key profile with no vault entry got a "no password" warning each time.
-        if (connType is "SSH" or "SFTP"
-            && string.IsNullOrEmpty(dto.SshPasswordEncrypted)
-            && string.IsNullOrWhiteSpace(dto.SshKeyPath))
+        // A profile that signs in with a key still gets the vault's password, as optional: the
+        // SSH.NET path sends the key and the password together (SshHandler), so the password is
+        // what signs in on a server that wants both or refuses the key. Leaving key profiles out
+        // removed that fallback; reporting their misses warned on every connect of a profile
+        // whose key alone was enough.
+        if (connType is "SSH" or "SFTP" && string.IsNullOrEmpty(dto.SshPasswordEncrypted))
         {
             return new CredentialTarget(
                 dto.SshPort, dto.SshUsername,
                 encrypted => dto.SshPasswordEncrypted = encrypted,
-                username => { if (string.IsNullOrEmpty(dto.SshUsername)) dto.SshUsername = username; });
+                username => { if (string.IsNullOrEmpty(dto.SshUsername)) dto.SshUsername = username; },
+                PasswordOptional: !string.IsNullOrWhiteSpace(dto.SshKeyPath));
         }
 
         if (connType is "RDP" && string.IsNullOrEmpty(dto.RdpPasswordEncrypted))
@@ -1538,11 +1557,16 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         return null;
     }
 
+    /// <param name="PasswordOptional">
+    /// Whether the connection can sign in without this password (an SSH key), so that a vault
+    /// that has none is not a failure to report.
+    /// </param>
     internal readonly record struct CredentialTarget(
         int Port,
         string? Username,
         Action<string> SetPassword,
-        Action<string> SetUsernameIfEmpty);
+        Action<string> SetUsernameIfEmpty,
+        bool PasswordOptional = false);
 
     /// <summary>
     /// Enforces the optional Windows Hello gate before any stored credentials are used.
@@ -1602,11 +1626,26 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// the password and injects it (DPAPI-encrypted) into the DTO. This allows all
     /// downstream code to work unchanged.
     /// </summary>
+    /// <param name="skipOnFailure">
+    /// Whether a failure is reported without a dialog and the server skipped (true returned).
+    /// </param>
+    /// <param name="reportQuietly">
+    /// Where a failure that shows no dialog is still said, without a modal: the status line of a
+    /// single connect. A restore and the failed tab's Reconnect button take this path, and with
+    /// nothing said there a vault that timed out or held no entry looked like a server refusing
+    /// the login. Null in a bulk connect, whose summary counts the skipped servers.
+    /// </param>
+    /// <param name="announceLookup">
+    /// Whether the status line says the vault is being read while the command runs, which can
+    /// take a few seconds for a database unlock with nothing else on screen moving.
+    /// </param>
     internal async Task<bool> TryResolveExternalCredentialsAsync(
         ServerProfileDto serverDto,
         AppSettings settings,
         CancellationToken ct,
-        bool skipOnFailure)
+        bool skipOnFailure,
+        Action<string>? reportQuietly = null,
+        bool announceLookup = false)
     {
         if (!settings.UseExternalCredentialProvider)
         {
@@ -1626,9 +1665,20 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return false;
         }
 
+        // A key profile asks the vault for a password it may not need: the key signs in, and the
+        // password is a fallback for a server that also wants one or refuses the key. Its failure
+        // is logged and never reported, and never skips the server.
+        bool passwordOptional = credTarget.Value.PasswordOptional;
+
         try
         {
             var vaultTitle = CredentialLookupTitle(serverDto);
+
+            if (announceLookup)
+            {
+                StatusMessageRequested?.Invoke(
+                    _localizer.Format("StatusCredentialProviderLookup", serverDto.DisplayName));
+            }
 
             var credential = await provider.GetCredentialAsync(
                 serverDto.RemoteServer, credTarget.Value.Port,
@@ -1638,14 +1688,19 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             {
                 Core.Logging.FileLogger.Warn(
                     $"External credential provider returned no result for {serverDto.DisplayName}");
+                if (passwordOptional)
+                {
+                    return false;
+                }
+
+                string noResult = _localizer.Format("WarnCredentialProviderNoResult", serverDto.DisplayName);
                 if (skipOnFailure)
                 {
+                    reportQuietly?.Invoke(noResult);
                     return true;
                 }
 
-                _dialogService.ShowWarning(
-                    _localizer["ErrorConnectionTitle"],
-                    _localizer.Format("WarnCredentialProviderNoResult", serverDto.DisplayName));
+                _dialogService.ShowWarning(_localizer["ErrorConnectionTitle"], noResult);
                 return false;
             }
 
@@ -1671,14 +1726,19 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             Core.Logging.FileLogger.Warn(
                 $"External credential provider failed for {serverDto.DisplayName}: {ex.Message}");
+            if (passwordOptional)
+            {
+                return false;
+            }
+
+            string failure = DescribeCredentialProviderFailure(ex, serverDto.DisplayName, settings);
             if (skipOnFailure)
             {
+                reportQuietly?.Invoke(failure);
                 return true;
             }
 
-            _dialogService.ShowError(
-                _localizer["ErrorConnectionTitle"],
-                DescribeCredentialProviderFailure(ex, serverDto.DisplayName, settings));
+            _dialogService.ShowError(_localizer["ErrorConnectionTitle"], failure);
             return false;
         }
     }

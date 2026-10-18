@@ -247,7 +247,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         };
         viewModel.Settings.FileShareTftpSaved += _fileShareTftpSavedHandler;
 
-        _settingsLoadedHandler = () => Dispatcher.BeginInvoke(() => PopulateCredentialProviderUnlockSecret(viewModel));
+        _settingsLoadedHandler = () => Dispatcher.BeginInvoke(() =>
+        {
+            PopulateCredentialProviderUnlockSecret(viewModel);
+            SyncCredentialProviderPresetSelection(viewModel);
+        });
         viewModel.Settings.SettingsLoaded += _settingsLoadedHandler;
 
         // A refused save takes the user to the first field in error rather than leaving them to
@@ -496,7 +500,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void ApplySettingsLocalization(MainViewModel vm)
     {
-        PopulateCredentialProviderPresets();
+        PopulateCredentialProviderPresets(vm);
         PopulateCredentialProviderUnlockSecret(vm);
         _ = RefreshCommandLibraryTokenStatusAsync();
         RefreshExternalToolSettingsUi(vm);
@@ -517,16 +521,40 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
-    private void PopulateCredentialProviderPresets()
+    private void PopulateCredentialProviderPresets(MainViewModel vm)
     {
-        Mw_SettingsCredProvPreset.Items.Clear();
-
-        foreach (var label in _credentialProviderPresetService.GetPresetLabels(LocalizeWindowString))
+        _suppressCredProvPresetChange = true;
+        try
         {
-            Mw_SettingsCredProvPreset.Items.Add(label);
+            Mw_SettingsCredProvPreset.Items.Clear();
+
+            foreach (var label in _credentialProviderPresetService.GetPresetLabels(LocalizeWindowString))
+            {
+                Mw_SettingsCredProvPreset.Items.Add(label);
+            }
+        }
+        finally
+        {
+            _suppressCredProvPresetChange = false;
         }
 
-        Mw_SettingsCredProvPreset.SelectedIndex = 0;
+        SyncCredentialProviderPresetSelection(vm);
+    }
+
+    // Shows the preset the saved command is, rather than "Custom" for every one of them, which
+    // read as if the setup had been lost. Suppressed: showing a preset is not choosing it.
+    private void SyncCredentialProviderPresetSelection(MainViewModel vm)
+    {
+        _suppressCredProvPresetChange = true;
+        try
+        {
+            Mw_SettingsCredProvPreset.SelectedIndex =
+                _credentialProviderPresetService.IndexOfCommand(vm.Settings.CredentialProviderCommand);
+        }
+        finally
+        {
+            _suppressCredProvPresetChange = false;
+        }
     }
 
     private async Task RefreshCommandLibraryTokenStatusAsync()
@@ -2958,9 +2986,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
-    private void OnCredProvPresetChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    // Guards the preset selector so showing the saved command's preset does not apply it.
+    private bool _suppressCredProvPresetChange;
+
+    private async void OnCredProvPresetChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        if (DataContext is not MainViewModel vm)
+        if (_suppressCredProvPresetChange || DataContext is not MainViewModel vm)
         {
             return;
         }
@@ -2973,9 +3004,31 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
-        vm.Settings.CredentialProviderCommand = command;
-        vm.Settings.CredentialProviderFirstLineOnly = firstLineOnly;
-        vm.Settings.IsDirty = true;
+        try
+        {
+            // A command the user wrote is not one of the presets; picking a preset replaced it
+            // with no way back but Undo changes, which also undoes everything else on the panel.
+            string current = vm.Settings.CredentialProviderCommand;
+            bool customCommand = !string.IsNullOrWhiteSpace(current)
+                && _credentialProviderPresetService.IndexOfCommand(current) == 0;
+            if (customCommand
+                && !await _dialogService.ShowConfirmAsync(
+                    vm.Localize("CredProvPresetReplaceTitle"),
+                    vm.Localize("CredProvPresetReplaceMessage"),
+                    "warning").ConfigureAwait(true))
+            {
+                SyncCredentialProviderPresetSelection(vm);
+                return;
+            }
+
+            vm.Settings.CredentialProviderCommand = command;
+            vm.Settings.CredentialProviderFirstLineOnly = firstLineOnly;
+            vm.Settings.IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"Credential provider preset not applied: {ex.Message}");
+        }
     }
 
     // Guards the unlock PasswordBox so programmatic population on load does not mark dirty.

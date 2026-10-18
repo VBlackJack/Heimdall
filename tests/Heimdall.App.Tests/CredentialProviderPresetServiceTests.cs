@@ -80,6 +80,26 @@ public sealed class CredentialProviderPresetServiceTests
         Assert.Contains("-FailIfNoEntry", command);
     }
 
+    [Fact]
+    public void IndexOfCommand_FindsThePresetOfASavedCommand()
+    {
+        // The selector showed "Custom" for every saved setup, preset or not.
+        int keePassXc = IndexOf("KeePassXC");
+        Assert.True(_service.TryGetPreset(keePassXc, out string command, out _));
+
+        Assert.Equal(keePassXc, _service.IndexOfCommand(command));
+        Assert.Equal(keePassXc, _service.IndexOfCommand("  " + command + "  "));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("my-own-script.exe {Title}")]
+    public void IndexOfCommand_BlankOrUnknownCommandIsCustom(string? command)
+    {
+        Assert.Equal(0, _service.IndexOfCommand(command));
+    }
+
     private int IndexOf(string label)
     {
         int index = _service.GetPresetLabels(key => key).ToList().IndexOf(label);

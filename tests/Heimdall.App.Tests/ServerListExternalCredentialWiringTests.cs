@@ -285,37 +285,138 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
     }
 
     [Fact]
-    public async Task ResolveCredentials_SshProfileWithAKey_NeverRunsTheVaultCommand()
+    public async Task ResolveCredentials_SshProfileWithAKey_AsksTheVaultQuietly()
     {
+        // The SSH.NET path sends the key and the password together, so the vault's password is
+        // a fallback a key profile must still get; a miss is not worth a warning, since the key
+        // may be all the server wants.
         var provider = new StubCredentialProvider { Result = null };
         await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
         var dto = CreateSshServer(passwordEncrypted: null);
         dto.SshKeyPath = @"C:\keys\id_ed25519";
+        var statuses = new List<string>();
 
         var result = await fixture.ViewModel.TryResolveExternalCredentialsAsync(
-            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: true, reportQuietly: statuses.Add);
 
         Assert.False(result);
-        Assert.Equal(0, provider.CallCount);
+        Assert.Equal(1, provider.CallCount);
         Assert.Equal(0, fixture.Dialog.WarningCount);
+        Assert.Empty(statuses);
     }
 
     [Fact]
-    public async Task Restore_VaultHasNoEntry_RaisesNoModal()
+    public async Task ResolveCredentials_SshProfileWithAKey_UsesTheVaultPasswordWhenThereIsOne()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.SshKeyPath = @"C:\keys\id_ed25519";
+
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+
+        Assert.Equal("s3cr3t", CredentialProtector.Unprotect(dto.SshPasswordEncrypted));
+    }
+
+    [Fact]
+    public async Task BulkPlan_KeyProfileWithAVaultFailure_IsNotSkipped()
+    {
+        // The key may sign in alone: a vault that timed out must not drop the server from a batch.
+        var provider = new StubCredentialProvider
+        {
+            Exception = new CredentialProviderTimeoutException(TimeSpan.FromSeconds(1))
+        };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.SshKeyPath = @"C:\keys\id_ed25519";
+        await fixture.SeedAsync(dto);
+
+        var plan = await fixture.ViewModel.PrepareBulkConnectPlanAsync(
+            fixture.ViewModel.Servers.ToList(), CancellationToken.None);
+
+        Assert.Equal(1, plan.ConnectableCount);
+        Assert.Empty(plan.Skips.Occurred);
+    }
+    [Fact]
+    public async Task Restore_VaultHasNoEntry_RaisesNoModalButSaysWhyLast()
     {
         // A restore reconnects on its own, several sessions at launch: the vault's "no password"
-        // warning arrived as one modal per restored session.
+        // warning arrived as one modal per restored session. Without any modal, the cause must
+        // still be on screen, and last: the connection that follows fails with its own message.
         var provider = new StubCredentialProvider { Result = null };
         await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
         await fixture.SeedAsync(CreateSshServer(passwordEncrypted: null));
+        var statuses = new List<string>();
+        fixture.ViewModel.StatusMessageRequested += statuses.Add;
 
         await fixture.ViewModel.RestoreServerAsync(
             "srv-ssh", CancellationToken.None, failureReport: ConnectFailureReport.FailedTabOnly);
 
         Assert.Equal(1, provider.CallCount);
         Assert.Equal(0, fixture.Dialog.WarningCount);
+        Assert.Equal(fixture.Localizer.Format("WarnCredentialProviderNoResult", "SSH Box"), statuses.Last());
     }
 
+    [Fact]
+    public async Task TabReconnect_VaultTimesOut_SaysTheTimeoutOnTheStatusLine()
+    {
+        // The failed tab's Reconnect button goes through RestoreServerAsync with the default
+        // report: measured in the app, a vault failure there left only "Connection refused".
+        var provider = new StubCredentialProvider
+        {
+            Exception = new CredentialProviderTimeoutException(TimeSpan.FromMilliseconds(4321))
+        };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        await fixture.SeedAsync(CreateSshServer(passwordEncrypted: null));
+        var statuses = new List<string>();
+        fixture.ViewModel.StatusMessageRequested += statuses.Add;
+
+        await fixture.ViewModel.RestoreServerAsync("srv-ssh", CancellationToken.None);
+
+        string expected = fixture.Localizer.Format(
+            "ErrorCredentialProviderTimeout",
+            "SSH Box",
+            (await fixture.ConfigManager.LoadSettingsAsync()).CredentialProviderTimeoutMs);
+        Assert.Equal(expected, statuses.Last());
+        Assert.Equal(0, fixture.Dialog.WarningCount);
+    }
+
+    [Fact]
+    public async Task TabReconnect_ConnectionFailsAfterTheVault_TheVaultCauseIsSaidAfterTheFailure()
+    {
+        // In the app the failed session writes its own status ("Connection refused") as it is
+        // published, so the vault's message must come after it to stay on screen.
+        var provider = new StubCredentialProvider { Result = null };
+        await using var fixture = await Fixture.CreateAsync(
+            new FakeCredentialProviderFactory(provider), new FailingSshHandler());
+        await fixture.SeedAsync(CreateSshServer(passwordEncrypted: null));
+        var events = new List<string>();
+        fixture.ViewModel.SessionFailed += (_, _, _, _, statusText, _) => events.Add("failed:" + statusText);
+        fixture.ViewModel.StatusMessageRequested += message => events.Add("status:" + message);
+
+        await fixture.ViewModel.RestoreServerAsync("srv-ssh", CancellationToken.None);
+
+        string vaultMessage = "status:" + fixture.Localizer.Format("WarnCredentialProviderNoResult", "SSH Box");
+        int lastFailure = events.FindLastIndex(entry => entry.StartsWith("failed:", StringComparison.Ordinal));
+        Assert.True(lastFailure >= 0, "the connection was expected to publish a failed session");
+        Assert.Equal(vaultMessage, events.Last());
+        Assert.True(events.LastIndexOf(vaultMessage) > lastFailure);
+    }
+
+    [Fact]
+    public async Task Connect_AnnouncesTheVaultLookup()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        await fixture.SeedAsync(CreateSshServer(passwordEncrypted: null));
+        var statuses = new List<string>();
+        fixture.ViewModel.StatusMessageRequested += statuses.Add;
+
+        await fixture.ViewModel.ConnectCommand.ExecuteAsync(fixture.ViewModel.Servers[0]);
+
+        Assert.Contains(fixture.Localizer.Format("StatusCredentialProviderLookup", "SSH Box"), statuses);
+    }
     [Fact]
     public async Task Connect_VaultHasNoEntry_StillWarnsTheUserWhoAsked()
     {
@@ -355,12 +456,14 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
     }
 
     [Fact]
-    public async Task BulkPlan_LooksTheVaultUpSideBySide_AtMostTheCapAtOnce()
+    public async Task BulkPlan_LooksTheVaultUpOneAtATime_InSelectionOrder()
     {
-        // One after the other, a batch waited for one database unlock per server in a row.
-        var provider = new ConcurrencyProbeProvider(ServerListViewModel.MaxParallelVaultLookups);
+        // Side by side, KeePassXC unlocks shared the processor their key derivation was tuned to
+        // fill alone and ran past the timeout; pass lookups queued behind one passphrase prompt.
+        const int serverCount = 3;
+        var provider = new ConcurrencyProbeProvider(expected: 1);
         await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
-        var servers = Enumerable.Range(1, ServerListViewModel.MaxParallelVaultLookups + 2)
+        var servers = Enumerable.Range(1, serverCount)
             .Select(index =>
             {
                 var dto = CreateSshServer(passwordEncrypted: null);
@@ -374,13 +477,12 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
         var plan = await fixture.ViewModel.PrepareBulkConnectPlanAsync(
             fixture.ViewModel.Servers.ToList(), CancellationToken.None);
 
-        Assert.Equal(ServerListViewModel.MaxParallelVaultLookups, provider.MaxConcurrent);
-        Assert.Equal(servers.Length, plan.ConnectableCount);
+        Assert.Equal(1, provider.MaxConcurrent);
+        Assert.Equal(serverCount, plan.ConnectableCount);
         Assert.Equal(
             servers.Select(server => server.Id),
             plan.Candidates.Select(candidate => candidate.ServerDto.Id));
     }
-
     private static AppSettings EnabledSettings() => new()
     {
         UseExternalCredentialProvider = true,
@@ -440,7 +542,9 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
                 await ConfigManager.LoadSettingsAsync());
         }
 
-        public static async Task<Fixture> CreateAsync(ICredentialProviderFactory factory)
+        public static async Task<Fixture> CreateAsync(
+            ICredentialProviderFactory factory,
+            params IProtocolHandler[] handlers)
         {
             var rootPath = Path.Combine(
                 Path.GetTempPath(), "heimdall-cred-wiring", Guid.NewGuid().ToString("N"));
@@ -452,7 +556,7 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
 
             var stateMachine = new ConnectionStateMachine();
             var connectionService = new ConnectionService(
-                configManager, localizer, new NullTunnelService(), Array.Empty<IProtocolHandler>());
+                configManager, localizer, new NullTunnelService(), handlers);
             var dialog = new RecordingDialogService();
             var puttyImporter = new PuttySessionImporter(new FakePuttySessionRegistrySource([]), configManager);
             var knownHostsImporter = new KnownHostsImporter(configManager, new HostKeyStore());
@@ -594,6 +698,26 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
                 Interlocked.Decrement(ref _running);
             }
         }
+    }
+
+    /// <summary>An SSH handler whose every connection fails, as one without the password would.</summary>
+    private sealed class FailingSshHandler : IProtocolHandler
+    {
+        public string Protocol => "SSH";
+
+        public Task<ConnectionResult> ConnectAsync(
+            ServerProfileDto server,
+            AppSettings settings,
+            CancellationToken ct,
+            RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
+            => Task.FromResult(new ConnectionResult(
+                false,
+                Refused,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(
+                    Heimdall.App.Localization.SshLocalizationKeys.ErrorConnectionFailed, Refused)));
+
+        private const string Refused = "Connection refused by ssh.example.com.";
     }
 
     private sealed class NullTunnelService : ITunnelService

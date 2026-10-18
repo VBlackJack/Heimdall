@@ -130,12 +130,34 @@ public partial class ServerDialogViewModel : ObservableValidator
                 _defaultSshTunnelPort = settings.DefaultSshTunnelPort;
                 _defaultRdpResizeEnableDelayMs = settings.RdpResizeEnableDelayMs;
                 _sshAgentPreference = settings.SshAgentPreference;
+                _usesCredentialProvider = settings.UseExternalCredentialProvider;
+                _credentialProviderSuppliesUsername = settings.UseExternalCredentialProvider
+                    && (settings.CredentialProviderType == CredentialProviderKind.WindowsCredentialManager
+                        || !string.IsNullOrWhiteSpace(settings.CredentialProviderUsernameCommand));
                 ApplyRdpDialogAdvancedDefault(settings.RdpDialogAdvancedDefault);
                 OnPropertyChanged(nameof(RdpResizeEnableDelayPlaceholder));
+                OnPropertyChanged(nameof(RequiresSshUsername));
+                OnPropertyChanged(nameof(SshUsernameLabel));
+                OnPropertyChanged(nameof(SshAuthHint));
+                OnPropertyChanged(nameof(ShowsVaultEntryName));
                 RefreshAgentChipIfNeeded();
             });
         }
     }
+
+    private bool _usesCredentialProvider;
+
+    private bool _credentialProviderSuppliesUsername;
+
+    /// <summary>
+    /// Whether the vault entry name field is shown: when the external credential provider is on,
+    /// or when the profile already names an entry, so a saved value is never hidden.
+    /// </summary>
+    /// <remarks>
+    /// Read once, when the dialog binds after hydration, and deliberately not raised as the
+    /// name is typed: clearing the field would otherwise hide it under the cursor.
+    /// </remarks>
+    public bool ShowsVaultEntryName => _usesCredentialProvider || !string.IsNullOrWhiteSpace(VaultEntryName);
 
     private string L(string key) => Localizer?[key] ?? key;
 
@@ -495,7 +517,13 @@ public partial class ServerDialogViewModel : ObservableValidator
             {
                 return L("ServerDialogSshAuthHintPassword");
             }
-            return L("ServerDialogSshAuthHintAgent");
+
+            // With the external provider on, a profile with no password and no key gets its
+            // password from the vault; saying it would "rely on Pageant" described a connection
+            // that never happens.
+            return _usesCredentialProvider
+                ? L("ServerDialogSshAuthHintCredentialProvider")
+                : L("ServerDialogSshAuthHintAgent");
         }
     }
 
@@ -1640,10 +1668,16 @@ public partial class ServerDialogViewModel : ObservableValidator
     /// reached, and PuTTY asks for the login name itself; the plink fallback likewise tolerates a
     /// key-only profile without one. Marking the field required there would put a false statement
     /// on screen, which is the same defect class this change exists to remove.
+    ///
+    /// Neither when the external credential provider supplies the username (a username command,
+    /// or the Credential Manager, which stores one with every entry): the vault fills it in before
+    /// the guard runs, and requiring it here made the username command unreachable for every
+    /// profile made in this dialog.
     /// </remarks>
     public bool RequiresSshUsername =>
-        IsSftpConnection
-        || (IsSshConnection && !string.Equals(SshMode, "External", StringComparison.OrdinalIgnoreCase));
+        !_credentialProviderSuppliesUsername
+        && (IsSftpConnection
+            || (IsSshConnection && !string.Equals(SshMode, "External", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>
     /// The username label, carrying the required marker only when it is true.

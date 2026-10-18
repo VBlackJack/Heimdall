@@ -215,7 +215,7 @@ the entry in Heimdall.
 the password was found (and the username, when a username command is set), whether the tool
 could not be started, or whether the command ran past the timeout.
 
-An SSH or SFTP profile that signs in with a key does not ask the vault: it needs no password.
+An SSH or SFTP profile that signs in with a key still asks the vault, quietly: the password is sent with the key for a server that wants both, and an entry that is missing is not reported. With a username command (or the Credential Manager), the SSH username of a profile becomes optional, since the vault fills it in. The vault entry name of a profile is on its General tab, under **External vault**. When a restore or a tab's Reconnect cannot get the password, the reason is shown on the status line rather than in a dialog.
 
 ## RDP and memory
 

@@ -208,7 +208,7 @@ inside `Build.ps1 -Mode Release`.
 ## Localization And I18n
 
 The interface ships in English, French and Spanish. Each catalogue under `locales/`
-holds the same 7,182 keys, and `LocaleCatalogueParityTests` enforces that in both
+holds the same 7,187 keys, and `LocaleCatalogueParityTests` enforces that in both
 directions and across format placeholders. Adding a language is a documented
 checklist in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
