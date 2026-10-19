@@ -660,7 +660,7 @@ Avant de diagnostiquer la connectivité, vérifiez que TFTP est activé dans Par
 
 **Solution** :
 1. Exécuter Heimdall en tant qu'administrateur si TFTP est nécessaire
-2. Le serveur HTTP (port 8080) fonctionne sans élévation
+2. Le serveur HTTP (port 8080) démarre sans élévation, mais n'écoute alors que sur localhost : Windows n'accorde l'écoute sur toutes les interfaces qu'à un processus élevé, ou à un utilisateur titulaire d'une ACL d'URL (`netsh http add urlacl url=http://+:8080/ user=<utilisateur>`, à exécuter une fois en administrateur). Le journal du partage indique alors "localhost-only fallback"
 3. Sans élévation, TFTP n'est pas disponible (restriction de sécurité Windows)
 
 **Fichiers** : `Services/EphemeralFileServer.cs`

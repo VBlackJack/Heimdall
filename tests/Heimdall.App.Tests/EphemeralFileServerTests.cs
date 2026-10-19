@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net;
@@ -209,7 +210,7 @@ public class EphemeralFileServerTests : IDisposable
         }
         catch (Exception ex) when (IsPortException(ex))
         {
-            return; // skip — port unavailable in this environment
+            return; // skip: port unavailable in this environment
         }
 
         Assert.True(_server.IsHttpRunning);
@@ -225,7 +226,7 @@ public class EphemeralFileServerTests : IDisposable
         }
         catch (Exception ex) when (IsPortException(ex))
         {
-            return; // skip — port unavailable
+            return; // skip: port unavailable
         }
 
         await _server.StopHttpServerAsync();
@@ -252,7 +253,7 @@ public class EphemeralFileServerTests : IDisposable
         }
         catch (Exception ex) when (IsPortException(ex))
         {
-            return; // skip — port unavailable
+            return; // skip: port unavailable
         }
 
         Assert.True(_server.IsHttpRunning);
@@ -280,7 +281,7 @@ public class EphemeralFileServerTests : IDisposable
         }
         catch (Exception ex) when (IsPortException(ex))
         {
-            return; // skip — port unavailable in this environment
+            return; // skip: port unavailable in this environment
         }
 
         await Task.Delay(50);
@@ -304,7 +305,7 @@ public class EphemeralFileServerTests : IDisposable
         }
         catch (Exception ex) when (IsPortException(ex))
         {
-            return; // skip — port unavailable in this environment
+            return; // skip: port unavailable in this environment
         }
 
         await Task.Delay(50);
@@ -333,7 +334,7 @@ public class EphemeralFileServerTests : IDisposable
         }
         catch (Exception ex) when (IsPortException(ex))
         {
-            return; // skip — port unavailable in this environment
+            return; // skip: port unavailable in this environment
         }
 
         await Task.Delay(50);
@@ -358,7 +359,7 @@ public class EphemeralFileServerTests : IDisposable
         }
         catch (Exception ex) when (IsPortException(ex))
         {
-            return; // skip — port unavailable in this environment
+            return; // skip: port unavailable in this environment
         }
 
         await Task.Delay(50);
@@ -398,7 +399,7 @@ public class EphemeralFileServerTests : IDisposable
             }
             catch (Exception ex) when (IsPortException(ex))
             {
-                return; // skip — port unavailable in this environment
+                return; // skip: port unavailable in this environment
             }
 
             await Task.Delay(50);
@@ -429,6 +430,189 @@ public class EphemeralFileServerTests : IDisposable
         }
     }
 
+    // ── Links inside the shared folder ────────────────────────────────
+
+    /// <summary>
+    /// Creates a directory junction, which needs no privilege (unlike a symbolic link).
+    /// Returns false when the junction could not be created.
+    /// </summary>
+    private static bool TryCreateJunction(string linkPath, string targetPath)
+    {
+        ProcessStartInfo startInfo = new("cmd.exe", $"/c mklink /J \"{linkPath}\" \"{targetPath}\"")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        using Process? process = Process.Start(startInfo);
+        if (process is null) return false;
+        process.WaitForExit();
+        return process.ExitCode == 0 && Directory.Exists(linkPath);
+    }
+
+    /// <summary>
+    /// Lays out a shared folder holding a regular file and a junction to a sibling folder
+    /// that holds a secret file. Returns the shared folder, or null when no junction could be made.
+    /// </summary>
+    private string? CreateSharedFolderWithJunction(string secretContent)
+    {
+        string shared = Path.Combine(_testDir, "shared");
+        string outside = Path.Combine(_testDir, "outside");
+        Directory.CreateDirectory(shared);
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(shared, "allowed.txt"), "allowed-content");
+        File.WriteAllText(Path.Combine(outside, "secret.txt"), secretContent);
+
+        return TryCreateJunction(Path.Combine(shared, "jn"), outside) ? shared : null;
+    }
+
+    [Fact]
+    public async Task Http_Request_Through_Junction_Is_Forbidden()
+    {
+        int httpPort = GetFreeTcpPort();
+        string secretContent = $"secret-content-{Guid.NewGuid():N}";
+        string? shared = CreateSharedFolderWithJunction(secretContent);
+        Assert.NotNull(shared);
+
+        try
+        {
+            await _server.StartHttpServerAsync(shared!, httpPort);
+        }
+        catch (Exception ex) when (IsPortException(ex))
+        {
+            return; // skip: port unavailable in this environment
+        }
+
+        await Task.Delay(50);
+
+        (HttpStatusCode StatusCode, string Body) allowed =
+            await SendRawAuthenticatedGetAsync(httpPort, "/allowed.txt", _server.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+
+        foreach (string path in new[] { "/jn/secret.txt", "/jn/", "/jn" })
+        {
+            (HttpStatusCode StatusCode, string Body) response =
+                await SendRawAuthenticatedGetAsync(httpPort, path, _server.AccessToken);
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            Assert.DoesNotContain(secretContent, response.Body, StringComparison.Ordinal);
+            Assert.DoesNotContain("secret.txt", response.Body, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Http_Directory_Listing_Leaves_Out_Junction()
+    {
+        int httpPort = GetFreeTcpPort();
+        string? shared = CreateSharedFolderWithJunction("unused");
+        Assert.NotNull(shared);
+        Directory.CreateDirectory(Path.Combine(shared!, "realdir"));
+
+        try
+        {
+            await _server.StartHttpServerAsync(shared!, httpPort);
+        }
+        catch (Exception ex) when (IsPortException(ex))
+        {
+            return; // skip: port unavailable in this environment
+        }
+
+        await Task.Delay(50);
+
+        (HttpStatusCode StatusCode, string Body) listing =
+            await SendRawAuthenticatedGetAsync(httpPort, "/", _server.AccessToken);
+
+        Assert.Equal(HttpStatusCode.OK, listing.StatusCode);
+        Assert.Contains(">realdir/<", listing.Body, StringComparison.Ordinal);
+        Assert.Contains(">allowed.txt<", listing.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain(">jn/<", listing.Body, StringComparison.Ordinal);
+    }
+
+    private const ushort TftpOpcodeData = 3;
+    private const ushort TftpOpcodeError = 5;
+
+    private static int GetFreeUdpPort()
+    {
+        using UdpClient probe = new(new IPEndPoint(IPAddress.Loopback, 0));
+        return ((IPEndPoint)probe.Client.LocalEndPoint!).Port;
+    }
+
+    /// <summary>Sends an octet-mode RRQ and returns the opcode of the first reply.</summary>
+    private static async Task<ushort> SendTftpReadRequestAsync(int port, string fileName)
+    {
+        using UdpClient client = new(new IPEndPoint(IPAddress.Loopback, 0));
+        byte[] name = Encoding.ASCII.GetBytes(fileName);
+        byte[] mode = Encoding.ASCII.GetBytes("octet");
+        byte[] request = new byte[2 + name.Length + 1 + mode.Length + 1];
+        request[1] = 1;
+        name.CopyTo(request, 2);
+        mode.CopyTo(request, 2 + name.Length + 1);
+        await client.SendAsync(request, request.Length, new IPEndPoint(IPAddress.Loopback, port));
+
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(5));
+        UdpReceiveResult reply = await client.ReceiveAsync(timeout.Token);
+        return (ushort)((reply.Buffer[0] << 8) | reply.Buffer[1]);
+    }
+
+    [Fact]
+    public async Task Tftp_Read_Of_A_Link_Is_Refused()
+    {
+        // A file symbolic link needs a privilege the test runner lacks, so the link is reported
+        // by the injected check; the regular file next to it is the control.
+        int tftpPort = GetFreeUdpPort();
+        await File.WriteAllBytesAsync(Path.Combine(_testDir, "linked.bin"), [1, 2, 3]);
+        await File.WriteAllBytesAsync(Path.Combine(_testDir, "plain.bin"), [4, 5, 6]);
+        var server = new EphemeralFileServer
+        {
+            ShutdownTimeoutMs = 500,
+            IsLink = path => string.Equals(Path.GetFileName(path), "linked.bin", StringComparison.OrdinalIgnoreCase),
+        };
+
+        try
+        {
+            try
+            {
+                await server.StartTftpServerAsync(_testDir, tftpPort);
+            }
+            catch (Exception ex) when (IsPortException(ex))
+            {
+                return; // skip: port unavailable in this environment
+            }
+
+            Assert.Equal(TftpOpcodeData, await SendTftpReadRequestAsync(tftpPort, "plain.bin"));
+            Assert.Equal(TftpOpcodeError, await SendTftpReadRequestAsync(tftpPort, "linked.bin"));
+        }
+        finally
+        {
+            await server.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public void CrossesLink_Ignores_The_Root_And_Flags_A_Link_Below_It()
+    {
+        string root = Path.Combine(_testDir, "root");
+        string link = Path.Combine(root, "link");
+        bool IsLink(string path) => path == root || path == link;
+
+        Assert.False(EphemeralFileServer.CrossesLink(root, root, IsLink));
+        Assert.False(EphemeralFileServer.CrossesLink(root, Path.Combine(root, "plain", "file.txt"), IsLink));
+        Assert.True(EphemeralFileServer.CrossesLink(root, link, IsLink));
+        Assert.True(EphemeralFileServer.CrossesLink(root, Path.Combine(link, "deeper", "file.txt"), IsLink));
+    }
+
+    [Fact]
+    public void CrossesLink_Refuses_A_Component_It_Cannot_Inspect()
+    {
+        string root = Path.Combine(_testDir, "root");
+
+        Assert.True(EphemeralFileServer.CrossesLink(
+            root,
+            Path.Combine(root, "locked.txt"),
+            _ => throw new UnauthorizedAccessException("denied")));
+    }
+
     // ── TFTP lifecycle ────────────────────────────────────────────────
 
     [Fact]
@@ -440,7 +624,7 @@ public class EphemeralFileServerTests : IDisposable
         }
         catch (Exception ex) when (IsPortException(ex))
         {
-            return; // skip — port unavailable
+            return; // skip: port unavailable
         }
 
         Assert.True(_server.IsTftpRunning);

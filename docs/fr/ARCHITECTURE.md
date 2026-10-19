@@ -748,7 +748,7 @@ L'état d'erreur est atteignable depuis Ready ou Busy.
 | Assainissement CRLF | Construction brute de l'en-tête HTTP Host assainie contre l'injection d'en-têtes |
 | Construction de commandes | Listes d'arguments structurées pour Plink/gsudo (aucune concaténation de chaînes issues de l'utilisateur) |
 | Assainissement des emplacements | Sensible au contexte : `InputValidator.IsShellTarget()` détecte les interpréteurs (cmd, powershell, bash, wsl, cscript, mshta + .bat/.cmd/.ps1/.vbs/.js/.wsf/.hta) ; les cibles shell subissent un filtrage strict des métacaractères, les cibles .exe ordinaires un filtrage relâché qui préserve `()`, `'`, `%` dans les valeurs légitimes |
-| Traversée HTTP/TFTP | Contrôle du séparateur final + comparaison exacte à la racine dans EphemeralFileServer |
+| Traversée HTTP/TFTP | Contrôle du séparateur final + comparaison exacte à la racine dans EphemeralFileServer ; aucun lien symbolique ni jonction n'est suivi sous la racine partagée, et la liste les omet |
 | Concurrence de configuration | Verrou d'écriture SemaphoreSlim dans ConfigManager pour éviter le dernier-écrivain-gagne |
 | Durcissement WebView2 | CSP (`default-src 'none'`), blocage de navigation, validation de la source des `WebMessage` |
 | IPC Pageant | Vérification de l'identité du propriétaire du processus avant tout accès à la mémoire partagée |
