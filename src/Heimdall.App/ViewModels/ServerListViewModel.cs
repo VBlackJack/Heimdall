@@ -1432,7 +1432,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 return new BulkConnectOutcome(
                     BulkConnectOutcomeStatus.Success,
                     null,
-                    Authenticated: result.Session is SshSessionResult,
+                    Authenticated: result.Session is SshSessionResult or SftpSessionBundle,
                     FallbackFrom: result.FallbackFrom);
             }
 

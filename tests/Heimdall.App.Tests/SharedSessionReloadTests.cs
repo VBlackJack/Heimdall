@@ -252,13 +252,14 @@ public sealed class SharedSessionReloadTests : IDisposable
     public async Task OfflineCopy_GoesThroughTheParserAndTheSanitizerAgain()
     {
         // A copy rewritten on this disk, hash and all: a key path on a file share and a session
-        // type that is not SSH or RDP. The copy is trusted no more than the file it stands for.
+        // type the importer does not map (a WSL distribution). The copy is trusted no more than
+        // the file it stands for.
         const string tampered = """
             [Bookmarks]
             SubRep=
             ImgNum=42
             srv-k01= #109#0%srv-k01.example.test%22%jdoe%%\\files.example.test\share\id_rsa
-            srv-t01= #98#1%srv-t01.example.test%23%%%2%%
+            srv-w01= #151#14%AlmaLinux-9%
             srv-a01= #109#0%srv-a01.example.test%22%jdoe%%
             """;
         var cache = new SharedSessionSourceCache(CacheDirectory);
@@ -271,11 +272,11 @@ public sealed class SharedSessionReloadTests : IDisposable
         Assert.All(provider.Profiles, profile =>
         {
             Assert.Null(profile.SshKeyPath);
-            Assert.Contains(profile.ConnectionType, new[] { "SSH", "RDP" });
+            Assert.Contains(profile.ConnectionType, new[] { "SSH", "SFTP", "RDP", "Telnet", "VNC" });
             Assert.StartsWith(SharedSessionIds.PrefixFor(SourceId), profile.Id, StringComparison.Ordinal);
             Assert.False(profile.ExecutionConfirmed);
         });
-        Assert.DoesNotContain(provider.Profiles, profile => profile.DisplayName == "srv-t01");
+        Assert.DoesNotContain(provider.Profiles, profile => profile.DisplayName == "srv-w01");
     }
 
     [Fact]

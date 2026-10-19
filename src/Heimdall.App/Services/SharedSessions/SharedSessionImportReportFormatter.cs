@@ -165,7 +165,11 @@ public sealed class SharedSessionImportReportFormatter
         return entry.SkipReason switch
         {
             MobaXtermImportWarningKind.MalformedSessionLine => _localizer["SharedReportSkipMalformed"],
-            MobaXtermImportWarningKind.UnsupportedSessionType => _localizer.Format("SharedReportSkipUnsupportedType", entry.Detail),
+            MobaXtermImportWarningKind.UnsupportedSessionType => ExplainUnsupportedType(entry.Detail),
+            MobaXtermImportWarningKind.JumpHostNotSupported => _localizer.Format("SharedReportSkipJumpHost", entry.Detail),
+            MobaXtermImportWarningKind.ProxyNotSupported => entry.Detail.Length == 0
+                ? _localizer["SharedReportSkipProxyNoHost"]
+                : _localizer.Format("SharedReportSkipProxy", entry.Detail),
             MobaXtermImportWarningKind.MissingHost => _localizer["SharedReportSkipMissingHost"],
             MobaXtermImportWarningKind.InvalidGatewayHost => _localizer.Format("SharedReportSkipInvalidGateway", entry.Detail),
             MobaXtermImportWarningKind.DuplicateSession => _localizer["SharedReportSkipDuplicate"],
@@ -173,6 +177,14 @@ public sealed class SharedSessionImportReportFormatter
             _ => _localizer["SharedReportSkipRefused"],
         };
     }
+
+    private string ExplainUnsupportedType(string typeCode) =>
+        MobaXtermImporter.ClassifySkippedType(typeCode) switch
+        {
+            MobaXtermSkippedType.Wsl => _localizer["SharedReportSkipWslType"],
+            MobaXtermSkippedType.Ftp => _localizer["SharedReportSkipFtpType"],
+            _ => _localizer.Format("SharedReportSkipUnsupportedType", typeCode),
+        };
 
     private string ExplainRefusal(SharedProfileRefusal refusal, string detail) => refusal switch
     {

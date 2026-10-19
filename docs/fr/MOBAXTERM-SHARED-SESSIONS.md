@@ -58,6 +58,9 @@ Un mot de passe mémorisé appartient à un bastion (son hôte, son port et son 
 - Si vous utilisez un fournisseur d'identifiants externe, son mot de passe passe en premier : un mot de passe mémorisé ne complète que ce qu'il laisse vide. Pour une session partagée, le fournisseur reçoit l'entrée nommée d'après l'**hôte** de la session, pas d'après son nom : rangez vos entrées de coffre sous le nom d'hôte (par exemple `srv-app-01.corp.example`).
 - Quand **Windows Hello** est exigé pour se connecter, il est demandé avant qu'aucun mot de passe mémorisé ne soit utilisé.
 - La réouverture des sessions au démarrage et **Tout connecter** utilisent les mots de passe mémorisés mais ne demandent jamais rien : une session qui n'en a pas le demande quand vous l'ouvrez seule.
+- Une session SFTP partagée mémorise son mot de passe par utilisateur, comme une session SSH, avec la même case et les mêmes règles.
+- Une session Telnet demande son identifiant et son mot de passe dans le terminal, que Heimdall ne mémorise pas.
+- Une session VNC utilise sa propre demande de mot de passe, ou le fournisseur d'identifiants externe comme tout profil.
 - Une session RDP demande son mot de passe dans la fenêtre RDP, que Heimdall ne mémorise pas. Le mot de passe de son bastion est mémorisé comme les autres.
 
 Dans les paramètres, chaque source qui a des mots de passe mémorisés affiche **Oublier les mots de passe enregistrés**. Supprimer une source oublie aussi ses mots de passe. Rien de ce que vous saisissez n'est jamais écrit dans une session partagée, qui reste en lecture seule.
@@ -77,12 +80,20 @@ Chaque lecture vérifie aussi le fichier à la recherche d'erreurs courantes. Qu
 - **Sessions ignorées** : les sessions non chargées, et pourquoi.
 - **Variables non résolues** : un `[NOM]` sans valeur (section 2).
 - **Nom et hôte différents** : une session nommée d'après une machine qui en joint une autre.
-- **Passerelles inhabituelles** : une session qui ne passe pas par le bastion que prend la plupart de son dossier.
-- **Hôtes en double** : deux sessions d'un même dossier qui joignent le même hôte.
+- **Passerelles inhabituelles** : une session qui ne passe pas par le bastion que prend la plupart de son dossier. Seules comptent les sessions dont le type peut nommer un rebond dans MobaXterm, c'est-à-dire SSH et RDP : une session Telnet, VNC ou SFTP est directe quoi que fasse son dossier.
+- **Hôtes en double** : deux sessions d'un même dossier qui joignent le même hôte avec le même protocole. Une session SSH et une session RDP ou SFTP vers un même hôte sont deux façons de s'en servir, pas des doublons ; deux sessions SSH vers cet hôte en sont.
 
 Le rapport ne fait qu'informer : chaque session qu'il liste reste chargée telle que le fichier la décrit. **Copier** et **Exporter en CSV** permettent de l'envoyer à qui maintient le fichier.
 
 ## 8. Limites connues
 
-- Seules les sessions SSH et RDP sont importées. Les sessions FTP, SFTP, VNC et Telnet d'un fichier MobaXterm ne sont pas encore importées ; elles apparaissent comme ignorées dans le rapport d'import.
+- Cinq types de session sont importés : SSH, RDP, SFTP, Telnet et VNC. Toute autre session d'un fichier MobaXterm apparaît comme ignorée dans le rapport d'import, avec sa raison (section 7) :
+  - **FTP** : pas encore importé. FTP envoie le mot de passe en clair, et une session partagée ne doit pas envoyer ainsi un mot de passe du coffre ou mémorisé.
+  - **WSL** : un système Linux de l'ordinateur qui exécute MobaXterm, donc rien à joindre.
+  - **Serial, Mosh, RSH, Xdmcp, Browser, Shell, File et S3** : non importés.
+  - **Une session Telnet ou VNC passant par un rebond SSH** : ignorée, car Heimdall ne fait pas passer ces protocoles par un rebond et une connexion directe contournerait le bastion.
+  - **Une session Telnet, VNC ou SFTP passant par un proxy** : ignorée, car Heimdall n'utilise pas de proxy pour ces protocoles et une connexion directe contournerait le proxy.
+- Le proxy d'une session SSH ou RDP n'est pas lu : une telle session est importée en connexion directe ou par son rebond.
+- Une session Telnet demande son identifiant dans le terminal : aucun utilisateur n'est importé pour elle.
+- Le dossier de départ distant d'une session SFTP n'est pas repris : la session s'ouvre dans le dossier par défaut.
 - Les sessions partagées sont en lecture seule dans Heimdall (section 3).

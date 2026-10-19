@@ -38,7 +38,7 @@ public sealed class SharedSessionImportReportTests : IDisposable
 
     // One case of each check, anonymized: app02 is named after one machine and reaches app03 (name
     // and host), which app03 also reaches (duplicate host); app04 alone takes gw2 (outlier); app05
-    // logs in as [NOPE] (unresolved variable); tel01 is a Telnet session (skipped).
+    // logs in as [NOPE] (unresolved variable); wsl01 is a WSL distribution (skipped: nothing to connect to).
     private const string OneOfEach = """
         [Bookmarks]
         SubRep=
@@ -51,7 +51,7 @@ public sealed class SharedSessionImportReportTests : IDisposable
         app03=#109#0%app03.example.test%22%[DAS]%%0%-1%%gw1.example.test%22%jdoe%-1#MobaFont%10#0#
         app04=#109#0%app04.example.test%22%[DAS]%%0%-1%%gw2.example.test%22%jdoe%-1#MobaFont%10#0#
         app05=#109#0%app05.example.test%22%[NOPE]%%0%-1%%gw1.example.test%22%jdoe%-1#MobaFont%10#0#
-        tel01=#98#1%tel01.example.test%23%%%2%%
+        wsl01=#151#14%AlmaLinux-9%
         """;
 
     private readonly string _directory = Path.Combine(
@@ -191,6 +191,110 @@ public sealed class SharedSessionImportReportTests : IDisposable
         Assert.Equal(0, report.CountOf(SharedSessionReportCheck.DuplicateHost));
     }
 
+    // Producer: SharedSessionImportReportBuilder.DuplicateHosts, which now keys by host AND
+    // protocol. An SSH and an SFTP session to one host are two ways to use it, not a repetition;
+    // two sessions of the same protocol still are.
+    [Fact]
+    public void DuplicateHost_SshAndSftpToOneHost_AreNotDuplicates_TwoOfTheSameProtocolStillAre()
+    {
+        SharedSessionImportReport mixed = BuildReport(
+        [
+            Session("db01", "PROD", Gw1, host: "db01.example.test"),
+            Session("db01-files", "PROD", Gw1, host: "db01.example.test", connectionType: "SFTP"),
+        ]);
+        SharedSessionImportReport same = BuildReport(
+        [
+            Session("db02", "PROD", Gw1, host: "db02.example.test", connectionType: "SFTP"),
+            Session("db02-bis", "PROD", Gw1, host: "DB02.example.test", connectionType: "sftp"),
+        ]);
+
+        Assert.Equal(0, mixed.CountOf(SharedSessionReportCheck.DuplicateHost));
+        Assert.Equal(2, same.CountOf(SharedSessionReportCheck.DuplicateHost));
+    }
+
+    // Producer: SharedSessionImportReportBuilder.DuplicateHosts, keyed by host and protocol. An SSH
+    // and an RDP session to one host are two ways to use it: no finding. Two SSH sessions to it are
+    // a repetition: a finding for each.
+    [Fact]
+    public void DuplicateHost_SshAndRdpToOneHost_IsNoFinding_TwoSshSessionsAre()
+    {
+        SharedSessionImportReport sshAndRdp = BuildReport(
+        [
+            Session("srv01", "PROD", Gw1, host: "srv01.example.test"),
+            Session("srv01-rdp", "PROD", Gw1, host: "srv01.example.test", connectionType: "RDP"),
+        ]);
+        SharedSessionImportReport twoSsh = BuildReport(
+        [
+            Session("srv02", "PROD", Gw1, host: "srv02.example.test"),
+            Session("srv02-bis", "PROD", Gw1, host: "srv02.example.test"),
+        ]);
+
+        Assert.Equal(0, sshAndRdp.CountOf(SharedSessionReportCheck.DuplicateHost));
+        Assert.Equal(2, twoSsh.CountOf(SharedSessionReportCheck.DuplicateHost));
+    }
+
+    // Producer: SharedSessionImportReportBuilder.GatewayOutliers through
+    // MobaXtermImporter.CanCarryGateway: an SFTP session has no jump host slot in MobaXterm, so it
+    // is direct whatever its folder does, although Heimdall can route SFTP through a gateway.
+    [Fact]
+    public void GatewayOutlier_DirectSftpSessionsInAFolderOfBastionSessions_AreNoOutlier_AndDoNotChangeTheMajority()
+    {
+        SharedSessionImportReport onlySftpDirect = BuildReport(
+        [
+            Session("a1", "PROD", Gw1), Session("a2", "PROD", Gw1), Session("a3", "PROD", Gw1),
+            Session("f1", "PROD", null, connectionType: "SFTP"),
+            Session("f2", "PROD", null, connectionType: "SFTP"),
+        ]);
+        SharedSessionImportReport withARealOutlier = BuildReport(
+        [
+            Session("a1", "PROD", Gw1), Session("a2", "PROD", Gw1), Session("a3", "PROD", null),
+            Session("f1", "PROD", null, connectionType: "SFTP"),
+            Session("f2", "PROD", null, connectionType: "SFTP"),
+            Session("f3", "PROD", null, connectionType: "SFTP"),
+        ]);
+
+        Assert.Equal(0, onlySftpDirect.CountOf(SharedSessionReportCheck.GatewayOutlier));
+        SharedSessionReportEntry outlier = Assert.Single(
+            withARealOutlier.Entries,
+            entry => entry.Check == SharedSessionReportCheck.GatewayOutlier);
+        Assert.Equal("a3", outlier.SessionName);
+        Assert.Equal("gw1", outlier.Context);
+    }
+
+    // Producer: SharedSessionImportReportBuilder.GatewayOutliers, which counts only sessions whose
+    // protocol supports a gateway (ProtocolCapabilities.SupportsSshGateway). A Telnet or VNC
+    // session is direct whatever its folder does: it is never an outlier and it casts no vote.
+    [Fact]
+    public void GatewayOutlier_DirectTelnetAndVncSessions_AreNeverOutliers()
+    {
+        SharedSessionImportReport report = BuildReport(
+        [
+            Session("a1", "PROD", Gw1), Session("a2", "PROD", Gw1), Session("a3", "PROD", Gw1),
+            Session("t1", "PROD", null, connectionType: "Telnet"),
+            Session("v1", "PROD", null, connectionType: "VNC"),
+        ]);
+
+        Assert.Equal(0, report.CountOf(SharedSessionReportCheck.GatewayOutlier));
+    }
+
+    [Fact]
+    public void GatewayOutlier_DirectTelnetSessions_DoNotChangeTheMajority()
+    {
+        // Three Telnet sessions would make "direct" the biggest route of the folder (3 of 6) and
+        // hide the direct SSH session; they cast no vote, so it is still the one outlier.
+        SharedSessionImportReport report = BuildReport(
+        [
+            Session("a1", "PROD", Gw1), Session("a2", "PROD", Gw1), Session("a3", "PROD", null),
+            Session("t1", "PROD", null, connectionType: "Telnet"),
+            Session("t2", "PROD", null, connectionType: "Telnet"),
+            Session("t3", "PROD", null, connectionType: "Telnet"),
+        ]);
+
+        SharedSessionReportEntry outlier = Assert.Single(report.Entries, entry => entry.Check == SharedSessionReportCheck.GatewayOutlier);
+        Assert.Equal("a3", outlier.SessionName);
+        Assert.Equal("gw1", outlier.Context);
+    }
+
     // --- Parser warnings, refused sessions ---
 
     [Fact]
@@ -199,11 +303,11 @@ public sealed class SharedSessionImportReportTests : IDisposable
         const string content = "[Bookmarks_3]\r\nSubRep=Old\\PROD\r\nImgNum=41\r\n";
         MobaXtermImportWarning[] warnings =
         [
-            new("Bookmarks_3", "tel01", MobaXtermImportWarningKind.UnsupportedSessionType, "1"),
+            new("Bookmarks_3", "wsl01", MobaXtermImportWarningKind.UnsupportedSessionType, "14"),
             new("Bookmarks_3", "app05", MobaXtermImportWarningKind.UnresolvedVariable, "NOPE"),
             new("Bookmarks_9", "lost", MobaXtermImportWarningKind.MissingHost, ""),
         ];
-        ServerProfileDto refused = Session("vnc01", "Old/PROD", null, host: "vnc01.example.test");
+        ServerProfileDto refused = Session("web01", "Old/PROD", null, host: "web01.example.test");
 
         SharedSessionImportReport report = Build(
             SourceId,
@@ -212,19 +316,19 @@ public sealed class SharedSessionImportReportTests : IDisposable
             warnings,
             [],
             [],
-            [new SharedRefusedSession(refused, SharedProfileRefusal.UnsupportedProtocol, "VNC")],
+            [new SharedRefusedSession(refused, SharedProfileRefusal.UnsupportedProtocol, "WEB")],
             new Options(60, 3));
 
         Assert.Equal(3, report.CountOf(SharedSessionReportCheck.SkippedSession));
         Assert.Equal(1, report.CountOf(SharedSessionReportCheck.UnresolvedVariable));
-        Assert.Equal("Old/PROD", report.Entries.Single(entry => entry.SessionName == "tel01").FolderPath);
+        Assert.Equal("Old/PROD", report.Entries.Single(entry => entry.SessionName == "wsl01").FolderPath);
         Assert.Equal("Old/PROD", report.Entries.Single(entry => entry.SessionName == "app05").FolderPath);
         Assert.Equal(string.Empty, report.Entries.Single(entry => entry.SessionName == "lost").FolderPath);
-        SharedSessionReportEntry vnc = report.Entries.Single(entry => entry.SessionName == "vnc01");
-        Assert.Null(vnc.SkipReason);
-        Assert.Equal(SharedProfileRefusal.UnsupportedProtocol, vnc.Refusal);
-        Assert.Equal("VNC", vnc.Detail);
-        Assert.Equal(MobaXtermImportWarningKind.UnsupportedSessionType, report.Entries.Single(entry => entry.SessionName == "tel01").SkipReason);
+        SharedSessionReportEntry web = report.Entries.Single(entry => entry.SessionName == "web01");
+        Assert.Null(web.SkipReason);
+        Assert.Equal(SharedProfileRefusal.UnsupportedProtocol, web.Refusal);
+        Assert.Equal("WEB", web.Detail);
+        Assert.Equal(MobaXtermImportWarningKind.UnsupportedSessionType, report.Entries.Single(entry => entry.SessionName == "wsl01").SkipReason);
     }
 
     [Fact]
@@ -252,7 +356,123 @@ public sealed class SharedSessionImportReportTests : IDisposable
         Assert.Equal(expected.Count, expected.Values.Distinct(StringComparer.Ordinal).Count());
     }
 
+    // Producer: SharedSessionImportReportFormatter.ExplainSkip and ExplainUnsupportedType; the
+    // reason is worded from MobaXtermImporter.ClassifySkippedType, shared with the Settings importer.
+    [Fact]
+    public async Task Explain_WordsTheKnownSkippedTypes_TheJumpHostAndTheProxy()
+    {
+        LocalizationManager localizer = await LocalizerAsync();
+        var formatter = new SharedSessionImportReportFormatter(localizer);
+
+        string Explain(MobaXtermImportWarningKind kind, string detail) => formatter.Explain(new SharedSessionReportEntry(
+            SharedSessionReportCheck.SkippedSession, "PROD", "srv01", detail, SkipReason: kind));
+
+        string wsl = Explain(MobaXtermImportWarningKind.UnsupportedSessionType, "14");
+        string ftp = Explain(MobaXtermImportWarningKind.UnsupportedSessionType, "6");
+        string unknown = Explain(MobaXtermImportWarningKind.UnsupportedSessionType, "999");
+        string jump = Explain(MobaXtermImportWarningKind.JumpHostNotSupported, "jump.example.test");
+        string proxy = Explain(MobaXtermImportWarningKind.ProxyNotSupported, "proxy.example.test");
+
+        Assert.Equal(localizer["SharedReportSkipWslType"], wsl);
+        Assert.Equal(localizer["SharedReportSkipFtpType"], ftp);
+        Assert.Equal(localizer.Format("SharedReportSkipUnsupportedType", "999"), unknown);
+        Assert.Contains("999", unknown, StringComparison.Ordinal);
+        Assert.DoesNotContain("SSH and RDP", unknown, StringComparison.Ordinal);
+        Assert.Equal(localizer.Format("SharedReportSkipJumpHost", "jump.example.test"), jump);
+        Assert.Contains("jump.example.test", jump, StringComparison.Ordinal);
+        Assert.Equal(localizer.Format("SharedReportSkipProxy", "proxy.example.test"), proxy);
+        Assert.Contains("proxy.example.test", proxy, StringComparison.Ordinal);
+        Assert.Equal(5, new[] { wsl, ftp, unknown, jump, proxy }.Distinct(StringComparer.Ordinal).Count());
+        Assert.DoesNotContain("SSH and RDP", localizer["SharedReportRefusedProtocol"], StringComparison.Ordinal);
+    }
+
+    // Producer: SharedSessionImportReportFormatter.ExplainSkip, ProxyNotSupported: a proxy type
+    // with no proxy host (detail empty) is worded without a name, not as the proxy "".
+    [Fact]
+    public async Task Explain_AProxyWithoutAHost_NamesNoProxy()
+    {
+        LocalizationManager localizer = await LocalizerAsync();
+        var formatter = new SharedSessionImportReportFormatter(localizer);
+
+        string text = formatter.Explain(new SharedSessionReportEntry(
+            SharedSessionReportCheck.SkippedSession,
+            "PROD",
+            "srv01",
+            string.Empty,
+            SkipReason: MobaXtermImportWarningKind.ProxyNotSupported));
+
+        Assert.Equal(localizer["SharedReportSkipProxyNoHost"], text);
+        Assert.DoesNotContain("{", text, StringComparison.Ordinal);
+        Assert.NotEqual(localizer.Format("SharedReportSkipProxy", string.Empty), text);
+    }
+
+    // Producer: SharedProfileSanitizer.NormalizeConnectionType (the accepted set), worded by
+    // SharedReportRefusedProtocol. Every protocol the sanitizer accepts is named in the sentence
+    // that says which ones are loaded, so adding one without the text fails here.
+    [Fact]
+    public async Task RefusedProtocolText_NamesEveryProtocolTheSanitizerAccepts()
+    {
+        LocalizationManager localizer = await LocalizerAsync();
+        string text = localizer.Format("SharedReportRefusedProtocol", "WEB");
+        string[] accepted =
+        [
+            .. ConnectionTypeCatalog.CanonicalTypes.Where(type => SharedProfileSanitizer.Sanitize(new ServerProfileDto
+            {
+                Id = SharedSessionIds.PrefixFor(SourceId) + "probe",
+                ConnectionType = type,
+                RemoteServer = "probe.example.test",
+            }) is not null),
+        ];
+
+        // Positive control: the five protocols of the feature were found accepted.
+        Assert.Equal(5, accepted.Length);
+        foreach (string type in accepted)
+        {
+            Assert.Contains(ConnectionTypeCatalog.Canonicalize(type), text, StringComparison.Ordinal);
+        }
+    }
+
     // --- A real file through the provider ---
+
+    // Producer: SharedSessionProvider.LoadAsync over MobaXtermImporter, a file that mixes mapped
+    // and refused sessions (jump host, proxy, WSL, FTP): what the report lists is what was skipped.
+    [Fact]
+    public async Task Load_TelnetVncSftpSessions_AreLoaded_AndTheRefusedOnesReportedWithTheirReason()
+    {
+        const string content = """
+            [Bookmarks_1]
+            SubRep=PROD
+            ImgNum=41
+            telnet-a= #98#1%telnet-a.example.test%2323%telusera%%2%%%%%0%0%%1080%%%0%-1%0#MobaFont%10#0#
+            vnc-a= #128#5%vnc-a.example.test%5911%-1%0%%%%%-1%-1%0%vncusera%0%%1080%%%0#MobaFont%10#0#
+            sftp-a= #140#7%sftp-a.example.test%2202%sftpusera%-1%0%/srv/sftpa%0%0%%0%%1080%%%%0#MobaFont%10#0#
+            telnet-gw= #98#1%telnet-gw.example.test%23%telusergw%%1%jumpt.example.test%2299%jumpusert%%0%1%proxyt.example.test%3128%proxyusert%%0#MobaFont%10#0#
+            sftp-px= #140#7%sftp-px.example.test%22%sftpuserpx%-1%0%%0%0%%1%proxys.example.test%3130%proxyusers%%%0#MobaFont%10#0#
+            wsl= #151#14%AlmaLinux-9%
+            ftp-a= #130#6%ftp-a.example.test%2121%ftpusera%-1%/srv/ftpa%0%-1%0%0%%21%%%0%0%-1%0%-1%0%%0#MobaFont%10#0#
+            """;
+        LocalizationManager localizer = await LocalizerAsync();
+        SharedSessionProvider provider = await LoadedProviderAsync(content);
+
+        Assert.Equal(3, provider.Profiles.Count);
+        Assert.Equal(
+            new[] { "SFTP", "Telnet", "VNC" },
+            provider.Profiles.Select(profile => profile.ConnectionType!).Order(StringComparer.Ordinal));
+        Assert.Equal(
+            new[] { "sftp-a", "telnet-a", "vnc-a" },
+            provider.Profiles.Select(profile => profile.DisplayName!).Order(StringComparer.Ordinal));
+        SharedSessionImportReport report = Assert.Single(provider.Sources).Report!;
+        var formatter = new SharedSessionImportReportFormatter(localizer);
+        Dictionary<string, string> skipped = report.Entries
+            .Where(entry => entry.Check == SharedSessionReportCheck.SkippedSession)
+            .ToDictionary(entry => entry.SessionName, formatter.Explain, StringComparer.Ordinal);
+        Assert.Equal(4, skipped.Count);
+        Assert.Equal(localizer.Format("SharedReportSkipJumpHost", "jumpt.example.test"), skipped["telnet-gw"]);
+        Assert.Equal(localizer.Format("SharedReportSkipProxy", "proxys.example.test"), skipped["sftp-px"]);
+        Assert.Equal(localizer["SharedReportSkipWslType"], skipped["wsl"]);
+        Assert.Equal(localizer["SharedReportSkipFtpType"], skipped["ftp-a"]);
+        Assert.Empty(provider.Gateways);
+    }
 
     [Fact]
     public async Task Load_ASessionTheSharedFilterRefusesForItsHost_IsReportedWithThatHost()
@@ -289,7 +509,7 @@ public sealed class SharedSessionImportReportTests : IDisposable
         SharedSessionImportReport report = Assert.IsType<SharedSessionImportReport>(state.Report);
 
         Assert.Equal(1, report.CountOf(SharedSessionReportCheck.SkippedSession));
-        Assert.Equal("tel01", report.Entries.Single(entry => entry.Check == SharedSessionReportCheck.SkippedSession).SessionName);
+        Assert.Equal("wsl01", report.Entries.Single(entry => entry.Check == SharedSessionReportCheck.SkippedSession).SessionName);
         Assert.Equal(1, report.CountOf(SharedSessionReportCheck.UnresolvedVariable));
         Assert.Equal("app02", report.Entries.Single(entry => entry.Check == SharedSessionReportCheck.NameHostMismatch).SessionName);
         Assert.Equal("app04", report.Entries.Single(entry => entry.Check == SharedSessionReportCheck.GatewayOutlier).SessionName);
@@ -439,16 +659,24 @@ public sealed class SharedSessionImportReportTests : IDisposable
             [],
             options ?? new Options(60, 3));
 
-    private static ServerProfileDto Session(string name, string folder, string? gatewayId, string? host = null) => new()
+    private static ServerProfileDto Session(
+        string name,
+        string folder,
+        string? gatewayId,
+        string? host = null,
+        string connectionType = "SSH")
     {
-        Id = SharedSessionIds.PrefixFor(SourceId) + Guid.NewGuid().ToString("N")[..8],
-        DisplayName = name,
-        Group = folder,
-        ConnectionType = "SSH",
-        RemoteServer = host ?? name + ".example.test",
-        SshGatewayId = gatewayId,
-        UseDirectConnection = gatewayId is null,
-    };
+        return new ServerProfileDto
+        {
+            Id = SharedSessionIds.PrefixFor(SourceId) + Guid.NewGuid().ToString("N")[..8],
+            DisplayName = name,
+            Group = folder,
+            ConnectionType = connectionType,
+            RemoteServer = host ?? name + ".example.test",
+            SshGatewayId = gatewayId,
+            UseDirectConnection = gatewayId is null,
+        };
+    }
 
     private static SshGatewayDto Gateway(string id, string name) => new() { Id = id, Name = name, Host = name + ".example.test" };
 

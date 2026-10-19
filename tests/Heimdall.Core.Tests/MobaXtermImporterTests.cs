@@ -890,4 +890,295 @@ public class MobaXtermImporterTests
         Assert.Equal(gateway.Id, server.SshGatewayId);
         Assert.False(server.UseDirectConnection);
     }
+
+    // --- Telnet, VNC and SFTP (measured sessions: see MobaXtermSharedSessionsFixture.ProtocolsContent) ---
+
+    private static MobaXtermImportResult ParseProtocols() =>
+        MobaXtermImporter.Parse(MobaXtermSharedSessionsFixture.ProtocolsContent);
+
+    private static ServerProfileDto Imported(MobaXtermImportResult result, string name) =>
+        Assert.Single(result.Servers, server => server.DisplayName == name);
+
+    private static MobaXtermImportWarning Skipped(MobaXtermImportResult result, string name) =>
+        Assert.Single(result.Warnings, warning => warning.SessionName == name);
+
+    private static void AssertDirectAndEmpty(MobaXtermImportResult result, ServerProfileDto server)
+    {
+        Assert.Empty(result.Gateways);
+        Assert.True(server.UseDirectConnection);
+        Assert.Null(server.SshGatewayId);
+        Assert.Empty(server.PostConnectSteps);
+        Assert.Null(server.RdpUsername);
+        Assert.Null(server.TelnetUsername);
+        Assert.Equal(ProfileOrigin.ImportMobaXterm, server.Origin);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession through the Telnet [1] layout (host 0, port 1,
+    // ApplyProtocolSettings writes TelnetPort); trigger: the two measured Telnet sessions, whose
+    // ports are not 23, so a constant or a shifted port index fails.
+    [Theory]
+    [InlineData("tel-a", "telnet-a.example.test", 2323)]
+    [InlineData("tel-b", "telnet-b.example.test", 2324)]
+    public void Telnet_MeasuredSession_ImportsHostAndPortOnTheTelnetProperties(string name, string host, int port)
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        ServerProfileDto server = Imported(result, name);
+        Assert.Equal(ConnectionTypeCatalog.Canonicalize("TELNET"), server.ConnectionType);
+        Assert.Equal(host, server.RemoteServer);
+        Assert.Equal(port, server.TelnetPort);
+        Assert.Equal(port, server.RemotePort);
+        Assert.False(server.HasSshPortField);
+        Assert.Equal(DefaultPorts.Vnc, server.VncPort);
+        Assert.Null(server.SshUsername);
+        AssertDirectAndEmpty(result, server);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession through the VNC [5] layout (host 0, port 1, no
+    // user: index 11 is an Xvnc option); trigger: the two measured VNC sessions.
+    [Theory]
+    [InlineData("vnc-a", "vnc-a.example.test", 5911, "vncusera")]
+    [InlineData("vnc-b", "vnc-b.example.test", 5912, "vncuserb")]
+    public void Vnc_MeasuredSession_ImportsHostAndPort_AndNeverTheXvncLogin(string name, string host, int port, string xvncLogin)
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        ServerProfileDto server = Imported(result, name);
+        Assert.Equal(ConnectionTypeCatalog.Canonicalize("VNC"), server.ConnectionType);
+        Assert.Equal(host, server.RemoteServer);
+        Assert.Equal(port, server.VncPort);
+        Assert.Equal(port, server.RemotePort);
+        Assert.False(server.HasSshPortField);
+        Assert.Equal(DefaultPorts.Telnet, server.TelnetPort);
+        Assert.Null(server.SshUsername);
+        AssertDirectAndEmpty(result, server);
+        Assert.DoesNotContain(xvncLogin, System.Text.Json.JsonSerializer.Serialize(server), StringComparison.Ordinal);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession through the SFTP [7] layout (host 0, port 1, user
+    // 2); trigger: the measured SFTP session. The port goes through the SshPort setter, so the
+    // profile declares it.
+    [Fact]
+    public void Sftp_MeasuredSession_ImportsHostPortAndUserOnTheSshProperties()
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        ServerProfileDto server = Imported(result, "sftp-a");
+        Assert.Equal(ConnectionTypeCatalog.Canonicalize("SFTP"), server.ConnectionType);
+        Assert.Equal("sftp-a.example.test", server.RemoteServer);
+        Assert.Equal(2202, server.SshPort);
+        Assert.Equal(2202, server.RemotePort);
+        Assert.True(server.HasSshPortField);
+        Assert.Equal("sftpusera", server.SshUsername);
+        Assert.Equal(DefaultPorts.Telnet, server.TelnetPort);
+        Assert.Equal(DefaultPorts.Vnc, server.VncPort);
+        Assert.Empty(result.Gateways);
+        Assert.True(server.UseDirectConnection);
+        Assert.Null(server.SshGatewayId);
+        Assert.Empty(server.PostConnectSteps);
+        Assert.Null(server.RdpUsername);
+        Assert.Null(server.TelnetUsername);
+    }
+
+    // Producer: the three layouts again, on SYNTHETIC lines where every unread field is a sentinel
+    // (u3, u4...). A layout shifted by one lands on a sentinel and the exact assertions fail; no
+    // string of the profile may hold a sentinel.
+    [Theory]
+    [InlineData("syn-telnet", "syn-telnet.example.test", 2325, null)]
+    [InlineData("syn-vnc", "syn-vnc.example.test", 5913, null)]
+    [InlineData("syn-sftp", "syn-sftp.example.test", 2203, "synsftpu")]
+    public void SyntheticLine_EachLayoutReadsItsOwnFieldsOnly(string name, string host, int port, string? sshUser)
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        ServerProfileDto server = Imported(result, name);
+        Assert.Equal(host, server.RemoteServer);
+        Assert.Equal(port, server.RemotePort);
+        Assert.Equal(sshUser, server.SshUsername);
+        Assert.Equal(name == "syn-telnet" ? port : DefaultPorts.Telnet, server.TelnetPort);
+        Assert.Equal(name == "syn-vnc" ? port : DefaultPorts.Vnc, server.VncPort);
+        Assert.Equal(name == "syn-sftp", server.HasSshPortField);
+
+        System.Text.RegularExpressions.Regex sentinel = new(@"\bu\d+\b");
+        foreach (System.Reflection.PropertyInfo property in typeof(ServerProfileDto)
+            .GetProperties()
+            .Where(property => property.PropertyType == typeof(string) && property.GetIndexParameters().Length == 0))
+        {
+            string? value = (string?)property.GetValue(server);
+            Assert.False(
+                value is not null && sentinel.IsMatch(value),
+                $"{name}: {property.Name} holds a field the layout must not read: {value}");
+        }
+    }
+
+    // Producer: MobaXtermImporter.ParsePort through the three layouts; trigger: a session whose
+    // port field is empty gets the protocol's own default, not another protocol's.
+    [Fact]
+    public void EmptyPortField_FallsBackToTheProtocolDefault()
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        ServerProfileDto telnet = Imported(result, "noport-telnet");
+        Assert.Equal(DefaultPorts.Telnet, telnet.TelnetPort);
+        Assert.Equal(DefaultPorts.Telnet, telnet.RemotePort);
+        Assert.False(telnet.HasSshPortField);
+
+        ServerProfileDto vnc = Imported(result, "noport-vnc");
+        Assert.Equal(DefaultPorts.Vnc, vnc.VncPort);
+        Assert.Equal(DefaultPorts.Vnc, vnc.RemotePort);
+        Assert.False(vnc.HasSshPortField);
+
+        ServerProfileDto sftp = Imported(result, "noport-sftp");
+        Assert.Equal(DefaultPorts.Sftp, sftp.SshPort);
+        Assert.Equal(DefaultPorts.Sftp, sftp.RemotePort);
+        Assert.True(sftp.HasSshPortField);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession, the jump host refusal; trigger: a Telnet and a VNC
+    // session that name a jump host. Heimdall cannot route either protocol through a gateway
+    // (ProtocolCapabilities.SupportsSshGateway), and importing them direct would go around it.
+    [Theory]
+    [InlineData("telnet-gw", "jumpt.example.test")]
+    [InlineData("vnc-gw", "jumpv.example.test")]
+    public void TelnetOrVncThroughAJumpHost_IsNotImported_AndNoGatewayIsCreated(string name, string jumpHost)
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        Assert.DoesNotContain(result.Servers, server => server.DisplayName == name);
+        MobaXtermImportWarning warning = Skipped(result, name);
+        Assert.Equal(MobaXtermImportWarningKind.JumpHostNotSupported, warning.Kind);
+        Assert.Equal(jumpHost, warning.Detail);
+        Assert.False(warning.SessionImported);
+        Assert.Empty(result.Gateways);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession, the proxy refusal; trigger: SFTP (measured) and
+    // Telnet and VNC (synthetic, no jump host) sessions with a proxy, and a VNC session with a
+    // proxy type but no proxy host.
+    [Theory]
+    [InlineData("sftp-px", "proxys.example.test")]
+    [InlineData("syn-telnet-proxy", "proxyt2.example.test")]
+    [InlineData("syn-vnc-proxy", "proxyv2.example.test")]
+    [InlineData("syn-vnc-proxytype", "")]
+    [InlineData("syn-telnet-proxytype", "")]
+    [InlineData("syn-sftp-proxytype", "")]
+    public void SessionThroughAProxy_IsNotImported_AndNamesTheProxy(string name, string proxyHost)
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        Assert.DoesNotContain(result.Servers, server => server.DisplayName == name);
+        MobaXtermImportWarning warning = Skipped(result, name);
+        Assert.Equal(MobaXtermImportWarningKind.ProxyNotSupported, warning.Kind);
+        Assert.Equal(proxyHost, warning.Detail);
+        Assert.Empty(result.Gateways);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession through the Telnet [1] layout, UserIndex null:
+    // Telnet asks for its login in the terminal, so the login field is not read, and a [VAR] in it
+    // raises no UnresolvedVariable warning for a value nobody consumes.
+    [Fact]
+    public void Telnet_LoginField_IsNotReadNorResolved()
+    {
+        const string content = """
+            [Bookmarks_1]
+            SubRep=Telnet
+            tel-var= #98#1%telnet-var.example.test%23%[DAS]%%2%%%%%0%0%%1080%%%0%-1%0#MobaFont%10#0#
+            """;
+
+        MobaXtermImportResult result = MobaXtermImporter.Parse(content);
+
+        ServerProfileDto server = Assert.Single(result.Servers);
+        Assert.Null(server.TelnetUsername);
+        Assert.Null(server.SshUsername);
+        Assert.DoesNotContain(result.Warnings, warning => warning.Kind == MobaXtermImportWarningKind.UnresolvedVariable);
+        Assert.Empty(result.Warnings);
+    }
+
+    // Producer: MobaXtermImporter.ApplyProtocolSettings, the default arm, reached through Parse:
+    // a layout whose connection type has no case surfaces as a ParseError warning. Every type code
+    // the importer recognises (one that is not reported UnsupportedSessionType) is walked with a
+    // minimal line, so a layout added without its case fails here.
+    [Fact]
+    public void EveryRecognisedTypeCode_ParsesWithoutAParseError()
+    {
+        const int highestTypeCodeProbed = 99;
+        int recognised = 0;
+        for (int code = 0; code <= highestTypeCodeProbed; code++)
+        {
+            string content = $"[Bookmarks_1]\nSubRep=\nwalk= #1#{code}%walk.example.test%\n";
+
+            MobaXtermImportResult result = MobaXtermImporter.Parse(content);
+
+            if (result.Warnings.Any(warning => warning.Kind == MobaXtermImportWarningKind.UnsupportedSessionType))
+            {
+                continue;
+            }
+
+            recognised++;
+            Assert.DoesNotContain(
+                result.Warnings,
+                warning => warning.Kind == MobaXtermImportWarningKind.ParseError);
+            Assert.Single(result.Servers);
+        }
+
+        // Positive control: SSH, Telnet, RDP, VNC and SFTP were reached, so the loop walked something.
+        Assert.Equal(5, recognised);
+    }
+
+    // Producer: MobaXtermImporter.CanCarryGateway, derived from the layout table and
+    // ProtocolCapabilities.SupportsSshGateway.
+    [Theory]
+    [InlineData("SSH", true)]
+    [InlineData("ssh", true)]
+    [InlineData("RDP", true)]
+    [InlineData("SFTP", false)]
+    [InlineData("Telnet", false)]
+    [InlineData("VNC", false)]
+    [InlineData("WEB", false)]
+    public void CanCarryGateway_OnlyTypesWithAJumpHostSlotAndGatewayRouting(string type, bool expected)
+    {
+        Assert.Equal(expected, MobaXtermImporter.CanCarryGateway(type));
+    }
+
+    // Producer: MobaXtermImporter.ParseSession, unmapped type codes; trigger: the measured FTP [6]
+    // and WSL [14] sessions stay skipped, and ClassifySkippedType words them.
+    [Theory]
+    [InlineData("ftp-a", "6", MobaXtermSkippedType.Ftp)]
+    [InlineData("wsl", "14", MobaXtermSkippedType.Wsl)]
+    public void FtpAndWsl_StayUnsupported_WithAKnownReason(string name, string code, MobaXtermSkippedType expected)
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        Assert.DoesNotContain(result.Servers, server => server.DisplayName == name);
+        MobaXtermImportWarning warning = Skipped(result, name);
+        Assert.Equal(MobaXtermImportWarningKind.UnsupportedSessionType, warning.Kind);
+        Assert.Equal(code, warning.Detail);
+        Assert.Equal(expected, MobaXtermImporter.ClassifySkippedType(warning.Detail));
+    }
+
+    [Theory]
+    [InlineData("999", MobaXtermSkippedType.Unknown)]
+    [InlineData("", MobaXtermSkippedType.Unknown)]
+    [InlineData(null, MobaXtermSkippedType.Unknown)]
+    [InlineData("fourteen", MobaXtermSkippedType.Unknown)]
+    [InlineData("6", MobaXtermSkippedType.Ftp)]
+    [InlineData("14", MobaXtermSkippedType.Wsl)]
+    public void ClassifySkippedType_NamesOnlyTheTypesItKnows(string? code, MobaXtermSkippedType expected)
+    {
+        Assert.Equal(expected, MobaXtermImporter.ClassifySkippedType(code));
+    }
+
+    // Producer: the whole ProtocolsContent file. Every session is either imported or reported, so
+    // a new skipped line cannot hide behind the count of imported ones.
+    [Fact]
+    public void ProtocolsFile_EverySessionIsEitherImportedOrReported()
+    {
+        MobaXtermImportResult result = ParseProtocols();
+
+        Assert.Equal(MobaXtermSharedSessionsFixture.ProtocolsImportedCount, result.Servers.Count);
+        Assert.Equal(MobaXtermSharedSessionsFixture.ProtocolsSkippedCount, result.Warnings.Count);
+        Assert.Equal(
+            new[] { "Telnet", "VNC", "SFTP" }.Order(StringComparer.Ordinal),
+            result.Servers.Select(server => server.ConnectionType).Distinct().Order(StringComparer.Ordinal));
+    }
 }
