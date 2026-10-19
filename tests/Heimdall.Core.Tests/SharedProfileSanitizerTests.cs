@@ -39,7 +39,9 @@ public sealed class SharedProfileSanitizerTests
     /// <summary>
     /// Every <see cref="ServerProfileDto"/> property a shared file may NOT set, decided one by one:
     /// local execution, external clients, secrets, key paths, forwarding, local tunnel ports,
-    /// display and redirection preferences, other protocols, and the execution trust flag.
+    /// display and redirection preferences, other protocols, and the execution trust flag. The
+    /// Telnet and VNC ports are kept (a shared Telnet or VNC session needs its port to be reached);
+    /// nothing else of those protocols is.
     /// </summary>
     private static readonly string[] ResetProfileProperties =
     [
@@ -85,10 +87,10 @@ public sealed class SharedProfileSanitizerTests
         nameof(ServerProfileDto.CitrixIcaFilePath), nameof(ServerProfileDto.CitrixSeamlessMode),
         nameof(ServerProfileDto.CitrixUseSso), nameof(ServerProfileDto.CitrixLaunchCommandLine),
         nameof(ServerProfileDto.FtpPort), nameof(ServerProfileDto.FtpUsername),
-        nameof(ServerProfileDto.FtpPasswordEncrypted), nameof(ServerProfileDto.VncPort),
+        nameof(ServerProfileDto.FtpPasswordEncrypted),
         nameof(ServerProfileDto.VncPassword), nameof(ServerProfileDto.FtpPassiveMode),
         nameof(ServerProfileDto.FtpUseSsl), nameof(ServerProfileDto.VncViewOnly),
-        nameof(ServerProfileDto.TelnetPort), nameof(ServerProfileDto.TelnetUsername),
+        nameof(ServerProfileDto.TelnetUsername),
         nameof(ServerProfileDto.TelnetPasswordEncrypted), nameof(ServerProfileDto.WebPort),
         nameof(ServerProfileDto.WebUseHttp), nameof(ServerProfileDto.WebPath),
         nameof(ServerProfileDto.WebUsername), nameof(ServerProfileDto.WebPasswordEncrypted),
@@ -133,8 +135,11 @@ public sealed class SharedProfileSanitizerTests
         Assert.False(sanitized.UsesLegacySshCredentialMapping);
     }
 
+    // Producer: SharedProfileSanitizer.Sanitize(ServerProfileDto), a poisoned shared source. Looping
+    // over KeptProfileProperties means a property added to the allowlist but not copied in the
+    // object initializer fails here, whichever protocol it belongs to.
     [Fact]
-    public void Sanitize_Profile_KeepsTheAllowlistedValues()
+    public void Sanitize_Profile_KeepsEveryAllowlistedValue()
     {
         ServerProfileDto poisoned = Poison<ServerProfileDto>();
         poisoned.Id = SharedProfileId;
@@ -143,20 +148,17 @@ public sealed class SharedProfileSanitizerTests
 
         ServerProfileDto sanitized = SharedProfileSanitizer.Sanitize(poisoned)!;
 
-        Assert.Equal(SharedProfileId, sanitized.Id);
-        Assert.Equal(poisoned.DisplayName, sanitized.DisplayName);
-        Assert.Equal(poisoned.Group, sanitized.Group);
         Assert.Equal("SSH", sanitized.ConnectionType);
-        Assert.Equal(poisoned.RemoteServer, sanitized.RemoteServer);
-        Assert.Equal(poisoned.RemotePort, sanitized.RemotePort);
-        Assert.Equal(poisoned.SshPort, sanitized.SshPort);
-        Assert.Equal(poisoned.SshUsername, sanitized.SshUsername);
-        Assert.Equal(poisoned.RdpUsername, sanitized.RdpUsername);
-        Assert.Equal(SharedGatewayId, sanitized.SshGatewayId);
-        Assert.Equal(poisoned.UseDirectConnection, sanitized.UseDirectConnection);
-        Assert.Equal(poisoned.Tags, sanitized.Tags);
-        Assert.Equal(poisoned.Origin, sanitized.Origin);
         Assert.Equal(poisoned.PostConnectSteps.Select(step => step.Input), sanitized.PostConnectSteps.Select(step => step.Input));
+        Assert.Equal(SharedGatewayId, sanitized.SshGatewayId);
+        foreach (string name in SharedProfileSanitizer.KeptProfileProperties
+            .Except([nameof(ServerProfileDto.ConnectionType), nameof(ServerProfileDto.PostConnectSteps)]))
+        {
+            PropertyInfo property = typeof(ServerProfileDto).GetProperty(name)!;
+            Assert.True(
+                string.Equals(Json(property.GetValue(poisoned)), Json(property.GetValue(sanitized)), StringComparison.Ordinal),
+                $"{name} is in the allowlist but its value did not survive sanitizing.");
+        }
     }
 
     [Fact]
@@ -183,7 +185,11 @@ public sealed class SharedProfileSanitizerTests
     [InlineData("SHARED", "SSH", null, SharedProfileRefusal.ForeignId)]
     [InlineData(null, "LOCAL", null, SharedProfileRefusal.UnsupportedProtocol)]
     [InlineData(null, "WEB", null, SharedProfileRefusal.UnsupportedProtocol)]
-    [InlineData(null, "SFTP", null, SharedProfileRefusal.UnsupportedProtocol)]
+    [InlineData(null, "CITRIX", null, SharedProfileRefusal.UnsupportedProtocol)]
+    [InlineData(null, "WINRM", null, SharedProfileRefusal.UnsupportedProtocol)]
+    [InlineData(null, "FTP", null, SharedProfileRefusal.UnsupportedProtocol)]
+    [InlineData(null, "TOOL:ping", null, SharedProfileRefusal.UnsupportedProtocol)]
+    [InlineData(null, "", null, SharedProfileRefusal.UnsupportedProtocol)]
     [InlineData(null, "SSH", "local-gateway", SharedProfileRefusal.ForeignGateway)]
     public void Sanitize_Profile_RefusesAProfileThatCannotBeShared_AndSaysWhy(
         string? id,
@@ -201,6 +207,48 @@ public sealed class SharedProfileSanitizerTests
 
         Assert.Null(SharedProfileSanitizer.Sanitize(source));
         Assert.Equal(expected, SharedProfileSanitizer.RefusalOf(source));
+    }
+
+    // Producer: SharedProfileSanitizer.NormalizeConnectionType through Sanitize(ServerProfileDto),
+    // any spelling of a protocol a shared file may use comes out in the inventory's spelling.
+    [Theory]
+    [InlineData("SSH", "SSH")]
+    [InlineData("sftp", "SFTP")]
+    [InlineData("SFTP", "SFTP")]
+    [InlineData("TELNET", "Telnet")]
+    [InlineData("telnet", "Telnet")]
+    [InlineData("vnc", "VNC")]
+    [InlineData("RDP", "RDP")]
+    public void Sanitize_Profile_AcceptsTheSharedProtocols_InTheirCanonicalSpelling(string written, string canonical)
+    {
+        var source = new ServerProfileDto { Id = SharedProfileId, ConnectionType = written, RemoteServer = "srv-x.example.test" };
+
+        ServerProfileDto sanitized = Assert.IsType<ServerProfileDto>(SharedProfileSanitizer.Sanitize(source));
+        Assert.Equal(canonical, sanitized.ConnectionType);
+        Assert.Equal(ConnectionTypeCatalog.Canonicalize(written), sanitized.ConnectionType);
+        Assert.Null(SharedProfileSanitizer.RefusalOf(source));
+    }
+
+    // Producer: SharedProfileSanitizer.Sanitize(ServerProfileDto), the HasSshPortField branch. An
+    // SFTP profile that declared an SSH port keeps it declared; Telnet and VNC never gain one.
+    [Fact]
+    public void Sanitize_Profile_SftpKeepsItsDeclaredSshPort_TelnetAndVncGainNone()
+    {
+        var sftp = new ServerProfileDto { Id = SharedProfileId, ConnectionType = "SFTP", RemoteServer = "srv-x.example.test", SshPort = 2202 };
+        var telnet = new ServerProfileDto { Id = SharedProfileId, ConnectionType = "Telnet", RemoteServer = "srv-x.example.test", TelnetPort = 2323 };
+        var vnc = new ServerProfileDto { Id = SharedProfileId, ConnectionType = "VNC", RemoteServer = "srv-x.example.test", VncPort = 5911 };
+
+        ServerProfileDto sanitizedSftp = SharedProfileSanitizer.Sanitize(sftp)!;
+        Assert.True(sanitizedSftp.HasSshPortField);
+        Assert.Equal(2202, sanitizedSftp.SshPort);
+
+        ServerProfileDto sanitizedTelnet = SharedProfileSanitizer.Sanitize(telnet)!;
+        Assert.False(sanitizedTelnet.HasSshPortField);
+        Assert.Equal(2323, sanitizedTelnet.TelnetPort);
+
+        ServerProfileDto sanitizedVnc = SharedProfileSanitizer.Sanitize(vnc)!;
+        Assert.False(sanitizedVnc.HasSshPortField);
+        Assert.Equal(5911, sanitizedVnc.VncPort);
     }
 
     // A shared file is read without review: a host the inventory would refuse is refused here

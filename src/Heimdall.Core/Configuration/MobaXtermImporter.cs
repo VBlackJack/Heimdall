@@ -80,9 +80,18 @@ public static partial class MobaXtermImporter
     private const char GatewayNameUserSeparator = '@';
     private const char GatewayNamePortSeparator = ':';
 
-    private const string SshConnectionType = "SSH";
-    private const string RdpConnectionType = "RDP";
+    // The canonical spelling of each protocol, so the importer and the shared-profile sanitizer
+    // name a type the way the inventory does.
+    private static readonly string SshConnectionType = ConnectionTypeCatalog.Canonicalize("SSH");
+    private static readonly string RdpConnectionType = ConnectionTypeCatalog.Canonicalize("RDP");
+    private static readonly string TelnetConnectionType = ConnectionTypeCatalog.Canonicalize("TELNET");
+    private static readonly string VncConnectionType = ConnectionTypeCatalog.Canonicalize("VNC");
+    private static readonly string SftpConnectionType = ConnectionTypeCatalog.Canonicalize("SFTP");
     private const string EmbeddedMode = "Embedded";
+
+    // Session type codes this importer recognises without mapping them, to word the reason.
+    private const int FtpTypeCode = 6;
+    private const int WslTypeCode = 14;
 
     /// <summary>
     /// Where each supported session type keeps its fields, by index in the '%' list that follows
@@ -93,6 +102,10 @@ public static partial class MobaXtermImporter
     /// login command at 6, the SSH gateway host, port and user at 7-9.</para>
     /// <para>Type 4 (RDP) is kept from the existing realistic RDP fixture, which carries host, port
     /// and user at 0-2 and its SSH gateway at 12-14. It has no login command.</para>
+    /// <para>Types 1 (Telnet), 5 (VNC) and 7 (SFTP) are measured on sessions created in the
+    /// MobaXterm interface. A VNC session has no login field: index 11 is an Xvnc "Unix login"
+    /// option, not a credential. An SFTP session has no jump host slot. A jump host on a Telnet or
+    /// VNC session, and a proxy on any of the three, are read only to refuse the session.</para>
     /// <para>Every other code is reported as unsupported rather than guessed.</para>
     /// </remarks>
     private static readonly Dictionary<int, SessionLayout> SessionLayouts = new()
@@ -100,22 +113,46 @@ public static partial class MobaXtermImporter
         [0] = new SessionLayout(
             SshConnectionType,
             DefaultPorts.Ssh,
+            UserIndex: 2,
             LoginCommandIndex: 6,
-            GatewayHostIndex: 7,
-            GatewayPortIndex: 8,
-            GatewayUserIndex: 9),
+            Gateway: new GatewaySlot(HostIndex: 7, PortIndex: 8, UserIndex: 9),
+            Proxy: null),
+        [1] = new SessionLayout(
+            TelnetConnectionType,
+            DefaultPorts.Telnet,
+            UserIndex: 2,
+            LoginCommandIndex: null,
+            Gateway: new GatewaySlot(HostIndex: 5, PortIndex: 6, UserIndex: 7),
+            Proxy: new ProxySlot(TypeIndex: 10, HostIndex: 11)),
         [4] = new SessionLayout(
             RdpConnectionType,
             DefaultPorts.Rdp,
+            UserIndex: 2,
             LoginCommandIndex: null,
-            GatewayHostIndex: 12,
-            GatewayPortIndex: 13,
-            GatewayUserIndex: 14),
+            Gateway: new GatewaySlot(HostIndex: 12, PortIndex: 13, UserIndex: 14),
+            Proxy: null),
+        [5] = new SessionLayout(
+            VncConnectionType,
+            DefaultPorts.Vnc,
+            UserIndex: null,
+            LoginCommandIndex: null,
+            Gateway: new GatewaySlot(HostIndex: 4, PortIndex: 5, UserIndex: 6),
+            Proxy: new ProxySlot(TypeIndex: 12, HostIndex: 13)),
+        [7] = new SessionLayout(
+            SftpConnectionType,
+            DefaultPorts.Sftp,
+            UserIndex: 2,
+            LoginCommandIndex: null,
+            Gateway: null,
+            Proxy: new ProxySlot(TypeIndex: 9, HostIndex: 10)),
     };
 
     private const int HostIndex = 0;
     private const int PortIndex = 1;
-    private const int UserIndex = 2;
+
+    // MobaXterm writes "0" in a proxy type field that names no proxy.
+    private const string NoProxyType = "0";
+
 
     /// <summary>
     /// Parses a MobaXterm session file with the default identifier prefix and no variable resolver.
@@ -180,6 +217,26 @@ public static partial class MobaXtermImporter
         return result;
     }
 
+    /// <summary>
+    /// What a session type code that <see cref="MobaXtermImportWarningKind.UnsupportedSessionType"/> reported is, when the
+    /// importer knows it well enough to word the reason.
+    /// </summary>
+    /// <param name="typeCode">The warning's detail: the type code as written in the file.</param>
+    public static MobaXtermSkippedType ClassifySkippedType(string? typeCode)
+    {
+        if (!int.TryParse(typeCode, NumberStyles.None, CultureInfo.InvariantCulture, out int code))
+        {
+            return MobaXtermSkippedType.Unknown;
+        }
+
+        return code switch
+        {
+            WslTypeCode => MobaXtermSkippedType.Wsl,
+            FtpTypeCode => MobaXtermSkippedType.Ftp,
+            _ => MobaXtermSkippedType.Unknown,
+        };
+    }
+
     private static void ParseSession(
         ParseContext context,
         string section,
@@ -207,6 +264,27 @@ public static partial class MobaXtermImporter
             return;
         }
 
+        // A jump host or a proxy the protocol cannot honour is a route the file asked for and
+        // Heimdall cannot take: the session is refused rather than imported as a direct connection.
+        if (layout.Gateway is { } jumpHost
+            && !ProtocolCapabilities.SupportsSshGateway(layout.ConnectionType)
+            && FieldAt(line.Fields, jumpHost.HostIndex).Trim() is { Length: > 0 } unsupportedJumpHost)
+        {
+            context.Warn(section, sessionName, MobaXtermImportWarningKind.JumpHostNotSupported, unsupportedJumpHost);
+            return;
+        }
+
+        if (layout.Proxy is { } proxy)
+        {
+            string proxyType = FieldAt(line.Fields, proxy.TypeIndex).Trim();
+            string proxyHost = FieldAt(line.Fields, proxy.HostIndex).Trim();
+            if ((proxyType.Length > 0 && proxyType != NoProxyType) || proxyHost.Length > 0)
+            {
+                context.Warn(section, sessionName, MobaXtermImportWarningKind.ProxyNotSupported, proxyHost);
+                return;
+            }
+        }
+
         string profileId = BuildId(context.Options.IdPrefix, ProfileIdDomain, group, sessionName);
         if (!context.ProfileIds.Add(profileId))
         {
@@ -215,8 +293,8 @@ public static partial class MobaXtermImporter
         }
 
         string? gatewayId = null;
-        string gatewayHost = FieldAt(line.Fields, layout.GatewayHostIndex).Trim();
-        if (gatewayHost.Length > 0)
+        if (layout.Gateway is { } gatewaySlot
+            && FieldAt(line.Fields, gatewaySlot.HostIndex).Trim() is { Length: > 0 } gatewayHost)
         {
             // A session that names a gateway is never imported as a direct connection: that
             // would reach the host around the bastion the file asked for.
@@ -228,16 +306,16 @@ public static partial class MobaXtermImporter
                 return;
             }
 
-            int gatewayPort = ParsePort(FieldAt(line.Fields, layout.GatewayPortIndex), DefaultPorts.Ssh);
+            int gatewayPort = ParsePort(FieldAt(line.Fields, gatewaySlot.PortIndex), DefaultPorts.Ssh);
             string gatewayUser = context
-                .ResolveVariables(section, sessionName, FieldAt(line.Fields, layout.GatewayUserIndex))
+                .ResolveVariables(section, sessionName, FieldAt(line.Fields, gatewaySlot.UserIndex))
                 .Trim();
             gatewayId = context.GetOrAddGateway(canonicalGatewayHost, gatewayPort, gatewayUser);
         }
 
-        string user = context
-            .ResolveVariables(section, sessionName, FieldAt(line.Fields, UserIndex))
-            .Trim();
+        string user = layout.UserIndex is int userIndex
+            ? context.ResolveVariables(section, sessionName, FieldAt(line.Fields, userIndex)).Trim()
+            : string.Empty;
         int port = ParsePort(FieldAt(line.Fields, PortIndex), layout.DefaultPort);
 
         var dto = new ServerProfileDto
@@ -260,20 +338,38 @@ public static partial class MobaXtermImporter
 
     private static void ApplyProtocolSettings(ServerProfileDto dto, SessionLayout layout, int port, string user)
     {
-        switch (layout.ConnectionType)
+        // Each protocol's handler reads its own port property; RemotePort is kept equal for
+        // the views that show one port whatever the protocol.
+        dto.RemotePort = port;
+        if (layout.ConnectionType == SshConnectionType)
         {
-            case SshConnectionType:
-                dto.SshPort = port;
-                dto.RemotePort = port;
-                dto.SshUsername = NullIfEmpty(user);
-                dto.SshMode = EmbeddedMode;
-                break;
-
-            case RdpConnectionType:
-                dto.RemotePort = port;
-                dto.RdpUsername = NullIfEmpty(user);
-                dto.RdpMode = EmbeddedMode;
-                break;
+            dto.SshPort = port;
+            dto.SshUsername = NullIfEmpty(user);
+            dto.SshMode = EmbeddedMode;
+        }
+        else if (layout.ConnectionType == RdpConnectionType)
+        {
+            dto.RdpUsername = NullIfEmpty(user);
+            dto.RdpMode = EmbeddedMode;
+        }
+        else if (layout.ConnectionType == TelnetConnectionType)
+        {
+            dto.TelnetPort = port;
+        }
+        else if (layout.ConnectionType == VncConnectionType)
+        {
+            dto.VncPort = port;
+        }
+        else if (layout.ConnectionType == SftpConnectionType)
+        {
+            dto.SshPort = port;
+            dto.SshUsername = NullIfEmpty(user);
+        }
+        else
+        {
+            // A layout added without its case here must fail loudly, not import half a profile.
+            throw new InvalidOperationException(
+                $"No protocol settings are defined for connection type '{layout.ConnectionType}'.");
         }
     }
 
@@ -478,10 +574,16 @@ public static partial class MobaXtermImporter
     private sealed record SessionLayout(
         string ConnectionType,
         int DefaultPort,
+        int? UserIndex,
         int? LoginCommandIndex,
-        int GatewayHostIndex,
-        int GatewayPortIndex,
-        int GatewayUserIndex);
+        GatewaySlot? Gateway,
+        ProxySlot? Proxy);
+
+    /// <summary>The three fields of a jump host, which are present together or not at all.</summary>
+    private sealed record GatewaySlot(int HostIndex, int PortIndex, int UserIndex);
+
+    /// <summary>The proxy type and proxy host fields of a session.</summary>
+    private sealed record ProxySlot(int TypeIndex, int HostIndex);
 
     private sealed record IniSection(string Name, List<KeyValuePair<string, string>> Entries);
 
@@ -596,6 +698,19 @@ public sealed class MobaXtermImportOptions
     public Func<string, string?>? VariableResolver { get; init; }
 }
 
+/// <summary>A session type the importer does not map, as far as it can tell what it is.</summary>
+public enum MobaXtermSkippedType
+{
+    /// <summary>A type code this importer has no word for.</summary>
+    Unknown,
+
+    /// <summary>A WSL distribution on the computer that runs MobaXterm.</summary>
+    Wsl,
+
+    /// <summary>An FTP session, not imported yet.</summary>
+    Ftp,
+}
+
 /// <summary>Why a MobaXterm line or value could not be taken as it is.</summary>
 public enum MobaXtermImportWarningKind
 {
@@ -610,6 +725,18 @@ public enum MobaXtermImportWarningKind
 
     /// <summary>The session's gateway host is not a usable host; not imported.</summary>
     InvalidGatewayHost,
+
+    /// <summary>
+    /// The session goes through an SSH jump host and its protocol cannot be routed through one;
+    /// not imported, since a direct connection would go around the jump host.
+    /// </summary>
+    JumpHostNotSupported,
+
+    /// <summary>
+    /// The session goes through a proxy and Heimdall does not use one for its protocol; not
+    /// imported, since a direct connection would go around the proxy.
+    /// </summary>
+    ProxyNotSupported,
 
     /// <summary>Another session with the same name already exists in the same folder; not imported.</summary>
     DuplicateSession,

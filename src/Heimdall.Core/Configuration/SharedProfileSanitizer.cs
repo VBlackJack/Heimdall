@@ -35,8 +35,18 @@ namespace Heimdall.Core.Configuration;
 /// </remarks>
 public static class SharedProfileSanitizer
 {
-    private const string SshConnectionType = "SSH";
-    private const string RdpConnectionType = "RDP";
+    /// <summary>
+    /// The protocols a shared profile may use, by their canonical spelling. The inventory's own
+    /// spelling is the one stored, so a handler never meets "TELNET" where it expects "Telnet".
+    /// </summary>
+    private static readonly IReadOnlySet<string> SharedConnectionTypes = new HashSet<string>(StringComparer.Ordinal)
+    {
+        ConnectionTypeCatalog.Canonicalize("SSH"),
+        ConnectionTypeCatalog.Canonicalize("SFTP"),
+        ConnectionTypeCatalog.Canonicalize("RDP"),
+        ConnectionTypeCatalog.Canonicalize("TELNET"),
+        ConnectionTypeCatalog.Canonicalize("VNC"),
+    };
 
     /// <summary>The <see cref="ServerProfileDto"/> properties a shared profile keeps.</summary>
     public static IReadOnlySet<string> KeptProfileProperties { get; } = new HashSet<string>(StringComparer.Ordinal)
@@ -50,6 +60,8 @@ public static class SharedProfileSanitizer
         nameof(ServerProfileDto.SshPort),
         nameof(ServerProfileDto.SshUsername),
         nameof(ServerProfileDto.RdpUsername),
+        nameof(ServerProfileDto.VncPort),
+        nameof(ServerProfileDto.TelnetPort),
         nameof(ServerProfileDto.SshGatewayId),
         nameof(ServerProfileDto.UseDirectConnection),
         nameof(ServerProfileDto.PostConnectSteps),
@@ -70,7 +82,7 @@ public static class SharedProfileSanitizer
 
     /// <summary>
     /// The shared form of <paramref name="source"/>, or null when it cannot be a shared profile:
-    /// an identifier outside the shared namespace, a protocol other than SSH or RDP, a host the
+    /// an identifier outside the shared namespace, a protocol other than SSH, SFTP, RDP, Telnet or VNC, a host the
     /// inventory would refuse (<see cref="SchemaValidator.IsValidHost"/>: a value starting with a
     /// dash or holding a space could pass for an option of Plink or of an external tool), or a
     /// gateway reference outside the shared namespace (dropping that reference would turn a session
@@ -97,6 +109,8 @@ public static class SharedProfileSanitizer
             RemotePort = source.RemotePort,
             SshUsername = source.SshUsername,
             RdpUsername = source.RdpUsername,
+            VncPort = source.VncPort,
+            TelnetPort = source.TelnetPort,
             SshGatewayId = SshGatewayRoute.IsAssigned(source.SshGatewayId) ? source.SshGatewayId : null,
             UseDirectConnection = source.UseDirectConnection,
             PostConnectSteps = SanitizeSteps(source.PostConnectSteps),
@@ -170,10 +184,16 @@ public static class SharedProfileSanitizer
         };
     }
 
-    private static string? NormalizeConnectionType(string? connectionType) =>
-        string.Equals(connectionType, SshConnectionType, StringComparison.OrdinalIgnoreCase) ? SshConnectionType
-        : string.Equals(connectionType, RdpConnectionType, StringComparison.OrdinalIgnoreCase) ? RdpConnectionType
-        : null;
+    private static string? NormalizeConnectionType(string? connectionType)
+    {
+        if (string.IsNullOrWhiteSpace(connectionType))
+        {
+            return null;
+        }
+
+        string canonical = ConnectionTypeCatalog.Canonicalize(connectionType);
+        return SharedConnectionTypes.Contains(canonical) ? canonical : null;
+    }
 
     /// <summary>
     /// Keeps the text each step types into the remote session and how it is paced. A reference to
