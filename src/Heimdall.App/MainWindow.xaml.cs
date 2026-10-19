@@ -2056,6 +2056,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 vm.ToggleSplitOrientation(splitSession);
         });
 
+        // Ctrl+Shift+M: copy the active terminal's output with its secrets masked. Gated on the
+        // tab having a readable terminal pane, so on an RDP or VNC tab the key is not swallowed
+        // (remote desktops use the chord). Deliberately absent from the low-level global router.
+        RegisterMaskedCopyShortcut(
+            _keyboardShortcutService,
+            () => GetMainVm() is { } vm && vm.MaskedCopy.CanRun(vm.Connection.ActiveSession),
+            () => GetMainVm()?.MaskedCopy.Start(GetMainVm()?.Connection.ActiveSession));
+
         // ── Session lifecycle ────────────────────────────────────────
         RegisterCloseTabShortcuts(
             _keyboardShortcutService,
@@ -2114,6 +2122,30 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             if (GetMainVm() is { } vm)
                 OpenTreeViewKeyboardContextMenu(vm);
         }, canExecute: () => !IsTerminalFocusedContext());
+    }
+
+    /// <summary>
+    /// Registers Ctrl+Shift+M, "Copy output, secrets masked".
+    /// </summary>
+    /// <param name="service">Dispatcher the binding is added to.</param>
+    /// <param name="hasTerminalSource">Whether the active tab has a terminal pane that can be read.</param>
+    /// <param name="copyMasked">Starts the copy flow for the active tab.</param>
+    /// <remarks>
+    /// The gate decides who owns the keystroke: the shortcut service marks the event handled for
+    /// any binding whose canExecute passes, so without it the chord would be swallowed on a tab
+    /// that has no terminal text, an RDP or VNC tab whose remote desktop binds the same chord.
+    /// Taken as parameters rather than read from this window so the gate can be exercised without one.
+    /// </remarks>
+    internal static void RegisterMaskedCopyShortcut(
+        KeyboardShortcutService service,
+        Func<bool> hasTerminalSource,
+        Action copyMasked)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(hasTerminalSource);
+        ArgumentNullException.ThrowIfNull(copyMasked);
+
+        service.Register(Key.M, ModifierKeys.Control | ModifierKeys.Shift, copyMasked, canExecute: hasTerminalSource);
     }
 
     /// <summary>
@@ -3517,7 +3549,13 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             }
         }
 
-        var menu = _sessionTabContextMenuFactory.CreateMenu(session, vm, this);
+        // The pane the click landed in, so a split tab copies the output the user pointed at.
+        SessionPaneModel? clickedPane = clickSource is null
+            ? null
+            : SplitTreeHelper.EnumerateLeaves(session.RootContent).FirstOrDefault(pane =>
+                pane.HostControl is DependencyObject host && IsSelfOrDescendantOf(clickSource, host));
+
+        var menu = _sessionTabContextMenuFactory.CreateMenu(session, vm, this, clickedPane);
         menu.PlacementTarget = SessionTabControl;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
         menu.IsOpen = true;

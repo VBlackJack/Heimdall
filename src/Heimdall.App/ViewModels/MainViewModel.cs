@@ -374,6 +374,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// <summary>Session lifecycle hub: broadcast, reconnect, SFTP auto-open, workspace restore.</summary>
     public SessionCoordinator Session { get; }
 
+    /// <summary>"Copy output, secrets masked": the one flow behind the tab menu, the shortcut and the palette.</summary>
+    public MaskedTerminalCopyService MaskedCopy { get; }
+
     /// <summary>Recently used tool IDs (most recent first, bounded).</summary>
     private readonly RecentToolList _recentTools = new();
 
@@ -440,6 +443,11 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _appStatus = appStatus;
         _hostKeyStore = hostKeyStore;
         _dialogService = dialogService;
+        MaskedCopy = new MaskedTerminalCopyService(
+            dialogService,
+            localizer,
+            new WpfClipboardService(),
+            message => StatusText = message);
         _embeddedSessionManager = embeddedSessionManager;
         _themeService = themeService;
         _sessionRestore = sessionRestore;

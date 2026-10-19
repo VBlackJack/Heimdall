@@ -670,6 +670,13 @@
                         return false;
                     }
 
+                    // Ctrl+Shift+M: "Copy output, secrets masked" is the host's command. Left to xterm
+                    // the chord is Ctrl+M, a carriage return the shell would execute.
+                    if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.code === 'KeyM') {
+                        event.preventDefault();
+                        return false;
+                    }
+
                     // Ctrl+Shift+F: search
                     if (event.ctrlKey && event.shiftKey && event.code === 'KeyF') {
                         toggleSearch();
