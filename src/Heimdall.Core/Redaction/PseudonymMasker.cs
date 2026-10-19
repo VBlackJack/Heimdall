@@ -38,6 +38,8 @@ internal static class PseudonymMasker
     private static readonly string[] FileExtensions =
     [
         "dll", "exe", "json", "yaml", "yml", "txt", "log", "cs", "md", "sh", "ps1", "py", "conf", "ini", "xml", "html",
+        "gz", "tgz", "bz2", "xz", "zip", "tar", "js", "css", "map", "so", "cfg", "bak", "old", "tmp", "pem", "crt",
+        "key", "pub", "csv", "sql", "jar", "war", "whl",
     ];
 
     internal static string ApplyIpv4(string text, Regex pattern, string ruleId, RedactionRun run) =>

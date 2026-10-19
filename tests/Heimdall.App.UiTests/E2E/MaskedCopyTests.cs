@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using FlaUI.Core;
@@ -38,6 +39,11 @@ namespace Heimdall.App.UiTests.E2E;
 /// select with UI Automation, take the foreground, and then type. The terminal is a WebView2
 /// page, so its text is not in the UI Automation tree; the test learns that the shell has
 /// processed the command by asking for the masked copy until the text shows it.
+/// <para>
+/// Global keyboard input goes to whichever window is in front, so every input is preceded by a
+/// check that the Heimdall main window is the foreground window; the test fails rather than
+/// type into another window. The clipboard text is saved before the run and put back after it.
+/// </para>
 /// </remarks>
 [Collection(DesktopUiCollection.Name)]
 public sealed class MaskedCopyTests
@@ -69,6 +75,8 @@ public sealed class MaskedCopyTests
     private const string DialogClosedDescription = "masked copy dialog closed";
     private const string CopyButtonDescription = "Copy button of the masked copy dialog";
     private const string CountLineDescription = "count line of the key-value rule";
+    private const string ForegroundDescription = "the Heimdall main window to be the foreground window (keys are not sent otherwise)";
+    private const string User32Library = "user32.dll";
 
     private static readonly TimeSpan LaunchTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(30);
@@ -77,6 +85,10 @@ public sealed class MaskedCopyTests
     private static readonly TimeSpan ProbeInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan CloseTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan ExitTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan ForegroundTimeout = TimeSpan.FromSeconds(5);
+
+    [DllImport(User32Library)]
+    private static extern IntPtr GetForegroundWindow();
 
     [ProductLaunchFact]
     [Trait("Category", "RequiresDesktop")]
@@ -88,6 +100,7 @@ public sealed class MaskedCopyTests
         var dataDir = Path.Combine(Path.GetTempPath(), TempFolderPrefix + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dataDir);
         Application? app = null;
+        var savedClipboardText = SaveClipboardText();
         try
         {
             File.WriteAllText(Path.Combine(dataDir, SettingsFileName), BuildSettingsJson(), new UTF8Encoding(false));
@@ -129,7 +142,9 @@ public sealed class MaskedCopyTests
             }
             CancelDialog(firstDialog);
 
+            EnsureForeground(window);
             Keyboard.Type(SecretCommand);
+            EnsureForeground(window);
             Keyboard.Type(VirtualKeyShort.ENTER);
 
             var dialog = WaitHelpers.WaitFor(
@@ -169,6 +184,53 @@ public sealed class MaskedCopyTests
         {
             StopApplication(app);
             TryDeleteDirectory(dataDir);
+            RestoreClipboardText(savedClipboardText);
+        }
+    }
+
+    // Brings the window to the front and fails the test when it does not get there: the keys
+    // that follow are global input and must not reach another window.
+    private static void EnsureForeground(Window window)
+    {
+        window.SetForeground();
+        var handle = window.Properties.NativeWindowHandle.ValueOrDefault;
+        Assert.True(handle != 0, "The Heimdall main window has no native handle.");
+        WaitHelpers.WaitUntil(
+            () => GetForegroundWindow().ToInt64() == handle,
+            ForegroundDescription,
+            ForegroundTimeout);
+    }
+
+    // The clipboard is user data the test overwrites: its text is kept and put back. Only the
+    // text format is saved; a clipboard that is busy or holds no text is left as it is found.
+    private static string? SaveClipboardText()
+    {
+        try
+        {
+            return System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText() : null;
+        }
+        catch (ExternalException)
+        {
+            return null;
+        }
+    }
+
+    private static void RestoreClipboardText(string? saved)
+    {
+        try
+        {
+            if (saved is null)
+            {
+                System.Windows.Clipboard.Clear();
+            }
+            else
+            {
+                System.Windows.Clipboard.SetText(saved);
+            }
+        }
+        catch (ExternalException)
+        {
+            // Best effort: the clipboard is busy.
         }
     }
 
@@ -203,8 +265,9 @@ public sealed class MaskedCopyTests
         }
 
         row.Patterns.SelectionItem.Pattern.Select();
-        window.SetForeground();
+        EnsureForeground(window);
         row.Focus();
+        EnsureForeground(window);
         Keyboard.Type(VirtualKeyShort.ENTER);
     }
 
@@ -229,7 +292,7 @@ public sealed class MaskedCopyTests
 
     private static Window? TryOpenDialog(UIA3Automation automation, Application app, Window window, string title)
     {
-        window.SetForeground();
+        EnsureForeground(window);
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_M);
 
         var deadline = DateTime.UtcNow + DialogProbeTimeout;

@@ -916,7 +916,8 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
                     connectionStateMachine,
                     hostKeyStore,
                     RejectingHostKeyVerifier.Instance,
-                    config));
+                    config),
+                new MaskedCopyTestSupport.RecordingClipboard());
 
             return new TestHarness(
                 rootPath,

@@ -307,12 +307,17 @@ Heimdall reads the text of the session, hides the secrets it recognizes, and sho
 What the rules hide:
 
 - a private key, from its BEGIN line to its END line;
-- an `Authorization: Bearer` or `Authorization: Basic` header value;
+- an `Authorization: Bearer`, `Basic`, `Token` or `Digest` header value;
 - the password in a URL (`https://user:password@host/`);
 - a password given on a command line: `--password`, `sshpass -p`, `export ...PASSWORD=`, `PGPASSWORD=`, `MYSQL_PWD=`, and `-p` on the mysql family of commands;
 - what was typed after a password prompt and echoed back, including a password typed into a shell that answered "command not found";
 - the value of a key named like a secret (`password`, `secret`, `token`, `api_key`, `access_key`, `private_key` and a few more);
 - AWS access keys, GitHub tokens, Slack tokens and JSON Web Tokens.
+
+The rules lean toward hiding too much rather than too little, so they may also hide something that is not a secret:
+
+- after a `[sudo] password for bob:` prompt, a single token that follows may also be hidden, even when it is only a command;
+- `mysql -u root -p mydb` may also hide the database name `mydb`, because the rule cannot tell a password from a database name.
 
 One option is off by default: **Also mask host names and addresses**. It replaces IPv4 addresses with `ip-1`, `ip-2`... and host names (the host in `user@host` prompts, and names with at least two dots) with `host-1`, `host-2`.... The same address or name always gets the same pseudonym inside one copy, so the text stays readable.
 
@@ -327,7 +332,7 @@ What it does not hide. The rules are patterns, not understanding, so read the pr
 Good to know:
 
 - Nothing leaves your machine on its own. The masking runs locally, uses no network and no outside service, and writes nothing to disk. You choose where to paste the result.
-- Only the last 4 MiB of the scrollback are read. When the output was longer, the preview says that it was cut.
+- Only the last 4 MiB of the scrollback are read. When the output was longer, the preview says that it was cut, and the first line of what remains is left out because it starts in the middle of a line.
 - If a rule takes too long on the text, Heimdall refuses to copy anything rather than copy text that might still hold a secret.
 - Session logs are not masked. This feature only changes what you copy.
 

@@ -7410,6 +7410,7 @@
   "MaskedCopyStatusNotReady": "Le terminal n'est pas encore pr\u00eat \u00e0 \u00eatre lu.",
   "MaskedCopyStatusTimeout": "Le terminal n'a pas r\u00e9pondu \u00e0 temps.",
   "MaskedCopyStatusFailed": "Le texte du terminal n'a pas pu \u00eatre lu.",
+  "MaskedCopyRerunFailed": "Le masquage n'a pas pu \u00eatre refait, donc rien ne peut \u00eatre copi\u00e9.",
   "MaskedCopyRulePrivateKeyBlock": "Cl\u00e9 priv\u00e9e",
   "MaskedCopyRuleAuthorizationHeader": "En-t\u00eate d'autorisation",
   "MaskedCopyRuleUrlCredentials": "Identifiants dans une URL",

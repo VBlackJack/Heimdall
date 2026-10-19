@@ -97,6 +97,30 @@ public sealed class MaskedCopyDialogViewModelTests
         Assert.Empty(viewModel.CountLines);
     }
 
+    /// <summary>
+    /// Producer: <c>MaskedCopyDialogViewModel.RerunAsync</c> catch branch, reached by toggling the host
+    /// option when the redactor throws (here a null source text, which <c>TextRedactor.Redact</c> rejects).
+    /// The dialog must show its own message, not the one for a failed terminal read.
+    /// </summary>
+    [Fact]
+    public async Task AFailedRerun_ShowsTheRerunMessage_NotTheReadFailure_AndDisablesCopy()
+    {
+        var localizer = await LocalizerAsync();
+        var clipboard = new RecordingClipboard();
+        var initial = RedactionResult.Success("masked", new Dictionary<string, int>());
+        var viewModel = MaskedCopyDialogViewModel.FromResult(null!, false, initial, localizer, clipboard);
+
+        viewModel.MaskHosts = true;
+        await viewModel.LastRerun;
+
+        Assert.True(viewModel.IsRefused);
+        Assert.Equal(localizer["MaskedCopyRerunFailed"], viewModel.RefusedText);
+        Assert.NotEqual(localizer["MaskedCopyStatusFailed"], viewModel.RefusedText);
+        Assert.False(viewModel.CanCopy);
+        Assert.False(viewModel.IsBusy);
+        Assert.Equal(string.Empty, viewModel.MaskedText);
+    }
+
     [Fact]
     public async Task ARefusedResult_ShowsTheRefusal_AndDisablesCopy()
     {

@@ -47,7 +47,7 @@
         </StackPanel>
 
         <!-- One line per rule that masked something; none for a rule with a zero count. -->
-        <StackPanel Grid.Row="1" Margin="0,12,0,0">
+        <StackPanel Grid.Row="1" Margin="{StaticResource MarginSectionTop}">
             <ItemsControl Focusable="False"
                           ItemsSource="{Binding CountLines}"
                           AutomationProperties.AutomationId="MaskedCopyCounts"
@@ -79,7 +79,7 @@
         <!-- No wrapping and no virtualization: the text is capped at 4 MiB, and a wrapping box
              would measure every line against the width on each resize. -->
         <TextBox Grid.Row="2"
-                 Margin="0,8,0,0"
+                 Margin="{StaticResource MarginSubsectionTop}"
                  IsReadOnly="True"
                  IsReadOnlyCaretVisible="True"
                  TextWrapping="NoWrap"
@@ -92,11 +92,11 @@
                  AutomationProperties.AutomationId="MaskedCopyText"
                  AutomationProperties.Name="{Binding TextAccessibleName}"/>
 
-        <StackPanel Grid.Row="3" Margin="0,8,0,0">
+        <StackPanel Grid.Row="3" Margin="{StaticResource MarginSubsectionTop}">
             <TextBlock Text="{Binding TruncatedNotice}"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        TextWrapping="Wrap"
-                       Margin="0,0,0,8"
+                       Margin="{StaticResource MarginStackItem}"
                        AutomationProperties.AutomationId="MaskedCopyTruncated"
                        Visibility="{Binding IsTruncated, Converter={StaticResource BoolToVisibilityConverter}}"/>
             <CheckBox Content="{Binding HostsOptionLabel}"
@@ -113,7 +113,7 @@
                     Command="{Binding CopyCommand}"
                     IsDefault="True"
                     MinWidth="110"
-                    Margin="0,0,8,0"
+                    Margin="{StaticResource MarginInlineSm}"
                     Style="{DynamicResource PrimaryButtonStyle}"
                     AutomationProperties.AutomationId="MaskedCopyCopyButton"
                     AutomationProperties.Name="{Binding CopyLabel}"/>

@@ -33,7 +33,7 @@ public sealed class TerminalHtmlBufferReadTests
 {
     private const string RequestAnchor = "if (message.indexOf('buffer-request:') === 0)";
     private const string ReadAnchor = "function readNormalBufferText()";
-    private const string EncodeAnchor = "function encodeBufferText(text)";
+    private const string EncodeAnchor = "function encodeBufferText(read)";
     private const string ChunkedAnchor = "function bytesToBase64Chunked(bytes)";
 
     [Fact]
@@ -89,6 +89,38 @@ public sealed class TerminalHtmlBufferReadTests
         Assert.Contains(lines, line => line == "var start = bytes.length - bufferMaxBytes;");
         Assert.Contains(lines, line => line == "bytes = bytes.subarray(start);");
         Assert.Contains(lines, line => line == "truncated = true;");
+    }
+
+    /// <summary>
+    /// Producer: <c>terminal.html</c> <c>readNormalBufferText</c> / <c>encodeBufferText</c>. The host
+    /// drops the partial first line when the truncated flag is set, so the page must set it for a
+    /// headless first line too. The script itself is not run here.
+    /// </summary>
+    [Fact]
+    public void AHeadlessFirstLineSetsTheTruncatedFlag()
+    {
+        string html = TerminalAssetsLoader.TerminalHtml;
+
+        string[] read = ExecutableLines(ExtractBlock(html, ReadAnchor));
+        Assert.Contains(read, line => line.Contains("buffer.getLine(0).isWrapped", StringComparison.Ordinal));
+        Assert.Contains(read, line => line.Contains("firstLineHeadless: firstLineHeadless", StringComparison.Ordinal));
+
+        string[] encode = ExecutableLines(ExtractBlock(html, EncodeAnchor));
+        Assert.Contains(encode, line => line == "var truncated = read.firstLineHeadless;");
+    }
+
+    /// <summary>
+    /// Producer: <c>terminal.html</c> key handler. The host owns Ctrl+Shift+M; the page matches the
+    /// key by keyCode, which AZERTY layouts share with QWERTY, not by <c>event.code</c>.
+    /// </summary>
+    [Fact]
+    public void TheMaskedCopyChordIsMatchedByKeyCode()
+    {
+        string[] lines = ExecutableLines(TerminalAssetsLoader.TerminalHtml);
+
+        Assert.Contains(lines, line => line == "var maskedCopyKeyCode = 77;");
+        Assert.Contains(lines, line => line.Contains("event.keyCode === maskedCopyKeyCode", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, line => line.Contains("'KeyM'", StringComparison.Ordinal));
     }
 
     [Fact]

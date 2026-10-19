@@ -7411,6 +7411,7 @@
   "MaskedCopyStatusNotReady": "The terminal is not ready to be read yet.",
   "MaskedCopyStatusTimeout": "The terminal did not answer in time.",
   "MaskedCopyStatusFailed": "The terminal text could not be read.",
+  "MaskedCopyRerunFailed": "The masking could not be redone, so nothing can be copied.",
   "MaskedCopyRulePrivateKeyBlock": "Private key",
   "MaskedCopyRuleAuthorizationHeader": "Authorization header",
   "MaskedCopyRuleUrlCredentials": "Credentials in a URL",

@@ -297,7 +297,7 @@ public sealed partial class MaskedCopyDialogViewModel : ObservableObject
     private void ShowFailure()
     {
         // A re-run that threw is treated as a refusal: nothing is offered for the clipboard.
-        ShowRefusal(_localizer["MaskedCopyStatusFailed"]);
+        ShowRefusal(_localizer["MaskedCopyRerunFailed"]);
     }
 
     private string RuleLabel(string ruleId) =>

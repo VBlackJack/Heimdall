@@ -38,12 +38,20 @@ public enum TerminalTextReadStatus
 
 /// <summary>Text read from a terminal session, with the reason when there is none.</summary>
 /// <param name="Text">The terminal text, empty unless <paramref name="Status"/> is <see cref="TerminalTextReadStatus.Ok"/>.</param>
-/// <param name="Truncated">True when the oldest output was cut to respect the size cap.</param>
+/// <param name="Truncated">True when the oldest output was cut, by the size cap or by the scrollback; the partial first line is then already dropped from the text.</param>
 /// <param name="Status">How the read ended.</param>
 public readonly record struct TerminalTextReadResult(string Text, bool Truncated, TerminalTextReadStatus Status)
 {
     /// <summary>A result carrying no text and the given non-Ok status.</summary>
     public static TerminalTextReadResult Empty(TerminalTextReadStatus status) => new(string.Empty, false, status);
+
+    /// <summary>
+    /// Describes the result without its text, which can hold secrets: the generated member would
+    /// print it into any log line or assertion message that formats the result.
+    /// </summary>
+    public override string ToString() => string.Create(
+        CultureInfo.InvariantCulture,
+        $"TerminalTextReadResult {{ Status = {Status}, Truncated = {Truncated}, TextLength = {Text.Length} }}");
 }
 
 /// <summary>
@@ -88,7 +96,11 @@ internal sealed class TerminalBufferReadCoordinator
     /// <summary>Host to page: asks the page for its text, followed by the request id.</summary>
     internal const string RequestPrefix = "buffer-request:";
 
-    /// <summary>Page to host: <c>buffer:&lt;id&gt;:&lt;truncated 0|1&gt;:&lt;base64&gt;</c>.</summary>
+    /// <summary>
+    /// Page to host: <c>buffer:&lt;id&gt;:&lt;truncated 0|1&gt;:&lt;base64&gt;</c>. The flag is 1 when the
+    /// text starts mid-line, because the size cap cut it or because the scrollback evicted the head
+    /// of its first line.
+    /// </summary>
     internal const string ReplyPrefix = "buffer:";
 
     /// <summary>Largest UTF-8 text the page sends; mirrors <c>bufferMaxBytes</c> in terminal.html.</summary>
@@ -110,6 +122,7 @@ internal sealed class TerminalBufferReadCoordinator
     internal const int OffThreadDecodeMinBase64Length = 64 * 1024;
 
     private const char FieldSeparator = ':';
+    private const string LineFeed = "\n";
     private const string TruncatedFlag = "1";
     private const string NotTruncatedFlag = "0";
 
@@ -228,6 +241,13 @@ internal sealed class TerminalBufferReadCoordinator
                 ? await Task.Run(() => DecodeOrNull(base64)).ConfigureAwait(false)
                 : DecodeOrNull(base64);
 
+            // A cut text starts in the middle of a line: the key naming a secret may be gone
+            // while its value remains, and no masking rule could recognize it. Drop that line.
+            if (text is not null && truncated)
+            {
+                text = DropPartialFirstLine(text);
+            }
+
             pending.Completion.TrySetResult(text is null
                 ? TerminalTextReadResult.Empty(TerminalTextReadStatus.Failed)
                 : new TerminalTextReadResult(text, truncated, TerminalTextReadStatus.Ok));
@@ -281,6 +301,16 @@ internal sealed class TerminalBufferReadCoordinator
 
         base64 = rest[(flagEnd + 1)..].ToString();
         return true;
+    }
+
+    /// <summary>
+    /// Removes everything up to and including the first line feed: the first line of a text
+    /// whose head was cut is partial. A text without a line feed is one partial line and becomes empty.
+    /// </summary>
+    internal static string DropPartialFirstLine(string text)
+    {
+        int lineEnd = text.IndexOf(LineFeed, StringComparison.Ordinal);
+        return lineEnd < 0 ? string.Empty : text[(lineEnd + 1)..];
     }
 
     /// <summary>Decodes a reply payload; false when it is over the reply cap or is not valid base64.</summary>

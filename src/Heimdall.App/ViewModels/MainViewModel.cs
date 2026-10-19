@@ -434,7 +434,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         UpdateBannerViewModel update,
         IPaneCloseArbiter closeArbiter,
         ICommandPaletteViewModelFactory commandPaletteFactory,
-        ITunnelsViewModelFactory tunnelsFactory)
+        ITunnelsViewModelFactory tunnelsFactory,
+        IClipboardService clipboard)
     {
         _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
         _configManager = configManager;
@@ -446,7 +447,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         MaskedCopy = new MaskedTerminalCopyService(
             dialogService,
             localizer,
-            new WpfClipboardService(),
+            clipboard,
             message => StatusText = message);
         _embeddedSessionManager = embeddedSessionManager;
         _themeService = themeService;

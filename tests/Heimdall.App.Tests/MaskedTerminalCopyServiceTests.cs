@@ -27,6 +27,10 @@ namespace Heimdall.App.Tests;
 /// </summary>
 public sealed class MaskedTerminalCopyServiceTests
 {
+    private static readonly TimeSpan WaitDeadline = TimeSpan.FromSeconds(10);
+
+    private static readonly TimeSpan WaitPoll = TimeSpan.FromMilliseconds(10);
+
     private sealed class Rig
     {
         public required LocalizationManager Localizer { get; init; }
@@ -202,11 +206,11 @@ public sealed class MaskedTerminalCopyServiceTests
 
     private static async Task WaitForAsync(Func<bool> condition)
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        var deadline = DateTime.UtcNow + WaitDeadline;
         while (!condition())
         {
             Assert.True(DateTime.UtcNow < deadline, "The condition was not met in time.");
-            await Task.Delay(10);
+            await Task.Delay(WaitPoll);
         }
     }
 }

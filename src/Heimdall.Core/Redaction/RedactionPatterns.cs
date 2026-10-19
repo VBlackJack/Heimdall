@@ -65,7 +65,9 @@ internal static partial class RedactionPatterns
     internal static partial Regex PrivateKeyMarker();
 
     [GeneratedRegex(
-        "Authorization:[ \\t]{0,16}(?:Bearer[ \\t]{1,16}(?<v>[A-Za-z0-9._~+/=-]{8," + MaxToken + "})|Basic[ \\t]{1,16}(?<v>[A-Za-z0-9+/=]{8," + MaxToken + "}))",
+        "Authorization:[ \\t]{0,16}(?:Bearer[ \\t]{1,16}(?<v>[A-Za-z0-9._~+/=-]{8," + MaxToken + "})|Basic[ \\t]{1,16}(?<v>[A-Za-z0-9+/=]{8," + MaxToken + "})"
+        + "|Token[ \\t]{1,16}(?<v>[A-Za-z0-9._~+/=-]{8," + MaxToken + "})"
+        + "|Digest[ \\t]{1,16}(?<v>[^\\r\\n]{1," + MaxValue + "}))",
         Insensitive,
         RedactionRule.MatchTimeoutMilliseconds)]
     internal static partial Regex AuthorizationHeader();

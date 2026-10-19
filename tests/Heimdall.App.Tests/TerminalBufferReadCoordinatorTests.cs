@@ -145,9 +145,92 @@ public sealed class TerminalBufferReadCoordinatorTests
         TerminalTextReadResult result = await read;
 
         Assert.Equal(TerminalTextReadStatus.Ok, result.Status);
-        Assert.Equal("line one\nline two", result.Text);
+        Assert.Equal("line two", result.Text);
         Assert.True(result.Truncated);
         Assert.False(coordinator.HasPendingRead);
+    }
+
+    /// <summary>
+    /// Producer: <c>TerminalBufferReadCoordinator.HandleReplyAsync</c>. A cut text starts mid-line
+    /// (<c>Passw|ord: hunter2</c> keeps <c>ord: hunter2</c>): that line is dropped host-side because
+    /// no masking rule could recognize a value whose key is gone.
+    /// </summary>
+    [Fact]
+    public async Task ReadAsync_DropsThePartialFirstLineOfATruncatedReply()
+    {
+        TerminalBufferReadCoordinator coordinator = new();
+        string? posted = null;
+
+        Task<TerminalTextReadResult> read = coordinator.ReadAsync(true, m => posted = m, LongTimeout, CancellationToken.None);
+        await coordinator.HandleReplyAsync(Reply(IdOf(posted!), truncated: true, "ord: hunter2\nrest"));
+        TerminalTextReadResult result = await read;
+
+        Assert.Equal("rest", result.Text);
+        Assert.DoesNotContain("hunter2", result.Text, StringComparison.Ordinal);
+        Assert.True(result.Truncated);
+    }
+
+    /// <summary>
+    /// A reply the page flagged for a headless first line (its head evicted from the scrollback)
+    /// uses the same flag as a size cut, so the same strip applies.
+    /// </summary>
+    [Fact]
+    public async Task ReadAsync_DropsAHeadlessFirstLineFlaggedByThePage()
+    {
+        TerminalBufferReadCoordinator coordinator = new();
+        string? posted = null;
+
+        Task<TerminalTextReadResult> read = coordinator.ReadAsync(true, m => posted = m, LongTimeout, CancellationToken.None);
+        await coordinator.HandleReplyAsync(Reply(IdOf(posted!), truncated: true, "tail of a wrapped line hunter2\nfirst whole line\nsecond"));
+        TerminalTextReadResult result = await read;
+
+        Assert.Equal("first whole line\nsecond", result.Text);
+    }
+
+    [Fact]
+    public async Task ReadAsync_LeavesAnUntruncatedReplyUntouched()
+    {
+        TerminalBufferReadCoordinator coordinator = new();
+        string? posted = null;
+
+        Task<TerminalTextReadResult> read = coordinator.ReadAsync(true, m => posted = m, LongTimeout, CancellationToken.None);
+        await coordinator.HandleReplyAsync(Reply(IdOf(posted!), truncated: false, "ord: hunter2\nrest"));
+        TerminalTextReadResult result = await read;
+
+        Assert.Equal("ord: hunter2\nrest", result.Text);
+        Assert.False(result.Truncated);
+    }
+
+    [Fact]
+    public async Task ReadAsync_EmptiesATruncatedReplyThatIsOnePartialLine()
+    {
+        TerminalBufferReadCoordinator coordinator = new();
+        string? posted = null;
+
+        Task<TerminalTextReadResult> read = coordinator.ReadAsync(true, m => posted = m, LongTimeout, CancellationToken.None);
+        await coordinator.HandleReplyAsync(Reply(IdOf(posted!), truncated: true, "ord: hunter2"));
+        TerminalTextReadResult result = await read;
+
+        Assert.Equal(TerminalTextReadStatus.Ok, result.Status);
+        Assert.Equal(string.Empty, result.Text);
+    }
+
+    /// <summary>
+    /// Producer: <c>TerminalTextReadResult.ToString</c>; the generated record member prints the
+    /// unmasked text into any log line or assertion message that formats the result.
+    /// </summary>
+    [Fact]
+    public void TerminalTextReadResult_ToStringNeverPrintsTheText()
+    {
+        const string secret = "hunter2-correct-horse";
+        TerminalTextReadResult result = new("password: " + secret, true, TerminalTextReadStatus.Ok);
+
+        string described = result.ToString();
+
+        Assert.DoesNotContain(secret, described, StringComparison.Ordinal);
+        Assert.Contains(nameof(TerminalTextReadStatus.Ok), described, StringComparison.Ordinal);
+        Assert.Contains("True", described, StringComparison.Ordinal);
+        Assert.Contains(result.Text.Length.ToString(CultureInfo.InvariantCulture), described, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -394,7 +394,8 @@ public sealed partial class SessionCoordinatorPreMountTests
                     connectionStateMachine,
                     hostKeyStore,
                     Heimdall.Core.Ssh.RejectingHostKeyVerifier.Instance,
-                    configManager));
+                    configManager),
+                new MaskedCopyTestSupport.RecordingClipboard());
 
             return new TestHarness(
                 rootPath,

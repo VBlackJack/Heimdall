@@ -91,6 +91,12 @@ public sealed class RedactionRuleControlsTests
     [InlineData(
         "authorization:bearer abcdef123456",
         "authorization:bearer [masked:authorization-header]")]
+    [InlineData(
+        "Authorization: Token abcdef123456",
+        "Authorization: Token [masked:authorization-header]")]
+    [InlineData(
+        "Authorization: Digest username=\"bob\", realm=\"x\", response=\"6629fae49393a05397450978507c4ef1\"",
+        "Authorization: Digest [masked:authorization-header]")]
     public void AuthorizationHeader_TokenIsMasked(string input, string expected)
     {
         Assert.Equal(expected, Mask(input));
@@ -101,6 +107,8 @@ public sealed class RedactionRuleControlsTests
     [InlineData("Visual Basic 6.0")]
     [InlineData("Basic auth enabled")]
     [InlineData("Authorization: Basic abc")]
+    [InlineData("Authorization: Token")]
+    [InlineData("Authorization: Digest")]
     public void AuthorizationHeader_UnrelatedText_Survives(string input)
     {
         Assert.Equal(input, Mask(input));
@@ -286,6 +294,7 @@ public sealed class RedactionRuleControlsTests
     [InlineData("bob@hostA:~$ ls", "bob@host-1:~$ ls")]
     [InlineData("curl https://web.example.com/x", "curl https://host-1/x")]
     [InlineData("a.b.example.org", "host-1")]
+    [InlineData("api.github.com", "host-1")]
     public void Pseudonyms_WhenEnabled_ReplaceAddressesAndHosts(string input, string expected)
     {
         Assert.Equal(expected, Pseudonymize(input));
@@ -305,6 +314,12 @@ public sealed class RedactionRuleControlsTests
     [InlineData("config.yaml")]
     [InlineData("Heimdall.Core.dll")]
     [InlineData("a.b.json")]
+    [InlineData("foo.tar.gz")]
+    [InlineData("app.min.js")]
+    [InlineData("libssl.so.3")]
+    [InlineData("backup.2026.sql.bak")]
+    [InlineData("site.min.css.map")]
+    [InlineData("server.cert.pem")]
     [InlineData("v2026.091401.1")]
     [InlineData("ip-1 host-1")]
     [InlineData("bob@host-1:~$")]

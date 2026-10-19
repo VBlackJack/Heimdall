@@ -336,12 +336,17 @@ Heimdall lit le texte de la session, masque les secrets qu'il reconnaît, et vou
 Ce que les règles masquent :
 
 - une clé privée, de sa ligne BEGIN à sa ligne END ;
-- la valeur d'un en-tête `Authorization: Bearer` ou `Authorization: Basic` ;
+- la valeur d'un en-tête `Authorization: Bearer`, `Basic`, `Token` ou `Digest` ;
 - le mot de passe dans une URL (`https://utilisateur:motdepasse@hôte/`) ;
 - un mot de passe donné sur une ligne de commande : `--password`, `sshpass -p`, `export ...PASSWORD=`, `PGPASSWORD=`, `MYSQL_PWD=`, et `-p` sur la famille de commandes mysql ;
 - ce qui a été tapé après une invite de mot de passe et réaffiché, y compris un mot de passe tapé dans un shell qui a répondu "command not found" ;
 - la valeur d'une clé dont le nom évoque un secret (`password`, `secret`, `token`, `api_key`, `access_key`, `private_key` et quelques autres) ;
 - les clés d'accès AWS, les jetons GitHub, les jetons Slack et les JSON Web Tokens.
+
+Les règles préfèrent masquer trop plutôt que pas assez : elles peuvent donc aussi masquer quelque chose qui n'est pas un secret :
+
+- après une invite `[sudo] password for bob:`, un mot isolé qui suit peut aussi être masqué, même si ce n'est qu'une commande ;
+- `mysql -u root -p mydb` peut aussi masquer le nom de base `mydb`, car la règle ne sait pas distinguer un mot de passe d'un nom de base.
 
 Une option est désactivée par défaut : **Masquer aussi les noms d'hôte et les adresses**. Elle remplace les adresses IPv4 par `ip-1`, `ip-2`... et les noms d'hôte (l'hôte des invites `utilisateur@hôte`, et les noms à au moins deux points) par `host-1`, `host-2`.... Une même adresse ou un même nom reçoit toujours le même pseudonyme dans une copie, ce qui garde le texte lisible.
 
@@ -356,7 +361,7 @@ Ce que la commande ne masque pas. Les règles sont des motifs, pas de la compré
 À savoir :
 
 - Rien ne quitte votre machine de lui-même. Le masquage s'exécute en local, n'utilise ni réseau ni service extérieur, et n'écrit rien sur le disque. Vous choisissez où coller le résultat.
-- Seuls les 4 derniers Mio de l'historique de défilement sont lus. Quand la sortie était plus longue, l'aperçu indique qu'elle a été coupée.
+- Seuls les 4 derniers Mio de l'historique de défilement sont lus. Quand la sortie était plus longue, l'aperçu indique qu'elle a été coupée, et la première ligne du reste est écartée parce qu'elle commence au milieu d'une ligne.
 - Si une règle met trop de temps sur le texte, Heimdall refuse de copier quoi que ce soit plutôt que de copier un texte qui pourrait encore contenir un secret.
 - Les journaux de session ne sont pas masqués. Cette fonction ne change que ce que vous copiez.
 
