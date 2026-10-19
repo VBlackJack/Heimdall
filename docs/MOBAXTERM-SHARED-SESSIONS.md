@@ -58,6 +58,9 @@ A remembered password belongs to one bastion (its host, port and login) or to on
 - If you use an external credential provider, its password comes first: a remembered password only fills what it leaves empty. For a shared session the provider is asked for the entry named after the session's **host**, not after the session's name: file your vault entries under the host name (for example `srv-app-01.corp.example`).
 - When **Windows Hello** is required to connect, it is asked before any remembered password is used.
 - Reopening sessions at startup and **Connect all** use remembered passwords but never ask: a session without one asks when you open it alone.
+- A shared SFTP session remembers its password per user, like an SSH session, with the same box and the same rules.
+- A Telnet session asks for its login and password in the terminal, which Heimdall does not remember.
+- A VNC session uses its own password prompt, or the external credential provider like any profile.
 - An RDP session asks for its password in the RDP window, which Heimdall does not remember. The password of its bastion is remembered like any other.
 
 In the settings, each source with remembered passwords shows **Forget saved passwords**. Removing a source also forgets its passwords. Nothing you type is ever written to a shared session, which stays read-only.
@@ -84,5 +87,11 @@ The report only informs: every session it lists is still loaded as the file desc
 
 ## 8. Known limits
 
-- Only SSH and RDP sessions are imported. FTP, SFTP, VNC and Telnet sessions of a MobaXterm file are not imported yet; they are listed as skipped in the import report.
+- Five session types are imported: SSH, RDP, SFTP, Telnet and VNC. Every other session of a MobaXterm file is listed as skipped in the import report, with its reason (section 7):
+  - **FTP**: not imported yet. A read-only shared session has no way to ask for its password, and a password kept in the vault must not travel over plain FTP.
+  - **WSL**: a Linux system on the computer that runs MobaXterm, so there is nothing to connect to.
+  - **Serial, Mosh, RSH, Xdmcp, Browser, Shell, File and S3**: not imported.
+  - **A Telnet or VNC session through an SSH jump host**: skipped, because Heimdall does not route these protocols through a jump host and a direct connection would go around the bastion.
+  - **A Telnet, VNC or SFTP session through a proxy**: skipped, because Heimdall does not use a proxy for these protocols and a direct connection would go around the proxy.
+- The remote start folder of an SFTP session is not carried over: the session opens in the default folder.
 - Shared sessions are read-only in Heimdall (section 3).
