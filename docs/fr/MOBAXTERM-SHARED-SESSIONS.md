@@ -61,7 +61,7 @@ Un mot de passe mémorisé appartient à un bastion (son hôte, son port et son 
 - Une session SFTP partagée mémorise son mot de passe par utilisateur, comme une session SSH, avec la même case et les mêmes règles.
 - Une session Telnet demande son identifiant et son mot de passe dans le terminal, que Heimdall ne mémorise pas.
 - Une session VNC utilise sa propre demande de mot de passe, ou le fournisseur d'identifiants externe comme tout profil.
-- Une session RDP demande son mot de passe dans la fenêtre RDP, que Heimdall ne mémorise pas. Le mot de passe de son bastion est mémorisé comme les autres.
+- Une session RDP demande son mot de passe dans la fenêtre RDP (l'invite Sécurité Windows, qui propose aussi la carte à puce et Windows Hello Entreprise là où le serveur les autorise), et Heimdall ne le mémorise pas. Pour ne pas le retaper, rangez le mot de passe dans le fournisseur d'identifiants externe sous le nom d'hôte de la session, comme expliqué plus haut : Heimdall le saisit alors à votre place. Le mot de passe de son bastion est mémorisé comme les autres.
 
 Dans les paramètres, chaque source qui a des mots de passe mémorisés affiche **Oublier les mots de passe enregistrés**. Supprimer une source oublie aussi ses mots de passe. Rien de ce que vous saisissez n'est jamais écrit dans une session partagée, qui reste en lecture seule.
 
@@ -95,5 +95,6 @@ Le rapport ne fait qu'informer : chaque session qu'il liste reste chargée telle
   - **Une session Telnet, VNC ou SFTP passant par un proxy** : ignorée, car Heimdall n'utilise pas de proxy pour ces protocoles et une connexion directe contournerait le proxy.
 - Le proxy d'une session SSH ou RDP n'est pas lu : une telle session est importée en connexion directe ou par son rebond.
 - Une session Telnet demande son identifiant dans le terminal : aucun utilisateur n'est importé pour elle.
+- Les outils réseau (ping, scan de ports et les autres outils qui peuvent passer par une passerelle) passent uniquement par vos propres passerelles SSH des paramètres, pas par les bastions qu'une source partagée définit. Pour joindre depuis un outil les hôtes derrière un bastion partagé, définissez ce bastion comme l'une de vos passerelles.
 - Le dossier de départ distant d'une session SFTP n'est pas repris : la session s'ouvre dans le dossier par défaut.
 - Les sessions partagées sont en lecture seule dans Heimdall (section 3).
