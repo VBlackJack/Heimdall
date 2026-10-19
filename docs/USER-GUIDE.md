@@ -28,9 +28,10 @@ local shell. Everything opens in a tab inside one window.
 3. [Where your passwords are kept](#where-your-passwords-are-kept)
 4. [Transferring files](#transferring-files)
 5. [When a connection fails](#when-a-connection-fails)
-6. [Sending a log when you need help](#sending-a-log-when-you-need-help)
-7. [Updating](#updating)
-8. [Shortcuts worth knowing](#shortcuts-worth-knowing)
+6. [Sharing what a session printed](#sharing-what-a-session-printed)
+7. [Sending a log when you need help](#sending-a-log-when-you-need-help)
+8. [Updating](#updating)
+9. [Shortcuts worth knowing](#shortcuts-worth-knowing)
 
 ---
 
@@ -291,6 +292,47 @@ access only, not that an RDP, database or other application login will work.
 
 ---
 
+## Sharing what a session printed
+
+When you need to paste what a terminal printed into a ticket, a chat or an email, use **Copy output, secrets masked**. It works on SSH, Telnet, WinRM and the embedded local shell. It does not exist for RDP, VNC, SFTP, FTP or web tabs, which have no terminal text to read.
+
+Open it in any of three ways:
+
+- press **Ctrl+Shift+M** in the terminal tab;
+- right-click the session tab and choose **Copy output, secrets masked...**;
+- press **Ctrl+K** and run the **Copy output, secrets masked** command.
+
+Heimdall reads the text of the session, hides the secrets it recognizes, and shows you the result in a preview. Each hidden value becomes `[masked:<rule>]`, and the preview lists how many values each rule hid. Nothing is copied until you press **Copy**. **Cancel** copies nothing.
+
+What the rules hide:
+
+- a private key, from its BEGIN line to its END line;
+- an `Authorization: Bearer` or `Authorization: Basic` header value;
+- the password in a URL (`https://user:password@host/`);
+- a password given on a command line: `--password`, `sshpass -p`, `export ...PASSWORD=`, `PGPASSWORD=`, `MYSQL_PWD=`, and `-p` on the mysql family of commands;
+- what was typed after a password prompt and echoed back, including a password typed into a shell that answered "command not found";
+- the value of a key named like a secret (`password`, `secret`, `token`, `api_key`, `access_key`, `private_key` and a few more);
+- AWS access keys, GitHub tokens, Slack tokens and JSON Web Tokens.
+
+One option is off by default: **Also mask host names and addresses**. It replaces IPv4 addresses with `ip-1`, `ip-2`... and host names (the host in `user@host` prompts, and names with at least two dots) with `host-1`, `host-2`.... The same address or name always gets the same pseudonym inside one copy, so the text stays readable.
+
+What it does not hide. The rules are patterns, not understanding, so read the preview before you paste it:
+
+- user names, file paths, and anything else that is not on the list above;
+- a password typed where no rule can see it, for example in the middle of a sentence or into an editor;
+- a private key whose BEGIN and END lines have both scrolled out of what was read;
+- host names and addresses, unless you tick the option above;
+- anything a rule does not recognize, such as a secret in an unusual format.
+
+Good to know:
+
+- Nothing leaves your machine on its own. The masking runs locally, uses no network and no outside service, and writes nothing to disk. You choose where to paste the result.
+- Only the last 4 MiB of the scrollback are read. When the output was longer, the preview says that it was cut.
+- If a rule takes too long on the text, Heimdall refuses to copy anything rather than copy text that might still hold a secret.
+- Session logs are not masked. This feature only changes what you copy.
+
+---
+
 ## Sending a log when you need help
 
 Heimdall keeps a diagnostic log. When you report a problem, that log is the single most useful
@@ -351,6 +393,7 @@ Press **F1** at any time for the full list. The ones that pay for themselves imm
 | `Ctrl+S` | On the Settings tab, save the settings when there are changes to save |
 | `F11` | Fullscreen, `Escape` to leave it |
 | `Ctrl+Shift+T` | Switch the left panel between Sessions and Tools |
+| `Ctrl+Shift+M` | In a terminal tab, copy its output with secrets masked, after a preview |
 | `Ctrl+Tab` | Next tab, `Ctrl+Shift+Tab` for the previous one; a collapsed folder is skipped |
 | `Ctrl+PgDn` / `Ctrl+PgUp` | Next or previous tab, from a terminal too; inside an RDP session they go to the remote computer |
 | `Ctrl+Shift+PgDn` / `Ctrl+Shift+PgUp` | Move the open tab right or left, within its pinned block and its folder |

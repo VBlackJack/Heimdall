@@ -67,6 +67,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Des événements de sécurité typés en cours de session distinguent les attaques sur la clé d'hôte des déconnexions ordinaires et suppriment la reconnexion automatique SSH en cas de signal MITM
 - Surcouche de reconnexion automatique en cas de déconnexion inattendue (SSH et RDP)
 - Le plantage ou le redémarrage d'un processus auxiliaire GPU ou utilitaire de WebView2 (réinitialisation du pilote graphique, changement d'affichage) laisse tourner les terminaux ouverts ; seule la perte du processus navigateur ou de rendu déclenche le repli, et la transcription et les étapes d'attente des macros continuent sur la connexion qui reste derrière
+- **Copier la sortie, secrets masqués** (Ctrl+Shift+M, menu de l'onglet de session, palette Ctrl+K) : lit le texte d'une session SSH, Telnet, WinRM ou shell local (4 derniers Mio de l'historique), masque clés privées, en-têtes d'autorisation, identifiants d'URL, mots de passe de ligne de commande et d'invite, secrets clé-valeur et jetons AWS, GitHub, Slack et JWT sous la forme `[masked:<rule-id>]`, et affiche un aperçu avec le compte par règle et un pseudonyme stable optionnel pour les adresses IPv4 et les noms d'hôte. Ne copie qu'au clic sur **Copier** ; fonctionne hors ligne, n'écrit rien sur le disque, refuse de copier si une règle dépasse son délai ; les journaux de session ne sont pas masqués
 
 ### VNC
 - Visionneuse VNC embarquée via noVNC + WebView2

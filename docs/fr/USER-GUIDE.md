@@ -29,9 +29,10 @@ web et un shell local. Tout s'ouvre dans un onglet, au sein d'une seule fenêtre
 3. [Où vivent vos mots de passe](#où-vivent-vos-mots-de-passe)
 4. [Transférer des fichiers](#transférer-des-fichiers)
 5. [Quand une connexion échoue](#quand-une-connexion-échoue)
-6. [Envoyer un journal quand vous avez besoin d'aide](#envoyer-un-journal-quand-vous-avez-besoin-daide)
-7. [Mettre à jour](#mettre-à-jour)
-8. [Les raccourcis qui valent la peine](#les-raccourcis-qui-valent-la-peine)
+6. [Partager ce qu'une session a affiché](#partager-ce-quune-session-a-affiché)
+7. [Envoyer un journal quand vous avez besoin d'aide](#envoyer-un-journal-quand-vous-avez-besoin-daide)
+8. [Mettre à jour](#mettre-à-jour)
+9. [Les raccourcis qui valent la peine](#les-raccourcis-qui-valent-la-peine)
 
 ---
 
@@ -320,6 +321,47 @@ RDP, de base de données ou d'une autre application.
 
 ---
 
+## Partager ce qu'une session a affiché
+
+Quand vous devez coller dans un ticket, une discussion ou un e-mail ce qu'un terminal a affiché, utilisez **Copier la sortie, secrets masqués**. La commande fonctionne sur SSH, Telnet, WinRM et le shell local intégré. Elle n'existe pas pour les onglets RDP, VNC, SFTP, FTP ou web, qui n'ont pas de texte de terminal à lire.
+
+Trois façons de l'ouvrir :
+
+- appuyer sur **Ctrl+Shift+M** dans l'onglet du terminal ;
+- faire un clic droit sur l'onglet de la session et choisir **Copier la sortie, secrets masqués...** ;
+- appuyer sur **Ctrl+K** et lancer la commande **Copier la sortie, secrets masqués**.
+
+Heimdall lit le texte de la session, masque les secrets qu'il reconnaît, et vous montre le résultat dans un aperçu. Chaque valeur masquée devient `[masked:<règle>]`, et l'aperçu indique combien de valeurs chaque règle a masquées. Rien n'est copié tant que vous n'appuyez pas sur **Copier**. **Annuler** ne copie rien.
+
+Ce que les règles masquent :
+
+- une clé privée, de sa ligne BEGIN à sa ligne END ;
+- la valeur d'un en-tête `Authorization: Bearer` ou `Authorization: Basic` ;
+- le mot de passe dans une URL (`https://utilisateur:motdepasse@hôte/`) ;
+- un mot de passe donné sur une ligne de commande : `--password`, `sshpass -p`, `export ...PASSWORD=`, `PGPASSWORD=`, `MYSQL_PWD=`, et `-p` sur la famille de commandes mysql ;
+- ce qui a été tapé après une invite de mot de passe et réaffiché, y compris un mot de passe tapé dans un shell qui a répondu "command not found" ;
+- la valeur d'une clé dont le nom évoque un secret (`password`, `secret`, `token`, `api_key`, `access_key`, `private_key` et quelques autres) ;
+- les clés d'accès AWS, les jetons GitHub, les jetons Slack et les JSON Web Tokens.
+
+Une option est désactivée par défaut : **Masquer aussi les noms d'hôte et les adresses**. Elle remplace les adresses IPv4 par `ip-1`, `ip-2`... et les noms d'hôte (l'hôte des invites `utilisateur@hôte`, et les noms à au moins deux points) par `host-1`, `host-2`.... Une même adresse ou un même nom reçoit toujours le même pseudonyme dans une copie, ce qui garde le texte lisible.
+
+Ce que la commande ne masque pas. Les règles sont des motifs, pas de la compréhension : relisez l'aperçu avant de coller.
+
+- les noms d'utilisateur, les chemins de fichiers, et tout ce qui n'est pas dans la liste ci-dessus ;
+- un mot de passe tapé là où aucune règle ne le voit, par exemple au milieu d'une phrase ou dans un éditeur ;
+- une clé privée dont les lignes BEGIN et END ont toutes les deux défilé hors de ce qui a été lu ;
+- les noms d'hôte et les adresses, sauf si vous cochez l'option ci-dessus ;
+- tout ce qu'aucune règle ne reconnaît, comme un secret dans un format inhabituel.
+
+À savoir :
+
+- Rien ne quitte votre machine de lui-même. Le masquage s'exécute en local, n'utilise ni réseau ni service extérieur, et n'écrit rien sur le disque. Vous choisissez où coller le résultat.
+- Seuls les 4 derniers Mio de l'historique de défilement sont lus. Quand la sortie était plus longue, l'aperçu indique qu'elle a été coupée.
+- Si une règle met trop de temps sur le texte, Heimdall refuse de copier quoi que ce soit plutôt que de copier un texte qui pourrait encore contenir un secret.
+- Les journaux de session ne sont pas masqués. Cette fonction ne change que ce que vous copiez.
+
+---
+
 ## Envoyer un journal quand vous avez besoin d'aide
 
 Heimdall tient un journal de diagnostic. Quand vous signalez un problème, ce journal est la chose
@@ -384,6 +426,7 @@ Appuyez sur **F1** à tout moment pour la liste complète. Ceux qui se rentabili
 | `Ctrl+S` | Dans l'onglet Paramètres, enregistrer les paramètres quand il y a des modifications à enregistrer |
 | `F11` | Plein écran, `Echap` pour en sortir |
 | `Ctrl+Shift+T` | Basculer le panneau gauche entre Sessions et Outils |
+| `Ctrl+Shift+M` | Dans un onglet de terminal, copier sa sortie avec les secrets masqués, après un aperçu |
 | `Ctrl+Tab` | Onglet suivant, `Ctrl+Shift+Tab` pour le précédent ; un dossier replié est sauté |
 | `Ctrl+PgDn` / `Ctrl+PgUp` | Onglet suivant ou précédent, depuis un terminal aussi ; dans une session RDP, ils vont à l'ordinateur distant |
 | `Ctrl+Shift+PgDn` / `Ctrl+Shift+PgUp` | Déplacer l'onglet ouvert vers la droite ou la gauche, dans son bloc épinglé et son dossier |

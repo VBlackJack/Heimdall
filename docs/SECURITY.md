@@ -982,6 +982,10 @@ an end-of-options marker is a property of that server's utilities, not something
 and not a universal guarantee. A utility that rejects these forms makes the command fail, and the
 caller refuses: there is no fallback to a primitive that could replace the destination.
 
+### Masked copy of terminal output
+
+**Copy output, secrets masked** (Ctrl+Shift+M) copies the text of a terminal session after pattern-based masking, so it can be pasted into a ticket or a chat. It runs entirely on the machine: no network, no outside service, nothing written to disk. It fails closed: if a rule times out, nothing is copied, and the text reaches the clipboard only when you press **Copy** in the preview. The rules are patterns and miss what they do not describe (user names, paths, a password typed where no prompt precedes it); session logs are not masked.
+
 ## Security testing
 
 - Unit tests for TOFU verification:

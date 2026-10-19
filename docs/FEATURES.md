@@ -67,6 +67,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Typed mid-session security events distinguish host-key attacks from ordinary disconnects and suppress SSH auto-reconnect on MITM signals
 - Auto-reconnect overlay on unexpected disconnect (SSH and RDP)
 - A crash or restart of a WebView2 GPU or utility helper process (a graphics driver reset, a display change) leaves open terminals running; only the loss of the browser or renderer process falls back, and the transcript and macro expect steps keep running on the connection behind it
+- **Copy output, secrets masked** (Ctrl+Shift+M, session tab menu, Ctrl+K palette): reads the text of an SSH, Telnet, WinRM or local shell session (last 4 MiB of scrollback), masks private keys, authorization headers, URL credentials, command-line and prompt passwords, key-value secrets and AWS, GitHub, Slack and JWT tokens as `[masked:<rule-id>]`, and shows a preview with the count per rule and an optional stable pseudonym for IPv4 addresses and host names. Copies only on **Copy**; runs offline, writes nothing to disk, refuses to copy if a rule times out; session logs are not masked
 
 ### VNC
 - Embedded VNC viewer via noVNC + WebView2
