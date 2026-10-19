@@ -60,7 +60,7 @@ Un mot de passe mémorisé appartient à un bastion (son hôte, son port et son 
 - La réouverture des sessions au démarrage et **Tout connecter** utilisent les mots de passe mémorisés mais ne demandent jamais rien : une session qui n'en a pas le demande quand vous l'ouvrez seule.
 - Une session SFTP partagée mémorise son mot de passe par utilisateur, comme une session SSH, avec la même case et les mêmes règles.
 - Une session Telnet demande son identifiant et son mot de passe dans le terminal, que Heimdall ne mémorise pas.
-- Une session VNC utilise sa propre demande de mot de passe, ou le fournisseur d'identifiants externe comme tout profil.
+- Une session VNC n'a pas de demande de mot de passe dans Heimdall, et une session partagée ne peut pas en stocker. Si le serveur VNC demande un mot de passe, rangez-le dans le fournisseur d'identifiants externe sous le nom d'hôte de la session : Heimdall le saisit alors à votre place. Sans lui, la session s'arrête sur "Ce serveur VNC demande un mot de passe".
 - Une session RDP demande son mot de passe dans la fenêtre RDP (l'invite Sécurité Windows, qui propose aussi la carte à puce et Windows Hello Entreprise là où le serveur les autorise), et Heimdall ne le mémorise pas. Pour ne pas le retaper, rangez le mot de passe dans le fournisseur d'identifiants externe sous le nom d'hôte de la session, comme expliqué plus haut : Heimdall le saisit alors à votre place. Le mot de passe de son bastion est mémorisé comme les autres.
 
 Dans les paramètres, chaque source qui a des mots de passe mémorisés affiche **Oublier les mots de passe enregistrés**. Supprimer une source oublie aussi ses mots de passe. Rien de ce que vous saisissez n'est jamais écrit dans une session partagée, qui reste en lecture seule.

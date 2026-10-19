@@ -60,7 +60,7 @@ A remembered password belongs to one bastion (its host, port and login) or to on
 - Reopening sessions at startup and **Connect all** use remembered passwords but never ask: a session without one asks when you open it alone.
 - A shared SFTP session remembers its password per user, like an SSH session, with the same box and the same rules.
 - A Telnet session asks for its login and password in the terminal, which Heimdall does not remember.
-- A VNC session uses its own password prompt, or the external credential provider like any profile.
+- A VNC session has no password prompt in Heimdall, and a shared session cannot store one. If the VNC server asks for a password, file it in the external credential provider under the session's host name: Heimdall then fills it in. Without it, the session stops with "This VNC server asks for a password".
 - An RDP session asks for its password in the RDP window (the Windows Security prompt, which also offers smart card and Windows Hello for Business where the server allows them), and Heimdall does not remember it. To avoid retyping it, file the password in the external credential provider under the session's host name, as above: Heimdall then fills it in. The password of its bastion is remembered like any other.
 
 In the settings, each source with remembered passwords shows **Forget saved passwords**. Removing a source also forgets its passwords. Nothing you type is ever written to a shared session, which stays read-only.
