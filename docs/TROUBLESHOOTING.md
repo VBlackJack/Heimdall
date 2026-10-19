@@ -660,7 +660,7 @@ Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Securi
 
 **Solution**:
 1. Run Heimdall as Administrator if TFTP is needed
-2. The HTTP server (port 8080) works without elevation
+2. The HTTP server (port 8080) starts without elevation, but then listens on localhost only: Windows grants the all-interfaces prefix only to an elevated process or to a user holding a URL ACL (`netsh http add urlacl url=http://+:8080/ user=<user>`, run once as Administrator). The share log says "localhost-only fallback" in that case
 3. For non-elevated usage, TFTP is not available (this is a Windows security restriction)
 
 **Files**: `Services/EphemeralFileServer.cs`
