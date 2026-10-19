@@ -429,6 +429,114 @@ public class EphemeralFileServerTests : IDisposable
         }
     }
 
+    // ── HTTP concurrency ──────────────────────────────────────────────
+
+    // Large enough that the server cannot push it into the socket buffers of a client
+    // that never reads, so its handler stays inside the download.
+    private const long StalledDownloadFileBytes = 256L * 1024 * 1024;
+    private const int StalledClientReceiveBufferBytes = 4096;
+    private const int SecondRequestBoundMs = 5000;
+    private const int ShutdownSlackMs = 1500;
+
+    /// <summary>
+    /// Opens an authenticated download of <paramref name="path"/> and reads only the first
+    /// chunk of the response, proving the server is inside the handler, then stops reading.
+    /// </summary>
+    private static async Task<TcpClient> OpenStalledDownloadAsync(int port, string path, string accessToken)
+    {
+        TcpClient client = new() { ReceiveBufferSize = StalledClientReceiveBufferBytes };
+        await client.ConnectAsync(IPAddress.Loopback, port);
+
+        NetworkStream stream = client.GetStream();
+        string request =
+            $"GET {path} HTTP/1.1\r\n" +
+            $"Host: localhost:{port}\r\n" +
+            $"Authorization: Bearer {accessToken}\r\n" +
+            "Connection: close\r\n\r\n";
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(request));
+
+        byte[] firstChunk = new byte[StalledClientReceiveBufferBytes];
+        int read = await stream.ReadAsync(firstChunk).AsTask().WaitAsync(TimeSpan.FromMilliseconds(SecondRequestBoundMs));
+        Assert.True(read > 0);
+        Assert.StartsWith("HTTP/1.1 200", Encoding.ASCII.GetString(firstChunk, 0, read), StringComparison.Ordinal);
+        return client;
+    }
+
+    private string CreateStalledDownloadFile()
+    {
+        string bigPath = Path.Combine(_testDir, "big.bin");
+        using (FileStream big = new(bigPath, FileMode.CreateNew, FileAccess.Write))
+        {
+            big.SetLength(StalledDownloadFileBytes);
+        }
+
+        return bigPath;
+    }
+
+    [Fact]
+    public async Task Http_Stalled_Download_Does_Not_Block_Other_Requests()
+    {
+        int httpPort = GetFreeTcpPort();
+        CreateStalledDownloadFile();
+        await File.WriteAllTextAsync(Path.Combine(_testDir, "small.txt"), "small-ok");
+
+        try
+        {
+            await _server.StartHttpServerAsync(_testDir, httpPort);
+        }
+        catch (Exception ex) when (IsPortException(ex))
+        {
+            return; // skip: port unavailable in this environment
+        }
+
+        try
+        {
+            using TcpClient stalled = await OpenStalledDownloadAsync(httpPort, "/big.bin", _server.AccessToken);
+
+            Task<(HttpStatusCode StatusCode, string Body)> second =
+                SendRawAuthenticatedGetAsync(httpPort, "/small.txt", _server.AccessToken);
+            Task finished = await Task.WhenAny(second, Task.Delay(SecondRequestBoundMs));
+
+            Assert.True(
+                finished == second,
+                $"A second request did not complete within {SecondRequestBoundMs} ms while another download was stalled.");
+            (HttpStatusCode statusCode, string body) = await second;
+            Assert.Equal(HttpStatusCode.OK, statusCode);
+            Assert.Equal("small-ok", body);
+        }
+        finally
+        {
+            await _server.StopHttpServerAsync();
+        }
+    }
+
+    [Fact]
+    public async Task StopHttpServerAsync_Finishes_Within_Timeout_With_A_Stalled_Download()
+    {
+        int httpPort = GetFreeTcpPort();
+        CreateStalledDownloadFile();
+
+        try
+        {
+            await _server.StartHttpServerAsync(_testDir, httpPort);
+        }
+        catch (Exception ex) when (IsPortException(ex))
+        {
+            return; // skip: port unavailable in this environment
+        }
+
+        using TcpClient stalled = await OpenStalledDownloadAsync(httpPort, "/big.bin", _server.AccessToken);
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        await _server.StopHttpServerAsync();
+        stopwatch.Stop();
+
+        Assert.False(_server.IsHttpRunning);
+        Assert.True(
+            stopwatch.ElapsedMilliseconds < _server.ShutdownTimeoutMs + ShutdownSlackMs,
+            $"StopHttpServerAsync took {stopwatch.ElapsedMilliseconds} ms.");
+    }
+
     // ── TFTP lifecycle ────────────────────────────────────────────────
 
     [Fact]

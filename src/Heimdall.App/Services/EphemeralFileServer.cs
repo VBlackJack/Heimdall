@@ -42,6 +42,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     private const int TftpTimeout = 5000;
     private const int TftpMaxRetries = 3;
     private const int MaxConcurrentTftpTransfers = 8;
+    private const int MaxConcurrentHttpRequests = 8;
 
     // TFTP opcodes (RFC 1350)
     private const ushort OpcodeRrq = 1;
@@ -270,33 +271,64 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
 
     private async Task HttpListenLoop(CancellationToken token)
     {
+        // Each request runs on its own task so one slow download cannot hold every other
+        // request. The semaphore bounds how many run at once: while it is exhausted the loop
+        // stops accepting and HTTP.sys queues the waiting requests.
+        using SemaphoreSlim requestSlots = new(MaxConcurrentHttpRequests, MaxConcurrentHttpRequests);
+        List<Task> inFlight = [];
+
         while (!token.IsCancellationRequested && _httpListener is { IsListening: true })
         {
+            try
+            {
+                await requestSlots.WaitAsync(token);
+            }
+            catch (OperationCanceledException) { break; }
+
             HttpListenerContext? context = null;
             try
             {
                 context = await _httpListener.GetContextAsync().WaitAsync(token);
             }
-            catch (OperationCanceledException) { break; }
-            catch (ObjectDisposedException) { break; }
-            catch (HttpListenerException) { break; }
+            catch (OperationCanceledException) { requestSlots.Release(); break; }
+            catch (ObjectDisposedException) { requestSlots.Release(); break; }
+            catch (HttpListenerException) { requestSlots.Release(); break; }
 
-            if (context is null) continue;
+            if (context is null)
+            {
+                requestSlots.Release();
+                continue;
+            }
 
+            inFlight.RemoveAll(task => task.IsCompleted);
+            inFlight.Add(ServeHttpContextAsync(context, requestSlots));
+        }
+
+        // Stopping the listener aborts in-flight responses, so their handlers end quickly.
+        // Waiting for them keeps the semaphore alive until the last one releases its slot.
+        await Task.WhenAll(inFlight);
+    }
+
+    private async Task ServeHttpContextAsync(HttpListenerContext context, SemaphoreSlim requestSlots)
+    {
+        try
+        {
+            await Task.Yield();
+            await HandleHttpRequest(context);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error($"HTTP request error: {ex.Message}");
             try
             {
-                await HandleHttpRequest(context);
+                context.Response.StatusCode = 500;
+                context.Response.Close();
             }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Error($"HTTP request error: {ex.Message}");
-                try
-                {
-                    context.Response.StatusCode = 500;
-                    context.Response.Close();
-                }
-                catch (Exception closeEx) { Core.Logging.FileLogger.Warn($"[EphemeralFileServer] HTTP error response close: {closeEx.Message}"); }
-            }
+            catch (Exception closeEx) { Core.Logging.FileLogger.Warn($"[EphemeralFileServer] HTTP error response close: {closeEx.Message}"); }
+        }
+        finally
+        {
+            requestSlots.Release();
         }
     }
 
