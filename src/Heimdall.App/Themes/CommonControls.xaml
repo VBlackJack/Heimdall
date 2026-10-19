@@ -42,8 +42,12 @@
     <sys:Double x:Key="SettingsRailWidth">210</sys:Double>
     <Thickness x:Key="SettingsRailSelectedBar">3,0,0,0</Thickness>
     <!-- A line under a rail control that belongs to its content column, not to the rail: the rail
-         width plus the margin and card padding the section text starts at. -->
-    <Thickness x:Key="SettingsRailFooterMargin">250,8,0,12</Thickness>
+         width plus the inset, margin and card padding the section text starts at. -->
+    <Thickness x:Key="SettingsRailFooterMargin">258,8,0,12</Thickness>
+    <!-- The gap between the rail and the open section, and the widest the section grows: the
+         section text width plus the left and right margins of SettingsTabContentMargin. -->
+    <Thickness x:Key="SettingsRailContentInset">8,0,0,0</Thickness>
+    <sys:Double x:Key="SettingsRailContentMaxWidth">940</sys:Double>
     <!-- How tall a settings list grows before it scrolls. A section holds little else, so a
          trust list gets most of the height; a list of a few entries above an edit panel gets less. -->
     <sys:Double x:Key="SettingsListMaxHeight">440</sys:Double>
@@ -1148,6 +1152,7 @@
                                     CornerRadius="0,0,12,12"
                                     Padding="12">
                                 <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  HorizontalAlignment="Stretch"
                                                   Margin="{TemplateBinding Padding}"
                                                   ContentSource="SelectedContent"
                                                   SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
@@ -1386,11 +1391,26 @@
                                             KeyboardNavigation.DirectionalNavigation="Cycle"/>
                             </ScrollViewer>
                         </Border>
-                        <ContentPresenter x:Name="PART_SelectedContentHost"
-                                          Grid.Column="1"
-                                          Margin="{TemplateBinding Padding}"
-                                          ContentSource="SelectedContent"
-                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        <!-- The open section sits on the window background, so its cards stand out
+                             from it; on the tab's own card colour they did not. -->
+                        <Border Grid.Column="1"
+                                Margin="{StaticResource SettingsRailContentInset}"
+                                Background="{DynamicResource BackgroundBrush}"
+                                CornerRadius="{StaticResource CornerRadiusLg}">
+                            <!-- One star column capped at the section width: every section gets the
+                                 same width and stays left against the rail. A capped stretch alone
+                                 would centre the section in a wide window. -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsRailContentMaxWidth}"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  HorizontalAlignment="Stretch"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  ContentSource="SelectedContent"
+                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                            </Grid>
+                        </Border>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -1429,7 +1449,6 @@
         <Setter Property="MinHeight" Value="34"/>
         <Setter Property="Padding" Value="12,7"/>
         <Setter Property="Margin" Value="0,0,0,2"/>
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TabItem}">

@@ -217,6 +217,38 @@ public sealed class SettingsLayoutOrderGuardTests
         Assert.Equal("Mw_SettingsAdvancedSubTabCmdLibSync", section);
     }
 
+    /// <summary>
+    /// Every section of the rail takes the same width, whatever it holds.
+    /// </summary>
+    /// <remarks>
+    /// A section sized itself to its content: a scroll viewer that may scroll sideways measures
+    /// its content at infinite width, and the rail item style left-aligned the open section, so
+    /// Devices was a narrow card and Tools a wide one. A section neither scrolls sideways nor
+    /// inherits a left alignment from its rail entry.
+    /// </remarks>
+    [Fact]
+    public void EveryRailSectionTakesTheSameWidth()
+    {
+        List<XElement> sections = SettingsRoot().Descendants()
+            .Where(element => element.Name.LocalName == "TabItem"
+                && element.Attribute("Style")?.Value == "{StaticResource SettingsRailTabItemStyle}")
+            .ToList();
+
+        Assert.True(sections.Count >= 25, $"only {sections.Count} rail sections found; the scan is not reading the settings");
+        Assert.All(sections, section =>
+        {
+            XElement viewer = section.Elements().Single(element => element.Name.LocalName == "ScrollViewer");
+            Assert.Equal("Disabled", viewer.Attribute("HorizontalScrollBarVisibility")?.Value);
+        });
+
+        XDocument theme = XDocument.Load(
+            Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "Themes", "CommonControls.xaml"));
+        XElement itemStyle = theme.Descendants().Single(element => element.Attribute(Xaml + "Key")?.Value == "SettingsRailTabItemStyle");
+        Assert.DoesNotContain(
+            itemStyle.Elements().Where(element => element.Name.LocalName == "Setter"),
+            setter => setter.Attribute("Property")?.Value == "HorizontalContentAlignment");
+    }
+
     private static XElement SettingsRoot()
     {
         XDocument markup = XDocument.Load(

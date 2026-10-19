@@ -2925,7 +2925,7 @@
                             <TabItem x:Name="Mw_SettingsGeneralSubTabAppearance"
                                      Header="{loc:Translate SettingsGeneralSubTabAppearance}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -3033,7 +3033,7 @@
                             <TabItem x:Name="Mw_SettingsGeneralSubTabBehavior"
                                      Header="{loc:Translate SettingsGeneralSubTabBehavior}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -3063,7 +3063,7 @@
                             <TabItem x:Name="Mw_SettingsGeneralSubTabUpdates"
                                      Header="{loc:Translate SettingsGeneralSubTabUpdates}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -3158,7 +3158,7 @@
                             <TabItem x:Name="Mw_SettingsGeneralSubTabFiles"
                                      Header="{loc:Translate SettingsGeneralSubTabFiles}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Settings file: preferences out and in, never secrets. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -3297,7 +3297,7 @@
                             <TabItem x:Name="Mw_SettingsGeneralSubTabSharedSources"
                                      Header="{loc:Translate SettingsGeneralSubTabSharedSources}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Shared session sources: MobaXterm files other people edit, listed read-only in the
                                      tree. The status column says what the last read found. -->
@@ -3466,7 +3466,7 @@
                             <TabItem x:Name="Mw_SettingsGeneralSubTabOnboarding"
                                      Header="{loc:Translate SettingsGeneralSubTabOnboarding}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Replaying the tour is the only way back into it. One reflex
                                      Escape used to end it permanently: Skip and Escape both call
@@ -3620,7 +3620,7 @@
                             <TabItem x:Name="Mw_SettingsSshSubTabConnection"
                                      Header="{loc:Translate SettingsSshSubTabConnection}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
@@ -3712,7 +3712,7 @@
                             <TabItem x:Name="Mw_SettingsSshSubTabSession"
                                      Header="{loc:Translate SettingsSshSubTabSession}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
@@ -3781,7 +3781,7 @@
                             <TabItem x:Name="Mw_SettingsSshSubTabSftpX11"
                                      Header="{loc:Translate SettingsSshSubTabSftpX11}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
@@ -3828,7 +3828,7 @@
                             <TabItem x:Name="Mw_SettingsSshSubTabHostKeys"
                                      Header="{loc:Translate SettingsSshSubTabHostKeys}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -4013,7 +4013,7 @@
                             <TabItem x:Name="Mw_SettingsSshSubTabGateways"
                                      Header="{loc:Translate SettingsSshSubTabGateways}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
@@ -4106,7 +4106,7 @@
                                 <TabItem x:Name="Mw_SettingsRdpSubTabDisplayAudio"
                                          Header="{loc:Translate SettingsRdpSubTabDisplayAudio}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
@@ -4207,7 +4207,7 @@
                                 <TabItem x:Name="Mw_SettingsRdpSubTabDevices"
                                          Header="{loc:Translate SettingsRdpSubTabDevices}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
@@ -4238,7 +4238,7 @@
                                 <TabItem x:Name="Mw_SettingsRdpSubTabPerformance"
                                          Header="{loc:Translate SettingsRdpSubTabPerformance}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
@@ -4290,7 +4290,7 @@
                                 <TabItem x:Name="Mw_SettingsRdpSubTabBehavior"
                                          Header="{loc:Translate SettingsRdpSubTabBehavior}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
@@ -4412,7 +4412,7 @@
                                 <TabItem x:Name="Mw_SettingsRdpSubTabCertificates"
                                          Header="{loc:Translate SettingsRdpSubTabCertificates}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Connection security sits with the certificate trust it governs, not under
                                      Performance, where NLA and strict server authentication used to be. -->
@@ -4653,7 +4653,7 @@
                             <TabItem x:Name="Mw_SettingsSecuritySubTabOverview"
                                      Header="{loc:Translate SettingsSecuritySubTabOverview}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Security posture: the security-relevant choices of the whole panel, one
                                      line each, as they stand now including unsaved edits. Which state is
@@ -4711,7 +4711,7 @@
                             <TabItem x:Name="Mw_SettingsSecuritySubTabVault"
                                      Header="{loc:Translate SettingsSecuritySubTabVault}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -4837,7 +4837,7 @@
                             <TabItem x:Name="Mw_SettingsSecuritySubTabCredentialProvider"
                                      Header="{loc:Translate SettingsSecuritySubTabCredentialProvider}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -4970,7 +4970,7 @@
                             <TabItem x:Name="Mw_SettingsSecuritySubTabConnectionChecks"
                                      Header="{loc:Translate SettingsSecuritySubTabConnectionChecks}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -5008,7 +5008,7 @@
                             <TabItem x:Name="Mw_SettingsSecuritySubTabWebCertificates"
                                      Header="{loc:Translate SettingsSecuritySubTabWebCertificates}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Web console certificates: the pins "Trust certificate" leaves behind, and the
                                      only way to take one back short of editing settings.json. -->
@@ -5156,7 +5156,7 @@
                             <TabItem x:Name="Mw_SettingsSecuritySubTabFileSharing"
                                      Header="{loc:Translate SettingsSecuritySubTabFileSharing}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- File Sharing -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
@@ -5208,7 +5208,7 @@
                             <TabItem x:Name="Mw_SettingsAdvancedSubTabDiagnostics"
                                      Header="{loc:Translate SettingsAdvancedSubTabDiagnostics}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Logging -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -5360,7 +5360,7 @@
                             <TabItem x:Name="Mw_SettingsAdvancedSubTabTools"
                                      Header="{loc:Translate SettingsAdvancedSubTabTools}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
 
                                 <!-- External Editor -->
@@ -5397,57 +5397,60 @@
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsExtProvTitle" Text="{loc:Translate SettingsSectionExternalToolProviders}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
                                         <TextBlock x:Name="Mw_SettingsExtProvDesc" Text="{loc:Translate SettingsExternalToolProvidersDesc}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <TextBlock x:Name="Mw_SettingsLblSysintPath" Grid.Row="0" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsLblSysinternalsPath}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <StackPanel Grid.Row="0" Grid.Column="1">
-                                                <TextBox x:Name="Mw_SettingsTxtSysintPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblSysintPath}" Text="{Binding Settings.SysinternalsPath, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}"/>
-                                                <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SysinternalsPath]}"/>
-                                            </StackPanel>
-                                            <Button x:Name="Mw_SettingsBtnSysintBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseSysinternalsPath}" Grid.Row="0" Grid.Column="2" Padding="6,2" Margin="4,0,0,8" Click="OnSysinternalsPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Button>
-                                            <TextBlock x:Name="Mw_SettingsSysintPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Grid.Row="1" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="{Binding Settings.IsSysinternalsPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                            <TextBlock x:Name="Mw_SettingsLblNirSoftPath" Grid.Row="2" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsLblNirSoftPath}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <StackPanel Grid.Row="2" Grid.Column="1">
-                                                <TextBox x:Name="Mw_SettingsTxtNirSoftPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblNirSoftPath}" Text="{Binding Settings.NirSoftPath, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8" FontSize="{StaticResource FontSizeBody}"/>
-                                                <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[NirSoftPath]}"/>
-                                            </StackPanel>
-                                            <Button x:Name="Mw_SettingsBtnNirSoftBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNirSoftPath}" Grid.Row="2" Grid.Column="2" Padding="6,2" Margin="4,0,0,8" Click="OnNirSoftPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Button>
-                                            <TextBlock x:Name="Mw_SettingsNirSoftPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Grid.Row="3" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="{Binding Settings.IsNirSoftPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                            <TextBlock x:Name="Mw_SettingsLblNanaRunPath" Grid.Row="4" Grid.Column="0" Margin="0,0,12,0" Text="{loc:Translate SettingsLblNanaRunPath}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}"/>
-                                            <StackPanel Grid.Row="4" Grid.Column="1">
-                                                <TextBox x:Name="Mw_SettingsTxtNanaRunPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblNanaRunPath}" Text="{Binding Settings.NanaRunPath, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,0" FontSize="{StaticResource FontSizeBody}"/>
-                                                <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[NanaRunPath]}"/>
-                                            </StackPanel>
-                                            <Button x:Name="Mw_SettingsBtnNanaRunBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNanaRunPath}" Grid.Row="4" Grid.Column="2" Padding="6,2" Margin="4,0,0,0" Click="OnNanaRunPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Button>
-                                            <TextBlock x:Name="Mw_SettingsNanaRunPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Grid.Row="5" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsNanaRunPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                        </Grid>
+                                        <StackPanel>
+                                            <TextBlock x:Name="Mw_SettingsLblSysintPath" Text="{loc:Translate SettingsLblSysinternalsPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" x:Name="Mw_SettingsTxtSysintPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblSysintPath}" Text="{Binding Settings.SysinternalsPath, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}"/>
+                                                <Button Grid.Column="1" x:Name="Mw_SettingsBtnSysintBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseSysinternalsPath}" Padding="6,2" Margin="4,0,0,0" Click="OnSysinternalsPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SysinternalsPath]}"/>
+                                            <TextBlock x:Name="Mw_SettingsSysintPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsSysinternalsPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsLblNirSoftPath" Text="{loc:Translate SettingsLblNirSoftPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" x:Name="Mw_SettingsTxtNirSoftPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblNirSoftPath}" Text="{Binding Settings.NirSoftPath, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}"/>
+                                                <Button Grid.Column="1" x:Name="Mw_SettingsBtnNirSoftBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNirSoftPath}" Padding="6,2" Margin="4,0,0,0" Click="OnNirSoftPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[NirSoftPath]}"/>
+                                            <TextBlock x:Name="Mw_SettingsNirSoftPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsNirSoftPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsLblNanaRunPath" Text="{loc:Translate SettingsLblNanaRunPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" x:Name="Mw_SettingsTxtNanaRunPath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblNanaRunPath}" Text="{Binding Settings.NanaRunPath, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}"/>
+                                                <Button Grid.Column="1" x:Name="Mw_SettingsBtnNanaRunBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseNanaRunPath}" Padding="6,2" Margin="4,0,0,0" Click="OnNanaRunPathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[NanaRunPath]}"/>
+                                            <TextBlock x:Name="Mw_SettingsNanaRunPathMissing" Text="{loc:Translate SettingsFolderNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsNanaRunPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </StackPanel>
                                         <DockPanel Margin="0,8,0,0">
                                             <Button x:Name="Mw_SettingsBtnRescan" DockPanel.Dock="Right" Content="{loc:Translate ExtToolBtnRescan}" Click="OnRescanExternalToolsClick" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}"/>
                                             <TextBlock x:Name="Mw_SettingsExtProvStatus" Text="" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" FontStyle="Italic" VerticalAlignment="Center"
@@ -5579,7 +5582,7 @@
                             <TabItem x:Name="Mw_SettingsAdvancedSubTabCmdLibSync"
                                      Header="{loc:Translate SettingsAdvancedSubTabCmdLibSync}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}">
                                 <!-- Command Library Git Sync -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
