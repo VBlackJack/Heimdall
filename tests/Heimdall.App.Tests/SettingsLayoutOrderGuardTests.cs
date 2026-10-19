@@ -137,6 +137,93 @@ public sealed class SettingsLayoutOrderGuardTests
         Assert.Equal("{loc:Translate " + key + "}", badge.Elements().Single().Attribute("Text")?.Value);
     }
 
+    /// <summary>
+    /// The buttons beside a section heading keep their own height.
+    /// </summary>
+    /// <remarks>
+    /// A stack docked right in a DockPanel stretches to the height of the text docked beside it.
+    /// Next to a heading, a badge and a hint, Import, Export and Refresh grew to 68 pixels and the
+    /// hint ran into them, on the host keys and both certificate lists.
+    /// </remarks>
+    [Fact]
+    public void ButtonsBesideAHeadingDoNotStretchToItsHeight()
+    {
+        XElement root = SettingsRoot();
+        List<XElement> stacks = root.Descendants()
+            .Where(element => element.Name.LocalName == "StackPanel"
+                && element.Attribute("DockPanel.Dock")?.Value == "Right"
+                && element.Attribute("Orientation")?.Value == "Horizontal")
+            .ToList();
+
+        Assert.True(stacks.Count >= 7, $"only {stacks.Count} right-docked button stacks found; the scan is not reading the settings");
+        Assert.All(stacks, stack => Assert.NotNull(stack.Attribute("VerticalAlignment")));
+    }
+
+    /// <summary>
+    /// A trust list filter says in the box what it filters.
+    /// </summary>
+    /// <remarks>
+    /// The three filters were empty boxes above their lists, explained only by a tooltip, so
+    /// nothing on screen said they were a search.
+    /// </remarks>
+    [Fact]
+    public void ATrustListFilterShowsWhatItFilters()
+    {
+        List<XElement> filters = SettingsRoot().Descendants()
+            .Where(element => element.Name.LocalName == "TextBox"
+                && (element.Attribute("Text")?.Value ?? string.Empty).StartsWith("{Binding Settings.Trusted", StringComparison.Ordinal)
+                && (element.Attribute("Text")?.Value ?? string.Empty).Contains(".SearchText", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Equal(3, filters.Count);
+        Assert.All(filters, filter =>
+        {
+            Assert.Equal("{StaticResource WatermarkTextBoxStyle}", filter.Attribute("Style")?.Value);
+            Assert.Equal(filter.Attribute("ToolTip")?.Value, filter.Attribute("Tag")?.Value);
+        });
+    }
+
+    /// <summary>
+    /// A block that only applies while a switch is on dims as a whole when it is off.
+    /// </summary>
+    /// <remarks>
+    /// The inputs dimmed but the labels did not, and an empty dimmed box on a card of its own
+    /// colour looked like any other, so the credential provider and Git sync read as available
+    /// with their switch off.
+    /// </remarks>
+    [Fact]
+    public void ABlockDisabledByASwitchDimsAsAWhole()
+    {
+        List<XElement> blocks = SettingsRoot().Descendants()
+            .Where(element => element.Name.LocalName == "StackPanel"
+                && (element.Attribute("IsEnabled")?.Value ?? string.Empty).StartsWith("{Binding Settings.", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(blocks.Count >= 15, $"only {blocks.Count} switch-bound blocks found; the scan is not reading the settings");
+        Assert.All(blocks, block => Assert.Equal("{StaticResource SettingsDependentPanelStyle}", block.Attribute("Style")?.Value));
+    }
+
+    /// <summary>
+    /// The command library Git sync has its own section, apart from the external tools.
+    /// </summary>
+    [Fact]
+    public void TheCommandLibrarySyncHasItsOwnSection()
+    {
+        XElement title = SettingsRoot().Descendants()
+            .Single(element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsCmdLibSyncTitle");
+        string? section = title.Ancestors()
+            .FirstOrDefault(element => element.Name.LocalName == "TabItem")?.Attribute(Xaml + "Name")?.Value;
+
+        Assert.Equal("Mw_SettingsAdvancedSubTabCmdLibSync", section);
+    }
+
+    private static XElement SettingsRoot()
+    {
+        XDocument markup = XDocument.Load(
+            Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
+        return markup.Descendants().Single(element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsRoot");
+    }
+
     [Fact]
     public void TheCheckRefusesEachShape()
     {

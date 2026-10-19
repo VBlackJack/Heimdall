@@ -4828,6 +4828,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     public string? DescribeFieldError(string propertyName) => GetLocalizedFieldError(propertyName);
 
     /// <summary>
+    /// Whether the box bound to <paramref name="boxProperty"/> counts as a field in error, the way
+    /// the tab badges count it: its text does not parse, or its number is out of range.
+    /// </summary>
+    /// <remarks>
+    /// A box binds the text of its number, and a range error sits on the number, so asking about
+    /// the text alone missed every out-of-range value. The two never report together (the number
+    /// waits while the text does not parse), so a field counts once.
+    /// </remarks>
+    public bool FieldHasError(string boxProperty) =>
+        GetLocalizedFieldError(boxProperty) is not null
+        || (boxProperty.EndsWith(NumberTextSuffix, StringComparison.Ordinal)
+            && GetLocalizedFieldError(boxProperty[..^NumberTextSuffix.Length]) is not null);
+
+    /// <summary>
     /// Raised when a save is refused over a field error, with the property the first field in
     /// error is bound to, so the view can take the user there.
     /// </summary>

@@ -234,6 +234,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 AttachSelectedExternalToolPreviewTracking(viewModel.Settings.SelectedExternalTool);
                 Dispatcher.BeginInvoke(() => RefreshExternalToolSettingsUi(viewModel));
             }
+            else if (string.Equals(e.PropertyName, nameof(SettingsViewModel.ValidationSummary), StringComparison.Ordinal)
+                || (e.PropertyName?.EndsWith(SettingsTabErrorCountSuffix, StringComparison.Ordinal) ?? false))
+            {
+                // The tab badges recount on every change in error; the sections recount with them.
+                Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => RefreshSettingsRailErrorCounts(viewModel.Settings)));
+            }
         };
         viewModel.Settings.PropertyChanged += _settingsPropertyChangedHandler;
 
@@ -1217,6 +1223,54 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         _isRdpImportDragActive = isVisible;
         RdpImportDropOverlay.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>The name ending of the view model's per-tab error counts.</summary>
+    private const string SettingsTabErrorCountSuffix = "TabErrorCount";
+
+    /// <summary>
+    /// Puts on every section of the settings rails the count of its fields in error, so the badge
+    /// on a top tab leads to a section and not to a tab that has to be searched.
+    /// </summary>
+    private void RefreshSettingsRailErrorCounts(SettingsViewModel settings)
+    {
+        foreach (System.Windows.Controls.TabControl rail in SettingsRails(Mw_SettingsSubTabControl))
+        {
+            foreach (object item in rail.Items)
+            {
+                if (item is TabItem section && section.Content is DependencyObject content)
+                {
+                    Controls.SettingsRail.SetErrorCount(
+                        section,
+                        Controls.SettingsRail.CountFieldErrors(
+                            content,
+                            settings.FieldHasError,
+                            Converters.SettingsFieldErrorConverter.SettingsPathPrefix));
+                }
+            }
+        }
+    }
+
+    /// <summary>The rail tab controls under <paramref name="root"/>, in the logical tree.</summary>
+    internal static IEnumerable<System.Windows.Controls.TabControl> SettingsRails(DependencyObject root)
+    {
+        foreach (object child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is not DependencyObject node)
+            {
+                continue;
+            }
+
+            if (node is System.Windows.Controls.TabControl { TabStripPlacement: Dock.Left } rail)
+            {
+                yield return rail;
+            }
+
+            foreach (System.Windows.Controls.TabControl nested in SettingsRails(node))
+            {
+                yield return nested;
+            }
+        }
     }
 
     internal sealed record SettingsSearchEntry(FrameworkElement Target, TabItem TopTab, TabItem? SubTab);

@@ -770,6 +770,7 @@
   "SettingsTabAdvanced": "Advanced",
   "SettingsAdvancedSubTabDiagnostics": "Diagnostics",
   "SettingsAdvancedSubTabTools": "Tools & integrations",
+  "SettingsAdvancedSubTabCmdLibSync": "Command library sync",
   "SettingsSearchPlaceholder": "Search settings...",
   "SettingsSearchResultCount": "Results: {0} - press Enter to jump",
   "SettingsSearchResultPosition": "Result {0} of {1} - Enter for the next, Shift+Enter for the previous",

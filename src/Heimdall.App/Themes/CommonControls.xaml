@@ -2,7 +2,10 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib"
                     xmlns:theming="clr-namespace:Heimdall.App.Theming"
-                    xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors">
+                    xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+                    xmlns:controls="clr-namespace:Heimdall.App.Controls"
+                    xmlns:converters="clr-namespace:Heimdall.App.Converters"
+                    xmlns:loc="clr-namespace:Heimdall.App.Localization">
 
     <!-- ========================================================= -->
     <!-- Design Tokens: Typography                                 -->
@@ -38,6 +41,13 @@
          in French on one line, and the thickness of the bar that marks the open section. -->
     <sys:Double x:Key="SettingsRailWidth">210</sys:Double>
     <Thickness x:Key="SettingsRailSelectedBar">3,0,0,0</Thickness>
+    <!-- A line under a rail control that belongs to its content column, not to the rail: the rail
+         width plus the margin and card padding the section text starts at. -->
+    <Thickness x:Key="SettingsRailFooterMargin">250,8,0,12</Thickness>
+    <!-- How tall a settings list grows before it scrolls. A section holds little else, so a
+         trust list gets most of the height; a list of a few entries above an edit panel gets less. -->
+    <sys:Double x:Key="SettingsListMaxHeight">440</sys:Double>
+    <sys:Double x:Key="SettingsShortListMaxHeight">240</sys:Double>
 
     <!-- Max width for single-column tool content panels -->
     <sys:Double x:Key="ToolContentMaxWidth">700</sys:Double>
@@ -1387,8 +1397,31 @@
         </Setter>
     </Style>
 
+    <!-- Settings that only apply while a switch above them is on. The inputs already dim when
+         disabled, but an empty box dimmed on a card of its own colour looked the same, and the
+         labels did not dim at all, so the block read as available. The whole block dims. -->
+    <Style x:Key="SettingsDependentPanelStyle" TargetType="{x:Type StackPanel}">
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <converters:AccessibleStateNameConverter x:Key="SettingsRailAccessibleNameConverter"/>
+
     <Style x:Key="SettingsRailTabItemStyle" TargetType="{x:Type TabItem}">
         <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+        <!-- The badge is only seen, so the error count joins the name a screen reader hears. -->
+        <Setter Property="AutomationProperties.Name">
+            <Setter.Value>
+                <MultiBinding Converter="{StaticResource SettingsRailAccessibleNameConverter}">
+                    <Binding Path="Header" RelativeSource="{RelativeSource Self}"/>
+                    <Binding Path="(controls:SettingsRail.ErrorCount)" RelativeSource="{RelativeSource Self}"/>
+                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
+                </MultiBinding>
+            </Setter.Value>
+        </Setter>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
@@ -1408,18 +1441,39 @@
                             CornerRadius="{StaticResource CornerRadiusSm}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Left"
-                                          VerticalAlignment="Center"
-                                          RecognizesAccessKey="True"
-                                          ContentSource="Header">
-                            <ContentPresenter.Resources>
-                                <Style TargetType="{x:Type TextBlock}">
-                                    <Setter Property="TextWrapping" Value="Wrap"/>
-                                </Style>
-                            </ContentPresenter.Resources>
-                        </ContentPresenter>
+                        <DockPanel LastChildFill="True">
+                            <Border x:Name="ErrorBadge"
+                                    DockPanel.Dock="Right"
+                                    Background="{DynamicResource ErrorTextBrush}"
+                                    CornerRadius="{StaticResource CornerRadiusMd}"
+                                    MinWidth="{StaticResource BadgeHeight}"
+                                    Height="{StaticResource BadgeHeight}"
+                                    Padding="5,0"
+                                    Margin="6,0,0,0"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding (controls:SettingsRail.ErrorCount), RelativeSource={RelativeSource TemplatedParent}}"
+                                           Foreground="{DynamicResource TextOnAccentBrush}"
+                                           FontSize="{StaticResource FontSizeBadge}"
+                                           FontWeight="Normal"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <ContentPresenter HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              ContentSource="Header">
+                                <ContentPresenter.Resources>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                    </Style>
+                                </ContentPresenter.Resources>
+                            </ContentPresenter>
+                        </DockPanel>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="controls:SettingsRail.ErrorCount" Value="0">
+                            <Setter TargetName="ErrorBadge" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="RailBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
