@@ -260,7 +260,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 | **Système** | Chmod Calculator, Crontab Builder, DateTime Converter (fuseau horaire + relatif), UUID Generator (v4 + v7), ULID Generator, Hosts File Editor, SSH Config Generator, Log Viewer / Tail (filtre regex), Cron Job Manager (crontab + tâches Windows), Service Status Dashboard, **Notes** (éditeur Markdown façon Obsidian avec WYSIWYG Milkdown + thème Dracula, barre latérale repliable à largeur persistée, menu de mise en forme au clic droit, modèles localisés EN/FR, explorateur de fichiers en TreeView, `[[wiki-links]]` insensibles aux accents, tags, glisser-déposer, export Confluence/HTML), **Diagram Editor** (draw.io embarqué hors ligne, Nouveau/Ouvrir/Enregistrer/Exporter en PNG), **Command Library**, **Privilege Launcher** |
 
 ### Gestion des sessions
-- **Panneau de propriétés** sous l'arborescence (menu de filtre, `Paramètres > Général > Arborescence des sessions` ou Ctrl+Maj+B) : protocole, adresse, authentification, utilisateur, clé SSH, passerelle, dossier, environnement, étiquettes, latence et date de dernière ouverture de la session sélectionnée, chacun copié d'un clic ; un dossier sous le curseur ou une multi-sélection est résumé par nombre de sessions, nombre de connectées et protocole
+- **Panneau de propriétés** sous l'arborescence (menu de filtre, `Paramètres > Général > Apparence > Arborescence des sessions` ou Ctrl+Maj+B) : protocole, adresse, authentification, utilisateur, clé SSH, passerelle, dossier, environnement, étiquettes, latence et date de dernière ouverture de la session sélectionnée, chacun copié d'un clic ; un dossier sous le curseur ou une multi-sélection est résumé par nombre de sessions, nombre de connectées et protocole
 - Sessions à onglets avec réorganisation par glisser-déposer
 - Détachement d'un onglet vers une fenêtre flottante (glisser-sortir façon Chrome ou menu contextuel) ; un onglet scindé reste dans la barre d'onglets, et la barre d'état indique d'annuler d'abord la division
 - Fermer l'onglet sélectionné sélectionne l'onglet qui prend sa place, ou celui qui le précède s'il était le dernier
@@ -384,7 +384,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     sans rebond se connecte en direct
   - Les variables comme `[DAS]` dans un champ utilisateur sont résolues depuis le réglage
     `MobaXtermUserVariables` (par défaut `DAS` = `%USERNAME%`, variables d'environnement
-    développées), modifiable dans Paramètres > Général > Variables d'import MobaXterm, qui affiche
+    développées), modifiable dans Paramètres > Général > Fichier et import > Variables d'import MobaXterm, qui affiche
     ce que devient chaque valeur. Une variable non résolue est conservée telle quelle et signalée
     dans le résumé d'import
   - La commande de connexion (par exemple `sudo su - www`) devient une étape post-connexion. Le
@@ -399,7 +399,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     la fois précédente, y compris les modifications locales qui leur ont été apportées
   - Les mots de passe enregistrés par MobaXterm ne sont pas importés (chiffrement propriétaire) ; le
     résumé d'import les compte
-- Sources de sessions MobaXterm partagées (Paramètres > Général > Sources de sessions partagées) ;
+- Sources de sessions MobaXterm partagées (Paramètres > Général > Sources partagées) ;
   un guide pas à pas pour les équipes qui viennent de MobaXterm est dans
   [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md) :
   - Une source est un nom et le chemin d'un fichier `.mxtsessions`, en général sur un partage

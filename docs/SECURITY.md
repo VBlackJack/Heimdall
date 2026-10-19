@@ -37,7 +37,7 @@ chain attacks on SSH.NET or WebView2. Track dependency exposure with
 
 ## Security overview in Settings
 
-The first card of `Settings > Security` lists the security-relevant choices of
+The `Settings > Security > Overview` section lists the security-relevant choices of
 the Settings screen, one line each, with their state, and flags the documented
 insecure ones: NLA off, TFTP sharing on, session transcripts on, the `Bypass` or
 `Unrestricted` PowerShell execution policy, the master password on with no idle
