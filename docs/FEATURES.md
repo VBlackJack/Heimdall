@@ -260,7 +260,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 | **System** | Chmod Calculator, Crontab Builder, DateTime Converter (timezone + relative), UUID Generator (v4 + v7), ULID Generator, Hosts File Editor, SSH Config Generator, Log Viewer / Tail (regex filter), Cron Job Manager (crontab + Windows tasks), Service Status Dashboard, **Notes** (Obsidian-style Markdown editor with Milkdown WYSIWYG + Dracula theme, collapsible sidebar with persisted width, right-click formatting menu, localized templates EN/FR, TreeView file explorer, accent-insensitive `[[wiki-links]]`, tags, drag-and-drop, Confluence/HTML export), **Diagram Editor** (draw.io embedded offline, New/Open/Save/Export PNG), **Command Library**, **Privilege Launcher** |
 
 ### Session Management
-- **Properties panel** under the tree (filter menu, `Settings > General > Session tree` or Ctrl+Shift+B): the selected session's protocol, address, authentication, user, SSH key, gateway, folder, environment, tags, latency and last opened time, each copied with a click; a folder under the cursor or a multi-selection is summarized by session count, connected count and protocol
+- **Properties panel** under the tree (filter menu, `Settings > General > Appearance > Session tree` or Ctrl+Shift+B): the selected session's protocol, address, authentication, user, SSH key, gateway, folder, environment, tags, latency and last opened time, each copied with a click; a folder under the cursor or a multi-selection is summarized by session count, connected count and protocol
 - Tabbed sessions with drag-to-reorder
 - Tab detach to floating window (Chrome-style drag-out or context menu); a split tab stays in the strip, and the status bar says to unsplit it first
 - Closing the selected tab selects the tab that takes its place, or the one before it when it was the last
@@ -383,7 +383,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     and user is reused instead of duplicated. A session without a jump host connects directly
   - Variables such as `[DAS]` in a user field are resolved from the `MobaXtermUserVariables`
     setting (default `DAS` = `%USERNAME%`, environment variables expanded), edited in Settings >
-    General > MobaXterm import variables, which shows what each value resolves to. An unresolved
+    General > Settings file & import > MobaXterm import variables, which shows what each value resolves to. An unresolved
     variable is kept as written and reported in the import summary
   - The login command (for example `sudo su - www`) becomes a post-connect step. The profile is
     imported with `ExecutionConfirmed = false`, so Heimdall asks for confirmation before typing it
@@ -396,7 +396,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     any local edits made to them
   - Passwords stored by MobaXterm are not imported (proprietary encryption); the import summary
     counts them
-- Shared MobaXterm session sources (Settings > General > Shared session sources); a step-by-step
+- Shared MobaXterm session sources (Settings > General > Shared sources); a step-by-step
   guide for teams coming from MobaXterm is in [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md):
   - A source is a name and the path of a `.mxtsessions` file, typically on a team share or a
     synchronized folder; environment variables are allowed (`%OneDriveCommercial%\...`). Each

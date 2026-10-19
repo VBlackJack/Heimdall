@@ -17,7 +17,7 @@ Pour les équipes qui gardent leurs sessions dans un fichier MobaXterm `.mxtsess
 
 ## 1. Ajouter une source partagée
 
-1. Ouvrez **Paramètres > Général > Sources de sessions partagées** et cliquez sur **Ajouter**.
+1. Ouvrez **Paramètres > Général > Sources partagées** et cliquez sur **Ajouter**.
 2. **Nom** : le nom que l'arborescence affiche pour cette source, par exemple `Equipe`.
 3. **Fichier** : le chemin du fichier `.mxtsessions`. **Parcourir...** le sélectionne, ou saisissez un chemin avec des variables d'environnement pour qu'il fonctionne pour tout le monde, par exemple `%OneDriveCommercial%\Equipe\sessions.mxtsessions`.
 4. Laissez **Activée** cochée, puis **Enregistrer**.
@@ -26,7 +26,7 @@ La colonne **État** indique ce que la dernière lecture a trouvé : le nombre d
 
 ## 2. Vérifier la variable de connexion
 
-Les fichiers MobaXterm écrivent souvent l'identifiant sous forme de variable, comme `[DAS]`. Heimdall la remplace par la valeur définie dans **Paramètres > Général > Variables d'import MobaXterm**. `DAS` vaut par défaut `%USERNAME%`, votre identifiant Windows. Si votre identifiant sur les serveurs est différent, changez la valeur à cet endroit ; la colonne **Devient** montre le résultat. Une variable sans valeur apparaît dans le rapport d'import (section 7).
+Les fichiers MobaXterm écrivent souvent l'identifiant sous forme de variable, comme `[DAS]`. Heimdall la remplace par la valeur définie dans **Paramètres > Général > Fichier et import > Variables d'import MobaXterm**. `DAS` vaut par défaut `%USERNAME%`, votre identifiant Windows. Si votre identifiant sur les serveurs est différent, changez la valeur à cet endroit ; la colonne **Devient** montre le résultat. Une variable sans valeur apparaît dans le rapport d'import (section 7).
 
 ## 3. Ce qui est en lecture seule, et pourquoi
 

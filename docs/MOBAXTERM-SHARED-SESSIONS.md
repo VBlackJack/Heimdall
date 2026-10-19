@@ -17,7 +17,7 @@ For teams that keep their sessions in a MobaXterm `.mxtsessions` file on a share
 
 ## 1. Add a shared source
 
-1. Open **Settings > General > Shared session sources** and click **Add**.
+1. Open **Settings > General > Shared sources** and click **Add**.
 2. **Name**: the name the tree shows for this source, for example `Team`.
 3. **File**: the path of the `.mxtsessions` file. **Browse...** picks it, or type a path with environment variables so it works for everyone, for example `%OneDriveCommercial%\Team\sessions.mxtsessions`.
 4. Keep **Enabled** ticked, then **Save settings**.
@@ -26,7 +26,7 @@ The **Status** column says what the last read found: the number of sessions, or 
 
 ## 2. Check the login variable
 
-MobaXterm files often write the login as a variable, such as `[DAS]`. Heimdall replaces it with the value set in **Settings > General > MobaXterm import variables**. `DAS` defaults to `%USERNAME%`, your Windows login. If your login on the servers is different, change the value there; the **Resolves to** column shows what it becomes. A variable with no value is listed in the import report (section 7).
+MobaXterm files often write the login as a variable, such as `[DAS]`. Heimdall replaces it with the value set in **Settings > General > Settings file & import > MobaXterm import variables**. `DAS` defaults to `%USERNAME%`, your Windows login. If your login on the servers is different, change the value there; the **Resolves to** column shows what it becomes. A variable with no value is listed in the import report (section 7).
 
 ## 3. What is read-only, and why
 

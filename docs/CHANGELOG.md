@@ -12,6 +12,47 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-19: a settings panel you can find your way around (v2026.101901)
+
+### Section rail (#640)
+
+- **Every Settings tab with more than one section lists them in a rail on the left**, the open one on
+  the right (`SettingsRailTabControlStyle`, `SettingsRailTabItemStyle`). General is split into
+  Appearance, Behavior, Updates, Settings file & import, Shared sources and Welcome tour; Security
+  into Overview, Master password & PIN, Credential provider, Connection checks, Web certificates and
+  File sharing. SSH & SFTP, RDP and Advanced move from the segmented strip to the same rail; Terminal
+  keeps one page.
+- The rail is one Tab stop and the arrow keys move inside it, like a tab strip (pinned by
+  `TheSectionRailIsASingleTabStop`).
+- Search, validation jumps and posture links already opened every enclosing tab, so they reach the
+  new sections unchanged. `SettingsLabelCatalog` names the new sections in the import preview.
+
+### Section polish (#641)
+
+- **Error badge per section**, with the count in the accessible name. Each box asks
+  `SettingsViewModel.FieldHasError`, the rule the tab badges use (text unparsed, or number out of
+  range), so a tab's sections add up to its badge.
+- **Switch-bound blocks dim as a whole** (`SettingsDependentPanelStyle`, 15 blocks, every one
+  guarded); only the inputs dimmed before, and the labels stayed bright.
+- Right-docked button stacks no longer stretch to the height of the heading beside them (host keys,
+  RDP and web certificates); the three trust list filters show their hint as a placeholder.
+- The command library Git sync moves to its own section, "Command library sync".
+- Trust lists grow to 440 px and the external tools list to 240 px before scrolling (260 and 120).
+
+### Section layout (#642)
+
+- **One width for every section.** A section sized itself to its content: its scroll viewer could
+  scroll sideways and so measured at infinite width, and the rail item's `HorizontalContentAlignment`
+  left-aligned the open section. The content column is now one star column capped at the section
+  width (pinned by `EveryRailSectionTakesTheSameWidth`).
+- The open section sits on the window background, so its cards stand out.
+- The third-party tool folders show their label above the field.
+
+### Docs
+
+- The guides that named a place in Settings (properties panel, MobaXterm variables, shared session
+  sources, security overview, web console certificates) give its section, in English and French.
+
 ## 2026-10-18: external password vaults that work as expected, and a refreshed look (v2026.101801)
 
 ### External credential provider (#635-#638)

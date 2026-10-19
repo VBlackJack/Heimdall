@@ -40,7 +40,7 @@ SSH.NET ou WebView2. Suivez l'exposition des dépendances avec
 
 ## Vue d'ensemble de la sécurité dans les paramètres
 
-La première carte de `Paramètres > Sécurité` liste les choix de l'écran
+La section `Paramètres > Sécurité > Vue d'ensemble` liste les choix de l'écran
 Paramètres qui touchent à la sécurité, une ligne chacun, avec leur état, et
 marque ceux documentés comme non sûrs : NLA désactivée, partage TFTP activé,
 transcription des sessions activée, politique d'exécution PowerShell `Bypass` ou
