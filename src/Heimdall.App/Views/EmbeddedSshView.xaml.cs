@@ -85,7 +85,7 @@ internal sealed class AutoReconnectTickScheduler
 /// WPF host for an interactive SSH shell session rendered through WebView2 + xterm.js.
 /// The browser surface handles VT parsing, ANSI colors, cursor movement, and scrollback.
 /// </summary>
-public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink, ISessionPaneOwner
+public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink, ITerminalTextSource, ISessionPaneOwner
 {
     private static readonly (string Tag, Func<string> ContentFactory, string WrapperStart, string WrapperEnd)[] InlineAssets =
     [
@@ -104,6 +104,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgCwd = "cwd:";
     private const string MsgClipboardWrite = "clipboard-write:";
     private const string MsgClipboardRead = "clipboard-read:";
+
+    /// <summary>Inbound message: the page's text, <c>buffer:&lt;id&gt;:&lt;truncated 0|1&gt;:&lt;base64&gt;</c>.</summary>
+    private const string MsgBuffer = TerminalBufferReadCoordinator.ReplyPrefix;
+
+    /// <summary>Outbound message: gives the keyboard focus to the terminal.</summary>
+    private const string MsgFocus = "focus:";
     private const string TerminalPageMessageSource = "about:blank";
     private const int LoggedWebViewTextLimit = 256;
     internal const int MaxPendingTerminalMessageBytes = 4 * 1024 * 1024;
@@ -284,6 +290,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private readonly List<MacroEntry> _macroEntries = [];
     private readonly Stopwatch _macroStopwatch = new();
 
+    private readonly TerminalBufferReadCoordinator _bufferReads = new();
     private bool _healthPanelVisible;
     private bool _disposed;
     private bool _webViewInitializationStarted;
@@ -637,6 +644,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         IsVisibleChanged -= OnVisibilityChanged;
 
         _terminalReady = false;
+        _bufferReads.FailPending();
 
         if (_sessionTab is not null)
         {
@@ -738,8 +746,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
                 if (!focusIsElsewhere)
                 {
-                    TerminalWebView.Focus();
-                    PostTerminalMessage("focus:");
+                    FocusTerminal();
                 }
             }, System.Windows.Threading.DispatcherPriority.Input);
         }
@@ -1119,8 +1126,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private void OnOverlayViewOutputClick(object sender, RoutedEventArgs e)
     {
         HideReconnectOverlay();
-        TerminalWebView.Focus();
-        PostTerminalMessage("focus:");
+        FocusTerminal();
     }
 
     internal static int ComputeAutoReconnectDelaySeconds(AppSettings? settings, int attempt)
@@ -1589,6 +1595,14 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        // Terminal text reply: terminal on purpose, so it can never reach the unknown-message
+        // log below. The page is trusted (checked at the top); the text is unmasked output.
+        if (message.StartsWith(MsgBuffer, StringComparison.Ordinal))
+        {
+            _ = _bufferReads.HandleReplyAsync(message);
+            return;
+        }
+
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSSH dropped unknown WebView2 terminal message: {DescribeWebViewText(message)}");
     }
@@ -1669,11 +1683,17 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         return string.Equals(source, TerminalPageMessageSource, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string DescribeWebViewText(string? text)
+    internal static string DescribeWebViewText(string? text)
     {
         if (string.IsNullOrEmpty(text))
         {
             return "<empty>";
+        }
+
+        // Terminal text is unmasked output (it can hold secrets): log its length, never a slice.
+        if (text.StartsWith(MsgBuffer, StringComparison.Ordinal))
+        {
+            return $"{MsgBuffer}<{text.Length - MsgBuffer.Length} chars>";
         }
 
         if (text.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
@@ -2672,6 +2692,32 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         ElevateRequested?.Invoke();
     }
 
+    /// <inheritdoc />
+    public bool CanReadText =>
+        !_disposed && _terminalReady && !_webViewUnavailable && TryGetCoreWebView2(out _);
+
+    /// <inheritdoc />
+    public Task<TerminalTextReadResult> ReadTextAsync(CancellationToken cancellationToken)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            return Dispatcher.InvokeAsync(() => ReadTextAsync(cancellationToken)).Task.Unwrap();
+        }
+
+        return _bufferReads.ReadAsync(
+            CanReadText,
+            PostTerminalMessage,
+            TimeSpan.FromMilliseconds(TerminalBufferReadCoordinator.ReadTimeoutMilliseconds),
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public void FocusTerminal()
+    {
+        TerminalWebView.Focus();
+        PostTerminalMessage(MsgFocus);
+    }
+
     private void PostTerminalMessage(string message)
     {
         if (_disposed || _webViewUnavailable || IsDispatcherShuttingDown())
@@ -2788,6 +2834,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     {
         _terminalReady = false;
         _webViewUnavailable = true;
+        _bufferReads.FailPending();
 
         _pendingTerminalMessages.Clear();
     }
@@ -2813,8 +2860,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             if (IsVisible && !focusIsElsewhere)
             {
                 Core.Logging.FileLogger.Info("EmbeddedSSH applying initial terminal focus");
-                TerminalWebView.Focus();
-                PostTerminalMessage("focus:");
+                FocusTerminal();
             }
         }
     }
