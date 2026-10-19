@@ -770,6 +770,7 @@
   "SettingsTabAdvanced": "Avanc\u00e9",
   "SettingsAdvancedSubTabDiagnostics": "Diagnostics",
   "SettingsAdvancedSubTabTools": "Outils et int\u00e9grations",
+  "SettingsAdvancedSubTabCmdLibSync": "Synchro de la bibliothèque",
   "SettingsSearchPlaceholder": "Rechercher dans les param\u00e8tres...",
   "SettingsSearchResultCount": "R\u00e9sultats : {0} - Entr\u00e9e pour y aller",
   "SettingsSearchResultPosition": "R\u00e9sultat {0} sur {1} - Entr\u00e9e pour le suivant, Maj+Entr\u00e9e pour le pr\u00e9c\u00e9dent",

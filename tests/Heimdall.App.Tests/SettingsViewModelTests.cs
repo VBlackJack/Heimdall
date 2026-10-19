@@ -2841,6 +2841,32 @@ public sealed partial class SettingsViewModelTests : IDisposable
         Assert.Equal(0, viewModel.GeneralTabErrorCount);
     }
 
+    // The settings rail badges a section by asking, box by box, whether the field is in error. A
+    // box binds the text, and a range error can sit on the number while the text reads as valid,
+    // so a question about the text alone would miss it.
+    [Fact]
+    public void FieldHasError_ReportsAnUnparsedTextAndAnOutOfRangeNumber()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        const string box = nameof(SettingsViewModel.MaxEmbeddedSessionsText);
+        Assert.False(viewModel.FieldHasError(box));
+
+        viewModel.MaxEmbeddedSessionsText = "many";
+        Assert.True(viewModel.FieldHasError(box));
+
+        viewModel.MaxEmbeddedSessionsText = "15";
+        Assert.False(viewModel.FieldHasError(box));
+
+        // The number in error while its text still reads as valid: only the number carries it.
+        viewModel.MaxEmbeddedSessions = 50;
+        Assert.Null(viewModel.DescribeFieldError(box));
+        Assert.NotNull(viewModel.DescribeFieldError(nameof(SettingsViewModel.MaxEmbeddedSessions)));
+        Assert.True(viewModel.FieldHasError(box));
+
+        viewModel.MaxEmbeddedSessions = 15;
+        Assert.False(viewModel.FieldHasError(box));
+    }
+
     // P3-3: removing an external tool is as final as removing a gateway until the whole visit is
     // undone, so it asks first, and declining leaves the list as it was.
     [Theory]
