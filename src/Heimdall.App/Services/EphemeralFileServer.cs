@@ -82,6 +82,12 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     /// <summary>Raised when a file is served (downloaded) by either server.</summary>
     public event Action<string>? FileServed;
 
+    /// <summary>
+    /// Tells whether a path is a symbolic link or a junction. Replaceable by tests, which
+    /// cannot create a file symbolic link without the SeCreateSymbolicLink privilege.
+    /// </summary>
+    internal Func<string, bool> IsLink { get; init; } = IsSymbolicLinkOrJunction;
+
     public EphemeralFileServer()
     {
         AccessToken = GenerateAccessToken();
@@ -100,10 +106,14 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
         _servingDirectory = Path.GetFullPath(directory);
         _httpCts = new CancellationTokenSource();
         _httpListener = new HttpListener();
-        // Intentional wildcard bind: tightening to a specific IP (for example the detected LAN address)
-        // would require a Windows URL ACL (`netsh http add urlacl`) or admin elevation, breaking the
-        // File Share toggle UX for non-admin users. The bearer token enforced on every request is the
-        // actual security boundary here.
+        // Wildcard bind first, so network devices can reach the share. HTTP.sys grants a wildcard
+        // prefix only to an elevated process or to a user holding a URL ACL
+        // (`netsh http add urlacl url=http://+:<port>/ user=<user>`); without either, Start() throws
+        // and the listener falls back to localhost, which network devices cannot reach
+        // (FileShareService then shows the localhost URL). Binding the detected LAN address instead
+        // would need the same ACL, so it would not help the non-elevated case. Only localhost
+        // prefixes are free. On the network, the bearer token enforced on every request is the
+        // security boundary.
         _httpListener.Prefixes.Add($"http://+:{port}/");
         IsHttpLocalOnly = false;
 
@@ -336,9 +346,14 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
             ? _servingDirectory
             : _servingDirectory + Path.DirectorySeparatorChar;
 
-        if (!fullPath.StartsWith(safeBase, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(fullPath, _servingDirectory, StringComparison.OrdinalIgnoreCase))
+        // The prefix check reads the requested path only: a link inside the shared folder
+        // would still lead outside it, so no link is followed below the shared root.
+        if ((!fullPath.StartsWith(safeBase, StringComparison.OrdinalIgnoreCase)
+             && !string.Equals(fullPath, _servingDirectory, StringComparison.OrdinalIgnoreCase))
+            || CrossesLink(_servingDirectory, fullPath, IsLink))
         {
+            Core.Logging.FileLogger.Warn(
+                $"[EphemeralFileServer] HTTP request refused outside the shared folder or through a link: {fullPath}");
             response.StatusCode = 403;
             response.Close();
             return;
@@ -381,9 +396,10 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
             sb.Append($"<tr><td><a href=\"{AppendTokenToRelativeUrl($"/{parent}")}\">..</a></td><td></td><td></td></tr>");
         }
 
-        // Directories
+        // Directories (links are left out: following one is refused)
         foreach (var dir in Directory.GetDirectories(dirPath).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
         {
+            if (CrossesLink(dirPath, dir, IsLink)) continue;
             var name = Path.GetFileName(dir);
             var href = string.IsNullOrEmpty(relativePath)
                 ? $"/{HttpUtility.UrlEncode(name)}"
@@ -394,6 +410,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
         // Files
         foreach (var file in Directory.GetFiles(dirPath).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
         {
+            if (CrossesLink(dirPath, file, IsLink)) continue;
             var name = Path.GetFileName(file);
             var info = new FileInfo(file);
             var href = string.IsNullOrEmpty(relativePath)
@@ -506,7 +523,8 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
 
             if ((!filePath.StartsWith(tftpSafeBase, StringComparison.OrdinalIgnoreCase)
                  && !string.Equals(filePath, _servingDirectory, StringComparison.OrdinalIgnoreCase))
-                || !File.Exists(filePath))
+                || !File.Exists(filePath)
+                || CrossesLink(_servingDirectory, filePath, IsLink))
             {
                 using UdpClient errorClient = new();
                 await SendTftpError(errorClient, clientEndpoint, 1, "File not found");
@@ -635,6 +653,45 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     }
 
     // ── Helpers ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Whether any component of <paramref name="fullPath"/> below <paramref name="root"/> is a
+    /// link. The root itself is the user's choice and may be one. A missing component returns
+    /// false so the caller answers "not found"; a component that cannot be inspected counts as
+    /// a link, so the request is refused rather than followed.
+    /// </summary>
+    internal static bool CrossesLink(string root, string fullPath, Func<string, bool> isLink)
+    {
+        string relative = Path.GetRelativePath(root, fullPath);
+        if (relative == ".") return false;
+
+        string current = root;
+        foreach (string segment in relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            try
+            {
+                if (isLink(current)) return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Core.Logging.FileLogger.Warn($"[EphemeralFileServer] link check failed for {current}: {ex.Message}");
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether a path is a symbolic link or a junction. Other reparse points, such as
+    /// OneDrive placeholders or deduplicated files, have no link target and are served.
+    /// </summary>
+    private static bool IsSymbolicLinkOrJunction(string path)
+    {
+        FileSystemInfo info = Directory.Exists(path) ? new DirectoryInfo(path) : new FileInfo(path);
+        return info.Exists && info.LinkTarget is not null;
+    }
 
     private static string GenerateAccessToken()
     {

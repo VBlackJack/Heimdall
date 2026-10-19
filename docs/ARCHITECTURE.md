@@ -743,7 +743,7 @@ Error state reachable from Ready or Busy.
 | CRLF sanitization | Raw HTTP Host header construction sanitized against header injection |
 | Command construction | Structured argument lists for Plink/gsudo (no string concatenation of user input) |
 | Placeholder sanitization | Context-aware: `InputValidator.IsShellTarget()` detects shell interpreters (cmd, powershell, bash, wsl, cscript, mshta + .bat/.cmd/.ps1/.vbs/.js/.wsf/.hta); shell targets get strict metacharacter stripping, regular .exe targets get relaxed stripping that preserves `()`, `'`, `%` in legitimate values |
-| HTTP/TFTP traversal | Trailing-separator + exact-root check in EphemeralFileServer |
+| HTTP/TFTP traversal | Trailing-separator + exact-root check in EphemeralFileServer; no symbolic link or junction is followed below the shared root, and the listing leaves them out |
 | Config concurrency | SemaphoreSlim write lock in ConfigManager prevents last-writer-wins |
 | WebView2 hardening | CSP (`default-src 'none'`), navigation blocking, `WebMessage` source validation |
 | Pageant IPC | Process owner identity verification before shared memory access |

@@ -340,7 +340,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - PBKDF2-SHA256 PIN hashing (100,000 iterations) with lockout mechanics
 - Windows ACL enforcement on config directories, log files, and temp files
 - Centralized `InputValidator` security utilities: `EscapeShellArg()`, `EscapeForDoubleQuotedString()`, `ValidateDomain()`, `SanitizeCsvCell()`, `IsShellTarget()` - shell injection prevention (CWE-78) on all SSH tunnel and tool `CreateCommand()` calls, context-aware placeholder sanitization (strict for shell targets, relaxed for regular executables), CSV formula injection prevention on all exporters, CRLF sanitization on HTTP headers
-- HTTP/TFTP directory traversal prevention with sibling-prefix check
+- HTTP/TFTP directory traversal prevention with sibling-prefix check; symbolic links and junctions inside the shared folder are not followed
 - WebSocket Origin validation on VNC proxy (CSWSH prevention)
 - Atomic file creation with restrictive ACL for sensitive temp files (TOCTOU-safe)
 - Privileged (sudo) SFTP edit/upload stream their content over the privileged channel into a root-owned temp directory created beside the target and commit with an atomic, symlink-refusing rename - no attacker-writable `/tmp` staging, and the privileged read path holds a no-follow descriptor

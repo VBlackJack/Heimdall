@@ -340,7 +340,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - Hachage du code PIN en PBKDF2-SHA256 (100 000 itérations) avec mécanique de verrouillage
 - Application des ACL Windows sur les répertoires de configuration, les fichiers de log et les fichiers temporaires
 - Utilitaires de sécurité centralisés dans `InputValidator` : `EscapeShellArg()`, `EscapeForDoubleQuotedString()`, `ValidateDomain()`, `SanitizeCsvCell()`, `IsShellTarget()` - prévention de l'injection shell (CWE-78) sur tous les tunnels SSH et tous les appels `CreateCommand()` des outils, assainissement des substitutions sensible au contexte (strict pour les cibles shell, souple pour les exécutables ordinaires), prévention de l'injection de formules CSV sur tous les exporteurs, assainissement CRLF sur les en-têtes HTTP
-- Prévention de la traversée de répertoires HTTP/TFTP avec contrôle de préfixe frère
+- Prévention de la traversée de répertoires HTTP/TFTP avec contrôle de préfixe frère ; les liens symboliques et jonctions présents dans le dossier partagé ne sont pas suivis
 - Validation de l'Origin WebSocket sur le proxy VNC (prévention CSWSH)
 - Création de fichier atomique avec ACL restrictives pour les fichiers temporaires sensibles (à l'abri des TOCTOU)
 - Les éditions et téléversements SFTP privilégiés (sudo) transmettent leur contenu par le canal privilégié vers un répertoire temporaire appartenant à root créé à côté de la cible, puis valident par un renommage atomique qui refuse les liens symboliques - aucun passage par un `/tmp` inscriptible par un attaquant, et le chemin de lecture privilégié conserve un descripteur no-follow
