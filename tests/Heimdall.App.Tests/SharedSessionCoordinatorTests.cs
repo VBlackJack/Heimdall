@@ -16,12 +16,15 @@
 
 using System.IO;
 using Heimdall.App.Services;
+using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Heimdall.Sftp;
+using Heimdall.Ssh;
 using static Heimdall.App.Tests.SessionCoordinatorPreMountTests;
 
 namespace Heimdall.App.Tests;
@@ -267,5 +270,122 @@ public sealed class SharedCompanionSftpCredentialTests : IDisposable
         Assert.DoesNotContain(saved.SshGateways, gateway => SharedSessionIds.IsShared(gateway.Id));
         Assert.Null(data.Provider.FindProfile(data.Profile.Id)!.SshPasswordEncrypted);
         Assert.Null(data.Provider.Gateways.Single().SshPasswordEncrypted);
+    }
+
+    // --- A shared SFTP session is signed in with the one password its applier supplied ---
+
+    private const string SharedSftpPassword = "typed-sftp";
+
+    private static SharedSessionTestData.SftpFixture SharedSftp() => SharedSessionTestData.CreateSftp();
+
+    private static ConnectionResult SftpSignedIn() => new(
+        true,
+        null,
+        new SftpSessionBundle(new SftpBrowser(), new SshConnectionParams { Host = "srv-files01.example.test", Username = "jdoe" }));
+
+    private static ConnectionResult SftpRejected() => new(
+        false,
+        "rejected",
+        null,
+        SshSessionDiagnosticFactory.FromClassifiedFailure(
+            new SshFailureInfo(SshFailureCode.PasswordRejected, "rejected", false)));
+
+    // Producer: ServerListViewModel.RunConnectionPipelineAsync, "Authenticated: result.Session is
+    // SshSessionResult or SftpSessionBundle". Without the SftpSessionBundle arm an SFTP connection
+    // that signed in reads as not authenticated and SharedCredentialPlan.SettleAsync never keeps the
+    // password the user asked to remember.
+    [Fact]
+    public async Task SharedSftp_AskedPassword_IsRemembered_OnceTheBrowserSignedIn()
+    {
+        SharedSessionTestData.SftpFixture data = SharedSftp();
+        (TestHarness harness, SharedSessionSecretStore store, SharedPasswordPromptProxy prompts) = CreateHarness(data);
+        using (harness)
+        {
+            prompts.Answers.Enqueue(new PasswordPromptResult(SharedSftpPassword, Remember: true));
+            ControlledProtocolHandler sftp = harness.GetHandler("SFTP");
+            ServerItemViewModel row = (await harness.Main.ServerList.FindSharedServerItemAsync(data.Profile.Id))!;
+
+            Task connect = harness.Main.ServerList.ConnectCommand.ExecuteAsync(row);
+            await sftp.Started.Task.WaitAsync(SessionCoordinatorPreMountTests.TestTimeout);
+            sftp.Result.SetResult(SftpSignedIn());
+            await connect.WaitAsync(SessionCoordinatorPreMountTests.TestTimeout);
+
+            Assert.NotNull(store.Find(SharedSecretKind.Session, SharedSessionTestData.SourceId, data.SessionKey));
+        }
+    }
+
+    // Producer: SharedCredentialApplier.ApplyAsync (ForbidRetype), read by SftpHandler's mayRetype.
+    // A remembered password the server refuses is forgotten and the connection fails: the handler
+    // is not allowed to retype, so a retyped password cannot make the refused one look good.
+    [Fact]
+    public async Task SharedSftp_RememberedPasswordRejected_DoesNotRetype_AndIsForgotten()
+    {
+        SharedSessionTestData.SftpFixture data = SharedSftp();
+        (TestHarness harness, SharedSessionSecretStore store, SharedPasswordPromptProxy prompts) = CreateHarness(data);
+        using (harness)
+        {
+            await store.RememberAsync(
+                SharedSecretKind.Session,
+                SharedSessionTestData.SourceId,
+                data.SessionKey,
+                CredentialProtector.Protect(SharedSftpPassword));
+            ControlledProtocolHandler sftp = harness.GetHandler("SFTP");
+            ServerItemViewModel row = (await harness.Main.ServerList.FindSharedServerItemAsync(data.Profile.Id))!;
+
+            Task connect = harness.Main.ServerList.ConnectCommand.ExecuteAsync(row);
+            await sftp.Started.Task.WaitAsync(SessionCoordinatorPreMountTests.TestTimeout);
+            Assert.False(sftp.LastServer!.AllowCredentialPrompt);
+            Assert.Equal(SharedSftpPassword, CredentialProtector.Unprotect(sftp.LastServer.SshPasswordEncrypted));
+            sftp.Result.SetResult(SftpRejected());
+            await connect.WaitAsync(SessionCoordinatorPreMountTests.TestTimeout);
+
+            Assert.Null(store.Find(SharedSecretKind.Session, SharedSessionTestData.SourceId, data.SessionKey));
+            Assert.Empty(prompts.Prompts);
+        }
+    }
+
+    [Fact]
+    public async Task SharedSftp_AskedPasswordRejected_IsNotSaved_AndIsAskedAgainNextTime()
+    {
+        SharedSessionTestData.SftpFixture data = SharedSftp();
+        (TestHarness harness, SharedSessionSecretStore store, SharedPasswordPromptProxy prompts) = CreateHarness(data);
+        using (harness)
+        {
+            prompts.Answers.Enqueue(new PasswordPromptResult(SharedSftpPassword, Remember: true));
+            prompts.Answers.Enqueue(new PasswordPromptResult(SharedSftpPassword, Remember: true));
+            ControlledProtocolHandler sftp = harness.GetHandler("SFTP");
+            ServerItemViewModel row = (await harness.Main.ServerList.FindSharedServerItemAsync(data.Profile.Id))!;
+
+            Task first = harness.Main.ServerList.ConnectCommand.ExecuteAsync(row);
+            await sftp.Started.Task.WaitAsync(SessionCoordinatorPreMountTests.TestTimeout);
+            Assert.False(sftp.LastServer!.AllowCredentialPrompt);
+            sftp.Result.SetResult(SftpRejected());
+            await first.WaitAsync(SessionCoordinatorPreMountTests.TestTimeout);
+            Assert.Null(store.Find(SharedSecretKind.Session, SharedSessionTestData.SourceId, data.SessionKey));
+
+            sftp.Reset();
+            Task second = harness.Main.ServerList.ConnectCommand.ExecuteAsync(row);
+            await sftp.Started.Task.WaitAsync(SessionCoordinatorPreMountTests.TestTimeout);
+            sftp.Result.SetResult(SftpRejected());
+            await second.WaitAsync(SessionCoordinatorPreMountTests.TestTimeout);
+
+            Assert.Equal(2, prompts.Prompts.Count);
+        }
+    }
+
+    private static (TestHarness Harness, SharedSessionSecretStore Store, SharedPasswordPromptProxy Prompts) CreateHarness(
+        SharedSessionTestData.SftpFixture data)
+    {
+        SharedSessionSecretStore? store = null;
+        SharedPasswordPromptProxy? prompts = null;
+        TestHarness harness = TestHarness.Create(
+            profileLookupFactory: configManager => new ProfileLookup(configManager, data.Provider),
+            sharedCredentialsFactory: (rootPath, localizer) =>
+            {
+                store = new SharedSessionSecretStore(Path.Combine(rootPath, SharedSessionSecretStore.FileName));
+                (IDialogService dialogs, prompts) = SharedPasswordPromptProxy.Create();
+                return new SharedCredentialApplier(store, dialogs, localizer, _ => 0);
+            });
+        return (harness, store!, prompts!);
     }
 }

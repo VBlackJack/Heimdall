@@ -103,8 +103,9 @@ public static partial class MobaXtermImporter
     /// <para>Type 4 (RDP) is kept from the existing realistic RDP fixture, which carries host, port
     /// and user at 0-2 and its SSH gateway at 12-14. It has no login command.</para>
     /// <para>Types 1 (Telnet), 5 (VNC) and 7 (SFTP) are measured on sessions created in the
-    /// MobaXterm interface. A VNC session has no login field: index 11 is an Xvnc "Unix login"
-    /// option, not a credential. An SFTP session has no jump host slot. A jump host on a Telnet or
+    /// MobaXterm interface. A Telnet session carries a login at index 2, but no Heimdall consumer
+    /// reads it: Telnet asks for its login in the terminal, so it is not imported. A VNC session
+    /// has no login field: index 11 is an Xvnc "Unix login" option, not a credential. An SFTP session has no jump host slot. A jump host on a Telnet or
     /// VNC session, and a proxy on any of the three, are read only to refuse the session.</para>
     /// <para>Every other code is reported as unsupported rather than guessed.</para>
     /// </remarks>
@@ -120,7 +121,7 @@ public static partial class MobaXtermImporter
         [1] = new SessionLayout(
             TelnetConnectionType,
             DefaultPorts.Telnet,
-            UserIndex: 2,
+            UserIndex: null,
             LoginCommandIndex: null,
             Gateway: new GatewaySlot(HostIndex: 5, PortIndex: 6, UserIndex: 7),
             Proxy: new ProxySlot(TypeIndex: 10, HostIndex: 11)),
@@ -152,7 +153,6 @@ public static partial class MobaXtermImporter
 
     // MobaXterm writes "0" in a proxy type field that names no proxy.
     private const string NoProxyType = "0";
-
 
     /// <summary>
     /// Parses a MobaXterm session file with the default identifier prefix and no variable resolver.
@@ -215,6 +215,20 @@ public static partial class MobaXtermImporter
             $"MobaXterm parse: {result.Servers.Count} profile(s), {result.Gateways.Count} gateway(s), "
             + $"{result.Warnings.Count} warning(s).");
         return result;
+    }
+
+    /// <summary>
+    /// Whether a session of this connection type can name an SSH jump host in MobaXterm and
+    /// Heimdall can route that protocol through one. Derived from the layout table, so a protocol
+    /// whose MobaXterm sessions have no jump host slot never counts as a gateway outlier.
+    /// </summary>
+    /// <param name="connectionType">A connection type name, in any spelling the catalogue accepts.</param>
+    public static bool CanCarryGateway(string connectionType)
+    {
+        string canonical = ConnectionTypeCatalog.Canonicalize(connectionType);
+        return ProtocolCapabilities.SupportsSshGateway(canonical)
+            && SessionLayouts.Values.Any(layout =>
+                layout.ConnectionType == canonical && layout.Gateway is not null);
     }
 
     /// <summary>
@@ -367,7 +381,9 @@ public static partial class MobaXtermImporter
         }
         else
         {
-            // A layout added without its case here must fail loudly, not import half a profile.
+            // A layout added without its case here throws; Parse catches it and reports the
+            // session as a ParseError warning that carries this message, so nothing half-built
+            // is imported. A test walks every layout code through Parse to catch the omission.
             throw new InvalidOperationException(
                 $"No protocol settings are defined for connection type '{layout.ConnectionType}'.");
         }

@@ -1060,6 +1060,8 @@ public class MobaXtermImporterTests
     [InlineData("syn-telnet-proxy", "proxyt2.example.test")]
     [InlineData("syn-vnc-proxy", "proxyv2.example.test")]
     [InlineData("syn-vnc-proxytype", "")]
+    [InlineData("syn-telnet-proxytype", "")]
+    [InlineData("syn-sftp-proxytype", "")]
     public void SessionThroughAProxy_IsNotImported_AndNamesTheProxy(string name, string proxyHost)
     {
         MobaXtermImportResult result = ParseProtocols();
@@ -1069,6 +1071,73 @@ public class MobaXtermImporterTests
         Assert.Equal(MobaXtermImportWarningKind.ProxyNotSupported, warning.Kind);
         Assert.Equal(proxyHost, warning.Detail);
         Assert.Empty(result.Gateways);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession through the Telnet [1] layout, UserIndex null:
+    // Telnet asks for its login in the terminal, so the login field is not read, and a [VAR] in it
+    // raises no UnresolvedVariable warning for a value nobody consumes.
+    [Fact]
+    public void Telnet_LoginField_IsNotReadNorResolved()
+    {
+        const string content = """
+            [Bookmarks_1]
+            SubRep=Telnet
+            tel-var= #98#1%telnet-var.example.test%23%[DAS]%%2%%%%%0%0%%1080%%%0%-1%0#MobaFont%10#0#
+            """;
+
+        MobaXtermImportResult result = MobaXtermImporter.Parse(content);
+
+        ServerProfileDto server = Assert.Single(result.Servers);
+        Assert.Null(server.TelnetUsername);
+        Assert.Null(server.SshUsername);
+        Assert.DoesNotContain(result.Warnings, warning => warning.Kind == MobaXtermImportWarningKind.UnresolvedVariable);
+        Assert.Empty(result.Warnings);
+    }
+
+    // Producer: MobaXtermImporter.ApplyProtocolSettings, the default arm, reached through Parse:
+    // a layout whose connection type has no case surfaces as a ParseError warning. Every type code
+    // the importer recognises (one that is not reported UnsupportedSessionType) is walked with a
+    // minimal line, so a layout added without its case fails here.
+    [Fact]
+    public void EveryRecognisedTypeCode_ParsesWithoutAParseError()
+    {
+        const int highestTypeCodeProbed = 99;
+        int recognised = 0;
+        for (int code = 0; code <= highestTypeCodeProbed; code++)
+        {
+            string content = $"[Bookmarks_1]\nSubRep=\nwalk= #1#{code}%walk.example.test%\n";
+
+            MobaXtermImportResult result = MobaXtermImporter.Parse(content);
+
+            if (result.Warnings.Any(warning => warning.Kind == MobaXtermImportWarningKind.UnsupportedSessionType))
+            {
+                continue;
+            }
+
+            recognised++;
+            Assert.DoesNotContain(
+                result.Warnings,
+                warning => warning.Kind == MobaXtermImportWarningKind.ParseError);
+            Assert.Single(result.Servers);
+        }
+
+        // Positive control: SSH, Telnet, RDP, VNC and SFTP were reached, so the loop walked something.
+        Assert.Equal(5, recognised);
+    }
+
+    // Producer: MobaXtermImporter.CanCarryGateway, derived from the layout table and
+    // ProtocolCapabilities.SupportsSshGateway.
+    [Theory]
+    [InlineData("SSH", true)]
+    [InlineData("ssh", true)]
+    [InlineData("RDP", true)]
+    [InlineData("SFTP", false)]
+    [InlineData("Telnet", false)]
+    [InlineData("VNC", false)]
+    [InlineData("WEB", false)]
+    public void CanCarryGateway_OnlyTypesWithAJumpHostSlotAndGatewayRouting(string type, bool expected)
+    {
+        Assert.Equal(expected, MobaXtermImporter.CanCarryGateway(type));
     }
 
     // Producer: MobaXtermImporter.ParseSession, unmapped type codes; trigger: the measured FTP [6]

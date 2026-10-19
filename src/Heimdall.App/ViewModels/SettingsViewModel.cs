@@ -3110,7 +3110,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 _ => "ImportMobaXtermWarningUnsupportedType",
             },
             MobaXtermImportWarningKind.JumpHostNotSupported => "ImportMobaXtermWarningJumpHost",
-            MobaXtermImportWarningKind.ProxyNotSupported => "ImportMobaXtermWarningProxy",
+            MobaXtermImportWarningKind.ProxyNotSupported => warning.Detail.Length == 0
+                ? "ImportMobaXtermWarningProxyNoHost"
+                : "ImportMobaXtermWarningProxy",
             MobaXtermImportWarningKind.MissingHost => "ImportMobaXtermWarningMissingHost",
             MobaXtermImportWarningKind.InvalidGatewayHost => "ImportMobaXtermWarningInvalidGatewayHost",
             MobaXtermImportWarningKind.DuplicateSession => "ImportMobaXtermWarningDuplicateSession",

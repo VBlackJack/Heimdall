@@ -326,7 +326,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 210 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 212 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -377,7 +377,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - Fichiers de sessions MobaXterm (Paramètres > Import) :
   - Les sessions SSH, RDP, SFTP, Telnet et VNC sont importées. Tout autre type de session MobaXterm
     (FTP, WSL et autres) est signalé comme non pris en charge dans le résumé d'import, avec sa
-    section INI et le nom de la session ; aucune ligne n'est écartée sans avertissement
+    section INI et le nom de la session ; aucune ligne n'est écartée sans avertissement. Une
+    session Telnet ou VNC passant par un rebond et une session Telnet, VNC ou SFTP passant par un
+    proxy sont aussi ignorées à cet endroit
   - Les champs de rebond d'une session (hôte, port et utilisateur de passerelle) deviennent une
     passerelle SSH. Les sessions qui partagent un rebond partagent une passerelle, et une passerelle
     locale de même hôte, port et utilisateur est réutilisée au lieu d'être dupliquée. Une session
@@ -476,8 +478,11 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     - passerelles inhabituelles : dans un dossier d'au moins `SharedReportGatewayMinFolderSessions`
       sessions (3 par défaut) où un même chemin (une passerelle, ou une connexion directe) est pris
       par au moins `SharedReportGatewayMajorityPercent` pour cent d'entre elles (60 par défaut), les
-      sessions qui prennent un autre chemin ; un dossier sans telle majorité n'en a aucune
-    - hôtes en double : deux sessions ou plus d'un même dossier qui joignent le même hôte
+      sessions qui prennent un autre chemin ; un dossier sans telle majorité n'en a aucune. Seules
+      comptent les sessions SSH et RDP, les types qui peuvent nommer un rebond dans MobaXterm
+    - hôtes en double : deux sessions ou plus d'un même dossier qui joignent le même hôte avec le
+      même protocole (une session SSH et une session RDP ou SFTP vers un même hôte ne sont pas des
+      doublons)
   - La racine de la source dans l'arborescence affiche le nombre de problèmes à côté de son nom, et
     son menu contextuel propose **Afficher le rapport d'import** ; la carte des paramètres a un
     bouton **Rapport** sur chaque source qui a des constats. Les deux ouvrent la même fenêtre en

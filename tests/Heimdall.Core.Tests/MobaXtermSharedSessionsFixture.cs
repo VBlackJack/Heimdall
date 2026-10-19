@@ -79,9 +79,9 @@ internal static class MobaXtermSharedSessionsFixture
 
     /// <summary>
     /// How many sessions of <see cref="ProtocolsContent"/> are skipped: FTP, WSL, two with a jump
-    /// host, one measured and three synthetic with a proxy.
+    /// host, one measured and five synthetic with a proxy.
     /// </summary>
-    public const int ProtocolsSkippedCount = 8;
+    public const int ProtocolsSkippedCount = 10;
 
     // The terminal font and colours MobaXterm writes after the '%' fields of a session.
     private const string Tail = "#MobaFont%10%0%0%-1%15%236,236,236%30,30,30%180,180,192%0%-1%0%%xterm%-1%0%_Std_Colors_0_%80%24%0%1%-1%<none>%%0%0%-1#0#";
@@ -125,5 +125,7 @@ internal static class MobaXtermSharedSessionsFixture
         syn-telnet-proxy= #98#1%syn-telnet-proxy.example.test%2326%syntelu%u3%u4%%%%u8%u9%1%proxyt2.example.test%3128%u13{Tail}
         syn-vnc-proxy= #128#5%syn-vnc-proxy.example.test%5914%u2%u3%%%%u7%u8%u9%u10%u11%1%proxyv2.example.test%3129{Tail}
         syn-vnc-proxytype= #128#5%syn-vnc-proxytype.example.test%5915%u2%u3%%%%u7%u8%u9%u10%u11%2%{Tail}
+        syn-telnet-proxytype= #98#1%syn-telnet-proxytype.example.test%2327%syntelu%u3%u4%%%%u8%u9%2%%u12%u13%u14{Tail}
+        syn-sftp-proxytype= #140#7%syn-sftp-proxytype.example.test%2204%synsftpu%u3%u4%u5%u6%u7%u8%2%%u11%u12{Tail}
         """;
 }

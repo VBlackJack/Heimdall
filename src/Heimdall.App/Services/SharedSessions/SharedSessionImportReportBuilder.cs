@@ -38,9 +38,9 @@ namespace Heimdall.App.Services.SharedSessions;
 /// <item>Gateway outlier: in a folder of at least <see cref="Options.GatewayMinFolderSessions"/>
 /// sessions where one route (a gateway, or a direct connection) is taken by at least
 /// <see cref="Options.GatewayMajorityPercent"/> percent of them, every session taking another route.
-/// A folder without such a majority has no outlier. Only sessions whose protocol can be routed
-/// through a gateway count: a Telnet or VNC session is direct whatever the folder does, so it
-/// neither votes nor stands out.</item>
+/// A folder without such a majority has no outlier. Only sessions whose type can name a jump
+/// host in MobaXterm count (<see cref="MobaXtermImporter.CanCarryGateway"/>): a Telnet, VNC or SFTP
+/// session is direct whatever the folder does, so it neither votes nor stands out.</item>
 /// <item>Duplicate host: two or more sessions of the same folder with the same host and the same
 /// protocol, compared case-insensitively, whatever their port. An SSH and an SFTP session to one
 /// host are two ways to use it, not a repetition.</item>
@@ -166,7 +166,7 @@ public static class SharedSessionImportReportBuilder
             .GroupBy(gateway => gateway.Id, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
-        IEnumerable<ServerProfileDto> routable = loaded.Where(profile => ProtocolCapabilities.SupportsSshGateway(profile.ConnectionType));
+        IEnumerable<ServerProfileDto> routable = loaded.Where(profile => MobaXtermImporter.CanCarryGateway(profile.ConnectionType ?? string.Empty));
         foreach (IGrouping<string, ServerProfileDto> folder in routable.GroupBy(FolderOf, StringComparer.OrdinalIgnoreCase))
         {
             List<ServerProfileDto> sessions = [.. folder];

@@ -80,18 +80,20 @@ Chaque lecture vérifie aussi le fichier à la recherche d'erreurs courantes. Qu
 - **Sessions ignorées** : les sessions non chargées, et pourquoi.
 - **Variables non résolues** : un `[NOM]` sans valeur (section 2).
 - **Nom et hôte différents** : une session nommée d'après une machine qui en joint une autre.
-- **Passerelles inhabituelles** : une session qui ne passe pas par le bastion que prend la plupart de son dossier.
-- **Hôtes en double** : deux sessions d'un même dossier qui joignent le même hôte.
+- **Passerelles inhabituelles** : une session qui ne passe pas par le bastion que prend la plupart de son dossier. Seules comptent les sessions dont le type peut nommer un rebond dans MobaXterm, c'est-à-dire SSH et RDP : une session Telnet, VNC ou SFTP est directe quoi que fasse son dossier.
+- **Hôtes en double** : deux sessions d'un même dossier qui joignent le même hôte avec le même protocole. Une session SSH et une session RDP ou SFTP vers un même hôte sont deux façons de s'en servir, pas des doublons ; deux sessions SSH vers cet hôte en sont.
 
 Le rapport ne fait qu'informer : chaque session qu'il liste reste chargée telle que le fichier la décrit. **Copier** et **Exporter en CSV** permettent de l'envoyer à qui maintient le fichier.
 
 ## 8. Limites connues
 
 - Cinq types de session sont importés : SSH, RDP, SFTP, Telnet et VNC. Toute autre session d'un fichier MobaXterm apparaît comme ignorée dans le rapport d'import, avec sa raison (section 7) :
-  - **FTP** : pas encore importé. Une session partagée en lecture seule n'a aucun moyen de demander son mot de passe, et un mot de passe du coffre ne doit pas circuler en FTP non chiffré.
+  - **FTP** : pas encore importé. FTP envoie le mot de passe en clair, et une session partagée ne doit pas envoyer ainsi un mot de passe du coffre ou mémorisé.
   - **WSL** : un système Linux de l'ordinateur qui exécute MobaXterm, donc rien à joindre.
   - **Serial, Mosh, RSH, Xdmcp, Browser, Shell, File et S3** : non importés.
   - **Une session Telnet ou VNC passant par un rebond SSH** : ignorée, car Heimdall ne fait pas passer ces protocoles par un rebond et une connexion directe contournerait le bastion.
   - **Une session Telnet, VNC ou SFTP passant par un proxy** : ignorée, car Heimdall n'utilise pas de proxy pour ces protocoles et une connexion directe contournerait le proxy.
+- Le proxy d'une session SSH ou RDP n'est pas lu : une telle session est importée en connexion directe ou par son rebond.
+- Une session Telnet demande son identifiant dans le terminal : aucun utilisateur n'est importé pour elle.
 - Le dossier de départ distant d'une session SFTP n'est pas repris : la session s'ouvre dans le dossier par défaut.
 - Les sessions partagées sont en lecture seule dans Heimdall (section 3).

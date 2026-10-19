@@ -326,7 +326,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,210 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,212 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 
@@ -377,7 +377,8 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - MobaXterm session files (Settings > Import):
   - SSH, RDP, SFTP, Telnet and VNC sessions are imported. Every other MobaXterm session type (FTP,
     WSL and others) is listed as unsupported in the import summary, with its INI section and
-    session name; no line is skipped without a warning
+    session name; no line is skipped without a warning. A Telnet or VNC session through a jump
+    host and a Telnet, VNC or SFTP session through a proxy are skipped there too
   - The jump host fields of a session (gateway host, port and user) become an SSH gateway.
     Sessions that share a jump host share one gateway, and a local gateway with the same host, port
     and user is reused instead of duplicated. A session without a jump host connects directly
@@ -464,8 +465,10 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     - gateway outliers: in a folder of at least `SharedReportGatewayMinFolderSessions` sessions
       (default 3) where one route (a gateway, or a direct connection) is taken by at least
       `SharedReportGatewayMajorityPercent` percent of them (default 60), the sessions taking another
-      route; a folder without such a majority has none
-    - duplicate hosts: two or more sessions of the same folder reaching the same host
+      route; a folder without such a majority has none. Only SSH and RDP sessions count, the types
+      that can name a jump host in MobaXterm
+    - duplicate hosts: two or more sessions of the same folder reaching the same host with the same
+      protocol (an SSH and an RDP or SFTP session to one host are not duplicates)
   - The source root in the tree shows the number of issues next to its name, and its context menu
     has **Show import report**; the Settings card has a **Report** button on each source with
     findings. Both open the same read-only dialog: the count of each check, then the findings by

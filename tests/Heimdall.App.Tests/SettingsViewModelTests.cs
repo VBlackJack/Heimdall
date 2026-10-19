@@ -3788,6 +3788,86 @@ public sealed partial class SettingsViewModelTests : IDisposable
         }
     }
 
+    // Producer: SettingsViewModel.ImportMobaXtermAsync and FormatMobaXtermWarning over
+    // MobaXtermImporter: one session of each new type is persisted with its own port property, a
+    // jump host on Telnet and a proxy on SFTP are refused with their wording, and a proxy type with
+    // no host gets the wording that names no proxy.
+    [Fact]
+    public async Task ImportConfigCommand_MobaXtermTelnetVncSftp_PersistsThePortsAndWordsTheRefusals()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        string importRoot = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-settings-import-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(importRoot);
+        string importPath = Path.Combine(importRoot, "protocols.mxtsessions");
+        const string content = """
+            [Bookmarks_1]
+            SubRep=Protocols
+            ImgNum=41
+            tel-a= #98#1%telnet-a.example.test%2323%telusera%%2%%%%%0%0%%1080%%%0%-1%0#MobaFont%10#0#
+            vnc-a= #128#5%vnc-a.example.test%5911%-1%0%%%%%-1%-1%0%vncusera%0%%1080%%%0#MobaFont%10#0#
+            sftp-a= #140#7%sftp-a.example.test%2202%sftpusera%-1%0%/srv/sftpa%0%0%%0%%1080%%%%0#MobaFont%10#0#
+            telnet-gw= #98#1%telnet-gw.example.test%23%telusergw%%1%jumpt.example.test%2299%jumpusert%%0%1%proxyt.example.test%3128%proxyusert%%0#MobaFont%10#0#
+            sftp-px= #140#7%sftp-px.example.test%22%sftpuserpx%-1%0%%0%0%%1%proxys.example.test%3130%proxyusers%%%0#MobaFont%10#0#
+            vnc-pt= #128#5%vnc-pt.example.test%5915%u2%u3%%%%u7%u8%u9%u10%u11%2%#MobaFont%10#0#
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(importPath, content);
+            viewModel.ImportFilePathProvider = () => importPath;
+
+            await viewModel.ImportConfigCommand.ExecuteAsync(null);
+
+            Assert.NotNull(config.SavedServers);
+            Assert.Equal(3, config.SavedServers.Count);
+            ServerProfileDto telnet = config.SavedServers.Single(s => s.DisplayName == "tel-a");
+            Assert.Equal("Telnet", telnet.ConnectionType);
+            Assert.Equal(2323, telnet.TelnetPort);
+            Assert.Equal(2323, telnet.RemotePort);
+            Assert.Null(telnet.TelnetUsername);
+            ServerProfileDto vnc = config.SavedServers.Single(s => s.DisplayName == "vnc-a");
+            Assert.Equal("VNC", vnc.ConnectionType);
+            Assert.Equal(5911, vnc.VncPort);
+            Assert.Equal(5911, vnc.RemotePort);
+            ServerProfileDto sftp = config.SavedServers.Single(s => s.DisplayName == "sftp-a");
+            Assert.Equal("SFTP", sftp.ConnectionType);
+            Assert.Equal(2202, sftp.SshPort);
+            Assert.True(sftp.HasSshPortField);
+            Assert.Equal("sftpusera", sftp.SshUsername);
+            Assert.All(config.SavedServers, server => Assert.True(server.UseDirectConnection));
+
+            (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
+            Assert.Contains(
+                localizer.Format("ImportMobaXtermWarningJumpHost", "Bookmarks_1", "telnet-gw", "jumpt.example.test"),
+                warning.Message,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                localizer.Format("ImportMobaXtermWarningProxy", "Bookmarks_1", "sftp-px", "proxys.example.test"),
+                warning.Message,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                localizer.Format("ImportMobaXtermWarningProxyNoHost", "Bookmarks_1", "vnc-pt"),
+                warning.Message,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain("\"\"", warning.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(importRoot))
+            {
+                Directory.Delete(importRoot, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public async Task ImportConfigCommand_MobaXtermOnlySkippedSessions_ShowsWhyInsteadOfNothingFound()
     {

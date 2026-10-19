@@ -20,6 +20,8 @@ using System.Text.Json;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
+using FlaUI.Core.WindowsAPI;
 using FlaUI.UIA3;
 using Heimdall.App.UiTests.Infrastructure;
 using Heimdall.Core.Configuration;
@@ -55,6 +57,7 @@ public sealed class SharedSessionsDayOneTests
     private static readonly TimeSpan LaunchTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan CloseTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan ExitTimeout = TimeSpan.FromSeconds(15);
 
     private const string SshName = "ssh-a";
     private const string RdpName = "rdp-a";
@@ -186,14 +189,20 @@ public sealed class SharedSessionsDayOneTests
         JsonElement locale)
     {
         var header = LocaleText(locale, "TreeCtxShowImportReport");
+
+        // The menu is opened from the keyboard on the selected root, the way a keyboard user
+        // reaches it: a mouse right-click lands on whatever window is in front of the app when
+        // Windows refuses it the foreground, and an expanded root's centre is a session row.
+        root.Patterns.SelectionItem.Pattern.Select();
+        window.SetForeground();
         root.Focus();
-        root.RightClick();
+        Keyboard.TypeSimultaneously(VirtualKeyShort.SHIFT, VirtualKeyShort.F10);
 
         var item = WaitHelpers.WaitFor(
             () => FindMenuItem(automation, window, header),
             ContextMenuDescription,
             UiTimeout);
-        item.Click();
+        item.Patterns.Invoke.Pattern.Invoke();
 
         var title = LocaleText(locale, "SharedReportDialogTitle").Replace(PlaceholderZero, SourceName, StringComparison.Ordinal);
         return WaitHelpers.WaitFor(
@@ -221,10 +230,7 @@ public sealed class SharedSessionsDayOneTests
         AssertReason(
             texts,
             TelnetGatewayName,
-            [
-                TemplateWithDetail(locale, "SharedReportSkipJumpHost", JumpHost),
-                TemplateWithDetail(locale, "SharedReportSkipProxy", ProxyHost),
-            ]);
+            [TemplateWithDetail(locale, "SharedReportSkipJumpHost", JumpHost)]);
     }
 
     private static void AssertReason(List<string> texts, string session, IReadOnlyList<Func<string, bool>> acceptable)
@@ -288,14 +294,14 @@ public sealed class SharedSessionsDayOneTests
             "[Bookmarks]",
             "SubRep=",
             "ImgNum=42",
-            $"{SshName}=#140#0%ssh-a.example.test%22%[DAS]%%0%-1%%%%%-1%0%0%%%-1%0%0%0%%1080%%0%0%1{MobaFontTail}",
-            $"{RdpName}=#91#4%rdp-a.example.test%3389%Administrator%0%-1%-1%-1%-1%0%0%-1%%%%%0%0%%-1%%-1%-1%0%-1%0%-1%0%0%0%0%{MobaFontTail}",
-            $"{TelnetName}=#98#1%telnet-a.example.test%2323%telusera%%2%%%%%0%0%%1080%%%0%-1%0{MobaFontTail}",
-            $"{VncName}=#128#5%vnc-a.example.test%5911%-1%0%%%%%-1%-1%0%vncusera%0%%1080%%%0{MobaFontTail}",
-            $"{SftpName}=#140#7%sftp-a.example.test%2202%sftpusera%-1%0%/srv/sftpa%0%0%%0%%1080%%%%0{MobaFontTail}",
-            $"{FtpName}=#130#6%ftp-a.example.test%2121%ftpusera%-1%/srv/ftpa%0%-1%0%0%%21%%%0%0%-1%0%-1%0%%0{MobaFontTail}",
-            $"{WslName}=#151#14%{WslName}%{MobaFontTail}",
-            $"{TelnetGatewayName}=#98#1%telnet-gw.example.test%23%telusergw%%1%{JumpHost}%2299%jumpusert%%0%1%{ProxyHost}%3128%proxyusert%%0%-1%0{MobaFontTail}",
+            $"{SshName}= #140#0%ssh-a.example.test%22%[DAS]%%0%-1%%%%%-1%0%0%%%-1%0%0%0%%1080%%0%0%1{MobaFontTail}",
+            $"{RdpName}= #91#4%rdp-a.example.test%3389%Administrator%0%-1%-1%-1%-1%0%0%-1%%%%%0%0%%-1%%-1%-1%0%-1%0%-1%0%0%0%0%{MobaFontTail}",
+            $"{TelnetName}= #98#1%telnet-a.example.test%2323%telusera%%2%%%%%0%0%%1080%%%0%-1%0{MobaFontTail}",
+            $"{VncName}= #128#5%vnc-a.example.test%5911%-1%0%%%%%-1%-1%0%vncusera%0%%1080%%%0{MobaFontTail}",
+            $"{SftpName}= #140#7%sftp-a.example.test%2202%sftpusera%-1%0%/srv/sftpa%0%0%%0%%1080%%%%0{MobaFontTail}",
+            $"{FtpName}= #130#6%ftp-a.example.test%2121%ftpusera%-1%/srv/ftpa%0%-1%0%0%%21%%%0%0%-1%0%-1%0%%0{MobaFontTail}",
+            $"{WslName}= #151#14%{WslName}%{MobaFontTail}",
+            $"{TelnetGatewayName}= #98#1%telnet-gw.example.test%23%telusergw%%1%{JumpHost}%2299%jumpusert%%0%1%{ProxyHost}%3128%proxyusert%%0%-1%0{MobaFontTail}",
         };
         return string.Join(Environment.NewLine, lines) + Environment.NewLine;
     }
@@ -308,6 +314,9 @@ public sealed class SharedSessionsDayOneTests
         {
             ["schemaVersion"] = AppSettings.CurrentSchemaVersion,
             ["defaultLocale"] = EnglishLocale,
+
+            // The first-run tour covers the window and swallows the clicks the test makes.
+            ["onboardingCompleted"] = true,
             ["sharedSessionSources"] = new[]
             {
                 new Dictionary<string, object>
@@ -358,10 +367,21 @@ public sealed class SharedSessionsDayOneTests
             {
                 app.Kill();
             }
+
         }
         catch
         {
             // Already gone.
+        }
+
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(app.ProcessId);
+            process.WaitForExit(ExitTimeout);
+        }
+        catch (ArgumentException)
+        {
+            // The process is already gone.
         }
 
         app.Dispose();

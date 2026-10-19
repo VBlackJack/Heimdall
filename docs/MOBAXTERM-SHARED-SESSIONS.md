@@ -80,18 +80,20 @@ Each read also checks the file for common mistakes. When it finds some, the sour
 - **Skipped sessions**: sessions not loaded, and why.
 - **Unresolved variables**: a `[NAME]` with no value (section 2).
 - **Name and host mismatch**: a session named after one machine that reaches another.
-- **Gateway outliers**: a session that does not take the bastion most of its folder takes.
-- **Duplicate hosts**: two sessions of one folder reaching the same host.
+- **Gateway outliers**: a session that does not take the bastion most of its folder takes. Only sessions whose type can name a jump host in MobaXterm count, which means SSH and RDP: a Telnet, VNC or SFTP session is direct whatever its folder does.
+- **Duplicate hosts**: two sessions of one folder reaching the same host with the same protocol. An SSH session and an RDP or SFTP session to one host are two ways to use it, not duplicates; two SSH sessions to it are.
 
 The report only informs: every session it lists is still loaded as the file describes it. **Copy** and **Export CSV** let you send it to whoever maintains the file.
 
 ## 8. Known limits
 
 - Five session types are imported: SSH, RDP, SFTP, Telnet and VNC. Every other session of a MobaXterm file is listed as skipped in the import report, with its reason (section 7):
-  - **FTP**: not imported yet. A read-only shared session has no way to ask for its password, and a password kept in the vault must not travel over plain FTP.
+  - **FTP**: not imported yet. FTP sends the password in clear, and a shared session must not send a vault or remembered password that way.
   - **WSL**: a Linux system on the computer that runs MobaXterm, so there is nothing to connect to.
   - **Serial, Mosh, RSH, Xdmcp, Browser, Shell, File and S3**: not imported.
   - **A Telnet or VNC session through an SSH jump host**: skipped, because Heimdall does not route these protocols through a jump host and a direct connection would go around the bastion.
   - **A Telnet, VNC or SFTP session through a proxy**: skipped, because Heimdall does not use a proxy for these protocols and a direct connection would go around the proxy.
+- The proxy of an SSH or RDP session is not read: such a session is imported as a direct connection or through its jump host.
+- A Telnet session asks for its login in the terminal, so no user is imported for it.
 - The remote start folder of an SFTP session is not carried over: the session opens in the default folder.
 - Shared sessions are read-only in Heimdall (section 3).

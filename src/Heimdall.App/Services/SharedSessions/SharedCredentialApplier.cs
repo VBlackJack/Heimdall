@@ -206,6 +206,7 @@ public sealed class SharedCredentialApplier
             {
                 profile.SshPasswordEncrypted = remembered;
                 plan.Used.Add(target);
+                ForbidRetype(profile);
             }
             else if (allowPrompt && !_agentRefused.ContainsKey(target) && await AgentHasKeysAsync().ConfigureAwait(false))
             {
@@ -223,6 +224,7 @@ public sealed class SharedCredentialApplier
                 }
 
                 profile.SshPasswordEncrypted = _seal(answer.Password);
+                ForbidRetype(profile);
                 if (answer.Remember)
                 {
                     plan.Pending.Add((target, profile.SshPasswordEncrypted));
@@ -233,6 +235,21 @@ public sealed class SharedCredentialApplier
         // An RDP session asks for its password in the RDP client, which Heimdall does not own:
         // there is no answer here to remember. Its bastions above are still covered.
         return plan;
+    }
+
+    /// <summary>
+    /// An SFTP connection retypes a refused password itself when it may prompt, and a retyped
+    /// password that works would make the connection look authenticated with the one the server
+    /// refused. A password this class supplied, remembered or just asked, is therefore the only
+    /// one tried: a refusal fails the connection, <see cref="SharedCredentialPlan.SettleAsync"/>
+    /// forgets it and the next connect asks again through this class.
+    /// </summary>
+    private static void ForbidRetype(ServerProfileDto profile)
+    {
+        if (string.Equals(profile.ConnectionType, SftpConnectionType, StringComparison.OrdinalIgnoreCase))
+        {
+            profile.AllowCredentialPrompt = false;
+        }
     }
 
     /// <summary>The shared bastions on the route of <paramref name="profile"/>, from the nearest up.</summary>

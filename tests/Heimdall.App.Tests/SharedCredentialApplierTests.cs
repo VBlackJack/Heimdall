@@ -252,6 +252,64 @@ public sealed class SharedCredentialApplierTests : IDisposable
         Assert.Equal(SessionPassword, CredentialProtector.Unprotect(again.SshPasswordEncrypted));
     }
 
+    // Producer: SharedCredentialApplier.ApplyAsync (ForbidRetype), read by SftpHandler's mayRetype
+    // (src/Heimdall.App/Services/Handlers/SftpHandler.cs): a password the applier supplied, asked
+    // or remembered, is the only one an SFTP connection tries.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Sftp_SuppliedPassword_ForbidsTheHandlersRetype(bool remembered)
+    {
+        Harness harness = await Harness.CreateAsync(this, content: SftpContent);
+        if (remembered)
+        {
+            await harness.Store.RememberAsync(SharedSecretKind.Session, SourceId, harness.SftpKey, CredentialProtector.Protect(SessionPassword));
+        }
+        else
+        {
+            harness.Prompts.Answers.Enqueue(new PasswordPromptResult(SessionPassword, false));
+        }
+
+        (ServerProfileDto profile, AppSettings settings) = harness.SftpCopies();
+        profile.AllowCredentialPrompt = true;
+        await harness.Applier.ApplyAsync(profile, settings, allowPrompt: true, CancellationToken.None);
+
+        Assert.False(profile.AllowCredentialPrompt);
+    }
+
+    [Fact]
+    public async Task Sftp_AskedPasswordRejected_IsNotSaved()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: SftpContent);
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(SessionPassword, true));
+
+        (ServerProfileDto profile, AppSettings settings) = harness.SftpCopies();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: true, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: false, sessionAuthenticated: false, failureCode: (int)SshFailureCode.PasswordRejected, failedAtGateway: false);
+
+        Assert.Equal(0, harness.Store.CountFor(SourceId));
+    }
+
+    // A profile that is not shared is no business of the applier: its SFTP handler still retypes.
+    [Fact]
+    public async Task Sftp_NotShared_KeepsTheHandlersRetype()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: SftpContent);
+        var local = new ServerProfileDto
+        {
+            Id = "local-sftp",
+            ConnectionType = "SFTP",
+            RemoteServer = "srv-local.example.test",
+            SshUsername = Login,
+            AllowCredentialPrompt = true,
+        };
+
+        await harness.Applier.ApplyAsync(local, new AppSettings(), allowPrompt: true, CancellationToken.None);
+
+        Assert.True(local.AllowCredentialPrompt);
+        Assert.Empty(harness.Prompts.Prompts);
+    }
+
     // The SFTP connect path reports the outcome the way the SSH one does: BulkConnectOutcome
     // carries Authenticated (ServerListViewModel: a SftpSessionBundle counts as signed in, the
     // browser having connected) and Failure.Code (the classified SshFailureCode, which the SFTP

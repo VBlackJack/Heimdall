@@ -52,6 +52,31 @@ internal sealed class SharedSessionTestData
 
     public StubSharedSessionProvider Provider { get; }
 
+    /// <summary>A shared SFTP session with a login and no password, behind a stub provider.</summary>
+    public static SftpFixture CreateSftp()
+    {
+        var profile = new ServerProfileDto
+        {
+            Id = SharedSessionIds.PrefixFor(SourceId) + "sftp1",
+            DisplayName = "srv-files01",
+            Group = SharedFolder,
+            ConnectionType = "SFTP",
+            RemoteServer = "srv-files01.example.test",
+            SshPort = DefaultPorts.Sftp,
+            RemotePort = DefaultPorts.Sftp,
+            SshUsername = "jdoe",
+            UseDirectConnection = true,
+            Origin = ProfileOrigin.ImportMobaXterm,
+        };
+        return new SftpFixture(
+            profile,
+            new StubSharedSessionProvider([profile], []),
+            SharedSessionSecretStore.SessionKey(profile.Id, profile.RemoteServer, profile.SshPort, profile.SshUsername));
+    }
+
+    /// <summary>The shared SFTP session, its provider and the key its password is filed under.</summary>
+    public sealed record SftpFixture(ServerProfileDto Profile, StubSharedSessionProvider Provider, string SessionKey);
+
     public static SharedSessionTestData Create()
     {
         string prefix = SharedSessionIds.PrefixFor(SourceId);
