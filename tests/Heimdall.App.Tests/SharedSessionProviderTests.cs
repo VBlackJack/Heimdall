@@ -87,6 +87,47 @@ public sealed class SharedSessionProviderTests : IDisposable
         Assert.Equal("Embedded", behindGateway.SshMode);
     }
 
+    // Producer: SharedSessionProvider.LoadAsync, parser then SharedProfileSanitizer, on measured
+    // Telnet, VNC and SFTP sessions with non-default ports: each port survives on the property its
+    // handler reads, and the SSH-port declaration appears for SFTP only.
+    [Fact]
+    public async Task LoadAsync_TelnetVncAndSftpSessions_KeepTheirPortsAfterSanitizing()
+    {
+        const string protocols = """
+            [Bookmarks_1]
+            SubRep=Protocols
+            ImgNum=41
+            telnet-a= #98#1%telnet-a.example.test%2323%telusera%%2%%%%%0%0%%1080%%%0%-1%0#MobaFont%10#0#
+            vnc-a= #128#5%vnc-a.example.test%5911%-1%0%%%%%-1%-1%0%vncusera%0%%1080%%%0#MobaFont%10#0#
+            sftp-a= #140#7%sftp-a.example.test%2202%sftpusera%-1%0%/srv/sftpa%0%0%%0%%1080%%%%0#MobaFont%10#0#
+            """;
+        string path = Path.Combine(_directory, "protocols.mxtsessions");
+        await File.WriteAllTextAsync(path, protocols);
+        SharedSessionProvider provider = new(await LocalizerAsync());
+
+        await provider.LoadAsync(Settings(Source(SourceId, path)));
+
+        Assert.Equal(3, Assert.Single(provider.Sources).ProfileCount);
+        ServerProfileDto telnet = Assert.Single(provider.Profiles, profile => profile.DisplayName == "telnet-a");
+        Assert.Equal("Telnet", telnet.ConnectionType);
+        Assert.Equal(2323, telnet.TelnetPort);
+        Assert.False(telnet.HasSshPortField);
+        Assert.Null(telnet.TelnetUsername);
+
+        ServerProfileDto vnc = Assert.Single(provider.Profiles, profile => profile.DisplayName == "vnc-a");
+        Assert.Equal("VNC", vnc.ConnectionType);
+        Assert.Equal(5911, vnc.VncPort);
+        Assert.False(vnc.HasSshPortField);
+        Assert.Null(vnc.VncPassword);
+
+        ServerProfileDto sftp = Assert.Single(provider.Profiles, profile => profile.DisplayName == "sftp-a");
+        Assert.Equal("SFTP", sftp.ConnectionType);
+        Assert.Equal(2202, sftp.SshPort);
+        Assert.True(sftp.HasSshPortField);
+        Assert.Equal("sftpusera", sftp.SshUsername);
+        Assert.Null(sftp.SshPasswordEncrypted);
+    }
+
     [Fact]
     public async Task LoadAsync_ReadsTheFilesOffTheCallersThread()
     {

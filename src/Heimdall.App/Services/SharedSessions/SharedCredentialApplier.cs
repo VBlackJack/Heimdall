@@ -33,7 +33,7 @@ namespace Heimdall.App.Services.SharedSessions;
 /// after the external credential provider: a password the vault provided is never replaced, and no
 /// remembered password is read before the user proved who they are. Nothing it does reaches the
 /// shared file, the offline copy, servers.json or the settings.</para>
-/// <para>A password is asked for a shared bastion, and for a shared SSH session, only when the
+/// <para>A password is asked for a shared bastion, and for a shared SSH or SFTP session, only when the
 /// connection would otherwise have nothing to sign in with: no remembered password and no key in
 /// the SSH agent. A password the user asked to remember is kept only once the server accepted it:
 /// a bastion's when the connection behind it succeeded, a session's when the SSH client itself
@@ -50,7 +50,8 @@ namespace Heimdall.App.Services.SharedSessions;
 /// </remarks>
 public sealed class SharedCredentialApplier
 {
-    private const string SshConnectionType = "SSH";
+    private static readonly string SshConnectionType = ConnectionTypeCatalog.Canonicalize("SSH");
+    private static readonly string SftpConnectionType = ConnectionTypeCatalog.Canonicalize("SFTP");
 
     private static readonly HashSet<int> CredentialRejections =
     [
@@ -190,7 +191,10 @@ public sealed class SharedCredentialApplier
             return plan;
         }
 
-        if (string.Equals(profile.ConnectionType, SshConnectionType, StringComparison.OrdinalIgnoreCase)
+        // An SFTP session signs in through the same SSH client with the same fields, so it is
+        // remembered under the same key shape and asked with the same question.
+        if ((string.Equals(profile.ConnectionType, SshConnectionType, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(profile.ConnectionType, SftpConnectionType, StringComparison.OrdinalIgnoreCase))
             && string.IsNullOrEmpty(profile.SshPasswordEncrypted)
             && !string.IsNullOrWhiteSpace(profile.SshUsername))
         {

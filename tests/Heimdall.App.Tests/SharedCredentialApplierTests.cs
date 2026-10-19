@@ -49,6 +49,16 @@ public sealed class SharedCredentialApplierTests : IDisposable
         srv-tools01=#140#0%srv-tools01.example.test%22%[DAS]%%0%-1%%%%%-1#MobaFont%10#0#tools
         """;
 
+    // An SFTP session of a real MobaXterm (fake host): host 0, port 1 and user 2 of the SFTP layout.
+    private const string SftpContent = """
+        [Bookmarks_1]
+        SubRep=FILES
+        ImgNum=41
+        srv-files01= #140#7%srv-files01.example.test%2202%[DAS]%-1%0%/srv/files%0%0%%0%%1080%%%%0#MobaFont%10#0#files
+        """;
+
+    private const int SftpPort = 2202;
+
     private const string AnotherSession = """
 
         srv-web01=#140#0%srv-web01.example.test%22%[DAS]%%0%-1%%%%%-1#MobaFont%10#0#web
@@ -199,6 +209,97 @@ public sealed class SharedCredentialApplierTests : IDisposable
         Assert.Equal(asked + 2, harness.Prompts.Prompts.Count);
         Assert.Equal("gw-other", CredentialProtector.Unprotect(Gateway(settings).SshPasswordEncrypted));
         Assert.Equal("session-other", CredentialProtector.Unprotect(profile.SshPasswordEncrypted));
+    }
+
+    // --- A shared SFTP session: the same key shape and the same question as an SSH one ---
+
+    // Producer: SharedCredentialApplier.ApplyAsync, the shared session branch, for an SFTP profile
+    // with a login and no password: it is asked like an SSH one, and remembered under the SSH-shaped
+    // key (profile, host, SshPort, SshUsername) once the connection signed in.
+    [Fact]
+    public async Task Sftp_Absent_IsAsked_AndRememberedAfterASignedInConnection()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: SftpContent);
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(SessionPassword, true));
+
+        (ServerProfileDto profile, AppSettings settings) = harness.SftpCopies();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: true, CancellationToken.None))!;
+
+        Assert.Equal("SFTP", profile.ConnectionType);
+        Assert.Equal(harness.Localizer.Format("DialogSshPasswordPromptMessage", Login + "@srv-files01.example.test"), Assert.Single(harness.Prompts.Prompts));
+        Assert.Equal(SessionPassword, CredentialProtector.Unprotect(profile.SshPasswordEncrypted));
+        Assert.Equal(0, harness.Store.CountFor(SourceId));
+
+        await plan.SettleAsync(succeeded: true, sessionAuthenticated: true, failureCode: null, failedAtGateway: false);
+
+        Assert.Equal(1, harness.Store.CountFor(SourceId));
+        Assert.NotNull(harness.Store.Find(SharedSecretKind.Session, SourceId, harness.SftpKey));
+    }
+
+    [Fact]
+    public async Task Sftp_Remembered_IsUsedWithoutAsking()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: SftpContent);
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(SessionPassword, true));
+        (ServerProfileDto first, AppSettings firstSettings) = harness.SftpCopies();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(first, firstSettings, allowPrompt: true, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: true, sessionAuthenticated: true, failureCode: null, failedAtGateway: false);
+
+        (ServerProfileDto again, AppSettings settings) = harness.SftpCopies();
+        Assert.NotNull(await harness.Applier.ApplyAsync(again, settings, allowPrompt: true, CancellationToken.None));
+
+        Assert.Single(harness.Prompts.Prompts);
+        Assert.Equal(SessionPassword, CredentialProtector.Unprotect(again.SshPasswordEncrypted));
+    }
+
+    // The SFTP connect path reports the outcome the way the SSH one does: BulkConnectOutcome
+    // carries Authenticated (ServerListViewModel: a SftpSessionBundle counts as signed in, the
+    // browser having connected) and Failure.Code (the classified SshFailureCode, which the SFTP
+    // handler puts in the diagnostic). A connection that returned without signing in is not
+    // remembered, as for SSH.
+    [Fact]
+    public async Task Sftp_SuccessWithoutSignIn_RemembersNothing()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: SftpContent);
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(SessionPassword, true));
+
+        (ServerProfileDto profile, AppSettings settings) = harness.SftpCopies();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: true, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: true, sessionAuthenticated: false, failureCode: null, failedAtGateway: false);
+
+        Assert.Equal(0, harness.Store.CountFor(SourceId));
+    }
+
+    [Theory]
+    [InlineData(SshFailureCode.PasswordRejected)]
+    [InlineData(SshFailureCode.AuthRejected)]
+    [InlineData(SshFailureCode.TooManyAuthFailures)]
+    public async Task Sftp_RejectedByTheServer_ForgetsTheRememberedPassword(SshFailureCode code)
+    {
+        Harness harness = await Harness.CreateAsync(this, content: SftpContent);
+        await harness.Store.RememberAsync(SharedSecretKind.Session, SourceId, harness.SftpKey, CredentialProtector.Protect(SessionPassword));
+
+        (ServerProfileDto profile, AppSettings settings) = harness.SftpCopies();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: false, CancellationToken.None))!;
+        Assert.Equal(SessionPassword, CredentialProtector.Unprotect(profile.SshPasswordEncrypted));
+        await plan.SettleAsync(succeeded: false, sessionAuthenticated: false, failureCode: (int)code, failedAtGateway: false);
+
+        Assert.Equal(0, harness.Store.CountFor(SourceId));
+    }
+
+    [Theory]
+    [InlineData(SshFailureCode.NetworkTimedOut)]
+    [InlineData(SshFailureCode.HostKeyMismatch)]
+    public async Task Sftp_FailedForAnotherReason_KeepsTheRememberedPassword(SshFailureCode code)
+    {
+        Harness harness = await Harness.CreateAsync(this, content: SftpContent);
+        await harness.Store.RememberAsync(SharedSecretKind.Session, SourceId, harness.SftpKey, CredentialProtector.Protect(SessionPassword));
+
+        (ServerProfileDto profile, AppSettings settings) = harness.SftpCopies();
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, settings, allowPrompt: false, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: false, sessionAuthenticated: false, failureCode: (int)code, failedAtGateway: false);
+
+        Assert.Equal(1, harness.Store.CountFor(SourceId));
     }
 
     // --- Rejected credentials ---
@@ -565,9 +666,9 @@ public sealed class SharedCredentialApplierTests : IDisposable
 
         public string ProfileId => Provider.Profiles.Single(profile => profile.DisplayName == "srv-db01").Id;
 
-        public static async Task<Harness> CreateAsync(SharedCredentialApplierTests owner, int agentKeys = 0)
+        public static async Task<Harness> CreateAsync(SharedCredentialApplierTests owner, int agentKeys = 0, string content = Content)
         {
-            await File.WriteAllTextAsync(owner.SourcePath, Content);
+            await File.WriteAllTextAsync(owner.SourcePath, content);
             LocalizationManager localizer = new();
             await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
 
@@ -592,6 +693,17 @@ public sealed class SharedCredentialApplierTests : IDisposable
             ServerProfileDto profile = Provider.Profiles.Single(candidate => candidate.DisplayName == "srv-db01");
             return Task.FromResult((profile, new AppSettings { SshGateways = [.. Provider.Gateways] }));
         }
+
+        /// <summary>The copies a connection to srv-files01 (SFTP) is made from.</summary>
+        public (ServerProfileDto Profile, AppSettings Settings) SftpCopies() =>
+            (Provider.Profiles.Single(candidate => candidate.DisplayName == "srv-files01"), new AppSettings());
+
+        /// <summary>What the password of srv-files01 is filed under: the SSH-shaped session key.</summary>
+        public string SftpKey => SharedSessionSecretStore.SessionKey(
+            Provider.Profiles.Single(candidate => candidate.DisplayName == "srv-files01").Id,
+            "srv-files01.example.test",
+            SftpPort,
+            Login);
 
         public void AnswerBoth(bool remember)
         {

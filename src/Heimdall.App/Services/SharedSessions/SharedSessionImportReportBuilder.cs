@@ -16,6 +16,7 @@
 
 using System.Net;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.Services.SharedSessions;
 
@@ -37,9 +38,12 @@ namespace Heimdall.App.Services.SharedSessions;
 /// <item>Gateway outlier: in a folder of at least <see cref="Options.GatewayMinFolderSessions"/>
 /// sessions where one route (a gateway, or a direct connection) is taken by at least
 /// <see cref="Options.GatewayMajorityPercent"/> percent of them, every session taking another route.
-/// A folder without such a majority has no outlier.</item>
-/// <item>Duplicate host: two or more sessions of the same folder with the same host, compared
-/// case-insensitively, whatever their port.</item>
+/// A folder without such a majority has no outlier. Only sessions whose protocol can be routed
+/// through a gateway count: a Telnet or VNC session is direct whatever the folder does, so it
+/// neither votes nor stands out.</item>
+/// <item>Duplicate host: two or more sessions of the same folder with the same host and the same
+/// protocol, compared case-insensitively, whatever their port. An SSH and an SFTP session to one
+/// host are two ways to use it, not a repetition.</item>
 /// </list>
 /// </remarks>
 public static class SharedSessionImportReportBuilder
@@ -162,7 +166,8 @@ public static class SharedSessionImportReportBuilder
             .GroupBy(gateway => gateway.Id, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
-        foreach (IGrouping<string, ServerProfileDto> folder in loaded.GroupBy(FolderOf, StringComparer.OrdinalIgnoreCase))
+        IEnumerable<ServerProfileDto> routable = loaded.Where(profile => ProtocolCapabilities.SupportsSshGateway(profile.ConnectionType));
+        foreach (IGrouping<string, ServerProfileDto> folder in routable.GroupBy(FolderOf, StringComparer.OrdinalIgnoreCase))
         {
             List<ServerProfileDto> sessions = [.. folder];
             if (sessions.Count < options.GatewayMinFolderSessions)
@@ -196,11 +201,14 @@ public static class SharedSessionImportReportBuilder
 
     private static IEnumerable<SharedSessionReportEntry> DuplicateHosts(IReadOnlyList<ServerProfileDto> loaded)
     {
-        IEnumerable<IGrouping<(string Folder, string Host), ServerProfileDto>> sameHost = loaded
+        IEnumerable<IGrouping<(string Folder, string Host, string Protocol), ServerProfileDto>> sameHost = loaded
             .Where(profile => !string.IsNullOrWhiteSpace(profile.RemoteServer))
             .GroupBy(
-                profile => (Folder: FolderOf(profile).ToUpperInvariant(), Host: profile.RemoteServer!.Trim().ToUpperInvariant()));
-        foreach (IGrouping<(string Folder, string Host), ServerProfileDto> group in sameHost)
+                profile => (
+                    Folder: FolderOf(profile).ToUpperInvariant(),
+                    Host: profile.RemoteServer!.Trim().ToUpperInvariant(),
+                    Protocol: (profile.ConnectionType ?? string.Empty).Trim().ToUpperInvariant()));
+        foreach (IGrouping<(string Folder, string Host, string Protocol), ServerProfileDto> group in sameHost)
         {
             List<ServerProfileDto> sessions = [.. group];
             if (sessions.Count < 2)

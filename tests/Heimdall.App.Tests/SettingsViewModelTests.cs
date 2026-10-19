@@ -3775,7 +3775,7 @@ public sealed partial class SettingsViewModelTests : IDisposable
             (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
             Assert.Contains("1 issue was found in the file:", warning.Message, StringComparison.Ordinal);
             Assert.Contains(
-                "[Bookmarks_1] browser: session type 999 is not supported; not imported.",
+                localizer.Format("ImportMobaXtermWarningUnsupportedType", "Bookmarks_1", "browser", "999"),
                 warning.Message,
                 StringComparison.Ordinal);
         }
@@ -3820,7 +3820,15 @@ public sealed partial class SettingsViewModelTests : IDisposable
             Assert.Empty(config.PersistenceCalls);
             Assert.Empty(dialog.ConfirmCalls);
             (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
-            Assert.Contains("session type 14 is not supported", warning.Message, StringComparison.Ordinal);
+
+            // Producer: SettingsViewModel.FormatMobaXtermWarning, an UnsupportedSessionType warning
+            // whose code MobaXtermImporter.ClassifySkippedType knows: the WSL line gets its own
+            // wording, not the generic "type 14 is not supported".
+            Assert.Contains(
+                localizer.Format("ImportMobaXtermWarningWslType", "Bookmarks", "WSL-Dev-box", "14"),
+                warning.Message,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain("session type 14", warning.Message, StringComparison.Ordinal);
         }
         finally
         {

@@ -3103,7 +3103,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         string key = warning.Kind switch
         {
             MobaXtermImportWarningKind.MalformedSessionLine => "ImportMobaXtermWarningMalformedLine",
-            MobaXtermImportWarningKind.UnsupportedSessionType => "ImportMobaXtermWarningUnsupportedType",
+            MobaXtermImportWarningKind.UnsupportedSessionType => MobaXtermImporter.ClassifySkippedType(warning.Detail) switch
+            {
+                MobaXtermSkippedType.Wsl => "ImportMobaXtermWarningWslType",
+                MobaXtermSkippedType.Ftp => "ImportMobaXtermWarningFtpType",
+                _ => "ImportMobaXtermWarningUnsupportedType",
+            },
+            MobaXtermImportWarningKind.JumpHostNotSupported => "ImportMobaXtermWarningJumpHost",
+            MobaXtermImportWarningKind.ProxyNotSupported => "ImportMobaXtermWarningProxy",
             MobaXtermImportWarningKind.MissingHost => "ImportMobaXtermWarningMissingHost",
             MobaXtermImportWarningKind.InvalidGatewayHost => "ImportMobaXtermWarningInvalidGatewayHost",
             MobaXtermImportWarningKind.DuplicateSession => "ImportMobaXtermWarningDuplicateSession",
