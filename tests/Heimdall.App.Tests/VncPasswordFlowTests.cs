@@ -143,6 +143,59 @@ public sealed class VncPasswordFlowTests
         Assert.Null(new VncPasswordFlow(string.Empty, null).Password);
     }
 
+    // The open connection takes one answer: a second answer is a new connect.
+    // Kills: a waiting server never released, so a later answer goes to a closed connection.
+    [Fact]
+    public void AWaitingServer_IsTakenByOneAnswerOnly()
+    {
+        var flow = new VncPasswordFlow(null, new RecordingKeeper());
+
+        flow.OnServerWaiting();
+
+        Assert.True(flow.ServerWaiting);
+        Assert.True(flow.TakeWaitingServer());
+        Assert.False(flow.TakeWaitingServer());
+    }
+
+    // Kills: an ended attempt still read as a waiting server, so the answer goes to no connection.
+    [Theory]
+    [InlineData("ended")]
+    [InlineData("connected")]
+    [InlineData("refused")]
+    public async Task AnAttemptThatEnds_LeavesNoServerWaiting(string end)
+    {
+        var flow = new VncPasswordFlow(null, new RecordingKeeper());
+        flow.OnServerWaiting();
+
+        switch (end)
+        {
+            case "ended":
+                flow.OnAttemptEnded();
+                break;
+            case "connected":
+                await flow.OnConnectedAsync();
+                break;
+            default:
+                await flow.OnSecurityFailureAsync(afterPassword: false);
+                break;
+        }
+
+        Assert.False(flow.ServerWaiting);
+        Assert.False(flow.TakeWaitingServer());
+    }
+
+    // A profile of the user's own cannot be asked, so its server never waits on Heimdall.
+    // Kills: an own profile left with an open connection nothing will answer.
+    [Fact]
+    public void WithoutAKeeper_NoServerWaits()
+    {
+        var flow = new VncPasswordFlow(Given, keeper: null);
+
+        flow.OnServerWaiting();
+
+        Assert.False(flow.ServerWaiting);
+    }
+
     private sealed class RecordingKeeper(PasswordPromptResult? answer = null) : IVncPasswordKeeper
     {
         public List<string> Remembered { get; } = [];

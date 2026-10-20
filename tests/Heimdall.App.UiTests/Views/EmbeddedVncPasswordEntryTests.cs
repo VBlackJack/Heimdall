@@ -38,10 +38,12 @@ public sealed class EmbeddedVncPasswordEntryTests
 {
     private const string Typed = "typed-pw-5120";
 
-    // Kills: the dead end kept for a shared session, or the entry reset by the disconnect the
-    // view's own "disconnect:" brings back from the page.
+    // The connection stays open while the user types: ending it counts as a failed sign-in on
+    // TigerVNC, which blocks the address after a few (measured on the lab container, 2026-10-20).
+    // Kills: the dead end kept for a shared session, the "disconnect:" still sent, or the entry
+    // reset when the server ends the wait itself.
     [StaFact]
-    public void ASharedSession_AskedForAPassword_OffersToTypeIt_AndKeepsTheOfferAfterTheDisconnect()
+    public void ASharedSession_AskedForAPassword_OffersToTypeIt_AndKeepsTheConnectionOpen()
     {
         var keeper = new RecordingKeeper();
         List<string> sent = [];
@@ -61,16 +63,17 @@ public sealed class EmbeddedVncPasswordEntryTests
             afterDisconnect = view.OverlayEnterPasswordButton.Visibility;
         });
 
-        Assert.Contains("disconnect:", sent);
+        Assert.DoesNotContain("disconnect:", sent);
         Assert.Equal(Visibility.Visible, afterRequest);
         Assert.Equal(Visibility.Visible, afterDisconnect);
         Assert.Equal("ErrorVncSharedPasswordRequired", message);
     }
 
-    // A profile of the user's own holds its password: the overlay sends the user to it.
-    // Kills: the entry offered without a keeper.
+    // A profile of the user's own holds its password: the overlay sends the user to it, and
+    // nothing here will answer the server, so the attempt ends.
+    // Kills: the entry offered without a keeper, or a connection left open that nothing answers.
     [StaFact]
-    public void AnOwnProfile_AskedForAPassword_OffersNoEntry()
+    public void AnOwnProfile_AskedForAPassword_OffersNoEntry_AndEndsTheAttempt()
     {
         List<string> sent = [];
         Visibility entry = Visibility.Visible;
@@ -87,6 +90,7 @@ public sealed class EmbeddedVncPasswordEntryTests
 
         Assert.Equal(Visibility.Collapsed, entry);
         Assert.Equal("ErrorVncPasswordRequired", message);
+        Assert.Contains("disconnect:", sent);
     }
 
     // Heimdall has no VNC username: a request for one keeps the dead end even on a shared session.
@@ -107,11 +111,11 @@ public sealed class EmbeddedVncPasswordEntryTests
         Assert.Equal(Visibility.Collapsed, entry);
     }
 
-    // The typed password goes into a new connect in this view, and is kept once the session
-    // connects. Kills: the answer dropped, a connect sent with the old password, or the password
-    // kept before the server accepted it.
+    // The typed password answers the server still waiting for it, with no new connection, and is
+    // kept once the session connects. Kills: the answer sent as a new connect (one more abandoned
+    // sign-in), the answer dropped, or the password kept before the server accepted it.
     [StaFact]
-    public void ATypedPassword_ConnectsInPlace_AndIsKeptOnceConnected()
+    public void ATypedPassword_AnswersTheWaitingServer_AndIsKeptOnceConnected()
     {
         var keeper = new RecordingKeeper(new PasswordPromptResult(Typed, true));
         List<string> sent = [];
@@ -133,12 +137,62 @@ public sealed class EmbeddedVncPasswordEntryTests
             view.HandlePageMessage("connected:");
         });
 
-        string connect = Assert.Single(sent, message => message.StartsWith("connect:", StringComparison.Ordinal));
-        Assert.Contains("\"password\":\"" + Typed + "\"", connect, StringComparison.Ordinal);
+        string answer = Assert.Single(sent);
+        Assert.Equal("credentials:{\"password\":\"" + Typed + "\"}", answer);
         Assert.Equal(0, keptBeforeConnect);
         Assert.Equal(Visibility.Collapsed, overlay);
         Assert.Equal(["s1"], retried);
         Assert.Equal([Typed], keeper.Remembered);
+    }
+
+    // A server that ended the wait before the user answered gets a new connect with the password.
+    // Kills: the answer sent to a connection already gone.
+    [StaFact]
+    public void ATypedPassword_AfterTheServerLeft_ConnectsInPlace()
+    {
+        var keeper = new RecordingKeeper(new PasswordPromptResult(Typed, false));
+        List<string> sent = [];
+
+        WpfTestHost.Invoke(() =>
+        {
+            using EmbeddedVncView view = Build(keeper, sent);
+            view.HandlePageMessage("credentials-required:[\"password\"]");
+            view.HandlePageMessage("disconnected:error");
+            sent.Clear();
+
+            InvokePrivate(view, "OnOverlayEnterPasswordClick", view.OverlayEnterPasswordButton, new RoutedEventArgs());
+        });
+
+        Assert.DoesNotContain(sent, message => message.StartsWith("credentials:", StringComparison.Ordinal));
+        string connect = Assert.Single(sent, message => message.StartsWith("connect:", StringComparison.Ordinal));
+        Assert.Contains("\"password\":\"" + Typed + "\"", connect, StringComparison.Ordinal);
+    }
+
+    // The server can leave between the answer leaving the view and reaching the page: the page
+    // says so, and the answer goes into a new connect, the overlay its disconnect raised taken down.
+    // Kills: a late answer lost, or the overlay left over the new attempt.
+    [StaFact]
+    public void AnAnswerThatArrivesLate_ConnectsInPlace()
+    {
+        var keeper = new RecordingKeeper(new PasswordPromptResult(Typed, false));
+        List<string> sent = [];
+        Visibility overlay = Visibility.Visible;
+
+        WpfTestHost.Invoke(() =>
+        {
+            using EmbeddedVncView view = Build(keeper, sent);
+            view.HandlePageMessage("credentials-required:[\"password\"]");
+            InvokePrivate(view, "OnOverlayEnterPasswordClick", view.OverlayEnterPasswordButton, new RoutedEventArgs());
+            view.HandlePageMessage("disconnected:error");
+            sent.Clear();
+
+            view.HandlePageMessage("credentials-late:");
+            overlay = view.ReconnectOverlay.Visibility;
+        });
+
+        string connect = Assert.Single(sent, message => message.StartsWith("connect:", StringComparison.Ordinal));
+        Assert.Contains("\"password\":\"" + Typed + "\"", connect, StringComparison.Ordinal);
+        Assert.Equal(Visibility.Collapsed, overlay);
     }
 
     // A retry that then fails for another reason (a server blocking the address) shows the overlay
