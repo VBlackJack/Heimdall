@@ -458,7 +458,8 @@ public sealed class ContextMenuFactory
             var context = new Core.Models.ToolContext(
                 TargetHost: tool.RemoteServer,
                 TargetPort: tool.RemotePort > 0 ? tool.RemotePort : null,
-                Argument: tool.RemoteServer);
+                Argument: tool.RemoteServer,
+                RemoteOs: tool.SourceProfile?.RemoteOs ?? Core.Configuration.RemoteOs.Auto);
             _ = vm.OpenToolTabAsync(toolId, tool.DisplayName, context);
         };
         menu.Items.Add(openItem);

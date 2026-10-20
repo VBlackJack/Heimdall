@@ -22,6 +22,8 @@ namespace Heimdall.Core.Models;
 /// instead of generic placeholders like "example.com".
 /// <see cref="DocumentContent"/> hands the tool an unsaved document body (never a
 /// path): the receiving tool must ask for a location before its first write.
+/// <see cref="RemoteOs"/> is the operating system the originating profile declares for its far
+/// end; <see cref="Configuration.RemoteOs.Auto"/> when it declares none or there is no profile.
 /// </summary>
 public sealed record ToolContext(
     string? TargetHost = null,
@@ -43,4 +45,5 @@ public sealed record ToolContext(
     ICommandBroadcaster? CommandBroadcaster = null,
     string? InitialActionId = null,
     IGatewayInventory? GatewayInventory = null,
-    string? DocumentContent = null);
+    string? DocumentContent = null,
+    Configuration.RemoteOs RemoteOs = Configuration.RemoteOs.Auto);

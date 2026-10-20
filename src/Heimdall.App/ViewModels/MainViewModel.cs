@@ -471,6 +471,12 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         // in. Handing the collection back is what lets a Command Library broadcast see tabs
         // other than the one it was opened from.
         _embeddedSessionManager.ActiveSessionsProvider = () => Connection.ActiveSessions;
+
+        // A Command Library docked beside a terminal reads the facts of that terminal's profile;
+        // the whole inventory, not the tree's filtered view, as for the tab tooltip.
+        _embeddedSessionManager.ProfileResolver = profileId => ServerList.AllServers
+            .FirstOrDefault(server => string.Equals(server.Id, profileId, StringComparison.Ordinal))
+            ?.SourceProfile;
         Settings = settings;
         Update = update;
         Sidebar = new SidebarViewModel(this, localizer, configManager, toolsTabPopulation, toolContextProvider, _uiDispatcher);

@@ -298,6 +298,12 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// </summary>
     public string SshKeyPath => _sourceDto?.SshKeyPath ?? "";
 
+    /// <summary>
+    /// The profile this row was built from, for the session facts a docked tool reads (host,
+    /// user, protocol, declared operating system); null for a row built without one.
+    /// </summary>
+    internal ServerProfileDto? SourceProfile => _sourceDto;
+
     public bool IsActiveSession => ConnectionStateSets.IsConnected(ConnectionState);
 
     /// <summary>
@@ -757,7 +763,8 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
 
     private void InvalidateSearchTextCache() => _searchTextCacheInvalid = true;
 
-    private static string GetUsername(ServerProfileDto dto)
+    /// <summary>The user name the profile authenticates with for its own protocol, or empty.</summary>
+    internal static string GetUsername(ServerProfileDto dto)
     {
         return dto.ConnectionType?.ToUpperInvariant() switch
         {

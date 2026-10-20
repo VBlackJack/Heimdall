@@ -159,6 +159,18 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public bool UseDirectConnection { get; set; }
     public string? ProjectId { get; set; }
     public string ConnectionType { get; set; } = "RDP";
+
+    /// <summary>
+    /// The operating system of the far end, as the user declared it; <see cref="RemoteOs.Auto"/>
+    /// when nothing was declared.
+    /// </summary>
+    /// <remarks>
+    /// Written as a name, like <see cref="RdpResolutionMode"/>. A file that omits it, and every
+    /// profile an importer builds, reads as Auto, which keeps the guess from the protocol.
+    /// </remarks>
+    [JsonConverter(typeof(JsonStringEnumConverter<RemoteOs>))]
+    public RemoteOs RemoteOs { get; set; } = RemoteOs.Auto;
+
     public bool? SessionLoggingOverride { get; set; }
 
     /// <summary>

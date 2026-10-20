@@ -929,20 +929,29 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     }
 
     /// <summary>
-    /// Pre-seeds the platform filter index using the originating tool context's
-    /// connection type (SSH → Linux, RDP/LOCAL → Windows, otherwise All).
+    /// Pre-seeds the platform filter from the originating session: the operating system its
+    /// profile declares, or, when it declares none, the guess from the connection type
+    /// (see <see cref="RemoteOsResolver"/>). Undetermined leaves the filter on All.
     /// The view calls this once after <see cref="InitializeAsync"/>.
     /// </summary>
-    public void AutoSelectPlatform(string? connectionType)
+    public void AutoSelectPlatform(string? connectionType, RemoteOs remoteOs = RemoteOs.Auto)
     {
-        PlatformFilterIndex = connectionType?.ToUpperInvariant() switch
+        PlatformFilterIndex = RemoteOsResolver.Resolve(remoteOs, connectionType) switch
         {
-            "SSH" => 2,
-            "LOCAL" => 1,
-            "RDP" => 1,
-            _ => 0
+            RemoteOs.Linux => PlatformFilterLinux,
+            RemoteOs.Windows => PlatformFilterWindows,
+            _ => PlatformFilterAll
         };
     }
+
+    /// <summary>Index of "All" in <see cref="PlatformFilterItems"/>.</summary>
+    internal const int PlatformFilterAll = 0;
+
+    /// <summary>Index of "Windows" in <see cref="PlatformFilterItems"/>.</summary>
+    internal const int PlatformFilterWindows = 1;
+
+    /// <summary>Index of "Linux" in <see cref="PlatformFilterItems"/>.</summary>
+    internal const int PlatformFilterLinux = 2;
 
     /// <summary>
     /// Reloads the entire library (used after CRUD and Git sync). Preserves
@@ -987,7 +996,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
             if (hasWin && hasLinux)
             {
-                var preferWindows = PlatformFilterIndex != 2;
+                var preferWindows = PlatformFilterIndex != PlatformFilterLinux;
                 UseWindowsTemplate = preferWindows;
                 _activeTemplate = preferWindows
                     ? _selectedAction.WindowsCommandTemplate

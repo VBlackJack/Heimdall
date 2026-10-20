@@ -21,10 +21,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services.PostConnect;
 using Heimdall.App.ViewModels.CommandLibrary;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
+using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
+using TemplateParameter = TwinShell.Core.Models.TemplateParameter;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
@@ -95,9 +98,23 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
 
     public event Action? CloseRequested;
 
+    /// <summary>
+    /// The operating system the profile being edited declares for its far end. Post-connect runs
+    /// over SSH, so an undeclared far end keeps the Linux template; a declared Windows one - SSH
+    /// into Windows OpenSSH - picks and previews the Windows template instead.
+    /// </summary>
+    public RemoteOs RemoteOs { get; init; } = RemoteOs.Auto;
+
+    /// <summary>True when the Windows template is the one this picker links and previews.</summary>
+    public bool UsesWindowsTemplate =>
+        RemoteOsResolver.Resolve(RemoteOs, PostConnectConnectionType) == RemoteOs.Windows;
+
+    /// <summary>Post-connect steps run only over SSH terminals.</summary>
+    private const string PostConnectConnectionType = "SSH";
+
     public bool CanConfirm =>
         SelectedAction is not null
-        && SelectedAction.HasLinuxTemplate
+        && HasActiveTemplate(SelectedAction)
         && Parameters.All(parameter => !parameter.Required || !string.IsNullOrWhiteSpace(parameter.Value));
 
     public Task InitializeAsync(AutoPrefillContext? prefillContext = null)
@@ -155,16 +172,18 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
             return;
         }
 
-        if (!value.HasLinuxTemplate)
+        if (!HasActiveTemplate(value))
         {
             GeneratedCommand = string.Empty;
-            ErrorMessage = _localizer["LabelCommandLibraryPickerNoLinuxTemplate"];
+            ErrorMessage = UsesWindowsTemplate
+                ? _localizer["LabelCommandLibraryPickerNoWindowsTemplate"]
+                : _localizer["LabelCommandLibraryPickerNoLinuxTemplate"];
             OnPropertyChanged(nameof(CanConfirm));
             ConfirmCommand.NotifyCanExecuteChanged();
             return;
         }
 
-        foreach (var parameter in value.LinuxParameters)
+        foreach (var parameter in ActiveParameters(value))
         {
             var vm = new TemplateParameterInputViewModel(parameter);
             vm.PropertyChanged += OnParameterPropertyChanged;
@@ -202,6 +221,8 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
                     HasWindowsTemplate = action.WindowsCommandTemplate is not null,
                     LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],
                     LinuxTemplate = action.LinuxCommandTemplate,
+                    WindowsParameters = action.WindowsCommandTemplate?.Parameters?.ToList() ?? [],
+                    WindowsTemplate = action.WindowsCommandTemplate,
                     Presentation = CommandPresentationResolver.Resolve(action, key => _localizer[key]),
                     PlatformBadge = ResolvePlatformBadge(
                         action.WindowsCommandTemplate is not null,
@@ -327,7 +348,7 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
 
     private void RegeneratePreview()
     {
-        var template = SelectedAction?.LinuxTemplate;
+        var template = SelectedAction is null ? null : ActiveTemplate(SelectedAction);
         if (template is null)
         {
             GeneratedCommand = string.Empty;
@@ -360,6 +381,15 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
         }
     }
 
+    private bool HasActiveTemplate(CommandLibraryPickerItem action)
+        => UsesWindowsTemplate ? action.HasWindowsTemplate : action.HasLinuxTemplate;
+
+    private CommandTemplate? ActiveTemplate(CommandLibraryPickerItem action)
+        => UsesWindowsTemplate ? action.WindowsTemplate : action.LinuxTemplate;
+
+    private IReadOnlyList<TemplateParameter> ActiveParameters(CommandLibraryPickerItem action)
+        => UsesWindowsTemplate ? action.WindowsParameters : action.LinuxParameters;
+
     private void ApplyParameterValues(CommandLibraryPickerItem action)
     {
         if (_existingValues is not null)
@@ -379,7 +409,7 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
         }
 
         var prefills = PostConnectParameterAutoPrefiller.Prefill(
-            action.LinuxParameters,
+            ActiveParameters(action),
             _prefillContext,
             _existingValues);
 

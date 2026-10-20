@@ -172,6 +172,7 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Recherche plein texte avec classement par pertinence sur les titres, les tags, les descriptions et le texte des commandes
 - Filtres par catégorie, tag, plateforme et niveau de risque ; chaque filtre conserve sa sélection après un rechargement de la bibliothèque
 - Favoris, et badge de risque par action (info, run, dangereux)
+- Ouverte depuis une session, la bibliothèque démarre avec le filtre de plateforme de cette session. Un profil peut déclarer le système d'exploitation de sa machine distante (onglet Général, **Système d'exploitation distant**) : Windows ou Linux est alors pris tel quel, et Automatique garde la déduction tirée du protocole (SSH pour Linux ; RDP, WinRM et Local pour Windows). Les étapes post-connexion liées à la bibliothèque et leur sélecteur suivent la même déclaration, si bien qu'une connexion SSH vers un serveur Windows OpenSSH reçoit le modèle Windows
 
 **Construire la commande**
 - Paramètres typés : texte, entier, booléen, nom d'hôte, adresse IP, chemin, et **choice** (un jeu fixe de valeurs proposé en liste déroulante)

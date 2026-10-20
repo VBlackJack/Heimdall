@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Services.PostConnect;
@@ -21,4 +22,15 @@ namespace Heimdall.App.Services.PostConnect;
 public interface IPostConnectStepResolver
 {
     Task<PostConnectResolveResult> ResolveAsync(PostConnectStep step, CancellationToken ct);
+
+    /// <summary>
+    /// Resolves a step for a far end that runs <paramref name="remoteOs"/>, so a linked action is
+    /// expanded from the template of the platform the profile declares.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to the platform-blind overload, so an implementation with nothing to choose
+    /// between needs no change.
+    /// </remarks>
+    Task<PostConnectResolveResult> ResolveAsync(PostConnectStep step, RemoteOs remoteOs, CancellationToken ct)
+        => ResolveAsync(step, ct);
 }

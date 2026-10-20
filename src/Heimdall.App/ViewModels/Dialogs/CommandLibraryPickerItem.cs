@@ -31,6 +31,12 @@ public sealed class CommandLibraryPickerItem
     /// <summary>Linux command template (when present), used for the live command preview.</summary>
     public CommandTemplate? LinuxTemplate { get; init; }
 
+    /// <summary>Parameters of the Windows template, used when the profile declares a Windows far end.</summary>
+    public IReadOnlyList<TemplateParameter> WindowsParameters { get; init; } = [];
+
+    /// <summary>Windows command template (when present), used when the profile declares a Windows far end.</summary>
+    public CommandTemplate? WindowsTemplate { get; init; }
+
     /// <summary>Resolved presentation (description, risk, platform labels) for this action.</summary>
     public required CommandPresentation Presentation { get; init; }
 
