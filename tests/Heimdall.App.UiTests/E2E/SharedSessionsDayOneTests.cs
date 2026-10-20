@@ -194,7 +194,7 @@ public sealed class SharedSessionsDayOneTests
         // reaches it: a mouse right-click lands on whatever window is in front of the app when
         // Windows refuses it the foreground, and an expanded root's centre is a session row.
         root.Patterns.SelectionItem.Pattern.Select();
-        window.SetForeground();
+        ForegroundGuard.Ensure(window);
         root.Focus();
         Keyboard.TypeSimultaneously(VirtualKeyShort.SHIFT, VirtualKeyShort.F10);
 

@@ -75,8 +75,6 @@ public sealed class MaskedCopyTests
     private const string DialogClosedDescription = "masked copy dialog closed";
     private const string CopyButtonDescription = "Copy button of the masked copy dialog";
     private const string CountLineDescription = "count line of the key-value rule";
-    private const string ForegroundDescription = "the Heimdall main window to be the foreground window (keys are not sent otherwise)";
-    private const string User32Library = "user32.dll";
 
     private static readonly TimeSpan LaunchTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(30);
@@ -85,10 +83,7 @@ public sealed class MaskedCopyTests
     private static readonly TimeSpan ProbeInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan CloseTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan ExitTimeout = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan ForegroundTimeout = TimeSpan.FromSeconds(5);
 
-    [DllImport(User32Library)]
-    private static extern IntPtr GetForegroundWindow();
 
     [ProductLaunchFact]
     [Trait("Category", "RequiresDesktop")]
@@ -142,9 +137,9 @@ public sealed class MaskedCopyTests
             }
             CancelDialog(firstDialog);
 
-            EnsureForeground(window);
+            ForegroundGuard.Ensure(window);
             Keyboard.Type(SecretCommand);
-            EnsureForeground(window);
+            ForegroundGuard.Ensure(window);
             Keyboard.Type(VirtualKeyShort.ENTER);
 
             var dialog = WaitHelpers.WaitFor(
@@ -186,19 +181,6 @@ public sealed class MaskedCopyTests
             TryDeleteDirectory(dataDir);
             RestoreClipboardText(savedClipboardText);
         }
-    }
-
-    // Brings the window to the front and fails the test when it does not get there: the keys
-    // that follow are global input and must not reach another window.
-    private static void EnsureForeground(Window window)
-    {
-        window.SetForeground();
-        var handle = window.Properties.NativeWindowHandle.ValueOrDefault;
-        Assert.True(handle != 0, "The Heimdall main window has no native handle.");
-        WaitHelpers.WaitUntil(
-            () => GetForegroundWindow().ToInt64() == handle,
-            ForegroundDescription,
-            ForegroundTimeout);
     }
 
     // The clipboard is user data the test overwrites: its text is kept and put back. Only the
@@ -265,9 +247,9 @@ public sealed class MaskedCopyTests
         }
 
         row.Patterns.SelectionItem.Pattern.Select();
-        EnsureForeground(window);
+        ForegroundGuard.Ensure(window);
         row.Focus();
-        EnsureForeground(window);
+        ForegroundGuard.Ensure(window);
         Keyboard.Type(VirtualKeyShort.ENTER);
     }
 
@@ -292,7 +274,7 @@ public sealed class MaskedCopyTests
 
     private static Window? TryOpenDialog(UIA3Automation automation, Application app, Window window, string title)
     {
-        EnsureForeground(window);
+        ForegroundGuard.Ensure(window);
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_M);
 
         var deadline = DateTime.UtcNow + DialogProbeTimeout;
