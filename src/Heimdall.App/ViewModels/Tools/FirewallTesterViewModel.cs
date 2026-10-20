@@ -36,6 +36,15 @@ public sealed partial class FirewallTesterViewModel : ObservableObject, IDisposa
     private List<string> _lastHosts = [];
     private List<int> _lastPorts = [];
 
+    /// <summary>
+    /// Number of the test run in progress, and of the last run that reached its final state.
+    /// Progress reports are posted asynchronously by <see cref="Progress{T}"/>, so one can arrive
+    /// after the run has written its final counters; a report whose run is finished, or is not the
+    /// current one, is dropped instead of overwriting them.
+    /// </summary>
+    private int _run;
+    private int _finishedRun;
+
     [ObservableProperty] private bool _isTesting;
     [ObservableProperty] private string _errorText = string.Empty;
     [ObservableProperty] private bool _showError;
@@ -94,9 +103,11 @@ public sealed partial class FirewallTesterViewModel : ObservableObject, IDisposa
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
 
+        int run;
         lock (_lock)
         {
             _allResults.Clear();
+            run = ++_run;
         }
 
         _lastHosts = [.. hosts];
@@ -118,23 +129,25 @@ public sealed partial class FirewallTesterViewModel : ObservableObject, IDisposa
         {
             var progress = new Progress<FwProbeProgress>(update =>
             {
-                Completed = update.Completed;
-                Total = update.Total;
-                ProgressPercent = update.Total > 0 ? (int)(update.Completed * 100.0 / update.Total) : 0;
-                ProgressCountText = Format("ToolFwProgress", update.Completed, update.Total);
-
-                if (update.LatestResult is { } result)
+                lock (_lock)
                 {
-                    lock (_lock)
+                    if (IsStaleReport(run))
                     {
-                        if (!_allResults.Contains(result))
-                        {
-                            _allResults.Add(result);
-                        }
+                        return;
                     }
-                }
 
-                UpdateCountsAndSummary();
+                    Completed = update.Completed;
+                    Total = update.Total;
+                    ProgressPercent = update.Total > 0 ? (int)(update.Completed * 100.0 / update.Total) : 0;
+                    ProgressCountText = Format("ToolFwProgress", update.Completed, update.Total);
+
+                    if (update.LatestResult is { } result && !_allResults.Contains(result))
+                    {
+                        _allResults.Add(result);
+                    }
+
+                    UpdateCountsAndSummary();
+                }
             });
 
             var results = await _service.TestMatrixAsync(
@@ -145,22 +158,32 @@ public sealed partial class FirewallTesterViewModel : ObservableObject, IDisposa
 
             lock (_lock)
             {
+                MarkFinished(run);
                 _allResults.Clear();
                 _allResults.AddRange(results);
-            }
 
-            Completed = _allResults.Count;
-            Total = hosts.Count * ports.Count;
-            ProgressPercent = Total > 0 ? (int)(Completed * 100.0 / Total) : 0;
-            ProgressCountText = Format("ToolFwProgress", Completed, Total);
-            UpdateCountsAndSummary();
+                Completed = _allResults.Count;
+                Total = hosts.Count * ports.Count;
+                ProgressPercent = Total > 0 ? (int)(Completed * 100.0 / Total) : 0;
+                ProgressCountText = Format("ToolFwProgress", Completed, Total);
+                UpdateCountsAndSummary();
+            }
         }
         catch (OperationCanceledException)
         {
-            UpdateCountsAndSummary();
+            lock (_lock)
+            {
+                MarkFinished(run);
+                UpdateCountsAndSummary();
+            }
         }
         catch (Exception ex)
         {
+            lock (_lock)
+            {
+                MarkFinished(run);
+            }
+
             SetError(FormatError("ToolTunnelFailed", ex.Message));
         }
         finally
@@ -191,6 +214,18 @@ public sealed partial class FirewallTesterViewModel : ObservableObject, IDisposa
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
+    }
+
+    /// <summary>Call under <see cref="_lock"/>.</summary>
+    private bool IsStaleReport(int run) => run != _run || _finishedRun >= run;
+
+    /// <summary>Call under <see cref="_lock"/>.</summary>
+    private void MarkFinished(int run)
+    {
+        if (_finishedRun < run)
+        {
+            _finishedRun = run;
+        }
     }
 
     private void UpdateCountsAndSummary()
