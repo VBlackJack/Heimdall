@@ -53,6 +53,13 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     private bool _eventConnectEmitted;
     private bool _eventDisconnectEmitted;
 
+    // The password the next connect sends, and what the server's answer does to it.
+    private VncPasswordFlow? _passwordFlow;
+
+    // Whether the failure overlay offers to type the password: only after the server asked for
+    // one the session could not give, or refused the one it gave.
+    private bool _offerPasswordEntry;
+
     // Whether this view holds a sleep-prevention reference. Watching a remote screen involves no
     // local input, so without one the machine slept under an open VNC session - RDP and SSH
     // sessions already held one.
@@ -63,6 +70,27 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
     /// <summary>Raised when the VNC session encounters an error. Parameters: ServerId, error message.</summary>
     public event Action<string, string>? SessionError;
+
+    /// <summary>
+    /// Raised when the view connects again in place, with a password the user just typed.
+    /// Parameter: ServerId.
+    /// </summary>
+    public event Action<string>? SessionRetrying;
+
+    /// <summary>Raised when the failure overlay's Edit profile is pressed.</summary>
+    public event Action? EditProfileRequested;
+
+    /// <summary>
+    /// Asks for, keeps and drops the password of a session whose profile cannot hold one (a shared
+    /// session); null for a profile of the user's own. Set before <see cref="InitializeSessionAsync"/>.
+    /// </summary>
+    public IVncPasswordKeeper? PasswordKeeper { get; set; }
+
+    /// <summary>
+    /// Whether the failure overlay offers Edit profile, asked each time it is shown: the pane this
+    /// view lives in can change. Null offers it never.
+    /// </summary>
+    public Func<bool>? EditProfileAvailable { get; set; }
 
     /// <summary>
     /// Raised when the session ends cleanly, by the user or by the server. Parameter: ServerId.
@@ -137,6 +165,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         _session = session;
         _sessionTab = sessionTab;
         _localizer = localizer;
+        _passwordFlow = new VncPasswordFlow(session.Password, PasswordKeeper);
 
         SessionTitleText.Text = displayName;
         EndpointTextBlock.Text = $"{session.Host}:{session.Port}";
@@ -184,6 +213,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             ReconnectMessageText.Text = L10n("VncDisconnectedOverlay");
         }
         OverlayReconnectButton.Content = L10n("BtnReconnectSession");
+        OverlayEnterPasswordButton.Content = L10n("BtnVncEnterPassword");
         OverlayCloseButton.Content = L10n("BtnCloseOverlay");
         FallbackTitleText.Text = L10n("VncFallbackTitle");
         if (FallbackPanel.Visibility != Visibility.Visible)
@@ -202,6 +232,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         System.Windows.Automation.AutomationProperties.SetName(SplitButton, L10n("A11ySplitSession"));
         System.Windows.Automation.AutomationProperties.SetName(OverlayReconnectButton, L10n("A11yReconnectSession"));
         System.Windows.Automation.AutomationProperties.SetName(OverlayCloseButton, L10n("A11yCloseOverlay"));
+        System.Windows.Automation.AutomationProperties.SetName(OverlayEnterPasswordButton, L10n("A11yVncEnterPassword"));
         System.Windows.Automation.AutomationProperties.SetHelpText(StatusTextBlock, L10n("A11yConnectionStatus"));
     }
 
@@ -301,7 +332,15 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             return;
         }
 
-        var message = e.TryGetWebMessageAsString();
+        HandlePageMessage(e.TryGetWebMessageAsString());
+    }
+
+    /// <summary>
+    /// Acts on one message from the trusted page. Separate from the WebView2 event so a test can
+    /// hand the view what the page would send, as <see cref="PageMessageSink"/> records what it sends.
+    /// </summary>
+    internal void HandlePageMessage(string? message)
+    {
         if (string.IsNullOrEmpty(message))
         {
             return;
@@ -334,6 +373,11 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             }
             EmitConnect();
             AcquireSleepPrevention();
+            _offerPasswordEntry = false;
+            if (_passwordFlow is { } connectedFlow)
+            {
+                ObservePasswordTask(connectedFlow.OnConnectedAsync());
+            }
             return;
         }
 
@@ -368,6 +412,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
         if (message.StartsWith("disconnected:", StringComparison.Ordinal))
         {
+            _passwordFlow?.OnAttemptEnded();
             EmitDisconnect("remote");
             ReleaseSleepPrevention();
             if (_session?.ServerId is not null)
@@ -388,6 +433,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         {
             var errorMsg = message["error:".Length..];
             Core.Logging.FileLogger.Error($"VNC error: {errorMsg}");
+            _passwordFlow?.OnAttemptEnded();
 
             // Mid-session error ends the session; the latch makes this a no-op pre-connect.
             EmitDisconnect("remote");
@@ -443,21 +489,76 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         if (message.StartsWith("credentials-required:", StringComparison.Ordinal))
         {
             HandleCredentialsRequest(message["credentials-required:".Length..]);
+            return;
+        }
+
+        if (message.StartsWith("security-failure:", StringComparison.Ordinal))
+        {
+            HandleSecurityFailure(message["security-failure:".Length..]);
+            return;
+        }
+
+        if (message == "credentials-late:")
+        {
+            HandleLateCredentials();
         }
     }
 
     /// <summary>
-    /// Ends the attempt when the server asks for credentials the profile does not hold, and says
-    /// which. See <see cref="VncCredentialsPolicy"/>.
+    /// Ends the attempt when the server asks for credentials the session does not hold, and says
+    /// which. A session whose profile cannot hold the password (a shared one) offers to type it;
+    /// see <see cref="VncCredentialsPolicy"/>.
     /// </summary>
     private void HandleCredentialsRequest(string requestedTypesJson)
     {
-        string key = VncCredentialsPolicy.MessageKeyFor(requestedTypesJson);
-        string text = _localizer?[key] ?? key;
-        Core.Logging.FileLogger.Warn($"VNC server asked for credentials the profile does not hold ({key}).");
+        bool canAsk = _passwordFlow?.CanAsk == true;
+        bool offerEntry = canAsk && VncCredentialsPolicy.AsksForPasswordOnly(requestedTypesJson);
+        string key = VncCredentialsPolicy.MessageKeyFor(requestedTypesJson, canAsk);
+        Core.Logging.FileLogger.Warn($"VNC server asked for credentials the session does not hold ({key}).");
+
+        // Where the user can type the password, the server keeps waiting for it on this connection:
+        // ending it would count as a wrong password on TigerVNC, which blocks the address after a few.
+        if (offerEntry)
+        {
+            _passwordFlow!.OnServerWaiting();
+        }
+        else
+        {
+            Dispatcher.Invoke(() => PostWebMessage("disconnect:"));
+        }
+
+        EndAttempt(_localizer?[key] ?? key, offerEntry);
+    }
+
+    /// <summary>
+    /// Ends the attempt the server refused at its security step. A refusal after the password was
+    /// sent drops a remembered one, so the next attempt asks instead of sending it again.
+    /// </summary>
+    private void HandleSecurityFailure(string failureJson)
+    {
+        VncSecurityFailure failure = VncCredentialsPolicy.ReadSecurityFailure(failureJson);
+        bool canAsk = _passwordFlow?.CanAsk == true;
+        string key = VncCredentialsPolicy.MessageKeyForSecurityFailure(failure, canAsk);
+
+        // The server's reason is logged and shown, never the password or whether one was remembered.
+        Core.Logging.FileLogger.Warn($"VNC server refused the sign-in ({key}): {failure.Reason}");
+        if (_passwordFlow is { } flow)
+        {
+            ObservePasswordTask(flow.OnSecurityFailureAsync(failure.AfterPassword));
+        }
+
+        string text = key == "ErrorVncSecurityRefusedReason"
+            ? _localizer?.Format(key, failure.Reason ?? string.Empty) ?? key
+            : _localizer?[key] ?? key;
+        EndAttempt(text, offerEntry: failure.AfterPassword && canAsk);
+    }
+
+    /// <summary>Shows why the attempt ended, on the header and over the pane.</summary>
+    private void EndAttempt(string text, bool offerEntry)
+    {
         Dispatcher.Invoke(() =>
         {
-            PostWebMessage("disconnect:");
+            _offerPasswordEntry = offerEntry;
             StatusTextBlock.Text = text;
             Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
             ShowReconnectOverlay(text);
@@ -467,6 +568,16 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         {
             SessionError?.Invoke(_session.ServerId, text);
         }
+    }
+
+    /// <summary>Logs a failure to keep or drop a password; the session itself goes on.</summary>
+    private static void ObservePasswordTask(Task task)
+    {
+        _ = task.ContinueWith(
+            t => Core.Logging.FileLogger.Warn($"VNC password could not be kept or dropped: {t.Exception?.GetBaseException().Message}"),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
     }
 
     private void OnWebViewNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs navArgs)
@@ -551,7 +662,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         var connectParams = new
         {
             wsUrl = $"ws://127.0.0.1:{_proxy.ListenPort}",
-            password = _session?.Password,
+            password = _passwordFlow?.Password,
             viewOnly = _session?.ViewOnly ?? false,
 
             // The page shows and reports these; it used to carry its own English ones.
@@ -689,6 +800,87 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         RequestReconnect?.Invoke(_session?.ServerId ?? "");
     }
 
+    /// <summary>
+    /// Asks for the password the server wants and hands it to the connection still waiting for it,
+    /// or connects again in this view with it when that connection is gone. A reconnect from the
+    /// pane rebuilds the session without asking anything, so it could never get there.
+    /// </summary>
+    private async void OnOverlayEnterPasswordClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed || _passwordFlow is null)
+        {
+            return;
+        }
+
+        bool answered;
+        try
+        {
+            answered = await _passwordFlow.AskAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"VNC password prompt failed: {ex.Message}");
+            return;
+        }
+
+        if (!answered || _disposed)
+        {
+            return;
+        }
+
+        ShowSigningInWithPassword();
+        if (_passwordFlow.TakeWaitingServer())
+        {
+            PostWebMessage("credentials:" + JsonSerializer.Serialize(new { password = _passwordFlow.Password }));
+        }
+        else
+        {
+            SendConnectCommand();
+        }
+    }
+
+    /// <summary>
+    /// The page had no connection waiting when the answer reached it (the server ended the sign-in
+    /// in the meantime): the answer goes into a new connect instead.
+    /// </summary>
+    private void HandleLateCredentials()
+    {
+        if (_disposed || _passwordFlow?.Password is null)
+        {
+            return;
+        }
+
+        Dispatcher.Invoke(() =>
+        {
+            ShowSigningInWithPassword();
+            SendConnectCommand();
+        });
+    }
+
+    /// <summary>Takes the overlay down while the typed password signs in.</summary>
+    private void ShowSigningInWithPassword()
+    {
+        // The words that asked for the password would outlive it: an attempt that then fails for
+        // another reason shows the overlay again without the entry, and must not still say to use it.
+        _offerPasswordEntry = false;
+        ReconnectMessageText.Text = L10n("VncDisconnectedOverlay");
+        ReconnectOverlay.Visibility = Visibility.Collapsed;
+        ReconnectButton.Visibility = Visibility.Collapsed;
+        VncWebView.Visibility = Visibility.Visible;
+        StatusTextBlock.Text = L10n("StatusVncConnecting");
+        Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
+        VncLoadingBar.Visibility = Visibility.Visible;
+        if (_session?.ServerId is not null)
+        {
+            SessionRetrying?.Invoke(_session.ServerId);
+        }
+    }
+
+    private void OnOverlayEditProfileClick(object sender, RoutedEventArgs e)
+    {
+        EditProfileRequested?.Invoke();
+    }
+
     private void OnOverlayReconnectClick(object sender, RoutedEventArgs e)
     {
         ReconnectOverlay.Visibility = Visibility.Collapsed;
@@ -760,6 +952,8 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
                 ReconnectMessageText.Text = message;
             }
 
+            OverlayEnterPasswordButton.Visibility = _offerPasswordEntry ? Visibility.Visible : Visibility.Collapsed;
+            OverlayEditProfileButton.Visibility = EditProfileAvailable?.Invoke() == true ? Visibility.Visible : Visibility.Collapsed;
             ReconnectOverlay.Visibility = Visibility.Visible;
             ReconnectButton.Visibility = Visibility.Visible;
             // Airspace rule: the WebView2 HWND occludes WPF siblings regardless

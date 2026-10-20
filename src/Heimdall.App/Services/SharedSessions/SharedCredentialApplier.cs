@@ -52,6 +52,7 @@ public sealed class SharedCredentialApplier
 {
     private static readonly string SshConnectionType = ConnectionTypeCatalog.Canonicalize("SSH");
     private static readonly string SftpConnectionType = ConnectionTypeCatalog.Canonicalize("SFTP");
+    private static readonly string VncConnectionType = ConnectionTypeCatalog.Canonicalize("VNC");
 
     private static readonly HashSet<int> CredentialRejections =
     [
@@ -232,10 +233,50 @@ public sealed class SharedCredentialApplier
             }
         }
 
+        // A VNC session is never asked here: nothing in a shared entry says whether its server
+        // wants a password, and a question before a server that wants none would be one too many.
+        // Only a remembered password is filled; the view asks when the server does, and keeps or
+        // drops the password from the server's own answer (see VncPasswordFor). The plan does not
+        // carry it: the connection succeeding says nothing of the VNC sign-in, which comes after.
+        if (string.Equals(profile.ConnectionType, VncConnectionType, StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrEmpty(profile.VncPassword)
+            && await FindReadableAsync(VncTarget(sessionSource, profile.InventoryProfileId, profile.RemoteServer, VncPortOf(profile))).ConfigureAwait(false) is { } rememberedVnc)
+        {
+            profile.VncPassword = rememberedVnc;
+        }
+
         // An RDP session asks for its password in the RDP client, which Heimdall does not own:
         // there is no answer here to remember. Its bastions above are still covered.
         return plan;
     }
+
+    /// <summary>
+    /// The password of the shared VNC session <paramref name="profileId"/> on
+    /// <paramref name="host"/>:<paramref name="port"/>, for the view to ask, keep and drop; null
+    /// for a profile that is not shared, whose password belongs in the profile.
+    /// </summary>
+    /// <remarks>
+    /// Reads nothing remembered: the remembered password, if any, was filled by
+    /// <see cref="ApplyAsync"/>, after the Windows Hello gate.
+    /// </remarks>
+    public SharedVncPassword? VncPasswordFor(string? profileId, string host, int port)
+    {
+        if (!SharedSessionIds.IsShared(profileId)
+            || SharedSessionIds.SourceIdOf(profileId) is not { } sourceId
+            || string.IsNullOrWhiteSpace(host))
+        {
+            return null;
+        }
+
+        return new SharedVncPassword(this, VncTarget(sourceId, profileId!, host, port), host);
+    }
+
+    private static SecretTarget VncTarget(string sourceId, string profileId, string host, int port) =>
+        new(SharedSecretKind.Vnc, sourceId, SharedSessionSecretStore.VncKey(profileId, host, port));
+
+    /// <summary>The port a VNC connection dials, as <c>VncHandler</c> reads it.</summary>
+    private static int VncPortOf(ServerProfileDto profile) =>
+        profile.VncPort > 0 ? profile.VncPort : DefaultPorts.Vnc;
 
     /// <summary>
     /// An SFTP connection retypes a refused password itself when it may prompt, and a retyped
@@ -315,8 +356,11 @@ public sealed class SharedCredentialApplier
     }
 
     private Task<PasswordPromptResult?> AskAsync(string message, CancellationToken cancellationToken) =>
+        AskAsync(_localizer["DialogSshPasswordPromptTitle"], message, cancellationToken);
+
+    private Task<PasswordPromptResult?> AskAsync(string title, string message, CancellationToken cancellationToken) =>
         _dialogService.ShowPasswordInputWithRememberAsync(
-            _localizer["DialogSshPasswordPromptTitle"],
+            title,
             message,
             _localizer["DialogRememberPasswordOnThisComputer"],
             cancellationToken);
@@ -337,6 +381,47 @@ public sealed class SharedCredentialApplier
 
     /// <summary>What a remembered password is filed under.</summary>
     internal sealed record SecretTarget(SharedSecretKind Kind, string SourceId, string Key);
+
+    /// <summary>
+    /// The password of one shared VNC session: asked when its server wants one, kept once the
+    /// server accepted it, dropped when the server refused it.
+    /// </summary>
+    /// <remarks>
+    /// The view drives it from the server's answers, because only the VNC client sees them: the
+    /// connection returns before the VNC sign-in starts. Not logged: whether a password was
+    /// remembered is itself credential data.
+    /// </remarks>
+    public sealed class SharedVncPassword : IVncPasswordKeeper
+    {
+        private readonly SharedCredentialApplier _owner;
+        private readonly SecretTarget _target;
+        private readonly string _host;
+
+        internal SharedVncPassword(SharedCredentialApplier owner, SecretTarget target, string host)
+        {
+            _owner = owner;
+            _target = target;
+            _host = host;
+        }
+
+        /// <inheritdoc />
+        public Task<PasswordPromptResult?> AskAsync(CancellationToken cancellationToken) =>
+            _owner.AskAsync(
+                _owner._localizer["DialogVncPasswordPromptTitle"],
+                _owner._localizer.Format("DialogVncPasswordPromptMessage", _host),
+                cancellationToken);
+
+        /// <inheritdoc />
+        public Task RememberAsync(string password)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(password);
+            return _owner._store.RememberAsync(_target.Kind, _target.SourceId, _target.Key, _owner._seal(password));
+        }
+
+        /// <inheritdoc />
+        public Task ForgetAsync() =>
+            _owner._store.ForgetAsync(_target.Kind, _target.SourceId, _target.Key);
+    }
 
     /// <summary>The passwords a connection used and the ones it was asked to remember.</summary>
     public sealed class SharedCredentialPlan

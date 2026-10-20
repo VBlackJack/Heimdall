@@ -60,6 +60,8 @@ public sealed class MaskedCopyTests
     private const string ShellExecutable = "cmd.exe";
     private const string NameSeparator = ", ";
     private const int DiagnosticNameLimit = 80;
+    private const string DiagnosticsTimedOut = "(UI Automation timed out while listing them)";
+    private const string SessionTreeAutomationId = "SessionTreeView";
     private const string Secret = "hunter2";
     private const string SecretCommand = "echo password=" + Secret;
 
@@ -70,6 +72,7 @@ public sealed class MaskedCopyTests
     private const string PlaceholderOne = "{1}";
 
     private const string MainWindowDescription = "Heimdall main window";
+    private const string SessionTreeDescription = "session tree";
     private const string ProfileRowDescription = "local shell row in the session tree";
     private const string DialogDescription = "masked copy dialog showing the masked command";
     private const string DialogClosedDescription = "masked copy dialog closed";
@@ -113,7 +116,7 @@ public sealed class MaskedCopyTests
 
             using var automation = new UIA3Automation();
             var window = WaitHelpers.WaitFor(
-                () => app.GetMainWindow(automation),
+                () => UiaTimeout.MissOnTimeout(() => app.GetMainWindow(automation)),
                 MainWindowDescription,
                 LaunchTimeout);
 
@@ -132,8 +135,8 @@ public sealed class MaskedCopyTests
             }
             catch (Xunit.Sdk.XunitException ex)
             {
-                var seen = window.FindAllDescendants().Select(NameOf).Where(name => name.Length > 0).Take(DiagnosticNameLimit);
-                throw new Xunit.Sdk.XunitException(ex.Message + " Named elements seen: " + string.Join(" | ", seen));
+                var seen = DescribeNames(() => ProductTopLevelWindows(automation, app));
+                throw new Xunit.Sdk.XunitException(ex.Message + " Product windows seen: " + seen);
             }
             CancelDialog(firstDialog);
 
@@ -155,19 +158,21 @@ public sealed class MaskedCopyTests
             Assert.True(occurrences >= 1, "The key-value rule masked nothing.");
             var expectedLine = ExpectedCountLine(locale, occurrences);
             WaitHelpers.WaitFor(
-                () => dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.Text))
-                    .FirstOrDefault(element => string.Equals(NameOf(element), expectedLine, StringComparison.Ordinal)),
+                () => UiaTimeout.MissOnTimeout(
+                    () => dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Text).And(cf.ByName(expectedLine)))),
                 CountLineDescription + $" ('{expectedLine}')",
                 UiTimeout);
 
             var copyButton = WaitHelpers.WaitFor(
-                () => dialog.FindFirstDescendant(cf => cf.ByAutomationId(CopyButtonAutomationId)),
+                () => UiaTimeout.MissOnTimeout(
+                    () => dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByAutomationId(CopyButtonAutomationId)))),
                 CopyButtonDescription,
                 UiTimeout);
             copyButton.Patterns.Invoke.Pattern.Invoke();
 
+            // A search that timed out did not see the dialog gone: it reads as still open.
             WaitHelpers.WaitUntil(
-                () => FindWindowByTitle(automation, app, window, dialogTitle) is null,
+                () => UiaTimeout.FalseOnTimeout(() => FindWindowByTitle(automation, app, window, dialogTitle) is null),
                 DialogClosedDescription,
                 CloseTimeout);
 
@@ -221,13 +226,17 @@ public sealed class MaskedCopyTests
     private static void OpenLocalShell(Window window)
     {
         var rowPrefix = ProfileName + NameSeparator;
+        var tree = WaitHelpers.WaitFor(
+            () => UiaTimeout.MissOnTimeout(() => FindSessionTree(window)),
+            SessionTreeDescription,
+            UiTimeout);
         AutomationElement row;
         try
         {
             row = WaitHelpers.WaitFor(
-                () =>
+                () => UiaTimeout.MissOnTimeout(() =>
                 {
-                    var items = window.FindAllDescendants(cf => cf.ByControlType(ControlType.TreeItem));
+                    var items = tree.FindAllDescendants(cf => cf.ByControlType(ControlType.TreeItem));
 
                     // A profile without a folder sits under the "No folder" node, folded at start.
                     foreach (var folded in items.Where(IsCollapsed))
@@ -236,14 +245,14 @@ public sealed class MaskedCopyTests
                     }
 
                     return items.FirstOrDefault(item => NameOf(item).StartsWith(rowPrefix, StringComparison.Ordinal));
-                },
+                }),
                 ProfileRowDescription,
                 UiTimeout);
         }
         catch (Xunit.Sdk.XunitException ex)
         {
-            var seen = window.FindAllDescendants().Select(NameOf).Where(name => name.Length > 0).Take(DiagnosticNameLimit);
-            throw new Xunit.Sdk.XunitException(ex.Message + " Named elements seen: " + string.Join(" | ", seen));
+            var seen = DescribeNames(() => tree.FindAllDescendants(cf => cf.ByControlType(ControlType.TreeItem)));
+            throw new Xunit.Sdk.XunitException(ex.Message + " Tree rows seen: " + seen);
         }
 
         row.Patterns.SelectionItem.Pattern.Select();
@@ -274,13 +283,31 @@ public sealed class MaskedCopyTests
 
     private static Window? TryOpenDialog(UIA3Automation automation, Application app, Window window, string title)
     {
+        // A dialog an earlier probe opened but could not see (its search timed out) is still up
+        // and modal: the shortcut would not reach the shell, so it is taken as the answer.
+        // When even this search times out, nothing is typed and the probe misses.
+        Window? open;
+        try
+        {
+            open = FindWindowByTitle(automation, app, window, title);
+        }
+        catch (COMException ex) when (UiaTimeout.IsTimeout(ex))
+        {
+            return null;
+        }
+
+        if (open is not null)
+        {
+            return open;
+        }
+
         ForegroundGuard.Ensure(window);
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_M);
 
         var deadline = DateTime.UtcNow + DialogProbeTimeout;
         while (DateTime.UtcNow < deadline)
         {
-            var found = FindWindowByTitle(automation, app, window, title);
+            var found = UiaTimeout.MissOnTimeout(() => FindWindowByTitle(automation, app, window, title));
             if (found is not null)
             {
                 return found;
@@ -295,7 +322,8 @@ public sealed class MaskedCopyTests
     private static void CancelDialog(Window dialog)
     {
         var cancel = WaitHelpers.WaitFor(
-            () => dialog.FindFirstDescendant(cf => cf.ByAutomationId(CancelButtonAutomationId)),
+            () => UiaTimeout.MissOnTimeout(
+                () => dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByAutomationId(CancelButtonAutomationId)))),
             "Cancel button of the masked copy dialog",
             UiTimeout);
         cancel.Patterns.Invoke.Pattern.Invoke();
@@ -305,7 +333,8 @@ public sealed class MaskedCopyTests
     private static string ReadDialogText(Window dialog)
     {
         var box = WaitHelpers.WaitFor(
-            () => dialog.FindFirstDescendant(cf => cf.ByAutomationId(TextAutomationId)),
+            () => UiaTimeout.MissOnTimeout(
+                () => dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Edit).And(cf.ByAutomationId(TextAutomationId)))),
             "masked text box",
             UiTimeout);
         return box.Patterns.Value.Pattern.Value.Value ?? string.Empty;
@@ -338,15 +367,40 @@ public sealed class MaskedCopyTests
         return count;
     }
 
+    // The dialog is a top-level window of the product, or a child of the main window when UI
+    // Automation parents it to its owner: two one-level searches, never the main window's tree,
+    // which holds the WebView2 terminal. A UI Automation timeout is left to the caller.
     private static Window? FindWindowByTitle(UIA3Automation automation, Application app, Window main, string title)
     {
-        var top = app.GetAllTopLevelWindows(automation).FirstOrDefault(w => string.Equals(w.Title, title, StringComparison.Ordinal));
+        var top = automation.GetDesktop().FindFirstChild(cf => cf.ByControlType(ControlType.Window)
+            .And(cf.ByProcessId(app.ProcessId))
+            .And(cf.ByName(title)));
         if (top is not null)
         {
-            return top;
+            return top.AsWindow();
         }
 
-        return main.FindFirstDescendant(cf => cf.ByControlType(ControlType.Window).And(cf.ByName(title)))?.AsWindow();
+        return main.FindFirstChild(cf => cf.ByControlType(ControlType.Window).And(cf.ByName(title)))?.AsWindow();
+    }
+
+    private static AutomationElement[] ProductTopLevelWindows(UIA3Automation automation, Application app) =>
+        automation.GetDesktop().FindAllChildren(cf => cf.ByProcessId(app.ProcessId));
+
+    private static AutomationElement? FindSessionTree(Window window) =>
+        window.FindFirstDescendant(cf => cf.ByControlType(ControlType.Tree).And(cf.ByAutomationId(SessionTreeAutomationId)));
+
+    // Diagnostics for a failure message: a timeout while listing must not hide the real failure.
+    private static string DescribeNames(Func<IEnumerable<AutomationElement>> elements)
+    {
+        try
+        {
+            var names = elements().Select(NameOf).Where(name => name.Length > 0).Take(DiagnosticNameLimit);
+            return string.Join(" | ", names);
+        }
+        catch (COMException ex) when (UiaTimeout.IsTimeout(ex))
+        {
+            return DiagnosticsTimedOut;
+        }
     }
 
     private static bool IsCollapsed(AutomationElement element) =>

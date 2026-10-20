@@ -154,6 +154,10 @@
             var container = document.getElementById('vnc-container');
             var rfb = null;
 
+            // Hands a typed password to the client whose server is still waiting for it; returns
+            // false when no client waits any more. Set by each connect.
+            var answerWaitingServer = function () { return false; };
+
             // Display settings, owned by the host: the tab header carries the controls and every
             // change arrives as a message below. They are held here rather than applied on
             // arrival, because a change can land before the client it applies to exists.
@@ -235,11 +239,35 @@
                     rfb = null;
                 }
 
+                // The password is held here and sent only when the server asks for it, so the page
+                // knows whether a security failure came before or after it: only one after it says
+                // the password was wrong, and only then may the host drop a remembered one.
+                var heldPassword = password || null;
+                var passwordSent = false;
+                var securityFailed = false;
+
+                // The server asked for the password and the host is asking the user: the
+                // connection stays open, since ending it counts as a failed sign-in on TigerVNC.
+                var waitingForPassword = false;
+
                 try {
                     rfb = new RFB(container, wsUrl, {
-                        credentials: password ? { password: password } : undefined,
                         wsProtocols: ['binary']
                     });
+
+                    // noVNC's events carry no target, so a listener answers through this.
+                    var client = rfb;
+
+                    answerWaitingServer = function (typedPassword) {
+                        if (client !== rfb || !waitingForPassword || !typedPassword) {
+                            return false;
+                        }
+                        waitingForPassword = false;
+                        heldPassword = typedPassword;
+                        passwordSent = true;
+                        client.sendCredentials({ password: typedPassword });
+                        return true;
+                    };
 
                     rfb.showDotCursor = true;
                     applyScaling();
@@ -251,6 +279,7 @@
                     });
 
                     rfb.addEventListener('disconnect', function (event) {
+                        waitingForPassword = false;
                         // Surface any extra detail beyond the bare `clean` flag —
                         // noVNC may attach the underlying failure reason here.
                         var detail = event.detail || {};
@@ -265,14 +294,34 @@
                         if (event.detail.clean) {
                             postMessage('disconnected:clean');
                         } else {
-                            showError(text.disconnected, text.connectionLost);
+                            // A refused sign-in was already reported with its own words; "connection
+                            // lost" would replace them.
+                            if (!securityFailed) {
+                                showError(text.disconnected, text.connectionLost);
+                            }
                             postMessage('disconnected:error');
                         }
                     });
 
                     rfb.addEventListener('credentialsrequired', function (event) {
                         var types = (event.detail && event.detail.types) || [];
+                        if (heldPassword && !passwordSent && types.length === 1 && types[0] === 'password') {
+                            passwordSent = true;
+                            client.sendCredentials({ password: heldPassword });
+                            return;
+                        }
+                        waitingForPassword = types.length === 1 && types[0] === 'password';
                         postMessage('credentials-required:' + JSON.stringify(types));
+                    });
+
+                    rfb.addEventListener('securityfailure', function (event) {
+                        var detail = event.detail || {};
+                        securityFailed = true;
+                        postMessage('security-failure:' + JSON.stringify({
+                            afterPassword: passwordSent,
+                            status: detail.status,
+                            reason: detail.reason || null
+                        }));
                     });
 
                     rfb.addEventListener('clipboard', function (event) {
@@ -338,6 +387,16 @@
                             qualityLevel = levels.qualityLevel;
                             compressionLevel = levels.compressionLevel;
                             applyQuality();
+                        }
+                        return;
+                    }
+
+                    if (msg.indexOf('credentials:') === 0) {
+                        var answer = JSON.parse(msg.substring('credentials:'.length));
+                        if (!answerWaitingServer(answer.password)) {
+                            // The server ended the sign-in before the answer came: the host
+                            // connects again with it.
+                            postMessage('credentials-late:');
                         }
                         return;
                     }

@@ -26,17 +26,81 @@ namespace Heimdall.App.Services;
 /// server also wants a username (macOS Screen Sharing, VeNCrypt Plain, TightUnix, MSLogon). The
 /// view used to answer by sending the same connect again, which can never satisfy the request and
 /// built a second client behind the first on a proxy that serves one connection at a time - the
-/// pane hung on "Connecting". It is a dead end, so it is reported as one.
+/// pane hung on "Connecting". It is a dead end, so it is reported as one - except for a password
+/// alone on a session whose profile cannot hold it (a shared one), which the user can type in the
+/// view (<see cref="VncPasswordFlow"/>).
 /// </remarks>
 internal static class VncCredentialsPolicy
 {
     /// <summary>The message to show for the credential types the server asked for.</summary>
     /// <param name="requestedTypesJson">The JSON array of credential names noVNC reported, if any.</param>
-    internal static string MessageKeyFor(string? requestedTypesJson)
+    /// <param name="canTypePassword">
+    /// Whether the user can type the password in the view, for a session whose profile cannot hold
+    /// it: a request for a password alone then says to type it rather than to edit the profile.
+    /// </param>
+    internal static string MessageKeyFor(string? requestedTypesJson, bool canTypePassword = false)
     {
+        if (canTypePassword && AsksForPasswordOnly(requestedTypesJson))
+        {
+            return "ErrorVncSharedPasswordRequired";
+        }
+
         return RequestedTypes(requestedTypesJson).Contains("username", StringComparer.OrdinalIgnoreCase)
             ? "ErrorVncUsernameRequired"
             : "ErrorVncPasswordRequired";
+    }
+
+    /// <summary>
+    /// Whether the server asked for a password alone, which a user can type for a session whose
+    /// profile cannot hold it. A username as well keeps the dead end: Heimdall has no VNC username.
+    /// </summary>
+    internal static bool AsksForPasswordOnly(string? requestedTypesJson)
+    {
+        IReadOnlyList<string> types = RequestedTypes(requestedTypesJson);
+        return types.Count > 0 && types.All(type => string.Equals(type, "password", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>The message to show for a security failure the page reported.</summary>
+    /// <param name="failure">The failure, read by <see cref="ReadSecurityFailure"/>.</param>
+    /// <param name="canAsk">Whether the user can type the password in the view.</param>
+    internal static string MessageKeyForSecurityFailure(VncSecurityFailure failure, bool canAsk)
+    {
+        if (failure.AfterPassword)
+        {
+            return canAsk ? "ErrorVncSharedPasswordRejected" : "ErrorVncPasswordRejected";
+        }
+
+        return string.IsNullOrWhiteSpace(failure.Reason) ? "ErrorVncSecurityRefused" : "ErrorVncSecurityRefusedReason";
+    }
+
+    /// <summary>Reads the JSON the page sends with a security failure; a malformed one counts as before the password.</summary>
+    internal static VncSecurityFailure ReadSecurityFailure(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new VncSecurityFailure(false, null);
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return new VncSecurityFailure(false, null);
+            }
+
+            bool afterPassword = root.TryGetProperty("afterPassword", out JsonElement after)
+                && after.ValueKind == JsonValueKind.True;
+            string? reason = root.TryGetProperty("reason", out JsonElement text) && text.ValueKind == JsonValueKind.String
+                ? text.GetString()
+                : null;
+            return new VncSecurityFailure(afterPassword, reason);
+        }
+        catch (JsonException)
+        {
+            return new VncSecurityFailure(false, null);
+        }
     }
 
     private static IReadOnlyList<string> RequestedTypes(string? requestedTypesJson)
@@ -56,3 +120,8 @@ internal static class VncCredentialsPolicy
         }
     }
 }
+
+/// <summary>A VNC sign-in the server ended with a security failure.</summary>
+/// <param name="AfterPassword">Whether the page had sent the password when the server refused.</param>
+/// <param name="Reason">The reason the server gave, if any.</param>
+internal sealed record VncSecurityFailure(bool AfterPassword, string? Reason);

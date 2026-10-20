@@ -126,7 +126,7 @@ public sealed class WebViewFocusReleaseTests
     }
 
     private const string SshMessageHandler = "private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs args)";
-    private const string VncMessageHandler = "private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)";
+    private const string VncMessageHandler = "internal void HandlePageMessage(string? message)";
     private const string WebViewConstructor = "public EmbeddedWebView()";
     private const string ReleaseMessageTest = "if (message == WebViewFocusRelease.Message)";
     private const string SubscribeGestureStatement = "ConsoleWebView.PreviewKeyDown += OnConsoleWebViewPreviewKeyDown;";

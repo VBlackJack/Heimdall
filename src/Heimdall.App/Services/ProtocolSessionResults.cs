@@ -118,7 +118,8 @@ public sealed record VncSessionResult(
     int Port,
     string? Password = null,
     bool ViewOnly = false,
-    bool? SessionLoggingOverride = null) : ISessionResult
+    bool? SessionLoggingOverride = null,
+    string? ProfileId = null) : ISessionResult
 {
     /// <summary>
     /// Lists every member but the password, which is only said to be present. The compiler's
@@ -131,7 +132,8 @@ public sealed record VncSessionResult(
             .Append(", Port = ").Append(Port)
             .Append(", Password = ").Append(Password is null ? "null" : "***")
             .Append(", ViewOnly = ").Append(ViewOnly)
-            .Append(", SessionLoggingOverride = ").Append(SessionLoggingOverride);
+            .Append(", SessionLoggingOverride = ").Append(SessionLoggingOverride)
+            .Append(", ProfileId = ").Append(ProfileId);
         return true;
     }
 }

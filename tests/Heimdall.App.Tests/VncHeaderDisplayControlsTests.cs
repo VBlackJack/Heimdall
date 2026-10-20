@@ -215,6 +215,44 @@ public sealed class VncHeaderDisplayControlsTests
                 "if (!levels || !isLevel(levels.qualityLevel) || !isLevel(levels.compressionLevel)) {");
     }
 
+    // The page's half of the VNC password: it holds the password and sends it only when the server
+    // asks, so a security failure can say whether it came after it. Handed to the client at
+    // construction, noVNC sends it unasked and the page cannot tell; the host could then drop a
+    // remembered password on a refusal that never saw it.
+
+    /// <summary>Kills: the password handed to the client at construction again.</summary>
+    [Fact]
+    public void ThePage_HoldsThePasswordUntilTheServerAsksForIt()
+    {
+        string page = PageSource();
+
+        StatementsOf(BlockAfter(page, "rfb = new RFB(container, wsUrl,"))
+            .Should().NotContain(statement => statement.Contains("credentials", StringComparison.Ordinal));
+        StatementsOf(BlockAfter(page, "rfb.addEventListener('credentialsrequired', function (event)"))
+            .Should().Contain([
+                "passwordSent = true;",
+                "client.sendCredentials({ password: heldPassword });",
+            ]);
+    }
+
+    /// <summary>
+    /// Kills: a page that never reports a security failure, reports it without saying whether the
+    /// password was sent, or lets "connection lost" replace its words.
+    /// </summary>
+    [Fact]
+    public void ThePage_ReportsASecurityFailure_WithWhetherThePasswordWasSent()
+    {
+        string page = PageSource();
+
+        StatementsOf(BlockAfter(page, "rfb.addEventListener('securityfailure', function (event)"))
+            .Should().Contain([
+                "securityFailed = true;",
+                "afterPassword: passwordSent,",
+            ]);
+        StatementsOf(BlockAfter(page, "rfb.addEventListener('disconnect', function (event)"))
+            .Should().Contain("if (!securityFailed) {");
+    }
+
     /// <summary>The text between the brace that follows <paramref name="anchor"/> and its match.</summary>
     private static string BlockAfter(string source, string anchor)
     {
