@@ -394,7 +394,8 @@ public sealed partial class SessionCoordinatorPreMountTests
                     connectionStateMachine,
                     hostKeyStore,
                     Heimdall.Core.Ssh.RejectingHostKeyVerifier.Instance,
-                    configManager));
+                    configManager),
+                new MaskedCopyTestSupport.RecordingClipboard());
 
             return new TestHarness(
                 rootPath,
@@ -765,6 +766,17 @@ public sealed partial class SessionCoordinatorPreMountTests
     internal sealed class FakeDialogService : IDialogService
     {
         public List<SharedSessionImportReportDialogViewModel> SharedReports { get; } = [];
+
+        public List<MaskedCopyDialogViewModel> MaskedCopies { get; } = [];
+
+        /// <summary>What the masked copy dialog does while it is "open"; the default closes at once.</summary>
+        public Func<MaskedCopyDialogViewModel, Task>? MaskedCopyBehavior { get; set; }
+
+        public Task ShowMaskedCopyAsync(MaskedCopyDialogViewModel viewModel)
+        {
+            MaskedCopies.Add(viewModel);
+            return MaskedCopyBehavior?.Invoke(viewModel) ?? Task.CompletedTask;
+        }
 
         public Task ShowSharedSessionImportReportAsync(SharedSessionImportReportDialogViewModel viewModel)
         {

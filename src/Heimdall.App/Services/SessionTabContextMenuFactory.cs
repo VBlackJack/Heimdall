@@ -61,10 +61,15 @@ public sealed class SessionTabContextMenuFactory
     /// <see cref="ContextMenu.PlacementTarget"/>, <see cref="ContextMenu.Placement"/>
     /// and <see cref="ContextMenu.IsOpen"/>).
     /// </summary>
+    /// <param name="session">The tab the menu is for.</param>
+    /// <param name="vm">The main view model.</param>
+    /// <param name="callbacks">Window-layer actions.</param>
+    /// <param name="clickedPane">The pane of the tab the user right-clicked, when the click landed in one.</param>
     public ContextMenu CreateMenu(
         SessionTabViewModel session,
         MainViewModel vm,
-        ISessionTabContextCallbacks callbacks)
+        ISessionTabContextCallbacks callbacks,
+        SessionPaneModel? clickedPane = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(vm);
@@ -110,6 +115,8 @@ public sealed class SessionTabContextMenuFactory
                     AppendTranscriptItem(host, session, vm, sshView);
                     AppendMacroItems(host, vm, sshView);
                 }
+
+                AppendMaskedCopyItem(host, session, vm, clickedPane);
             }),
             Section(host => AppendSplitItems(host, session, vm, callbacks)),
             Section(host =>
@@ -667,6 +674,33 @@ public sealed class SessionTabContextMenuFactory
             }
         };
         menu.Items.Add(transcriptItem);
+    }
+
+    // ── Copy output, secrets masked (any readable terminal pane) ─────
+
+    /// <summary>
+    /// Adds "Copy output, secrets masked..." when the tab has a terminal pane that can be read.
+    /// Hidden otherwise, like the other terminal-only items; the pane is chosen by the same
+    /// resolver as the shortcut and the palette entry.
+    /// </summary>
+    private static void AppendMaskedCopyItem(
+        ContextMenu menu,
+        SessionTabViewModel session,
+        MainViewModel vm,
+        SessionPaneModel? clickedPane)
+    {
+        if (!vm.MaskedCopy.CanRun(session, clickedPane))
+        {
+            return;
+        }
+
+        var maskedCopyItem = new MenuItem
+        {
+            Header = vm.Localize("SessionMaskedCopyMenu"),
+            InputGestureText = vm.Localize("SessionMaskedCopyGesture"),
+        };
+        maskedCopyItem.Click += (_, _) => vm.MaskedCopy.Start(session, clickedPane);
+        menu.Items.Add(maskedCopyItem);
     }
 
     // ── Macro record toggle + play submenu (SSH only) ────────────────

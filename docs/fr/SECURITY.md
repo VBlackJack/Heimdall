@@ -1093,6 +1093,10 @@ qui soit démontré ici, ni une garantie universelle. Un utilitaire qui rejette 
 la commande, et l'appelant refuse : il n'existe pas de repli vers une primitive susceptible de
 remplacer la destination.
 
+### Copie masquée de la sortie d'un terminal
+
+**Copier la sortie, secrets masqués** (Ctrl+Shift+M) copie le texte d'une session de terminal après un masquage par motifs, pour pouvoir le coller dans un ticket ou une discussion. Tout s'exécute sur la machine : pas de réseau, pas de service extérieur, rien d'écrit sur le disque. La fonction échoue de façon fermée : si une règle dépasse son délai, rien n'est copié, et le texte n'arrive dans le presse-papiers que lorsque vous appuyez sur **Copier** dans l'aperçu. Les règles sont des motifs et ratent ce qu'elles ne décrivent pas (noms d'utilisateur, chemins, un mot de passe tapé sans invite devant) ; les journaux de session ne sont pas masqués.
+
 ## Tests de sécurité
 
 - Tests unitaires de la vérification TOFU :
@@ -1159,7 +1163,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 7 212 clés) et une analyse informative
+  le jeu de clés anglais, actuellement 7 247 clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

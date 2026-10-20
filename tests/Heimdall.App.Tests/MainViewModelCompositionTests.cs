@@ -67,7 +67,7 @@ public sealed class MainViewModelCompositionTests
     [Fact]
     public void MainViewModel_ConstructorTakesTheMeasuredNumberOfDependencies()
     {
-        Assert.Equal(23, MainViewModelConstructor.GetParameters().Length);
+        Assert.Equal(24, MainViewModelConstructor.GetParameters().Length);
     }
 
     // The palette resolves a scoped service per operation. Handing it the root provider is what makes

@@ -242,7 +242,8 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                     connectionStateMachine,
                     hostKeyStore,
                     RejectingHostKeyVerifier.Instance,
-                    configManager));
+                    configManager),
+                new MaskedCopyTestSupport.RecordingClipboard());
 
             return new PaletteHarness(rootPath, main, dialogService, embeddedSessionManager, order);
         }

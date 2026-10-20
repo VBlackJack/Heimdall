@@ -1,0 +1,129 @@
+<Window x:Class="Heimdall.App.Views.Dialogs.MaskedCopyDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="{Binding DialogTitle}"
+        Width="860"
+        Height="640"
+        MinWidth="640"
+        MinHeight="460"
+        behaviors:WorkingAreaMinimumBehavior.IsEnabled="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BackgroundBrush}"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Themes/DialogCommonStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <!-- Nothing leaves the dialog until Copy, and Copy sends exactly the text shown. Cancel is the
+         Escape button; Copy is the Enter button. -->
+    <Grid Margin="{StaticResource SpacingLg}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="{Binding DialogTitle}"
+                       FontSize="{StaticResource FontSizeBodyLarge}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <TextBlock Text="{Binding IntroText}"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- One line per rule that masked something; none for a rule with a zero count. -->
+        <StackPanel Grid.Row="1" Margin="{StaticResource MarginSectionTop}">
+            <ItemsControl Focusable="False"
+                          ItemsSource="{Binding CountLines}"
+                          AutomationProperties.AutomationId="MaskedCopyCounts"
+                          AutomationProperties.Name="{Binding CountsAccessibleName}"
+                          Visibility="{Binding HasCounts, Converter={StaticResource BoolToVisibilityConverter}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Margin="0,0,0,2"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding NothingMaskedText}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       FontStyle="Italic"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding IsNothingMasked, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            <TextBlock Text="{Binding RefusedText, NotifyOnTargetUpdated=True}"
+                       Foreground="{DynamicResource ErrorBrush}"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="MaskedCopyRefused"
+                       AutomationProperties.LiveSetting="Assertive"
+                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
+                       Visibility="{Binding IsRefused, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        </StackPanel>
+
+        <!-- No wrapping and no virtualization: the text is capped at 4 MiB, and a wrapping box
+             would measure every line against the width on each resize. -->
+        <TextBox Grid.Row="2"
+                 Margin="{StaticResource MarginSubsectionTop}"
+                 IsReadOnly="True"
+                 IsReadOnlyCaretVisible="True"
+                 TextWrapping="NoWrap"
+                 AcceptsReturn="True"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto"
+                 FontFamily="{StaticResource FontFamilyMonospace}"
+                 FontSize="{StaticResource FontSizeBody}"
+                 Text="{Binding MaskedText, Mode=OneWay}"
+                 AutomationProperties.AutomationId="MaskedCopyText"
+                 AutomationProperties.Name="{Binding TextAccessibleName}"/>
+
+        <StackPanel Grid.Row="3" Margin="{StaticResource MarginSubsectionTop}">
+            <TextBlock Text="{Binding TruncatedNotice}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       Margin="{StaticResource MarginStackItem}"
+                       AutomationProperties.AutomationId="MaskedCopyTruncated"
+                       Visibility="{Binding IsTruncated, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            <CheckBox Content="{Binding HostsOptionLabel}"
+                      IsChecked="{Binding MaskHosts}"
+                      AutomationProperties.AutomationId="MaskedCopyHostsOption"
+                      Style="{DynamicResource DialogFormCheckBoxStyle}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0">
+            <Button Content="{Binding CopyLabel}"
+                    Command="{Binding CopyCommand}"
+                    IsDefault="True"
+                    MinWidth="110"
+                    Margin="{StaticResource MarginInlineSm}"
+                    Style="{DynamicResource PrimaryButtonStyle}"
+                    AutomationProperties.AutomationId="MaskedCopyCopyButton"
+                    AutomationProperties.Name="{Binding CopyLabel}"/>
+            <Button Content="{Binding CancelLabel}"
+                    Command="{Binding CancelCommand}"
+                    IsCancel="True"
+                    MinWidth="110"
+                    Style="{DynamicResource SecondaryButtonStyle}"
+                    AutomationProperties.AutomationId="MaskedCopyCancelButton"
+                    AutomationProperties.Name="{Binding CancelLabel}"/>
+        </StackPanel>
+    </Grid>
+</Window>

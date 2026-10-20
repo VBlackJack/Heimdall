@@ -67,6 +67,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Des événements de sécurité typés en cours de session distinguent les attaques sur la clé d'hôte des déconnexions ordinaires et suppriment la reconnexion automatique SSH en cas de signal MITM
 - Surcouche de reconnexion automatique en cas de déconnexion inattendue (SSH et RDP)
 - Le plantage ou le redémarrage d'un processus auxiliaire GPU ou utilitaire de WebView2 (réinitialisation du pilote graphique, changement d'affichage) laisse tourner les terminaux ouverts ; seule la perte du processus navigateur ou de rendu déclenche le repli, et la transcription et les étapes d'attente des macros continuent sur la connexion qui reste derrière
+- **Copier la sortie, secrets masqués** (Ctrl+Shift+M, menu de l'onglet de session, palette Ctrl+K) : lit le texte d'une session SSH, Telnet, WinRM ou shell local (4 derniers Mio de l'historique), masque clés privées, en-têtes d'autorisation, identifiants d'URL, mots de passe de ligne de commande et d'invite, secrets clé-valeur et jetons AWS, GitHub, Slack et JWT sous la forme `[masked:<rule-id>]`, et affiche un aperçu avec le compte par règle et un pseudonyme stable optionnel pour les adresses IPv4 et les noms d'hôte. Ne copie qu'au clic sur **Copier** ; fonctionne hors ligne, n'écrit rien sur le disque, refuse de copier si une règle dépasse son délai ; les journaux de session ne sont pas masqués
 
 ### VNC
 - Visionneuse VNC embarquée via noVNC + WebView2
@@ -326,7 +327,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 212 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 247 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 

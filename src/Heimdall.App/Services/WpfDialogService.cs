@@ -547,6 +547,21 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
+    public Task ShowMaskedCopyAsync(MaskedCopyDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+
+        var dialog = new MaskedCopyDialog
+        {
+            DataContext = viewModel,
+            Owner = GetOwnerWindow()
+        };
+
+        dialog.ShowDialog();
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     public Task<ImportKnownHostsConflictResolution?> ShowImportKnownHostsConflictAsync(
         ImportKnownHostsConflictDialogViewModel viewModel)
     {

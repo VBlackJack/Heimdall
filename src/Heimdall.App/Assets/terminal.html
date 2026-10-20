@@ -177,6 +177,14 @@
             var currentFontSize = baseFontSize;
             var resizeDebounceMilliseconds = 60;
             var scrollbackLines = 10000;
+            // Largest UTF-8 text a buffer reply carries; mirrors TerminalBufferReadCoordinator.PageMaxTextBytes.
+            var bufferMaxBytes = 4 * 1024 * 1024;
+            // Bytes handed to String.fromCharCode at once when encoding a buffer reply.
+            var base64ChunkBytes = 32 * 1024;
+            // keyCode of the M key, the key of the host's masked-copy chord (Ctrl+Shift+M).
+            var maskedCopyKeyCode = 77;
+            var utf8ContinuationMask = 0xC0;
+            var utf8ContinuationBits = 0x80;
             var searchContextRows = 5;
             var searchStatusElement = document.getElementById('search-status');
             var searchNoResultsText = /*{{TERMINAL_SEARCH_NO_RESULTS_LITERAL}}*/;
@@ -217,6 +225,66 @@
 
             function stringToBase64(text) {
                 return bytesToBase64(new TextEncoder().encode(text));
+            }
+
+            // bytesToBase64 appends one character at a time, which freezes the renderer on
+            // megabytes; this one converts slices and joins them once.
+            function bytesToBase64Chunked(bytes) {
+                var parts = [];
+                for (var offset = 0; offset < bytes.length; offset += base64ChunkBytes) {
+                    parts.push(String.fromCharCode.apply(null, bytes.subarray(offset, offset + base64ChunkBytes)));
+                }
+                return btoa(parts.join(''));
+            }
+
+            // Text of the normal buffer (not the active one: a full-screen program such as vim or
+            // less would otherwise give its own screen). A wrapped row is joined to the previous
+            // one without a newline so a long token comes back whole; logical lines are joined
+            // with \n and the trailing blank ones dropped. Also reports whether the first logical
+            // line is headless: its first row is a wrapped row, so the start of that line was
+            // evicted from the scrollback.
+            function readNormalBufferText() {
+                var buffer = term.buffer.normal;
+                var logicalLines = [];
+                var firstLineHeadless = buffer.length > 0 && !!buffer.getLine(0) && buffer.getLine(0).isWrapped;
+                for (var row = 0; row < buffer.length; row++) {
+                    var line = buffer.getLine(row);
+                    if (!line) {
+                        continue;
+                    }
+                    var next = row + 1 < buffer.length ? buffer.getLine(row + 1) : null;
+                    // Trailing blanks are trimmed only on the last row of a logical line: on a
+                    // wrapped row they can be the space between two words.
+                    var rowText = line.translateToString(!(next && next.isWrapped));
+                    if (line.isWrapped && logicalLines.length > 0) {
+                        logicalLines[logicalLines.length - 1] += rowText;
+                    } else {
+                        logicalLines.push(rowText);
+                    }
+                }
+                while (logicalLines.length > 0 && logicalLines[logicalLines.length - 1] === '') {
+                    logicalLines.pop();
+                }
+                return { text: logicalLines.join('\n'), firstLineHeadless: firstLineHeadless };
+            }
+
+            // Encodes the text, keeping the tail (most recent output) when it is over the cap.
+            // The truncated flag is also set when the first line is headless: in both cases the
+            // text starts in the middle of a line, and the host drops that partial first line
+            // (TerminalBufferReadCoordinator) so a secret whose key was cut away cannot survive.
+            function encodeBufferText(read) {
+                var bytes = new TextEncoder().encode(read.text);
+                var truncated = read.firstLineHeadless;
+                if (bytes.length > bufferMaxBytes) {
+                    var start = bytes.length - bufferMaxBytes;
+                    // Do not start in the middle of a multi-byte character.
+                    while (start < bytes.length && (bytes[start] & utf8ContinuationMask) === utf8ContinuationBits) {
+                        start++;
+                    }
+                    bytes = bytes.subarray(start);
+                    truncated = true;
+                }
+                return { base64: bytesToBase64Chunked(bytes), truncated: truncated };
             }
 
             function tryParseOsc7Path(data) {
@@ -474,6 +542,21 @@
                     return;
                 }
 
+                if (message.indexOf('buffer-request:') === 0) {
+                    var requestId = message.substring('buffer-request:'.length);
+                    // No reply for an id that is not a plain number or when reading fails: the
+                    // host ends that request on its timeout.
+                    if (/^[0-9]+$/.test(requestId)) {
+                        try {
+                            var encoded = encodeBufferText(readNormalBufferText());
+                            postMessage('buffer:' + requestId + ':' + (encoded.truncated ? '1' : '0') + ':' + encoded.base64);
+                        } catch (error) {
+                            // Left to the host timeout.
+                        }
+                    }
+                    return;
+                }
+
                 if (message.indexOf('focus:') === 0) {
                     term.focus();
                 }
@@ -592,6 +675,13 @@
                     if (event.shiftKey && !event.ctrlKey && !event.altKey && event.code === 'Insert') {
                         event.preventDefault();
                         postMessage('clipboard-read:');
+                        return false;
+                    }
+
+                    // Ctrl+Shift+M: "Copy output, secrets masked" is the host's command; the host owns
+                    // this chord, keep the page inert. keyCode (not code) so that AZERTY layouts match.
+                    if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.keyCode === maskedCopyKeyCode) {
+                        event.preventDefault();
                         return false;
                     }
 

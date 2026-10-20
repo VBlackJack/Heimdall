@@ -374,6 +374,10 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         {
             LaunchExternalToolFromPalette(server);
         }
+        else if (server.Id.StartsWith(CommandIdPrefix, StringComparison.Ordinal))
+        {
+            RunPaletteCommand(server);
+        }
         else if (server.Id.StartsWith("snippet-", StringComparison.Ordinal))
         {
             HandleSnippetSelection(server);
@@ -402,6 +406,10 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         else if (server.Id.StartsWith("ext-tool-", StringComparison.Ordinal))
         {
             LaunchExternalToolFromPalette(server);
+        }
+        else if (server.Id.StartsWith(CommandIdPrefix, StringComparison.Ordinal))
+        {
+            RunPaletteCommand(server);
         }
         else if (server.Id.StartsWith("snippet-", StringComparison.Ordinal))
         {
@@ -452,6 +460,12 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         if (server.Id.StartsWith("ext-tool-", StringComparison.Ordinal))
         {
             LaunchExternalToolFromPalette(server);
+            return;
+        }
+
+        if (server.Id.StartsWith(CommandIdPrefix, StringComparison.Ordinal))
+        {
+            RunPaletteCommand(server);
             return;
         }
 
