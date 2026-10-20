@@ -747,6 +747,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     public async Task InitializeAsync(string? targetHost, string? initialActionId = null)
     {
         _targetHost = string.IsNullOrWhiteSpace(targetHost) ? null : targetHost.Trim();
+        OnPropertyChanged(nameof(HasTargetHost));
         EmptyStateMessage = LocalizeKey("ToolCmdLibStatusLoading");
         HelpContentText = LocalizeKey("ToolHelpCMDLIB").Replace("\\n", "\n");
 

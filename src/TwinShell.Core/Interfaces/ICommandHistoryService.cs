@@ -33,6 +33,8 @@ public interface ICommandHistoryService
     /// <param name="platform">Platform for which the command was generated</param>
     /// <param name="actionTitle">Title of the action (for denormalization)</param>
     /// <param name="category">Category of the action (for denormalization)</param>
+    /// <param name="targetHost">Host of the session the command was produced for, or null</param>
+    /// <param name="isExecuted">True when the command was sent to a terminal, false when it was only copied or inserted</param>
     /// <returns>The ID of the created history entry</returns>
     Task<string> AddCommandAsync(
         string actionId,
@@ -40,7 +42,9 @@ public interface ICommandHistoryService
         Dictionary<string, string> parameters,
         Platform platform,
         string actionTitle,
-        string category);
+        string category,
+        string? targetHost,
+        bool isExecuted);
 
     /// <summary>
     /// Update a command history entry with execution results

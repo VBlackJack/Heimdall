@@ -47,7 +47,7 @@ public sealed partial class CommandLibraryViewModel
         if (!copied) return;
 
         ShowCopyFeedback?.Invoke(CopyTarget);
-        RecordHistory();
+        RecordHistory(isExecuted: false);
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public sealed partial class CommandLibraryViewModel
 
         SendCommandHandler(GeneratedCommand);
         ShowCopyFeedback?.Invoke(SendTarget);
-        RecordHistory();
+        RecordHistory(isExecuted: true);
     }
 
     /// <summary>

@@ -186,7 +186,9 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Clavier : `Entrée` copie, `Ctrl+Entrée` envoie, `Ctrl+D` duplique l'action sélectionnée
 
 **Historique**
-- Chaque commande copiée ou envoyée est enregistrée avec son titre, sa catégorie et son horodatage
+- Chaque commande copiée ou envoyée est enregistrée avec son titre, sa catégorie et son horodatage, l'hôte de la session depuis laquelle la bibliothèque a été ouverte, et le fait qu'elle a été envoyée ou seulement copiée
+- Une case **Cet hôte uniquement** en haut du panneau, cochée par défaut quand la bibliothèque appartient à une session, ne montre que ce qui est parti vers cet hôte ; elle garde son état quand le panneau se recharge
+- Envoyée signifie que le texte a atteint le terminal, pas qu'il a réussi : un terminal ne renvoie rien, aucun code de sortie n'est donc enregistré
 - La commande elle-même et les valeurs de ses paramètres sont chiffrées avant d'atteindre la base, sous le coffre à mot de passe maître quand il est configuré et via DPAPI sinon
 - Rejouez une commande passée dans le générateur, avec ses paramètres
 - Rien n'est enregistré coffre verrouillé, et les lignes sont purgées au-delà de 90 jours

@@ -61,6 +61,22 @@ public sealed class CommandLibraryHistoryEntry
     /// </remarks>
     public Platform Platform { get; init; }
 
+    /// <summary>Host of the session the command was produced for, or null when there was none.</summary>
+    public string? TargetHost { get; init; }
+
+    /// <summary>True when the row names a host, which drives the host label on the row.</summary>
+    public bool HasTargetHost => !string.IsNullOrWhiteSpace(TargetHost);
+
+    /// <summary>True when the command was sent to a terminal rather than copied or inserted.</summary>
+    /// <remarks>
+    /// Sent says where the text went, not how it ended: a terminal gives nothing back, so no
+    /// exit code exists for any row.
+    /// </remarks>
+    public bool IsExecuted { get; init; }
+
+    /// <summary>The negation of <see cref="IsExecuted"/>, for the "copied" badge.</summary>
+    public bool IsCopied => !IsExecuted;
+
     /// <summary>Parameter values as they were when the command was produced.</summary>
     public IReadOnlyDictionary<string, string> Parameters { get; init; } =
         new Dictionary<string, string>(StringComparer.Ordinal);

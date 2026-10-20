@@ -186,7 +186,9 @@ generator that produces the final command for you.
 - Keyboard: `Enter` copies, `Ctrl+Enter` sends, `Ctrl+D` duplicates the selected action
 
 **History**
-- Every command you copy or send is recorded with its title, category and timestamp
+- Every command you copy or send is recorded with its title, category and timestamp, the host of the session the library was opened from, and whether it was sent or only copied
+- A **This host only** box at the top of the panel, ticked by default when the library belongs to a session, shows only what went to that host; it keeps its state while the panel reloads
+- Sent means the text reached the terminal, not that it succeeded: a terminal gives nothing back, so no exit code is recorded
 - The command itself and its parameter values are encrypted before they reach the database, under the master-password vault when one is set and DPAPI otherwise
 - Replay a past command back into the generator, with its parameters
 - Nothing is recorded while the vault is locked, and rows are pruned after 90 days

@@ -758,6 +758,15 @@
                             Style="{DynamicResource GhostButtonStyle}"
                             FontSize="14" MinWidth="28" Height="28"
                             Padding="4"/>
+                    <!-- Only offered when the library was opened for a host: without one there is
+                         nothing to compare a row against. -->
+                    <CheckBox DockPanel.Dock="Right"
+                              Content="{loc:Translate ToolCmdLibHistoryThisHostOnly}"
+                              AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryThisHostOnly}"
+                              IsChecked="{Binding HistoryThisHostOnly, Mode=TwoWay}"
+                              Visibility="{Binding HasTargetHost, Converter={StaticResource BoolToVisibilityConverter}}"
+                              VerticalAlignment="Center"
+                              Margin="{StaticResource MarginInlineControl}"/>
                     <TextBlock Text="{loc:Translate ToolCmdLibHistoryTitle}"
                                FontSize="{StaticResource FontSizeBody}"
                                FontWeight="SemiBold"
@@ -770,7 +779,7 @@
                                VerticalAlignment="Center"
                                Margin="{StaticResource MarginInlineControl}"/>
                 </DockPanel>
-                <ListView ItemsSource="{Binding HistoryEntries}"
+                <ListView ItemsSource="{Binding HistoryView}"
                           Background="Transparent" BorderThickness="0"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.ItemContainerStyle>
@@ -844,11 +853,36 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            VerticalAlignment="Center"
                                            Margin="{StaticResource MarginInlineControl}"/>
+                                <!-- Sent or copied: where the text went, never how it ended.
+                                     A terminal has no return channel, so there is no exit code. -->
+                                <TextBlock DockPanel.Dock="Right"
+                                           Text="{loc:Translate ToolCmdLibHistorySent}"
+                                           Visibility="{Binding IsExecuted, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="{StaticResource MarginInlineControl}"/>
+                                <TextBlock DockPanel.Dock="Right"
+                                           Text="{loc:Translate ToolCmdLibHistoryCopied}"
+                                           Visibility="{Binding IsCopied, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="{StaticResource MarginInlineControl}"/>
                                 <StackPanel>
-                                    <TextBlock Text="{Binding ActionTitle}"
-                                               FontSize="{StaticResource FontSizeCaption}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               TextTrimming="CharacterEllipsis"/>
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right"
+                                                   Text="{Binding TargetHost}"
+                                                   Visibility="{Binding HasTargetHost, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Margin="{StaticResource MarginInlineControl}"/>
+                                        <TextBlock Text="{Binding ActionTitle}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </DockPanel>
                                     <ScrollViewer HorizontalScrollBarVisibility="Auto"
                                                   VerticalScrollBarVisibility="Disabled"
                                                   Visibility="{Binding IsReadable, Converter={StaticResource BoolToVisibilityConverter}}">

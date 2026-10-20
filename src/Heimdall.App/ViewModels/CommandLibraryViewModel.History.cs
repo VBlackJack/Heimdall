@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using System.Globalization;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.ViewModels.CommandLibrary;
@@ -46,6 +48,66 @@ public sealed partial class CommandLibraryViewModel
     private bool _isHistoryEmpty;
 
     /// <summary>
+    /// Whether the history panel shows only the rows sent or copied for the host this library
+    /// was opened for. Checked by default; meaningful only when <see cref="HasTargetHost"/>.
+    /// </summary>
+    /// <remarks>
+    /// Lives on the view model, not on the panel, so a reload of the rows after a clear or a
+    /// new command keeps the operator's choice instead of snapping back to the default.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _historyThisHostOnly = true;
+
+    private ListCollectionView? _historyView;
+
+    /// <summary>
+    /// True when the library was opened for a host, which is when the "this host only" filter
+    /// has something to compare against and is shown.
+    /// </summary>
+    public bool HasTargetHost => _targetHost is not null;
+
+    /// <summary>
+    /// The rows the history panel shows: <see cref="HistoryEntries"/> through
+    /// <see cref="ShouldShowHistoryEntry"/>.
+    /// </summary>
+    public ICollectionView HistoryView => _historyView ??= new ListCollectionView(HistoryEntries)
+    {
+        Filter = item => item is CommandLibraryHistoryEntry entry && ShouldShowHistoryEntry(entry)
+    };
+
+    /// <summary>
+    /// Whether a history row passes the "this host only" filter.
+    /// </summary>
+    /// <remarks>
+    /// A row without a host - written before hosts were recorded, or from a library opened
+    /// outside any session - is hidden while the filter is on: nothing says it went to this
+    /// host, and showing it under that heading would claim it did. Host names compare without
+    /// regard to case, as DNS does.
+    /// </remarks>
+    public bool ShouldShowHistoryEntry(CommandLibraryHistoryEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (!HistoryThisHostOnly || _targetHost is null)
+        {
+            return true;
+        }
+
+        return string.Equals(entry.TargetHost, _targetHost, StringComparison.OrdinalIgnoreCase);
+    }
+
+    partial void OnHistoryThisHostOnlyChanged(bool value) => RefreshHistoryView();
+
+    /// <summary>
+    /// Re-applies the history filter and updates the empty-state flag from what is visible.
+    /// </summary>
+    private void RefreshHistoryView()
+    {
+        HistoryView.Refresh();
+        IsHistoryEmpty = HistoryView.IsEmpty;
+    }
+
+    /// <summary>
     /// Reloads the bound <see cref="HistoryEntries"/> collection from the
     /// history service. Safe to call even when the history panel is hidden.
     /// </summary>
@@ -68,6 +130,8 @@ public sealed partial class CommandLibraryViewModel
                     ActionId = h.ActionId,
                     Platform = h.Platform,
                     Parameters = h.Parameters,
+                    TargetHost = h.TargetHost,
+                    IsExecuted = h.IsExecuted,
                     // Explicit CurrentCulture, matching every other formatting site in the
                     // app. Heimdall has no mapping from its own locale to a CultureInfo,
                     // so introducing one here would make this the only surface that
@@ -76,7 +140,7 @@ public sealed partial class CommandLibraryViewModel
                 });
             }
 
-            IsHistoryEmpty = HistoryEntries.Count == 0;
+            RefreshHistoryView();
         }
         catch (Exception ex)
         {
@@ -191,8 +255,15 @@ public sealed partial class CommandLibraryViewModel
     /// parameter entries are observable and the user is free to keep editing them the
     /// instant Copy returns.
     /// </para>
+    /// <para>
+    /// <paramref name="isExecuted"/> is a parameter rather than a field read afterwards because
+    /// only the gesture knows it: Send and Broadcast ran the command, Copy and Insert did not,
+    /// and a flag set beside the call would be one more piece of state a later gesture could
+    /// leave stale.
+    /// </para>
     /// </remarks>
-    private void RecordHistory()
+    /// <param name="isExecuted">True when the gesture ran the command in a terminal.</param>
+    private void RecordHistory(bool isExecuted)
     {
         var action = _selectedAction;
         var template = _activeTemplate;
@@ -207,6 +278,8 @@ public sealed partial class CommandLibraryViewModel
             parameters[parameter.Name] = parameter.Value;
         }
 
+        var targetHost = _targetHost;
+
         _ = Task.Run(async () =>
         {
             try
@@ -215,7 +288,8 @@ public sealed partial class CommandLibraryViewModel
                 var historyService = scope.ServiceProvider.GetRequiredService<ICommandHistoryService>();
                 await historyService.AddCommandAsync(
                     action.Id, command, parameters,
-                    template.Platform, action.Title, action.Category);
+                    template.Platform, action.Title, action.Category,
+                    targetHost, isExecuted);
             }
             catch (VaultLockedException)
             {
