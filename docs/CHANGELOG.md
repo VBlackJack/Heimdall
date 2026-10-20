@@ -12,6 +12,92 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-20: shared MobaXterm sessions a team can use on day one, and a masked copy of terminal output (v2026.102001)
+
+### Shared MobaXterm sessions (#646, #648-#652)
+
+- **Telnet, VNC and SFTP sessions are imported** from a shared file (#646), beside SSH and RDP.
+  The three layouts were measured on sessions created in the MobaXterm interface, jump host and
+  proxy slots included. The shared profile sanitizer accepts the three types and keeps their
+  ports; the one-time MobaXterm import in Settings shares the same layout table.
+- **Every skipped session is worded** in the import report and in the Settings import summary:
+  FTP (`MobaXtermSkippedType.Ftp`, the password travels in clear), WSL (nothing to connect to), any other
+  type code, a Telnet or VNC session through an SSH jump host, and a Telnet, VNC or SFTP session
+  through a proxy (#646). The SSH layout now reads its proxy slot (fields 18-19), so an SSH session
+  through a proxy is skipped with `ProxyNotSupported` too (#649).
+- **RD Gateway of an RDP session** (#649, #651). MobaXterm has no proxy for RDP; its other route is
+  the RD Gateway, server at field 19 and again in the packed field 30. A session set to Always
+  whose gateway sign-in uses a password (same as end server, prompt, or a login) is imported with
+  `RdpGateway`; the gateway login is not carried. Smart card, unknown mode or auth, or a field 30
+  that names another server is skipped with `RdGatewayNotSupported`; a server that is not a host is
+  `InvalidGatewayHost`. Never and Detect store no server, so those sessions connect directly.
+  `SharedProfileSanitizer` did not keep `RdpGateway` and would have made such a session direct in
+  silence; it is allowlisted, and an invalid gateway host refuses the profile
+  (`SharedProfileRefusal.InvalidRdGateway`).
+- **Shared SFTP sessions remember their password per user** like SSH sessions (#646). When the
+  shared credential plan supplied the password, the SFTP handler no longer retypes it itself, so a
+  refused password is forgotten instead of kept.
+- **Shared VNC sessions type and remember their password** (#650, #652). noVNC reports `connect`
+  only after the security result, and a refused password raises `securityfailure` after
+  authentication, so the signal is unambiguous where RDP's is not. The page holds the password and
+  sends it on `credentialsrequired`; `VncPasswordFlow` keeps it on `connected:` when Remember was
+  ticked and drops it on a refusal that came after the password (a server that blocks the address
+  before any password keeps it). `SharedCredentialApplier` fills a remembered VNC password before
+  connect (new secret kind `Vnc`, keyed by profile, host and port) and never asks; the overlay
+  offers **Enter password** and retries in place. The connection stays open while the password is
+  typed: the page keeps the waiting client and answers it with `rfb.sendCredentials`
+  (`credentials:`), or reconnects with the typed password when the server left
+  (`credentials-late:`), because TigerVNC counts an abandoned VncAuth handshake as a failed sign-in
+  and blacklists the address after a few. `SessionPaneControl.HostHandlesFailureOverlay` includes
+  `EmbeddedVncView`, so one overlay shows instead of two stacked.
+- **Import report**: duplicate hosts compare host and protocol; gateway outliers only count session
+  types that can name a jump host in MobaXterm, SSH and RDP (#646).
+- **Documented limits** (#648): a shared RDP session asks for its password in the Windows Security
+  prompt and Heimdall does not remember it (embedded RDP reports success before the control has
+  authenticated, and the only credential-shaped disconnect code also covers "right password, no
+  logon right"); network tools route through the user's own gateways only; the VNC sentence that
+  named a password prompt Heimdall does not have was corrected. Guide section 8 and FEATURES list
+  every skip, in English and French.
+
+### Copy output, secrets masked (#647)
+
+- **`Heimdall.Core/Redaction`**: an offline redactor with a declared rule catalogue (private key
+  blocks, Authorization Bearer/Basic/Token/Digest values, URL credentials, key-value secrets such
+  as `DB_PASSWORD=` or `"password":`, command-line passwords such as `--password`, `sshpass -p` and
+  `PGPASSWORD=`, AWS, GitHub and Slack tokens, JWTs, echoed password prompts). Each mask is a
+  literal `[masked:<rule-id>]`, counted per rule; an option replaces host names and IPv4 addresses
+  with stable pseudonyms. A rule that hits its regex timeout refuses the whole result.
+- **Terminal bridge**: the page answers a numbered request with the normal buffer (not the
+  alternate screen), rejoins wrapped rows so a long token is not split, caps at the last 4 MiB and
+  encodes in chunks. The host caps the reply, decodes it off the UI thread, discards stale replies,
+  fails fast when the terminal cannot answer and never logs the text. A truncated first line is
+  dropped so a secret whose key was cut away cannot slip through.
+- **Command**: Ctrl+Shift+M, the session tab menu and a Ctrl+K palette entry, through one resolver
+  that picks the pane with a terminal, so the command is absent on RDP, VNC, SFTP and web tabs. A
+  preview dialog shows the masked text, the count per rule and the host option; Copy is the only
+  way to the clipboard, and focus returns to the terminal. The shortcut is not added to the
+  low-level router, so it never reaches an RDP desktop. F1 shortcut list in en/fr/es; user guide,
+  feature list and security notes in English and French. Session logs are not masked.
+
+### Quick file server (#644, #645)
+
+- **Links out of the shared folder are refused** (#644). `CrossesLink` walks each path component
+  below the shared root and refuses a symbolic link or a junction: HTTP answers 403, TFTP "File not
+  found"; a component that cannot be inspected is refused rather than followed; the directory
+  listing leaves links out. Other reparse points (OneDrive placeholders, deduplicated files) are
+  still served. TROUBLESHOOTING #33 says HTTP without elevation is localhost-only and gives the
+  `netsh http add urlacl` command.
+- **HTTP requests are served concurrently** (#645). Each context runs on its own task, bounded by
+  `MaxConcurrentHttpRequests = 8`; while the slots are taken HTTP.sys queues the rest, so nothing is
+  rejected. On exit the loop waits for in-flight handlers, still capped by `ShutdownTimeoutMs`.
+
+### Tests (#653)
+
+- The product-launch E2E tests (masked copy, shared sessions day one) treat a UI Automation timeout
+  inside a poll as "not yet" (`UiaTimeout.MissOnTimeout`, `FalseOnTimeout`), search narrower scopes
+  (session tree, dialog children, the main window's popups) and keep the original failure message
+  when listing diagnostics times out.
+
 ## 2026-10-19: a settings panel you can find your way around (v2026.101901)
 
 ### Section rail (#640)
