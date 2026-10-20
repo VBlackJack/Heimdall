@@ -61,6 +61,40 @@ internal sealed class VncPasswordFlow
     internal bool CanAsk => _keeper is not null;
 
     /// <summary>
+    /// Whether the server asked for the password and is still waiting for it on the open
+    /// connection, so an answer goes to that connection rather than to a new one.
+    /// </summary>
+    /// <remarks>
+    /// Ending the attempt instead costs a failure on servers that count an abandoned sign-in as a
+    /// wrong password: TigerVNC blocks the address after a few of them. TigerVNC keeps the sign-in
+    /// open for as long as the user takes to type.
+    /// </remarks>
+    internal bool ServerWaiting { get; private set; }
+
+    /// <summary>The server asked for the password on the open connection and waits for it.</summary>
+    internal void OnServerWaiting()
+    {
+        if (_keeper is not null)
+        {
+            ServerWaiting = true;
+        }
+    }
+
+    /// <summary>The attempt ended, or got its answer: the next one is a new connection.</summary>
+    internal void OnAttemptEnded() => ServerWaiting = false;
+
+    /// <summary>
+    /// Takes the open connection for the answer just typed: true when it still waits, and from then
+    /// on it no longer does.
+    /// </summary>
+    internal bool TakeWaitingServer()
+    {
+        bool waiting = ServerWaiting;
+        ServerWaiting = false;
+        return waiting;
+    }
+
+    /// <summary>
     /// Asks for the password. On an answer it becomes the one the next connect sends, and is kept
     /// once the server accepts it if the user asked for that.
     /// </summary>
@@ -86,6 +120,7 @@ internal sealed class VncPasswordFlow
     /// <summary>The server accepted the password: keep it if the user asked to.</summary>
     internal async Task OnConnectedAsync()
     {
+        ServerWaiting = false;
         if (!_rememberOnConnect || _keeper is null || Password is null)
         {
             return;
@@ -105,6 +140,7 @@ internal sealed class VncPasswordFlow
     /// </param>
     internal async Task OnSecurityFailureAsync(bool afterPassword)
     {
+        ServerWaiting = false;
         if (!afterPassword)
         {
             return;

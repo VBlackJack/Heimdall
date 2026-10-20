@@ -412,6 +412,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
         if (message.StartsWith("disconnected:", StringComparison.Ordinal))
         {
+            _passwordFlow?.OnAttemptEnded();
             EmitDisconnect("remote");
             ReleaseSleepPrevention();
             if (_session?.ServerId is not null)
@@ -432,6 +433,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         {
             var errorMsg = message["error:".Length..];
             Core.Logging.FileLogger.Error($"VNC error: {errorMsg}");
+            _passwordFlow?.OnAttemptEnded();
 
             // Mid-session error ends the session; the latch makes this a no-op pre-connect.
             EmitDisconnect("remote");
@@ -493,6 +495,12 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         if (message.StartsWith("security-failure:", StringComparison.Ordinal))
         {
             HandleSecurityFailure(message["security-failure:".Length..]);
+            return;
+        }
+
+        if (message == "credentials-late:")
+        {
+            HandleLateCredentials();
         }
     }
 
@@ -507,7 +515,18 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         bool offerEntry = canAsk && VncCredentialsPolicy.AsksForPasswordOnly(requestedTypesJson);
         string key = VncCredentialsPolicy.MessageKeyFor(requestedTypesJson, canAsk);
         Core.Logging.FileLogger.Warn($"VNC server asked for credentials the session does not hold ({key}).");
-        Dispatcher.Invoke(() => PostWebMessage("disconnect:"));
+
+        // Where the user can type the password, the server keeps waiting for it on this connection:
+        // ending it would count as a wrong password on TigerVNC, which blocks the address after a few.
+        if (offerEntry)
+        {
+            _passwordFlow!.OnServerWaiting();
+        }
+        else
+        {
+            Dispatcher.Invoke(() => PostWebMessage("disconnect:"));
+        }
+
         EndAttempt(_localizer?[key] ?? key, offerEntry);
     }
 
@@ -782,8 +801,9 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     }
 
     /// <summary>
-    /// Asks for the password the server wants and connects again in this view with it. A reconnect
-    /// from the pane rebuilds the session without asking anything, so it could never get there.
+    /// Asks for the password the server wants and hands it to the connection still waiting for it,
+    /// or connects again in this view with it when that connection is gone. A reconnect from the
+    /// pane rebuilds the session without asking anything, so it could never get there.
     /// </summary>
     private async void OnOverlayEnterPasswordClick(object sender, RoutedEventArgs e)
     {
@@ -808,6 +828,38 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             return;
         }
 
+        ShowSigningInWithPassword();
+        if (_passwordFlow.TakeWaitingServer())
+        {
+            PostWebMessage("credentials:" + JsonSerializer.Serialize(new { password = _passwordFlow.Password }));
+        }
+        else
+        {
+            SendConnectCommand();
+        }
+    }
+
+    /// <summary>
+    /// The page had no connection waiting when the answer reached it (the server ended the sign-in
+    /// in the meantime): the answer goes into a new connect instead.
+    /// </summary>
+    private void HandleLateCredentials()
+    {
+        if (_disposed || _passwordFlow?.Password is null)
+        {
+            return;
+        }
+
+        Dispatcher.Invoke(() =>
+        {
+            ShowSigningInWithPassword();
+            SendConnectCommand();
+        });
+    }
+
+    /// <summary>Takes the overlay down while the typed password signs in.</summary>
+    private void ShowSigningInWithPassword()
+    {
         // The words that asked for the password would outlive it: an attempt that then fails for
         // another reason shows the overlay again without the entry, and must not still say to use it.
         _offerPasswordEntry = false;
@@ -822,8 +874,6 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         {
             SessionRetrying?.Invoke(_session.ServerId);
         }
-
-        SendConnectCommand();
     }
 
     private void OnOverlayEditProfileClick(object sender, RoutedEventArgs e)
