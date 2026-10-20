@@ -170,6 +170,7 @@ public sealed class SharedSessionImportReportFormatter
             MobaXtermImportWarningKind.ProxyNotSupported => entry.Detail.Length == 0
                 ? _localizer["SharedReportSkipProxyNoHost"]
                 : _localizer.Format("SharedReportSkipProxy", entry.Detail),
+            MobaXtermImportWarningKind.RdGatewayNotSupported => _localizer.Format("SharedReportSkipRdGateway", entry.Detail),
             MobaXtermImportWarningKind.MissingHost => _localizer["SharedReportSkipMissingHost"],
             MobaXtermImportWarningKind.InvalidGatewayHost => _localizer.Format("SharedReportSkipInvalidGateway", entry.Detail),
             MobaXtermImportWarningKind.DuplicateSession => _localizer["SharedReportSkipDuplicate"],

@@ -3817,6 +3817,8 @@ public sealed partial class SettingsViewModelTests : IDisposable
             telnet-gw= #98#1%telnet-gw.example.test%23%telusergw%%1%jumpt.example.test%2299%jumpusert%%0%1%proxyt.example.test%3128%proxyusert%%0#MobaFont%10#0#
             sftp-px= #140#7%sftp-px.example.test%22%sftpuserpx%-1%0%%0%0%%1%proxys.example.test%3130%proxyusers%%%0#MobaFont%10#0#
             vnc-pt= #128#5%vnc-pt.example.test%5915%u2%u3%%%%u7%u8%u9%u10%u11%2%#MobaFont%10#0#
+            ssh-px= #109#0%ssh-px.example.test%22%%%-1%-1%%%%%0%-1%0%%%-1%-1%0%1%proxy-ssh.example.test%3181%pxuser%0%0%1%%0%%%%0%-1%-1%0%%%0#MobaFont%10#0#
+            rdp-gw= #91#4%rdp-gw.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw.example.test,,0,0,#MobaFont%10#0#
             """;
 
         try
@@ -3855,6 +3857,14 @@ public sealed partial class SettingsViewModelTests : IDisposable
                 StringComparison.Ordinal);
             Assert.Contains(
                 localizer.Format("ImportMobaXtermWarningProxyNoHost", "Bookmarks_1", "vnc-pt"),
+                warning.Message,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                localizer.Format("ImportMobaXtermWarningProxy", "Bookmarks_1", "ssh-px", "proxy-ssh.example.test"),
+                warning.Message,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                localizer.Format("ImportMobaXtermWarningRdGateway", "Bookmarks_1", "rdp-gw", "rdgw.example.test"),
                 warning.Message,
                 StringComparison.Ordinal);
             Assert.DoesNotContain("\"\"", warning.Message, StringComparison.Ordinal);

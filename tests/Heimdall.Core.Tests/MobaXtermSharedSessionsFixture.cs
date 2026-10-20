@@ -153,4 +153,29 @@ internal static class MobaXtermSharedSessionsFixture
         syn-ssh-proxy= #109#0%syn-ssh-proxy.example.test%2225%synsshu%u3%u4%u5%%%%%u10%u11%u12%u13%u14%u15%u16%u17%1%proxyssh2.example.test%u20%u21%u22{Tail}
         syn-ssh-proxytype= #109#0%syn-ssh-proxytype.example.test%2226%synsshu%u3%u4%u5%%%%%u10%u11%u12%u13%u14%u15%u16%u17%2%%u20%u21%u22{Tail}
         """;
+
+    /// <summary>
+    /// RDP sessions with and without an RD Gateway, three created in the MobaXterm interface and
+    /// two synthetic.
+    /// </summary>
+    /// <remarks>
+    /// <para>MobaXterm has no proxy for an RDP session; its other route is the RD Gateway of the
+    /// Expert RDP settings. The <c>rdp-proxy-</c> sessions are measured with the gateway set to
+    /// Always: <c>a</c> authenticates as the end server, <c>b</c> prompts and carries a user on the
+    /// session. The server lands at field 19 and again in the packed field 30.
+    /// <c>rdp-direct-c</c> has no gateway: field 19 is empty and field 30 is absent.</para>
+    /// <para>The <c>syn-rdp</c> sessions are SYNTHETIC: every field the RDP layout does not read
+    /// holds a unique sentinel and the SSH jump host is empty, so a gateway index shifted by one
+    /// lands on a sentinel and refuses the session that has no gateway.</para>
+    /// </remarks>
+    public const string RdpGatewayContent = $"""
+        [Bookmarks_1]
+        SubRep=RdpGateway
+        ImgNum=41
+        rdp-proxy-a.example.test= #91#4%rdp-proxy-a.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-a.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-a.example.test,,0,0,{Tail}
+        rdp-proxy-b.example.test (rdpuserb)= #91#4%rdp-proxy-b.example.test%3389%rdpuserb%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-b.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-b.example.test,,0,1,{Tail}
+        rdp-direct-c.example.test= #91#4%rdp-direct-c.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%%-1%-1%0%-1%0%-1%0%0%0%0%{Tail}
+        syn-rdp= #91#4%syn-rdp.example.test%3390%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%%u20%u21%u22{Tail}
+        syn-rdp-gw= #91#4%syn-rdp-gw.example.test%3391%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%rdgw2.example.test%u20%u21%u22{Tail}
+        """;
 }

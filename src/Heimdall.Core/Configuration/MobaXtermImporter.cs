@@ -104,7 +104,8 @@ public static partial class MobaXtermImporter
     /// the session.</para>
     /// <para>Type 4 (RDP) is kept from the existing realistic RDP fixture, which carries host, port
     /// and user at 0-2 and its SSH gateway at 12-14. It has no login command. MobaXterm offers no
-    /// proxy for an RDP session: its only other route is an RD Gateway, not read here.</para>
+    /// proxy for an RDP session: its other route is an RD Gateway, whose server at 19 is measured
+    /// on sessions created in the MobaXterm interface and read only to refuse the session.</para>
     /// <para>Types 1 (Telnet), 5 (VNC) and 7 (SFTP) are measured on sessions created in the
     /// MobaXterm interface. A Telnet session carries a login at index 2, but no Heimdall consumer
     /// reads it: Telnet asks for its login in the terminal, so it is not imported. A VNC session
@@ -120,35 +121,40 @@ public static partial class MobaXtermImporter
             UserIndex: 2,
             LoginCommandIndex: 6,
             Gateway: new GatewaySlot(HostIndex: 7, PortIndex: 8, UserIndex: 9),
-            Proxy: new ProxySlot(TypeIndex: 18, HostIndex: 19)),
+            Proxy: new ProxySlot(TypeIndex: 18, HostIndex: 19),
+            RdGatewayHostIndex: null),
         [1] = new SessionLayout(
             TelnetConnectionType,
             DefaultPorts.Telnet,
             UserIndex: null,
             LoginCommandIndex: null,
             Gateway: new GatewaySlot(HostIndex: 5, PortIndex: 6, UserIndex: 7),
-            Proxy: new ProxySlot(TypeIndex: 10, HostIndex: 11)),
+            Proxy: new ProxySlot(TypeIndex: 10, HostIndex: 11),
+            RdGatewayHostIndex: null),
         [4] = new SessionLayout(
             RdpConnectionType,
             DefaultPorts.Rdp,
             UserIndex: 2,
             LoginCommandIndex: null,
             Gateway: new GatewaySlot(HostIndex: 12, PortIndex: 13, UserIndex: 14),
-            Proxy: null),
+            Proxy: null,
+            RdGatewayHostIndex: 19),
         [5] = new SessionLayout(
             VncConnectionType,
             DefaultPorts.Vnc,
             UserIndex: null,
             LoginCommandIndex: null,
             Gateway: new GatewaySlot(HostIndex: 4, PortIndex: 5, UserIndex: 6),
-            Proxy: new ProxySlot(TypeIndex: 12, HostIndex: 13)),
+            Proxy: new ProxySlot(TypeIndex: 12, HostIndex: 13),
+            RdGatewayHostIndex: null),
         [7] = new SessionLayout(
             SftpConnectionType,
             DefaultPorts.Sftp,
             UserIndex: 2,
             LoginCommandIndex: null,
             Gateway: null,
-            Proxy: new ProxySlot(TypeIndex: 9, HostIndex: 10)),
+            Proxy: new ProxySlot(TypeIndex: 9, HostIndex: 10),
+            RdGatewayHostIndex: null),
     };
 
     private const int HostIndex = 0;
@@ -300,6 +306,13 @@ public static partial class MobaXtermImporter
                 context.Warn(section, sessionName, MobaXtermImportWarningKind.ProxyNotSupported, proxyHost);
                 return;
             }
+        }
+
+        if (layout.RdGatewayHostIndex is { } rdGatewayIndex
+            && FieldAt(line.Fields, rdGatewayIndex).Trim() is { Length: > 0 } rdGatewayHost)
+        {
+            context.Warn(section, sessionName, MobaXtermImportWarningKind.RdGatewayNotSupported, rdGatewayHost);
+            return;
         }
 
         string profileId = BuildId(context.Options.IdPrefix, ProfileIdDomain, group, sessionName);
@@ -596,7 +609,8 @@ public static partial class MobaXtermImporter
         int? UserIndex,
         int? LoginCommandIndex,
         GatewaySlot? Gateway,
-        ProxySlot? Proxy);
+        ProxySlot? Proxy,
+        int? RdGatewayHostIndex);
 
     /// <summary>The three fields of a jump host, which are present together or not at all.</summary>
     private sealed record GatewaySlot(int HostIndex, int PortIndex, int UserIndex);
@@ -756,6 +770,12 @@ public enum MobaXtermImportWarningKind
     /// imported, since a direct connection would go around the proxy.
     /// </summary>
     ProxyNotSupported,
+
+    /// <summary>
+    /// The RDP session goes through an RD Gateway, which this importer does not carry over yet;
+    /// not imported, since a direct connection would go around the gateway.
+    /// </summary>
+    RdGatewayNotSupported,
 
     /// <summary>Another session with the same name already exists in the same folder; not imported.</summary>
     DuplicateSession,
