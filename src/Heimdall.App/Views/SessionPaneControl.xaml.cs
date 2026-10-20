@@ -150,7 +150,7 @@ public partial class SessionPaneControl : UserControl
     /// set of the same buttons on top of the first.
     /// </summary>
     internal static bool HostHandlesFailureOverlay(object? hostControl)
-        => hostControl is EmbeddedRdpView or EmbeddedSshView or EmbeddedSftpView;
+        => hostControl is EmbeddedRdpView or EmbeddedSshView or EmbeddedSftpView or EmbeddedVncView;
 
     private void UpdateOverlays()
     {

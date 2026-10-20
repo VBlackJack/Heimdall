@@ -80,7 +80,8 @@ internal sealed class VncHandler : IProtocolHandler
             vncPort,
             password,
             server.VncViewOnly,
-            server.SessionLoggingOverride);
+            server.SessionLoggingOverride,
+            server.InventoryProfileId);
         return Task.FromResult(new ConnectionResult(true, null, session));
     }
 }
