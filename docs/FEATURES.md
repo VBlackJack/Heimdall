@@ -67,6 +67,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Typed mid-session security events distinguish host-key attacks from ordinary disconnects and suppress SSH auto-reconnect on MITM signals
 - Auto-reconnect overlay on unexpected disconnect (SSH and RDP)
 - A crash or restart of a WebView2 GPU or utility helper process (a graphics driver reset, a display change) leaves open terminals running; only the loss of the browser or renderer process falls back, and the transcript and macro expect steps keep running on the connection behind it
+- **Copy output, secrets masked** (Ctrl+Shift+M, session tab menu, Ctrl+K palette): reads the text of an SSH, Telnet, WinRM or local shell session (last 4 MiB of scrollback), masks private keys, authorization headers, URL credentials, command-line and prompt passwords, key-value secrets and AWS, GitHub, Slack and JWT tokens as `[masked:<rule-id>]`, and shows a preview with the count per rule and an optional stable pseudonym for IPv4 addresses and host names. Copies only on **Copy**; runs offline, writes nothing to disk, refuses to copy if a rule times out; session logs are not masked
 
 ### VNC
 - Embedded VNC viewer via noVNC + WebView2
@@ -326,7 +327,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,214 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,249 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 

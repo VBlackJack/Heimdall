@@ -55,6 +55,7 @@ public sealed class WindowMinimumSizeContractTests
         "ImportSessionsPreviewDialog.xaml",
         "MacroEditorDialog.xaml",
         "MainWindow.xaml",
+        "MaskedCopyDialog.xaml",
         "RdpImportDialog.xaml",
         "SharedSessionImportReportDialog.xaml",
         "ToolPickerDialog.xaml",
@@ -66,11 +67,12 @@ public sealed class WindowMinimumSizeContractTests
     {
         IReadOnlyList<(string File, double MinWidth)> atRisk = FindAtRiskWindows();
 
-        // Fourteen: the thirteen after the RDP certificate prompt left (its question is asked
-        // inside the session pane that raised it), and the import report of a shared session
-        // source, which opts in from the start. Anything else means the population moved and the
-        // lot that wires them needs re-scoping rather than a quietly updated number.
-        Assert.Equal(14, atRisk.Count);
+        // Fifteen: the thirteen after the RDP certificate prompt left (its question is asked
+        // inside the session pane that raised it), the import report of a shared session
+        // source, and the masked terminal copy review, which both opt in from the start. Anything
+        // else means the population moved and the lot that wires them needs re-scoping rather
+        // than a quietly updated number.
+        Assert.Equal(15, atRisk.Count);
 
         string[] optedInFound = [.. atRisk
             .Where(window => ReadXaml(window.File).Contains(

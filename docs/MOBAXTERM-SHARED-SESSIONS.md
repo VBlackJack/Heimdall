@@ -60,8 +60,8 @@ A remembered password belongs to one bastion (its host, port and login) or to on
 - Reopening sessions at startup and **Connect all** use remembered passwords but never ask: a session without one asks when you open it alone.
 - A shared SFTP session remembers its password per user, like an SSH session, with the same box and the same rules.
 - A Telnet session asks for its login and password in the terminal, which Heimdall does not remember.
-- A VNC session uses its own password prompt, or the external credential provider like any profile.
-- An RDP session asks for its password in the RDP window, which Heimdall does not remember. The password of its bastion is remembered like any other.
+- A VNC session has no password prompt in Heimdall, and a shared session cannot store one. If the VNC server asks for a password, file it in the external credential provider under the session's host name: Heimdall then fills it in. Without it, the session stops with "This VNC server asks for a password".
+- An RDP session asks for its password in the RDP window (the Windows Security prompt, which also offers smart card and Windows Hello for Business where the server allows them), and Heimdall does not remember it. To avoid retyping it, file the password in the external credential provider under the session's host name, as above: Heimdall then fills it in. The password of its bastion is remembered like any other.
 
 In the settings, each source with remembered passwords shows **Forget saved passwords**. Removing a source also forgets its passwords. Nothing you type is ever written to a shared session, which stays read-only.
 
@@ -96,5 +96,6 @@ The report only informs: every session it lists is still loaded as the file desc
   - **An RDP session through an RD Gateway**: skipped, because the RD Gateway of a MobaXterm session is not imported yet and a direct connection would go around the gateway.
 - MobaXterm has no proxy setting for an RDP session: its only other route is the RD Gateway above.
 - A Telnet session asks for its login in the terminal, so no user is imported for it.
+- Network tools (ping, port scan and the other tools that can go through a gateway) route only through your own SSH gateways from the settings, not through the bastions a shared source defines. To reach hosts behind a shared bastion from a tool, define that bastion as one of your own gateways.
 - The remote start folder of an SFTP session is not carried over: the session opens in the default folder.
 - Shared sessions are read-only in Heimdall (section 3).

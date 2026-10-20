@@ -192,6 +192,18 @@ public sealed partial class CommandPaletteViewModel
             }
         }
 
+        // App commands act on the active tab, so they are listed only when it has something to
+        // act on, and never while the palette is choosing a split partner.
+        if (_splitPaletteSession is null && _main.MaskedCopy.CanRun(_main.Connection.ActiveSession))
+        {
+            var maskedCopyItem = BuildMaskedCopyCommandItem();
+            var score = FuzzyScoreString(maskedCopyItem.DisplayName, query);
+            if (score > 0)
+            {
+                scored.Add((maskedCopyItem, score));
+            }
+        }
+
         foreach (var server in _main.ServerList.InventoryInTreeOrder)
         {
             var score = FuzzyScore(server, query);
@@ -392,6 +404,32 @@ public sealed partial class CommandPaletteViewModel
         ConnectionType = "EXTERNAL",
         Group = _localizer["PaletteExternalToolsHeader"]
     };
+
+    /// <summary>Id prefix of the palette entries that run an app command instead of opening something.</summary>
+    internal const string CommandIdPrefix = "command-";
+
+    /// <summary>Id of the "Copy output, secrets masked" palette command.</summary>
+    internal const string MaskedCopyCommandId = CommandIdPrefix + "masked-copy";
+
+    /// <summary>Badge shown on an app command row.</summary>
+    private const string CommandConnectionType = "CMD";
+
+    private ServerItemViewModel BuildMaskedCopyCommandItem() => new()
+    {
+        Id = MaskedCopyCommandId,
+        DisplayName = _localizer["MaskedCopyPaletteCommand"],
+        ConnectionType = CommandConnectionType,
+        Group = _localizer["PaletteCommandsHeader"]
+    };
+
+    /// <summary>Runs the app command a palette row stands for; the palette is already closed.</summary>
+    private void RunPaletteCommand(ServerItemViewModel item)
+    {
+        if (string.Equals(item.Id, MaskedCopyCommandId, StringComparison.Ordinal))
+        {
+            _main.MaskedCopy.Start(_main.Connection.ActiveSession);
+        }
+    }
 
     private const int ToolExactAliasScore = 999;
 

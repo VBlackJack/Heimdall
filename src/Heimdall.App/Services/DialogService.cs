@@ -224,6 +224,17 @@ public interface IDialogService
     }
 
     /// <summary>
+    /// Shows the masked terminal text for review, with a Copy that places it on the clipboard.
+    /// Returns once the dialog is closed.
+    /// </summary>
+    /// <remarks>A test double that does not show dialogs has nothing to show it in.</remarks>
+    Task ShowMaskedCopyAsync(MaskedCopyDialogViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Shows known_hosts import conflicts and returns the user's resolution,
     /// or <c>null</c> when the dialog is cancelled.
     /// </summary>

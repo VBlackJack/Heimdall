@@ -33,6 +33,7 @@ public sealed class HelpShortcutsDocumentationTests
     [Theory]
     [InlineData("en")]
     [InlineData("fr")]
+    [InlineData("es")]
     public async Task HelpShortcuts_ListSaveSettings(string locale)
     {
         LocalizationManager localizer = await CreateLocalizerAsync(locale);
@@ -55,8 +56,35 @@ public sealed class HelpShortcutsDocumentationTests
     /// The modifier names are themselves localized, so the screenshot entry is not spelled
     /// the same way in both files.
     /// </summary>
-    private static string ScreenshotToken(string locale)
-        => string.Equals(locale, "fr", StringComparison.Ordinal) ? "Ctrl+Maj+S" : "Ctrl+Shift+S";
+    private static string ScreenshotToken(string locale) => ModifiedToken(locale, 'S');
+
+    /// <summary>The Ctrl+Shift chord on a letter, spelled as the locale spells its Shift key.</summary>
+    private static string ModifiedToken(string locale, char letter) => locale switch
+    {
+        "fr" => $"Ctrl+Maj+{letter}",
+        "es" => $"Ctrl+May\u00fas+{letter}",
+        _ => $"Ctrl+Shift+{letter}",
+    };
+
+    /// <summary>
+    /// "Copy output, secrets masked" is bound to Ctrl+Shift+M by <c>MainWindow.RegisterMaskedCopyShortcut</c>;
+    /// a key the help does not list reads as a swallowed key.
+    /// </summary>
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    public async Task HelpShortcuts_ListMaskedCopy(string locale)
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync(locale);
+
+        Dictionary<string, string> entries = ParseShortcutEntries(localizer["HelpShortcutsContent"]);
+
+        Assert.True(
+            entries.TryGetValue(ModifiedToken(locale, 'M'), out string? description),
+            $"The {locale} shortcut help lists no masked copy entry. Listed: {string.Join(", ", entries.Keys)}");
+        Assert.False(string.IsNullOrWhiteSpace(description));
+    }
 
     /// <summary>
     /// Splits the help text into its key/description pairs. Entries are the indented,
