@@ -74,6 +74,10 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     private string? _editLinuxTemplateId;
     private Guid? _editLinuxTemplatePublicId;
 
+    // Carried through an edit untouched: the dialog edits the pivot text only, and a save
+    // that dropped the other languages would lose them without the operator ever seeing them.
+    private List<ActionTranslation>? _editTranslations;
+
     // ── Action fields ─────────────────────────────────────────────
 
     [ObservableProperty]
@@ -422,7 +426,8 @@ public partial class CommandActionDialogViewModel : ObservableValidator
                 .Select(e => e.ToModel()).ToList(),
             Links = Links.Select(l => l.ToModel()).ToList(),
             IsUserCreated = true,
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.UtcNow,
+            Translations = _editTranslations?.ToList() ?? []
         };
 
         if (!string.IsNullOrWhiteSpace(WindowsPattern))
@@ -497,6 +502,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         vm._editWinTemplatePublicId = null;
         vm._editLinuxTemplateId = null;
         vm._editLinuxTemplatePublicId = null;
+        vm._editTranslations = null;
         vm._isInitializing = false;
 
         // A copy is unsaved work from the moment it exists, unlike an edit of something
@@ -515,6 +521,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         vm._editActionId = action.Id;
         vm._editPublicId = action.PublicId;
         vm._editCreatedAt = action.CreatedAt;
+        vm._editTranslations = action.Translations?.ToList();
         vm.Title = action.Title;
         vm.Description = action.Description ?? "";
         vm.Category = action.Category;

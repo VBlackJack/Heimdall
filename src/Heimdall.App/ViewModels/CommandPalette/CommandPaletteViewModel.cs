@@ -27,6 +27,7 @@ using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
+using TwinShell.Core.Services;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.ViewModels.CommandPalette;
@@ -207,7 +208,9 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
                 var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
                 actions = (await actionService.GetAllActionsAsync()).ToList();
             }
-            _cachedSnippets = actions;
+
+            // Snippets are shown, never written back: they carry the operator's language.
+            _cachedSnippets = ActionLocalizer.LocalizeAll(actions, _localizer.CurrentLocale);
 
             // Awaited without ConfigureAwait(false) so this continuation resumes
             // on the UI thread (Open/OpenSplit run there). Re-rank once fresh data

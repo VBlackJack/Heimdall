@@ -25,6 +25,7 @@ using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
+using TwinShell.Core.Services;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
@@ -192,7 +193,11 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
             // it, so the continuation has to resume on the thread that created them.
             // ActionService already applies ConfigureAwait(false) internally, which means
             // the caller's await is the only thing that can bring the flow back.
-            var items = (await actionService.GetAllActionsAsync())
+            var stored = await actionService.GetAllActionsAsync();
+
+            // The picker shows the operator's language. What it hands back is the action id
+            // and the template, whose command pattern no translation touches.
+            var items = ActionLocalizer.LocalizeAll(stored, _localizer.CurrentLocale)
                 .Select(action => new CommandLibraryPickerItem
                 {
                     ActionId = action.Id,

@@ -38,16 +38,27 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     /// <summary>
     /// Creates a new display entry bound to the given action and owning VM.
     /// </summary>
-    /// <param name="source">Underlying TwinShell action model.</param>
+    /// <param name="source">The action as shown, in the operator's language.</param>
     /// <param name="viewModel">VM providing favorite/search/locale state.</param>
-    public CommandLibraryActionEntry(ActionModel source, CommandLibraryViewModel viewModel)
+    /// <param name="pivot">
+    /// The action as stored, when <paramref name="source"/> is a localized copy of it; null
+    /// when the two are the same.
+    /// </param>
+    public CommandLibraryActionEntry(ActionModel source, CommandLibraryViewModel viewModel, ActionModel? pivot = null)
     {
         Source = source;
         _viewModel = viewModel;
+        Pivot = pivot ?? source;
     }
 
-    /// <summary>The underlying TwinShell action model.</summary>
+    /// <summary>The action as shown, in the operator's language.</summary>
     public ActionModel Source { get; }
+
+    /// <summary>
+    /// The action as stored: pivot text and translations. What an edit starts from, so that a
+    /// save never writes the operator's language over the pivot.
+    /// </summary>
+    public ActionModel Pivot { get; }
 
     /// <summary>Action title (passthrough).</summary>
     public string Title => Source.Title;

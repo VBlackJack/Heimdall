@@ -341,7 +341,7 @@ public sealed partial class CommandLibraryViewModel
     {
         if (entry is null || ShowActionDialogAsync is null) return;
 
-        var vm = CommandActionDialogViewModel.FromAction(entry.Source);
+        var vm = CommandActionDialogViewModel.FromAction(entry.Pivot);
         vm.DialogTitle = LocalizeKey("ToolCmdLibDialogTitleEdit");
         vm.Localizer = _localizer;
         vm.AvailableCategories = _categoryList.ToList();
