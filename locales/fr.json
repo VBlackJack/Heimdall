@@ -6383,6 +6383,8 @@
   "ToolCmdLibRiskBadgeDanger": "DANGER",
   "ToolCmdLibBtnCopy": "Copier",
   "ToolCmdLibBtnCopyExample": "Copier l'exemple",
+  "ToolCmdLibBtnInsert": "Insérer",
+  "ToolCmdLibBtnInsertTooltip": "Taper la commande à l'invite du terminal sans l'exécuter (Maj+Entrée). Appuyez sur Entrée dans le terminal pour l'exécuter.",
   "ToolCmdLibApplyExample": "Appliquer l'exemple",
   "ToolCmdLibBroadcastToggleTooltip": "Envoyer vers plusieurs terminaux ouverts",
   "ToolCmdLibBroadcastNoTerminals": "Aucun terminal ouvert ne peut recevoir une commande pour le moment.",

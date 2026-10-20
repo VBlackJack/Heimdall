@@ -522,6 +522,25 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private Action<string>? _sendCommandHandler;
 
     /// <summary>
+    /// The handler invoked by Insert, populated by the view from
+    /// <see cref="Heimdall.Core.Models.ToolContext.InsertTextAction"/>: it types the command at
+    /// the session's prompt without submitting it. When null, the Insert button is hidden.
+    /// </summary>
+    public Action<string>? InsertTextHandler
+    {
+        get => _insertTextHandler;
+        set
+        {
+            _insertTextHandler = value;
+            OnPropertyChanged(nameof(IsInsertVisible));
+        }
+    }
+    private Action<string>? _insertTextHandler;
+
+    /// <summary>True when an <see cref="InsertTextHandler"/> is wired, which shows the Insert button.</summary>
+    public bool IsInsertVisible => _insertTextHandler is not null;
+
+    /// <summary>
     /// Probe installed by the view from
     /// <see cref="Heimdall.Core.Models.ToolContext.CanSendToTerminal"/>. Answers
     /// "does this session tab currently contain an injectable terminal sink?".
@@ -567,6 +586,9 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     /// <summary>Feedback target for the generator's Send button.</summary>
     public const string SendTarget = "send";
+
+    /// <summary>Feedback target for the generator's Insert button.</summary>
+    public const string InsertTarget = "insert";
 
     /// <summary>Feedback target for copying an example row's command.</summary>
     public const string CopyExampleTarget = "example";

@@ -6384,6 +6384,8 @@
   "ToolCmdLibRiskBadgeDanger": "DANGER",
   "ToolCmdLibBtnCopy": "Copy",
   "ToolCmdLibBtnCopyExample": "Copy example",
+  "ToolCmdLibBtnInsert": "Insert",
+  "ToolCmdLibBtnInsertTooltip": "Type the command at the terminal prompt without running it (Shift+Enter). Press Enter in the terminal to run it.",
   "ToolCmdLibApplyExample": "Apply example",
   "ToolCmdLibBroadcastToggleTooltip": "Send to several open terminals",
   "ToolCmdLibBroadcastNoTerminals": "No open terminal can receive a command right now.",

@@ -80,6 +80,27 @@ public sealed partial class CommandLibraryViewModel
     }
 
     /// <summary>
+    /// Types the current generated command at the session's prompt without running it, so the
+    /// operator can read it, adjust it and press Enter themselves.
+    /// </summary>
+    /// <remarks>
+    /// Never asks the dangerous-command confirmation: nothing runs, and the operator's own Enter
+    /// is the confirmation. Recorded in history as not executed, like a copy, because that is
+    /// what it is until the operator decides otherwise, and the library never learns which.
+    /// Enabled under the same condition as Send (<see cref="IsSendEnabled"/>); the keyboard
+    /// gesture reaches this method directly, so it checks the same condition itself.
+    /// </remarks>
+    [RelayCommand]
+    public void Insert()
+    {
+        if (string.IsNullOrEmpty(GeneratedCommand) || InsertTextHandler is null || !IsSendEnabled) return;
+
+        InsertTextHandler(GeneratedCommand);
+        ShowCopyFeedback?.Invoke(InsertTarget);
+        RecordHistory(isExecuted: false);
+    }
+
+    /// <summary>
     /// Copies an example row's command to the clipboard, leaving the generator output
     /// untouched. Clicking the row itself is the gesture that replaces the output; that
     /// is <see cref="ApplyExample"/>.

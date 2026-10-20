@@ -73,6 +73,7 @@ public partial class CommandLibraryView : UserControl, IToolView
         _viewModel = services.GetRequiredService<CommandLibraryViewModel>();
 
         _viewModel.SendCommandHandler = context?.SendCommandAction;
+        _viewModel.InsertTextHandler = context?.InsertTextAction;
         _viewModel.CanSendToTerminalProbe = context?.CanSendToTerminal;
         _viewModel.CommandBroadcaster = context?.CommandBroadcaster;
         _viewModel.ShowActionDialogAsync = ShowActionDialogAsync;
@@ -169,6 +170,7 @@ public partial class CommandLibraryView : UserControl, IToolView
     {
         CommandLibraryViewModel.CopyTarget => BtnCopy,
         CommandLibraryViewModel.SendTarget => BtnSend,
+        CommandLibraryViewModel.InsertTarget => BtnInsert,
         CommandLibraryViewModel.CopyExampleTarget => BtnCopy,
         _ => null
     };

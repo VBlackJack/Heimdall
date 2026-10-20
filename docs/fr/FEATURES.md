@@ -184,9 +184,10 @@ paramètres et un générateur qui produit la commande finale à votre place.
 
 **L'exécuter**
 - Copier dans le presse-papiers, ou envoyer vers le terminal de la session depuis laquelle la bibliothèque a été ouverte
+- **Insérer** (`Maj+Entrée`), entre Copier et Envoyer, tape la commande à l'invite de ce terminal sans l'exécuter, pour que vous puissiez la relire, la modifier et appuyer vous-même sur Entrée. Rien ne s'exécute, donc la confirmation des commandes dangereuses n'est jamais demandée ; un saut de ligne dans la commande devient une espace, et l'historique l'enregistre comme copiée, pas envoyée
 - Les commandes marquées dangereuses demandent confirmation avant envoi
 - **Envoyer vers plusieurs terminaux ouverts** : cochez les terminaux dans un panneau à côté du bouton Envoyer et la même commande part vers chacun. Elle atteint des terminaux déjà ouverts et n'en connecte jamais aucun ; tous reçoivent le même texte ; une seule confirmation nomme combien vont recevoir, quel que soit le risque déclaré de l'action ; et un terminal qui refuse n'arrête pas les autres : le résumé nomme ceux qui n'ont pas reçu
-- Clavier : `Entrée` copie, `Ctrl+Entrée` envoie, `Ctrl+D` duplique l'action sélectionnée
+- Clavier : `Entrée` copie, `Maj+Entrée` insère, `Ctrl+Entrée` envoie, `Ctrl+D` duplique l'action sélectionnée
 
 **Historique**
 - Chaque commande copiée ou envoyée est enregistrée avec son titre, sa catégorie et son horodatage, l'hôte de la session depuis laquelle la bibliothèque a été ouverte, et le fait qu'elle a été envoyée ou seulement copiée

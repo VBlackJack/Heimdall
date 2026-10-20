@@ -1626,6 +1626,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         {
             SetBusyAction = busy => sessionTab.IsBusy = busy,
             SendCommandAction = command => TrySendCommandToSession(sessionTab, command),
+            InsertTextAction = text => TryInsertTextIntoSession(sessionTab, text),
             CanSendToTerminal = () => SessionHasTerminalSink(sessionTab),
             CommandBroadcaster = new SessionBroadcaster(this, sessionTab)
         };
@@ -1703,6 +1704,33 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         if (session is null) return false;
 
         return TrySendCommandToFirstSink(session.RootContent, command);
+    }
+
+    /// <summary>
+    /// Types text at the prompt of the session's first terminal without submitting it, the same
+    /// terminal <see cref="TrySendCommandToSession"/> writes to.
+    /// </summary>
+    /// <returns><c>true</c> when a terminal received the text.</returns>
+    public bool TryInsertTextIntoSession(SessionTabViewModel session, string text)
+    {
+        if (session is null) return false;
+
+        return TryInsertTextIntoFirstSink(session.RootContent, text);
+    }
+
+    /// <summary>
+    /// Pure helper that forwards text to the first terminal sink of the split tree, unsubmitted.
+    /// </summary>
+    /// <returns>
+    /// <c>true</c> when a sink was found and written to; <c>false</c> when there is none.
+    /// </returns>
+    internal static bool TryInsertTextIntoFirstSink(ISplitContent? root, string text)
+    {
+        var sink = FindFirstTerminalSink(root);
+        if (sink is null) return false;
+
+        sink.WriteText(text);
+        return true;
     }
 
     /// <summary>

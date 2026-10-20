@@ -13,10 +13,12 @@
          was checked against what the window already takes: Ctrl+B/E/F/N/O/S/T/W/Tab are
          registered globally, and the window's preview handler only claims Apps, Shift+F10,
          F11 and Escape-while-fullscreen. Return and Ctrl+Return match the convention the
-         other tools already use for a primary and a consequential action. -->
+         other tools already use for a primary and a consequential action. Shift+Return types
+         the command at the prompt without running it; the window claims no Shift+Return. -->
     <UserControl.InputBindings>
         <KeyBinding Key="Return" Command="{Binding CopyCommand}"/>
         <KeyBinding Key="Return" Modifiers="Control" Command="{Binding SendCommand}"/>
+        <KeyBinding Key="Return" Modifiers="Shift" Command="{Binding InsertCommand}"/>
         <KeyBinding Key="D" Modifiers="Control" Command="{Binding DuplicateSelectedCommand}"/>
     </UserControl.InputBindings>
     <Grid>
@@ -622,6 +624,21 @@
                                 Padding="{StaticResource PaddingButtonCopy}"
                                 FontSize="{StaticResource FontSizeBody}"
                                 Margin="{StaticResource MarginInlineSm}" TabIndex="5"/>
+                        <!-- Insert sits between Copy and Send: it reaches the terminal like Send and
+                             runs nothing, like Copy. Enabled under Send's condition. -->
+                        <Button x:Name="BtnInsert"
+                                Command="{Binding InsertCommand}"
+                                IsEnabled="{Binding IsSendEnabled}"
+                                Visibility="{Binding IsInsertVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                ToolTip="{loc:Translate ToolCmdLibBtnInsertTooltip}"
+                                ToolTipService.ShowOnDisabled="True"
+                                Content="{loc:Translate ToolCmdLibBtnInsert}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibBtnInsert}"
+                                AutomationProperties.HelpText="{loc:Translate ToolCmdLibBtnInsertTooltip}"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="{StaticResource PaddingButtonCopy}"
+                                FontSize="{StaticResource FontSizeBody}"
+                                Margin="{StaticResource MarginInlineSm}" TabIndex="5"/>
                         <Button x:Name="BtnSend"
                                 Command="{Binding SendCommand}"
                                 IsEnabled="{Binding IsSendEnabled}"
@@ -788,7 +805,7 @@
                                VerticalAlignment="Center"
                                Margin="{StaticResource MarginInlineControl}"/>
                 </DockPanel>
-                <ListView ItemsSource="{Binding HistoryView}"
+                <ListView ItemsSource="{Binding HistoryEntries}"
                           Background="Transparent" BorderThickness="0"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.ItemContainerStyle>

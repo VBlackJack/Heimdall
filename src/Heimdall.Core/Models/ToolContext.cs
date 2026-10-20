@@ -24,6 +24,8 @@ namespace Heimdall.Core.Models;
 /// path): the receiving tool must ask for a location before its first write.
 /// <see cref="RemoteOs"/> is the operating system the originating profile declares for its far
 /// end; <see cref="Configuration.RemoteOs.Auto"/> when it declares none or there is no profile.
+/// <see cref="InsertTextAction"/> types text at the session's prompt without submitting it,
+/// beside <see cref="SendCommandAction"/>, which runs it.
 /// </summary>
 public sealed record ToolContext(
     string? TargetHost = null,
@@ -46,4 +48,5 @@ public sealed record ToolContext(
     string? InitialActionId = null,
     IGatewayInventory? GatewayInventory = null,
     string? DocumentContent = null,
-    Configuration.RemoteOs RemoteOs = Configuration.RemoteOs.Auto);
+    Configuration.RemoteOs RemoteOs = Configuration.RemoteOs.Auto,
+    Action<string>? InsertTextAction = null);

@@ -184,9 +184,10 @@ generator that produces the final command for you.
 
 **Running it**
 - Copy to the clipboard, or send to the terminal of the session the library was opened from
+- **Insert** (`Shift+Enter`), between Copy and Send, types the command at that terminal's prompt without running it, so you can read and edit it and press Enter yourself. Nothing runs, so it never asks the dangerous-command confirmation; any line break in the command becomes a space, and the history records it as copied, not sent
 - Commands flagged dangerous require confirmation before they are sent
 - **Send to several open terminals**: tick the terminals from a panel beside the Send button and the same command goes to each. It reaches terminals that are already open and never connects one; every target receives the same text; one confirmation names how many will receive it, whatever the action's declared risk; and a terminal that refuses does not stop the others - the summary names which did not receive it
-- Keyboard: `Enter` copies, `Ctrl+Enter` sends, `Ctrl+D` duplicates the selected action
+- Keyboard: `Enter` copies, `Shift+Enter` inserts, `Ctrl+Enter` sends, `Ctrl+D` duplicates the selected action
 
 **History**
 - Every command you copy or send is recorded with its title, category and timestamp, the host of the session the library was opened from, and whether it was sent or only copied

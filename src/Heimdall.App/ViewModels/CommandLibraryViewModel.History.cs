@@ -58,7 +58,7 @@ public sealed partial class CommandLibraryViewModel
     [ObservableProperty]
     private bool _historyThisHostOnly = true;
 
-    private ListCollectionView? _historyView;
+    private ICollectionView? _historyView;
 
     /// <summary>
     /// True when the library was opened for a host, which is when the "this host only" filter
@@ -70,10 +70,24 @@ public sealed partial class CommandLibraryViewModel
     /// The rows the history panel shows: <see cref="HistoryEntries"/> through
     /// <see cref="ShouldShowHistoryEntry"/>.
     /// </summary>
-    public ICollectionView HistoryView => _historyView ??= new ListCollectionView(HistoryEntries)
+    /// <remarks>
+    /// The collection's default view, which is the one the panel's list binds to when it binds
+    /// <see cref="HistoryEntries"/>; filtering it here filters the panel without a second
+    /// collection to keep in step.
+    /// </remarks>
+    public ICollectionView HistoryView
     {
-        Filter = item => item is CommandLibraryHistoryEntry entry && ShouldShowHistoryEntry(entry)
-    };
+        get
+        {
+            if (_historyView is null)
+            {
+                _historyView = CollectionViewSource.GetDefaultView(HistoryEntries);
+                _historyView.Filter = item => item is CommandLibraryHistoryEntry entry && ShouldShowHistoryEntry(entry);
+            }
+
+            return _historyView;
+        }
+    }
 
     /// <summary>
     /// Whether a history row passes the "this host only" filter.
