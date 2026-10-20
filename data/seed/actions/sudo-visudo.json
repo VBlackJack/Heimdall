@@ -33,7 +33,7 @@
     },
     {
       "command": "visudo",
-      "description": "Cas d'usage standard. Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo.",
       "platform": 1
     },
     {

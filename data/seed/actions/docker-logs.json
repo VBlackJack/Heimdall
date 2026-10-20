@@ -44,10 +44,6 @@
       "url": "https://docs.docker.com/engine/reference/commandline/logs/"
     }
   ],
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "windowsCommandTemplate": {
     "id": "docker-logs-win-cmd",
     "platform": 0,
@@ -90,16 +86,6 @@
       "platform": 0
     },
     {
-      "command": "docker --help",
-      "description": "Affiche l'aide complète de la commande docker. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 0
-    },
-    {
-      "command": "man docker",
-      "description": "Affiche le manuel complet de docker. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 0
-    },
-    {
       "command": "docker logs -f {container}",
       "description": "Exemple utilisant le paramètre 'options': Options (-f=follow, --tail=n, --since, -t=timestamps). Remplacez <options> par la valeur appropriée selon votre environnement.",
       "platform": 0
@@ -107,11 +93,6 @@
     {
       "command": "docker logs {options} container_name",
       "description": "Exemple utilisant le paramètre 'container': Nom ou ID du conteneur. Remplacez <container> par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "docker logs -f --tail 100 webapp",
-      "description": "Exemple Windows pour Consulter les logs d'un conteneur",
       "platform": 0
     }
   ],
@@ -132,16 +113,6 @@
       "platform": 1
     },
     {
-      "command": "docker --help",
-      "description": "Affiche l'aide complète de la commande docker. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man docker",
-      "description": "Affiche le manuel complet de docker. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "docker logs -f {container}",
       "description": "Exemple utilisant le paramètre 'options': Options (-f=follow, --tail=n, --since, -t=timestamps). Remplacez <options> par la valeur appropriée selon votre environnement.",
       "platform": 1
@@ -157,14 +128,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe identique sur Windows et Linux"
-    ],
-    "commonalities": [
-      "Docker CLI est cross-platform",
-      "Fonctionnalité identique sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

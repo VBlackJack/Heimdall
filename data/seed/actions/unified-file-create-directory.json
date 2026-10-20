@@ -4,10 +4,6 @@
   "description": "Crée un nouveau dossier, y compris les dossiers parents si nécessaire.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -67,11 +63,6 @@
       "platform": 0
     },
     {
-      "command": "New-Item -Path \"C:\\Logs\\app.log\" -ItemType Directory -Force",
-      "description": "Exemple Windows pour Créer un répertoire",
-      "platform": 0
-    },
-    {
       "command": "New-Item -Path \"C:\\Projects\\src\",\"C:\\Projects\\bin\" -ItemType Directory -Force",
       "description": "Cree plusieurs dossiers en une commande.",
       "platform": 0
@@ -111,29 +102,10 @@
       "platform": 1
     },
     {
-      "command": "mkdir --help",
-      "description": "Affiche l'aide complète de la commande mkdir. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man mkdir",
-      "description": "Affiche le manuel complet de mkdir. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "mkdir -p \"<path>\"",
       "description": "Exemple utilisant le paramètre 'path': Chemin du nouveau dossier à créer. Remplacez <path> par la valeur appropriée selon votre environnement.",
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'New-Item', Linux utilise 'mkdir'"
-    ],
-    "commonalities": [
-      "Les deux permettent de créer un répertoire",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

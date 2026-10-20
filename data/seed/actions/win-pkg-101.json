@@ -39,11 +39,6 @@
       "command": "choco install vscode -y",
       "description": "Installe Visual Studio Code",
       "platform": 0
-    },
-    {
-      "command": "choco install Microsoft.VisualStudioCode -y",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help choco -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "Nécessite Chocolatey installé. L'option -y accepte automatiquement les prompts.",

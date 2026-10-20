@@ -17,7 +17,7 @@
     "id": "unregister-scheduledtask-cmd",
     "platform": 0,
     "name": "Unregister-ScheduledTask",
-    "commandPattern": "Unregister-ScheduledTask -TaskName '{taskname}' {confirm}",
+    "commandPattern": "Unregister-ScheduledTask -TaskName '{taskname}' -Confirm:$false",
     "parameters": [
       {
         "name": "taskname",
@@ -27,14 +27,6 @@
         "defaultValue": "MyTask",
         "required": true,
         "description": "Nom de la tâche à supprimer"
-      },
-      {
-        "name": "confirm",
-        "label": "Confirmation",
-        "type": "string",
-        "defaultValue": "-Confirm:$false",
-        "required": false,
-        "description": "Confirmer la suppression (-Confirm:$false pour ignorer)"
       }
     ]
   },
@@ -52,16 +44,6 @@
     {
       "command": "Unregister-ScheduledTask -TaskName 'OldTask'",
       "description": "Supprime avec confirmation interactive",
-      "platform": 0
-    },
-    {
-      "command": "Unregister-ScheduledTask -TaskName 'MyTask' $false",
-      "description": "Exemple utilisant le paramètre 'taskname': Nom de la tâche à supprimer. Remplacez DailyBackup par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "Unregister-ScheduledTask -TaskName 'DailyBackup' -Confirm:$false",
-      "description": "Exemple utilisant le paramètre 'confirm': Confirmer la suppression (-Confirm:$false pour ignorer). Remplacez $false par la valeur appropriée selon votre environnement.",
       "platform": 0
     }
   ],

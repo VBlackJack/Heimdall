@@ -29,11 +29,6 @@
       "command": "Start-PSWSUSSync",
       "description": "Alternative si le module PSWSUS est installé",
       "platform": 0
-    },
-    {
-      "command": "[void][reflection.assembly]::LoadWithPartialName('Microsoft.UpdateServices.Administration'); $wsus = [Microsoft.UpdateServices.Administration.AdminProxy]::GetUpdateServer(); $subscription = $wsus.GetSubscription(); $subscription.StartSynchronization()",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help [void][reflection.assembly]::LoadWithPartialName('Microsoft.UpdateServices.Administration'); -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "À exécuter sur le serveur WSUS. Nécessite droits administrateur et module UpdateServices. La synchronisation peut prendre plusieurs minutes.",

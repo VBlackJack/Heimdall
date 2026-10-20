@@ -43,7 +43,7 @@
     },
     {
       "command": "Disable-WindowsOptionalFeature -Online -FeatureName 'Internet-Explorer-Optional-amd64' -NoRestart",
-      "description": "Cas d'usage standard. Désactive le composant Internet Explorer (IE11) de Windows. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Désactive le composant Internet Explorer (IE11) de Windows.",
       "platform": 0
     }
   ],

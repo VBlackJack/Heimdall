@@ -151,21 +151,6 @@
       "command": "ping -f google.com",
       "description": "Flood ping : envoie des paquets aussi vite que possible (nécessite root). Le flag -f (flood) ne laisse aucun délai entre les paquets. ATTENTION : à utiliser uniquement pour les tests de performance/stress sur VOS propres serveurs. Peut être considéré comme une attaque DoS sur des systèmes tiers.",
       "platform": 1
-    },
-    {
-      "command": "ping -s 1500 -M do 10.0.0.1",
-      "description": "Test MTU avec paquets de 1500 octets",
-      "platform": 1
-    },
-    {
-      "command": "ping -c 10 -i 0.2 192.168.1.1",
-      "description": "Ping rapide",
-      "platform": 1
-    },
-    {
-      "command": "ping6 -c 4 ipv6.google.com",
-      "description": "Ping IPv6",
-      "platform": 1
     }
   ]
 }

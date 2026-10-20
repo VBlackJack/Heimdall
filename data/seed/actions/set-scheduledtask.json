@@ -17,7 +17,7 @@
     "id": "set-scheduledtask-cmd",
     "platform": 0,
     "name": "Set-ScheduledTask",
-    "commandPattern": "Set-ScheduledTask -TaskName '{taskname}' {parameters}",
+    "commandPattern": "Set-ScheduledTask -TaskName '{taskname}' -Trigger (New-ScheduledTaskTrigger -Daily -At '{time}')",
     "parameters": [
       {
         "name": "taskname",
@@ -29,12 +29,13 @@
         "description": "Nom de la tâche à modifier"
       },
       {
-        "name": "parameters",
-        "label": "Paramètres à modifier",
+        "name": "time",
+        "label": "Heure d'exécution quotidienne",
         "type": "string",
-        "defaultValue": "-Trigger (New-ScheduledTaskTrigger -Daily -At 3:00AM)",
+        "quoting": "InlineInQuotes",
+        "defaultValue": "03:00",
         "required": true,
-        "description": "Propriétés à modifier (-Trigger, -Action, -User, etc.)"
+        "description": "Nouvelle heure du déclenchement quotidien (ex: 03:00). Les autres modifications (-Action, -User) figurent dans les exemples."
       }
     ]
   },

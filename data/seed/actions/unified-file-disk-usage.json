@@ -4,10 +4,6 @@
   "description": "Affiche l'utilisation de l'espace disque pour les volumes.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "espace",
@@ -48,11 +44,6 @@
       "command": "Get-PSDrive -PSProvider FileSystem | Measure-Object",
       "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
       "platform": 0
-    },
-    {
-      "command": "Get-PSDrive -PSProvider FileSystem | Select-Object Name,Used,Free,@{Name='Size';Expression={$_.Used+$_.Free}} | Format-Table -AutoSize",
-      "description": "Cas d'usage standard. Affiche l'utilisation de l'espace disque pour les volumes. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "file-disk-usage-linux-cmd",
@@ -75,26 +66,6 @@
       "platform": 1
     },
     {
-      "command": "man df",
-      "description": "Affiche le manuel complet de df. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
-      "command": "df -h",
-      "description": "Cas d'usage standard. Affiche l'utilisation de l'espace disque pour les systèmes de fichiers montés. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
-      "platform": 1
-    },
-    {
-      "command": "df -h",
-      "description": "Exemple Linux pour Vérifier l'espace disque",
-      "platform": 1
-    },
-    {
-      "command": "df -h /home",
-      "description": "Espace disque du point de montage /home",
-      "platform": 1
-    },
-    {
       "command": "df -T",
       "description": "Afficher le type de filesystem",
       "platform": 1
@@ -105,14 +76,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Get-PSDrive', Linux utilise 'df'"
-    ],
-    "commonalities": [
-      "Les deux permettent de vérifier l'espace disque",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

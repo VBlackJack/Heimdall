@@ -27,7 +27,6 @@
     "commandPattern": "netstat -tulpn",
     "parameters": []
   },
-  "parameters": [],
   "examples": [],
   "windowsExamples": [
     {

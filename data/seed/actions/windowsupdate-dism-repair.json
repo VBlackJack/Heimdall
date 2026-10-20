@@ -37,7 +37,7 @@
     },
     {
       "command": "Repair-WindowsImage -Online -RestoreHealth -Verbose",
-      "description": "Cas d'usage standard. Utilise DISM pour réparer l'image Windows et résoudre les problèmes de Windows Update Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Utilise DISM pour réparer l'image Windows et résoudre les problèmes de Windows Update.",
       "platform": 0
     }
   ],

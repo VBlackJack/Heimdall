@@ -39,11 +39,6 @@
       "command": "choco search --exact googlechrome",
       "description": "Recherche par nom exact",
       "platform": 0
-    },
-    {
-      "command": "choco search Admin",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help choco -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "Recherche dans le dépôt community.chocolatey.org par défaut. Utiliser --exact pour correspondance exacte.",

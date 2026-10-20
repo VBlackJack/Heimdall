@@ -87,11 +87,6 @@
       "command": "dig @8.8.8.8 example.com MX",
       "description": "Requête MX via DNS Google",
       "platform": 1
-    },
-    {
-      "command": "dig +trace example.com",
-      "description": "Trace complète de la résolution DNS",
-      "platform": 1
     }
   ],
   "notes": "Ne nécessite pas sudo. +short pour affichage minimal. nslookup et host sont des alternatives.",

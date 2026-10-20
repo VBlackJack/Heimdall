@@ -54,6 +54,8 @@ public static class MessageKeys
     public const string ValidationParameterInvalidIPAddress = "Validation.ParameterInvalidIPAddress";
     public const string ValidationParameterInvalidPath = "Validation.ParameterInvalidPath";
     public const string ValidationParameterNotAnOfferedValue = "Validation.ParameterNotAnOfferedValue";
+    public const string ValidationParameterMustBeNumber = "Validation.ParameterMustBeNumber";
+    public const string ValidationParameterMustBeDriveLetter = "Validation.ParameterMustBeDriveLetter";
 
     // Execution messages
     public const string ExecutionError = "Execution.Error";

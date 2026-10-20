@@ -43,7 +43,7 @@
     },
     {
       "command": "Get-AppxPackage | Where-Object { $_.Publisher -notlike '*Microsoft*' } | Select-Object Name,Version,Publisher | Format-Table -AutoSize",
-      "description": "Cas d'usage standard. Affiche une liste complète de toutes les applications tierces installées via AppX. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Affiche une liste complète de toutes les applications tierces installées via AppX.",
       "platform": 0
     }
   ],

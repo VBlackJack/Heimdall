@@ -4,10 +4,6 @@
   "description": "Recherche des fichiers ou dossiers par nom ou motif.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -84,11 +80,6 @@
       "command": "Get-ChildItem -Path \"C:\\\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime",
       "description": "Exemple utilisant le paramètre 'searchPath': Dossier où commencer la recherche. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
       "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path \"C:\\Windows\\System32\" -Filter \"*.txt\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime",
-      "description": "Exemple Windows pour Rechercher des fichiers par nom",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "search-find-files-linux-cmd",
@@ -133,16 +124,6 @@
       "platform": 1
     },
     {
-      "command": "find --help",
-      "description": "Affiche l'aide complète de la commande find. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man find",
-      "description": "Affiche le manuel complet de find. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "find \"/\" -name \"{pattern}\"",
       "description": "Exemple utilisant le paramètre 'searchPath': Dossier où commencer la recherche. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
       "platform": 1
@@ -151,21 +132,7 @@
       "command": "find \"{searchPath}\" -name \"*.txt\"",
       "description": "Exemple utilisant le paramètre 'pattern': Motif de nom de fichier (ex: *.txt, *.log). Remplacez <pattern> par la valeur appropriée selon votre environnement.",
       "platform": 1
-    },
-    {
-      "command": "find /usr/share -name \"*.txt\"",
-      "description": "Exemple Linux pour Rechercher des fichiers par nom",
-      "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Get-ChildItem', Linux utilise 'find'"
-    ],
-    "commonalities": [
-      "Les deux permettent de rechercher des fichiers par nom",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

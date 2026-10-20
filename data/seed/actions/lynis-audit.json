@@ -33,7 +33,7 @@
     },
     {
       "command": "lynis audit system",
-      "description": "Cas d'usage standard. Lance un audit de sécurité complet du système avec Lynis Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Lance un audit de sécurité complet du système avec Lynis.",
       "platform": 1
     },
     {

@@ -4,10 +4,6 @@
   "description": "Calcule l'empreinte cryptographique (hash SHA256) d'un fichier pour vérification d'intégrité.",
   "category": "🔒 Security & Encryption",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "hash",
@@ -67,16 +63,6 @@
       "command": "(Get-FileHash -Path \"C:\\file.exe\").Hash -eq \"ABC123...\"",
       "description": "Compare avec un hash connu",
       "platform": 0
-    },
-    {
-      "command": "Get-Help Get-FileHash -Full",
-      "description": "Affiche l'aide complète de Get-FileHash",
-      "platform": 0
-    },
-    {
-      "command": "Get-FileHash -Path \"C:\\Data\\report.xlsx\" -Algorithm SHA256",
-      "description": "Exemple Windows pour Calculer le hash d'un fichier",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "file-hash-linux-cmd",
@@ -118,16 +104,6 @@
       "platform": 1
     },
     {
-      "command": "man sha256sum",
-      "description": "Affiche le manuel complet de sha256sum",
-      "platform": 1
-    },
-    {
-      "command": "sha256sum /home/user/report.xlsx",
-      "description": "Exemple Linux pour Calculer le hash d'un fichier",
-      "platform": 1
-    },
-    {
       "command": "sha256sum /etc/passwd",
       "description": "Hash SHA256 d'un fichier",
       "platform": 1
@@ -148,15 +124,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Get-FileHash', Linux utilise 'sha256sum'",
-      "Windows: format objet PowerShell, Linux: format texte"
-    ],
-    "commonalities": [
-      "Les deux calculent le hash SHA256 d'un fichier",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

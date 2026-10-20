@@ -34,11 +34,6 @@
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000002}'",
       "description": "Déclenche l'inventaire logiciel",
       "platform": 0
-    },
-    {
-      "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000002}' -ErrorAction Stop",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Invoke-WmiMethod -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "Schedule ID {02} = Software Inventory Cycle. L'inventaire logiciel collecte les informations sur les fichiers et applications installés.",

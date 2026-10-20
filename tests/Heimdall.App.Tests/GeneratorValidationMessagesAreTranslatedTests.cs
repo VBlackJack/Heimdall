@@ -19,6 +19,9 @@ using System.Reflection;
 using System.Text.Json;
 using Heimdall.App.Tests.Views.EmbeddedRdp;
 using TwinShell.Core.Constants;
+using TwinShell.Core.Enums;
+using TwinShell.Core.Models;
+using TwinShell.Core.Services;
 
 namespace Heimdall.App.Tests;
 
@@ -137,6 +140,47 @@ public sealed class GeneratorValidationMessagesAreTranslatedTests
                 Assert.Contains("{0}", strings[key], StringComparison.Ordinal);
             }
         }
+    }
+
+    /// <summary>
+    /// The guards above only see messages that are named in <see cref="MessageKeys"/>. A
+    /// message written as an interpolated sentence in the validator is invisible to them, which
+    /// is how "must be a number" and "must be a single drive letter" reached the operator in
+    /// English whatever the language.
+    /// </summary>
+    /// <remarks>
+    /// Run against a localizer that hands the key back, so every error the validator reports is
+    /// exactly the key it asked for. A literal sentence cannot equal a key, and an error that is
+    /// not one of the declared keys fails here whatever its wording.
+    /// </remarks>
+    [Theory]
+    [InlineData("number", "abc")]
+    [InlineData("driveletter", "CD")]
+    [InlineData("int", "1.5")]
+    [InlineData("bool", "maybe")]
+    [InlineData("hostname", "-bad")]
+    [InlineData("ipaddress", "999.1.1.1")]
+    [InlineData("path", "/var/\nlog")]
+    [InlineData("string", "a\rb")]
+    public void EveryRejectionIsADeclaredMessageKey(string type, string badValue)
+    {
+        var service = new CommandGeneratorService(new FakeTwinShellLocalizationService());
+        var template = new CommandTemplate
+        {
+            Id = "guard",
+            Name = "guard",
+            Platform = Platform.Linux,
+            CommandPattern = "run {v}",
+            Parameters = [CommandLibraryTestHelpers.RequiredParameter("v", "Value", type)],
+        };
+
+        service.ValidateParameters(
+            template,
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["v"] = badValue },
+            out var errors);
+
+        Assert.NotEmpty(errors);
+        Assert.All(errors, error => Assert.Contains(error, ParameterMessageKeys));
     }
 
     private static Dictionary<string, string> LoadLocale(string locale)

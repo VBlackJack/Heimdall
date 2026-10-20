@@ -29,11 +29,6 @@
       "command": "Install-WindowsUpdate -Category 'Critical Updates','Security Updates' -AcceptAll -IgnoreReboot",
       "description": "Installe uniquement les mises à jour critiques et de sécurité sans redémarrer",
       "platform": 0
-    },
-    {
-      "command": "Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -IgnoreReboot -Verbose",
-      "description": "Exécution standard de la commande Install. Consultez la documentation officielle avec Get-Help Install-WindowsUpdate -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "ATTENTION: Cette commande peut nécessiter un redémarrage. Utilisez -IgnoreReboot pour empêcher le redémarrage automatique. Nécessite PSWindowsUpdate.",

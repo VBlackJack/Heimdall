@@ -4,10 +4,6 @@
   "description": "Supprime des fichiers ou des répertoires de manière permanente.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 2,
   "tags": [
     "linux",
@@ -72,11 +68,6 @@
       "command": "Remove-Item -Path \"<path>\" -Recurse -Force",
       "description": "Exemple utilisant le paramètre 'path': Chemin du fichier ou dossier à supprimer. Remplacez <path> par la valeur appropriée selon votre environnement.",
       "platform": 0
-    },
-    {
-      "command": "Remove-Item -Path \"C:\\Logs\\app.log\" -Recurse -Force",
-      "description": "Exemple Windows pour Supprimer des fichiers ou dossiers",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "file-delete-linux-cmd",
@@ -118,23 +109,8 @@
       "platform": 1
     },
     {
-      "command": "rm --help",
-      "description": "Affiche l'aide complète de la commande rm. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man rm",
-      "description": "Affiche le manuel complet de rm. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "rm -rf \"<path>\"",
       "description": "Exemple utilisant le paramètre 'path': Chemin du fichier ou dossier à supprimer. Remplacez <path> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "rm -rf /var/log/app.log",
-      "description": "Exemple Linux pour Supprimer des fichiers ou dossiers",
       "platform": 1
     },
     {
@@ -158,14 +134,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Remove-Item', Linux utilise 'rm'"
-    ],
-    "commonalities": [
-      "Les deux permettent de supprimer des fichiers ou dossiers",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

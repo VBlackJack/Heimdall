@@ -42,7 +42,7 @@
     },
     {
       "command": "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Format-List",
-      "description": "Cas d'usage standard. Affiche la configuration actuelle du client WSUS en lisant le registre Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Affiche la configuration actuelle du client WSUS en lisant le registre.",
       "platform": 0
     }
   ],

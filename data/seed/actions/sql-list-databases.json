@@ -50,7 +50,7 @@
     },
     {
       "command": "Invoke-Sqlcmd -ServerInstance 'localhost\\SQLEXPRESS' -Query \"SELECT name AS DatabaseName, database_id AS ID, state_desc AS State, recovery_model_desc AS RecoveryModel, (SELECT SUM(size)*8/1024 FROM sys.master_files WHERE database_id = d.database_id) AS SizeMB FROM sys.databases d ORDER BY name\" | Format-Table -AutoSize",
-      "description": "Cas d'usage standard. Affiche la liste complète de toutes les bases de données sur une instance SQL Server avec leur taille, état et mode de récupération. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Affiche la liste complète de toutes les bases de données sur une instance SQL Server avec leur taille, état et mode de récupération.",
       "platform": 0
     }
   ],

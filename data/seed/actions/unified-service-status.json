@@ -4,10 +4,6 @@
   "description": "Affiche l'état actuel d'un service Windows.",
   "category": "⚙️ Services & Automation",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -65,11 +61,6 @@
       "command": "Get-Service -Name Spooler",
       "description": "Vérifie le statut du service d'impression Windows (Spooler).",
       "platform": 0
-    },
-    {
-      "command": "Get-Service -Name wuauserv",
-      "description": "Exemple Windows pour Vérifier le statut d'un service",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "linux-service-status-cmd",
@@ -101,16 +92,6 @@
       "platform": 1
     },
     {
-      "command": "systemctl --help",
-      "description": "Affiche l'aide complète de la commande systemctl. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man systemctl",
-      "description": "Affiche le manuel complet de systemctl. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "systemctl status apache2",
       "description": "Vérifie le statut du serveur web Apache.",
       "platform": 1
@@ -121,14 +102,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Get-Service', Linux utilise 'systemctl'"
-    ],
-    "commonalities": [
-      "Les deux permettent de vérifier le statut d'un service",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }
