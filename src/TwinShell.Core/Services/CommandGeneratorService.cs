@@ -211,7 +211,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                     case "number":
                         if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                         {
-                            errors.Add($"{parameter.Label} must be a number");
+                            errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeNumber, parameter.Label));
                         }
                         break;
 
@@ -255,7 +255,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                     case "driveletter":
                         if (!DriveLetterRegex.IsMatch(value))
                         {
-                            errors.Add($"{parameter.Label} must be a single drive letter");
+                            errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeDriveLetter, parameter.Label));
                         }
                         break;
 
