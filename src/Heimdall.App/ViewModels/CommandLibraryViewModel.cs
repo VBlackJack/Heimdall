@@ -1000,21 +1000,9 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
             var hasLinux = _selectedAction.LinuxCommandTemplate is not null;
             HasMultipleTemplates = hasWin && hasLinux;
 
-            if (hasWin && hasLinux)
-            {
-                var preferWindows = PlatformFilterIndex != PlatformFilterLinux;
-                UseWindowsTemplate = preferWindows;
-                _activeTemplate = preferWindows
-                    ? _selectedAction.WindowsCommandTemplate
-                    : _selectedAction.LinuxCommandTemplate;
-            }
-            else
-            {
-                UseWindowsTemplate = hasWin;
-                _activeTemplate = hasWin
-                    ? _selectedAction.WindowsCommandTemplate
-                    : _selectedAction.LinuxCommandTemplate;
-            }
+            _activeTemplate = PreferredTemplate(_selectedAction, PlatformFilterIndex);
+            UseWindowsTemplate = hasWin
+                && ReferenceEquals(_activeTemplate, _selectedAction.WindowsCommandTemplate);
 
             if (_activeTemplate is null)
             {
@@ -1032,6 +1020,30 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         }
         return true;
     }
+
+    /// <summary>
+    /// The template an action opens on under a platform filter: Windows unless the filter is
+    /// Linux, and whichever exists when the action carries only one.
+    /// </summary>
+    /// <remarks>
+    /// Shared by <see cref="SelectAction"/> and the row's command preview, so the line a row
+    /// shows is the command a click on it puts in the generator.
+    /// </remarks>
+    internal static CommandTemplate? PreferredTemplate(ActionModel action, int platformFilterIndex)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        return platformFilterIndex != PlatformFilterLinux
+            ? action.WindowsCommandTemplate ?? action.LinuxCommandTemplate
+            : action.LinuxCommandTemplate ?? action.WindowsCommandTemplate;
+    }
+
+    /// <summary>
+    /// One line of the command pattern a row's action would open on under the current platform
+    /// filter, shortened the way the palette shortens its snippets.
+    /// </summary>
+    public string ResolveCommandPreview(ActionModel action)
+        => CommandPreviewText.ToPreview(PreferredTemplate(action, PlatformFilterIndex)?.CommandPattern);
 
     /// <summary>
     /// Preselects the action with the given id (matching <see cref="ActionModel.Id"/>)

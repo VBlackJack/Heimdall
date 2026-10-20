@@ -58,6 +58,16 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     /// <summary>Action category, used for grouping and filtering.</summary>
     public string Category => Source.Category;
 
+    /// <summary>
+    /// The command pattern this row's action would open on under the current platform filter,
+    /// on one line and shortened like the palette's snippet previews.
+    /// </summary>
+    /// <remarks>
+    /// Read from the owning view model at bind time, like the favorite glyph: the platform
+    /// filter's change already refreshes the list view, which re-binds every row.
+    /// </remarks>
+    public string CommandPreview => _viewModel.ResolveCommandPreview(Source);
+
     /// <summary>Filled or hollow star glyph reflecting the current favorite state.</summary>
     public string FavoriteIcon => _viewModel.IsFavorite(Source.Id) ? "\u2605" : "\u2606";
 

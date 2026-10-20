@@ -346,6 +346,15 @@
                                        FontSize="{StaticResource FontSizeCaption}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        TextTrimming="CharacterEllipsis"/>
+                            <!-- The command itself, for the template a click would open on under
+                                 the current platform filter. Not part of the row's spoken name,
+                                 which stays title then badges. -->
+                            <TextBlock Text="{Binding CommandPreview}"
+                                       FontFamily="{StaticResource FontFamilyMonospace}"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
                     </DockPanel>
                 </DataTemplate>

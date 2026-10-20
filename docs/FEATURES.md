@@ -172,6 +172,7 @@ generator that produces the final command for you.
 - Full-text search with relevance ranking over titles, tags, descriptions and command text
 - Filter by category, tag, platform and risk level; every filter keeps its selection across a library reload
 - Favorites, and a per-action risk badge (info, run, dangerous)
+- Each row shows the command itself under its title, in monospace on one line: the template the row opens on under the current platform filter (Windows unless the filter is Linux, or the only template there is), cut at 96 characters like the command palette's snippet previews
 - Opened from a session, the platform filter starts on the platform of that session. A profile can declare the operating system of its far end (General tab, **Operating system of the far end**): Windows or Linux is then used as given, and Automatic keeps the guess from the protocol (SSH as Linux; RDP, WinRM and Local as Windows). Post-connect steps linked to the library and their picker follow the same declaration, so SSH into a Windows OpenSSH server gets the Windows template
 
 **Building the command**
