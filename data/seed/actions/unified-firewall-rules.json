@@ -27,7 +27,6 @@
     "commandPattern": "iptables -L -n -v --line-numbers",
     "parameters": []
   },
-  "parameters": [],
   "examples": [],
   "windowsExamples": [
     {

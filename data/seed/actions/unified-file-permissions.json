@@ -4,10 +4,6 @@
   "description": "Modifie les permissions NTFS d'un fichier ou dossier.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 1,
   "tags": [
     "icacls",
@@ -132,14 +128,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'icacls', Linux utilise 'chmod'"
-    ],
-    "commonalities": [
-      "Les deux permettent de modifier les permissions de fichiers",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

@@ -50,10 +50,6 @@
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/new-localuser"
     }
   ],
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "linuxExamples": [
     {
       "command": "sudo useradd -m -s /bin/bash john",
@@ -125,15 +121,5 @@
       "platform": 0
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'New-LocalUser', Linux utilise 'useradd'",
-      "Windows: -NoPassword par défaut, Linux: passwd séparé"
-    ],
-    "commonalities": [
-      "Les deux permettent de créer un utilisateur local",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

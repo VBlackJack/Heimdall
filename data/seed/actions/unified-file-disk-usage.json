@@ -4,10 +4,6 @@
   "description": "Affiche l'utilisation de l'espace disque pour les volumes.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "espace",
@@ -80,14 +76,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Get-PSDrive', Linux utilise 'df'"
-    ],
-    "commonalities": [
-      "Les deux permettent de vérifier l'espace disque",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

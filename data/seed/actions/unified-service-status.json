@@ -4,10 +4,6 @@
   "description": "Affiche l'état actuel d'un service Windows.",
   "category": "⚙️ Services & Automation",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -106,14 +102,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Get-Service', Linux utilise 'systemctl'"
-    ],
-    "commonalities": [
-      "Les deux permettent de vérifier le statut d'un service",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

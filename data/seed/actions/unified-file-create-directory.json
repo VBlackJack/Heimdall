@@ -4,10 +4,6 @@
   "description": "Crée un nouveau dossier, y compris les dossiers parents si nécessaire.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -111,14 +107,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'New-Item', Linux utilise 'mkdir'"
-    ],
-    "commonalities": [
-      "Les deux permettent de créer un répertoire",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

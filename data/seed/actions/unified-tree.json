@@ -4,10 +4,6 @@
   "description": "Affiche la structure hiérarchique d'un répertoire.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -111,14 +107,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'tree', Linux utilise 'tree'"
-    ],
-    "commonalities": [
-      "Les deux permettent de afficher l'arborescence de dossiers",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

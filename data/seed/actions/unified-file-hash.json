@@ -4,10 +4,6 @@
   "description": "Calcule l'empreinte cryptographique (hash SHA256) d'un fichier pour vérification d'intégrité.",
   "category": "🔒 Security & Encryption",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "hash",
@@ -128,15 +124,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Get-FileHash', Linux utilise 'sha256sum'",
-      "Windows: format objet PowerShell, Linux: format texte"
-    ],
-    "commonalities": [
-      "Les deux calculent le hash SHA256 d'un fichier",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

@@ -50,10 +50,6 @@
       "url": "https://man7.org/linux/man-pages/man1/nc.1.html"
     }
   ],
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "windowsExamples": [
     {
       "command": "Test-NetConnection google.com",
@@ -163,14 +159,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Test-NetConnection', Linux utilise 'nc' (netcat)"
-    ],
-    "commonalities": [
-      "Les deux permettent de tester si un port TCP est ouvert",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

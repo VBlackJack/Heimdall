@@ -4,10 +4,6 @@
   "description": "Recherche une chaîne de caractères dans le contenu des fichiers.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -146,14 +142,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Select-String', Linux utilise 'grep'"
-    ],
-    "commonalities": [
-      "Les deux permettent de rechercher dans le contenu de fichiers",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

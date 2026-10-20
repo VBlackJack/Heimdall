@@ -4,10 +4,6 @@
   "description": "Recherche des fichiers ou dossiers par nom ou motif.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -138,14 +134,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Get-ChildItem', Linux utilise 'find'"
-    ],
-    "commonalities": [
-      "Les deux permettent de rechercher des fichiers par nom",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

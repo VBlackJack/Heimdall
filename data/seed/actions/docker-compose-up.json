@@ -36,10 +36,6 @@
       "url": "https://docs.docker.com/compose/reference/up/"
     }
   ],
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "windowsCommandTemplate": {
     "id": "docker-compose-up-win-cmd",
     "platform": 0,
@@ -101,14 +97,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe identique sur Windows et Linux"
-    ],
-    "commonalities": [
-      "Docker CLI est cross-platform",
-      "Fonctionnalité identique sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

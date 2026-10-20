@@ -53,10 +53,6 @@
       "url": "https://docs.docker.com/engine/reference/commandline/exec/"
     }
   ],
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "windowsCommandTemplate": {
     "id": "docker-exec-win-cmd",
     "platform": 0,
@@ -144,14 +140,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe identique sur Windows et Linux"
-    ],
-    "commonalities": [
-      "Docker CLI est cross-platform",
-      "Fonctionnalité identique sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

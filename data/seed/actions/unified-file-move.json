@@ -4,10 +4,6 @@
   "description": "Déplace ou renomme des fichiers et dossiers.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 1,
   "tags": [
     "déplacer",
@@ -144,14 +140,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Move-Item', Linux utilise 'mv'"
-    ],
-    "commonalities": [
-      "Les deux permettent de déplacer ou renommer des fichiers",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

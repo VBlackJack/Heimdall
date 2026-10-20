@@ -51,10 +51,6 @@
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/remove-localuser"
     }
   ],
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "linuxExamples": [
     {
       "command": "sudo userdel john",
@@ -131,15 +127,5 @@
       "platform": 0
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Remove-LocalUser', Linux utilise 'userdel'",
-      "Windows: profil conservé, Linux: -r pour supprimer le home"
-    ],
-    "commonalities": [
-      "Les deux permettent de supprimer un utilisateur local",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

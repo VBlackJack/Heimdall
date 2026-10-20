@@ -4,10 +4,6 @@
   "description": "Copie des fichiers ou des répertoires avec leurs sous-dossiers.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 0,
   "tags": [
     "linux",
@@ -138,14 +134,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Copy-Item', Linux utilise 'cp'"
-    ],
-    "commonalities": [
-      "Les deux permettent de copier des fichiers ou dossiers",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

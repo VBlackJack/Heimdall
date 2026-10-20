@@ -27,7 +27,6 @@
     "commandPattern": "free -h",
     "parameters": []
   },
-  "parameters": [],
   "examples": [],
   "windowsExamples": [
     {

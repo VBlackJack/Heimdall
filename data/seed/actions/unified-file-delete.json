@@ -4,10 +4,6 @@
   "description": "Supprime des fichiers ou des répertoires de manière permanente.",
   "category": "📁 Files & Storage",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 2,
   "tags": [
     "linux",
@@ -138,14 +134,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Remove-Item', Linux utilise 'rm'"
-    ],
-    "commonalities": [
-      "Les deux permettent de supprimer des fichiers ou dossiers",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

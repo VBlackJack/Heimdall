@@ -4,10 +4,6 @@
   "description": "Redémarre un service Windows.",
   "category": "⚙️ Services & Automation",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 1,
   "tags": [
     "linux",
@@ -91,14 +87,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Restart-Service', Linux utilise 'systemctl'"
-    ],
-    "commonalities": [
-      "Les deux permettent de redémarrer un service",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }
