@@ -128,4 +128,29 @@ internal static class MobaXtermSharedSessionsFixture
         syn-telnet-proxytype= #98#1%syn-telnet-proxytype.example.test%2327%syntelu%u3%u4%%%%u8%u9%2%%u12%u13%u14{Tail}
         syn-sftp-proxytype= #140#7%syn-sftp-proxytype.example.test%2204%synsftpu%u3%u4%u5%u6%u7%u8%2%%u11%u12{Tail}
         """;
+
+    /// <summary>
+    /// SSH sessions with and without a proxy, three created in the MobaXterm interface and three
+    /// synthetic.
+    /// </summary>
+    /// <remarks>
+    /// <para>The <c>ssh-proxy-</c> sessions are measured: <c>a</c> goes through a Socks4 proxy
+    /// (type 1) with a login and port 3181, <c>c</c> through an Http proxy (type 3) with a user on
+    /// the session itself, <c>b</c> has no proxy and shows what MobaXterm writes then: type "0", no
+    /// host, port 1080. Fields are as written, hosts and users are fake.</para>
+    /// <para>The <c>syn-ssh</c> sessions are SYNTHETIC: every field the SSH layout does not read
+    /// holds a unique sentinel, the login command and jump host are empty, so a proxy slot shifted
+    /// by one in either direction lands on a sentinel and refuses the session that has no proxy.</para>
+    /// </remarks>
+    public const string SshProxyContent = $"""
+        [Bookmarks_1]
+        SubRep=SshProxy
+        ImgNum=41
+        ssh-proxy-a.example.test= #109#0%ssh-proxy-a.example.test%22%%%-1%-1%%%%%0%-1%0%%%-1%-1%0%1%proxy-ssh-a.example.test%3181%pxusera%0%0%1%%0%%%%0%-1%-1%0%%%0{Tail}
+        ssh-proxy-b.example.test= #109#0%ssh-proxy-b.example.test%22%%%-1%-1%%%%%0%-1%0%%%-1%-1%0%0%%1080%%0%0%1%%0%%%%0%-1%-1%0%%%0{Tail}
+        ssh-proxy-c.example.test (sshuserc)= #109#0%ssh-proxy-c.example.test%22%sshuserc%%-1%-1%%%%%0%0%0%%%-1%-1%0%3%proxy-ssh-c.example.test%3183%%0%0%1%%0%%%%0%-1%-1%0%%%0{Tail}
+        syn-ssh= #109#0%syn-ssh.example.test%2224%synsshu%u3%u4%u5%%%%%u10%u11%u12%u13%u14%u15%u16%u17%0%%u20%u21%u22{Tail}
+        syn-ssh-proxy= #109#0%syn-ssh-proxy.example.test%2225%synsshu%u3%u4%u5%%%%%u10%u11%u12%u13%u14%u15%u16%u17%1%proxyssh2.example.test%u20%u21%u22{Tail}
+        syn-ssh-proxytype= #109#0%syn-ssh-proxytype.example.test%2226%synsshu%u3%u4%u5%%%%%u10%u11%u12%u13%u14%u15%u16%u17%2%%u20%u21%u22{Tail}
+        """;
 }

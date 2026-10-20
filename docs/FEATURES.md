@@ -378,7 +378,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
   - SSH, RDP, SFTP, Telnet and VNC sessions are imported. Every other MobaXterm session type (FTP,
     WSL and others) is listed as unsupported in the import summary, with its INI section and
     session name; no line is skipped without a warning. A Telnet or VNC session through a jump
-    host and a Telnet, VNC or SFTP session through a proxy are skipped there too
+    host and an SSH, Telnet, VNC or SFTP session through a proxy are skipped there too
   - The jump host fields of a session (gateway host, port and user) become an SSH gateway.
     Sessions that share a jump host share one gateway, and a local gateway with the same host, port
     and user is reused instead of duplicated. A session without a jump host connects directly

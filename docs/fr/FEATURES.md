@@ -413,7 +413,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     fusionné avec un dossier partagé
   - Les sessions SSH, RDP, SFTP, Telnet et VNC d'un fichier partagé sont chargées. FTP, WSL et les
     autres types sont ignorés, de même qu'une session Telnet ou VNC passant par un rebond SSH et
-    qu'une session Telnet, VNC ou SFTP passant par un proxy (une connexion directe contournerait le
+    qu'une session SSH, Telnet, VNC ou SFTP passant par un proxy (une connexion directe contournerait le
     bastion ou le proxy) ; chaque session ignorée est listée avec sa raison dans le rapport d'import.
     Le dossier de départ distant d'une session SFTP n'est pas repris, et une session SFTP partagée
     mémorise son mot de passe par utilisateur comme une session SSH

@@ -99,9 +99,12 @@ public static partial class MobaXtermImporter
     /// </summary>
     /// <remarks>
     /// <para>Type 0 (SSH) is verified against a real team file: host, port and user at 0-2, the
-    /// login command at 6, the SSH gateway host, port and user at 7-9.</para>
+    /// login command at 6, the SSH gateway host, port and user at 7-9. Its proxy type and host at
+    /// 18-19 are measured on sessions created in the MobaXterm interface, and read only to refuse
+    /// the session.</para>
     /// <para>Type 4 (RDP) is kept from the existing realistic RDP fixture, which carries host, port
-    /// and user at 0-2 and its SSH gateway at 12-14. It has no login command.</para>
+    /// and user at 0-2 and its SSH gateway at 12-14. It has no login command. MobaXterm offers no
+    /// proxy for an RDP session: its only other route is an RD Gateway, not read here.</para>
     /// <para>Types 1 (Telnet), 5 (VNC) and 7 (SFTP) are measured on sessions created in the
     /// MobaXterm interface. A Telnet session carries a login at index 2, but no Heimdall consumer
     /// reads it: Telnet asks for its login in the terminal, so it is not imported. A VNC session
@@ -117,7 +120,7 @@ public static partial class MobaXtermImporter
             UserIndex: 2,
             LoginCommandIndex: 6,
             Gateway: new GatewaySlot(HostIndex: 7, PortIndex: 8, UserIndex: 9),
-            Proxy: null),
+            Proxy: new ProxySlot(TypeIndex: 18, HostIndex: 19)),
         [1] = new SessionLayout(
             TelnetConnectionType,
             DefaultPorts.Telnet,
