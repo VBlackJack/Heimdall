@@ -53,6 +53,9 @@ public sealed class SharedSessionsDayOneTests
     private const string PlaceholderTwo = "{2}";
     private const string PlaceholderThree = "{3}";
     private const string NameSeparator = ", ";
+    private const string SessionTreeAutomationId = "SessionTreeView";
+    private const string SessionTreeDescription = "session tree";
+    private const string TreeRowsDescription = "session tree rows";
 
     private static readonly TimeSpan LaunchTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(30);
@@ -113,19 +116,25 @@ public sealed class SharedSessionsDayOneTests
 
             using var automation = new UIA3Automation();
             var window = WaitHelpers.WaitFor(
-                () => app.GetMainWindow(automation),
+                () => UiaTimeout.MissOnTimeout(() => app.GetMainWindow(automation)),
                 MainWindowDescription,
                 LaunchTimeout);
 
+            var tree = WaitHelpers.WaitFor(
+                () => UiaTimeout.MissOnTimeout(() => FindSessionTree(window)),
+                SessionTreeDescription,
+                UiTimeout);
+
             var rootPrefix = SourceName + NameSeparator;
             var root = WaitHelpers.WaitFor(
-                () => FindTreeItems(window).FirstOrDefault(item => NameOf(item).StartsWith(rootPrefix, StringComparison.Ordinal)),
+                () => UiaTimeout.MissOnTimeout(
+                    () => FindTreeItems(tree).FirstOrDefault(item => NameOf(item).StartsWith(rootPrefix, StringComparison.Ordinal))),
                 SharedRootDescription,
                 UiTimeout);
             root.Patterns.ExpandCollapse.PatternOrDefault?.Expand();
 
-            AssertImportedRows(window, locale);
-            AssertSkippedRowsAbsent(window);
+            AssertImportedRows(tree, locale);
+            AssertSkippedRowsAbsent(tree);
 
             var dialog = OpenImportReport(automation, app, window, root, locale);
             try
@@ -138,8 +147,9 @@ public sealed class SharedSessionsDayOneTests
             }
 
             var title = LocaleText(locale, "SharedReportDialogTitle").Replace(PlaceholderZero, SourceName, StringComparison.Ordinal);
+            // A search that timed out did not see the report gone: it reads as still open.
             WaitHelpers.WaitUntil(
-                () => FindWindowByTitle(automation, app, window, title) is null,
+                () => UiaTimeout.FalseOnTimeout(() => FindWindowByTitle(automation, app, window, title) is null),
                 ReportClosedDescription,
                 CloseTimeout);
         }
@@ -150,7 +160,7 @@ public sealed class SharedSessionsDayOneTests
         }
     }
 
-    private static void AssertImportedRows(Window window, JsonElement locale)
+    private static void AssertImportedRows(AutomationElement tree, JsonElement locale)
     {
         var sharedTemplate = LocaleText(locale, "SessionTreeServerAccessibleNameShared");
         foreach (var (name, connectionType) in ImportedSessions)
@@ -166,15 +176,21 @@ public sealed class SharedSessionsDayOneTests
                 .Replace(PlaceholderThree, SourceName, StringComparison.Ordinal);
 
             WaitHelpers.WaitFor(
-                () => FindTreeItems(window).FirstOrDefault(item => NameOf(item).StartsWith(expectedPrefix, StringComparison.Ordinal)),
+                () => UiaTimeout.MissOnTimeout(
+                    () => FindTreeItems(tree).FirstOrDefault(item => NameOf(item).StartsWith(expectedPrefix, StringComparison.Ordinal))),
                 $"tree row '{expectedPrefix}'",
                 UiTimeout);
         }
     }
 
-    private static void AssertSkippedRowsAbsent(Window window)
+    private static void AssertSkippedRowsAbsent(AutomationElement tree)
     {
-        var names = FindTreeItems(window).Select(NameOf).ToList();
+        // An absence is asserted on a read that completed: a timed-out read is retried within
+        // the wait, never taken for an empty tree.
+        var names = WaitHelpers.WaitFor(
+            () => UiaTimeout.MissOnTimeout(() => FindTreeItems(tree).Select(NameOf).ToList()),
+            TreeRowsDescription,
+            UiTimeout);
         foreach (var skipped in SkippedSessions)
         {
             Assert.DoesNotContain(names, name => name.StartsWith(skipped + NameSeparator, StringComparison.Ordinal));
@@ -199,14 +215,14 @@ public sealed class SharedSessionsDayOneTests
         Keyboard.TypeSimultaneously(VirtualKeyShort.SHIFT, VirtualKeyShort.F10);
 
         var item = WaitHelpers.WaitFor(
-            () => FindMenuItem(automation, window, header),
+            () => UiaTimeout.MissOnTimeout(() => FindMenuItem(automation, app, window, header)),
             ContextMenuDescription,
             UiTimeout);
         item.Patterns.Invoke.Pattern.Invoke();
 
         var title = LocaleText(locale, "SharedReportDialogTitle").Replace(PlaceholderZero, SourceName, StringComparison.Ordinal);
         return WaitHelpers.WaitFor(
-            () => FindWindowByTitle(automation, app, window, title),
+            () => UiaTimeout.MissOnTimeout(() => FindWindowByTitle(automation, app, window, title)),
             ReportDialogDescription,
             UiTimeout);
     }
@@ -215,13 +231,13 @@ public sealed class SharedSessionsDayOneTests
     {
         // The report lists folder, session, reason: the reason follows the session name.
         var texts = WaitHelpers.WaitFor(
-            () =>
+            () => UiaTimeout.MissOnTimeout(() =>
             {
                 var found = dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.Text))
                     .Select(NameOf)
                     .ToList();
                 return found.Contains(FtpName) ? found : null;
-            },
+            }),
             "skipped sessions listed in the report",
             UiTimeout);
 
@@ -263,26 +279,43 @@ public sealed class SharedSessionsDayOneTests
             && actual.Contains(detail, StringComparison.Ordinal);
     }
 
-    private static AutomationElement? FindMenuItem(UIA3Automation automation, Window window, string header)
+    // A context menu opens in a popup of its own, which UI Automation shows as a child window of
+    // the main window (measured: Window/Popup > Menu/ContextMenu > MenuItem), or else as another
+    // top-level window of the product. Only those windows are searched, never the main window's
+    // own tree or the whole desktop. A UI Automation timeout is left to the caller.
+    private static AutomationElement? FindMenuItem(UIA3Automation automation, Application app, Window main, string header)
     {
-        var inWindow = window.FindFirstDescendant(cf => cf.ByControlType(ControlType.MenuItem).And(cf.ByName(header)));
-        return inWindow ?? automation.GetDesktop()
-            .FindFirstDescendant(cf => cf.ByControlType(ControlType.MenuItem).And(cf.ByName(header)));
+        var mainHandle = main.Properties.NativeWindowHandle.ValueOrDefault;
+        var otherTopLevel = automation.GetDesktop()
+            .FindAllChildren(cf => cf.ByProcessId(app.ProcessId))
+            .Where(element => element.Properties.NativeWindowHandle.ValueOrDefault != mainHandle);
+        return main.FindAllChildren(cf => cf.ByControlType(ControlType.Window))
+            .Concat(otherTopLevel)
+            .Select(popup => popup.FindFirstDescendant(cf => cf.ByControlType(ControlType.MenuItem).And(cf.ByName(header))))
+            .FirstOrDefault(found => found is not null);
     }
 
+    // The dialog is a top-level window of the product, or a child of the main window when UI
+    // Automation parents it to its owner: two one-level searches, never the main window's tree.
+    // A UI Automation timeout is left to the caller.
     private static Window? FindWindowByTitle(UIA3Automation automation, Application app, Window main, string title)
     {
-        var top = app.GetAllTopLevelWindows(automation).FirstOrDefault(w => string.Equals(w.Title, title, StringComparison.Ordinal));
+        var top = automation.GetDesktop().FindFirstChild(cf => cf.ByControlType(ControlType.Window)
+            .And(cf.ByProcessId(app.ProcessId))
+            .And(cf.ByName(title)));
         if (top is not null)
         {
-            return top;
+            return top.AsWindow();
         }
 
-        return main.FindFirstDescendant(cf => cf.ByControlType(ControlType.Window).And(cf.ByName(title)))?.AsWindow();
+        return main.FindFirstChild(cf => cf.ByControlType(ControlType.Window).And(cf.ByName(title)))?.AsWindow();
     }
 
-    private static IEnumerable<AutomationElement> FindTreeItems(Window window) =>
-        window.FindAllDescendants(cf => cf.ByControlType(ControlType.TreeItem));
+    private static AutomationElement? FindSessionTree(Window window) =>
+        window.FindFirstDescendant(cf => cf.ByControlType(ControlType.Tree).And(cf.ByAutomationId(SessionTreeAutomationId)));
+
+    private static AutomationElement[] FindTreeItems(AutomationElement tree) =>
+        tree.FindAllDescendants(cf => cf.ByControlType(ControlType.TreeItem));
 
     private static string NameOf(AutomationElement element) =>
         element.Properties.Name.ValueOrDefault ?? string.Empty;
