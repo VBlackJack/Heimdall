@@ -160,6 +160,6 @@ public sealed class ToolCountWordingTests
         public Task<CommandLibraryImportResult> ImportAsync(IActionService actionService, string path) =>
             Task.FromResult(result);
 
-        public Task<int> ExportAsync(IActionService actionService, string path) => Task.FromResult(0);
+        public Task<int> ExportAsync(IReadOnlyList<TwinShell.Core.Models.Action> actions, string path) => Task.FromResult(0);
     }
 }

@@ -109,6 +109,24 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
+    public Task<int?> ShowChoiceAsync(
+        string title,
+        string message,
+        IReadOnlyList<string> choices,
+        int defaultIndex,
+        string cancelLabel)
+    {
+        if (IsApplicationShuttingDown())
+        {
+            return Task.FromResult<int?>(null);
+        }
+
+        var result = Views.Dialogs.MessageDialog.ShowChoice(
+            GetOwnerWindow(), title, message, choices, defaultIndex, cancelLabel);
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
     public Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null)
     {
         var dialog = new InputDialog(_localizer)

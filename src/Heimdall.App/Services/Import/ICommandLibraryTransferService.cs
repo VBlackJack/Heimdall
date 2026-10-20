@@ -26,8 +26,11 @@ namespace Heimdall.App.Services.Import;
 /// </summary>
 public interface ICommandLibraryTransferService
 {
-    /// <summary>Exports all actions to a JSON envelope at the given path. Returns the exported count.</summary>
-    Task<int> ExportAsync(IActionService actionService, string path);
+    /// <summary>
+    /// Exports the given actions to a JSON envelope at the given path. Returns the exported
+    /// count, which is also the envelope's <c>totalActions</c>. The caller chooses the set.
+    /// </summary>
+    Task<int> ExportAsync(IReadOnlyList<ActionModel> actions, string path);
 
     /// <summary>Parses and merges actions from the given JSON file into the database. System (non-user-created) actions are never overwritten.</summary>
     Task<CommandLibraryImportResult> ImportAsync(IActionService actionService, string path);

@@ -198,6 +198,7 @@ generator that produces the final command for you.
 - Nothing is recorded while the vault is locked, and rows are pruned after 90 days
 
 **Sharing**
+- Export first asks what the file should contain: **My actions** (the default: the actions you created or imported), **Current filter** (what the list shows now, search included) or **Everything** (the seeded catalogue too); the warning about secrets in free-text fields follows the choice
 - Import and export as JSON, and Git synchronization for a shared team library; **Sync on startup** runs once after the vault is unlocked, and a failure is reported on the status bar
 - Actions that arrive from an import have their risk level and platform clamped to known values, so an unrecognized level is treated as dangerous rather than harmless
 

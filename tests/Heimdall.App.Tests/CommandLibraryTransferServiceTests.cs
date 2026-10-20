@@ -39,7 +39,7 @@ public sealed class CommandLibraryTransferServiceTests
         var path = Path.GetTempFileName();
         try
         {
-            var count = await service.ExportAsync(actionService, path);
+            var count = await service.ExportAsync((await actionService.GetAllActionsAsync()).ToList(), path);
 
             Assert.Equal(2, count);
             Assert.True(File.Exists(path));

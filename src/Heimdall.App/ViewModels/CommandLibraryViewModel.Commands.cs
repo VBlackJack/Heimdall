@@ -408,13 +408,38 @@ public sealed partial class CommandLibraryViewModel
     // ── Import / Export ──────────────────────────────────────────
 
     /// <summary>
-    /// Prompts for a destination path and writes a JSON envelope containing
-    /// every action currently in the database.
+    /// Asks what to export, prompts for a destination path, and writes a JSON envelope
+    /// containing the chosen actions.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The choice comes first and defaults to the operator's own actions: the whole catalogue
+    /// is mostly the seeded actions every installation already has, and sharing "my commands"
+    /// used to mean sending all of them. "Current filter" exports what the list shows now,
+    /// search included; "Everything" is the old behaviour.
+    /// </para>
+    /// <para>
+    /// The secret warning is still shown once, after the choice and the path, because it
+    /// applies to whatever is written.
+    /// </para>
+    /// </remarks>
     [RelayCommand(CanExecute = nameof(IsLibraryIdle))]
     public async Task ExportAsync()
     {
         if (ShowSaveFileDialog is null) return;
+
+        var choice = await _dialogService.ShowChoiceAsync(
+            LocalizeKey("ToolCmdLibExportScopeTitle"),
+            LocalizeKey("ToolCmdLibExportScopeMessage"),
+            [
+                LocalizeKey("ToolCmdLibExportScopeMine"),
+                LocalizeKey("ToolCmdLibExportScopeFiltered"),
+                LocalizeKey("ToolCmdLibExportScopeAll"),
+            ],
+            (int)CommandLibraryExportScope.Mine,
+            LocalizeKey("BtnCancel"));
+        if (choice is not int index || !Enum.IsDefined(typeof(CommandLibraryExportScope), index)) return;
+        var scope = (CommandLibraryExportScope)index;
 
         var defaultName = $"commands-export-{DateTime.Now:yyyyMMdd}.json";
         var path = ShowSaveFileDialog(defaultName, "JSON files (*.json)|*.json");
@@ -432,13 +457,39 @@ public sealed partial class CommandLibraryViewModel
         await RunActionServiceOperationAsync(
             async actionService =>
             {
-                var count = await _transferService.ExportAsync(actionService, path);
+                var actions = await SelectExportActionsAsync(scope, actionService);
+                var count = await _transferService.ExportAsync(actions, path);
                 _dialogService.ShowInfo(
                     LocalizeKey("ToolCmdLibExportSuccess"),
                     string.Format(LocalizeKey("ToolCmdLibExportSuccessMessage"), count, path));
             },
             "Export",
             "ToolCmdLibExportError");
+    }
+
+    /// <summary>
+    /// The actions an export of <paramref name="scope"/> writes.
+    /// </summary>
+    /// <remarks>
+    /// "Mine" and "Everything" read the store, so an action added since the list loaded is not
+    /// left out; "Current filter" is by definition what the list shows, so it reads the list.
+    /// </remarks>
+    internal async Task<IReadOnlyList<TwinShell.Core.Models.Action>> SelectExportActionsAsync(
+        CommandLibraryExportScope scope,
+        IActionService actionService)
+    {
+        if (scope == CommandLibraryExportScope.CurrentFilter)
+        {
+            return _allEntries
+                .Where(ShouldShowAction)
+                .Select(entry => entry.Source)
+                .ToList();
+        }
+
+        var all = await actionService.GetAllActionsAsync();
+        return scope == CommandLibraryExportScope.Mine
+            ? all.Where(action => action.IsUserCreated).ToList()
+            : all.ToList();
     }
 
     /// <summary>

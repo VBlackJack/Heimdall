@@ -198,6 +198,7 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Rien n'est enregistré coffre verrouillé, et les lignes sont purgées au-delà de 90 jours
 
 **Partager**
+- L'export demande d'abord ce que le fichier doit contenir : **Mes actions** (par défaut : les actions que vous avez créées ou importées), **Filtre actuel** (ce que la liste montre, recherche comprise) ou **Tout** (le catalogue fourni compris) ; l'avertissement sur les secrets des champs libres suit ce choix
 - Import et export en JSON, et synchronisation Git pour une bibliothèque d'équipe ; **Synchroniser au démarrage** s'exécute une fois après le déverrouillage du coffre, et un échec est signalé dans la barre d'état
 - Les actions issues d'un import voient leur niveau de risque et leur plateforme ramenés à des valeurs connues : un niveau non reconnu est traité comme dangereux plutôt qu'anodin
 
