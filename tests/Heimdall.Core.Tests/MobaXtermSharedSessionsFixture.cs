@@ -128,4 +128,54 @@ internal static class MobaXtermSharedSessionsFixture
         syn-telnet-proxytype= #98#1%syn-telnet-proxytype.example.test%2327%syntelu%u3%u4%%%%u8%u9%2%%u12%u13%u14{Tail}
         syn-sftp-proxytype= #140#7%syn-sftp-proxytype.example.test%2204%synsftpu%u3%u4%u5%u6%u7%u8%2%%u11%u12{Tail}
         """;
+
+    /// <summary>
+    /// SSH sessions with and without a proxy, three created in the MobaXterm interface and three
+    /// synthetic.
+    /// </summary>
+    /// <remarks>
+    /// <para>The <c>ssh-proxy-</c> sessions are measured: <c>a</c> goes through a Socks4 proxy
+    /// (type 1) with a login and port 3181, <c>c</c> through an Http proxy (type 3) with a user on
+    /// the session itself, <c>b</c> has no proxy and shows what MobaXterm writes then: type "0", no
+    /// host, port 1080. Fields are as written, hosts and users are fake.</para>
+    /// <para>The <c>syn-ssh</c> sessions are SYNTHETIC: every field the SSH layout does not read
+    /// holds a unique sentinel, the login command and jump host are empty, so a proxy slot shifted
+    /// by one in either direction lands on a sentinel and refuses the session that has no proxy.</para>
+    /// </remarks>
+    public const string SshProxyContent = $"""
+        [Bookmarks_1]
+        SubRep=SshProxy
+        ImgNum=41
+        ssh-proxy-a.example.test= #109#0%ssh-proxy-a.example.test%22%%%-1%-1%%%%%0%-1%0%%%-1%-1%0%1%proxy-ssh-a.example.test%3181%pxusera%0%0%1%%0%%%%0%-1%-1%0%%%0{Tail}
+        ssh-proxy-b.example.test= #109#0%ssh-proxy-b.example.test%22%%%-1%-1%%%%%0%-1%0%%%-1%-1%0%0%%1080%%0%0%1%%0%%%%0%-1%-1%0%%%0{Tail}
+        ssh-proxy-c.example.test (sshuserc)= #109#0%ssh-proxy-c.example.test%22%sshuserc%%-1%-1%%%%%0%0%0%%%-1%-1%0%3%proxy-ssh-c.example.test%3183%%0%0%1%%0%%%%0%-1%-1%0%%%0{Tail}
+        syn-ssh= #109#0%syn-ssh.example.test%2224%synsshu%u3%u4%u5%%%%%u10%u11%u12%u13%u14%u15%u16%u17%0%%u20%u21%u22{Tail}
+        syn-ssh-proxy= #109#0%syn-ssh-proxy.example.test%2225%synsshu%u3%u4%u5%%%%%u10%u11%u12%u13%u14%u15%u16%u17%1%proxyssh2.example.test%u20%u21%u22{Tail}
+        syn-ssh-proxytype= #109#0%syn-ssh-proxytype.example.test%2226%synsshu%u3%u4%u5%%%%%u10%u11%u12%u13%u14%u15%u16%u17%2%%u20%u21%u22{Tail}
+        """;
+
+    /// <summary>
+    /// RDP sessions with and without an RD Gateway, three created in the MobaXterm interface and
+    /// two synthetic.
+    /// </summary>
+    /// <remarks>
+    /// <para>MobaXterm has no proxy for an RDP session; its other route is the RD Gateway of the
+    /// Expert RDP settings. The <c>rdp-proxy-</c> sessions are measured with the gateway set to
+    /// Always: <c>a</c> authenticates as the end server, <c>b</c> prompts and carries a user on the
+    /// session. The server lands at field 19 and again in the packed field 30.
+    /// <c>rdp-direct-c</c> has no gateway: field 19 is empty and field 30 is absent.</para>
+    /// <para>The <c>syn-rdp</c> sessions are SYNTHETIC: every field the RDP layout does not read
+    /// holds a unique sentinel and the SSH jump host is empty, so a gateway index shifted by one
+    /// lands on a sentinel and refuses the session that has no gateway.</para>
+    /// </remarks>
+    public const string RdpGatewayContent = $"""
+        [Bookmarks_1]
+        SubRep=RdpGateway
+        ImgNum=41
+        rdp-proxy-a.example.test= #91#4%rdp-proxy-a.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-a.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-a.example.test,,0,0,{Tail}
+        rdp-proxy-b.example.test (rdpuserb)= #91#4%rdp-proxy-b.example.test%3389%rdpuserb%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-b.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-b.example.test,,0,1,{Tail}
+        rdp-direct-c.example.test= #91#4%rdp-direct-c.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%%-1%-1%0%-1%0%-1%0%0%0%0%{Tail}
+        syn-rdp= #91#4%syn-rdp.example.test%3390%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%%u20%u21%u22{Tail}
+        syn-rdp-gw= #91#4%syn-rdp-gw.example.test%3391%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%rdgw2.example.test%u20%u21%u22{Tail}
+        """;
 }

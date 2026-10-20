@@ -327,7 +327,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 247 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 249 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 
@@ -414,8 +414,9 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     fusionné avec un dossier partagé
   - Les sessions SSH, RDP, SFTP, Telnet et VNC d'un fichier partagé sont chargées. FTP, WSL et les
     autres types sont ignorés, de même qu'une session Telnet ou VNC passant par un rebond SSH et
-    qu'une session Telnet, VNC ou SFTP passant par un proxy (une connexion directe contournerait le
-    bastion ou le proxy) ; chaque session ignorée est listée avec sa raison dans le rapport d'import.
+    qu'une session SSH, Telnet, VNC ou SFTP passant par un proxy et qu'une session RDP passant par
+    une passerelle RD Gateway, pas encore importée (une connexion directe contournerait le bastion,
+    le proxy ou la passerelle) ; chaque session ignorée est listée avec sa raison dans le rapport d'import.
     Le dossier de départ distant d'une session SFTP n'est pas repris, et une session SFTP partagée
     mémorise son mot de passe par utilisateur comme une session SSH
   - Les sessions partagées sont en lecture seule dans Heimdall et continuent d'être modifiées dans

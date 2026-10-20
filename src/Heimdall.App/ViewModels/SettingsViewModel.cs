@@ -3113,6 +3113,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             MobaXtermImportWarningKind.ProxyNotSupported => warning.Detail.Length == 0
                 ? "ImportMobaXtermWarningProxyNoHost"
                 : "ImportMobaXtermWarningProxy",
+            MobaXtermImportWarningKind.RdGatewayNotSupported => "ImportMobaXtermWarningRdGateway",
             MobaXtermImportWarningKind.MissingHost => "ImportMobaXtermWarningMissingHost",
             MobaXtermImportWarningKind.InvalidGatewayHost => "ImportMobaXtermWarningInvalidGatewayHost",
             MobaXtermImportWarningKind.DuplicateSession => "ImportMobaXtermWarningDuplicateSession",

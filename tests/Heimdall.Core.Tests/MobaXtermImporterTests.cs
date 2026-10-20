@@ -1073,6 +1073,137 @@ public class MobaXtermImporterTests
         Assert.Empty(result.Gateways);
     }
 
+    // --- SSH proxy (measured sessions: see MobaXtermSharedSessionsFixture.SshProxyContent) ---
+
+    private static MobaXtermImportResult ParseSshProxy() =>
+        MobaXtermImporter.Parse(MobaXtermSharedSessionsFixture.SshProxyContent);
+
+    // Producer: MobaXtermImporter.ParseSession, the proxy refusal through the SSH [0] layout
+    // (type 18, host 19); trigger: two measured SSH sessions behind a Socks4 and an Http proxy,
+    // and synthetic ones with a proxy host or a proxy type alone. The detail is the proxy host, so
+    // a slot shifted onto the proxy port or type fails here.
+    [Theory]
+    [InlineData("ssh-proxy-a.example.test", "proxy-ssh-a.example.test")]
+    [InlineData("ssh-proxy-c.example.test (sshuserc)", "proxy-ssh-c.example.test")]
+    [InlineData("syn-ssh-proxy", "proxyssh2.example.test")]
+    [InlineData("syn-ssh-proxytype", "")]
+    public void SshThroughAProxy_IsNotImported_AndNamesTheProxy(string name, string proxyHost)
+    {
+        MobaXtermImportResult result = ParseSshProxy();
+
+        Assert.DoesNotContain(result.Servers, server => server.DisplayName == name);
+        MobaXtermImportWarning warning = Skipped(result, name);
+        Assert.Equal(MobaXtermImportWarningKind.ProxyNotSupported, warning.Kind);
+        Assert.Equal(proxyHost, warning.Detail);
+        Assert.False(warning.SessionImported);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession through the SSH [0] layout; trigger: the measured
+    // SSH session without a proxy (type "0", port 1080 left in the slot) and the synthetic one
+    // whose unread fields are sentinels. Both import direct, and no string of the synthetic
+    // profile holds a sentinel.
+    [Theory]
+    [InlineData("ssh-proxy-b.example.test", "ssh-proxy-b.example.test", 22, "")]
+    [InlineData("syn-ssh", "syn-ssh.example.test", 2224, "synsshu")]
+    public void SshWithoutAProxy_IsImportedDirect(string name, string host, int port, string user)
+    {
+        MobaXtermImportResult result = ParseSshProxy();
+
+        ServerProfileDto server = Imported(result, name);
+        Assert.Equal(ConnectionTypeCatalog.Canonicalize("SSH"), server.ConnectionType);
+        Assert.Equal(host, server.RemoteServer);
+        Assert.Equal(port, server.SshPort);
+        Assert.Equal(user, server.SshUsername ?? string.Empty);
+        Assert.True(server.UseDirectConnection);
+        Assert.Null(server.SshGatewayId);
+        Assert.DoesNotContain(result.Warnings, warning => warning.SessionName == name);
+        AssertNoSentinel(name, server);
+    }
+
+    // Producer: MobaXtermImporter.Parse over the whole SSH proxy file; the counts pin that every
+    // session is either imported or skipped, never both and never lost.
+    [Fact]
+    public void SshProxyFile_ImportsTheTwoDirectSessions_AndSkipsTheFourBehindAProxy()
+    {
+        MobaXtermImportResult result = ParseSshProxy();
+
+        Assert.Equal(2, result.Servers.Count);
+        Assert.Equal(4, result.Warnings.Count(warning => warning.Kind == MobaXtermImportWarningKind.ProxyNotSupported));
+        Assert.Equal(4, result.Warnings.Count);
+        Assert.Empty(result.Gateways);
+    }
+
+    // --- RDP gateway (measured sessions: see MobaXtermSharedSessionsFixture.RdpGatewayContent) ---
+
+    private static MobaXtermImportResult ParseRdpGateway() =>
+        MobaXtermImporter.Parse(MobaXtermSharedSessionsFixture.RdpGatewayContent);
+
+    // Producer: MobaXtermImporter.ParseSession, the RD Gateway refusal through the RDP [4] layout
+    // (server at 19); trigger: the two measured sessions set to Always and a synthetic one. The
+    // detail is the gateway server, so an index shifted onto a neighbour fails here.
+    [Theory]
+    [InlineData("rdp-proxy-a.example.test", "rdgw-a.example.test")]
+    [InlineData("rdp-proxy-b.example.test (rdpuserb)", "rdgw-b.example.test")]
+    [InlineData("syn-rdp-gw", "rdgw2.example.test")]
+    public void RdpThroughAnRdGateway_IsNotImported_AndNamesTheGateway(string name, string rdGateway)
+    {
+        MobaXtermImportResult result = ParseRdpGateway();
+
+        Assert.DoesNotContain(result.Servers, server => server.DisplayName == name);
+        MobaXtermImportWarning warning = Skipped(result, name);
+        Assert.Equal(MobaXtermImportWarningKind.RdGatewayNotSupported, warning.Kind);
+        Assert.Equal(rdGateway, warning.Detail);
+        Assert.False(warning.SessionImported);
+    }
+
+    // Producer: MobaXtermImporter.ParseSession through the RDP [4] layout; trigger: the measured
+    // RDP session without a gateway and the synthetic one whose unread fields are sentinels.
+    [Theory]
+    [InlineData("rdp-direct-c.example.test", "rdp-direct-c.example.test", 3389, null)]
+    [InlineData("syn-rdp", "syn-rdp.example.test", 3390, "synrdpu")]
+    public void RdpWithoutAnRdGateway_IsImportedDirect(string name, string host, int port, string? user)
+    {
+        MobaXtermImportResult result = ParseRdpGateway();
+
+        ServerProfileDto server = Imported(result, name);
+        Assert.Equal(ConnectionTypeCatalog.Canonicalize("RDP"), server.ConnectionType);
+        Assert.Equal(host, server.RemoteServer);
+        Assert.Equal(port, server.RemotePort);
+        Assert.Equal(user, string.IsNullOrEmpty(server.RdpUsername) ? null : server.RdpUsername);
+        Assert.True(server.UseDirectConnection);
+        Assert.Null(server.SshGatewayId);
+        Assert.DoesNotContain(result.Warnings, warning => warning.SessionName == name);
+        AssertNoSentinel(name, server);
+    }
+
+    // Producer: MobaXtermImporter.Parse over the whole RDP gateway file.
+    [Fact]
+    public void RdpGatewayFile_ImportsTheTwoDirectSessions_AndSkipsTheThreeBehindAGateway()
+    {
+        MobaXtermImportResult result = ParseRdpGateway();
+
+        Assert.Equal(2, result.Servers.Count);
+        Assert.Equal(3, result.Warnings.Count(warning => warning.Kind == MobaXtermImportWarningKind.RdGatewayNotSupported));
+        Assert.Equal(3, result.Warnings.Count);
+        Assert.Empty(result.Gateways);
+    }
+
+    // No string of an imported profile may hold a synthetic sentinel (u3, u4...): the layout
+    // read a field it must not.
+    private static void AssertNoSentinel(string name, ServerProfileDto server)
+    {
+        System.Text.RegularExpressions.Regex sentinel = new(@"\bu\d+\b");
+        foreach (System.Reflection.PropertyInfo property in typeof(ServerProfileDto)
+            .GetProperties()
+            .Where(property => property.PropertyType == typeof(string) && property.GetIndexParameters().Length == 0))
+        {
+            string? value = (string?)property.GetValue(server);
+            Assert.False(
+                value is not null && sentinel.IsMatch(value),
+                $"{name}: {property.Name} holds a field the layout must not read: {value}");
+        }
+    }
+
     // Producer: MobaXtermImporter.ParseSession through the Telnet [1] layout, UserIndex null:
     // Telnet asks for its login in the terminal, so the login field is not read, and a [VAR] in it
     // raises no UnresolvedVariable warning for a value nobody consumes.
