@@ -60,7 +60,11 @@ A remembered password belongs to one bastion (its host, port and login) or to on
 - Reopening sessions at startup and **Connect all** use remembered passwords but never ask: a session without one asks when you open it alone.
 - A shared SFTP session remembers its password per user, like an SSH session, with the same box and the same rules.
 - A Telnet session asks for its login and password in the terminal, which Heimdall does not remember.
-- A VNC session has no password prompt in Heimdall, and a shared session cannot store one. If the VNC server asks for a password, file it in the external credential provider under the session's host name: Heimdall then fills it in. Without it, the session stops with "This VNC server asks for a password".
+- A VNC session is not asked for a password before it connects: nothing in a shared file says whether its server wants one. When the server asks, the session stops with "This VNC server asks for a password" and offers **Enter password**. The question has the same **Remember this password on this computer** box, and the session connects again with what you typed.
+  - A ticked password is kept once the VNC server has accepted it, for that session, its host and its port. The next connections, **Reconnect** included, use it without asking.
+  - When the server refuses the password, Heimdall forgets it and offers **Enter password** again. A refusal that comes before any password is sent, for example a server that blocks your address after too many failures, keeps it.
+  - An entry of the external credential provider under the session's host name still comes first, as above.
+  - A VNC server that also asks for a username stays out of reach: Heimdall has no VNC username.
 - An RDP session asks for its password in the RDP window (the Windows Security prompt, which also offers smart card and Windows Hello for Business where the server allows them), and Heimdall does not remember it. To avoid retyping it, file the password in the external credential provider under the session's host name, as above: Heimdall then fills it in. The password of its bastion is remembered like any other.
 
 In the settings, each source with remembered passwords shows **Forget saved passwords**. Removing a source also forgets its passwords. Nothing you type is ever written to a shared session, which stays read-only.
