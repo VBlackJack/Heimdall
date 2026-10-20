@@ -93,7 +93,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 : parameter.DefaultValue ?? string.Empty;
 
             // Validate the value according to the parameter type
-            if (!ValidateParameterValue(parameter, value, out var validationError))
+            if (!ValidateParameterValue(template, parameter, value, out var validationError))
             {
                 throw new InvalidOperationException($"Invalid parameter '{parameter.Name}': {validationError}");
             }
@@ -231,9 +231,8 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                             // BUGFIX: Replace hardcoded French message with localization
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMaxLength, parameter.Label, ValidationConstants.MaxParameterLength.ToString()));
                         }
-                        if (ContainsDangerousCharacters(value))
+                        if (ContainsRefusedCharacters(template, parameter, value))
                         {
-                            // BUGFIX: Replace hardcoded French message with localization
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterDangerousCharacters, parameter.Label));
                         }
                         break;
@@ -309,7 +308,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             offered => string.Equals(offered?.Trim(), value.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
-    private bool ValidateParameterValue(TemplateParameter parameter, string value, out string error)
+    private bool ValidateParameterValue(CommandTemplate template, TemplateParameter parameter, string value, out string error)
     {
         error = string.Empty;
 
@@ -385,7 +384,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                     error = $"String exceeds maximum length of {ValidationConstants.MaxParameterLength}";
                     return false;
                 }
-                if (ContainsDangerousCharacters(value))
+                if (ContainsRefusedCharacters(template, parameter, value))
                 {
                     error = "Contains dangerous characters";
                     return false;
@@ -537,14 +536,58 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     }
 
     /// <summary>
-    /// Checks if a value contains dangerous shell characters
+    /// True when <paramref name="value"/> holds a character the generator will not put into
+    /// <paramref name="template"/> for <paramref name="parameter"/>.
     /// </summary>
-    private bool ContainsDangerousCharacters(string value)
+    /// <remarks>
+    /// A control character is refused everywhere: a carriage return or a line feed submits
+    /// the command on the terminal before the operator has read it, and no quoting stops
+    /// that. The shell metacharacters are refused only where
+    /// <see cref="RequiresCharacterBlacklist"/> says the quoting cannot neutralize them.
+    /// </remarks>
+    private static bool ContainsRefusedCharacters(CommandTemplate template, TemplateParameter parameter, string value)
     {
         if (string.IsNullOrEmpty(value))
+        {
             return false;
+        }
 
-        // List of dangerous characters that could be used for command injection
-        return value.Any(c => DangerousChars.Contains(c) || char.IsControl(c));
+        if (value.Any(char.IsControl))
+        {
+            return true;
+        }
+
+        return RequiresCharacterBlacklist(template, parameter) && value.Any(c => DangerousChars.Contains(c));
+    }
+
+    /// <summary>
+    /// True when a value for <paramref name="parameter"/> would reach the shell outside a
+    /// literal single-quoted span, so shell metacharacters in it would be interpreted.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The one decision both validation paths read, so they cannot drift apart.
+    /// </para>
+    /// <para>
+    /// <see cref="QuotingMode.ShellQuote"/> wraps the value in single quotes itself, which
+    /// is literal only when the placeholder stands bare in the pattern: inside a
+    /// double-quoted string the shell still expands <c>$(...)</c> between those quotes.
+    /// <see cref="QuotingMode.InlineInQuotes"/> only escapes the value, so it is literal
+    /// only when every occurrence of the placeholder sits in a single-quoted span of the
+    /// pattern that no double-quoted string encloses. In both literal cases the only
+    /// character that could end the span is a single quote, and both escapers double or
+    /// close-and-reopen it, which is why the blacklist adds nothing there and refused
+    /// everyday values such as LDAP filters, grep alternations and <c>$env:TEMP</c>.
+    /// </para>
+    /// </remarks>
+    internal static bool RequiresCharacterBlacklist(CommandTemplate template, TemplateParameter parameter)
+    {
+        var literalContext = (parameter.Quoting ?? QuotingMode.ShellQuote) == QuotingMode.InlineInQuotes
+            ? CommandPatternQuoting.QuoteContext.SingleQuoted
+            : CommandPatternQuoting.QuoteContext.Bare;
+
+        return CommandPatternQuoting
+            .GetPlaceholderQuoteContexts(template.CommandPattern, parameter.Name, template.Platform == Platform.Windows)
+            .Any(context => context != literalContext);
     }
 }

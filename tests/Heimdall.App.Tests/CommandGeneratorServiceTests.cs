@@ -241,7 +241,9 @@ public sealed class CommandGeneratorServiceTests
         command.Should().Be(expected);
     }
 
-    // Dangerous shell characters in a string value block generation (command injection guard).
+    // A-03: a ShellQuote value is wrapped in single quotes, where both shells read every
+    // metacharacter literally, so the blacklist no longer refuses them. They have to arrive
+    // intact inside the quotes, on both platforms and through both validation paths.
     [Theory]
     [InlineData("a&b")]
     [InlineData("a|b")]
@@ -252,15 +254,130 @@ public sealed class CommandGeneratorServiceTests
     [InlineData("a)b")]
     [InlineData("a<b")]
     [InlineData("a>b")]
-    [InlineData("a\nb")]
-    public void GenerateCommand_StringWithDangerousCharacter_Throws(string value)
+    [InlineData("(objectClass=user)")]
+    [InlineData("error|warn")]
+    [InlineData("$env:TEMP")]
+    [InlineData("-Confirm:$false")]
+    public void GenerateCommand_ShellQuoteStringWithShellCharacters_ArrivesLiterallyInsideQuotes(string value)
     {
         CommandGeneratorService service = CreateService();
-        CommandTemplate template = WindowsTemplate(
-            "echo {v}",
+        CommandTemplate windows = WindowsTemplate(
+            "Write-Output {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        CommandTemplate linux = LinuxTemplate(
+            "printf %s {v}",
             CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
         Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = value };
 
+        service.ValidateParameters(windows, values, out List<string> windowsErrors);
+        service.ValidateParameters(linux, values, out List<string> linuxErrors);
+
+        windowsErrors.Should().BeEmpty();
+        linuxErrors.Should().BeEmpty();
+        service.GenerateCommand(windows, values).Should().Be("Write-Output '" + value + "'");
+        service.GenerateCommand(linux, values).Should().Be("printf %s '" + value + "'");
+    }
+
+    // A-03: with the blacklist gone for ShellQuote, the quote escaping is the only thing that
+    // keeps a value inside its quotes. An attempt to close the quote has to stay data.
+    [Fact]
+    public void GenerateCommand_ShellQuoteStringClosingTheQuote_StaysInsideTheQuotes()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate windows = WindowsTemplate(
+            "Write-Output {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        CommandTemplate linux = LinuxTemplate(
+            "printf %s {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "x'; rm -rf /" };
+
+        service.GenerateCommand(linux, values).Should().Be("printf %s 'x'\\''; rm -rf /'");
+        service.GenerateCommand(windows, values).Should().Be("Write-Output 'x''; rm -rf /'");
+    }
+
+    // A-03: an InlineInQuotes parameter whose placeholder is not inside a single-quoted span
+    // only gets its quotes escaped, so it lands bare and the blacklist still applies.
+    [Theory]
+    [InlineData("Windows")]
+    [InlineData("Linux")]
+    public void ValidateParameters_InlineInQuotesOutsideSingleQuotes_StillRefusesSemicolon(string platform)
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("v", "Value");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = platform == "Windows"
+            ? WindowsTemplate("Write-Output {v}", parameter)
+            : LinuxTemplate("echo {v}", parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "a; whoami" };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().Equal(MessageKeys.ValidationParameterDangerousCharacters);
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    // A-03: a correctly placed InlineInQuotes parameter is literal, so an LDAP filter passes.
+    [Fact]
+    public void GenerateCommand_InlineInQuotesInsideSingleQuotes_AcceptsAnLdapFilter()
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("filter", "Filter");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = WindowsTemplate("Get-ADObject -LDAPFilter '{filter}'", parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["filter"] = "(&(objectClass=user)(cn=O'Brien))" };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().BeEmpty();
+        service.GenerateCommand(template, values)
+            .Should().Be("Get-ADObject -LDAPFilter '(&(objectClass=user)(cn=O''Brien))'");
+    }
+
+    // A-03: single quotes the shell reads inside a double-quoted string are not literal:
+    // PowerShell expands $(...) in "Done: '{v}'". A ShellQuote placeholder written inside a
+    // double-quoted string keeps the blacklist, because its own quotes would not protect it.
+    [Fact]
+    public void ValidateParameters_ShellQuoteInsideDoubleQuotes_StillRefusesSubexpression()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "Write-Host \"Done: {v}\"",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "$(whoami)" };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().Equal(MessageKeys.ValidationParameterDangerousCharacters);
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    // A-03: a carriage return or a line feed submits the command on the terminal, which no
+    // quoting prevents, so both are refused whatever the quoting mode and placement.
+    [Theory]
+    [InlineData("shell-quote", "\r")]
+    [InlineData("shell-quote", "\n")]
+    [InlineData("inline-in-single-quotes", "\r")]
+    [InlineData("inline-in-single-quotes", "\n")]
+    [InlineData("inline-misplaced", "\r")]
+    [InlineData("inline-misplaced", "\n")]
+    public void ValidateParameters_CarriageReturnOrLineFeed_IsRefusedInEveryMode(string mode, string newline)
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("v", "Value");
+        string pattern = "Write-Output {v}";
+        if (mode != "shell-quote")
+        {
+            parameter.Quoting = QuotingMode.InlineInQuotes;
+            pattern = mode == "inline-in-single-quotes" ? "Write-Output '{v}'" : pattern;
+        }
+
+        CommandTemplate template = WindowsTemplate(pattern, parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "a" + newline + "b" };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().Equal(MessageKeys.ValidationParameterDangerousCharacters);
         Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
     }
 
@@ -922,9 +1039,11 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void ValidateParameters_DangerousCharacterInString_ReturnsFalseWithError()
     {
+        // A-03: a bare ShellQuote placeholder no longer refuses '&' (its quotes make it
+        // literal); inside a double-quoted string it still does.
         CommandGeneratorService service = CreateService();
         CommandTemplate template = WindowsTemplate(
-            "echo {v}",
+            "echo \"{v}\"",
             CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
         Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "a&b" };
 
