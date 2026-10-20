@@ -235,11 +235,20 @@
                     rfb = null;
                 }
 
+                // The password is held here and sent only when the server asks for it, so the page
+                // knows whether a security failure came before or after it: only one after it says
+                // the password was wrong, and only then may the host drop a remembered one.
+                var heldPassword = password || null;
+                var passwordSent = false;
+                var securityFailed = false;
+
                 try {
                     rfb = new RFB(container, wsUrl, {
-                        credentials: password ? { password: password } : undefined,
                         wsProtocols: ['binary']
                     });
+
+                    // noVNC's events carry no target, so a listener answers through this.
+                    var client = rfb;
 
                     rfb.showDotCursor = true;
                     applyScaling();
@@ -265,14 +274,33 @@
                         if (event.detail.clean) {
                             postMessage('disconnected:clean');
                         } else {
-                            showError(text.disconnected, text.connectionLost);
+                            // A refused sign-in was already reported with its own words; "connection
+                            // lost" would replace them.
+                            if (!securityFailed) {
+                                showError(text.disconnected, text.connectionLost);
+                            }
                             postMessage('disconnected:error');
                         }
                     });
 
                     rfb.addEventListener('credentialsrequired', function (event) {
                         var types = (event.detail && event.detail.types) || [];
+                        if (heldPassword && !passwordSent && types.length === 1 && types[0] === 'password') {
+                            passwordSent = true;
+                            client.sendCredentials({ password: heldPassword });
+                            return;
+                        }
                         postMessage('credentials-required:' + JSON.stringify(types));
+                    });
+
+                    rfb.addEventListener('securityfailure', function (event) {
+                        var detail = event.detail || {};
+                        securityFailed = true;
+                        postMessage('security-failure:' + JSON.stringify({
+                            afterPassword: passwordSent,
+                            status: detail.status,
+                            reason: detail.reason || null
+                        }));
                     });
 
                     rfb.addEventListener('clipboard', function (event) {

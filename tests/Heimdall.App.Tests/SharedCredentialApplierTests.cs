@@ -688,6 +688,122 @@ public sealed class SharedCredentialApplierTests : IDisposable
     private static SshGatewayDto Gateway(AppSettings settings) =>
         Assert.Single(settings.SshGateways, gateway => SharedSessionIds.IsShared(gateway.Id));
 
+    // --- VNC: never asked before the connection, kept and dropped by the view ---
+
+    // A VNC session of a real MobaXterm (fake host): host 0, port 1 of the VNC layout. It names no
+    // password, and nothing in it says whether the server wants one.
+    private const string VncContent = """
+        [Bookmarks_1]
+        SubRep=SCREENS
+        ImgNum=41
+        vnc-a= #128#5%vnc-a.example.test%5911%-1%0%%%%%-1%-1%0%vncusera%0%%1080%%%0#MobaFont%10#0#
+        """;
+
+    private const int VncPort = 5911;
+    private const string VncPassword = "vnc-pw-4471";
+
+    private static ServerProfileDto VncCopy(Harness harness) =>
+        harness.Provider.Profiles.Single(candidate => candidate.DisplayName == "vnc-a");
+
+    // Producer: SharedCredentialApplier.ApplyAsync, the VNC branch. A question before a server that
+    // wants no password would be one too many, and a cancel would abort a connection that needed
+    // nothing. Kills: an AskAsync call on the VNC branch.
+    [Fact]
+    public async Task Vnc_NothingRemembered_IsNotAskedBeforeTheConnection()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: VncContent);
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(VncPassword, true));
+        ServerProfileDto profile = VncCopy(harness);
+
+        SharedCredentialApplier.SharedCredentialPlan? plan = await harness.Applier.ApplyAsync(profile, new AppSettings(), allowPrompt: true, CancellationToken.None);
+
+        Assert.NotNull(plan);
+        Assert.Equal("VNC", profile.ConnectionType);
+        Assert.Empty(harness.Prompts.Prompts);
+        Assert.Null(profile.VncPassword);
+    }
+
+    // Producer: SharedVncPassword.RememberAsync, read back by ApplyAsync on the next connection
+    // under the VNC key (profile, host, VncPort). Kills: a VNC branch that never fills, or one
+    // that reads another key (the default port instead of the session's).
+    [Fact]
+    public async Task Vnc_RememberedByTheView_IsFilledOnTheNextConnection_WithoutAsking()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: VncContent);
+        ServerProfileDto first = VncCopy(harness);
+        SharedCredentialApplier.SharedVncPassword keeper = harness.Applier.VncPasswordFor(first.InventoryProfileId, first.RemoteServer, VncPort)!;
+
+        await keeper.RememberAsync(VncPassword);
+
+        Assert.NotNull(harness.Store.Find(SharedSecretKind.Vnc, SourceId, SharedSessionSecretStore.VncKey(first.Id, "vnc-a.example.test", VncPort)));
+        ServerProfileDto again = VncCopy(harness);
+        Assert.NotNull(await harness.Applier.ApplyAsync(again, new AppSettings(), allowPrompt: false, CancellationToken.None));
+        Assert.Equal(VncPassword, CredentialProtector.Unprotect(again.VncPassword));
+        Assert.Empty(harness.Prompts.Prompts);
+    }
+
+    // Producer: SharedVncPassword.ForgetAsync, which the view calls on a refusal after the password.
+    // Kills: a forget that removes nothing (wrong kind or key).
+    [Fact]
+    public async Task Vnc_ForgottenByTheView_IsNotFilledAnyMore()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: VncContent);
+        ServerProfileDto first = VncCopy(harness);
+        SharedCredentialApplier.SharedVncPassword keeper = harness.Applier.VncPasswordFor(first.InventoryProfileId, first.RemoteServer, VncPort)!;
+        await keeper.RememberAsync(VncPassword);
+
+        await keeper.ForgetAsync();
+
+        Assert.Equal(0, harness.Store.CountFor(SourceId));
+        ServerProfileDto again = VncCopy(harness);
+        await harness.Applier.ApplyAsync(again, new AppSettings(), allowPrompt: true, CancellationToken.None);
+        Assert.Null(again.VncPassword);
+    }
+
+    // The question the view shows names the VNC host, with the remember choice of every other
+    // shared password. Kills: the SSH wording reused for VNC.
+    [Fact]
+    public async Task Vnc_TheViewsQuestion_NamesTheHost_AndOffersToRemember()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: VncContent);
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(VncPassword, true));
+        ServerProfileDto profile = VncCopy(harness);
+
+        PasswordPromptResult? answer = await harness.Applier.VncPasswordFor(profile.InventoryProfileId, profile.RemoteServer, VncPort)!
+            .AskAsync(CancellationToken.None);
+
+        Assert.Equal(new PasswordPromptResult(VncPassword, true), answer);
+        Assert.Equal(harness.Localizer.Format("DialogVncPasswordPromptMessage", "vnc-a.example.test"), Assert.Single(harness.Prompts.Prompts));
+        Assert.Equal(harness.Localizer["DialogRememberPasswordOnThisComputer"], Assert.Single(harness.Prompts.RememberLabels));
+        Assert.Equal(0, harness.Store.CountFor(SourceId));
+    }
+
+    // A profile of the user's own holds its password: the view gets nothing to ask with.
+    // Kills: a keeper handed to every VNC profile.
+    [Fact]
+    public async Task Vnc_NotShared_GetsNoKeeper()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: VncContent);
+
+        Assert.Null(harness.Applier.VncPasswordFor("local-vnc", "vnc-a.example.test", VncPort));
+        Assert.Null(harness.Applier.VncPasswordFor(null, "vnc-a.example.test", VncPort));
+    }
+
+    // The pipeline's success says nothing of the VNC sign-in, which comes after it: settling the
+    // plan of a VNC connection keeps nothing. Kills: a VNC target added to the plan's Pending.
+    [Fact]
+    public async Task Vnc_TheConnectionsPlan_KeepsNothingOnSuccess()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: VncContent);
+        harness.Prompts.Answers.Enqueue(new PasswordPromptResult(VncPassword, true));
+        ServerProfileDto profile = VncCopy(harness);
+
+        SharedCredentialApplier.SharedCredentialPlan plan = (await harness.Applier.ApplyAsync(profile, new AppSettings(), allowPrompt: true, CancellationToken.None))!;
+        await plan.SettleAsync(succeeded: true, sessionAuthenticated: true, failureCode: null, failedAtGateway: false);
+
+        Assert.Equal(0, harness.Store.CountFor(SourceId));
+    }
+
     private sealed class Harness
     {
         private Harness(

@@ -18,6 +18,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
 using Heimdall.Core.Configuration;
@@ -42,6 +43,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         PendingReconnectStates = new ConditionalWeakTable<SessionTabViewModel, PendingReconnectState>();
 
     private readonly LocalizationManager _localizer;
+    private readonly SharedCredentialApplier? _sharedCredentials;
     private readonly IDialogService _dialogService;
     private readonly HostKeyStore _hostKeyStore;
     private readonly ConnectionStateMachine _connectionSm;
@@ -173,8 +175,10 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         ISessionOperationLog sessionOperationLog,
         ConfigManager configManager,
         WebCertificateTrust? webCertificateTrust = null,
-        WebZoomMemory? webZoomMemory = null)
+        WebZoomMemory? webZoomMemory = null,
+        SharedCredentialApplier? sharedCredentials = null)
     {
+        _sharedCredentials = sharedCredentials;
         _webCertificateTrust = webCertificateTrust ?? new WebCertificateTrust();
         _webZoomMemory = webZoomMemory ?? new WebZoomMemory();
         _localizer = localizer;
@@ -564,6 +568,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                     _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
             };
             view.SessionLoggingOverride = vnc.SessionLoggingOverride;
+            WireVncPassword(view, vnc, sessionTab);
             view.SessionConnected += (serverId) =>
             {
                 _connectionSm.TryTransition(serverId, ConnectionState.Connected);
@@ -1374,6 +1379,34 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     private void WireVncSplitRequested(EmbeddedVncView view, SessionTabViewModel tab)
     {
         view.RequestSplit += (_) => SplitRequestedCallback?.Invoke(tab);
+    }
+
+    /// <summary>
+    /// Gives a shared VNC session the way to type, keep and drop its password, and every other
+    /// profile the way to its own; walks the state machine back to connecting when the view
+    /// retries in place with a typed password.
+    /// </summary>
+    internal void WireVncPassword(EmbeddedVncView view, VncSessionResult vnc, SessionTabViewModel tab)
+    {
+        view.PasswordKeeper = _sharedCredentials?.VncPasswordFor(vnc.ProfileId, vnc.Host, vnc.Port);
+
+        // A shared profile is read-only: its overlay offers the password instead.
+        view.EditProfileAvailable = () =>
+        {
+            string profileId = view.OwningPane?.ProfileLookupServerId ?? tab.ProfileLookupServerId;
+            return !string.IsNullOrEmpty(profileId) && !SharedSessionIds.IsShared(profileId);
+        };
+        view.EditProfileRequested += () => EditServerRequestedCallback?.Invoke(
+            view.OwningPane?.ProfileLookupServerId ?? tab.ProfileLookupServerId);
+        view.SessionRetrying += (serverId) =>
+        {
+            // Error and Disconnected only lead back through Initializing; walk the path a fresh
+            // connect takes, as the web view does.
+            _connectionSm.TryTransition(serverId, ConnectionState.Initializing);
+            _connectionSm.TryTransition(serverId, ConnectionState.ValidatingConfig);
+            _connectionSm.TryTransition(serverId, ConnectionState.LaunchingVnc);
+            WriteHostStatus(tab, view.OwningPane, SessionStatusTokens.Connecting);
+        };
     }
 
     private void WireVncReconnectRequested(EmbeddedVncView view, SessionTabViewModel tab)

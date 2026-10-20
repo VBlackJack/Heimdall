@@ -42,6 +42,9 @@ public sealed class SessionPaneDisconnectedOverlayTests
         typeof(EmbeddedRdpView),
         typeof(EmbeddedSshView),
         typeof(EmbeddedSftpView),
+
+        // Its overlay carries the password entry of a shared session, which the pane's cannot.
+        typeof(EmbeddedVncView),
     };
 
     [Theory]

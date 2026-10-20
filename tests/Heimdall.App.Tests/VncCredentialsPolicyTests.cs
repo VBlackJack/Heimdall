@@ -43,9 +43,65 @@ public sealed class VncCredentialsPolicyTests
             HandlerMember);
 
         Assert.True(
-            ViewSource.IsStatementOfTheMethodBody(logic, "string key = VncCredentialsPolicy.MessageKeyFor(requestedTypesJson);"),
+            ViewSource.IsStatementOfTheMethodBody(logic, "string key = VncCredentialsPolicy.MessageKeyFor(requestedTypesJson, canAsk);"),
             "The credential request does not go through the policy.");
         Assert.DoesNotContain("SendConnectCommand()", logic, StringComparison.Ordinal);
+    }
+
+    // A session whose profile cannot hold the password is told to type it, and only for a
+    // password alone. Kills: the profile advice on a shared session, or the typing advice on a
+    // request for a username too.
+    [Theory]
+    [InlineData("[\"password\"]", true, "ErrorVncSharedPasswordRequired")]
+    [InlineData("[\"password\"]", false, "ErrorVncPasswordRequired")]
+    [InlineData("[\"username\",\"password\"]", true, "ErrorVncUsernameRequired")]
+    [InlineData("not json", true, "ErrorVncPasswordRequired")]
+    public void ACredentialRequest_SaysWhereThePasswordGoes(string requestedTypesJson, bool canTypePassword, string expectedKey)
+    {
+        Assert.Equal(expectedKey, VncCredentialsPolicy.MessageKeyFor(requestedTypesJson, canTypePassword));
+    }
+
+    // Only a password alone can be typed for a shared session: Heimdall has no VNC username.
+    // Kills: offering the password entry for every credential request.
+    [Theory]
+    [InlineData("[\"password\"]", true)]
+    [InlineData("[\"username\",\"password\"]", false)]
+    [InlineData("[\"username\"]", false)]
+    [InlineData("[]", false)]
+    [InlineData("", false)]
+    [InlineData("not json", false)]
+    public void OnlyAPasswordAlone_CanBeTyped(string requestedTypesJson, bool expected)
+    {
+        Assert.Equal(expected, VncCredentialsPolicy.AsksForPasswordOnly(requestedTypesJson));
+    }
+
+    // What the page reports with a security failure. A malformed report counts as before the
+    // password, the direction that forgets nothing. Kills: reading afterPassword from the wrong
+    // member, or defaulting it to true.
+    [Theory]
+    [InlineData("{\"afterPassword\":true,\"status\":1,\"reason\":\"Authentication failure\"}", true, "Authentication failure")]
+    [InlineData("{\"afterPassword\":false,\"status\":1,\"reason\":\"Too many security failures\"}", false, "Too many security failures")]
+    [InlineData("{\"afterPassword\":true,\"status\":1,\"reason\":null}", true, null)]
+    [InlineData("{\"afterPassword\":\"true\"}", false, null)]
+    [InlineData("[]", false, null)]
+    [InlineData("not json", false, null)]
+    [InlineData("", false, null)]
+    public void ASecurityFailure_IsReadFromThePagesReport(string json, bool afterPassword, string? reason)
+    {
+        Assert.Equal(new VncSecurityFailure(afterPassword, reason), VncCredentialsPolicy.ReadSecurityFailure(json));
+    }
+
+    // A refused password says so; a refusal before it names the server's reason when it gave one.
+    // Kills: "connection lost" or a profile advice shown for a shared session.
+    [Theory]
+    [InlineData(true, "x", true, "ErrorVncSharedPasswordRejected")]
+    [InlineData(true, "x", false, "ErrorVncPasswordRejected")]
+    [InlineData(false, "Too many security failures", true, "ErrorVncSecurityRefusedReason")]
+    [InlineData(false, null, false, "ErrorVncSecurityRefused")]
+    [InlineData(false, " ", true, "ErrorVncSecurityRefused")]
+    public void ASecurityFailure_NamesWhatHappened(bool afterPassword, string? reason, bool canAsk, string expectedKey)
+    {
+        Assert.Equal(expectedKey, VncCredentialsPolicy.MessageKeyForSecurityFailure(new VncSecurityFailure(afterPassword, reason), canAsk));
     }
 
     [Fact]

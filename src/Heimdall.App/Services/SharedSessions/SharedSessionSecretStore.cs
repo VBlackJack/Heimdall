@@ -30,6 +30,9 @@ public enum SharedSecretKind
 
     /// <summary>A shared session, keyed by its profile, host, port and user.</summary>
     Session,
+
+    /// <summary>A shared VNC session, keyed by its profile, host and port: VNC names no user.</summary>
+    Vnc,
 }
 
 /// <summary>
@@ -85,6 +88,10 @@ public sealed class SharedSessionSecretStore
     /// <summary>The key of a session's secret: its profile, host (in any case), port and user.</summary>
     public static string SessionKey(string profileId, string host, int port, string user) =>
         string.Join(KeySeparator, profileId, Endpoint(host, port), user);
+
+    /// <summary>The key of a VNC session's secret: its profile, host (in any case) and port.</summary>
+    public static string VncKey(string profileId, string host, int port) =>
+        string.Join(KeySeparator, profileId, Endpoint(host, port));
 
     private static string Endpoint(string host, int port) =>
         host.Trim().ToLowerInvariant() + KeySeparator + port.ToString(System.Globalization.CultureInfo.InvariantCulture);

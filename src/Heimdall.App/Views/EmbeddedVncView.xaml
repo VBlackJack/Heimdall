@@ -160,12 +160,34 @@
                                HorizontalAlignment="Center"
                                MaxWidth="720"
                                Margin="0,16,0,0">
+                        <!-- A shared session cannot store its password: the user types it here,
+                             and only when the server asked for it. -->
+                        <Button x:Name="OverlayEnterPasswordButton"
+                                Click="OnOverlayEnterPasswordClick"
+                                Style="{DynamicResource PrimaryButtonStyle}"
+                                Visibility="Collapsed"
+                                Padding="16,6"
+                                FontSize="{StaticResource FontSizeBodyLarge}"
+                                Margin="0,0,8,0"
+                                AutomationProperties.AutomationId="Vnc.OverlayEnterPassword"/>
                         <Button x:Name="OverlayReconnectButton"
                                 Click="OnOverlayReconnectClick"
                                 Style="{DynamicResource PrimaryButtonStyle}"
                                 Padding="16,6"
                                 FontSize="{StaticResource FontSizeBodyLarge}"
                                 Margin="0,0,8,0"/>
+                        <!-- This overlay is the only one over a VNC pane (the pane's own stays
+                             away), so it carries the pane's way to the profile. -->
+                        <Button x:Name="OverlayEditProfileButton"
+                                Click="OnOverlayEditProfileClick"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Visibility="Collapsed"
+                                Padding="16,6"
+                                FontSize="{StaticResource FontSizeBodyLarge}"
+                                Margin="8,0,0,0"
+                                Content="{loc:Translate BtnEditProfileOverlay}"
+                                ToolTip="{loc:Translate TooltipEditProfileOverlay}"
+                                AutomationProperties.Name="{loc:Translate A11yEditProfileOverlay}"/>
                         <Button x:Name="OverlayCloseButton"
                                 Click="OnOverlayCloseClick"
                                 Style="{DynamicResource SecondaryButtonStyle}"
