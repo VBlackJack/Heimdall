@@ -37,4 +37,7 @@ public enum SharedProfileRefusal
     /// defines it with a refused host. Decided by the reader of the file, which alone holds them.
     /// </summary>
     UnknownGateway,
+
+    /// <summary>Its RD Gateway is a host <see cref="SchemaValidator.IsValidHost"/> refuses.</summary>
+    InvalidRdGateway,
 }

@@ -104,8 +104,9 @@ public static partial class MobaXtermImporter
     /// the session.</para>
     /// <para>Type 4 (RDP) is kept from the existing realistic RDP fixture, which carries host, port
     /// and user at 0-2 and its SSH gateway at 12-14. It has no login command. MobaXterm offers no
-    /// proxy for an RDP session: its other route is an RD Gateway, whose server at 19 is measured
-    /// on sessions created in the MobaXterm interface and read only to refuse the session.</para>
+    /// proxy for an RDP session: its other route is an RD Gateway, measured on sessions created in
+    /// the MobaXterm interface. The gateway server sits at 19, and field 30 packs the gateway
+    /// settings (see <see cref="ReadRdGateway"/>).</para>
     /// <para>Types 1 (Telnet), 5 (VNC) and 7 (SFTP) are measured on sessions created in the
     /// MobaXterm interface. A Telnet session carries a login at index 2, but no Heimdall consumer
     /// reads it: Telnet asks for its login in the terminal, so it is not imported. A VNC session
@@ -122,7 +123,7 @@ public static partial class MobaXtermImporter
             LoginCommandIndex: 6,
             Gateway: new GatewaySlot(HostIndex: 7, PortIndex: 8, UserIndex: 9),
             Proxy: new ProxySlot(TypeIndex: 18, HostIndex: 19),
-            RdGatewayHostIndex: null),
+            RdGateway: null),
         [1] = new SessionLayout(
             TelnetConnectionType,
             DefaultPorts.Telnet,
@@ -130,7 +131,7 @@ public static partial class MobaXtermImporter
             LoginCommandIndex: null,
             Gateway: new GatewaySlot(HostIndex: 5, PortIndex: 6, UserIndex: 7),
             Proxy: new ProxySlot(TypeIndex: 10, HostIndex: 11),
-            RdGatewayHostIndex: null),
+            RdGateway: null),
         [4] = new SessionLayout(
             RdpConnectionType,
             DefaultPorts.Rdp,
@@ -138,7 +139,7 @@ public static partial class MobaXtermImporter
             LoginCommandIndex: null,
             Gateway: new GatewaySlot(HostIndex: 12, PortIndex: 13, UserIndex: 14),
             Proxy: null,
-            RdGatewayHostIndex: 19),
+            RdGateway: new RdGatewaySlot(HostIndex: 19, SettingsIndex: 30)),
         [5] = new SessionLayout(
             VncConnectionType,
             DefaultPorts.Vnc,
@@ -146,7 +147,7 @@ public static partial class MobaXtermImporter
             LoginCommandIndex: null,
             Gateway: new GatewaySlot(HostIndex: 4, PortIndex: 5, UserIndex: 6),
             Proxy: new ProxySlot(TypeIndex: 12, HostIndex: 13),
-            RdGatewayHostIndex: null),
+            RdGateway: null),
         [7] = new SessionLayout(
             SftpConnectionType,
             DefaultPorts.Sftp,
@@ -154,7 +155,7 @@ public static partial class MobaXtermImporter
             LoginCommandIndex: null,
             Gateway: null,
             Proxy: new ProxySlot(TypeIndex: 9, HostIndex: 10),
-            RdGatewayHostIndex: null),
+            RdGateway: null),
     };
 
     private const int HostIndex = 0;
@@ -162,6 +163,23 @@ public static partial class MobaXtermImporter
 
     // MobaXterm writes "0" in a proxy type field that names no proxy.
     private const string NoProxyType = "0";
+
+    // The RD Gateway settings field, "flags,mode,server,login,?,auth,", by position once split on
+    // ','. Measured on MobaXterm Personal v25.4.
+    private const char RdGatewaySettingsSeparator = ',';
+    private const int RdGatewayModePart = 1;
+    private const int RdGatewayServerPart = 2;
+    private const int RdGatewayAuthPart = 5;
+
+    // "Use RDP gateway": Never 0, Detect 1, Always 2. Never and Detect clear the server.
+    private const int RdGatewayModeAlways = 2;
+
+    /// <summary>
+    /// The gateway sign-ins Heimdall reproduces: 0 "Same as end server", 1 "Prompt during
+    /// connection" and 2 "Specify login/password" all sign in to the gateway with a password,
+    /// which the RDP control asks for. 3 "Use smartcard" and any other code are not reproduced.
+    /// </summary>
+    private static readonly HashSet<int> PasswordRdGatewayAuths = [0, 1, 2];
 
     /// <summary>
     /// Parses a MobaXterm session file with the default identifier prefix and no variable resolver.
@@ -308,11 +326,25 @@ public static partial class MobaXtermImporter
             }
         }
 
-        if (layout.RdGatewayHostIndex is { } rdGatewayIndex
-            && FieldAt(line.Fields, rdGatewayIndex).Trim() is { Length: > 0 } rdGatewayHost)
+        string? rdGateway = null;
+        if (layout.RdGateway is { } rdGatewaySlot)
         {
-            context.Warn(section, sessionName, MobaXtermImportWarningKind.RdGatewayNotSupported, rdGatewayHost);
-            return;
+            RdGatewayRoute route = ReadRdGateway(line.Fields, rdGatewaySlot);
+            if (!route.Reproducible)
+            {
+                context.Warn(section, sessionName, MobaXtermImportWarningKind.RdGatewayNotSupported, route.Server);
+                return;
+            }
+
+            if (route.Server.Length > 0)
+            {
+                rdGateway = ImportedProfileValidator.CanonicalizeHost(route.Server);
+                if (rdGateway is null)
+                {
+                    context.Warn(section, sessionName, MobaXtermImportWarningKind.InvalidGatewayHost, route.Server);
+                    return;
+                }
+            }
         }
 
         string profileId = BuildId(context.Options.IdPrefix, ProfileIdDomain, group, sessionName);
@@ -357,6 +389,7 @@ public static partial class MobaXtermImporter
             ConnectionType = layout.ConnectionType,
             UseDirectConnection = gatewayId is null,
             SshGatewayId = gatewayId,
+            RdpGateway = rdGateway,
             Group = string.IsNullOrWhiteSpace(group) ? null : group,
             Tags = BuildTags(line.Comment),
         };
@@ -428,6 +461,40 @@ public static partial class MobaXtermImporter
 
         dto.PostConnectSteps = [new PostConnectStep { Input = command }];
     }
+
+    /// <summary>
+    /// Reads the RD Gateway of an RDP session and decides whether Heimdall can take that route.
+    /// </summary>
+    /// <remarks>
+    /// <para>Measured: "Never" and "Detect" leave the server empty in both fields, "Always" writes
+    /// it in both, and a session never given gateway settings has no settings field at all.</para>
+    /// <para>A session that names no server has no gateway to go through and stays direct, as it
+    /// does in MobaXterm. A session that names one is reproduced only when the settings field
+    /// confirms "Always", the same server and a password sign-in. Anything else (a smart card, a
+    /// mode or sign-in code not measured, a settings field that is missing or names another
+    /// server) is a route Heimdall cannot take as written, so the session is refused rather than
+    /// imported as a direct connection that would go around the gateway.</para>
+    /// </remarks>
+    private static RdGatewayRoute ReadRdGateway(string[] fields, RdGatewaySlot slot)
+    {
+        string server = FieldAt(fields, slot.HostIndex).Trim();
+        string[] settings = FieldAt(fields, slot.SettingsIndex).Split(RdGatewaySettingsSeparator);
+        string settingsServer = FieldAt(settings, RdGatewayServerPart).Trim();
+        if (server.Length == 0 && settingsServer.Length == 0)
+        {
+            return new RdGatewayRoute(string.Empty, Reproducible: true);
+        }
+
+        bool reproducible = string.Equals(server, settingsServer, StringComparison.OrdinalIgnoreCase)
+            && TryParseCode(FieldAt(settings, RdGatewayModePart), out int mode)
+            && mode == RdGatewayModeAlways
+            && TryParseCode(FieldAt(settings, RdGatewayAuthPart), out int auth)
+            && PasswordRdGatewayAuths.Contains(auth);
+        return new RdGatewayRoute(server.Length > 0 ? server : settingsServer, reproducible);
+    }
+
+    private static bool TryParseCode(string value, out int code) =>
+        int.TryParse(value.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out code);
 
     private static string? BuildTags(string? comment)
     {
@@ -610,13 +677,22 @@ public static partial class MobaXtermImporter
         int? LoginCommandIndex,
         GatewaySlot? Gateway,
         ProxySlot? Proxy,
-        int? RdGatewayHostIndex);
+        RdGatewaySlot? RdGateway);
 
     /// <summary>The three fields of a jump host, which are present together or not at all.</summary>
     private sealed record GatewaySlot(int HostIndex, int PortIndex, int UserIndex);
 
     /// <summary>The proxy type and proxy host fields of a session.</summary>
     private sealed record ProxySlot(int TypeIndex, int HostIndex);
+
+    /// <summary>The RD Gateway server field and the packed gateway settings field of a session.</summary>
+    private sealed record RdGatewaySlot(int HostIndex, int SettingsIndex);
+
+    /// <summary>
+    /// The RD Gateway server a session names (empty for none), and whether Heimdall can take the
+    /// route as the file describes it.
+    /// </summary>
+    private readonly record struct RdGatewayRoute(string Server, bool Reproducible);
 
     private sealed record IniSection(string Name, List<KeyValuePair<string, string>> Entries);
 
@@ -772,8 +848,9 @@ public enum MobaXtermImportWarningKind
     ProxyNotSupported,
 
     /// <summary>
-    /// The RDP session goes through an RD Gateway, which this importer does not carry over yet;
-    /// not imported, since a direct connection would go around the gateway.
+    /// The RDP session goes through an RD Gateway in a way Heimdall does not reproduce (a smart
+    /// card sign-in, or a gateway setting not recognised); not imported, since a direct connection
+    /// would go around the gateway. A gateway reached with a password is imported.
     /// </summary>
     RdGatewayNotSupported,
 
