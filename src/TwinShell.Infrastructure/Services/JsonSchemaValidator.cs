@@ -346,10 +346,76 @@ public static class JsonSchemaValidator
             "updatedAt": {
                 "type": ["string", "null"],
                 "format": "date-time"
+            },
+            "translations": {
+                "type": ["object", "null"],
+                "maxProperties": 20,
+                "propertyNames": {
+                    "pattern": "^[a-z]{2}$"
+                },
+                "additionalProperties": {
+                    "$ref": "#/$defs/translation"
+                }
             }
         },
         "additionalProperties": false,
         "$defs": {
+            "translation": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "description": {
+                        "type": "string",
+                        "maxLength": 2000
+                    },
+                    "notes": {
+                        "type": "string",
+                        "maxLength": 5000
+                    },
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "windows": {
+                                "$ref": "#/$defs/parameterTranslations"
+                            },
+                            "linux": {
+                                "$ref": "#/$defs/parameterTranslations"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "examples": {
+                        "type": "object",
+                        "maxProperties": 50,
+                        "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 500
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "parameterTranslations": {
+                "type": "object",
+                "maxProperties": 50,
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                            "maxLength": 200
+                        },
+                        "description": {
+                            "type": "string",
+                            "maxLength": 500
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
             "example": {
                 "type": "object",
                 "required": ["command"],

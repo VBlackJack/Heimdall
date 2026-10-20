@@ -42,6 +42,17 @@ public static class TwinShellSchema
 
     private const string ActionsTableName = "Actions";
 
+    private const string ActionTranslationsTableName = "ActionTranslations";
+
+    // The translated parameter labels and example descriptions, added when the shipped
+    // catalogue started carrying its French beside an English pivot. Default '{}' matches the
+    // entity initializers, so a translation row that predates them still materialises.
+    private static readonly string[] TranslationTextColumns =
+    [
+        "ParametersJson",
+        "ExamplesJson"
+    ];
+
     private static readonly string[] PublicIdTables =
     [
         ActionsTableName,
@@ -66,6 +77,7 @@ public static class TwinShellSchema
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             [ActionsTableName] = [PublicIdColumnName, "WindowsExamplesJson", "LinuxExamplesJson"],
+            [ActionTranslationsTableName] = ["ParametersJson", "ExamplesJson"],
             ["CommandBatches"] = [PublicIdColumnName],
             ["CustomCategories"] = [PublicIdColumnName],
             ["CommandTemplates"] = [PublicIdColumnName]
@@ -85,7 +97,11 @@ public static class TwinShellSchema
         new SchemaStep(
             4,
             "Per-platform example columns on Actions",
-            ApplyPlatformExampleColumnsAsync)
+            ApplyPlatformExampleColumnsAsync),
+        new SchemaStep(
+            5,
+            "Translated parameter and example columns on ActionTranslations",
+            ApplyTranslationTextColumnsAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -139,6 +155,50 @@ public static class TwinShellSchema
                 transaction,
                 "ALTER TABLE " + ActionsTableName + " ADD COLUMN " + columnName
                 + " TEXT NOT NULL DEFAULT '[]'",
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Adds the translated parameter and example columns to <c>ActionTranslations</c> when
+    /// they are missing.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent by existence test, like <see cref="ApplyPlatformExampleColumnsAsync"/>. No
+    /// row is backfilled: a translation that predates the columns had no parameter or example
+    /// text to carry, and the DEFAULT says exactly that. A database without the table at all
+    /// is left alone: <c>EnsureCreated</c> writes the table whole, columns included, the
+    /// first time it creates it.
+    /// </remarks>
+    private static async Task ApplyTranslationTextColumnsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        if (!await TableExistsAsync(connection, transaction, ActionTranslationsTableName, cancellationToken))
+        {
+            return;
+        }
+
+        foreach (string columnName in TranslationTextColumns)
+        {
+            bool exists = await ColumnExistsAsync(
+                connection,
+                transaction,
+                ActionTranslationsTableName,
+                columnName,
+                cancellationToken);
+
+            if (exists)
+            {
+                continue;
+            }
+
+            await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                "ALTER TABLE " + ActionTranslationsTableName + " ADD COLUMN " + columnName
+                + " TEXT NOT NULL DEFAULT '{}'",
                 cancellationToken);
         }
     }
@@ -590,6 +650,25 @@ public static class TwinShellSchema
         object? result = await command.ExecuteScalarAsync(cancellationToken);
         int existingColumnCount = Convert.ToInt32(result, CultureInfo.InvariantCulture);
         return existingColumnCount > 0;
+    }
+
+    private static async Task<bool> TableExistsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        string tableName,
+        CancellationToken cancellationToken)
+    {
+        await using DbCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @name";
+
+        DbParameter nameParameter = command.CreateParameter();
+        nameParameter.ParameterName = "@name";
+        nameParameter.Value = tableName;
+        command.Parameters.Add(nameParameter);
+
+        object? result = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(result, CultureInfo.InvariantCulture) > 0;
     }
 
     private static void EnsureKnownColumn(string tableName, string columnName)

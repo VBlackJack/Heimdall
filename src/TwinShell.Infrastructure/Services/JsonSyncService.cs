@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
@@ -265,7 +266,8 @@ public sealed class JsonSyncService : SyncServiceBase
                         Url = l.Url
                     }).ToList(),
                     IsUserCreated = action.IsUserCreated,
-                    UpdatedAt = action.UpdatedAt
+                    UpdatedAt = action.UpdatedAt,
+                    Translations = action.Translations is { Count: > 0 } ? action.Translations : null
                 };
 
                 var fileName = BuildEntityFileName(action.Title, action.PublicId);
@@ -704,6 +706,7 @@ public sealed class JsonSyncService : SyncServiceBase
                     existing.Links = ParseLinks(model.Links);
                     existing.IsUserCreated = model.IsUserCreated;
                     existing.UpdatedAt = normalizedUpdatedAt ?? nowUtc;
+                    existing.Translations = model.Translations ?? new List<ActionTranslation>();
 
                     await _actionRepository.UpdateAsync(existing);
                     result.ActionsUpdated++;
@@ -730,7 +733,8 @@ public sealed class JsonSyncService : SyncServiceBase
                         Links = ParseLinks(model.Links),
                         IsUserCreated = model.IsUserCreated,
                         CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = normalizedUpdatedAt ?? nowUtc
+                        UpdatedAt = normalizedUpdatedAt ?? nowUtc,
+                        Translations = model.Translations ?? new List<ActionTranslation>()
                     };
                     await _actionRepository.AddAsync(action);
                     result.ActionsCreated++;
@@ -1232,6 +1236,14 @@ public sealed class JsonSyncService : SyncServiceBase
         public bool IsUserCreated { get; set; }
         /// <summary>Timestamp for conflict detection during sync</summary>
         public DateTime? UpdatedAt { get; set; }
+
+        /// <summary>
+        /// Other languages of the text above, in the same shape as the shipped seeds and the
+        /// library export: an object keyed by culture. Null, and so absent from the file,
+        /// when the action has none.
+        /// </summary>
+        [JsonConverter(typeof(ActionTranslationsJsonConverter))]
+        public List<ActionTranslation>? Translations { get; set; }
     }
 
     private sealed class ExampleModel

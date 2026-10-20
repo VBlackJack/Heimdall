@@ -52,6 +52,24 @@ public sealed class ActionTranslation
     public string? Notes { get; set; }
 
     /// <summary>
+    /// Translated label and help text of the Windows template's parameters, keyed by
+    /// parameter name. A parameter absent here keeps its pivot text.
+    /// </summary>
+    public Dictionary<string, ParameterTranslation> WindowsParameters { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Translated label and help text of the Linux template's parameters, keyed by
+    /// parameter name. A parameter absent here keeps its pivot text.
+    /// </summary>
+    public Dictionary<string, ParameterTranslation> LinuxParameters { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Translated example descriptions, keyed by the exact example command text. An example
+    /// absent here keeps its pivot description.
+    /// </summary>
+    public Dictionary<string, string> ExampleDescriptions { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>
     /// Navigation property to action
     /// </summary>
     public Action? Action { get; set; }

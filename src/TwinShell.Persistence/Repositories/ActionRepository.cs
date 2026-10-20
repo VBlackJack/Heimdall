@@ -50,6 +50,7 @@ public sealed class ActionRepository : IActionRepository
             .AsNoTracking()
             .Include(a => a.WindowsCommandTemplate)
             .Include(a => a.LinuxCommandTemplate)
+            .Include(a => a.Translations)
             .ToListAsync();
 
         return entities.Select(ActionMapper.ToModel);
@@ -62,6 +63,7 @@ public sealed class ActionRepository : IActionRepository
             .AsNoTracking()
             .Include(a => a.WindowsCommandTemplate)
             .Include(a => a.LinuxCommandTemplate)
+            .Include(a => a.Translations)
             .FirstOrDefaultAsync(a => a.Id == id);
 
         return entity != null ? ActionMapper.ToModel(entity) : null;
@@ -74,6 +76,7 @@ public sealed class ActionRepository : IActionRepository
             .AsNoTracking()
             .Include(a => a.WindowsCommandTemplate)
             .Include(a => a.LinuxCommandTemplate)
+            .Include(a => a.Translations)
             .Where(a => a.Category == category)
             .ToListAsync();
 
@@ -215,8 +218,16 @@ public sealed class ActionRepository : IActionRepository
                 trackedAction.State = EntityState.Detached;
             }
 
+            var translations = DetachTranslations(entity);
             _context.Actions.Update(entity);
+
+            await using var transaction = await BeginTransactionIfNoneAsync();
+            await ReplaceTranslationsAsync([entity.Id], translations);
             await _context.SaveChangesAsync();
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync();
+            }
 
             // Invalidate cache since category may have changed
             InvalidateCategoriesCache();
@@ -311,6 +322,7 @@ public sealed class ActionRepository : IActionRepository
             .AsNoTracking()
             .Include(a => a.WindowsCommandTemplate)
             .Include(a => a.LinuxCommandTemplate)
+            .Include(a => a.Translations)
             .FirstOrDefaultAsync(a => a.PublicId == publicId);
 
         return entity != null ? ActionMapper.ToModel(entity) : null;
@@ -325,6 +337,7 @@ public sealed class ActionRepository : IActionRepository
             .AsNoTracking()
             .Include(a => a.WindowsCommandTemplate)
             .Include(a => a.LinuxCommandTemplate)
+            .Include(a => a.Translations)
             .ToListAsync();
 
         return entities.Select(ActionMapper.ToModel);
@@ -437,10 +450,17 @@ public sealed class ActionRepository : IActionRepository
                 }
             }
 
+            var translations = entities.SelectMany(DetachTranslations).ToList();
             _context.Actions.UpdateRange(entities);
 
             // Single SaveChanges for all operations
+            await using var transaction = await BeginTransactionIfNoneAsync();
+            await ReplaceTranslationsAsync(entities.Select(e => e.Id).ToList(), translations);
             await _context.SaveChangesAsync();
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync();
+            }
 
             // Invalidate cache
             InvalidateCategoriesCache();
@@ -450,5 +470,59 @@ public sealed class ActionRepository : IActionRepository
             _logger.LogError(ex, "Database error while batch updating {Count} actions", actions.Count());
             throw;
         }
+    }
+
+    /// <summary>
+    /// Takes the translation rows off <paramref name="entity"/> so an <c>Update</c> of the
+    /// action does not mark them as existing rows to modify.
+    /// </summary>
+    /// <remarks>
+    /// An update replaces the action's set of translations rather than merging it: a culture
+    /// dropped from the action has to leave the database too, and the rows carry fresh ids
+    /// whenever they come from a file.
+    /// </remarks>
+    private static List<Entities.ActionTranslationEntity> DetachTranslations(Entities.ActionEntity entity)
+    {
+        var translations = entity.Translations.ToList();
+        entity.Translations = new();
+        return translations;
+    }
+
+    /// <summary>
+    /// Deletes the stored translations of <paramref name="actionIds"/> and queues
+    /// <paramref name="translations"/> in their place, to be written by the caller's
+    /// <c>SaveChanges</c>.
+    /// </summary>
+    private async Task ReplaceTranslationsAsync(
+        IReadOnlyCollection<string> actionIds,
+        List<Entities.ActionTranslationEntity> translations)
+    {
+        foreach (var tracked in _context.ChangeTracker.Entries<Entities.ActionTranslationEntity>()
+            .Where(e => actionIds.Contains(e.Entity.ActionId))
+            .ToList())
+        {
+            tracked.State = EntityState.Detached;
+        }
+
+        await _context.ActionTranslations
+            .Where(t => actionIds.Contains(t.ActionId))
+            .ExecuteDeleteAsync();
+
+        _context.ActionTranslations.AddRange(translations);
+    }
+
+    /// <summary>
+    /// Opens a transaction when the caller has not, so the delete of the old translations and
+    /// the save of the new ones land together. Returns null when one is already open: the
+    /// caller that opened it owns the commit.
+    /// </summary>
+    private async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction?> BeginTransactionIfNoneAsync()
+    {
+        if (_context.Database.CurrentTransaction is not null)
+        {
+            return null;
+        }
+
+        return await _context.Database.BeginTransactionAsync();
     }
 }
