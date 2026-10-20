@@ -538,6 +538,106 @@ public sealed class CommandGeneratorServiceTests
         command.Should().NotContain("''A B''", $"{fileName} / {templateName} / {parameterName} must not double-wrap");
     }
 
+    // A-02: every shipped template opens with the defaults it ships, so each one has to
+    // validate and generate with exactly those values. The value dictionary is what the
+    // Command Library view model starts from (GetInitialParameterValue): the default, or an
+    // empty string when there is none. A required parameter with no default is the one
+    // error allowed, because the operator is expected to fill it; any other error (a
+    // refused character, a malformed number) means the action opens broken.
+    [Theory]
+    [MemberData(nameof(EverySeedTemplate))]
+    public void GenerateCommand_EverySeedTemplate_AcceptsItsShippedDefaults(string seedTemplate)
+    {
+        string[] parts = seedTemplate.Split(" / ", StringSplitOptions.None);
+        CommandTemplate template = LoadSeedTemplate(parts[0], parts[1]);
+        CommandGeneratorService service = CreateService();
+
+        Dictionary<string, string> values = new(StringComparer.Ordinal);
+        List<string> expectedRequiredErrors = [];
+        foreach (TemplateParameter parameter in template.Parameters)
+        {
+            values[parameter.Name] = parameter.DefaultValue ?? string.Empty;
+            if (parameter.Required && string.IsNullOrWhiteSpace(values[parameter.Name]))
+            {
+                expectedRequiredErrors.Add(
+                    string.Format(System.Globalization.CultureInfo.InvariantCulture, MessageKeys.ValidationParameterRequired, parameter.Label));
+            }
+        }
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().BeEquivalentTo(
+            expectedRequiredErrors,
+            $"{seedTemplate} must validate with its shipped defaults; only an empty required field may be reported");
+
+        // The operator fills the required fields before generating; every other value keeps
+        // its shipped default, so generation still exercises each default.
+        foreach (TemplateParameter parameter in template.Parameters.Where(parameter =>
+            parameter.Required && string.IsNullOrWhiteSpace(values[parameter.Name])))
+        {
+            values[parameter.Name] = parameter.IsChoice
+                ? parameter.AllowedValues![0]
+                : SafeValueForParameter(parameter);
+        }
+
+        Func<string> generate = () => service.GenerateCommand(template, values);
+        if (OverlongShippedTemplates.Contains(seedTemplate))
+        {
+            // Pinned from the other side too: once one of these is shortened, this assertion
+            // fails and the entry has to leave the list, so the list cannot outlive the defect.
+            generate.Should().Throw<InvalidOperationException>(
+                    $"{seedTemplate} is listed as longer than the generator accepts; remove it from the list once it fits")
+                .WithMessage($"*{ValidationConstants.MaxCommandLength}*");
+            return;
+        }
+
+        generate.Should().NotThrow($"{seedTemplate} must generate with its shipped defaults");
+    }
+
+    /// <summary>
+    /// Shipped templates whose pattern alone is longer than
+    /// <see cref="ValidationConstants.MaxCommandLength"/>, so they cannot generate whatever
+    /// the values. Found by the theory above; they open on a generation error today.
+    /// Whether the bound or the scripts should change is an open decision, not this test's
+    /// to make, so the list records the defect instead of hiding it.
+    /// </summary>
+    private static readonly HashSet<string> OverlongShippedTemplates = new(StringComparer.Ordinal)
+    {
+        "win-perf-201.json / windowsCommandTemplate",
+        "win-perf-403.json / windowsCommandTemplate",
+        "win-perf-404.json / windowsCommandTemplate",
+        "win-privacy-101.json / windowsCommandTemplate",
+        "win-privacy-203.json / windowsCommandTemplate",
+        "win-privacy-205.json / windowsCommandTemplate",
+        "win-privacy-206.json / windowsCommandTemplate",
+        "win-privacy-303.json / windowsCommandTemplate",
+        "win-privacy-304.json / windowsCommandTemplate",
+    };
+
+    public static IEnumerable<object[]> EverySeedTemplate()
+    {
+        string seedActionsDirectory = FindSeedActionsDirectory();
+        foreach (string filePath in Directory.EnumerateFiles(seedActionsDirectory, "*.json").OrderBy(path => path, StringComparer.Ordinal))
+        {
+            ActionModel? action = JsonSerializer.Deserialize<ActionModel>(File.ReadAllText(filePath), JsonOptionsHelper.CaseInsensitive);
+            if (action == null)
+            {
+                continue;
+            }
+
+            string fileName = Path.GetFileName(filePath);
+            if (action.WindowsCommandTemplate != null)
+            {
+                yield return new object[] { fileName + " / windowsCommandTemplate" };
+            }
+
+            if (action.LinuxCommandTemplate != null)
+            {
+                yield return new object[] { fileName + " / linuxCommandTemplate" };
+            }
+        }
+    }
+
     // D2 Lot B step 2b: seed driveLetter parameters must be validated bare values.
     // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
     [Theory]
