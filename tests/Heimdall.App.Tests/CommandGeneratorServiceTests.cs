@@ -1005,18 +1005,68 @@ public sealed class CommandGeneratorServiceTests
         Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
     }
 
+    // E-01: a path is checked by its shape, not resolved on this machine. The rows that
+    // relied on the local AppData folders (tilde, percent sign, traversal, relative path,
+    // Desktop/Downloads/Documents) are retired on purpose: the command runs elsewhere, the
+    // value is quoted like a string, and all of those are literal text inside the quotes.
     public static IEnumerable<object[]> InvalidPaths()
     {
-        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        yield return new object[] { "   " };                                                         // blank
+        yield return new object[] { "/var/log/" + (char)0 + "syslog" };                               // NUL
+        yield return new object[] { "/var/log/syslog\nrm -rf /" };                                    // line feed
+        yield return new object[] { "C:\\inetpub\\wwwroot\r" };                                       // carriage return
+        yield return new object[] { "C:\\" + new string('a', ValidationConstants.MaxPathLength) };   // over the bound
+    }
 
-        yield return new object[] { "~/secret.txt" };                                              // tilde expansion
-        yield return new object[] { "%APPDATA%\\secret.txt" };                                      // env-var expansion
-        yield return new object[] { Path.Combine(appData, "..", "..", "..", "..", "evil.txt") };    // traversal out of allowed base
-        yield return new object[] { Path.Combine("relative", "path", "file.txt") };                 // non-rooted (relative)
-        yield return new object[] { Path.Combine(userProfile, "Desktop", "evil.txt") };             // blocked subfolder
-        yield return new object[] { Path.Combine(userProfile, "Downloads", "evil.txt") };           // blocked subfolder
-        yield return new object[] { Path.Combine(userProfile, "Documents", "evil.txt") };           // blocked subfolder
+    // E-01: paths of another machine validate and come out quoted, on both platforms.
+    [Theory]
+    [InlineData("/var/log/syslog")]
+    [InlineData("/etc/nginx/nginx.conf")]
+    [InlineData("C:\\inetpub\\wwwroot")]
+    [InlineData("C:\\Program Files (x86)\\App")]
+    [InlineData("~/backup")]
+    [InlineData("relative/dir")]
+    public void GenerateCommand_RemotePath_ValidatesAndComesOutQuoted(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate windows = WindowsTemplate(
+            "Get-Item -Path {p}",
+            CommandLibraryTestHelpers.RequiredParameter("p", "Path", "path"));
+        CommandTemplate linux = LinuxTemplate(
+            "tail -n 50 {p}",
+            CommandLibraryTestHelpers.RequiredParameter("p", "Path", "path"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["p"] = value };
+
+        service.ValidateParameters(windows, values, out List<string> windowsErrors);
+        service.ValidateParameters(linux, values, out List<string> linuxErrors);
+
+        windowsErrors.Should().BeEmpty();
+        linuxErrors.Should().BeEmpty();
+        service.GenerateCommand(windows, values).Should().Be("Get-Item -Path '" + value + "'");
+        service.GenerateCommand(linux, values).Should().Be("tail -n 50 '" + value + "'");
+    }
+
+    // E-01: the localized path reports the same refusals as the generation path.
+    [Theory]
+    [MemberData(nameof(InvalidPaths))]
+    public void ValidateParameters_InvalidPath_ReportsInvalidPath(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LinuxTemplate(
+            "tail {p}",
+            CommandLibraryTestHelpers.RequiredParameter("p", "Path", "path"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["p"] = value };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            // A blank required value is reported as missing, not as malformed.
+            errors.Should().Equal(MessageKeys.ValidationParameterRequired);
+            return;
+        }
+
+        errors.Should().Equal(MessageKeys.ValidationParameterInvalidPath);
     }
 
     // ===== TEST-01: ValidateParameters localized path (line 120) =====

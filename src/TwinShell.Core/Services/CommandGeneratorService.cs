@@ -15,7 +15,6 @@
  */
 
 using System.Globalization;
-using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -263,8 +262,11 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                     case "path":
                         if (!IsValidPath(value))
                         {
-                            // BUGFIX: Replace hardcoded French message with localization
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterInvalidPath, parameter.Label));
+                        }
+                        else if (ContainsRefusedCharacters(template, parameter, value))
+                        {
+                            errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterDangerousCharacters, parameter.Label));
                         }
                         break;
                 }
@@ -370,6 +372,11 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                     error = "Invalid path format";
                     return false;
                 }
+                if (ContainsRefusedCharacters(template, parameter, value))
+                {
+                    error = "Contains dangerous characters";
+                    return false;
+                }
                 break;
 
             case "string":
@@ -466,73 +473,21 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     }
 
     /// <summary>
-    /// Validates path format and prevents path traversal
-    /// SECURITY FIX: Now validates that path is within allowed base directories
+    /// True when <paramref name="value"/> has the shape of a path: not blank, no control
+    /// character, and no longer than <see cref="ValidationConstants.MaxPathLength"/>.
     /// </summary>
-    private bool IsValidPath(string value)
+    /// <remarks>
+    /// The check is syntactic on purpose. The command runs on another machine, a Linux
+    /// server or a remote Windows host, so resolving the value against this machine's file
+    /// system said nothing about it: the old rule accepted only paths under the local
+    /// AppData folders and refused /var/log/syslog and C:\inetpub. A path is quoted exactly
+    /// like a string, so a tilde, a percent sign or a relative path is literal text.
+    /// </remarks>
+    private static bool IsValidPath(string value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return false;
-
-        try
-        {
-            // SECURITY: Check for tilde expansion attempts (shell-specific)
-            if (value.Contains("~"))
-                return false;
-
-            // SECURITY: Check for Windows environment variables that could be exploited
-            if (value.Contains("%"))
-                return false;
-
-            // SECURITY: Improved path traversal validation
-            // Get the full normalized path
-            var fullPath = Path.GetFullPath(value);
-            var normalizedInput = Path.GetFullPath(value.Replace("/", Path.DirectorySeparatorChar.ToString()));
-
-            // Check that normalization didn't reveal path traversal attempts
-            // by ensuring the normalized path matches what we expect
-            if (!fullPath.Equals(normalizedInput, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            // Verify path is rooted (absolute path)
-            if (!Path.IsPathRooted(fullPath))
-                return false;
-
-            // SECURITY FIX: Validate that path is within allowed base directories
-            // Only allow paths within user's AppData or LocalAppData folders (not full UserProfile)
-            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var blockedSubfolders = new[] { "Desktop", "Downloads", "Documents" };
-
-            var allowedBases = new[]
-            {
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-            };
-
-            // Block dangerous subfolders within UserProfile
-            foreach (var blocked in blockedSubfolders)
-            {
-                var blockedPath = Path.Combine(userProfile, blocked);
-                if (fullPath.StartsWith(Path.GetFullPath(blockedPath), StringComparison.OrdinalIgnoreCase))
-                    return false;
-            }
-
-            var isInAllowedDirectory = allowedBases.Any(baseDir =>
-            {
-                var normalizedBase = Path.GetFullPath(baseDir);
-                return fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase) &&
-                       (fullPath.Length == normalizedBase.Length ||
-                        fullPath[normalizedBase.Length] == Path.DirectorySeparatorChar ||
-                        fullPath[normalizedBase.Length] == Path.AltDirectorySeparatorChar);
-            });
-
-            return isInAllowedDirectory;
-        }
-        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
-        {
-            // Path validation failed - treat as invalid
-            return false;
-        }
+        return !string.IsNullOrWhiteSpace(value)
+            && value.Length <= ValidationConstants.MaxPathLength
+            && !value.Any(char.IsControl);
     }
 
     /// <summary>
