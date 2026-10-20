@@ -372,6 +372,7 @@ public sealed class SharedSessionImportReportTests : IDisposable
         string unknown = Explain(MobaXtermImportWarningKind.UnsupportedSessionType, "999");
         string jump = Explain(MobaXtermImportWarningKind.JumpHostNotSupported, "jump.example.test");
         string proxy = Explain(MobaXtermImportWarningKind.ProxyNotSupported, "proxy.example.test");
+        string rdGateway = Explain(MobaXtermImportWarningKind.RdGatewayNotSupported, "rdgw.example.test");
 
         Assert.Equal(localizer["SharedReportSkipWslType"], wsl);
         Assert.Equal(localizer["SharedReportSkipFtpType"], ftp);
@@ -382,7 +383,9 @@ public sealed class SharedSessionImportReportTests : IDisposable
         Assert.Contains("jump.example.test", jump, StringComparison.Ordinal);
         Assert.Equal(localizer.Format("SharedReportSkipProxy", "proxy.example.test"), proxy);
         Assert.Contains("proxy.example.test", proxy, StringComparison.Ordinal);
-        Assert.Equal(5, new[] { wsl, ftp, unknown, jump, proxy }.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(localizer.Format("SharedReportSkipRdGateway", "rdgw.example.test"), rdGateway);
+        Assert.Contains("rdgw.example.test", rdGateway, StringComparison.Ordinal);
+        Assert.Equal(6, new[] { wsl, ftp, unknown, jump, proxy, rdGateway }.Distinct(StringComparer.Ordinal).Count());
         Assert.DoesNotContain("SSH and RDP", localizer["SharedReportRefusedProtocol"], StringComparison.Ordinal);
     }
 

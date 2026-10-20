@@ -96,8 +96,9 @@ The report only informs: every session it lists is still loaded as the file desc
   - **WSL**: a Linux system on the computer that runs MobaXterm, so there is nothing to connect to.
   - **Serial, Mosh, RSH, Xdmcp, Browser, Shell, File and S3**: not imported.
   - **A Telnet or VNC session through an SSH jump host**: skipped, because Heimdall does not route these protocols through a jump host and a direct connection would go around the bastion.
-  - **A Telnet, VNC or SFTP session through a proxy**: skipped, because Heimdall does not use a proxy for these protocols and a direct connection would go around the proxy.
-- The proxy of an SSH or RDP session is not read: such a session is imported as a direct connection or through its jump host.
+  - **An SSH, Telnet, VNC or SFTP session through a proxy**: skipped, because Heimdall does not use a proxy for these protocols and a direct connection would go around the proxy.
+  - **An RDP session through an RD Gateway**: skipped, because the RD Gateway of a MobaXterm session is not imported yet and a direct connection would go around the gateway.
+- MobaXterm has no proxy setting for an RDP session: its only other route is the RD Gateway above.
 - A Telnet session asks for its login in the terminal, so no user is imported for it.
 - Network tools (ping, port scan and the other tools that can go through a gateway) route only through your own SSH gateways from the settings, not through the bastions a shared source defines. To reach hosts behind a shared bastion from a tool, define that bastion as one of your own gateways.
 - The remote start folder of an SFTP session is not carried over: the session opens in the default folder.
