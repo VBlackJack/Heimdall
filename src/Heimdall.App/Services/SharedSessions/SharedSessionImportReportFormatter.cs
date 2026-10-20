@@ -194,6 +194,7 @@ public sealed class SharedSessionImportReportFormatter
         SharedProfileRefusal.InvalidHost => _localizer.Format("SharedReportRefusedHost", detail),
         SharedProfileRefusal.ForeignGateway => _localizer.Format("SharedReportRefusedForeignGateway", detail),
         SharedProfileRefusal.UnknownGateway => _localizer.Format("SharedReportRefusedUnknownGateway", detail),
+        SharedProfileRefusal.InvalidRdGateway => _localizer.Format("SharedReportRefusedRdGateway", detail),
         _ => _localizer["SharedReportSkipRefused"],
     };
 }

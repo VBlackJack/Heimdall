@@ -343,6 +343,7 @@ public sealed class SharedSessionImportReportTests : IDisposable
             [SharedProfileRefusal.InvalidHost] = localizer.Format("SharedReportRefusedHost", "value"),
             [SharedProfileRefusal.ForeignGateway] = localizer.Format("SharedReportRefusedForeignGateway", "value"),
             [SharedProfileRefusal.UnknownGateway] = localizer.Format("SharedReportRefusedUnknownGateway", "value"),
+            [SharedProfileRefusal.InvalidRdGateway] = localizer.Format("SharedReportRefusedRdGateway", "value"),
         };
 
         Assert.Equal(Enum.GetValues<SharedProfileRefusal>().Order(), expected.Keys.Order());

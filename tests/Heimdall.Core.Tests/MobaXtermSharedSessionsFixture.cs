@@ -155,18 +155,33 @@ internal static class MobaXtermSharedSessionsFixture
         """;
 
     /// <summary>
-    /// RDP sessions with and without an RD Gateway, three created in the MobaXterm interface and
-    /// two synthetic.
+    /// RDP sessions with and without an RD Gateway, seven created in the MobaXterm interface and
+    /// five synthetic.
     /// </summary>
     /// <remarks>
     /// <para>MobaXterm has no proxy for an RDP session; its other route is the RD Gateway of the
-    /// Expert RDP settings. The <c>rdp-proxy-</c> sessions are measured with the gateway set to
-    /// Always: <c>a</c> authenticates as the end server, <c>b</c> prompts and carries a user on the
-    /// session. The server lands at field 19 and again in the packed field 30.
-    /// <c>rdp-direct-c</c> has no gateway: field 19 is empty and field 30 is absent.</para>
+    /// Expert RDP settings ("Use RDP gateway" Never, Detect or Always; Server; Authentication;
+    /// Login). The server lands at field 19 and again in the packed field 30,
+    /// <c>flags,mode,server,login,?,auth,</c>. Measured on MobaXterm Personal v25.4:</para>
+    /// <list type="bullet">
+    /// <item><c>rdp-proxy-a</c>, <c>rdp-proxy-b</c> and <c>rdp-always-e</c>: Always (mode 2), with
+    /// the authentication "Same as end server" (0), "Prompt during connection" (1) and "Specify
+    /// login/password" (2, login <c>gwusere</c> at part 3). <c>b</c> also carries a user on the
+    /// session.</item>
+    /// <item><c>rdp-smartcard-f</c>: Always with "Use smartcard" (3).</item>
+    /// <item><c>rdp-detect-d</c>: Detect (mode 1), which disables Server and Login, so field 19
+    /// and the server part are empty.</item>
+    /// <item><c>rdp-never-g</c>: a server typed under Always, then Never chosen: MobaXterm clears
+    /// field 19 and drops field 30, so the line is the same as <c>rdp-direct-c</c>, which never
+    /// had a gateway.</item>
+    /// </list>
     /// <para>The <c>syn-rdp</c> sessions are SYNTHETIC: every field the RDP layout does not read
-    /// holds a unique sentinel and the SSH jump host is empty, so a gateway index shifted by one
-    /// lands on a sentinel and refuses the session that has no gateway.</para>
+    /// holds a unique sentinel (u3, u4... and, inside field 30, u31, u32, u34) and the SSH jump
+    /// host is empty. An index shifted by one, field or part, lands on a sentinel: the session
+    /// without a gateway is then refused, and <c>syn-rdp-gwa</c>, whose gateway is reproduced, is
+    /// refused too. <c>syn-rdp-gw</c> names a server with no settings field,
+    /// <c>syn-rdp-gw-mismatch</c> names two different servers, and <c>syn-rdp-gw-bad</c> names a
+    /// server that is not a host.</para>
     /// </remarks>
     public const string RdpGatewayContent = $"""
         [Bookmarks_1]
@@ -175,7 +190,14 @@ internal static class MobaXtermSharedSessionsFixture
         rdp-proxy-a.example.test= #91#4%rdp-proxy-a.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-a.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-a.example.test,,0,0,{Tail}
         rdp-proxy-b.example.test (rdpuserb)= #91#4%rdp-proxy-b.example.test%3389%rdpuserb%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-b.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-b.example.test,,0,1,{Tail}
         rdp-direct-c.example.test= #91#4%rdp-direct-c.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%%-1%-1%0%-1%0%-1%0%0%0%0%{Tail}
+        rdp-always-e.example.test= #91#4%rdp-always-e.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-e.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-e.example.test,gwusere,0,2,{Tail}
+        rdp-smartcard-f.example.test= #91#4%rdp-smartcard-f.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-f.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-f.example.test,,0,3,{Tail}
+        rdp-detect-d.example.test= #91#4%rdp-detect-d.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,1,,,0,0,{Tail}
+        rdp-never-g.example.test= #91#4%rdp-never-g.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%%-1%-1%0%-1%0%-1%0%0%0%0%{Tail}
         syn-rdp= #91#4%syn-rdp.example.test%3390%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%%u20%u21%u22{Tail}
         syn-rdp-gw= #91#4%syn-rdp-gw.example.test%3391%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%rdgw2.example.test%u20%u21%u22{Tail}
+        syn-rdp-gwa= #91#4%syn-rdp-gwa.example.test%3392%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%rdgw3.example.test%u20%u21%u22%u23%u24%u25%u26%u27%u28%u29%u31,2,rdgw3.example.test,u32,u34,0,{Tail}
+        syn-rdp-gw-mismatch= #91#4%syn-rdp-gw-mismatch.example.test%3393%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%rdgw4.example.test%u20%u21%u22%u23%u24%u25%u26%u27%u28%u29%u31,2,rdgw5.example.test,u32,u34,0,{Tail}
+        syn-rdp-gw-bad= #91#4%syn-rdp-gw-bad.example.test%3394%synrdpu%u3%u4%u5%u6%u7%u8%u9%u10%u11%%%%u15%u16%u17%u18%-rdgw6.example.test%u20%u21%u22%u23%u24%u25%u26%u27%u28%u29%u31,2,-rdgw6.example.test,u32,u34,0,{Tail}
         """;
 }

@@ -3790,8 +3790,9 @@ public sealed partial class SettingsViewModelTests : IDisposable
 
     // Producer: SettingsViewModel.ImportMobaXtermAsync and FormatMobaXtermWarning over
     // MobaXtermImporter: one session of each new type is persisted with its own port property, a
-    // jump host on Telnet and a proxy on SFTP are refused with their wording, and a proxy type with
-    // no host gets the wording that names no proxy.
+    // jump host on Telnet and a proxy on SFTP are refused with their wording, a proxy type with
+    // no host gets the wording that names no proxy, an RDP session keeps its RD Gateway, and one
+    // that signs in to its gateway with a smart card is refused.
     [Fact]
     public async Task ImportConfigCommand_MobaXtermTelnetVncSftp_PersistsThePortsAndWordsTheRefusals()
     {
@@ -3819,6 +3820,7 @@ public sealed partial class SettingsViewModelTests : IDisposable
             vnc-pt= #128#5%vnc-pt.example.test%5915%u2%u3%%%%u7%u8%u9%u10%u11%2%#MobaFont%10#0#
             ssh-px= #109#0%ssh-px.example.test%22%%%-1%-1%%%%%0%-1%0%%%-1%-1%0%1%proxy-ssh.example.test%3181%pxuser%0%0%1%%0%%%%0%-1%-1%0%%%0#MobaFont%10#0#
             rdp-gw= #91#4%rdp-gw.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw.example.test,,0,0,#MobaFont%10#0#
+            rdp-sc= #91#4%rdp-sc.example.test%3389%%0%0%0%0%-1%0%0%-1%%%%%0%0%%-1%rdgw-sc.example.test%-1%-1%0%-1%0%-1%0%0%0%0%10000010000000,2,rdgw-sc.example.test,,0,3,#MobaFont%10#0#
             """;
 
         try
@@ -3829,7 +3831,7 @@ public sealed partial class SettingsViewModelTests : IDisposable
             await viewModel.ImportConfigCommand.ExecuteAsync(null);
 
             Assert.NotNull(config.SavedServers);
-            Assert.Equal(3, config.SavedServers.Count);
+            Assert.Equal(4, config.SavedServers.Count);
             ServerProfileDto telnet = config.SavedServers.Single(s => s.DisplayName == "tel-a");
             Assert.Equal("Telnet", telnet.ConnectionType);
             Assert.Equal(2323, telnet.TelnetPort);
@@ -3844,6 +3846,8 @@ public sealed partial class SettingsViewModelTests : IDisposable
             Assert.Equal(2202, sftp.SshPort);
             Assert.True(sftp.HasSshPortField);
             Assert.Equal("sftpusera", sftp.SshUsername);
+            ServerProfileDto rdp = config.SavedServers.Single(s => s.DisplayName == "rdp-gw");
+            Assert.Equal("rdgw.example.test", rdp.RdpGateway);
             Assert.All(config.SavedServers, server => Assert.True(server.UseDirectConnection));
 
             (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
@@ -3864,7 +3868,7 @@ public sealed partial class SettingsViewModelTests : IDisposable
                 warning.Message,
                 StringComparison.Ordinal);
             Assert.Contains(
-                localizer.Format("ImportMobaXtermWarningRdGateway", "Bookmarks_1", "rdp-gw", "rdgw.example.test"),
+                localizer.Format("ImportMobaXtermWarningRdGateway", "Bookmarks_1", "rdp-sc", "rdgw-sc.example.test"),
                 warning.Message,
                 StringComparison.Ordinal);
             Assert.DoesNotContain("\"\"", warning.Message, StringComparison.Ordinal);

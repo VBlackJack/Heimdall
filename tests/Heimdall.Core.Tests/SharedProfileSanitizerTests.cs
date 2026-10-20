@@ -78,7 +78,7 @@ public sealed class SharedProfileSanitizerTests
         nameof(ServerProfileDto.RdpCompression), nameof(ServerProfileDto.RdpHardwareAcceleration),
         nameof(ServerProfileDto.RdpAutoReconnect), nameof(ServerProfileDto.RdpAdminMode),
         nameof(ServerProfileDto.RdpFullScreen), nameof(ServerProfileDto.RdpPerformanceFlags),
-        nameof(ServerProfileDto.RdpDisableUdp), nameof(ServerProfileDto.RdpGateway),
+        nameof(ServerProfileDto.RdpDisableUdp),
         nameof(ServerProfileDto.Environment), nameof(ServerProfileDto.MacAddress),
         nameof(ServerProfileDto.LocalShellExecutable), nameof(ServerProfileDto.LocalShellArguments),
         nameof(ServerProfileDto.LocalShellWorkingDirectory), nameof(ServerProfileDto.LocalShellElevated),
@@ -207,6 +207,42 @@ public sealed class SharedProfileSanitizerTests
 
         Assert.Null(SharedProfileSanitizer.Sanitize(source));
         Assert.Equal(expected, SharedProfileSanitizer.RefusalOf(source));
+    }
+
+    // Producer: SharedProfileSanitizer.Sanitize(ServerProfileDto); trigger: an RDP profile imported
+    // through an RD Gateway. Losing the gateway here would turn the shared session into a direct one.
+    [Fact]
+    public void Sanitize_Profile_KeepsTheRdGateway()
+    {
+        var source = new ServerProfileDto
+        {
+            Id = SharedProfileId,
+            ConnectionType = "RDP",
+            RemoteServer = "srv-x.example.test",
+            RdpGateway = " rdgw.example.test ",
+        };
+
+        ServerProfileDto sanitized = Assert.IsType<ServerProfileDto>(SharedProfileSanitizer.Sanitize(source));
+        Assert.Equal("rdgw.example.test", sanitized.RdpGateway);
+        Assert.Null(SharedProfileSanitizer.RefusalOf(source));
+    }
+
+    // Producer: SharedProfileSanitizer.RefusalOf; trigger: RD Gateways the inventory would refuse.
+    [Theory]
+    [InlineData("-rdgw.example.test")]
+    [InlineData("rdgw example.test")]
+    public void Sanitize_Profile_RefusesAnRdGatewayThatIsNotAHost(string rdGateway)
+    {
+        var source = new ServerProfileDto
+        {
+            Id = SharedProfileId,
+            ConnectionType = "RDP",
+            RemoteServer = "srv-x.example.test",
+            RdpGateway = rdGateway,
+        };
+
+        Assert.Null(SharedProfileSanitizer.Sanitize(source));
+        Assert.Equal(SharedProfileRefusal.InvalidRdGateway, SharedProfileSanitizer.RefusalOf(source));
     }
 
     // Producer: SharedProfileSanitizer.NormalizeConnectionType through Sanitize(ServerProfileDto),

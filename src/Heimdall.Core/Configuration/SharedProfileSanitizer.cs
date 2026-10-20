@@ -60,6 +60,7 @@ public static class SharedProfileSanitizer
         nameof(ServerProfileDto.SshPort),
         nameof(ServerProfileDto.SshUsername),
         nameof(ServerProfileDto.RdpUsername),
+        nameof(ServerProfileDto.RdpGateway),
         nameof(ServerProfileDto.VncPort),
         nameof(ServerProfileDto.TelnetPort),
         nameof(ServerProfileDto.SshGatewayId),
@@ -86,7 +87,8 @@ public static class SharedProfileSanitizer
     /// inventory would refuse (<see cref="SchemaValidator.IsValidHost"/>: a value starting with a
     /// dash or holding a space could pass for an option of Plink or of an external tool), or a
     /// gateway reference outside the shared namespace (dropping that reference would turn a session
-    /// meant to cross a bastion into a direct one).
+    /// meant to cross a bastion into a direct one), or an RD Gateway the inventory would refuse
+    /// (dropping it would do the same to an RDP session).
     /// </summary>
     public static ServerProfileDto? Sanitize(ServerProfileDto source)
     {
@@ -109,6 +111,7 @@ public static class SharedProfileSanitizer
             RemotePort = source.RemotePort,
             SshUsername = source.SshUsername,
             RdpUsername = source.RdpUsername,
+            RdpGateway = NullIfBlank(source.RdpGateway),
             VncPort = source.VncPort,
             TelnetPort = source.TelnetPort,
             SshGatewayId = SshGatewayRoute.IsAssigned(source.SshGatewayId) ? source.SshGatewayId : null,
@@ -156,6 +159,14 @@ public static class SharedProfileSanitizer
             return SharedProfileRefusal.ForeignGateway;
         }
 
+        // Refused rather than dropped: dropping the RD Gateway would turn an RDP session meant to
+        // cross it into a direct one.
+        if (!string.IsNullOrWhiteSpace(source.RdpGateway)
+            && !SchemaValidator.IsValidHost(source.RdpGateway.Trim()))
+        {
+            return SharedProfileRefusal.InvalidRdGateway;
+        }
+
         return null;
     }
 
@@ -183,6 +194,9 @@ public static class SharedProfileSanitizer
             ParentGatewayId = SharedSessionIds.IsShared(source.ParentGatewayId) ? source.ParentGatewayId : null,
         };
     }
+
+    private static string? NullIfBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string? NormalizeConnectionType(string? connectionType)
     {

@@ -1138,14 +1138,44 @@ public class MobaXtermImporterTests
     private static MobaXtermImportResult ParseRdpGateway() =>
         MobaXtermImporter.Parse(MobaXtermSharedSessionsFixture.RdpGatewayContent);
 
-    // Producer: MobaXtermImporter.ParseSession, the RD Gateway refusal through the RDP [4] layout
-    // (server at 19); trigger: the two measured sessions set to Always and a synthetic one. The
-    // detail is the gateway server, so an index shifted onto a neighbour fails here.
+    // Producer: MobaXtermImporter.ReadRdGateway through the RDP [4] layout (server at 19, settings
+    // at 30); trigger: the three measured sessions set to Always with a password sign-in, and the
+    // synthetic one whose every unread field and settings part is a sentinel. Shifting field 19 or
+    // 30, or the mode, server or auth part, lands on a sentinel and refuses syn-rdp-gwa.
     [Theory]
-    [InlineData("rdp-proxy-a.example.test", "rdgw-a.example.test")]
-    [InlineData("rdp-proxy-b.example.test (rdpuserb)", "rdgw-b.example.test")]
+    [InlineData("rdp-proxy-a.example.test", "rdp-proxy-a.example.test", 3389, null, "rdgw-a.example.test")]
+    [InlineData("rdp-proxy-b.example.test (rdpuserb)", "rdp-proxy-b.example.test", 3389, "rdpuserb", "rdgw-b.example.test")]
+    [InlineData("rdp-always-e.example.test", "rdp-always-e.example.test", 3389, null, "rdgw-e.example.test")]
+    [InlineData("syn-rdp-gwa", "syn-rdp-gwa.example.test", 3392, "synrdpu", "rdgw3.example.test")]
+    public void RdpThroughAPasswordRdGateway_IsImportedWithItsGateway(
+        string name,
+        string host,
+        int port,
+        string? user,
+        string rdGateway)
+    {
+        MobaXtermImportResult result = ParseRdpGateway();
+
+        ServerProfileDto server = Imported(result, name);
+        Assert.Equal(ConnectionTypeCatalog.Canonicalize("RDP"), server.ConnectionType);
+        Assert.Equal(host, server.RemoteServer);
+        Assert.Equal(port, server.RemotePort);
+        Assert.Equal(user, string.IsNullOrEmpty(server.RdpUsername) ? null : server.RdpUsername);
+        Assert.Equal(rdGateway, server.RdpGateway);
+        Assert.True(server.UseDirectConnection);
+        Assert.Null(server.SshGatewayId);
+        Assert.DoesNotContain(result.Warnings, warning => warning.SessionName == name);
+        AssertNoSentinel(name, server);
+    }
+
+    // Producer: MobaXtermImporter.ReadRdGateway, the refusal; trigger: the measured smart card
+    // session, a server with no settings field, and two servers that disagree. The detail is the
+    // server of field 19.
+    [Theory]
+    [InlineData("rdp-smartcard-f.example.test", "rdgw-f.example.test")]
     [InlineData("syn-rdp-gw", "rdgw2.example.test")]
-    public void RdpThroughAnRdGateway_IsNotImported_AndNamesTheGateway(string name, string rdGateway)
+    [InlineData("syn-rdp-gw-mismatch", "rdgw4.example.test")]
+    public void RdpThroughAnRdGatewayNotReproduced_IsNotImported_AndNamesTheGateway(string name, string rdGateway)
     {
         MobaXtermImportResult result = ParseRdpGateway();
 
@@ -1156,10 +1186,26 @@ public class MobaXtermImporterTests
         Assert.False(warning.SessionImported);
     }
 
+    // Producer: MobaXtermImporter.ParseSession, the host check on the RD Gateway server; trigger:
+    // a server starting with a dash, which the inventory would refuse.
+    [Fact]
+    public void RdpThroughAnRdGatewayThatIsNotAHost_IsNotImported()
+    {
+        MobaXtermImportResult result = ParseRdpGateway();
+
+        Assert.DoesNotContain(result.Servers, server => server.DisplayName == "syn-rdp-gw-bad");
+        MobaXtermImportWarning warning = Skipped(result, "syn-rdp-gw-bad");
+        Assert.Equal(MobaXtermImportWarningKind.InvalidGatewayHost, warning.Kind);
+        Assert.Equal("-rdgw6.example.test", warning.Detail);
+    }
+
     // Producer: MobaXtermImporter.ParseSession through the RDP [4] layout; trigger: the measured
-    // RDP session without a gateway and the synthetic one whose unread fields are sentinels.
+    // sessions that name no gateway server (no settings, Detect, and Never after a server was
+    // typed) and the synthetic one whose unread fields are sentinels.
     [Theory]
     [InlineData("rdp-direct-c.example.test", "rdp-direct-c.example.test", 3389, null)]
+    [InlineData("rdp-detect-d.example.test", "rdp-detect-d.example.test", 3389, null)]
+    [InlineData("rdp-never-g.example.test", "rdp-never-g.example.test", 3389, null)]
     [InlineData("syn-rdp", "syn-rdp.example.test", 3390, "synrdpu")]
     public void RdpWithoutAnRdGateway_IsImportedDirect(string name, string host, int port, string? user)
     {
@@ -1170,6 +1216,7 @@ public class MobaXtermImporterTests
         Assert.Equal(host, server.RemoteServer);
         Assert.Equal(port, server.RemotePort);
         Assert.Equal(user, string.IsNullOrEmpty(server.RdpUsername) ? null : server.RdpUsername);
+        Assert.Null(server.RdpGateway);
         Assert.True(server.UseDirectConnection);
         Assert.Null(server.SshGatewayId);
         Assert.DoesNotContain(result.Warnings, warning => warning.SessionName == name);
@@ -1178,13 +1225,15 @@ public class MobaXtermImporterTests
 
     // Producer: MobaXtermImporter.Parse over the whole RDP gateway file.
     [Fact]
-    public void RdpGatewayFile_ImportsTheTwoDirectSessions_AndSkipsTheThreeBehindAGateway()
+    public void RdpGatewayFile_ImportsEightSessions_AndSkipsTheFourItCannotRoute()
     {
         MobaXtermImportResult result = ParseRdpGateway();
 
-        Assert.Equal(2, result.Servers.Count);
+        Assert.Equal(8, result.Servers.Count);
+        Assert.Equal(4, result.Servers.Count(server => server.RdpGateway is not null));
         Assert.Equal(3, result.Warnings.Count(warning => warning.Kind == MobaXtermImportWarningKind.RdGatewayNotSupported));
-        Assert.Equal(3, result.Warnings.Count);
+        Assert.Equal(1, result.Warnings.Count(warning => warning.Kind == MobaXtermImportWarningKind.InvalidGatewayHost));
+        Assert.Equal(4, result.Warnings.Count);
         Assert.Empty(result.Gateways);
     }
 

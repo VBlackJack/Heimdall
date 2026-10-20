@@ -515,6 +515,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         SharedProfileRefusal.UnsupportedProtocol => profile.ConnectionType ?? string.Empty,
         SharedProfileRefusal.InvalidHost => profile.RemoteServer ?? string.Empty,
         SharedProfileRefusal.ForeignGateway => profile.SshGatewayId ?? string.Empty,
+        SharedProfileRefusal.InvalidRdGateway => profile.RdpGateway ?? string.Empty,
         _ => profile.Id ?? string.Empty,
     };
 
