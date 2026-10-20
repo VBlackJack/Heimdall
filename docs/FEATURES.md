@@ -179,6 +179,7 @@ generator that produces the final command for you.
 - A choice parameter accepts only what it offers, matched without regard to case or surrounding space; whether a value may be absent is left to the parameter's own Required flag
 - The editor warns when the command pattern and the declared parameters disagree - a `{placeholder}` with no parameter, or a parameter the pattern never uses. It warns and never blocks, because braces are ordinary shell punctuation
 - Live preview of the generated command, with shell quoting applied to substituted values
+- Opened from a session, the library prefills a host parameter with the session's host and a user parameter (`user`, `username`, `login`, `account`, `samaccountname`) with the session's user name; a parameter's default is kept when the session has no user
 
 **Running it**
 - Copy to the clipboard, or send to the terminal of the session the library was opened from

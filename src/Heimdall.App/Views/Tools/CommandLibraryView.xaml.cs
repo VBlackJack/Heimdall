@@ -90,7 +90,7 @@ public partial class CommandLibraryView : UserControl, IToolView
         _viewModel.RefreshBroadcastTargets();
 
         _viewModel.AutoSelectPlatform(context?.ConnectionType, context?.RemoteOs ?? RemoteOs.Auto);
-        _ = _viewModel.InitializeAsync(context?.TargetHost, context?.InitialActionId);
+        _ = _viewModel.InitializeAsync(context?.TargetHost, context?.InitialActionId, context?.Username);
     }
 
     /// <summary>

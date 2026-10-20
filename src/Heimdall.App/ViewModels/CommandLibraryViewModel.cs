@@ -94,6 +94,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private ActionModel? _selectedAction;
     private CommandTemplate? _activeTemplate;
     private string? _targetHost;
+    private string? _username;
     private bool _disposed;
     private bool _loadingSelection;
 
@@ -744,9 +745,14 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// Optional action id to preselect once the library has loaded (used by the
     /// Command Palette "Open in Command Library" bridge). Unknown ids are ignored.
     /// </param>
-    public async Task InitializeAsync(string? targetHost, string? initialActionId = null)
+    /// <param name="username">
+    /// Optional user name the originating session authenticates with; used to prefill
+    /// user-named parameters when a template is selected.
+    /// </param>
+    public async Task InitializeAsync(string? targetHost, string? initialActionId = null, string? username = null)
     {
         _targetHost = string.IsNullOrWhiteSpace(targetHost) ? null : targetHost.Trim();
+        _username = string.IsNullOrWhiteSpace(username) ? null : username.Trim();
         OnPropertyChanged(nameof(HasTargetHost));
         EmptyStateMessage = LocalizeKey("ToolCmdLibStatusLoading");
         HelpContentText = LocalizeKey("ToolHelpCMDLIB").Replace("\\n", "\n");
@@ -962,7 +968,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         var preservedSearch = SearchText;
         ResetSelection();
         ResetSearchState();
-        await InitializeAsync(_targetHost);
+        await InitializeAsync(_targetHost, initialActionId: null, _username);
         await ApplySearchAsync(preservedSearch);
     }
 
@@ -1251,7 +1257,22 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         {
             return _targetHost!;
         }
+        if (!string.IsNullOrWhiteSpace(_username) && IsUserParameter(parameter.Name))
+        {
+            return _username!;
+        }
         return parameter.DefaultValue ?? string.Empty;
+    }
+
+    /// <summary>
+    /// True for a parameter that names the account a command acts as, which the session's own
+    /// user name can fill. Matched on the name alone, like <see cref="IsHostParameter"/>: no
+    /// parameter type says "user".
+    /// </summary>
+    private static bool IsUserParameter(string name)
+    {
+        var n = name.ToLowerInvariant();
+        return n is "user" or "username" or "login" or "account" or "samaccountname";
     }
 
     private static bool CanPrefillTargetHost(TemplateParameter parameter, string targetHost)

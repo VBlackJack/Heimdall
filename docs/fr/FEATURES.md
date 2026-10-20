@@ -179,6 +179,7 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Un paramètre choice n'accepte que ce qu'il propose, la correspondance ignorant la casse et les espaces autour ; savoir si une valeur peut être absente reste du ressort de l'indicateur Requis du paramètre
 - L'éditeur signale quand le motif de commande et les paramètres déclarés divergent : un `{placeholder}` sans paramètre, ou un paramètre que le motif n'utilise jamais. Il avertit et ne bloque jamais, parce que les accolades sont de la ponctuation shell ordinaire
 - Aperçu en direct de la commande générée, avec échappement shell appliqué aux valeurs substituées
+- Ouverte depuis une session, la bibliothèque préremplit un paramètre d'hôte avec l'hôte de la session et un paramètre d'utilisateur (`user`, `username`, `login`, `account`, `samaccountname`) avec le nom d'utilisateur de la session ; la valeur par défaut du paramètre est conservée quand la session n'a pas d'utilisateur
 
 **L'exécuter**
 - Copier dans le presse-papiers, ou envoyer vers le terminal de la session depuis laquelle la bibliothèque a été ouverte
