@@ -1345,7 +1345,7 @@ public sealed class CommandGeneratorServiceTests
             _ => "value"
         };
 
-    private static string FindSeedActionsDirectory()
+    internal static string FindSeedActionsDirectory()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);
         while (current != null)

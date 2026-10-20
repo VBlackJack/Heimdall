@@ -78,6 +78,52 @@ public sealed class CommandLibraryTransferServiceTests
         });
     }
 
+    // A-05: an imported action keeps at most MaxActionExamplesCount examples per list. It is
+    // truncated, not refused, and the dropped examples are counted in the result.
+    [Fact]
+    public async Task ImportAsync_ExampleListsLongerThanTheBound_AreTruncatedAndCounted()
+    {
+        var service = new CommandLibraryTransferService();
+        var actionService = new FakeActionService([]);
+        static object[] Examples(int count, int platform) =>
+            Enumerable.Range(1, count)
+                .Select(index => (object)new { command = $"cmd-{index}", description = $"example {index}", platform })
+                .ToArray();
+
+        var json = JsonSerializer.Serialize(new
+        {
+            actions = new[]
+            {
+                new
+                {
+                    publicId = Guid.NewGuid(),
+                    id = "imp-long",
+                    title = "Long",
+                    category = "Net",
+                    examples = Examples(13, 1),
+                    windowsExamples = Examples(TwinShell.Core.Constants.ValidationConstants.MaxActionExamplesCount, 0),
+                    linuxExamples = Examples(11, 1),
+                }
+            }
+        });
+
+        await WithTempFileAsync(json, async path =>
+        {
+            var result = await service.ImportAsync(actionService, path);
+
+            Assert.Equal(CommandLibraryImportOutcome.Success, result.Outcome);
+            Assert.Equal(1, result.Imported);
+            Assert.Equal(4, result.TruncatedExamples);
+
+            var stored = Assert.Single(await actionService.GetAllActionsAsync());
+            Assert.Equal(
+                Enumerable.Range(1, 10).Select(index => $"cmd-{index}"),
+                stored.Examples.Select(example => example.Command));
+            Assert.Equal(10, stored.WindowsExamples.Count);
+            Assert.Equal(10, stored.LinuxExamples.Count);
+        });
+    }
+
     [Fact]
     public async Task ImportAsync_UpdatesExistingUserCreatedAction_MatchedByPublicId()
     {
