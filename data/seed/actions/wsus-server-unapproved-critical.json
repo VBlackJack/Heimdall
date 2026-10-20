@@ -43,7 +43,7 @@
     },
     {
       "command": "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Select-Object Title,Classification,Approval,CreationDate | Format-Table -AutoSize",
-      "description": "Cas d'usage standard. Affiche toutes les mises à jour critiques non encore approuvées sur le serveur WSUS Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Affiche toutes les mises à jour critiques non encore approuvées sur le serveur WSUS.",
       "platform": 0
     }
   ],

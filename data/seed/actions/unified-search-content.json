@@ -92,11 +92,6 @@
       "command": "Get-ChildItem -Path \".\" -Filter \"{filePattern}\" -Recurse | Select-String -Pattern \"{searchTerm}\"",
       "description": "Exemple utilisant le paramètre 'searchPath': Dossier où chercher. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
       "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path \"C:\\Windows\\System32\" -Filter \"*.log\" -Recurse | Select-String -Pattern \"Admin\"",
-      "description": "Exemple Windows pour Rechercher dans le contenu de fichiers",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "search-content-linux-cmd",
@@ -141,16 +136,6 @@
       "platform": 1
     },
     {
-      "command": "grep --help",
-      "description": "Affiche l'aide complète de la commande grep. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man grep",
-      "description": "Affiche le manuel complet de grep. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "grep -r \"<searchTerm>\" \"{searchPath}\"",
       "description": "Exemple utilisant le paramètre 'searchTerm': Texte ou regex à rechercher. Remplacez <searchTerm> par la valeur appropriée selon votre environnement.",
       "platform": 1
@@ -158,11 +143,6 @@
     {
       "command": "grep -r \"{searchTerm}\" \".\"",
       "description": "Exemple utilisant le paramètre 'searchPath': Dossier où chercher. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "grep -r \"error\" /var/log",
-      "description": "Exemple Linux pour Rechercher dans le contenu de fichiers",
       "platform": 1
     }
   ],

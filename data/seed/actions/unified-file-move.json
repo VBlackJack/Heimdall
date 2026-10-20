@@ -62,11 +62,6 @@
       "platform": 0
     },
     {
-      "command": "Move-Item -Path \"{sourcePath}\" -Destination \"{destinationPath}\" -Force",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Move-Item -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
-    },
-    {
       "command": "Move-Item -Path \"<sourcePath>\" -Destination \"{destinationPath}\" -Force",
       "description": "Exemple utilisant le paramètre 'sourcePath': Chemin du fichier ou dossier à déplacer. Remplacez <sourcePath> par la valeur appropriée selon votre environnement.",
       "platform": 0
@@ -74,11 +69,6 @@
     {
       "command": "Move-Item -Path \"{sourcePath}\" -Destination \"<destinationPath>\" -Force",
       "description": "Exemple utilisant le paramètre 'destinationPath': Nouveau chemin ou nom. Remplacez <destinationPath> par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "Move-Item -Path \"C:\\Source\\data.csv\" -Destination \"D:\\Backup\\data.csv\" -Force",
-      "description": "Exemple Windows pour Déplacer ou renommer des fichiers",
       "platform": 0
     }
   ],
@@ -124,16 +114,6 @@
       "platform": 1
     },
     {
-      "command": "mv --help",
-      "description": "Affiche l'aide complète de la commande mv. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man mv",
-      "description": "Affiche le manuel complet de mv. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "mv \"<sourcePath>\" \"{destinationPath}\"",
       "description": "Exemple utilisant le paramètre 'sourcePath': Chemin du fichier ou dossier à déplacer. Remplacez <sourcePath> par la valeur appropriée selon votre environnement.",
       "platform": 1
@@ -141,11 +121,6 @@
     {
       "command": "mv \"{sourcePath}\" \"<destinationPath>\"",
       "description": "Exemple utilisant le paramètre 'destinationPath': Nouveau chemin ou nom. Remplacez <destinationPath> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "mv /home/user/data.csv /backup/data.csv",
-      "description": "Exemple Linux pour Déplacer ou renommer des fichiers",
       "platform": 1
     },
     {

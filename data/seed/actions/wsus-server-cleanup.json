@@ -29,11 +29,6 @@
       "command": "Invoke-WsusServerCleanup -CleanupObsoleteComputers",
       "description": "Supprime les ordinateurs qui n'ont pas contacté le serveur depuis 30 jours",
       "platform": 0
-    },
-    {
-      "command": "Invoke-WsusServerCleanup -CleanupObsoleteUpdates -CleanupUnneededContentFiles -CompressUpdates -DeclineExpiredUpdates -DeclineSupersededUpdates",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Invoke-WsusServerCleanup -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "À exécuter sur le serveur WSUS. Peut prendre du temps selon la taille de la base WSUS. Libère de l'espace disque. Nécessite droits administrateur.",

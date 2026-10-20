@@ -39,11 +39,6 @@
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000022}'",
       "description": "Déclenche l'évaluation de la stratégie machine",
       "platform": 0
-    },
-    {
-      "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000021}' -ErrorAction Stop",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Invoke-WmiMethod -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "Schedule ID {21} = Machine Policy Retrieval, {22} = Machine Policy Evaluation. Nécessite le client SCCM installé. Vérifier CCM.log pour confirmation.",

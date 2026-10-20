@@ -32,7 +32,7 @@
     },
     {
       "command": "systemctl daemon-reload",
-      "description": "Cas d'usage standard. Recharge tous les fichiers d'unités systemd après modification Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Recharge tous les fichiers d'unités systemd après modification.",
       "platform": 1
     }
   ],

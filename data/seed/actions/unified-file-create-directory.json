@@ -67,11 +67,6 @@
       "platform": 0
     },
     {
-      "command": "New-Item -Path \"C:\\Logs\\app.log\" -ItemType Directory -Force",
-      "description": "Exemple Windows pour Créer un répertoire",
-      "platform": 0
-    },
-    {
       "command": "New-Item -Path \"C:\\Projects\\src\",\"C:\\Projects\\bin\" -ItemType Directory -Force",
       "description": "Cree plusieurs dossiers en une commande.",
       "platform": 0
@@ -108,16 +103,6 @@
     {
       "command": "mkdir -p \"{path}\" -v",
       "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "mkdir --help",
-      "description": "Affiche l'aide complète de la commande mkdir. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man mkdir",
-      "description": "Affiche le manuel complet de mkdir. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
       "platform": 1
     },
     {

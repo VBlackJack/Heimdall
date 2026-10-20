@@ -75,23 +75,8 @@
       "platform": 0
     },
     {
-      "command": "docker --help",
-      "description": "Affiche l'aide complète de la commande docker. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 0
-    },
-    {
-      "command": "man docker",
-      "description": "Affiche le manuel complet de docker. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 0
-    },
-    {
       "command": "docker stats --format \"table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\"",
       "description": "Affiche les stats avec un format personnalisé (nom, CPU, mémoire).",
-      "platform": 0
-    },
-    {
-      "command": "docker stats -v -f",
-      "description": "Exemple Windows pour Statistiques des conteneurs Docker",
       "platform": 0
     }
   ],
@@ -109,16 +94,6 @@
     {
       "command": "docker stats mycontainer",
       "description": "Stats d'un conteneur spécifique",
-      "platform": 1
-    },
-    {
-      "command": "docker --help",
-      "description": "Affiche l'aide complète de la commande docker. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man docker",
-      "description": "Affiche le manuel complet de docker. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
       "platform": 1
     },
     {

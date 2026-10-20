@@ -74,23 +74,8 @@
       "platform": 0
     },
     {
-      "command": "docker --help",
-      "description": "Affiche l'aide complète de la commande docker. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 0
-    },
-    {
-      "command": "man docker",
-      "description": "Affiche le manuel complet de docker. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 0
-    },
-    {
       "command": "docker ps --filter status=exited",
       "description": "Filtre pour afficher uniquement les conteneurs arrêtés.",
-      "platform": 0
-    },
-    {
-      "command": "docker ps -v -f",
-      "description": "Exemple Windows pour Lister les conteneurs Docker",
       "platform": 0
     }
   ],
@@ -111,28 +96,8 @@
       "platform": 1
     },
     {
-      "command": "docker --help",
-      "description": "Affiche l'aide complète de la commande docker. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man docker",
-      "description": "Affiche le manuel complet de docker. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "docker ps --format \"table {{.Names}}\\t{{.Status}}\"",
       "description": "Affiche les conteneurs avec un format personnalisé (nom et statut).",
-      "platform": 1
-    },
-    {
-      "command": "docker ps",
-      "description": "Lister les conteneurs en cours",
-      "platform": 1
-    },
-    {
-      "command": "docker ps -a",
-      "description": "Lister tous les conteneurs",
       "platform": 1
     },
     {

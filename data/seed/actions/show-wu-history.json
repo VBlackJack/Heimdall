@@ -41,7 +41,7 @@
     },
     {
       "command": "powershell -Command \"Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object -First 50 | Format-Table -AutoSize\"",
-      "description": "Cas d'usage standard. Liste les 50 dernières mises à jour installées avec leur statut Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Liste les 50 dernières mises à jour installées avec leur statut.",
       "platform": 0
     }
   ],

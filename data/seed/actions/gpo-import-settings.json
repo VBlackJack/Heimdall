@@ -51,11 +51,6 @@
       "platform": 0
     },
     {
-      "command": "Import-GPO -BackupId B1234567-89AB-CDEF-0123-456789ABCDEF -TargetName \"Custom-Security-Policy\" -Path \"D:\\Backups\\daily\"",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Import-GPO -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
-    },
-    {
       "command": "Import-GPO -BackupId B1234567-89AB-CDEF-0123-456789ABCDEF -TargetName \"Custom-Security-Policy\" -Path \"C:\\GPOBackups\"",
       "description": "Exemple utilisant le paramètre 'backupPath': Chemin du dossier de sauvegarde. Remplacez D:\\Backups\\daily par la valeur appropriée selon votre environnement.",
       "platform": 0

@@ -47,23 +47,8 @@
       "platform": 0
     },
     {
-      "command": "tree \"{path}\" /F /A",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help tree -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
-    },
-    {
       "command": "tree \".\" /F /A",
       "description": "Exemple utilisant le paramètre 'path': Dossier à afficher. Remplacez <path> par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "tree \"{path}\" /F /A",
-      "description": "Cas d'usage standard. Affiche la structure hiérarchique d'un répertoire. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
-      "platform": 0
-    },
-    {
-      "command": "tree \"C:\\Logs\\app.log\" /F /A",
-      "description": "Exemple Windows pour Afficher l'arborescence de dossiers",
       "platform": 0
     }
   ],
@@ -101,23 +86,8 @@
       "platform": 1
     },
     {
-      "command": "tree --help",
-      "description": "Affiche l'aide complète de la commande tree. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man tree",
-      "description": "Affiche le manuel complet de tree. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "tree \".\"",
       "description": "Exemple utilisant le paramètre 'path': Dossier à afficher. Remplacez <path> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "tree /var/log",
-      "description": "Exemple Linux pour Afficher l'arborescence de dossiers",
       "platform": 1
     },
     {

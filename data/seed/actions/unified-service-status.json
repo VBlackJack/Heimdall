@@ -65,11 +65,6 @@
       "command": "Get-Service -Name Spooler",
       "description": "Vérifie le statut du service d'impression Windows (Spooler).",
       "platform": 0
-    },
-    {
-      "command": "Get-Service -Name wuauserv",
-      "description": "Exemple Windows pour Vérifier le statut d'un service",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "linux-service-status-cmd",
@@ -98,16 +93,6 @@
     {
       "command": "systemctl status sshd",
       "description": "Vérifie le statut du service SSH",
-      "platform": 1
-    },
-    {
-      "command": "systemctl --help",
-      "description": "Affiche l'aide complète de la commande systemctl. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man systemctl",
-      "description": "Affiche le manuel complet de systemctl. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
       "platform": 1
     },
     {

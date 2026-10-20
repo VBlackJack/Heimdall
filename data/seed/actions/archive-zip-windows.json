@@ -46,11 +46,6 @@
       "command": "Compress-Archive -Path \"*.txt\",\"*.log\" -DestinationPath \"logs.zip\"",
       "description": "Compresse plusieurs types de fichiers",
       "platform": 0
-    },
-    {
-      "command": "Compress-Archive -Path \"C:\\Source\\data.csv\" -DestinationPath \"C:\\Backup\\archive.zip\" -CompressionLevel Optimal -Force",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Compress-Archive -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "-CompressionLevel: Optimal, Fastest, NoCompression. -Force écrase le ZIP existant.",

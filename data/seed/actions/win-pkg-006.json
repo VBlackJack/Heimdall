@@ -39,11 +39,6 @@
       "command": "winget search --name 'Visual Studio Code'",
       "description": "Recherche par nom exact",
       "platform": 0
-    },
-    {
-      "command": "winget search Admin",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "Recherche dans toutes les sources configurées. Utiliser --exact pour une correspondance exacte.",

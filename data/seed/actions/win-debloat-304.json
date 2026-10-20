@@ -43,7 +43,7 @@
     },
     {
       "command": "Disable-WindowsOptionalFeature -Online -FeatureName 'Microsoft-Hyper-V-All' -NoRestart",
-      "description": "Cas d'usage standard. Désactive la fonctionnalité Hyper-V de Windows (virtualisation). Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Désactive la fonctionnalité Hyper-V de Windows (virtualisation).",
       "platform": 0
     }
   ],

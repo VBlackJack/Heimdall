@@ -107,16 +107,6 @@
       "platform": 0
     },
     {
-      "command": "docker --help",
-      "description": "Affiche l'aide complète de la commande docker. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 0
-    },
-    {
-      "command": "man docker",
-      "description": "Affiche le manuel complet de docker. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 0
-    },
-    {
       "command": "docker exec -it {container} {command}",
       "description": "Exemple utilisant le paramètre 'options': Options (-it=interactive+tty, -u=user, -w=workdir). Remplacez <options> par la valeur appropriée selon votre environnement.",
       "platform": 0
@@ -124,11 +114,6 @@
     {
       "command": "docker exec {options} mycontainer {command}",
       "description": "Exemple utilisant le paramètre 'container': Nom ou ID du conteneur. Remplacez <container> par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "docker exec -v -f webapp Get-Process",
-      "description": "Exemple Windows pour Exécuter une commande dans un conteneur",
       "platform": 0
     }
   ],
@@ -146,16 +131,6 @@
     {
       "command": "docker exec -u root mycontainer apt update",
       "description": "Exécute en tant que root",
-      "platform": 1
-    },
-    {
-      "command": "docker --help",
-      "description": "Affiche l'aide complète de la commande docker. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man docker",
-      "description": "Affiche le manuel complet de docker. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
       "platform": 1
     },
     {

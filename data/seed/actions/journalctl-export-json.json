@@ -86,41 +86,6 @@
       "command": "journalctl -k -n 100",
       "description": "Affiche les 100 derniers messages du kernel. Le flag -k (kernel) filtre uniquement les messages noyau (équivalent de dmesg). Essentiel pour diagnostiquer les problèmes hardware, drivers, panics kernel, erreurs disque/réseau de bas niveau.",
       "platform": 1
-    },
-    {
-      "command": "journalctl -b -1",
-      "description": "Affiche tous les logs du boot PRÉCÉDENT. Le flag -b (boot) filtre par session de démarrage. -b sans argument = boot actuel. -b -1 = boot précédent. -b -2 = avant-avant-dernier. Crucial pour diagnostiquer pourquoi un système a crashé ou n'a pas démarré correctement : après reboot, consultez les logs du boot raté.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl --disk-usage",
-      "description": "Affiche l'espace disque utilisé par les journaux systemd. Les journaux peuvent occuper plusieurs Go sur des systèmes actifs. Utilisez cette commande pour surveiller l'espace et décider si un nettoyage est nécessaire (voir journalctl --vacuum-size ou --vacuum-time).",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -u nginx -f",
-      "description": "Suivre les logs de nginx en temps réel",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -p err -b",
-      "description": "Afficher les erreurs depuis le dernier boot",
-      "platform": 1
-    },
-    {
-      "command": "journalctl --since \"2024-01-01\" --until \"2024-01-02\"",
-      "description": "Logs entre deux dates",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -u sshd --no-pager | tail -50",
-      "description": "Les 50 dernières lignes des logs SSH",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -k",
-      "description": "Messages du noyau uniquement",
-      "platform": 1
     }
   ],
   "notes": "Formats disponibles: json, json-pretty, json-sse. Utile pour intégration avec outils d'analyse.",

@@ -67,16 +67,6 @@
       "platform": 1
     },
     {
-      "command": "userdel --help",
-      "description": "Affiche l'aide complète de la commande userdel. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man userdel",
-      "description": "Affiche le manuel complet de userdel. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "userdel -r {username}",
       "description": "Exemple utilisant le paramètre 'options': Options (-r supprime aussi le home). Remplacez <options> par la valeur appropriée selon votre environnement.",
       "platform": 1
@@ -84,11 +74,6 @@
     {
       "command": "userdel {options} john",
       "description": "Exemple utilisant le paramètre 'username': Utilisateur à supprimer. Remplacez <username> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "userdel -v -f jdupont",
-      "description": "Exemple Linux pour Supprimer un utilisateur local",
       "platform": 1
     },
     {
@@ -143,16 +128,6 @@
     {
       "command": "Get-LocalUser | Where-Object {$_.Enabled -eq $false} | Remove-LocalUser",
       "description": "Supprime tous les utilisateurs désactivés",
-      "platform": 0
-    },
-    {
-      "command": "Get-Help Remove-LocalUser -Full",
-      "description": "Affiche l'aide complète de Remove-LocalUser",
-      "platform": 0
-    },
-    {
-      "command": "Remove-LocalUser -Name \"jdupont\"",
-      "description": "Exemple Windows pour Supprimer un utilisateur local",
       "platform": 0
     }
   ],
