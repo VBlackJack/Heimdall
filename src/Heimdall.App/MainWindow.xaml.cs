@@ -2891,24 +2891,69 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// </summary>
     private void PlaceOnboardingCard(Rect target, Rect surface)
     {
-        OnboardingCard.HorizontalAlignment = System.Windows.HorizontalAlignment.Center;
+        System.Windows.Size card = new(
+            OnboardingCard.ActualWidth > 0 ? OnboardingCard.ActualWidth : OnboardingCard.MinWidth,
+            OnboardingCard.ActualHeight > 0 ? OnboardingCard.ActualHeight : OnboardingCardFallbackHeight);
+
+        System.Windows.Point origin = OnboardingCardOrigin(target, surface, card);
+
+        OnboardingCard.HorizontalAlignment = System.Windows.HorizontalAlignment.Left;
         OnboardingCard.VerticalAlignment = System.Windows.VerticalAlignment.Top;
+        OnboardingCard.Margin = new Thickness(origin.X, origin.Y, 0, 0);
+    }
 
-        double cardHeight = OnboardingCard.ActualHeight > 0 ? OnboardingCard.ActualHeight : 220;
-        const double Gap = 24;
+    /// <summary>The height assumed for the card before it has been measured once.</summary>
+    private const double OnboardingCardFallbackHeight = 220;
 
-        double below = target.Bottom + Gap;
-        double above = target.Top - Gap - cardHeight;
+    /// <summary>The space kept between the card and the control it points at.</summary>
+    internal const double OnboardingCardGap = 24;
 
-        // Below when it fits, above when it does not, and centred when neither does - a card
-        // that covers its own target explains nothing.
-        double top = below + cardHeight <= surface.Height
-            ? below
-            : above >= 0
-                ? above
-                : Math.Max(0, (surface.Height - cardHeight) / 2);
+    /// <summary>
+    /// Where the tour card goes so it never covers the control its step points at.
+    /// </summary>
+    /// <remarks>
+    /// <para>Beside the target first, centred in the free band on that side and vertically
+    /// centred: the first three steps point into the session sidebar, and a card centred on the
+    /// whole window lay half over the sidebar at narrow widths and, at wide ones, a slice off the
+    /// empty-state card of the content area, which is centred on that same free band. Below or
+    /// above when the target is too wide to stand beside, and centred on the window only when
+    /// nothing else fits.</para>
+    /// <para>A card that covers its own target explains nothing.</para>
+    /// </remarks>
+    /// <param name="target">The spotlighted rectangle, padding included, in overlay coordinates.</param>
+    /// <param name="surface">The overlay surface.</param>
+    /// <param name="card">The size of the card.</param>
+    /// <returns>The top-left corner of the card in overlay coordinates.</returns>
+    internal static System.Windows.Point OnboardingCardOrigin(Rect target, Rect surface, System.Windows.Size card)
+    {
+        double centredTop = Math.Max(0, (surface.Height - card.Height) / 2);
+        double centredLeft = Math.Max(0, (surface.Width - card.Width) / 2);
 
-        OnboardingCard.Margin = new Thickness(0, top, 0, 0);
+        double rightBand = surface.Right - target.Right;
+        if (rightBand >= card.Width + OnboardingCardGap)
+        {
+            return new System.Windows.Point(target.Right + Math.Max(OnboardingCardGap, (rightBand - card.Width) / 2), centredTop);
+        }
+
+        double leftBand = target.Left - surface.Left;
+        if (leftBand >= card.Width + OnboardingCardGap)
+        {
+            return new System.Windows.Point(surface.Left + Math.Min((leftBand - card.Width) / 2, leftBand - OnboardingCardGap - card.Width), centredTop);
+        }
+
+        double below = target.Bottom + OnboardingCardGap;
+        if (below + card.Height <= surface.Bottom)
+        {
+            return new System.Windows.Point(centredLeft, below);
+        }
+
+        double above = target.Top - OnboardingCardGap - card.Height;
+        if (above >= surface.Top)
+        {
+            return new System.Windows.Point(centredLeft, above);
+        }
+
+        return new System.Windows.Point(centredLeft, centredTop);
     }
 
     private void OnOnboardingCompleted(object? sender, EventArgs e)
