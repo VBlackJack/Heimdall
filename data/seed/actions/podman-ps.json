@@ -1,7 +1,7 @@
 {
   "id": "podman-ps",
-  "title": "Lister les conteneurs Podman",
-  "description": "Affiche les conteneurs Podman (alternative rootless à Docker)",
+  "title": "List Podman containers",
+  "description": "Show the Podman containers (the rootless alternative to Docker).",
   "category": "containers-vms",
   "platform": 1,
   "level": 0,
@@ -16,60 +16,67 @@
     "id": "podman-ps-cmd",
     "platform": 1,
     "name": "podman",
-    "commandPattern": "podman ps {options}",
-    "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-a",
-        "required": false,
-        "description": "Options (-a=all, -q=quiet, --pod, etc.)"
-      }
-    ]
+    "commandPattern": "podman ps -a",
+    "parameters": []
   },
   "examples": [
     {
       "command": "podman ps",
-      "description": "Liste les conteneurs en cours",
+      "description": "List the running containers",
       "platform": 1
     },
     {
       "command": "podman ps -a",
-      "description": "Liste tous les conteneurs",
+      "description": "List every container",
       "platform": 1
     },
     {
       "command": "podman pod list",
-      "description": "Liste les pods",
+      "description": "List the pods",
       "platform": 1
     },
     {
       "command": "podman images",
-      "description": "Lister les images",
+      "description": "List the images",
       "platform": 1
     },
     {
       "command": "podman logs webapp",
-      "description": "Logs d'un conteneur",
+      "description": "Logs of a container",
       "platform": 1
     },
     {
       "command": "podman exec -it webapp bash",
-      "description": "Shell dans un conteneur",
+      "description": "Shell in a container",
       "platform": 1
     },
     {
       "command": "podman stats",
-      "description": "Stats temps réel",
+      "description": "Real-time stats",
       "platform": 1
     }
   ],
-  "notes": "Podman est compatible Docker mais ne nécessite pas de daemon. Rootless par défaut.",
+  "notes": "Podman is Docker-compatible but needs no daemon. Rootless by default.",
   "links": [
     {
       "title": "Podman documentation",
       "url": "https://docs.podman.io/en/latest/Commands.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les conteneurs Podman",
+      "description": "Affiche les conteneurs Podman (alternative rootless à Docker)",
+      "notes": "Podman est compatible Docker mais ne nécessite pas de daemon. Rootless par défaut.",
+      "examples": {
+        "podman ps": "Liste les conteneurs en cours",
+        "podman ps -a": "Liste tous les conteneurs",
+        "podman pod list": "Liste les pods",
+        "podman images": "Lister les images",
+        "podman logs webapp": "Logs d'un conteneur",
+        "podman exec -it webapp bash": "Shell dans un conteneur",
+        "podman stats": "Stats temps réel"
+      }
+    }
+  }
 }

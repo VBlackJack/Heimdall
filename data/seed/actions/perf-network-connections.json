@@ -1,7 +1,7 @@
 {
   "id": "perf-network-connections",
-  "title": "Monitorer les connexions réseau actives",
-  "description": "Affiche toutes les connexions réseau TCP/UDP actives avec les ports locaux/distants, état et processus associé.",
+  "title": "Monitor active network connections",
+  "description": "Show every active TCP/UDP network connection with its local and remote ports, state and process.",
   "category": "performance",
   "platform": 2,
   "level": 0,
@@ -32,7 +32,7 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "États TCP: Established, Listen, TimeWait, CloseWait. Pour UDP, utilisez Get-NetUDPEndpoint. ss est plus rapide que netstat sur Linux.",
+  "notes": "TCP states: Established, Listen, TimeWait, CloseWait. For UDP, use Get-NetUDPEndpoint. ss is faster than netstat on Linux.",
   "links": [
     {
       "title": "Documentation Get-NetTCPConnection",
@@ -42,45 +42,62 @@
   "windowsExamples": [
     {
       "command": "netstat -anob",
-      "description": "🔥 URGENCE : Affiche TOUS les ports écoutés avec le nom de l'exécutable (-b) et le PID (-o). Le flag -n (numérique) évite les lenteurs de résolution DNS. Nécessite des droits Admin.",
+      "description": "🔥 EMERGENCY: show ALL the listening ports with the executable name (-b) and the PID (-o). The -n (numeric) flag avoids slow DNS resolution. Requires admin rights.",
       "platform": 0
     },
     {
       "command": "netstat -an | findstr \"ESTABLISHED\"",
-      "description": "Filtre uniquement les connexions actives établies. Utile pour repérer une exfiltration de données ou une activité suspecte en cours.",
+      "description": "Keep only the established connections. Useful to spot data exfiltration or suspicious activity in progress.",
       "platform": 0
     },
     {
       "command": "Get-NetTCPConnection | Group-Object State | Select-Object Name, Count",
-      "description": "Nombre de connexions par état",
+      "description": "Number of connections per state",
       "platform": 0
     },
     {
       "command": "netstat -ano | findstr ESTABLISHED",
-      "description": "Connexions établies avec PID (Windows cmd)",
+      "description": "Established connections with PID (Windows cmd)",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ss -tunap | grep ESTAB",
-      "description": "Alternative moderne sur Linux (ss au lieu de netstat)",
+      "description": "Modern alternative on Linux (ss instead of netstat)",
       "platform": 1
     },
     {
       "command": "netstat -tulpn",
-      "description": "Ports en écoute avec processus",
+      "description": "Listening ports with their process",
       "platform": 1
     },
     {
       "command": "netstat -an | grep ESTABLISHED",
-      "description": "Connexions établies",
+      "description": "Established connections",
       "platform": 1
     },
     {
       "command": "netstat -r",
-      "description": "Table de routage",
+      "description": "Routing table",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Monitorer les connexions réseau actives",
+      "description": "Affiche toutes les connexions réseau TCP/UDP actives avec les ports locaux/distants, état et processus associé.",
+      "notes": "États TCP: Established, Listen, TimeWait, CloseWait. Pour UDP, utilisez Get-NetUDPEndpoint. ss est plus rapide que netstat sur Linux.",
+      "examples": {
+        "netstat -anob": "🔥 URGENCE : Affiche TOUS les ports écoutés avec le nom de l'exécutable (-b) et le PID (-o). Le flag -n (numérique) évite les lenteurs de résolution DNS. Nécessite des droits Admin.",
+        "netstat -an | findstr \"ESTABLISHED\"": "Filtre uniquement les connexions actives établies. Utile pour repérer une exfiltration de données ou une activité suspecte en cours.",
+        "Get-NetTCPConnection | Group-Object State | Select-Object Name, Count": "Nombre de connexions par état",
+        "netstat -ano | findstr ESTABLISHED": "Connexions établies avec PID (Windows cmd)",
+        "ss -tunap | grep ESTAB": "Alternative moderne sur Linux (ss au lieu de netstat)",
+        "netstat -tulpn": "Ports en écoute avec processus",
+        "netstat -an | grep ESTABLISHED": "Connexions établies",
+        "netstat -r": "Table de routage"
+      }
+    }
+  }
 }

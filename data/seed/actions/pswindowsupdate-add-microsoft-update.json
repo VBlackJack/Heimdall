@@ -1,7 +1,7 @@
 {
   "id": "pswindowsupdate-add-microsoft-update",
-  "title": "Activer Microsoft Update comme source",
-  "description": "Ajoute Microsoft Update comme source de mises à jour (inclut Office, SQL, etc.)",
+  "title": "Enable Microsoft Update as a source",
+  "description": "Add Microsoft Update as an update source (includes Office, SQL, etc.).",
   "category": "windows-updates",
   "platform": 0,
   "level": 1,
@@ -22,20 +22,31 @@
   "examples": [
     {
       "command": "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d",
-      "description": "Active Microsoft Update",
+      "description": "Enable Microsoft Update",
       "platform": 0
     },
     {
       "command": "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d -Confirm:$false",
-      "description": "Exécution standard de la commande Add. Consultez la documentation officielle avec Get-Help Add-WUServiceManager -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Standard run of the Add command. See the official documentation with Get-Help Add-WUServiceManager -Full for details on the available parameters and advanced use cases.",
       "platform": 0
     }
   ],
-  "notes": "Permet de recevoir les mises à jour pour Office, SQL Server et autres produits Microsoft. Nécessite droits administrateur et PSWindowsUpdate.",
+  "notes": "Lets the computer receive updates for Office, SQL Server and other Microsoft products. Requires administrator rights and PSWindowsUpdate.",
   "links": [
     {
       "title": "Enable Microsoft Update",
       "url": "https://woshub.com/pswindowsupdate-module/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Activer Microsoft Update comme source",
+      "description": "Ajoute Microsoft Update comme source de mises à jour (inclut Office, SQL, etc.)",
+      "notes": "Permet de recevoir les mises à jour pour Office, SQL Server et autres produits Microsoft. Nécessite droits administrateur et PSWindowsUpdate.",
+      "examples": {
+        "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d": "Active Microsoft Update",
+        "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d -Confirm:$false": "Exécution standard de la commande Add. Consultez la documentation officielle avec Get-Help Add-WUServiceManager -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+      }
+    }
+  }
 }

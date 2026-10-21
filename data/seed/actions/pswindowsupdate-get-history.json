@@ -1,7 +1,7 @@
 {
   "id": "pswindowsupdate-get-history",
-  "title": "Afficher l'historique des mises à jour (PSWindowsUpdate)",
-  "description": "Liste l'historique détaillé de toutes les mises à jour Windows installées avec dates et statuts",
+  "title": "Show the update history (PSWindowsUpdate)",
+  "description": "List the detailed history of every installed Windows update with dates and statuses.",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -22,40 +22,55 @@
   "examples": [
     {
       "command": "Get-WUHistory | Select-Object -First 50",
-      "description": "Affiche les 50 dernières mises à jour installées",
+      "description": "Show the last 50 installed updates",
       "platform": 0
     },
     {
       "command": "Get-WUHistory -MaxDate (Get-Date).AddDays(-30)",
-      "description": "Affiche l'historique des 30 derniers jours",
+      "description": "Show the history of the last 30 days",
       "platform": 0
     },
     {
       "command": "Get-WUHistory | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-WUHistory | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "Get-WUHistory | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-WUHistory | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite le module PSWindowsUpdate. Fournit plus de détails que Get-HotFix.",
+  "notes": "Requires the PSWindowsUpdate module. Gives more details than Get-HotFix.",
   "links": [
     {
       "title": "PSWindowsUpdate Module",
       "url": "https://www.powershellgallery.com/packages/PSWindowsUpdate"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'historique des mises à jour (PSWindowsUpdate)",
+      "description": "Liste l'historique détaillé de toutes les mises à jour Windows installées avec dates et statuts",
+      "notes": "Nécessite le module PSWindowsUpdate. Fournit plus de détails que Get-HotFix.",
+      "examples": {
+        "Get-WUHistory | Select-Object -First 50": "Affiche les 50 dernières mises à jour installées",
+        "Get-WUHistory -MaxDate (Get-Date).AddDays(-30)": "Affiche l'historique des 30 derniers jours",
+        "Get-WUHistory | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-WUHistory | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-WUHistory | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-WUHistory | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

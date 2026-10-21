@@ -1,7 +1,7 @@
 {
   "id": "pswindowsupdate-hide-update",
-  "title": "Masquer une mise à jour spécifique",
-  "description": "Masque une mise à jour Windows pour empêcher son installation automatique",
+  "title": "Hide a given update",
+  "description": "Hide a Windows update to prevent its automatic installation.",
   "category": "windows-updates",
   "platform": 0,
   "level": 1,
@@ -20,36 +20,56 @@
     "parameters": [
       {
         "name": "kbNumber",
-        "label": "Numéro KB",
+        "label": "KB number",
         "type": "string",
         "defaultValue": "KB5001234",
         "required": true,
-        "description": "Numéro KB de la mise à jour à masquer (ex: KB5001234)"
+        "description": "KB number of the update to hide (e.g. KB5001234)"
       }
     ]
   },
   "examples": [
     {
       "command": "Hide-WindowsUpdate -KBArticleID KB5001234",
-      "description": "Masque la mise à jour KB5001234",
+      "description": "Hide update KB5001234",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate | Where-Object {$_.Title -like '*Driver*'} | Hide-WindowsUpdate",
-      "description": "Masque toutes les mises à jour de pilotes",
+      "description": "Hide every driver update",
       "platform": 0
     },
     {
       "command": "Hide-WindowsUpdate -KBArticleID KB5001234 -Confirm:$false",
-      "description": "Exemple utilisant le paramètre 'kbNumber': Numéro KB de la mise à jour à masquer (ex: KB5001234). Remplacez KB5012345 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'kbNumber' parameter: KB number of the update to hide (e.g. KB5001234). Replace KB5012345 with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "ATTENTION: Masquer des mises à jour de sécurité peut créer des vulnérabilités. Nécessite PSWindowsUpdate.",
+  "notes": "WARNING: hiding security updates can create vulnerabilities. Requires PSWindowsUpdate.",
   "links": [
     {
       "title": "Hide Windows Updates",
       "url": "https://woshub.com/pswindowsupdate-module/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Masquer une mise à jour spécifique",
+      "description": "Masque une mise à jour Windows pour empêcher son installation automatique",
+      "notes": "ATTENTION: Masquer des mises à jour de sécurité peut créer des vulnérabilités. Nécessite PSWindowsUpdate.",
+      "parameters": {
+        "windows": {
+          "kbNumber": {
+            "label": "Numéro KB",
+            "description": "Numéro KB de la mise à jour à masquer (ex: KB5001234)"
+          }
+        }
+      },
+      "examples": {
+        "Hide-WindowsUpdate -KBArticleID KB5001234": "Masque la mise à jour KB5001234",
+        "Get-WindowsUpdate | Where-Object {$_.Title -like '*Driver*'} | Hide-WindowsUpdate": "Masque toutes les mises à jour de pilotes",
+        "Hide-WindowsUpdate -KBArticleID KB5001234 -Confirm:$false": "Exemple utilisant le paramètre 'kbNumber': Numéro KB de la mise à jour à masquer (ex: KB5001234). Remplacez KB5012345 par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }
