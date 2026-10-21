@@ -1,0 +1,65 @@
+{
+  "id": "computerinfo-show-summary",
+  "title": "Show a system summary",
+  "description": "Show the name, edition, build, domain, memory, last boot and uptime of the computer.",
+  "category": "monitoring-logs",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "computerinfo",
+    "system",
+    "inventory",
+    "uptime",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "computerinfo-show-summary-cmd",
+  "windowsCommandTemplate": {
+    "id": "computerinfo-show-summary-cmd",
+    "platform": 0,
+    "name": "Get-ComputerInfo",
+    "commandPattern": "Get-ComputerInfo -Property CsName,WindowsProductName,OsVersion,OsBuildNumber,CsDomain,CsTotalPhysicalMemory,OsLastBootUpTime,OsUptime",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-ComputerInfo -Property Os*",
+      "description": "Show only the operating system properties",
+      "platform": 0
+    },
+    {
+      "command": "Get-ComputerInfo -Property Cs*",
+      "description": "Show the hardware and domain membership properties",
+      "platform": 0
+    },
+    {
+      "command": "Get-ComputerInfo -Property WindowsProductName,WindowsVersion,OsArchitecture",
+      "description": "Show the edition, version and architecture",
+      "platform": 0
+    },
+    {
+      "command": "Get-ComputerInfo",
+      "description": "Collect every property (takes several seconds)",
+      "platform": 0
+    }
+  ],
+  "notes": "Runs on the local computer only: open a remote session to query a server.",
+  "links": [
+    {
+      "title": "Get-ComputerInfo documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-computerinfo"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher un résumé du système",
+      "description": "Affiche le nom, l'édition, la build, le domaine, la mémoire, le dernier démarrage et la durée de fonctionnement de l'ordinateur.",
+      "notes": "Fonctionne uniquement sur l'ordinateur local : ouvrez une session distante pour interroger un serveur.",
+      "examples": {
+        "Get-ComputerInfo -Property Os*": "Affiche uniquement les propriétés du système d'exploitation",
+        "Get-ComputerInfo -Property Cs*": "Affiche les propriétés du matériel et de l'appartenance au domaine",
+        "Get-ComputerInfo -Property WindowsProductName,WindowsVersion,OsArchitecture": "Affiche l'édition, la version et l'architecture",
+        "Get-ComputerInfo": "Collecte toutes les propriétés (prend plusieurs secondes)"
+      }
+    }
+  }
+}

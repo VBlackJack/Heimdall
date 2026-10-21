@@ -1,0 +1,82 @@
+{
+  "id": "dhcp-list-scopes",
+  "title": "List the DHCP scopes",
+  "description": "Show the IPv4 scopes of a DHCP server with their range, lease duration and state.",
+  "category": "network-dns",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "dhcp",
+    "scope",
+    "dhcpserver",
+    "network",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "dhcp-list-scopes-cmd",
+  "windowsCommandTemplate": {
+    "id": "dhcp-list-scopes-cmd",
+    "platform": 0,
+    "name": "Get-DhcpServerv4Scope",
+    "commandPattern": "Get-DhcpServerv4Scope -ComputerName {dhcpServer} | Select-Object ScopeId,Name,SubnetMask,StartRange,EndRange,LeaseDuration,State | Format-Table -AutoSize",
+    "parameters": [
+      {
+        "name": "dhcpServer",
+        "label": "DHCP server",
+        "type": "hostname",
+        "defaultValue": "localhost",
+        "required": true,
+        "description": "DHCP server to query (localhost when run on the server)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-DhcpServerv4Scope -ComputerName DHCP01",
+      "description": "Show the scopes of DHCP01",
+      "platform": 0
+    },
+    {
+      "command": "Get-DhcpServerv4Scope -ComputerName DHCP01 -ScopeId 10.0.10.0 | Format-List *",
+      "description": "Show every setting of one scope",
+      "platform": 0
+    },
+    {
+      "command": "Get-DhcpServerv4Scope -ComputerName DHCP01 | Where-Object State -eq 'InActive'",
+      "description": "Find the scopes that are turned off",
+      "platform": 0
+    },
+    {
+      "command": "Get-DhcpServerInDC",
+      "description": "Show the DHCP servers authorized in Active Directory",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the DhcpServer module (RSAT DHCP tools) and membership of DHCP Users or DHCP Administrators.",
+  "links": [
+    {
+      "title": "Get-DhcpServerv4Scope documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/dhcpserver/get-dhcpserverv4scope"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les étendues DHCP",
+      "description": "Affiche les étendues IPv4 d'un serveur DHCP avec leur plage, leur durée de bail et leur état.",
+      "notes": "Nécessite le module DhcpServer (outils RSAT DHCP) et l'appartenance à DHCP Users ou DHCP Administrators.",
+      "parameters": {
+        "windows": {
+          "dhcpServer": {
+            "label": "Serveur DHCP",
+            "description": "Serveur DHCP à interroger (localhost si la commande tourne sur le serveur)"
+          }
+        }
+      },
+      "examples": {
+        "Get-DhcpServerv4Scope -ComputerName DHCP01": "Affiche les étendues de DHCP01",
+        "Get-DhcpServerv4Scope -ComputerName DHCP01 -ScopeId 10.0.10.0 | Format-List *": "Affiche tous les réglages d'une étendue",
+        "Get-DhcpServerv4Scope -ComputerName DHCP01 | Where-Object State -eq 'InActive'": "Trouve les étendues désactivées",
+        "Get-DhcpServerInDC": "Affiche les serveurs DHCP autorisés dans Active Directory"
+      }
+    }
+  }
+}

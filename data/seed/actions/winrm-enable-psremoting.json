@@ -1,0 +1,59 @@
+{
+  "id": "winrm-enable-psremoting",
+  "title": "Enable PowerShell remoting",
+  "description": "Configure the computer to receive PowerShell remote commands over WinRM.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 1,
+  "tags": [
+    "winrm",
+    "psremoting",
+    "remoting",
+    "powershell",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "winrm-enable-psremoting-cmd",
+  "windowsCommandTemplate": {
+    "id": "winrm-enable-psremoting-cmd",
+    "platform": 0,
+    "name": "Enable-PSRemoting",
+    "commandPattern": "Enable-PSRemoting -Force",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Enable-PSRemoting -Force",
+      "description": "Enable remoting without the confirmation prompts",
+      "platform": 0
+    },
+    {
+      "command": "Enable-PSRemoting -SkipNetworkProfileCheck -Force",
+      "description": "Enable remoting on a computer whose network profile is Public",
+      "platform": 0
+    },
+    {
+      "command": "Enable-PSRemoting -WhatIf",
+      "description": "Show what the command would change without applying it",
+      "platform": 0
+    }
+  ],
+  "notes": "Run it in an elevated session. It starts the WinRM service, creates the HTTP listener and the firewall exception, and registers the session configurations.",
+  "links": [
+    {
+      "title": "Enable-PSRemoting documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/enable-psremoting"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Activer la communication à distance PowerShell",
+      "description": "Configure l'ordinateur pour recevoir des commandes PowerShell à distance via WinRM.",
+      "notes": "À lancer dans une session élevée. Démarre le service WinRM, crée l'écouteur HTTP et l'exception de pare-feu, et enregistre les configurations de session.",
+      "examples": {
+        "Enable-PSRemoting -Force": "Active la communication à distance sans demande de confirmation",
+        "Enable-PSRemoting -SkipNetworkProfileCheck -Force": "Active la communication à distance sur un ordinateur dont le profil réseau est Public",
+        "Enable-PSRemoting -WhatIf": "Montre ce que la commande modifierait, sans rien appliquer"
+      }
+    }
+  }
+}

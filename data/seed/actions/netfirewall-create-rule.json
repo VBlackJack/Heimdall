@@ -1,0 +1,144 @@
+{
+  "id": "netfirewall-create-rule",
+  "title": "Create an inbound firewall rule",
+  "description": "Allow or block an inbound TCP or UDP port in Windows Defender Firewall.",
+  "category": "security",
+  "platform": 0,
+  "level": 1,
+  "tags": [
+    "firewall",
+    "netsecurity",
+    "rule",
+    "port",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "netfirewall-create-rule-cmd",
+  "windowsCommandTemplate": {
+    "id": "netfirewall-create-rule-cmd",
+    "platform": 0,
+    "name": "New-NetFirewallRule",
+    "commandPattern": "New-NetFirewallRule -DisplayName {displayName} -Direction Inbound -Protocol {protocol} -LocalPort {localPort} -Action {ruleAction} -Profile {profile}",
+    "parameters": [
+      {
+        "name": "displayName",
+        "label": "Rule name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name shown in the firewall console"
+      },
+      {
+        "name": "protocol",
+        "label": "Protocol",
+        "type": "choice",
+        "allowedValues": [
+          "TCP",
+          "UDP"
+        ],
+        "defaultValue": "TCP",
+        "required": true,
+        "description": "Transport protocol"
+      },
+      {
+        "name": "localPort",
+        "label": "Local port",
+        "type": "int",
+        "defaultValue": "",
+        "required": true,
+        "description": "Port the rule opens or blocks"
+      },
+      {
+        "name": "ruleAction",
+        "label": "Action",
+        "type": "choice",
+        "allowedValues": [
+          "Allow",
+          "Block"
+        ],
+        "defaultValue": "Allow",
+        "required": true,
+        "description": "Allow or block the traffic"
+      },
+      {
+        "name": "profile",
+        "label": "Profile",
+        "type": "choice",
+        "allowedValues": [
+          "Domain",
+          "Private",
+          "Public",
+          "Any"
+        ],
+        "defaultValue": "Domain",
+        "required": true,
+        "description": "Firewall profile the rule applies to"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "New-NetFirewallRule -DisplayName 'Web HTTPS' -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow -Profile Domain",
+      "description": "Open HTTPS to the domain network",
+      "platform": 0
+    },
+    {
+      "command": "New-NetFirewallRule -DisplayName 'SNMP from management' -Direction Inbound -Protocol UDP -LocalPort 161 -RemoteAddress 10.0.0.0/24 -Action Allow",
+      "description": "Admit SNMP from the management subnet only",
+      "platform": 0
+    },
+    {
+      "command": "New-NetFirewallRule -DisplayName 'Block outbound SMB' -Direction Outbound -Protocol TCP -RemotePort 445 -Action Block",
+      "description": "Block outbound SMB traffic",
+      "platform": 0
+    },
+    {
+      "command": "Get-NetFirewallRule -DisplayName 'Web HTTPS' | Get-NetFirewallPortFilter",
+      "description": "Check the port of the rule after creating it",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires administrator rights. The rule is enabled at once; a Block rule wins over an Allow rule.",
+  "links": [
+    {
+      "title": "New-NetFirewallRule documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/netsecurity/new-netfirewallrule"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer une règle de pare-feu entrante",
+      "description": "Autorise ou bloque un port TCP ou UDP entrant dans le Pare-feu Windows Defender.",
+      "notes": "Nécessite des droits administrateur. La règle est active immédiatement ; une règle Block l'emporte sur une règle Allow.",
+      "parameters": {
+        "windows": {
+          "displayName": {
+            "label": "Nom de la règle",
+            "description": "Nom affiché dans la console du pare-feu"
+          },
+          "protocol": {
+            "label": "Protocole",
+            "description": "Protocole de transport"
+          },
+          "localPort": {
+            "label": "Port local",
+            "description": "Port que la règle ouvre ou bloque"
+          },
+          "ruleAction": {
+            "label": "Action",
+            "description": "Autoriser ou bloquer le trafic"
+          },
+          "profile": {
+            "label": "Profil",
+            "description": "Profil de pare-feu auquel la règle s'applique"
+          }
+        }
+      },
+      "examples": {
+        "New-NetFirewallRule -DisplayName 'Web HTTPS' -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow -Profile Domain": "Ouvre HTTPS sur le réseau du domaine",
+        "New-NetFirewallRule -DisplayName 'SNMP from management' -Direction Inbound -Protocol UDP -LocalPort 161 -RemoteAddress 10.0.0.0/24 -Action Allow": "Admet SNMP depuis le sous-réseau d'administration seulement",
+        "New-NetFirewallRule -DisplayName 'Block outbound SMB' -Direction Outbound -Protocol TCP -RemotePort 445 -Action Block": "Bloque le trafic SMB sortant",
+        "Get-NetFirewallRule -DisplayName 'Web HTTPS' | Get-NetFirewallPortFilter": "Vérifie le port de la règle après sa création"
+      }
+    }
+  }
+}
