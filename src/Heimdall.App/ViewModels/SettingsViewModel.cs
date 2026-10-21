@@ -1976,9 +1976,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// "Heimdall User".
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Each field is filled only if it still holds its placeholder when the answer arrives, so
-    /// a value the operator typed meanwhile is never overwritten. A filled field counts as an
-    /// edit: the panel offers Save, and nothing is written until the operator saves.
+    /// a value the operator typed meanwhile is never overwritten.
+    /// </para>
+    /// <para>
+    /// The filled values are part of the loaded state, not an edit: they join the baseline the
+    /// panel compares against, so opening the panel leaves it clean and closing it asks
+    /// nothing. They reach the disk with the next save, like any other field.
+    /// </para>
     /// </remarks>
     private async Task PrefillGitAuthorAsync()
     {
@@ -1991,6 +1997,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         try
         {
             identity = await (_gitIdentity ??= _gitIdentityReader.ReadGlobalIdentityAsync());
+
+            // The baseline read the load started has to be in place before the prefill joins
+            // it, or that read would land afterwards and put the placeholders back.
+            await _savedSettingsLoad;
         }
         catch (Exception ex)
         {
@@ -2003,16 +2013,37 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(identity.Name)
-            && string.Equals(CmdLibGitSyncAuthorName, AppSettings.DefaultCmdLibGitSyncAuthorName, StringComparison.Ordinal))
+        var name = !string.IsNullOrWhiteSpace(identity.Name)
+            && string.Equals(CmdLibGitSyncAuthorName, AppSettings.DefaultCmdLibGitSyncAuthorName, StringComparison.Ordinal)
+            ? identity.Name
+            : null;
+        var email = !string.IsNullOrWhiteSpace(identity.Email)
+            && string.Equals(CmdLibGitSyncAuthorEmail, AppSettings.DefaultCmdLibGitSyncAuthorEmail, StringComparison.Ordinal)
+            ? identity.Email
+            : null;
+        if (name is null && email is null)
         {
-            CmdLibGitSyncAuthorName = identity.Name;
+            return;
         }
 
-        if (!string.IsNullOrWhiteSpace(identity.Email)
-            && string.Equals(CmdLibGitSyncAuthorEmail, AppSettings.DefaultCmdLibGitSyncAuthorEmail, StringComparison.Ordinal))
+        if (_savedSettings is not null)
         {
-            CmdLibGitSyncAuthorEmail = identity.Email;
+            // A copy: the snapshot may be the configuration manager's own instance.
+            var baseline = JsonSerializer.Deserialize<AppSettings>(JsonSerializer.Serialize(_savedSettings))!;
+            baseline.CmdLibGitSyncAuthorName = name ?? baseline.CmdLibGitSyncAuthorName;
+            baseline.CmdLibGitSyncAuthorEmail = email ?? baseline.CmdLibGitSyncAuthorEmail;
+            _savedSettings = baseline;
+        }
+
+        _loadingPanel = true;
+        try
+        {
+            CmdLibGitSyncAuthorName = name ?? CmdLibGitSyncAuthorName;
+            CmdLibGitSyncAuthorEmail = email ?? CmdLibGitSyncAuthorEmail;
+        }
+        finally
+        {
+            _loadingPanel = false;
         }
     }
 

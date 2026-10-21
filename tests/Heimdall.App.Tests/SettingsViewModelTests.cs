@@ -4569,7 +4569,26 @@ public sealed partial class SettingsViewModelTests : IDisposable
 
         Assert.Equal("Ada Lovelace", viewModel.CmdLibGitSyncAuthorName);
         Assert.Equal("ada@example.org", viewModel.CmdLibGitSyncAuthorEmail);
+
+        // Part of the loaded state, not an edit: opening the panel leaves it clean.
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public async Task LoadFromSettings_PrefilledGitAuthor_IsWrittenWithTheNextSave()
+    {
+        var config = new FakeConfigManager();
+        var viewModel = CreateViewModel(config, gitIdentityReader: new FixedGitIdentityReader(new GitIdentity("Ada Lovelace", "ada@example.org")));
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.GitAuthorPrefill;
+
+        viewModel.CmdLibGitSyncBranch = "develop";
         Assert.True(viewModel.IsDirty);
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.NotNull(config.SavedSettings);
+        Assert.Equal("Ada Lovelace", config.SavedSettings!.CmdLibGitSyncAuthorName);
+        Assert.Equal("ada@example.org", config.SavedSettings.CmdLibGitSyncAuthorEmail);
     }
 
     [Fact]
