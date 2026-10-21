@@ -646,14 +646,30 @@ public sealed class CommandGeneratorServiceTests
         string parameterName)
     {
         CommandGeneratorService service = CreateService();
-        Dictionary<string, string> values = CreateSeedGenerationValues(template, parameterName);
+
+        // F-09: a choice refuses any value it does not offer, "A B" included, so the theory
+        // used to throw on such a parameter instead of testing it. It sends the first offered
+        // value instead, which has to arrive inside the pattern's quotes, escaped if it holds
+        // a quote of its own.
+        TemplateParameter target = template.Parameters.Single(parameter => parameter.Name == parameterName);
+        string targetValue = target.IsChoice ? target.AllowedValues![0] : "A B";
+        Dictionary<string, string> values = CreateSeedGenerationValues(template, parameterName, targetValue);
 
         string command = service.GenerateCommand(template, values);
 
-        ContainsValueInsideSingleQuotedSpan(command, "A B")
+        if (targetValue.Contains('\''))
+        {
+            string escaped = template.Platform == Platform.Windows
+                ? targetValue.Replace("'", "''", StringComparison.Ordinal)
+                : targetValue.Replace("'", "'\\''", StringComparison.Ordinal);
+            command.Should().Contain(escaped, $"{fileName} / {templateName} / {parameterName} must escape the quote inside the existing span");
+            return;
+        }
+
+        ContainsValueInsideSingleQuotedSpan(command, targetValue)
             .Should()
             .BeTrue($"{fileName} / {templateName} / {parameterName} should keep the value inside one existing single-quoted span");
-        command.Should().NotContain("''A B''", $"{fileName} / {templateName} / {parameterName} must not double-wrap");
+        command.Should().NotContain("''" + targetValue + "''", $"{fileName} / {templateName} / {parameterName} must not double-wrap");
     }
 
     // A-02: every shipped template opens with the defaults it ships, so each one has to
@@ -1252,7 +1268,8 @@ public sealed class CommandGeneratorServiceTests
 
                 foreach (TemplateParameter parameter in item.Template.Parameters.Where(parameter =>
                     parameter.Quoting == QuotingMode.InlineInQuotes &&
-                    IsPlaceholderInsideSingleQuotedSpan(item.Template.CommandPattern, parameter.Name)))
+                    CommandPatternQuoting.IsPlaceholderOnlyInSingleQuotedSpans(
+                        item.Template.CommandPattern, parameter.Name, item.Template.Platform == Platform.Windows)))
                 {
                     yield return new object[]
                     {
@@ -1386,27 +1403,6 @@ public sealed class CommandGeneratorServiceTests
         }
 
         return false;
-    }
-
-    private static bool IsPlaceholderInsideSingleQuotedSpan(string commandPattern, string parameterName)
-    {
-        string placeholder = "{" + parameterName + "}";
-        int placeholderIndex = commandPattern.IndexOf(placeholder, StringComparison.Ordinal);
-        if (placeholderIndex < 0)
-        {
-            return false;
-        }
-
-        int quoteCount = 0;
-        for (int index = 0; index < placeholderIndex; index++)
-        {
-            if (commandPattern[index] == '\'')
-            {
-                quoteCount++;
-            }
-        }
-
-        return quoteCount % 2 == 1;
     }
 
     private static string SafeValueForParameter(TemplateParameter parameter)

@@ -208,6 +208,36 @@ public sealed class CommandGeneratorValueShapingTests
             .Should().Equal(CommandPatternQuoting.QuoteContext.Bare);
     }
 
+    /// <summary>
+    /// A choice whose placeholder sits in the pattern's own quotes: the offered value goes in
+    /// escaped, without a second pair of quotes. That the value has to be offered at all is
+    /// pinned by the choice membership tests, which the same generator line serves.
+    /// </summary>
+    [Theory]
+    [InlineData(Platform.Windows, "fast", "Write-Output 'mode=fast'")]
+    [InlineData(Platform.Windows, "it's", "Write-Output 'mode=it''s'")]
+    [InlineData(Platform.Linux, "it's", "echo 'mode=it'\\''s'")]
+    public void GenerateCommand_ChoiceInlineInQuotes_ArrivesInsideThePatternsQuotes(Platform platform, string value, string expected)
+    {
+        var pattern = platform == Platform.Windows ? "Write-Output 'mode={mode}'" : "echo 'mode={mode}'";
+        var template = Template(
+            platform,
+            pattern,
+            new TemplateParameter
+            {
+                Name = "mode",
+                Label = "Mode",
+                Type = TemplateParameter.ChoiceTypeName,
+                AllowedValues = ["fast", "it's"],
+                Required = true,
+                Quoting = QuotingMode.InlineInQuotes,
+            });
+
+        var command = CreateService().GenerateCommand(template, Values(("mode", value)));
+
+        command.Should().Be(expected);
+    }
+
     internal static CommandGeneratorService CreateService() =>
         new(new FakeTwinShellLocalizationService());
 
