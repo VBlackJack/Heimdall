@@ -6295,6 +6295,7 @@
   "TerminalLoadingLabel": "Initializing terminal...",
   "TerminalSearchPlaceholder": "Search...",
   "TerminalSessionEnded": "--- Session ended ---",
+  "TerminalSaveSelectionToLibrary": "Save selection to Command Library",
   "TerminalSearchPrevious": "Previous match",
   "TerminalSearchNext": "Next match",
   "TerminalSearchClose": "Close search",

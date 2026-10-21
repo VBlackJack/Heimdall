@@ -371,6 +371,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     public event Action<string>? CurrentDirectoryChanged;
 
     /// <summary>
+    /// Raised with the terminal selection when the user asks to save it to the Command Library
+    /// (Ctrl+Shift+L, or the entry of the Shift+right-click menu). The subscriber
+    /// (EmbeddedSessionManager) opens the library editor prefilled with it.
+    /// </summary>
+    public event Action<string>? SaveToLibraryRequested;
+
+    /// <summary>
     /// Raised when the user clicks the Reconnect button after a disconnection.
     /// The subscriber (EmbeddedSessionManager) re-establishes the connection
     /// using the original server parameters.
@@ -1595,6 +1602,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        if (TerminalLibraryCapture.TryRead(message, out TerminalLibraryRequest libraryRequest, out string librarySelection))
+        {
+            HandleLibraryRequest(libraryRequest, librarySelection);
+            return;
+        }
+
         // Terminal text reply: terminal on purpose, so it can never reach the unknown-message
         // log below. The page is trusted (checked at the top); the text is unmasked output.
         if (message.StartsWith(MsgBuffer, StringComparison.Ordinal))
@@ -1605,6 +1618,43 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSSH dropped unknown WebView2 terminal message: {DescribeWebViewText(message)}");
+    }
+
+    private void HandleLibraryRequest(TerminalLibraryRequest request, string selection)
+    {
+        switch (request)
+        {
+            case TerminalLibraryRequest.Save:
+                // Posted, not raised inline: the subscriber may open a modal editor, and a nested
+                // message loop inside a WebView2 event handler stalls the page until it closes.
+                _ = Dispatcher.BeginInvoke(() => RaiseSaveToLibraryRequested(selection));
+                break;
+            case TerminalLibraryRequest.Menu:
+                OpenSaveToLibraryMenu(selection);
+                break;
+        }
+    }
+
+    private void OpenSaveToLibraryMenu(string selection)
+    {
+        string label = _localizer?[TerminalLibraryCapture.MenuItemLabelKey]
+            ?? TerminalLibraryCapture.MenuItemLabelKey;
+        ContextMenu menu = TerminalLibraryCapture.CreateMenu(selection, label, RaiseSaveToLibraryRequested);
+        menu.PlacementTarget = TerminalWebView;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        menu.IsOpen = true;
+    }
+
+    private void RaiseSaveToLibraryRequested(string selection)
+    {
+        try
+        {
+            SaveToLibraryRequested?.Invoke(selection);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSSH SaveToLibraryRequested subscriber failed: {ex.Message}");
+        }
     }
 
     /// <summary>

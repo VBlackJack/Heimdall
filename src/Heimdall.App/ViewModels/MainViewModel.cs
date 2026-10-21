@@ -1349,6 +1349,22 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
         var connectionType = $"TOOL:{toolId.ToUpperInvariant()}";
 
+        // A command captured from a terminal lands in the library tab already open rather than
+        // in a second one. The capture carries the session's host, which would otherwise make
+        // it an open "with context" below, and every capture would add a tab.
+        if (CommandCapture.FromContext(context) is { } capture
+            && string.Equals(toolId, ToolRegistry.CommandLibraryToolId, StringComparison.OrdinalIgnoreCase))
+        {
+            var openLibrary = Connection.ActiveSessions
+                .FirstOrDefault(s => s.ConnectionType == connectionType && s.HostControl is ICommandCaptureTarget);
+            if (openLibrary?.HostControl is ICommandCaptureTarget target)
+            {
+                Connection.ActiveSession = openLibrary;
+                target.PrefillNewAction(capture);
+                return;
+            }
+        }
+
         // Singleton behavior: reuse existing tab for tools that have no context
         // (e.g., Password Generator, UUID, Chmod). Network tools or tools opened
         // with a specific argument are allowed to have multiple instances.
