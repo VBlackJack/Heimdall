@@ -17,7 +17,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
+using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
+using TwinShell.Core.Models;
 
 namespace TwinShell.Infrastructure.Services;
 
@@ -35,7 +37,7 @@ public static class JsonSchemaValidator
     static JsonSchemaValidator()
     {
         CategorySchema = JsonSchema.FromText(CategorySchemaJson);
-        TemplateSchema = JsonSchema.FromText(TemplateSchemaJson);
+        TemplateSchema = JsonSchema.FromText(BuildTemplateSchemaJson());
         ActionSchema = JsonSchema.FromText(BuildActionSchemaJson());
         BatchSchema = JsonSchema.FromText(BatchSchemaJson);
     }
@@ -227,7 +229,19 @@ public static class JsonSchemaValidator
                         },
                         "type": {
                             "type": "string",
-                            "enum": ["string", "integer", "boolean", "path", "hostname", "ipaddress"]
+                            "enum": ["__PARAMETER_TYPES__"]
+                        },
+                        "allowedValues": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "string",
+                                "maxLength": 200
+                            },
+                            "maxItems": 50
+                        },
+                        "quoting": {
+                            "type": ["string", "null"],
+                            "enum": ["__QUOTING_MODES__"]
                         },
                         "defaultValue": {
                             "type": ["string", "null"]
@@ -247,6 +261,25 @@ public static class JsonSchemaValidator
         "additionalProperties": false
     }
     """;
+
+    private const string ParameterTypesPlaceholder = "[\"__PARAMETER_TYPES__\"]";
+    private const string QuotingModesPlaceholder = "[\"__QUOTING_MODES__\"]";
+
+    /// <summary>
+    /// The template schema with its parameter types taken from
+    /// <see cref="TemplateParameterTypes.Accepted"/>, the list the generator understands, and
+    /// its quoting modes from <see cref="QuotingMode"/>.
+    /// </summary>
+    internal static string BuildTemplateSchemaJson()
+        => TemplateSchemaJson
+            .Replace(
+                ParameterTypesPlaceholder,
+                JsonSerializer.Serialize(TemplateParameterTypes.Accepted),
+                StringComparison.Ordinal)
+            .Replace(
+                QuotingModesPlaceholder,
+                JsonSerializer.Serialize(Enum.GetNames<QuotingMode>().Cast<string?>().Append(null)),
+                StringComparison.Ordinal);
 
     private const string LevelNamesPlaceholder = "[\"__LEVEL_NAMES__\"]";
 

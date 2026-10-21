@@ -172,7 +172,9 @@ public sealed class JsonSyncService : SyncServiceBase
                     Type = p.Type,
                     DefaultValue = p.DefaultValue,
                     Required = p.Required,
-                    Description = p.Description
+                    Description = p.Description,
+                    AllowedValues = p.AllowedValues is { Count: > 0 } ? p.AllowedValues.ToList() : null,
+                    Quoting = p.Quoting?.ToString()
                 }).ToList();
 
                 var model = new TemplateModel
@@ -545,10 +547,12 @@ public sealed class JsonSyncService : SyncServiceBase
                     {
                         Name = p.Name,
                         Label = p.Label,
-                        Type = p.Type ?? "string",
+                        Type = p.Type ?? TemplateParameterTypes.Text,
                         DefaultValue = p.DefaultValue,
                         Required = p.Required,
-                        Description = p.Description
+                        Description = p.Description,
+                        AllowedValues = p.AllowedValues is { Count: > 0 } ? p.AllowedValues.ToList() : null,
+                        Quoting = Enum.TryParse<QuotingMode>(p.Quoting, ignoreCase: true, out var quoting) ? quoting : null
                     }).ToList();
 
                 var existing = await _templateRepository.GetByPublicIdAsync(model.Id);
@@ -1216,6 +1220,12 @@ public sealed class JsonSyncService : SyncServiceBase
         public string? DefaultValue { get; set; }
         public bool Required { get; set; }
         public string? Description { get; set; }
+
+        /// <summary>The values a choice parameter offers; null for any other type.</summary>
+        public List<string>? AllowedValues { get; set; }
+
+        /// <summary>The quoting override, by <see cref="QuotingMode"/> name; null for the default.</summary>
+        public string? Quoting { get; set; }
     }
 
     private sealed class ActionModel

@@ -639,8 +639,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
 /// </summary>
 public partial class ParameterEntryVm : ObservableObject
 {
-    public static readonly string[] AvailableTypes =
-        ["string", "int", "bool", "hostname", "ipaddress", "path", TemplateParameter.ChoiceTypeName];
+    public static readonly string[] AvailableTypes = [.. TemplateParameterTypes.Offered];
 
     [ObservableProperty] private string _name = "";
     [ObservableProperty] private string _label = "";

@@ -200,30 +200,30 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
                 switch (parameter.Type.ToLowerInvariant())
                 {
-                    case "int":
-                    case "integer":
+                    case TemplateParameterTypes.Int:
+                    case TemplateParameterTypes.Integer:
                         if (!int.TryParse(value, out _))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeInteger, parameter.Label));
                         }
                         break;
 
-                    case "number":
+                    case TemplateParameterTypes.Number:
                         if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeNumber, parameter.Label));
                         }
                         break;
 
-                    case "bool":
-                    case "boolean":
+                    case TemplateParameterTypes.Bool:
+                    case TemplateParameterTypes.Boolean:
                         if (!bool.TryParse(value, out _))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeBoolean, parameter.Label));
                         }
                         break;
 
-                    case "string":
+                    case TemplateParameterTypes.Text:
                         // PERFORMANCE: Use constant instead of magic number
                         if (value.Length > ValidationConstants.MaxParameterLength)
                         {
@@ -236,7 +236,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                         }
                         break;
 
-                    case "hostname":
+                    case TemplateParameterTypes.Hostname:
                         if (!IsValidHostname(value))
                         {
                             // BUGFIX: Replace hardcoded French message with localization
@@ -244,7 +244,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                         }
                         break;
 
-                    case "ipaddress":
+                    case TemplateParameterTypes.IpAddress:
                         if (!IPAddress.TryParse(value, out _))
                         {
                             // BUGFIX: Replace hardcoded French message with localization
@@ -252,14 +252,14 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                         }
                         break;
 
-                    case "driveletter":
+                    case TemplateParameterTypes.DriveLetter:
                         if (!DriveLetterRegex.IsMatch(value))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeDriveLetter, parameter.Label));
                         }
                         break;
 
-                    case "path":
+                    case TemplateParameterTypes.Path:
                         if (!IsValidPath(value))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterInvalidPath, parameter.Label));
@@ -325,7 +325,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
         switch (parameter.Type.ToLower())
         {
-            case "hostname":
+            case TemplateParameterTypes.Hostname:
                 if (!IsValidHostname(value))
                 {
                     error = "Invalid hostname format";
@@ -333,7 +333,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 }
                 break;
 
-            case "ipaddress":
+            case TemplateParameterTypes.IpAddress:
                 if (!IPAddress.TryParse(value, out _))
                 {
                     error = "Invalid IP address";
@@ -341,8 +341,8 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 }
                 break;
 
-            case "int":
-            case "integer":
+            case TemplateParameterTypes.Int:
+            case TemplateParameterTypes.Integer:
                 if (!int.TryParse(value, out _))
                 {
                     error = "Must be an integer";
@@ -350,7 +350,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 }
                 break;
 
-            case "number":
+            case TemplateParameterTypes.Number:
                 if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                 {
                     error = "Must be a number";
@@ -358,7 +358,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 }
                 break;
 
-            case "driveletter":
+            case TemplateParameterTypes.DriveLetter:
                 if (!DriveLetterRegex.IsMatch(value))
                 {
                     error = "Must be a single drive letter";
@@ -366,7 +366,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 }
                 break;
 
-            case "path":
+            case TemplateParameterTypes.Path:
                 if (!IsValidPath(value))
                 {
                     error = "Invalid path format";
@@ -379,7 +379,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 }
                 break;
 
-            case "string":
+            case TemplateParameterTypes.Text:
                 if (string.IsNullOrWhiteSpace(value) && parameter.Required)
                 {
                     error = "Required field";
@@ -409,17 +409,17 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     {
         switch (parameterType.ToLower())
         {
-            case "hostname":
-            case "ipaddress":
-            case "driveletter":
-            case "int":
-            case "integer":
-            case "number":
+            case TemplateParameterTypes.Hostname:
+            case TemplateParameterTypes.IpAddress:
+            case TemplateParameterTypes.DriveLetter:
+            case TemplateParameterTypes.Int:
+            case TemplateParameterTypes.Integer:
+            case TemplateParameterTypes.Number:
                 // These types are already validated with whitelist, no additional escaping needed
                 return value;
 
-            case "path":
-            case "string":
+            case TemplateParameterTypes.Path:
+            case TemplateParameterTypes.Text:
             default:
                 // Quote for shell safety using the target platform
                 return (quotingMode ?? QuotingMode.ShellQuote) == QuotingMode.InlineInQuotes
