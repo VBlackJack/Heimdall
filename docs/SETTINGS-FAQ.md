@@ -30,7 +30,9 @@ does the same. After a save, "Settings saved" shows beside the buttons until you
 is saved: change a value and change it back, and nothing is pending any more. Edits to the SSH
 gateways and the external tools stay pending until you save or undo them.
 
-A card whose settings do not simply wait for Save says so under its title:
+A card whose settings do not simply wait for Save shows a glyph beside its title: a lightning bolt,
+a disk, or a new window. Hovering the glyph shows its meaning, a screen reader reads it as the
+glyph's name, and the legend under the list of sections repeats it:
 
 - **Applies immediately, kept on Save** (Appearance): the language, theme and accent are shown as
   you pick them; Undo changes returns to the saved look.

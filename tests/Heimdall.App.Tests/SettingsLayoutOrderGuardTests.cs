@@ -121,25 +121,34 @@ public sealed class SettingsLayoutOrderGuardTests
     /// <remarks>
     /// I-03. The PIN, the vault and the two trust lists are written the moment they change, so
     /// Discard cannot undo them and Save has nothing to do with them. Nothing on screen said so.
+    /// A badge under the title said it; a glyph beside the title says it now, with the same text
+    /// as its tooltip and as the name a screen reader hears.
     /// </remarks>
     [Theory]
-    [InlineData("Mw_SettingsPinTitle", "SettingsSavedImmediately")]
-    [InlineData("Mw_SettingsVaultTitle", "SettingsSavedImmediately")]
-    [InlineData("Mw_SettingsTrustedHostKeysTitle", "SettingsSavedImmediately")]
-    [InlineData("Mw_SettingsTrustedRdpCertificatesTitle", "SettingsSavedImmediately")]
-    [InlineData("Mw_SettingsAppearanceTitle", "SettingsAppliesImmediately")]
-    [InlineData("Mw_SettingsRdpDefaultsTitle", "SettingsAppliesToNewConnections")]
-    public void ASectionThatDoesNotWaitForSaveSaysWhenItApplies(string title, string key)
+    [InlineData("Mw_SettingsPinTitle", "SettingsSavedImmediately", "SettingsApplyGlyphSavedAtOnce")]
+    [InlineData("Mw_SettingsVaultTitle", "SettingsSavedImmediately", "SettingsApplyGlyphSavedAtOnce")]
+    [InlineData("Mw_SettingsTrustedHostKeysTitle", "SettingsSavedImmediately", "SettingsApplyGlyphSavedAtOnce")]
+    [InlineData("Mw_SettingsTrustedRdpCertificatesTitle", "SettingsSavedImmediately", "SettingsApplyGlyphSavedAtOnce")]
+    [InlineData("Mw_SettingsAppearanceTitle", "SettingsAppliesImmediately", "SettingsApplyGlyphImmediate")]
+    [InlineData("Mw_SettingsRdpDefaultsTitle", "SettingsAppliesToNewConnections", "SettingsApplyGlyphNextConnection")]
+    [InlineData("Mw_SettingsTerminalTitle", "SettingsAppliesToNewSessions", "SettingsApplyGlyphNextConnection")]
+    public void ASectionThatDoesNotWaitForSaveSaysWhenItApplies(string title, string key, string glyph)
     {
         XDocument markup = XDocument.Load(
             Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
         XElement heading = markup.Descendants().Single(element => element.Attribute(Xaml + "Name")?.Value == title);
 
-        XElement? badge = heading.ElementsAfterSelf().FirstOrDefault();
+        XElement? sign = heading.ElementsAfterSelf().FirstOrDefault();
 
-        Assert.NotNull(badge);
-        Assert.Equal("{StaticResource SettingsApplyBadgeStyle}", badge!.Attribute("Style")?.Value);
-        Assert.Equal("{loc:Translate " + key + "}", badge.Elements().Single().Attribute("Text")?.Value);
+        Assert.NotNull(sign);
+        Assert.Equal("TextBlock", sign!.Name.LocalName);
+        Assert.Equal("{StaticResource SettingsApplyGlyphStyle}", sign.Attribute("Style")?.Value);
+        Assert.Equal("{StaticResource " + glyph + "}", sign.Attribute("Text")?.Value);
+        Assert.Equal("{loc:Translate " + key + "}", sign.Attribute("ToolTip")?.Value);
+        Assert.Equal("{loc:Translate " + key + "}", sign.Attribute("AutomationProperties.Name")?.Value);
+
+        // Beside the title, not under it.
+        Assert.Equal("Horizontal", heading.Parent?.Attribute("Orientation")?.Value);
     }
 
     /// <summary>

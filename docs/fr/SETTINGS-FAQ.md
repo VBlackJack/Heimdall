@@ -33,7 +33,10 @@ qui est enregistré : changez une valeur puis remettez-la, et plus rien n'attend
 des passerelles SSH et des outils externes restent en attente jusqu'à l'enregistrement ou
 l'annulation.
 
-Une carte dont les réglages n'attendent pas simplement l'enregistrement le dit sous son titre :
+Une carte dont les réglages n'attendent pas simplement l'enregistrement affiche un pictogramme à
+côté de son titre : un éclair, une disquette ou une nouvelle fenêtre. Le survol du pictogramme
+affiche sa signification, un lecteur d'écran la lit comme nom du pictogramme, et la légende sous
+la liste des sections la reprend :
 
 - **S'applique aussitôt, conservé à l'enregistrement** (Apparence) : la langue, le thème et
   l'accent s'affichent dès que vous les choisissez ; Annuler les modifications revient à

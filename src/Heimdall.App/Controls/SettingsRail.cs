@@ -47,6 +47,30 @@ public static class SettingsRail
         typeof(SettingsRail),
         new FrameworkPropertyMetadata(null));
 
+    /// <summary>What the rail shows at its foot, under the list of sections: the legend of the apply glyphs.</summary>
+    public static readonly DependencyProperty FooterProperty = DependencyProperty.RegisterAttached(
+        "Footer",
+        typeof(object),
+        typeof(SettingsRail),
+        new FrameworkPropertyMetadata(null));
+
+    /// <summary>Reads what the rail shows at its foot.</summary>
+    /// <param name="element">The rail.</param>
+    public static object? GetFooter(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return element.GetValue(FooterProperty);
+    }
+
+    /// <summary>Sets what the rail shows at its foot.</summary>
+    /// <param name="element">The rail.</param>
+    /// <param name="value">The footer content.</param>
+    public static void SetFooter(DependencyObject element, object? value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(FooterProperty, value);
+    }
+
     /// <summary>Reads the group of a rail item.</summary>
     /// <param name="element">The section's or the group heading's tab item.</param>
     public static string? GetGroup(DependencyObject element)

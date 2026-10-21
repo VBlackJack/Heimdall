@@ -195,6 +195,92 @@ public sealed class SettingsSingleRailMarkupTests
         Assert.All(cards, card => Assert.Equal("{DynamicResource BorderBrush}", card.Attribute("BorderBrush")?.Value));
     }
 
+    /// <summary>The glyph each apply text is shown with; the two "after Save" texts share one.</summary>
+    private static readonly Dictionary<string, string> GlyphForKey = new(StringComparer.Ordinal)
+    {
+        ["SettingsAppliesImmediately"] = "SettingsApplyGlyphImmediate",
+        ["SettingsSavedImmediately"] = "SettingsApplyGlyphSavedAtOnce",
+        ["SettingsAppliesToNewSessions"] = "SettingsApplyGlyphNextConnection",
+        ["SettingsAppliesToNewConnections"] = "SettingsApplyGlyphNextConnection",
+    };
+
+    /// <summary>
+    /// The apply badge under a section title is gone; a glyph beside the title replaces it.
+    /// </summary>
+    [Fact]
+    public void NoApplyBadgeRemains()
+    {
+        string root = SettingsNumericFields.FindRepoRoot();
+        foreach (string file in new[] { Path.Combine("src", "Heimdall.App", "MainWindow.xaml"), Path.Combine("src", "Heimdall.App", "Themes", "CommonControls.xaml") })
+        {
+            string text = File.ReadAllText(Path.Combine(root, file));
+            Assert.DoesNotContain("SettingsApplyBadge", text, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// Every apply glyph sits beside a section title and carries the old badge text as its tooltip
+    /// and as the name a screen reader hears.
+    /// </summary>
+    [Fact]
+    public void EveryApplyGlyphSaysItsTextToTheMouseAndToAScreenReader()
+    {
+        List<XElement> glyphs = Named(Window(), "Mw_SettingsRoot").Descendants()
+            .Where(element => element.Attribute("Style")?.Value == "{StaticResource SettingsApplyGlyphStyle}")
+            .ToList();
+
+        Assert.True(glyphs.Count >= 15, $"only {glyphs.Count} apply glyphs found; the scan is not reading the settings");
+        Assert.All(glyphs, glyph =>
+        {
+            string name = glyph.Attribute(Xaml + "Name")?.Value ?? "(unnamed)";
+            string? tooltip = glyph.Attribute("ToolTip")?.Value;
+            Assert.Equal(tooltip, glyph.Attribute("AutomationProperties.Name")?.Value);
+            string key = Assert.Single(GlyphForKey.Keys, key => tooltip == "{loc:Translate " + key + "}");
+            Assert.Equal("{StaticResource " + GlyphForKey[key] + "}", glyph.Attribute("Text")?.Value);
+
+            XElement title = Assert.IsType<XElement>(glyph.ElementsBeforeSelf().LastOrDefault());
+            Assert.Equal(name, title.Attribute(Xaml + "Name")?.Value + "Applies");
+            Assert.Equal("Horizontal", glyph.Parent?.Attribute("Orientation")?.Value);
+        });
+    }
+
+    /// <summary>
+    /// The foot of the rail says what each glyph means, in the words the glyphs carry.
+    /// </summary>
+    [Fact]
+    public void TheRailLegendExplainsEveryGlyph()
+    {
+        XElement rail = Named(Window(), "Mw_SettingsSubTabControl");
+        XElement footer = rail.Elements().Single(element => element.Name == Controls + "SettingsRail.Footer");
+        XElement legend = footer.Elements().Single();
+        Assert.Equal("Mw_SettingsApplyLegend", legend.Attribute(Xaml + "Name")?.Value);
+
+        List<XElement> lines = legend.Elements().Where(element => element.Name.LocalName == "TextBlock").ToList();
+        Assert.Equal(3, lines.Count);
+        HashSet<string> explained = new(StringComparer.Ordinal);
+        foreach (XElement line in lines)
+        {
+            List<XElement> runs = line.Elements().Where(element => element.Name.LocalName == "Run").ToList();
+            Assert.Equal(2, runs.Count);
+            string text = runs[1].Attribute("Text")!.Value;
+            string key = Assert.Single(GlyphForKey.Keys, key => text == "{loc:Translate " + key + "}");
+
+            // The line is named by its text alone, so the glyph is not read out.
+            Assert.Equal(text, line.Attribute("AutomationProperties.Name")?.Value);
+            Assert.Equal("{StaticResource " + GlyphForKey[key] + "}", runs[0].Attribute("Text")?.Value);
+            explained.Add(GlyphForKey[key]);
+        }
+
+        Assert.Equal(GlyphForKey.Values.ToHashSet(StringComparer.Ordinal), explained);
+
+        // The rail template shows its footer under the list of sections.
+        XElement style = Named(Theme(), "SettingsRailTabControlStyle", Xaml + "Key");
+        Assert.Contains(
+            style.Descendants(),
+            element => element.Name.LocalName == "ContentPresenter"
+                && element.Attribute("Content")?.Value == "{TemplateBinding controls:SettingsRail.Footer}");
+    }
+
     private static List<XElement> RailItems() =>
         Named(Window(), "Mw_SettingsSubTabControl").Elements()
             .Where(element => element.Name.LocalName == "TabItem")
