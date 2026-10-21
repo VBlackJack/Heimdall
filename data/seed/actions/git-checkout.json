@@ -49,11 +49,6 @@
       "command": "git checkout main",
       "description": "Switch to the main branch",
       "platform": 2
-    },
-    {
-      "command": "git checkout srv-web-01.contoso.com",
-      "description": "Example using the 'target' parameter: branch or file to check out. Replace srv-web-01.contoso.com with the value that fits your environment.",
-      "platform": 2
     }
   ],
   "notes": "Use -b to create and switch to a new branch. Prefer 'git switch' and 'git restore' in modern Git.",
@@ -99,8 +94,7 @@
       "examples": {
         "git checkout -b new-feature": "Crée et bascule sur une nouvelle branche",
         "git checkout -- file.txt": "Restaure un fichier depuis le dernier commit",
-        "git checkout main": "Bascule sur la branche main",
-        "git checkout srv-web-01.contoso.com": "Exemple utilisant le paramètre 'target': Branche ou fichier à checkout. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement."
+        "git checkout main": "Bascule sur la branche main"
       }
     }
   }

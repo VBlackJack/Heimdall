@@ -57,21 +57,6 @@
       "command": "Get-Service | Where-Object {$_.StartType -eq 'Automatic' -and $_.Status -ne 'Running'}",
       "description": "Stopped automatic services (potential problem)",
       "platform": 0
-    },
-    {
-      "command": "Get-Service MyResource Jean Dupont | Select-Object * -First 1",
-      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
-      "platform": 0
-    },
-    {
-      "command": "Get-Service MyResource Jean Dupont | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
-      "platform": 0
-    },
-    {
-      "command": "Get-Service MyResource Jean Dupont | Measure-Object",
-      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
-      "platform": 0
     }
   ],
   "notes": "Essential on Windows Server Core. See also Start-Service, Stop-Service, Restart-Service to control services.",
@@ -102,10 +87,7 @@
         "Get-Service": "Liste tous les services",
         "Get-Service | Where-Object {$_.Status -eq 'Running'}": "Services en cours d'exécution",
         "Get-Service -Name 'wuauserv'": "Service Windows Update",
-        "Get-Service | Where-Object {$_.StartType -eq 'Automatic' -and $_.Status -ne 'Running'}": "Services automatiques arrêtés (problème potentiel)",
-        "Get-Service MyResource Jean Dupont | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
-        "Get-Service MyResource Jean Dupont | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
-        "Get-Service MyResource Jean Dupont | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+        "Get-Service | Where-Object {$_.StartType -eq 'Automatic' -and $_.Status -ne 'Running'}": "Services automatiques arrêtés (problème potentiel)"
       }
     }
   }

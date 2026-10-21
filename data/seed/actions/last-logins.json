@@ -53,11 +53,6 @@
       "platform": 1
     },
     {
-      "command": "last -n 20 jdupont",
-      "description": "Example using the 'count' parameter: number of logons to show. Replace 10 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "last -n 10 jdupont",
       "description": "Example using the 'username' parameter: filter by user (empty = all). Replace jdupont with the value that fits your environment.",
       "platform": 1
@@ -116,7 +111,6 @@
         "last -n 20": "Affiche les 20 dernières connexions",
         "last root": "Affiche toutes les connexions de l'utilisateur root",
         "lastb": "Affiche les tentatives de connexion échouées",
-        "last -n 20 jdupont": "Exemple utilisant le paramètre 'count': Nombre de connexions à afficher. Remplacez 10 par la valeur appropriée selon votre environnement.",
         "last -n 10 jdupont": "Exemple utilisant le paramètre 'username': Filtrer par utilisateur (vide = tous). Remplacez jdupont par la valeur appropriée selon votre environnement.",
         "last": "Historique des connexions",
         "last -x": "Inclure shutdown et runlevel",

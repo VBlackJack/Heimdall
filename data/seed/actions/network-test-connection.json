@@ -103,11 +103,6 @@
   ],
   "linuxExamples": [
     {
-      "command": "ping -c 10 srv-web-01.contoso.com",
-      "description": "Linux example using ping. Replace the parameters between <> with your values.",
-      "platform": 1
-    },
-    {
       "command": "ping -c 4 google.com",
       "description": "Send 4 pings to Google",
       "platform": 1
@@ -188,7 +183,6 @@
         "Test-Connection -ComputerName server01 -Source DC01": "Exécute le ping depuis un ordinateur distant (DC01 vers server01). Nécessite WinRM activé et des droits admin sur la source. Utile pour tester la connectivité entre deux serveurs distants sans s'y connecter physiquement.",
         "Get-Content C:\\servers.txt | ForEach-Object {Test-Connection $_ -Count 1 -Quiet} | Where-Object {$_ -eq $false}": "Lit une liste de serveurs depuis un fichier et identifie lesquels sont inaccessibles. Get-Content charge le fichier ligne par ligne. Test-Connection -Quiet retourne $true/$false. Where-Object filtre les échecs. Parfait pour les vérifications quotidiennes de disponibilité.",
         "Test-Connection -ComputerName google.com -Count 4 | Select-Object Address,ResponseTime | Format-Table -AutoSize": "Affiche uniquement l'adresse et le temps de réponse dans un tableau propre. Select-Object filtre les colonnes pertinentes. Format-Table -AutoSize optimise l'affichage. Utile pour des rapports de performance réseau lisibles.",
-        "ping -c 10 srv-web-01.contoso.com": "Exemple Linux utilisant ping. Remplacez les paramètres entre <> par vos valeurs.",
         "ping -c 4 google.com": "Envoyer 4 pings à Google",
         "ping -c 10 -i 0.5 192.168.1.1": "Ping rapide (0.5s intervalle)",
         "ping -W 2 -c 3 server.local": "Ping avec timeout de 2 secondes",

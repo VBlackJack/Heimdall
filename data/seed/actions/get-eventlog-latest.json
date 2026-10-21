@@ -75,21 +75,6 @@
       "command": "Get-EventLog -LogName System -After (Get-Date).AddHours(-1)",
       "description": "Events of the last hour",
       "platform": 0
-    },
-    {
-      "command": "Get-EventLog -LogName Application -Newest 10 Error | Select-Object * -First 1",
-      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
-      "platform": 0
-    },
-    {
-      "command": "Get-EventLog -LogName Application -Newest 10 Error | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
-      "platform": 0
-    },
-    {
-      "command": "Get-EventLog -LogName Application -Newest 10 Error | Measure-Object",
-      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
-      "platform": 0
     }
   ],
   "notes": "Essential for diagnostics. Use Get-WinEvent for newer logs (faster). EntryType: Error, Warning, Information.",
@@ -126,10 +111,7 @@
         "Get-EventLog -LogName System -Newest 20": "20 derniers événements système",
         "Get-EventLog -LogName Application -EntryType Error -Newest 10": "10 dernières erreurs applicatives",
         "Get-EventLog -LogName System -EntryType Error,Warning -Newest 50 | Out-GridView": "Erreurs et avertissements en grille interactive",
-        "Get-EventLog -LogName System -After (Get-Date).AddHours(-1)": "Événements de la dernière heure",
-        "Get-EventLog -LogName Application -Newest 10 Error | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
-        "Get-EventLog -LogName Application -Newest 10 Error | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
-        "Get-EventLog -LogName Application -Newest 10 Error | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+        "Get-EventLog -LogName System -After (Get-Date).AddHours(-1)": "Événements de la dernière heure"
       }
     }
   }

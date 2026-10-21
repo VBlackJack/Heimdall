@@ -75,11 +75,6 @@
       "command": "git reset --hard origin/main",
       "description": "Reset completely to the state of origin/main",
       "platform": 2
-    },
-    {
-      "command": "git reset --mixed srv-web-01.contoso.com",
-      "description": "Example using the 'mode' parameter: reset mode (--soft, --mixed, --hard). Replace Full with the value that fits your environment.",
-      "platform": 2
     }
   ],
   "notes": "WARNING: --hard discards the changes. --soft keeps everything staged, --mixed unstages.",
@@ -89,22 +84,11 @@
       "url": "https://git-scm.com/docs/git-reset"
     }
   ],
-  "windowsExamples": [
-    {
-      "command": "git reset Full srv-web-01.contoso.com",
-      "description": "Windows example using git. Replace the parameters between <> with your values.",
-      "platform": 0
-    }
-  ],
+  "windowsExamples": [],
   "linuxExamples": [
     {
       "command": "git reset HEAD~1",
       "description": "Undo the last commit and keep the changes",
-      "platform": 1
-    },
-    {
-      "command": "git reset Full HEAD~1",
-      "description": "Example using the 'target' parameter: target commit. Replace srv-web-01.contoso.com with the value that fits your environment.",
       "platform": 1
     }
   ],
@@ -136,11 +120,8 @@
         }
       },
       "examples": {
-        "git reset Full srv-web-01.contoso.com": "Exemple Windows utilisant git. Remplacez les paramètres entre <> par vos valeurs.",
         "git reset HEAD~1": "Annule le dernier commit en gardant les modifications",
-        "git reset Full HEAD~1": "Exemple utilisant le paramètre 'target': Commit cible. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
-        "git reset --hard origin/main": "Réinitialise complètement au state de origin/main",
-        "git reset --mixed srv-web-01.contoso.com": "Exemple utilisant le paramètre 'mode': Mode de reset (--soft, --mixed, --hard). Remplacez Full par la valeur appropriée selon votre environnement."
+        "git reset --hard origin/main": "Réinitialise complètement au state de origin/main"
       }
     }
   }

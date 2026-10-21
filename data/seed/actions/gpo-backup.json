@@ -41,11 +41,6 @@
       "command": "Backup-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"",
       "description": "Back up the Default Domain Policy to C:\\GPOBackups",
       "platform": 0
-    },
-    {
-      "command": "Backup-GPO -Name \"Security-Baseline\" -Path \"C:\\GPOBackups\"",
-      "description": "Example using the 'backupPath' parameter: path of the backup folder. Replace D:\\Backups\\daily with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "The destination folder must exist. The backup includes every setting of the GPO.",
@@ -73,8 +68,7 @@
         }
       },
       "examples": {
-        "Backup-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"": "Sauvegarde la Default Domain Policy dans C:\\GPOBackups",
-        "Backup-GPO -Name \"Security-Baseline\" -Path \"C:\\GPOBackups\"": "Exemple utilisant le paramètre 'backupPath': Chemin du dossier de sauvegarde. Remplacez D:\\Backups\\daily par la valeur appropriée selon votre environnement."
+        "Backup-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"": "Sauvegarde la Default Domain Policy dans C:\\GPOBackups"
       }
     }
   }

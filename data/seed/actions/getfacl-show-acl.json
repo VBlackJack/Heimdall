@@ -40,11 +40,6 @@
       "platform": 1
     },
     {
-      "command": "getfacl /path/to/file",
-      "description": "Example using the 'path' parameter: file or directory to examine. Replace C:\\Logs\\app.log with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "getfacl -R /home/user",
       "description": "Recursive ACLs",
       "platform": 1
@@ -88,7 +83,6 @@
       "examples": {
         "getfacl /var/www/html": "Affiche les ACL du répertoire",
         "getfacl -R /home/shared": "Affiche les ACL récursivement",
-        "getfacl /path/to/file": "Exemple utilisant le paramètre 'path': Fichier ou répertoire à examiner. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
         "getfacl -R /home/user": "ACL récursives",
         "getfacl --omit-header file.txt": "Sans en-tête",
         "getfacl -a /etc/passwd": "Uniquement les ACL d'accès",

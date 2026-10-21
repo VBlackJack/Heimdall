@@ -54,11 +54,6 @@
       "platform": 1
     },
     {
-      "command": "mkfs.ext4 /dev/sdb1",
-      "description": "Example using the 'device' parameter: partition to format. Replace /dev/sda1 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "mkfs.xfs /dev/sdc1",
       "description": "Format with XFS",
       "platform": 1
@@ -102,7 +97,6 @@
         "sudo mkfs.ext4 /dev/sdb1": "Formate en ext4",
         "sudo mkfs.xfs /dev/sdc1": "Formate en XFS",
         "mkfs.ext4 /dev/sda1": "Exemple utilisant le paramètre 'fstype': Type (ext4, xfs, ext3, btrfs, etc.). Remplacez ext4 par la valeur appropriée selon votre environnement.",
-        "mkfs.ext4 /dev/sdb1": "Exemple utilisant le paramètre 'device': Partition à formater. Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
         "mkfs.xfs /dev/sdc1": "Formater en XFS",
         "mkfs.btrfs /dev/sde1": "Formater en Btrfs",
         "mkswap /dev/sdf1": "Créer une partition swap"

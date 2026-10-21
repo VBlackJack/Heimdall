@@ -35,11 +35,6 @@
       "platform": 1
     },
     {
-      "command": "du -sh \".\"",
-      "description": "Example using the 'path' parameter: path of the folder to analyze. Replace C:\\Logs\\app.log with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "du -sh /home/*",
       "description": "Size of each home directory",
       "platform": 1
@@ -62,7 +57,6 @@
       },
       "examples": {
         "du -h --max-depth=1 /home | sort -h": "Liste les dossiers par taille",
-        "du -sh \".\"": "Exemple utilisant le paramètre 'path': Chemin du dossier à analyser. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
         "du -sh /home/*": "Taille de chaque home"
       }
     }

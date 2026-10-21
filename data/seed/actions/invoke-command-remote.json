@@ -53,11 +53,6 @@
       "command": "$cred = Get-Credential; Invoke-Command -ComputerName Server01 -Credential $cred -ScriptBlock { Get-Disk }",
       "description": "Run with specific credentials",
       "platform": 0
-    },
-    {
-      "command": "Invoke-Command -ComputerName PC-PARIS-001 -ScriptBlock { Get-Service } $cred",
-      "description": "Example using the 'scriptblock' parameter: PowerShell command to run remotely. Replace { Get-Process } with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "Requires WinRM enabled (Enable-PSRemoting). Essential to manage Windows Server Core remotely. Use Enter-PSSession for an interactive session.",
@@ -87,8 +82,7 @@
       "examples": {
         "Invoke-Command -ComputerName Server01 -ScriptBlock { Get-Service }": "Liste les services sur Server01",
         "Invoke-Command -ComputerName Server01,Server02,Server03 -ScriptBlock { Restart-Service -Name 'wuauserv' }": "Redémarre un service sur plusieurs serveurs",
-        "$cred = Get-Credential; Invoke-Command -ComputerName Server01 -Credential $cred -ScriptBlock { Get-Disk }": "Exécute avec identifiants spécifiques",
-        "Invoke-Command -ComputerName PC-PARIS-001 -ScriptBlock { Get-Service } $cred": "Exemple utilisant le paramètre 'scriptblock': Commande PowerShell à exécuter à distance. Remplacez { Get-Process } par la valeur appropriée selon votre environnement."
+        "$cred = Get-Credential; Invoke-Command -ComputerName Server01 -Credential $cred -ScriptBlock { Get-Disk }": "Exécute avec identifiants spécifiques"
       }
     }
   }

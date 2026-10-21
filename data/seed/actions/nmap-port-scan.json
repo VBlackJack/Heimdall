@@ -59,16 +59,6 @@
       "platform": 1
     },
     {
-      "command": "nmap -sT srv-web-01.contoso.com",
-      "description": "Example using the 'options' parameter: scan options (-sT=TCP, -sU=UDP, -p=ports, -A=aggressive). Replace -v -f with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "nmap -v -f localhost",
-      "description": "Example using the 'target' parameter: IP or network to scan. Replace srv-web-01.contoso.com with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "nmap -sP 192.168.1.0/24",
       "description": "Scan the live hosts",
       "platform": 1
@@ -122,8 +112,6 @@
         "nmap -sT localhost": "Scan TCP des ports communs sur localhost",
         "nmap -p 1-65535 192.168.1.1": "Scan complet de tous les ports",
         "nmap -sV -O 192.168.1.0/24": "Détection de version et OS sur un réseau",
-        "nmap -sT srv-web-01.contoso.com": "Exemple utilisant le paramètre 'options': Options de scan (-sT=TCP, -sU=UDP, -p=ports, -A=aggressive). Remplacez -v -f par la valeur appropriée selon votre environnement.",
-        "nmap -v -f localhost": "Exemple utilisant le paramètre 'target': IP ou réseau à scanner. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
         "nmap -sP 192.168.1.0/24": "Scanner les hôtes actifs",
         "nmap -p 22,80,443 server.com": "Scanner des ports spécifiques",
         "nmap -sV server.com": "Détecter les versions de services",

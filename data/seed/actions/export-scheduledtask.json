@@ -64,18 +64,8 @@
       "platform": 0
     },
     {
-      "command": "Export-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\ | Out-File 'results.csv'",
-      "description": "Example using the 'taskname' parameter: name of the task to export. Replace DailyBackup with the value that fits your environment.",
-      "platform": 0
-    },
-    {
       "command": "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'results.csv'",
       "description": "Example using the 'taskpath' parameter: task path. Replace \\Microsoft\\Windows\\ with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'C:\\Backup\\task.xml'",
-      "description": "Example using the 'outputfile' parameter: path of the output XML file. Replace results.csv with the value that fits your environment.",
       "platform": 0
     }
   ],
@@ -111,9 +101,7 @@
         "Export-ScheduledTask -TaskName 'DailyBackup' | Out-File 'C:\\Backup\\DailyBackup.xml'": "Exporte la tâche vers un fichier XML",
         "Get-ScheduledTask | ForEach-Object { Export-ScheduledTask $_.TaskName | Out-File \"C:\\Backup\\$($_.TaskName).xml\" }": "Exporte toutes les tâches",
         "Register-ScheduledTask -Xml (Get-Content 'C:\\Backup\\task.xml' | Out-String) -TaskName 'RestoredTask'": "Réimporte une tâche depuis XML",
-        "Export-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\ | Out-File 'results.csv'": "Exemple utilisant le paramètre 'taskname': Nom de la tâche à exporter. Remplacez DailyBackup par la valeur appropriée selon votre environnement.",
-        "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'results.csv'": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement.",
-        "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'C:\\Backup\\task.xml'": "Exemple utilisant le paramètre 'outputfile': Chemin du fichier XML de sortie. Remplacez results.csv par la valeur appropriée selon votre environnement."
+        "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'results.csv'": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
       }
     }
   }

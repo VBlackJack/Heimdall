@@ -38,11 +38,6 @@
       "command": "gpresult /R",
       "description": "Show the GPOs applied on the local computer",
       "platform": 0
-    },
-    {
-      "command": "gpresult /R /S localhost",
-      "description": "Example using the 'targetHost' parameter: name of the target computer (localhost by default). Replace PC-PARIS-001 with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "Run with administrator rights. Use /H to generate an HTML report.",
@@ -62,8 +57,7 @@
       },
       "examples": {
         "gpresult /R /S PC-PARIS-001": "Affiche les GPO appliquées sur FRPANSI001PC",
-        "gpresult /R": "Affiche les GPO appliquées sur la machine locale",
-        "gpresult /R /S localhost": "Exemple utilisant le paramètre 'targetHost': Nom de la machine cible (localhost par défaut). Remplacez PC-PARIS-001 par la valeur appropriée selon votre environnement."
+        "gpresult /R": "Affiche les GPO appliquées sur la machine locale"
       }
     }
   }

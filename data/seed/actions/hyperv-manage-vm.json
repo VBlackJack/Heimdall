@@ -62,11 +62,6 @@
       "command": "Restart-VM -Name 'VM-WEB-01'",
       "description": "Example using the 'vmName' parameter: name of the virtual machine. Replace VM-WEB-01 with the value that fits your environment.",
       "platform": 0
-    },
-    {
-      "command": "Start-VM -Name 'VM-WEB-01'",
-      "description": "Example using the 'action' parameter: action: Start, Stop, Save, Suspend, Resume. Replace Restart with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "Stop-VM without -Force attempts a clean shutdown through Integration Services. Save-VM frees the RAM but keeps the state. -TurnOff is the same as -Force.",
@@ -97,8 +92,7 @@
         "Start-VM -Name 'Windows11-Dev'": "Démarre la VM Windows11-Dev",
         "Save-VM -Name 'Production-DB'": "Sauvegarde l'état et suspend la VM",
         "Suspend-VM -Name 'TestVM'; Resume-VM -Name 'TestVM'": "Pause puis reprend une VM",
-        "Restart-VM -Name 'VM-WEB-01'": "Exemple utilisant le paramètre 'vmName': Nom de la machine virtuelle. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement.",
-        "Start-VM -Name 'VM-WEB-01'": "Exemple utilisant le paramètre 'action': Action: Start, Stop, Save, Suspend, Resume. Remplacez Restart par la valeur appropriée selon votre environnement."
+        "Restart-VM -Name 'VM-WEB-01'": "Exemple utilisant le paramètre 'vmName': Nom de la machine virtuelle. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement."
       }
     }
   }

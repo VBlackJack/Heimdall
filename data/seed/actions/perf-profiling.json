@@ -52,16 +52,6 @@
       "platform": 1
     },
     {
-      "command": "perf top -v -f",
-      "description": "Example using the 'subcommand' parameter: subcommand (top, record, report, stat). Replace list with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "perf list -v -f",
-      "description": "Example of additional options (-v -f) passed to perf list",
-      "platform": 1
-    },
-    {
       "command": "perf top",
       "description": "Profile in real time",
       "platform": 1
@@ -101,8 +91,6 @@
         "sudo perf top": "Vue en temps réel du profiling CPU",
         "sudo perf record -a -g sleep 10": "Enregistre 10 secondes de profiling",
         "perf report": "Affiche le rapport du dernier record",
-        "perf top -v -f": "Exemple utilisant le paramètre 'subcommand': Sous-commande (top, record, report, stat). Remplacez list par la valeur appropriée selon votre environnement.",
-        "perf list -v -f": "Exemple d'options additionnelles (-v -f) passées à perf list",
         "perf top": "Profiler en temps réel",
         "perf record -g command": "Enregistrer avec call graph",
         "perf list": "Lister les événements disponibles"

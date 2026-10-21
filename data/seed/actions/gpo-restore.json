@@ -41,11 +41,6 @@
       "command": "Restore-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"",
       "description": "Restore the Default Domain Policy from the backup",
       "platform": 0
-    },
-    {
-      "command": "Restore-GPO -Name \"Security-Baseline\" -Path \"C:\\GPOBackups\"",
-      "description": "Example using the 'backupPath' parameter: path of the backup folder. Replace D:\\Backups\\daily with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "Overwrites the current GPO with the settings of the backup. Use with care.",
@@ -73,8 +68,7 @@
         }
       },
       "examples": {
-        "Restore-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"": "Restaure la Default Domain Policy depuis la sauvegarde",
-        "Restore-GPO -Name \"Security-Baseline\" -Path \"C:\\GPOBackups\"": "Exemple utilisant le paramètre 'backupPath': Chemin du dossier de sauvegarde. Remplacez D:\\Backups\\daily par la valeur appropriée selon votre environnement."
+        "Restore-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"": "Restaure la Default Domain Policy depuis la sauvegarde"
       }
     }
   }

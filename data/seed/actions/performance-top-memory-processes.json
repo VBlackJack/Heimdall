@@ -31,21 +31,6 @@
   },
   "examples": [
     {
-      "command": "Get-Process | Sort-Object CPU -Descending | Select-Object -First 5",
-      "description": "🔥 PERFORMANCE: find the 5 processes that use the most CPU right now.",
-      "platform": 0
-    },
-    {
-      "command": "Get-Process | Where-Object {$_.Responding -eq $false}",
-      "description": "Find the 'Not responding' (frozen) applications.",
-      "platform": 0
-    },
-    {
-      "command": "Get-Process -Name chrome | Stop-Process -Force",
-      "description": "Kill switch: force every instance of a given process to close. Useful to clean up zombie processes.",
-      "platform": 1
-    },
-    {
       "command": "Get-Process | Sort-Object WS -Descending | Select-Object -First 10 ProcessName,@{n='Memory(MB)';e={[int]($_.WS/1MB)}}",
       "description": "Top 10 processes by memory (simplified)",
       "platform": 0
@@ -97,9 +82,6 @@
         }
       },
       "examples": {
-        "Get-Process | Sort-Object CPU -Descending | Select-Object -First 5": "🔥 PERFORMANCE : Identifie les 5 processus qui consomment le plus de CPU actuellement.",
-        "Get-Process | Where-Object {$_.Responding -eq $false}": "Trouve les applications 'Ne répond pas' (Frozen).",
-        "Get-Process -Name chrome | Stop-Process -Force": "Kill Switch : Ferme de force toutes les instances d'un processus spécifique. Utile pour nettoyer des processus zombies.",
         "Get-Process | Sort-Object WS -Descending | Select-Object -First 10 ProcessName,@{n='Memory(MB)';e={[int]($_.WS/1MB)}}": "Top 10 des processus par mémoire (simplifié)",
         "Get-Process | Where-Object {$_.WorkingSet -gt 100MB} | Sort-Object WS -Descending": "Processus utilisant plus de 100 MB",
         "Get-Process | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",

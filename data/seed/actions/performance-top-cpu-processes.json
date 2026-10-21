@@ -35,16 +35,6 @@
       "platform": 0
     },
     {
-      "command": "Get-Process | Where-Object {$_.Responding -eq $false}",
-      "description": "Find the 'Not responding' (frozen) applications.",
-      "platform": 0
-    },
-    {
-      "command": "Get-Process -Name chrome | Stop-Process -Force",
-      "description": "Kill switch: force every instance of a given process to close. Useful to clean up zombie processes.",
-      "platform": 1
-    },
-    {
       "command": "Get-Process | Sort-Object CPU -Descending | Select-Object -First 10",
       "description": "Top 10 processes by CPU",
       "platform": 0
@@ -97,8 +87,6 @@
       },
       "examples": {
         "Get-Process | Sort-Object CPU -Descending | Select-Object -First 5": "🔥 PERFORMANCE : Identifie les 5 processus qui consomment le plus de CPU actuellement.",
-        "Get-Process | Where-Object {$_.Responding -eq $false}": "Trouve les applications 'Ne répond pas' (Frozen).",
-        "Get-Process -Name chrome | Stop-Process -Force": "Kill Switch : Ferme de force toutes les instances d'un processus spécifique. Utile pour nettoyer des processus zombies.",
         "Get-Process | Sort-Object CPU -Descending | Select-Object -First 10": "Top 10 des processus par CPU",
         "Get-Process | Where-Object {$_.CPU -gt 10} | Sort-Object CPU -Descending": "Processus ayant utilisé plus de 10 secondes CPU",
         "Get-Process | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",

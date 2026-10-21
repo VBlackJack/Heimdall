@@ -52,11 +52,6 @@
       "platform": 1
     },
     {
-      "command": "mount /dev/sdb1 /mnt/data",
-      "description": "Example using the 'device' parameter: partition to mount. Replace /dev/sda1 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "mount /dev/sda1 /mnt/data",
       "description": "Example using the 'mountpoint' parameter: directory to mount on. Replace /mnt/data with the value that fits your environment.",
       "platform": 1
@@ -110,7 +105,6 @@
         "sudo mount /dev/sdb1 /mnt/data": "Monte /dev/sdb1 sur /mnt/data",
         "mount": "Liste tous les montages actifs",
         "sudo umount /mnt/data": "Démonte un filesystem",
-        "mount /dev/sdb1 /mnt/data": "Exemple utilisant le paramètre 'device': Partition à monter. Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
         "mount /dev/sda1 /mnt/data": "Exemple utilisant le paramètre 'mountpoint': Répertoire où monter. Remplacez /mnt/data par la valeur appropriée selon votre environnement.",
         "mount -o remount,rw /": "Remonter / en lecture-écriture",
         "mount -t nfs server:/share /mnt/nfs": "Monter un partage NFS",

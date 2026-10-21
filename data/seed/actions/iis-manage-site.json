@@ -47,16 +47,6 @@
       "command": "Start-WebSite -Name 'Default Web Site'",
       "description": "Start the default website",
       "platform": 0
-    },
-    {
-      "command": "Import-Module WebAdministration; Restart-WebSite -Name 'Default Web Site'",
-      "description": "Example using the 'siteName' parameter: name of the IIS site to manage. Replace Default Web Site with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "Import-Module WebAdministration; Start-WebSite -Name 'Default Web Site'",
-      "description": "Example using the 'action' parameter: action to run: Start, Stop, Restart. Replace Restart with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "Requires administrator privileges. To restart, use Stop then Start, or recycle the application pool.",
@@ -84,9 +74,7 @@
         }
       },
       "examples": {
-        "Start-WebSite -Name 'Default Web Site'": "Démarre le site web par défaut",
-        "Import-Module WebAdministration; Restart-WebSite -Name 'Default Web Site'": "Exemple utilisant le paramètre 'siteName': Nom du site IIS à gérer. Remplacez Default Web Site par la valeur appropriée selon votre environnement.",
-        "Import-Module WebAdministration; Start-WebSite -Name 'Default Web Site'": "Exemple utilisant le paramètre 'action': Action à effectuer: Start, Stop, Restart. Remplacez Restart par la valeur appropriée selon votre environnement."
+        "Start-WebSite -Name 'Default Web Site'": "Démarre le site web par défaut"
       }
     }
   }

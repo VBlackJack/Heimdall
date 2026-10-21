@@ -28,22 +28,22 @@
     {
       "command": "Get-NetIPAddress -AddressFamily IPv4",
       "description": "Show only the IPv4 addresses (excludes IPv6). The -AddressFamily parameter filters by address family. Simplifies the output when you work in IPv4 only. Avoids the noise of the many link-local IPv6 addresses.",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "Get-NetIPAddress -InterfaceAlias 'Ethernet' -AddressFamily IPv4",
       "description": "Show the IPv4 address of a given network interface. -InterfaceAlias uses the friendly name of the interface (the one shown in 'Network settings'). Useful when the computer has several network cards and you want to query one of them.",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "Get-NetIPAddress | Where-Object {$_.IPAddress -like '192.168.*'} | Select-Object IPAddress,InterfaceAlias,PrefixLength",
       "description": "Filter and show only the IP addresses of the 192.168.x.x local network. Where-Object filters with a wildcard, Select-Object picks the relevant columns. Useful to spot the LAN interfaces quickly on a multi-card computer.",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -eq 'Dhcp'}",
       "description": "Show only the IPv4 addresses obtained through DHCP. PrefixOrigin tells how the IP was configured (Dhcp/Manual/WellKnown). Useful to tell static IPs from dynamic ones during network troubleshooting.",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "Get-NetIPAddress | Export-Csv C:\\Temp\\NetworkConfig.csv -NoTypeInformation",

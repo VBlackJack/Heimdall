@@ -24,11 +24,6 @@
       "command": "gpupdate /force",
       "description": "Force the Group Policy update on the local computer",
       "platform": 0
-    },
-    {
-      "command": "gpupdate /force -Confirm:$false",
-      "description": "Run the action without an interactive confirmation. The -Confirm:$false parameter removes the prompts. Useful in automated scripts but use it with care.",
-      "platform": 0
     }
   ],
   "notes": "May require a restart depending on the GPO settings. Use /boot or /logoff to force it.",
@@ -39,8 +34,7 @@
       "description": "Force l'application immédiate des stratégies de groupe sans attendre le délai de rafraîchissement.",
       "notes": "Peut nécessiter un redémarrage selon les paramètres de GPO. Utiliser /boot ou /logoff pour forcer.",
       "examples": {
-        "gpupdate /force": "Force la mise à jour des GPO sur la machine locale",
-        "gpupdate /force -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution."
+        "gpupdate /force": "Force la mise à jour des GPO sur la machine locale"
       }
     }
   }

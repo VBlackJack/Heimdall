@@ -46,11 +46,6 @@
       "platform": 1
     },
     {
-      "command": "fsck -v -f /dev/sdb1",
-      "description": "Example using the 'device' parameter: partition to check (MUST be unmounted). Replace /dev/sda1 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "fsck /dev/sdb1",
       "description": "Check the filesystem",
       "platform": 1
@@ -100,7 +95,6 @@
         "sudo fsck -y /dev/sdb1": "Vérifie et répare automatiquement",
         "sudo e2fsck -f /dev/sdb1": "Force la vérification d'une partition ext4",
         "fsck -y /dev/sda1": "Répare automatiquement /dev/sda1",
-        "fsck -v -f /dev/sdb1": "Exemple utilisant le paramètre 'device': Partition à vérifier (DOIT être démontée). Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
         "fsck /dev/sdb1": "Vérifier le filesystem",
         "fsck -y /dev/sdb1": "Réparer automatiquement",
         "fsck -n /dev/sdb1": "Dry-run (pas de modification)",

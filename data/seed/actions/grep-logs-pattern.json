@@ -56,11 +56,6 @@
       "platform": 1
     },
     {
-      "command": "grep -i \"error\" /var/log/syslog | tail -n 100",
-      "description": "Example using the 'pattern' parameter: text or regex to search for. Replace *.txt with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "grep -i \"error|warning\" /var/log/syslog | tail -n 100",
       "description": "Example using the 'logfile' parameter: path to the log file. Replace /var/log/syslog with the value that fits your environment.",
       "platform": 1
@@ -122,7 +117,6 @@
       "examples": {
         "grep -i \"error\" /var/log/syslog | tail -n 50": "Recherche 'error' dans syslog (insensible à la casse)",
         "grep \"failed\" /var/log/auth.log": "Recherche les échecs d'authentification",
-        "grep -i \"error\" /var/log/syslog | tail -n 100": "Exemple utilisant le paramètre 'pattern': Texte ou regex à rechercher. Remplacez *.txt par la valeur appropriée selon votre environnement.",
         "grep -i \"error|warning\" /var/log/syslog | tail -n 100": "Exemple utilisant le paramètre 'logfile': Chemin vers le fichier de log. Remplacez /var/log/syslog par la valeur appropriée selon votre environnement.",
         "grep -i \"failed|denied\" /var/log/auth.log | tail -n 50": "Recherche les tentatives d'authentification échouées dans le journal d'authentification. Remplacez le fichier et le pattern selon votre environnement.",
         "grep -r \"error\" /var/log": "Rechercher \"error\" récursivement dans les logs",

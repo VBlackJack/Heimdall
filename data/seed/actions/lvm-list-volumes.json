@@ -51,11 +51,6 @@
       "platform": 1
     },
     {
-      "command": "lvs",
-      "description": "Example using the 'command' parameter: LVM command (lvs, vgs, pvs). Replace Get-Process with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "pvs",
       "description": "List physical volumes",
       "platform": 1
@@ -100,7 +95,6 @@
         "sudo lvs": "Liste les volumes logiques",
         "sudo vgs": "Liste les groupes de volumes",
         "sudo pvs": "Liste les volumes physiques",
-        "lvs": "Exemple utilisant le paramètre 'command': Commande LVM (lvs, vgs, pvs). Remplacez Get-Process par la valeur appropriée selon votre environnement.",
         "pvs": "Lister les volumes physiques",
         "vgs": "Lister les groupes de volumes",
         "lvdisplay": "Détails des volumes logiques",

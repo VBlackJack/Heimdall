@@ -49,11 +49,6 @@
       "command": "Import-GPO -BackupId {12345678-1234-1234-1234-123456789012} -TargetName \"New-Policy\" -Path \"C:\\GPOBackups\"",
       "description": "Import the settings of a backup into New-Policy",
       "platform": 0
-    },
-    {
-      "command": "Import-GPO -BackupId B1234567-89AB-CDEF-0123-456789ABCDEF -TargetName \"Custom-Security-Policy\" -Path \"C:\\GPOBackups\"",
-      "description": "Example using the 'backupPath' parameter: path of the backup folder. Replace D:\\Backups\\daily with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "To get the BackupId: Get-GPOReport -BackupDirectory. Useful to migrate GPOs between domains.",
@@ -85,8 +80,7 @@
         }
       },
       "examples": {
-        "Import-GPO -BackupId {12345678-1234-1234-1234-123456789012} -TargetName \"New-Policy\" -Path \"C:\\GPOBackups\"": "Importe les paramètres d'une sauvegarde dans New-Policy",
-        "Import-GPO -BackupId B1234567-89AB-CDEF-0123-456789ABCDEF -TargetName \"Custom-Security-Policy\" -Path \"C:\\GPOBackups\"": "Exemple utilisant le paramètre 'backupPath': Chemin du dossier de sauvegarde. Remplacez D:\\Backups\\daily par la valeur appropriée selon votre environnement."
+        "Import-GPO -BackupId {12345678-1234-1234-1234-123456789012} -TargetName \"New-Policy\" -Path \"C:\\GPOBackups\"": "Importe les paramètres d'une sauvegarde dans New-Policy"
       }
     }
   }

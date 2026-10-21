@@ -66,11 +66,6 @@
       "command": "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\"",
       "description": "Example using the 'gpoName' parameter: GPO name. Replace Security-Baseline with the value that fits your environment.",
       "platform": 0
-    },
-    {
-      "command": "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\GPOReports\\report.html\"",
-      "description": "Example using the 'outputPath' parameter: full path of the HTML file to create. Replace C:\\Reports\\output.txt with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "The HTML report is detailed and easy to share. Useful for documentation and audits.",
@@ -103,8 +98,7 @@
         "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
         "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
-        "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\"": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO. Remplacez Security-Baseline par la valeur appropriée selon votre environnement.",
-        "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\GPOReports\\report.html\"": "Exemple utilisant le paramètre 'outputPath': Chemin complet du fichier HTML à créer. Remplacez C:\\Reports\\output.txt par la valeur appropriée selon votre environnement."
+        "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\"": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
       }
     }
   }

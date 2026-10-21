@@ -67,11 +67,6 @@
       "command": "git diff main..feature",
       "description": "Compare two branches",
       "platform": 1
-    },
-    {
-      "command": "git diff srv-web-01.contoso.com",
-      "description": "Example using the 'target' parameter: branch, commit or file to compare. Replace srv-web-01.contoso.com with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "translations": {
@@ -96,8 +91,7 @@
       "examples": {
         "git diff": "Affiche les modifications non staged",
         "git diff --staged": "Affiche les modifications staged",
-        "git diff main..feature": "Compare deux branches",
-        "git diff srv-web-01.contoso.com": "Exemple utilisant le paramètre 'target': Branche, commit ou fichier à comparer. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement."
+        "git diff main..feature": "Compare deux branches"
       }
     }
   }

@@ -59,11 +59,6 @@
       "command": "git log --author=\"John\"",
       "description": "Filter by author",
       "platform": 2
-    },
-    {
-      "command": "git log --oneline --graph --decorate -n 20",
-      "description": "Example using the 'count' parameter: number of commits to show. Replace 10 with the value that fits your environment.",
-      "platform": 2
     }
   ],
   "notes": "Use --graph to see the branches, --stat to see change statistics.",
@@ -95,8 +90,7 @@
       "examples": {
         "git log --oneline": "Affiche l'historique en format compact",
         "git log --graph --all": "Affiche toutes les branches avec un graphe",
-        "git log --author=\"John\"": "Filtre par auteur",
-        "git log --oneline --graph --decorate -n 20": "Exemple utilisant le paramètre 'count': Nombre de commits à afficher. Remplacez 10 par la valeur appropriée selon votre environnement."
+        "git log --author=\"John\"": "Filtre par auteur"
       }
     }
   }

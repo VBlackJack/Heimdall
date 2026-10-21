@@ -38,11 +38,6 @@
       "command": "Get-WindowsUpdate | Where-Object {$_.Title -like '*Driver*'} | Hide-WindowsUpdate",
       "description": "Hide every driver update",
       "platform": 0
-    },
-    {
-      "command": "Hide-WindowsUpdate -KBArticleID KB5001234 -Confirm:$false",
-      "description": "Example using the 'kbNumber' parameter: KB number of the update to hide (e.g. KB5001234). Replace KB5012345 with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "WARNING: hiding security updates can create vulnerabilities. Requires PSWindowsUpdate.",
@@ -67,8 +62,7 @@
       },
       "examples": {
         "Hide-WindowsUpdate -KBArticleID KB5001234": "Masque la mise à jour KB5001234",
-        "Get-WindowsUpdate | Where-Object {$_.Title -like '*Driver*'} | Hide-WindowsUpdate": "Masque toutes les mises à jour de pilotes",
-        "Hide-WindowsUpdate -KBArticleID KB5001234 -Confirm:$false": "Exemple utilisant le paramètre 'kbNumber': Numéro KB de la mise à jour à masquer (ex: KB5001234). Remplacez KB5012345 par la valeur appropriée selon votre environnement."
+        "Get-WindowsUpdate | Where-Object {$_.Title -like '*Driver*'} | Hide-WindowsUpdate": "Masque toutes les mises à jour de pilotes"
       }
     }
   }

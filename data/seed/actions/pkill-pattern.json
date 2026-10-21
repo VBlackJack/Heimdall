@@ -41,11 +41,6 @@
       "platform": 1
     },
     {
-      "command": "pkill -v -f *.txt",
-      "description": "Example of combined options (-v -f)",
-      "platform": 1
-    },
-    {
       "command": "pkill -9 java",
       "description": "Force the Java processes to stop",
       "platform": 1
@@ -79,7 +74,6 @@
       "examples": {
         "pgrep -a firefox": "Liste les processus firefox (sans les tuer)",
         "pkill -u username": "Termine tous les processus d'un utilisateur",
-        "pkill -v -f *.txt": "Exemple d'options combinées (-v -f)",
         "pkill -9 java": "Forcer l'arrêt des processus Java",
         "pkill -u www-data": "Terminer les processus d'un utilisateur"
       }

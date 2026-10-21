@@ -56,16 +56,6 @@
       "command": "Import-VM -Path 'D:\\Backups\\VMs\\Windows11-Dev' -Copy -GenerateNewId",
       "description": "Import an exported VM (with a new ID)",
       "platform": 0
-    },
-    {
-      "command": "Export-VM -Name 'VM-WEB-01' -Path 'C:\\Export\\users.csv'",
-      "description": "Example using the 'vmName' parameter: name of the VM to export. Replace VM-WEB-01 with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "Export-VM -Name 'VM-WEB-01' -Path 'D:\\VM-Exports'",
-      "description": "Example using the 'exportPath' parameter: destination folder of the export. Replace C:\\Export\\users.csv with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "The export can take a while depending on the VM size. Check the free disk space. Use Import-VM to restore.",
@@ -95,9 +85,7 @@
       "examples": {
         "Export-VM -Name 'Windows11-Dev' -Path 'D:\\Backups\\VMs'": "Exporte une VM vers D:\\Backups\\VMs",
         "Export-VM -Name 'Production-DB' -Path '\\\\NAS\\VM-Backups' -CaptureLiveState CaptureSavedState": "Exporte avec capture de l'état actuel",
-        "Import-VM -Path 'D:\\Backups\\VMs\\Windows11-Dev' -Copy -GenerateNewId": "Importe une VM exportée (avec nouvel ID)",
-        "Export-VM -Name 'VM-WEB-01' -Path 'C:\\Export\\users.csv'": "Exemple utilisant le paramètre 'vmName': Nom de la VM à exporter. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement.",
-        "Export-VM -Name 'VM-WEB-01' -Path 'D:\\VM-Exports'": "Exemple utilisant le paramètre 'exportPath': Dossier de destination de l'export. Remplacez C:\\Export\\users.csv par la valeur appropriée selon votre environnement."
+        "Import-VM -Path 'D:\\Backups\\VMs\\Windows11-Dev' -Copy -GenerateNewId": "Importe une VM exportée (avec nouvel ID)"
       }
     }
   }
