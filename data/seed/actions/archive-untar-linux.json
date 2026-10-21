@@ -1,12 +1,12 @@
 {
   "id": "archive-untar-linux",
-  "title": "Extraire une archive TAR/GZ",
-  "description": "Extrait le contenu d'une archive tar ou tar.gz.",
+  "title": "Extract a TAR/GZ archive",
+  "description": "Extract the content of a tar or tar.gz archive.",
   "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [
-    "décompression",
+    "decompression",
     "tar",
     "extract",
     "linux"
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "archivePath",
-        "label": "Fichier archive",
+        "label": "Archive file",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier tar.gz"
+        "description": "Path of the tar.gz file"
       },
       {
         "name": "destinationPath",
@@ -32,32 +32,51 @@
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Dossier de destination"
+        "description": "Destination folder"
       }
     ]
   },
   "examples": [
     {
       "command": "tar -xzf archive.tar.gz -C /tmp",
-      "description": "Extrait dans /tmp",
+      "description": "Extract into /tmp",
       "platform": 1
     },
     {
       "command": "tar -tzf archive.tar.gz",
-      "description": "Liste le contenu sans extraire",
+      "description": "List the content without extracting",
       "platform": 1
     },
     {
       "command": "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\" -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\"",
-      "description": "Exemple utilisant le paramètre 'archivePath': Chemin du fichier tar.gz. Remplacez C:\\Backup\\data.tar.gz par la valeur appropriée selon votre environnement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     }
   ],
-  "notes": "-x extraire, -z gzip, -f fichier, -C destination, -t lister. -v pour verbeux.",
-  "links": []
+  "notes": "-x extract, -z gzip, -f file, -C destination, -t list. -v for verbose.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Extraire une archive TAR/GZ",
+      "description": "Extrait le contenu d'une archive tar ou tar.gz.",
+      "notes": "-x extraire, -z gzip, -f fichier, -C destination, -t lister. -v pour verbeux.",
+      "parameters": {
+        "linux": {
+          "archivePath": {
+            "label": "Fichier archive",
+            "description": "Chemin du fichier tar.gz"
+          },
+          "destinationPath": {
+            "label": "Destination",
+            "description": "Dossier de destination"
+          }
+        }
+      },
+      "examples": {
+        "tar -xzf archive.tar.gz -C /tmp": "Extrait dans /tmp",
+        "tar -tzf archive.tar.gz": "Liste le contenu sans extraire",
+        "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
+      }
+    }
+  }
 }

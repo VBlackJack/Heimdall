@@ -1,7 +1,7 @@
 {
   "id": "build-dotnet-publish",
-  "title": "Publier un projet .NET",
-  "description": "Publie un projet .NET pour le déploiement.",
+  "title": "Publish a .NET project",
+  "description": "Publish a .NET project for deployment.",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -21,19 +21,19 @@
     "parameters": [
       {
         "name": "projectPath",
-        "label": "Projet",
+        "label": "Project",
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Chemin du projet"
+        "description": "Path of the project"
       },
       {
         "name": "outputPath",
-        "label": "Dossier de sortie",
+        "label": "Output folder",
         "type": "string",
         "defaultValue": "./publish",
         "required": false,
-        "description": "Dossier où publier"
+        "description": "Folder to publish to"
       }
     ]
   },
@@ -46,24 +46,24 @@
     "parameters": [
       {
         "name": "projectPath",
-        "label": "Projet",
+        "label": "Project",
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Chemin du projet"
+        "description": "Path of the project"
       },
       {
         "name": "outputPath",
-        "label": "Dossier de sortie",
+        "label": "Output folder",
         "type": "string",
         "defaultValue": "./publish",
         "required": false,
-        "description": "Dossier où publier"
+        "description": "Folder to publish to"
       }
     ]
   },
   "examples": [],
-  "notes": "--self-contained inclut le runtime. --runtime spécifie la plateforme cible (win-x64, linux-x64, osx-x64).",
+  "notes": "--self-contained includes the runtime. --runtime sets the target platform (win-x64, linux-x64, osx-x64).",
   "links": [
     {
       "title": "Documentation dotnet publish",
@@ -73,35 +73,60 @@
   "windowsExamples": [
     {
       "command": "dotnet publish -c Release -o ./publish",
-      "description": "Publie en mode Release",
+      "description": "Publish in Release mode",
       "platform": 0
     },
     {
       "command": "dotnet publish --self-contained --runtime win-x64",
-      "description": "Publie avec runtime inclus pour Windows x64",
-      "platform": 0
-    },
-    {
-      "command": "dotnet publish \".\" --configuration Release --output \"C:\\Reports\\output.txt\"",
-      "description": "Exemple utilisant le paramètre 'projectPath': Chemin du projet. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "dotnet publish \"C:\\Projects\\MyApp\" --configuration Release --output \"./publish\"",
-      "description": "Exemple utilisant le paramètre 'outputPath': Dossier où publier. Remplacez C:\\Reports\\output.txt par la valeur appropriée selon votre environnement.",
+      "description": "Publish with the runtime included for Windows x64",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "dotnet publish \"./MyApp\" --configuration Release --output \"./publish\"",
-      "description": "Publie un projet .NET en mode Release",
+      "description": "Publish a .NET project in Release mode",
       "platform": 1
     },
     {
       "command": "dotnet publish -c Release",
-      "description": "Publier en mode Release",
+      "description": "Publish in Release mode",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Publier un projet .NET",
+      "description": "Publie un projet .NET pour le déploiement.",
+      "notes": "--self-contained inclut le runtime. --runtime spécifie la plateforme cible (win-x64, linux-x64, osx-x64).",
+      "parameters": {
+        "windows": {
+          "projectPath": {
+            "label": "Projet",
+            "description": "Chemin du projet"
+          },
+          "outputPath": {
+            "label": "Dossier de sortie",
+            "description": "Dossier où publier"
+          }
+        },
+        "linux": {
+          "projectPath": {
+            "label": "Projet",
+            "description": "Chemin du projet"
+          },
+          "outputPath": {
+            "label": "Dossier de sortie",
+            "description": "Dossier où publier"
+          }
+        }
+      },
+      "examples": {
+        "dotnet publish -c Release -o ./publish": "Publie en mode Release",
+        "dotnet publish --self-contained --runtime win-x64": "Publie avec runtime inclus pour Windows x64",
+        "dotnet publish \"./MyApp\" --configuration Release --output \"./publish\"": "Publie un projet .NET en mode Release",
+        "dotnet publish -c Release": "Publier en mode Release"
+      }
+    }
+  }
 }

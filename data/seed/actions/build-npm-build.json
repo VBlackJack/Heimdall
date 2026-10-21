@@ -1,7 +1,7 @@
 {
   "id": "build-npm-build",
-  "title": "Construire un projet npm",
-  "description": "Exécute le script de build défini dans package.json.",
+  "title": "Build an npm project",
+  "description": "Run the build script defined in package.json.",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -28,18 +28,29 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "Le script doit être défini dans package.json. npm run liste tous les scripts disponibles.",
+  "notes": "The script must be defined in package.json. npm run lists every available script.",
   "links": [],
   "linuxExamples": [
     {
       "command": "npm run build",
-      "description": "Exécute le script build de package.json",
+      "description": "Run the build script of package.json",
       "platform": 1
     },
     {
       "command": "npm run build:prod",
-      "description": "Exécute un script build personnalisé",
+      "description": "Run a custom build script",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Construire un projet npm",
+      "description": "Exécute le script de build défini dans package.json.",
+      "notes": "Le script doit être défini dans package.json. npm run liste tous les scripts disponibles.",
+      "examples": {
+        "npm run build": "Exécute le script build de package.json",
+        "npm run build:prod": "Exécute un script build personnalisé"
+      }
+    }
+  }
 }

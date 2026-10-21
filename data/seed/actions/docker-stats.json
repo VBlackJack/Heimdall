@@ -1,7 +1,7 @@
 {
   "id": "docker-stats",
-  "title": "Statistiques des conteneurs Docker",
-  "description": "Affiche en temps réel l'utilisation CPU, mémoire, réseau et I/O des conteneurs",
+  "title": "Docker container statistics",
+  "description": "Show the CPU, memory, network and I/O usage of the containers in real time",
   "category": "containers-vms",
   "platform": 2,
   "level": 0,
@@ -18,19 +18,10 @@
     "id": "docker-stats-cmd",
     "platform": 1,
     "name": "docker",
-    "commandPattern": "docker stats {options}",
-    "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "",
-        "required": false,
-        "description": "Options (--no-stream, --format, container_name)"
-      }
-    ]
+    "commandPattern": "docker stats",
+    "parameters": []
   },
-  "notes": "Windows & Linux: Ctrl+C pour quitter. --no-stream pour affichage unique.",
+  "notes": "Windows & Linux: Ctrl+C to quit. --no-stream for a one-off display.",
   "links": [
     {
       "title": "Docker stats",
@@ -41,62 +32,67 @@
     "id": "docker-stats-win-cmd",
     "platform": 0,
     "name": "docker",
-    "commandPattern": "docker stats {options}",
-    "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "",
-        "required": false,
-        "description": "Options (--no-stream, --format, container_name)"
-      }
-    ]
+    "commandPattern": "docker stats",
+    "parameters": []
   },
   "windowsCommandTemplateId": "docker-stats-win-cmd",
   "windowsExamples": [
     {
       "command": "docker stats",
-      "description": "Stats en temps réel de tous les conteneurs",
+      "description": "Live statistics of all containers",
       "platform": 0
     },
     {
       "command": "docker stats --no-stream",
-      "description": "Snapshot instantané (pas de rafraîchissement)",
+      "description": "One-off snapshot (no refresh)",
       "platform": 0
     },
     {
       "command": "docker stats mycontainer",
-      "description": "Stats d'un conteneur spécifique",
+      "description": "Statistics of one container",
       "platform": 0
     },
     {
       "command": "docker stats --format \"table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\"",
-      "description": "Affiche les stats avec un format personnalisé (nom, CPU, mémoire).",
+      "description": "Show the statistics with a custom format (name, CPU, memory).",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "docker stats",
-      "description": "Stats en temps réel de tous les conteneurs",
+      "description": "Live statistics of all containers",
       "platform": 1
     },
     {
       "command": "docker stats --no-stream",
-      "description": "Snapshot instantané (pas de rafraîchissement)",
+      "description": "One-off snapshot (no refresh)",
       "platform": 1
     },
     {
       "command": "docker stats mycontainer",
-      "description": "Stats d'un conteneur spécifique",
+      "description": "Statistics of one container",
       "platform": 1
     },
     {
       "command": "docker stats --no-stream --format \"{{.Name}}: {{.CPUPerc}}\"",
-      "description": "Affiche un snapshot des stats CPU avec format simplifié.",
+      "description": "Show a snapshot of the CPU statistics with a simple format.",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Statistiques des conteneurs Docker",
+      "description": "Affiche en temps réel l'utilisation CPU, mémoire, réseau et I/O des conteneurs",
+      "notes": "Windows & Linux: Ctrl+C pour quitter. --no-stream pour affichage unique.",
+      "examples": {
+        "docker stats": "Stats en temps réel de tous les conteneurs",
+        "docker stats --no-stream": "Snapshot instantané (pas de rafraîchissement)",
+        "docker stats mycontainer": "Stats d'un conteneur spécifique",
+        "docker stats --format \"table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\"": "Affiche les stats avec un format personnalisé (nom, CPU, mémoire).",
+        "docker stats --no-stream --format \"{{.Name}}: {{.CPUPerc}}\"": "Affiche un snapshot des stats CPU avec format simplifié."
+      }
+    }
+  }
 }

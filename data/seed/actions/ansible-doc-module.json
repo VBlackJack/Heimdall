@@ -1,7 +1,7 @@
 {
   "id": "ansible-doc-module",
-  "title": "Consulter la documentation d'un module",
-  "description": "Affiche la documentation complète d'un module Ansible",
+  "title": "Read the documentation of a module",
+  "description": "Show the full documentation of an Ansible module",
   "category": "services-automation",
   "platform": 2,
   "level": 0,
@@ -21,11 +21,11 @@
     "parameters": [
       {
         "name": "moduleName",
-        "label": "Nom du module",
+        "label": "Module name",
         "type": "string",
         "defaultValue": "copy",
         "required": true,
-        "description": "Nom du module Ansible à documenter"
+        "description": "Name of the Ansible module to document"
       }
     ]
   },
@@ -38,16 +38,16 @@
     "parameters": [
       {
         "name": "moduleName",
-        "label": "Nom du module",
+        "label": "Module name",
         "type": "string",
         "defaultValue": "copy",
         "required": true,
-        "description": "Nom du module Ansible"
+        "description": "Name of the Ansible module"
       }
     ]
   },
   "examples": [],
-  "notes": "Utilisez -l pour lister tous les modules disponibles, -t pour spécifier le type de plugin (lookup, callback, etc.).",
+  "notes": "Use -l to list every available module, -t to name the plugin type (lookup, callback and so on).",
   "links": [
     {
       "title": "Ansible Modules Index",
@@ -57,30 +57,58 @@
   "windowsExamples": [
     {
       "command": "ansible-doc Az.Accounts",
-      "description": "Exemple Windows utilisant ansible-doc. Remplacez les paramètres entre <> par vos valeurs.",
+      "description": "Windows example using ansible-doc. Replace the parameters between <> with your values.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-doc copy",
-      "description": "Documentation du module copy",
+      "description": "Documentation of the copy module",
       "platform": 1
     },
     {
       "command": "ansible-doc -t lookup file",
-      "description": "Documentation du plugin lookup 'file'",
+      "description": "Documentation of the 'file' lookup plugin",
       "platform": 1
     },
     {
       "command": "ansible-doc -l",
-      "description": "Lister les modules",
+      "description": "List the modules",
       "platform": 1
     },
     {
       "command": "ansible-doc -s copy",
-      "description": "Snippet du module",
+      "description": "Snippet of the module",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Consulter la documentation d'un module",
+      "description": "Affiche la documentation complète d'un module Ansible",
+      "notes": "Utilisez -l pour lister tous les modules disponibles, -t pour spécifier le type de plugin (lookup, callback, etc.).",
+      "parameters": {
+        "windows": {
+          "moduleName": {
+            "label": "Nom du module",
+            "description": "Nom du module Ansible à documenter"
+          }
+        },
+        "linux": {
+          "moduleName": {
+            "label": "Nom du module",
+            "description": "Nom du module Ansible"
+          }
+        }
+      },
+      "examples": {
+        "ansible-doc Az.Accounts": "Exemple Windows utilisant ansible-doc. Remplacez les paramètres entre <> par vos valeurs.",
+        "ansible-doc copy": "Documentation du module copy",
+        "ansible-doc -t lookup file": "Documentation du plugin lookup 'file'",
+        "ansible-doc -l": "Lister les modules",
+        "ansible-doc -s copy": "Snippet du module"
+      }
+    }
+  }
 }

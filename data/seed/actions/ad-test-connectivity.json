@@ -1,7 +1,7 @@
 {
   "id": "ad-test-connectivity",
-  "title": "Tester la connectivité Active Directory",
-  "description": "Teste la connectivité avec un contrôleur de domaine Active Directory.",
+  "title": "Test Active Directory connectivity",
+  "description": "Test connectivity with an Active Directory domain controller.",
   "category": "active-directory",
   "platform": 0,
   "level": 0,
@@ -22,25 +22,37 @@
   "examples": [
     {
       "command": "Test-ComputerSecureChannel -Verbose",
-      "description": "Teste le canal sécurisé avec le domaine",
+      "description": "Test the secure channel with the domain",
       "platform": 0
     },
     {
       "command": "Test-ComputerSecureChannel -Verbose -WhatIf",
-      "description": "Simulation de l'action avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter réellement. Indispensable pour tester les commandes de modification avant exécution. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action with -WhatIf (dry run). Shows what would be done without running it. Essential to test commands that change things before running them. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "Test-ComputerSecureChannel -Verbose -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution.",
+      "description": "Run the action without an interactive confirmation. The -Confirm:$false parameter suppresses the confirmation prompts. Useful in automated scripts, but use with care.",
       "platform": 0
     }
   ],
-  "notes": "Retourne True si la relation de confiance est OK. Utiliser -Repair pour tenter une réparation automatique.",
+  "notes": "Returns True when the trust relationship is fine. Use -Repair to attempt an automatic repair.",
   "links": [
     {
       "title": "Documentation Test-ComputerSecureChannel",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/test-computersecurechannel"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester la connectivité Active Directory",
+      "description": "Teste la connectivité avec un contrôleur de domaine Active Directory.",
+      "notes": "Retourne True si la relation de confiance est OK. Utiliser -Repair pour tenter une réparation automatique.",
+      "examples": {
+        "Test-ComputerSecureChannel -Verbose": "Teste le canal sécurisé avec le domaine",
+        "Test-ComputerSecureChannel -Verbose -WhatIf": "Simulation de l'action avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter réellement. Indispensable pour tester les commandes de modification avant exécution. Retirez -WhatIf après validation pour exécuter.",
+        "Test-ComputerSecureChannel -Verbose -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution."
+      }
+    }
+  }
 }

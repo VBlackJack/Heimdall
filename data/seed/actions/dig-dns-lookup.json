@@ -1,7 +1,7 @@
 {
   "id": "dig-dns-lookup",
-  "title": "Requête DNS avec dig",
-  "description": "Effectue des requêtes DNS détaillées pour résoudre des noms de domaine",
+  "title": "DNS query with dig",
+  "description": "Run detailed DNS queries to resolve domain names",
   "category": "network-dns",
   "platform": 1,
   "level": 0,
@@ -21,79 +21,110 @@
     "parameters": [
       {
         "name": "domain",
-        "label": "Domaine",
+        "label": "Domain",
         "type": "string",
         "defaultValue": "google.com",
         "required": true,
-        "description": "Nom de domaine à résoudre"
+        "description": "Domain name to resolve"
       },
       {
         "name": "record_type",
-        "label": "Type d'enregistrement",
+        "label": "Record type",
         "type": "string",
         "defaultValue": "A",
         "required": false,
-        "description": "Type d'enregistrement (A, AAAA, MX, NS, TXT, etc.)"
+        "description": "Record type (A, AAAA, MX, NS, TXT and so on)"
       }
     ]
   },
   "examples": [
     {
       "command": "dig google.com",
-      "description": "Résout google.com et affiche des détails complets de la requête DNS. dig (Domain Information Groper) est l'outil de diagnostic DNS de référence sous Linux. Retourne les enregistrements A (IPv4), le temps de requête, le serveur DNS utilisé, les flags de réponse, etc. Plus verbeux et détaillé que nslookup.",
+      "description": "Resolve google.com and show the full details of the DNS query. dig (Domain Information Groper) is the reference DNS diagnostic tool on Linux. Returns the A (IPv4) records, the query time, the DNS server used, the response flags and more. More verbose and detailed than nslookup.",
       "platform": 1
     },
     {
       "command": "dig google.com +short",
-      "description": "Résolution DNS minimaliste : affiche uniquement la/les adresse(s) IP. Le flag +short supprime tous les détails et retourne juste les réponses. Parfait pour les scripts : IP=$(dig google.com +short). Format idéal quand vous ne voulez que l'IP sans le bruit.",
+      "description": "Minimal DNS resolution: show only the IP address(es). The +short flag drops every detail and returns just the answers. Perfect for scripts: IP=$(dig google.com +short). The ideal format when you only want the IP without the noise.",
       "platform": 1
     },
     {
       "command": "dig google.com MX",
-      "description": "Interroge les enregistrements MX (Mail eXchange) de google.com. Les MX indiquent les serveurs mail responsables du domaine avec leurs priorités. Essentiel pour diagnostiquer les problèmes d'email, vérifier les configurations SMTP et analyser les infrastructures mail.",
+      "description": "Query the MX (Mail eXchange) records of google.com. MX records name the mail servers responsible for the domain with their priorities. Essential to diagnose email problems, check SMTP configurations and analyze mail infrastructures.",
       "platform": 1
     },
     {
       "command": "dig google.com ANY",
-      "description": "Demande TOUS les types d'enregistrements DNS disponibles (A, AAAA, MX, TXT, NS, SOA, etc.). Le type ANY retourne absolument tout ce que le serveur DNS veut bien divulguer. ATTENTION : certains serveurs DNS publics ignorent les requêtes ANY pour limiter les attaques d'amplification.",
+      "description": "Ask for ALL the available DNS record types (A, AAAA, MX, TXT, NS, SOA and so on). The ANY type returns everything the DNS server is willing to disclose. WARNING: some public DNS servers ignore ANY queries to limit amplification attacks.",
       "platform": 1
     },
     {
       "command": "dig @8.8.8.8 contoso.com",
-      "description": "Interroge un serveur DNS spécifique (Google DNS 8.8.8.8) au lieu du DNS local. La syntaxe @serveur force l'utilisation d'un résolveur particulier. Utile pour comparer les réponses entre différents DNS, vérifier la propagation ou contourner un DNS local défaillant/filtrant.",
+      "description": "Query a specific DNS server (Google DNS 8.8.8.8) instead of the local DNS. The @server syntax forces a particular resolver. Useful to compare answers between DNS servers, check propagation or bypass a failing or filtering local DNS.",
       "platform": 1
     },
     {
       "command": "dig contoso.com NS +short",
-      "description": "Affiche uniquement les serveurs DNS autoritaires (Name Servers) du domaine. Les enregistrements NS identifient où est hébergée la zone DNS. +short donne un output propre. Essentiel lors de migrations DNS, pour identifier l'hébergeur ou vérifier les délégations.",
+      "description": "Show only the authoritative DNS servers (Name Servers) of the domain. NS records tell where the DNS zone is hosted. +short gives clean output. Essential during DNS migrations, to find the hosting provider or to check delegations.",
       "platform": 1
     },
     {
       "command": "dig -x 8.8.8.8",
-      "description": "Résolution DNS inverse (reverse lookup) : trouve le nom de domaine associé à l'IP 8.8.8.8. Le flag -x active le mode reverse. Utilise les enregistrements PTR. Utile pour identifier un serveur à partir de son IP ou vérifier la cohérence des configurations DNS forward/reverse.",
+      "description": "Reverse DNS resolution (reverse lookup): find the domain name associated with IP 8.8.8.8. The -x flag turns on reverse mode. Uses the PTR records. Useful to identify a server from its IP or to check that forward and reverse DNS configurations agree.",
       "platform": 1
     },
     {
       "command": "dig google.com +trace",
-      "description": "Trace complète de la résolution DNS depuis les root servers. Le flag +trace affiche chaque étape de la récursion DNS : root → TLD (.com) → domaine autoritaire. Extrêmement utile pour diagnostiquer les problèmes de délégation DNS, comprendre la hiérarchie DNS et identifier où une résolution échoue.",
+      "description": "Full trace of the DNS resolution from the root servers. The +trace flag shows each step of the DNS recursion: root → TLD (.com) → authoritative domain. Extremely useful to diagnose DNS delegation problems, understand the DNS hierarchy and find where a resolution fails.",
       "platform": 1
     },
     {
       "command": "dig +short google.com A",
-      "description": "Obtenir uniquement l'IP",
+      "description": "Get the IP only",
       "platform": 1
     },
     {
       "command": "dig @8.8.8.8 example.com MX",
-      "description": "Requête MX via DNS Google",
+      "description": "MX query through Google DNS",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo. +short pour affichage minimal. nslookup et host sont des alternatives.",
+  "notes": "Does not require sudo. +short for minimal output. nslookup and host are alternatives.",
   "links": [
     {
       "title": "dig command",
       "url": "https://man7.org/linux/man-pages/man1/dig.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Requête DNS avec dig",
+      "description": "Effectue des requêtes DNS détaillées pour résoudre des noms de domaine",
+      "notes": "Ne nécessite pas sudo. +short pour affichage minimal. nslookup et host sont des alternatives.",
+      "parameters": {
+        "linux": {
+          "domain": {
+            "label": "Domaine",
+            "description": "Nom de domaine à résoudre"
+          },
+          "record_type": {
+            "label": "Type d'enregistrement",
+            "description": "Type d'enregistrement (A, AAAA, MX, NS, TXT, etc.)"
+          }
+        }
+      },
+      "examples": {
+        "dig google.com": "Résout google.com et affiche des détails complets de la requête DNS. dig (Domain Information Groper) est l'outil de diagnostic DNS de référence sous Linux. Retourne les enregistrements A (IPv4), le temps de requête, le serveur DNS utilisé, les flags de réponse, etc. Plus verbeux et détaillé que nslookup.",
+        "dig google.com +short": "Résolution DNS minimaliste : affiche uniquement la/les adresse(s) IP. Le flag +short supprime tous les détails et retourne juste les réponses. Parfait pour les scripts : IP=$(dig google.com +short). Format idéal quand vous ne voulez que l'IP sans le bruit.",
+        "dig google.com MX": "Interroge les enregistrements MX (Mail eXchange) de google.com. Les MX indiquent les serveurs mail responsables du domaine avec leurs priorités. Essentiel pour diagnostiquer les problèmes d'email, vérifier les configurations SMTP et analyser les infrastructures mail.",
+        "dig google.com ANY": "Demande TOUS les types d'enregistrements DNS disponibles (A, AAAA, MX, TXT, NS, SOA, etc.). Le type ANY retourne absolument tout ce que le serveur DNS veut bien divulguer. ATTENTION : certains serveurs DNS publics ignorent les requêtes ANY pour limiter les attaques d'amplification.",
+        "dig @8.8.8.8 contoso.com": "Interroge un serveur DNS spécifique (Google DNS 8.8.8.8) au lieu du DNS local. La syntaxe @serveur force l'utilisation d'un résolveur particulier. Utile pour comparer les réponses entre différents DNS, vérifier la propagation ou contourner un DNS local défaillant/filtrant.",
+        "dig contoso.com NS +short": "Affiche uniquement les serveurs DNS autoritaires (Name Servers) du domaine. Les enregistrements NS identifient où est hébergée la zone DNS. +short donne un output propre. Essentiel lors de migrations DNS, pour identifier l'hébergeur ou vérifier les délégations.",
+        "dig -x 8.8.8.8": "Résolution DNS inverse (reverse lookup) : trouve le nom de domaine associé à l'IP 8.8.8.8. Le flag -x active le mode reverse. Utilise les enregistrements PTR. Utile pour identifier un serveur à partir de son IP ou vérifier la cohérence des configurations DNS forward/reverse.",
+        "dig google.com +trace": "Trace complète de la résolution DNS depuis les root servers. Le flag +trace affiche chaque étape de la récursion DNS : root → TLD (.com) → domaine autoritaire. Extrêmement utile pour diagnostiquer les problèmes de délégation DNS, comprendre la hiérarchie DNS et identifier où une résolution échoue.",
+        "dig +short google.com A": "Obtenir uniquement l'IP",
+        "dig @8.8.8.8 example.com MX": "Requête MX via DNS Google"
+      }
+    }
+  }
 }

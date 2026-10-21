@@ -1,7 +1,7 @@
 {
   "id": "docker-logs-tail",
-  "title": "Voir les logs conteneur (Docker Logs)",
-  "description": "Affiche les logs de la sortie standard (stdout/stderr) d'un conteneur.",
+  "title": "Show container logs (docker logs)",
+  "description": "Show the standard output (stdout/stderr) logs of a container.",
   "category": "containers-vms",
   "platform": 2,
   "level": 0,
@@ -19,19 +19,19 @@
     "parameters": [
       {
         "name": "container",
-        "label": "Conteneur",
+        "label": "Container",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou ID"
+        "description": "Name or ID"
       },
       {
         "name": "lines",
-        "label": "Lignes",
+        "label": "Lines",
         "type": "number",
         "defaultValue": "100",
         "required": true,
-        "description": "Nombre de lignes"
+        "description": "Number of lines"
       }
     ]
   },
@@ -43,19 +43,19 @@
     "parameters": [
       {
         "name": "container",
-        "label": "Conteneur",
+        "label": "Container",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou ID"
+        "description": "Name or ID"
       },
       {
         "name": "lines",
-        "label": "Lignes",
+        "label": "Lines",
         "type": "number",
         "defaultValue": "100",
         "required": true,
-        "description": "Nombre de lignes"
+        "description": "Number of lines"
       }
     ]
   },
@@ -63,15 +63,47 @@
   "linuxExamples": [
     {
       "command": "docker logs --tail 50 -f web_server",
-      "description": "Suivi en temps réel (-f) des 50 dernières lignes de logs.",
+      "description": "Follow (-f) the last 50 log lines in real time.",
       "platform": 1
     },
     {
       "command": "docker logs --since 30m db_server",
-      "description": "Affiche uniquement les logs générés depuis 30 minutes.",
+      "description": "Show only the logs produced in the last 30 minutes.",
       "platform": 1
     }
   ],
   "linuxCommandTemplateId": "ff040900-b553-4242-8926-017d7d19f7a8",
-  "windowsCommandTemplateId": "63bf7995-cb6c-4368-a5b3-f77ed0754d14"
+  "windowsCommandTemplateId": "63bf7995-cb6c-4368-a5b3-f77ed0754d14",
+  "translations": {
+    "fr": {
+      "title": "Voir les logs conteneur (Docker Logs)",
+      "description": "Affiche les logs de la sortie standard (stdout/stderr) d'un conteneur.",
+      "parameters": {
+        "windows": {
+          "container": {
+            "label": "Conteneur",
+            "description": "Nom ou ID"
+          },
+          "lines": {
+            "label": "Lignes",
+            "description": "Nombre de lignes"
+          }
+        },
+        "linux": {
+          "container": {
+            "label": "Conteneur",
+            "description": "Nom ou ID"
+          },
+          "lines": {
+            "label": "Lignes",
+            "description": "Nombre de lignes"
+          }
+        }
+      },
+      "examples": {
+        "docker logs --tail 50 -f web_server": "Suivi en temps réel (-f) des 50 dernières lignes de logs.",
+        "docker logs --since 30m db_server": "Affiche uniquement les logs générés depuis 30 minutes."
+      }
+    }
+  }
 }

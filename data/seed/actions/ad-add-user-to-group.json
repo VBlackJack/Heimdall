@@ -1,7 +1,7 @@
 {
   "id": "ad-add-user-to-group",
-  "title": "Ajouter un utilisateur à un groupe AD",
-  "description": "Ajoute un utilisateur comme membre d'un groupe Active Directory.",
+  "title": "Add a user to an AD group",
+  "description": "Add a user as a member of an Active Directory group.",
   "category": "active-directory",
   "platform": 0,
   "level": 1,
@@ -20,59 +20,86 @@
     "parameters": [
       {
         "name": "groupName",
-        "label": "Nom du groupe",
+        "label": "Group name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du groupe AD"
+        "description": "Name of the AD group"
       },
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName de l'utilisateur à ajouter"
+        "description": "SamAccountName of the user to add"
       }
     ]
   },
   "examples": [
     {
       "command": "Add-ADGroupMember -Identity 'Domain Admins' -Members jdupont",
-      "description": "Ajoute jdupont au groupe Domain Admins. -Identity spécifie le groupe cible. -Members peut être un SamAccountName, DN, GUID ou SID. L'ajout est immédiat mais l'utilisateur doit se reconnecter pour que les nouveaux droits soient actifs.",
+      "description": "Add jdupont to the Domain Admins group. -Identity names the target group. -Members can be a SamAccountName, DN, GUID or SID. The change is immediate, but the user must log on again for the new rights to take effect.",
       "platform": 0
     },
     {
       "command": "Add-ADGroupMember -Identity 'IT_Support' -Members jdupont,mmartin,ldubois",
-      "description": "Ajoute plusieurs utilisateurs simultanément au groupe. -Members accepte un tableau de valeurs séparées par des virgules. Beaucoup plus efficace que des commandes individuelles : un seul appel AD au lieu de trois.",
+      "description": "Add several users to the group at once. -Members accepts a comma-separated list of values. Much more efficient than separate commands: one AD call instead of three.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter {Department -eq 'IT'} | ForEach-Object {Add-ADGroupMember -Identity 'IT_All_Users' -Members $_.SamAccountName}",
-      "description": "Ajoute automatiquement tous les utilisateurs du département IT à un groupe. ForEach-Object itère sur chaque résultat. $_.SamAccountName récupère l'identifiant de chaque utilisateur. Utile pour les ajouts de masse lors de réorganisations.",
+      "description": "Add every user of the IT department to a group automatically. ForEach-Object iterates over each result. $_.SamAccountName gets each user's identifier. Useful for bulk additions during reorganizations.",
       "platform": 0
     },
     {
       "command": "Add-ADGroupMember -Identity 'IT_Support' -Members jdupont -Confirm:$false",
-      "description": "Ajoute au groupe sans demander de confirmation. -Confirm:$false supprime l'invite. Par défaut Add-ADGroupMember ne demande pas de confirmation, mais ce switch est utile si une politique force les confirmations.",
+      "description": "Add to the group without asking for confirmation. -Confirm:$false suppresses the prompt. Add-ADGroupMember does not ask for confirmation by default, but this switch helps when a policy forces confirmations.",
       "platform": 0
     },
     {
       "command": "Add-ADGroupMember -Identity 'Groupe_Projets' -Members (Get-ADGroup 'IT_Team').DistinguishedName",
-      "description": "Ajoute un groupe entier comme membre d'un autre groupe (imbrication). Get-ADGroup récupère l'objet groupe source. L'imbrication permet une gestion hiérarchique : modifier IT_Team impacte automatiquement Groupe_Projets.",
+      "description": "Add a whole group as a member of another group (nesting). Get-ADGroup gets the source group object. Nesting allows hierarchical management: changing IT_Team automatically affects Groupe_Projets.",
       "platform": 0
     },
     {
       "command": "Get-ADGroupMember -Identity 'IT_Support' | Select-Object Name,SamAccountName; Add-ADGroupMember -Identity 'IT_Support' -Members jdupont -WhatIf",
-      "description": "Affiche d'abord les membres actuels du groupe, puis simule l'ajout avec -WhatIf. Cette approche prudente permet de vérifier que l'utilisateur n'est pas déjà membre avant l'ajout. Retirez -WhatIf après vérification pour exécuter réellement.",
+      "description": "Show the current members of the group first, then simulate the addition with -WhatIf. This careful approach checks that the user is not already a member before adding. Remove -WhatIf after checking to run it.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits d'administration AD. Les permissions du groupe s'appliquent immédiatement.",
+  "notes": "Requires AD administration rights. The group's permissions apply immediately.",
   "links": [
     {
       "title": "Documentation Add-ADGroupMember",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/add-adgroupmember"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Ajouter un utilisateur à un groupe AD",
+      "description": "Ajoute un utilisateur comme membre d'un groupe Active Directory.",
+      "notes": "Nécessite des droits d'administration AD. Les permissions du groupe s'appliquent immédiatement.",
+      "parameters": {
+        "windows": {
+          "groupName": {
+            "label": "Nom du groupe",
+            "description": "Nom du groupe AD"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName de l'utilisateur à ajouter"
+          }
+        }
+      },
+      "examples": {
+        "Add-ADGroupMember -Identity 'Domain Admins' -Members jdupont": "Ajoute jdupont au groupe Domain Admins. -Identity spécifie le groupe cible. -Members peut être un SamAccountName, DN, GUID ou SID. L'ajout est immédiat mais l'utilisateur doit se reconnecter pour que les nouveaux droits soient actifs.",
+        "Add-ADGroupMember -Identity 'IT_Support' -Members jdupont,mmartin,ldubois": "Ajoute plusieurs utilisateurs simultanément au groupe. -Members accepte un tableau de valeurs séparées par des virgules. Beaucoup plus efficace que des commandes individuelles : un seul appel AD au lieu de trois.",
+        "Get-ADUser -Filter {Department -eq 'IT'} | ForEach-Object {Add-ADGroupMember -Identity 'IT_All_Users' -Members $_.SamAccountName}": "Ajoute automatiquement tous les utilisateurs du département IT à un groupe. ForEach-Object itère sur chaque résultat. $_.SamAccountName récupère l'identifiant de chaque utilisateur. Utile pour les ajouts de masse lors de réorganisations.",
+        "Add-ADGroupMember -Identity 'IT_Support' -Members jdupont -Confirm:$false": "Ajoute au groupe sans demander de confirmation. -Confirm:$false supprime l'invite. Par défaut Add-ADGroupMember ne demande pas de confirmation, mais ce switch est utile si une politique force les confirmations.",
+        "Add-ADGroupMember -Identity 'Groupe_Projets' -Members (Get-ADGroup 'IT_Team').DistinguishedName": "Ajoute un groupe entier comme membre d'un autre groupe (imbrication). Get-ADGroup récupère l'objet groupe source. L'imbrication permet une gestion hiérarchique : modifier IT_Team impacte automatiquement Groupe_Projets.",
+        "Get-ADGroupMember -Identity 'IT_Support' | Select-Object Name,SamAccountName; Add-ADGroupMember -Identity 'IT_Support' -Members jdupont -WhatIf": "Affiche d'abord les membres actuels du groupe, puis simule l'ajout avec -WhatIf. Cette approche prudente permet de vérifier que l'utilisateur n'est pas déjà membre avant l'ajout. Retirez -WhatIf après vérification pour exécuter réellement."
+      }
+    }
+  }
 }

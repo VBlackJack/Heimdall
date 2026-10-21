@@ -1,7 +1,7 @@
 {
   "id": "enable-scheduledtask",
-  "title": "Activer une tâche planifiée",
-  "description": "Active une tâche planifiée désactivée pour qu'elle puisse s'exécuter selon son planning",
+  "title": "Enable a scheduled task",
+  "description": "Enable a disabled scheduled task so that it can run on its schedule",
   "category": "services-automation",
   "platform": 0,
   "level": 0,
@@ -21,65 +21,87 @@
     "parameters": [
       {
         "name": "taskname",
-        "label": "Nom de la tâche",
+        "label": "Task name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "MyTask",
         "required": true,
-        "description": "Nom de la tâche à activer"
+        "description": "Name of the task to enable"
       },
       {
         "name": "taskpath",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Chemin de la tâche"
+        "description": "Path of the task"
       }
     ]
   },
   "examples": [
     {
       "command": "Enable-ScheduledTask -TaskName 'DailyBackup'",
-      "description": "Active la tâche de sauvegarde",
+      "description": "Enable the backup task",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask | Where-Object {$_.State -eq 'Disabled'} | Enable-ScheduledTask",
-      "description": "Active toutes les tâches désactivées",
+      "description": "Enable every disabled task",
       "platform": 0
     },
     {
       "command": "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the confirmation prompts. Useful in automated scripts, but use with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
-      "platform": 0
-    },
-    {
-      "command": "Enable-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\",
-      "description": "Exemple utilisant le paramètre 'taskname': Nom de la tâche à activer. Remplacez DailyBackup par la valeur appropriée selon votre environnement.",
+      "description": "Show detailed information about the command's execution. -Verbose turns on the diagnostic messages that show exactly what happens. Essential for troubleshooting and to understand the internal operations.",
       "platform": 0
     },
     {
       "command": "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\",
-      "description": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'taskpath' parameter: task path. Replace \\Microsoft\\Windows\\ with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Change l'état de Disabled à Ready. La tâche s'exécutera selon son déclencheur.",
+  "notes": "Sets the state from Disabled to Ready. The task runs according to its trigger.",
   "links": [
     {
       "title": "Enable-ScheduledTask Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/enable-scheduledtask"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Activer une tâche planifiée",
+      "description": "Active une tâche planifiée désactivée pour qu'elle puisse s'exécuter selon son planning",
+      "notes": "Change l'état de Disabled à Ready. La tâche s'exécutera selon son déclencheur.",
+      "parameters": {
+        "windows": {
+          "taskname": {
+            "label": "Nom de la tâche",
+            "description": "Nom de la tâche à activer"
+          },
+          "taskpath": {
+            "label": "Chemin",
+            "description": "Chemin de la tâche"
+          }
+        }
+      },
+      "examples": {
+        "Enable-ScheduledTask -TaskName 'DailyBackup'": "Active la tâche de sauvegarde",
+        "Get-ScheduledTask | Where-Object {$_.State -eq 'Disabled'} | Enable-ScheduledTask": "Active toutes les tâches désactivées",
+        "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+        "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

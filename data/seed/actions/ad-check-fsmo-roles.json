@@ -1,7 +1,7 @@
 {
   "id": "ad-check-fsmo-roles",
-  "title": "Vérifier les rôles FSMO",
-  "description": "Affiche les contrôleurs de domaine détenant les rôles FSMO (Flexible Single Master Operations).",
+  "title": "Check the FSMO roles",
+  "description": "Show the domain controllers that hold the FSMO (Flexible Single Master Operations) roles.",
   "category": "active-directory",
   "platform": 0,
   "level": 0,
@@ -22,25 +22,25 @@
   "examples": [
     {
       "command": "netdom query fsmo",
-      "description": "Affiche tous les détenteurs de rôles FSMO",
-      "platform": 0
-    },
-    {
-      "command": "netdom query fsmo -WhatIf",
-      "description": "Simulation de l'action avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter réellement. Indispensable pour tester les commandes de modification avant exécution. Retirez -WhatIf après validation pour exécuter.",
-      "platform": 0
-    },
-    {
-      "command": "netdom query fsmo -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution.",
+      "description": "Show all FSMO role holders",
       "platform": 0
     }
   ],
-  "notes": "Les 5 rôles FSMO: Schema Master, Domain Naming Master, RID Master, PDC Emulator, Infrastructure Master.",
+  "notes": "The 5 FSMO roles: Schema Master, Domain Naming Master, RID Master, PDC Emulator, Infrastructure Master.",
   "links": [
     {
       "title": "Documentation netdom query fsmo",
       "url": "https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc835085(v=ws.11)"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier les rôles FSMO",
+      "description": "Affiche les contrôleurs de domaine détenant les rôles FSMO (Flexible Single Master Operations).",
+      "notes": "Les 5 rôles FSMO: Schema Master, Domain Naming Master, RID Master, PDC Emulator, Infrastructure Master.",
+      "examples": {
+        "netdom query fsmo": "Affiche tous les détenteurs de rôles FSMO"
+      }
+    }
+  }
 }

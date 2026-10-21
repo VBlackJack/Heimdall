@@ -1,7 +1,7 @@
 {
   "id": "build-make",
-  "title": "Compiler avec Make",
-  "description": "Exécute un Makefile pour compiler un projet C/C++.",
+  "title": "Build with Make",
+  "description": "Run a Makefile to build a C/C++ project.",
   "category": "development",
   "platform": 1,
   "level": 0,
@@ -21,61 +21,81 @@
     "parameters": [
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "all",
         "required": false,
-        "description": "Cible à compiler (all, clean, install, etc.)"
+        "description": "Target to build (all, clean, install and so on)"
       }
     ]
   },
   "examples": [
     {
       "command": "make",
-      "description": "Compile la cible par défaut",
+      "description": "Build the default target",
       "platform": 1
     },
     {
       "command": "make clean && make",
-      "description": "Nettoie puis recompile",
+      "description": "Clean, then rebuild",
       "platform": 1
     },
     {
       "command": "make -j4",
-      "description": "Compile en parallèle (4 jobs)",
-      "platform": 1
-    },
-    {
-      "command": "make all",
-      "description": "Exemple utilisant le paramètre 'target': Cible à compiler (all, clean, install, etc.). Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
+      "description": "Build in parallel (4 jobs)",
       "platform": 1
     },
     {
       "command": "make clean",
-      "description": "Nettoyer les fichiers générés",
+      "description": "Clean the generated files",
       "platform": 1
     },
     {
       "command": "make install",
-      "description": "Installer le programme",
+      "description": "Install the program",
       "platform": 1
     },
     {
       "command": "make test",
-      "description": "Exécuter les tests",
+      "description": "Run the tests",
       "platform": 1
     },
     {
       "command": "make -j$(nproc)",
-      "description": "Compilation parallèle",
+      "description": "Parallel build",
       "platform": 1
     },
     {
       "command": "make CFLAGS=\"-O2\" all",
-      "description": "Avec flags personnalisés",
+      "description": "With custom flags",
       "platform": 1
     }
   ],
-  "notes": "-j permet la compilation parallèle. make clean supprime les fichiers compilés.",
-  "links": []
+  "notes": "-j enables parallel builds. make clean deletes the built files.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Compiler avec Make",
+      "description": "Exécute un Makefile pour compiler un projet C/C++.",
+      "notes": "-j permet la compilation parallèle. make clean supprime les fichiers compilés.",
+      "parameters": {
+        "linux": {
+          "target": {
+            "label": "Cible",
+            "description": "Cible à compiler (all, clean, install, etc.)"
+          }
+        }
+      },
+      "examples": {
+        "make": "Compile la cible par défaut",
+        "make clean && make": "Nettoie puis recompile",
+        "make -j4": "Compile en parallèle (4 jobs)",
+        "make clean": "Nettoyer les fichiers générés",
+        "make install": "Installer le programme",
+        "make test": "Exécuter les tests",
+        "make -j$(nproc)": "Compilation parallèle",
+        "make CFLAGS=\"-O2\" all": "Avec flags personnalisés"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "cert-import",
-  "title": "Importer un certificat",
-  "description": "Importe un certificat (.cer, .pfx, .p12) dans un magasin de certificats Windows spécifique.",
+  "title": "Import a certificate",
+  "description": "Import a certificate (.cer, .pfx, .p12) into a specific Windows certificate store.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -24,55 +24,75 @@
     "parameters": [
       {
         "name": "certPath",
-        "label": "Chemin du certificat",
+        "label": "Certificate path",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Certs\\certificate.cer",
         "required": true,
-        "description": "Chemin du fichier certificat (.cer, .crt)"
+        "description": "Path of the certificate file (.cer, .crt)"
       },
       {
         "name": "storeName",
-        "label": "Magasin de destination",
+        "label": "Target store",
         "type": "string",
         "defaultValue": "My",
         "required": true,
-        "description": "Nom du magasin (My, Root, CA, TrustedPublisher)"
+        "description": "Name of the store (My, Root, CA, TrustedPublisher)"
       }
     ]
   },
   "examples": [
     {
       "command": "Import-Certificate -FilePath 'C:\\Certs\\cert.cer' -CertStoreLocation Cert:\\LocalMachine\\My",
-      "description": "Importe dans le magasin personnel de la machine",
+      "description": "Import into the machine's personal store",
       "platform": 0
     },
     {
       "command": "Import-PfxCertificate -FilePath 'C:\\Certs\\cert.pfx' -CertStoreLocation Cert:\\LocalMachine\\My -Password (ConvertTo-SecureString -String 'MyPassword' -AsPlainText -Force)",
-      "description": "Importe un certificat PFX avec clé privée",
+      "description": "Import a PFX certificate with its private key",
       "platform": 0
     },
     {
       "command": "certutil -addstore Root 'C:\\Certs\\rootCA.cer'",
-      "description": "Alternative avec certutil pour certificat racine",
-      "platform": 0
-    },
-    {
-      "command": "Import-Certificate -FilePath 'C:\\Certs\\certificate.cer' -CertStoreLocation Cert:\\LocalMachine\\My",
-      "description": "Exemple utilisant le paramètre 'certPath': Chemin du fichier certificat (.cer, .crt). Remplacez C:\\Certs\\server.pfx par la valeur appropriée selon votre environnement.",
+      "description": "Alternative with certutil for a root certificate",
       "platform": 0
     },
     {
       "command": "Import-Certificate -FilePath 'C:\\Certs\\server.pfx' -CertStoreLocation Cert:\\LocalMachine\\My",
-      "description": "Exemple utilisant le paramètre 'storeName': Nom du magasin (My, Root, CA, TrustedPublisher). Remplacez My par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'storeName' parameter: name of the store (My, Root, CA, TrustedPublisher). Replace My with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Privilèges administrateur requis pour LocalMachine. Les fichiers PFX nécessitent un mot de passe. Utilisez Import-PfxCertificate pour les .pfx.",
+  "notes": "Administrator rights are required for LocalMachine. PFX files need a password. Use Import-PfxCertificate for .pfx files.",
   "links": [
     {
       "title": "Documentation Import-Certificate",
       "url": "https://learn.microsoft.com/en-us/powershell/module/pki/import-certificate"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Importer un certificat",
+      "description": "Importe un certificat (.cer, .pfx, .p12) dans un magasin de certificats Windows spécifique.",
+      "notes": "Privilèges administrateur requis pour LocalMachine. Les fichiers PFX nécessitent un mot de passe. Utilisez Import-PfxCertificate pour les .pfx.",
+      "parameters": {
+        "windows": {
+          "certPath": {
+            "label": "Chemin du certificat",
+            "description": "Chemin du fichier certificat (.cer, .crt)"
+          },
+          "storeName": {
+            "label": "Magasin de destination",
+            "description": "Nom du magasin (My, Root, CA, TrustedPublisher)"
+          }
+        }
+      },
+      "examples": {
+        "Import-Certificate -FilePath 'C:\\Certs\\cert.cer' -CertStoreLocation Cert:\\LocalMachine\\My": "Importe dans le magasin personnel de la machine",
+        "Import-PfxCertificate -FilePath 'C:\\Certs\\cert.pfx' -CertStoreLocation Cert:\\LocalMachine\\My -Password (ConvertTo-SecureString -String 'MyPassword' -AsPlainText -Force)": "Importe un certificat PFX avec clé privée",
+        "certutil -addstore Root 'C:\\Certs\\rootCA.cer'": "Alternative avec certutil pour certificat racine",
+        "Import-Certificate -FilePath 'C:\\Certs\\server.pfx' -CertStoreLocation Cert:\\LocalMachine\\My": "Exemple utilisant le paramètre 'storeName': Nom du magasin (My, Root, CA, TrustedPublisher). Remplacez My par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

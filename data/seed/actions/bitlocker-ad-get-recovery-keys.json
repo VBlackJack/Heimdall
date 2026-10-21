@@ -1,7 +1,7 @@
 {
   "id": "bitlocker-ad-get-recovery-keys",
-  "title": "Récupérer les clés BitLocker depuis Active Directory",
-  "description": "Récupère les clés de récupération BitLocker stockées dans Active Directory pour un ordinateur spécifique (commande admin domaine).",
+  "title": "Get the BitLocker keys from Active Directory",
+  "description": "Get the BitLocker recovery keys stored in Active Directory for a specific computer (domain administrator command).",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -20,46 +20,68 @@
     "parameters": [
       {
         "name": "computerName",
-        "label": "Nom de l'ordinateur",
+        "label": "Computer name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom NetBIOS de l'ordinateur (ex: PC-001)"
+        "description": "NetBIOS name of the computer (e.g. PC-001)"
       }
     ]
   },
   "examples": [
     {
       "command": "$computer = Get-ADComputer -Identity PC-001; Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword | Select-Object -ExpandProperty msFVE-RecoveryPassword",
-      "description": "Récupère le mot de passe de récupération BitLocker de PC-001 depuis AD",
-      "platform": 1
+      "description": "Get the BitLocker recovery password of PC-001 from AD",
+      "platform": 0
     },
     {
       "command": "$computer = Get-ADComputer -Identity LAPTOP-005; Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword,whenCreated | Select-Object @{N='RecoveryPassword';E={$_.'msFVE-RecoveryPassword'}},@{N='DateCreated';E={$_.whenCreated}}",
-      "description": "Récupère les clés BitLocker avec leur date de création",
-      "platform": 1
+      "description": "Get the BitLocker keys with their creation date",
+      "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter {Name -like 'LAPTOP-*'} | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword; if($keys) { Write-Host \"$($_.Name): $($keys[0].'msFVE-RecoveryPassword')\" } }",
-      "description": "Récupère les clés BitLocker de tous les laptops depuis AD",
-      "platform": 1
+      "description": "Get the BitLocker keys of every laptop from AD",
+      "platform": 0
     },
     {
       "command": "$computer = Get-ADComputer -Identity PC-001; $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword,msFVE-RecoveryGuid; $keys | Select-Object @{N='Password';E={$_.'msFVE-RecoveryPassword'}},@{N='VolumeGUID';E={$_.'msFVE-RecoveryGuid'}}",
-      "description": "Récupère les clés avec leur GUID de volume (utile si plusieurs volumes chiffrés)",
-      "platform": 1
+      "description": "Get the keys with their volume GUID (useful when several volumes are encrypted)",
+      "platform": 0
     },
     {
       "command": "$computer = Get-ADComputer -Identity PC-001; $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword; $keys.'msFVE-RecoveryPassword' | Out-File \"C:\\BitLocker-Keys-PC-001.txt\"",
-      "description": "Sauvegarde les clés de récupération dans un fichier sécurisé",
-      "platform": 1
+      "description": "Save the recovery keys to a secured file",
+      "platform": 0
     }
   ],
-  "notes": "⚠️ ADMIN DOMAINE UNIQUEMENT: Cette commande récupère les clés depuis Active Directory (attributs msFVE-*). Nécessite droits de lecture sur les objets msFVE-RecoveryInformation. Les clés sont stockées sous chaque objet ordinateur AD. Plusieurs clés possibles si plusieurs volumes chiffrés. GUID format: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}.",
+  "notes": "⚠️ DOMAIN ADMINISTRATORS ONLY: this command reads the keys from Active Directory (msFVE-* attributes). Requires read rights on the msFVE-RecoveryInformation objects. The keys are stored under each AD computer object. There can be several keys when several volumes are encrypted. GUID format: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}.",
   "links": [
     {
       "title": "BitLocker Recovery in Active Directory",
       "url": "https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Récupérer les clés BitLocker depuis Active Directory",
+      "description": "Récupère les clés de récupération BitLocker stockées dans Active Directory pour un ordinateur spécifique (commande admin domaine).",
+      "notes": "⚠️ ADMIN DOMAINE UNIQUEMENT: Cette commande récupère les clés depuis Active Directory (attributs msFVE-*). Nécessite droits de lecture sur les objets msFVE-RecoveryInformation. Les clés sont stockées sous chaque objet ordinateur AD. Plusieurs clés possibles si plusieurs volumes chiffrés. GUID format: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}.",
+      "parameters": {
+        "windows": {
+          "computerName": {
+            "label": "Nom de l'ordinateur",
+            "description": "Nom NetBIOS de l'ordinateur (ex: PC-001)"
+          }
+        }
+      },
+      "examples": {
+        "$computer = Get-ADComputer -Identity PC-001; Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword | Select-Object -ExpandProperty msFVE-RecoveryPassword": "Récupère le mot de passe de récupération BitLocker de PC-001 depuis AD",
+        "$computer = Get-ADComputer -Identity LAPTOP-005; Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword,whenCreated | Select-Object @{N='RecoveryPassword';E={$_.'msFVE-RecoveryPassword'}},@{N='DateCreated';E={$_.whenCreated}}": "Récupère les clés BitLocker avec leur date de création",
+        "Get-ADComputer -Filter {Name -like 'LAPTOP-*'} | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword; if($keys) { Write-Host \"$($_.Name): $($keys[0].'msFVE-RecoveryPassword')\" } }": "Récupère les clés BitLocker de tous les laptops depuis AD",
+        "$computer = Get-ADComputer -Identity PC-001; $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword,msFVE-RecoveryGuid; $keys | Select-Object @{N='Password';E={$_.'msFVE-RecoveryPassword'}},@{N='VolumeGUID';E={$_.'msFVE-RecoveryGuid'}}": "Récupère les clés avec leur GUID de volume (utile si plusieurs volumes chiffrés)",
+        "$computer = Get-ADComputer -Identity PC-001; $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword; $keys.'msFVE-RecoveryPassword' | Out-File \"C:\\BitLocker-Keys-PC-001.txt\"": "Sauvegarde les clés de récupération dans un fichier sécurisé"
+      }
+    }
+  }
 }

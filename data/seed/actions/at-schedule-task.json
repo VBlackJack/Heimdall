@@ -1,7 +1,7 @@
 {
   "id": "at-schedule-task",
-  "title": "Planifier une tâche ponctuelle",
-  "description": "Planifie l'exécution d'une commande à une date/heure précise (usage unique)",
+  "title": "Schedule a one-off task",
+  "description": "Schedule a command to run at a precise date and time (once)",
   "category": "services-automation",
   "platform": 1,
   "level": 1,
@@ -21,74 +21,98 @@
     "parameters": [
       {
         "name": "command",
-        "label": "Commande",
+        "label": "Command",
         "type": "string",
         "defaultValue": "echo 'Task executed'",
         "required": true,
-        "description": "Commande à exécuter"
+        "description": "Command to run"
       },
       {
         "name": "time",
-        "label": "Heure",
+        "label": "Time",
         "type": "string",
         "defaultValue": "now + 1 hour",
         "required": true,
-        "description": "Heure d'exécution (now + 1 hour, 14:30, tomorrow, etc.)"
+        "description": "Run time (now + 1 hour, 14:30, tomorrow and so on)"
       }
     ]
   },
   "examples": [
     {
       "command": "at 14:30",
-      "description": "Mode interactif pour définir les commandes",
+      "description": "Interactive mode to enter the commands",
       "platform": 1
     },
     {
       "command": "atq",
-      "description": "Liste les tâches en attente",
+      "description": "List the pending tasks",
       "platform": 1
     },
     {
       "command": "atrm 3",
-      "description": "Supprime la tâche numéro 3",
-      "platform": 1
-    },
-    {
-      "command": "echo \"echo 'Task executed'\" | at 14:30:00",
-      "description": "Exemple utilisant le paramètre 'command': Commande à exécuter. Remplacez Get-Process par la valeur appropriée selon votre environnement.",
+      "description": "Delete task number 3",
       "platform": 1
     },
     {
       "command": "echo \"backup.sh\" | at now + 1 hour",
-      "description": "Planifier dans 1 heure",
+      "description": "Schedule in 1 hour",
       "platform": 1
     },
     {
       "command": "echo \"reboot\" | at 03:00",
-      "description": "Planifier un reboot à 3h",
+      "description": "Schedule a reboot at 3:00",
       "platform": 1
     },
     {
       "command": "at -f script.sh now + 2 hours",
-      "description": "Exécuter un script dans 2h",
+      "description": "Run a script in 2 hours",
       "platform": 1
     },
     {
       "command": "atrm 5",
-      "description": "Supprimer la tâche n°5",
+      "description": "Delete task number 5",
       "platform": 1
     },
     {
       "command": "at now + 1 hour",
-      "description": "Dans 1 heure",
+      "description": "In 1 hour",
       "platform": 1
     }
   ],
-  "notes": "Pour tâches ponctuelles uniquement. atq liste, atrm supprime. Format temps flexible.",
+  "notes": "For one-off tasks only. atq lists, atrm deletes. Flexible time format.",
   "links": [
     {
       "title": "at command",
       "url": "https://man7.org/linux/man-pages/man1/at.1p.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Planifier une tâche ponctuelle",
+      "description": "Planifie l'exécution d'une commande à une date/heure précise (usage unique)",
+      "notes": "Pour tâches ponctuelles uniquement. atq liste, atrm supprime. Format temps flexible.",
+      "parameters": {
+        "linux": {
+          "command": {
+            "label": "Commande",
+            "description": "Commande à exécuter"
+          },
+          "time": {
+            "label": "Heure",
+            "description": "Heure d'exécution (now + 1 hour, 14:30, tomorrow, etc.)"
+          }
+        }
+      },
+      "examples": {
+        "at 14:30": "Mode interactif pour définir les commandes",
+        "atq": "Liste les tâches en attente",
+        "atrm 3": "Supprime la tâche numéro 3",
+        "echo \"backup.sh\" | at now + 1 hour": "Planifier dans 1 heure",
+        "echo \"reboot\" | at 03:00": "Planifier un reboot à 3h",
+        "at -f script.sh now + 2 hours": "Exécuter un script dans 2h",
+        "atrm 5": "Supprimer la tâche n°5",
+        "at now + 1 hour": "Dans 1 heure"
+      }
+    }
+  }
 }

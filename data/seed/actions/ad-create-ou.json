@@ -1,7 +1,7 @@
 {
   "id": "ad-create-ou",
-  "title": "Créer une nouvelle unité d'organisation",
-  "description": "Crée une nouvelle unité d'organisation (OU) dans Active Directory.",
+  "title": "Create an organizational unit",
+  "description": "Create an organizational unit (OU) in Active Directory.",
   "category": "active-directory",
   "platform": 0,
   "level": 1,
@@ -20,19 +20,19 @@
     "parameters": [
       {
         "name": "ouName",
-        "label": "Nom de l'OU",
+        "label": "OU name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la nouvelle OU"
+        "description": "Name of the new OU"
       },
       {
         "name": "parentPath",
-        "label": "Chemin parent",
+        "label": "Parent path",
         "type": "string",
         "defaultValue": "DC=contoso,DC=com",
         "required": true,
-        "description": "Distinguished Name de l'OU parente ou du domaine"
+        "description": "Distinguished Name of the parent OU or of the domain"
       },
       {
         "name": "description",
@@ -40,47 +40,78 @@
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Description de l'OU"
+        "description": "Description of the OU"
       }
     ]
   },
   "examples": [
     {
       "command": "New-ADOrganizationalUnit -Name \"Departement IT\" -Path \"DC=contoso,DC=com\" -Description \"OU for the IT department\" -ProtectedFromAccidentalDeletion $true",
-      "description": "Crée une nouvelle OU Departement IT",
+      "description": "Create the OU Departement IT",
       "platform": 0
     },
     {
       "command": "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the confirmation prompts. Useful in automated scripts, but use with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the modified or created object to the pipeline. By default the Set- and New- cmdlets return nothing. -PassThru turns the output on, for chained operations or an immediate check.",
       "platform": 0
     },
     {
       "command": "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the command's execution. -Verbose turns on the diagnostic messages that show exactly what happens. Essential for troubleshooting and to understand the internal operations.",
       "platform": 0
     },
     {
       "command": "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true",
-      "description": "Exemple utilisant le paramètre 'ouName': Nom de la nouvelle OU. Remplacez Paris-Users par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'ouName' parameter: name of the new OU. Replace Paris-Users with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits d'administration AD. L'OU est protégée contre la suppression accidentelle par défaut.",
+  "notes": "Requires AD administration rights. The OU is protected from accidental deletion by default.",
   "links": [
     {
       "title": "Documentation New-ADOrganizationalUnit",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/new-adorganizationalunit"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer une nouvelle unité d'organisation",
+      "description": "Crée une nouvelle unité d'organisation (OU) dans Active Directory.",
+      "notes": "Nécessite des droits d'administration AD. L'OU est protégée contre la suppression accidentelle par défaut.",
+      "parameters": {
+        "windows": {
+          "ouName": {
+            "label": "Nom de l'OU",
+            "description": "Nom de la nouvelle OU"
+          },
+          "parentPath": {
+            "label": "Chemin parent",
+            "description": "Distinguished Name de l'OU parente ou du domaine"
+          },
+          "description": {
+            "label": "Description",
+            "description": "Description de l'OU"
+          }
+        }
+      },
+      "examples": {
+        "New-ADOrganizationalUnit -Name \"Departement IT\" -Path \"DC=contoso,DC=com\" -Description \"OU for the IT department\" -ProtectedFromAccidentalDeletion $true": "Crée une nouvelle OU Departement IT",
+        "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+        "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true": "Exemple utilisant le paramètre 'ouName': Nom de la nouvelle OU. Remplacez Paris-Users par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

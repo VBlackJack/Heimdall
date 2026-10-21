@@ -1,7 +1,7 @@
 {
   "id": "bitlocker-backup-to-ad",
-  "title": "Sauvegarder le mot de passe BitLocker dans Active Directory",
-  "description": "Sauvegarde automatiquement le mot de passe de récupération BitLocker dans Active Directory.",
+  "title": "Back up the BitLocker password to Active Directory",
+  "description": "Back up the BitLocker recovery password to Active Directory automatically.",
   "category": "security",
   "platform": 0,
   "level": 2,
@@ -20,56 +20,80 @@
     "parameters": [
       {
         "name": "driveLetter",
-        "label": "Lettre du disque",
+        "label": "Drive letter",
         "type": "driveletter",
         "defaultValue": "C",
         "required": true,
-        "description": "Lettre du volume (ex: C, D, E)"
+        "description": "Volume letter (e.g. C, D, E)"
       }
     ]
   },
   "examples": [
     {
       "command": "$kp = (Get-BitLockerVolume C:).KeyProtector | Where-Object {$_.KeyProtectorType -eq 'RecoveryPassword'}; Backup-BitLockerKeyProtector -MountPoint C: -KeyProtectorId $kp[0].KeyProtectorId",
-      "description": "Sauvegarde le mot de passe de récupération du volume C: dans AD",
+      "description": "Back up the recovery password of volume C: to AD",
       "platform": 0
     },
     {
       "command": "Get-BitLockerVolume | ForEach-Object { $kp = $_.KeyProtector | Where-Object {$_.KeyProtectorType -eq 'RecoveryPassword'}; if($kp) { Backup-BitLockerKeyProtector -MountPoint $_.MountPoint -KeyProtectorId $kp[0].KeyProtectorId } }",
-      "description": "Sauvegarde les mots de passe de tous les volumes dans AD",
+      "description": "Back up the passwords of every volume to AD",
       "platform": 0
     },
     {
       "command": "Backup-BitLockerKeyProtector -MountPoint C: -KeyProtectorId '{12345678-1234-1234-1234-123456789012}'",
-      "description": "Sauvegarde un protecteur de clé spécifique par son ID",
+      "description": "Back up one specific key protector by its ID",
       "platform": 0
     },
     {
       "command": "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite: ordinateur joint au domaine AD, droits d'écriture sur l'objet ordinateur dans AD, GPO configurée pour autoriser le stockage BitLocker dans AD. Permet la récupération centralisée par les admins AD.",
+  "notes": "Requires: a computer joined to the AD domain, write rights on the computer object in AD, and a GPO that allows BitLocker storage in AD. Lets AD administrators recover centrally.",
   "links": [
     {
       "title": "Backup-BitLockerKeyProtector",
       "url": "https://learn.microsoft.com/en-us/powershell/module/bitlocker/backup-bitlockerkeyprotector"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Sauvegarder le mot de passe BitLocker dans Active Directory",
+      "description": "Sauvegarde automatiquement le mot de passe de récupération BitLocker dans Active Directory.",
+      "notes": "Nécessite: ordinateur joint au domaine AD, droits d'écriture sur l'objet ordinateur dans AD, GPO configurée pour autoriser le stockage BitLocker dans AD. Permet la récupération centralisée par les admins AD.",
+      "parameters": {
+        "windows": {
+          "driveLetter": {
+            "label": "Lettre du disque",
+            "description": "Lettre du volume (ex: C, D, E)"
+          }
+        }
+      },
+      "examples": {
+        "$kp = (Get-BitLockerVolume C:).KeyProtector | Where-Object {$_.KeyProtectorType -eq 'RecoveryPassword'}; Backup-BitLockerKeyProtector -MountPoint C: -KeyProtectorId $kp[0].KeyProtectorId": "Sauvegarde le mot de passe de récupération du volume C: dans AD",
+        "Get-BitLockerVolume | ForEach-Object { $kp = $_.KeyProtector | Where-Object {$_.KeyProtectorType -eq 'RecoveryPassword'}; if($kp) { Backup-BitLockerKeyProtector -MountPoint $_.MountPoint -KeyProtectorId $kp[0].KeyProtectorId } }": "Sauvegarde les mots de passe de tous les volumes dans AD",
+        "Backup-BitLockerKeyProtector -MountPoint C: -KeyProtectorId '{12345678-1234-1234-1234-123456789012}'": "Sauvegarde un protecteur de clé spécifique par son ID",
+        "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

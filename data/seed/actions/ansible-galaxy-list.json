@@ -1,7 +1,7 @@
 {
   "id": "ansible-galaxy-list",
-  "title": "Lister les rôles installés",
-  "description": "Affiche la liste de tous les rôles Ansible installés localement",
+  "title": "List the installed roles",
+  "description": "Show the list of every Ansible role installed locally",
   "category": "services-automation",
   "platform": 2,
   "level": 0,
@@ -28,7 +28,7 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "Par défaut, les rôles sont installés dans ~/.ansible/roles ou /etc/ansible/roles.",
+  "notes": "By default, roles are installed in ~/.ansible/roles or /etc/ansible/roles.",
   "links": [
     {
       "title": "Ansible Galaxy",
@@ -38,28 +38,42 @@
   "linuxExamples": [
     {
       "command": "ansible-galaxy list",
-      "description": "Liste tous les rôles installés",
+      "description": "List every installed role",
       "platform": 1
     },
     {
       "command": "ansible-galaxy list --roles-path ./roles",
-      "description": "Liste les rôles d'un répertoire spécifique",
+      "description": "List the roles of a specific directory",
       "platform": 1
     },
     {
       "command": "ansible-galaxy role list",
-      "description": "Rôles uniquement",
+      "description": "Roles only",
       "platform": 1
     },
     {
       "command": "ansible-galaxy collection list",
-      "description": "Collections uniquement",
+      "description": "Collections only",
       "platform": 1
     },
     {
       "command": "ls -la ~/.ansible/roles/",
-      "description": "Répertoire des rôles",
+      "description": "Roles directory",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les rôles installés",
+      "description": "Affiche la liste de tous les rôles Ansible installés localement",
+      "notes": "Par défaut, les rôles sont installés dans ~/.ansible/roles ou /etc/ansible/roles.",
+      "examples": {
+        "ansible-galaxy list": "Liste tous les rôles installés",
+        "ansible-galaxy list --roles-path ./roles": "Liste les rôles d'un répertoire spécifique",
+        "ansible-galaxy role list": "Rôles uniquement",
+        "ansible-galaxy collection list": "Collections uniquement",
+        "ls -la ~/.ansible/roles/": "Répertoire des rôles"
+      }
+    }
+  }
 }

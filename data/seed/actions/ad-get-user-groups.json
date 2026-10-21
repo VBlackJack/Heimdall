@@ -1,7 +1,7 @@
 {
   "id": "ad-get-user-groups",
-  "title": "Lister les groupes d'un utilisateur",
-  "description": "Affiche tous les groupes Active Directory dont un utilisateur est membre.",
+  "title": "List the groups of a user",
+  "description": "Show every Active Directory group a user is a member of.",
   "category": "active-directory",
   "platform": 2,
   "level": 0,
@@ -20,16 +20,16 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName de l'utilisateur"
+        "description": "SamAccountName of the user"
       }
     ]
   },
   "examples": [],
-  "notes": "Affiche les groupes directs et indirects (imbriqués). Utile pour l'audit des permissions.",
+  "notes": "Shows direct and indirect (nested) groups. Useful to audit permissions.",
   "links": [
     {
       "title": "Documentation Get-ADPrincipalGroupMembership",
@@ -44,47 +44,76 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Utilisateur (vide = utilisateur actuel)"
+        "description": "User (empty = current user)"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "Get-ADGroup -Filter {GroupCategory -eq 'Security' -and GroupScope -eq 'Global'}",
-      "description": "Liste uniquement les groupes de sécurité globaux. GroupCategory peut être 'Security' ou 'Distribution'. GroupScope peut être 'DomainLocal', 'Global' ou 'Universal'. Les groupes de sécurité globaux sont les plus courants pour les permissions sur ressources.",
+      "description": "List global security groups only. GroupCategory is 'Security' or 'Distribution'. GroupScope is 'DomainLocal', 'Global' or 'Universal'. Global security groups are the most common for resource permissions.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "groups",
-      "description": "Affiche vos groupes",
+      "description": "Show your groups",
       "platform": 1
     },
     {
       "command": "groups john",
-      "description": "Affiche les groupes de john",
+      "description": "Show the groups of john",
       "platform": 1
     },
     {
       "command": "id john",
-      "description": "Affiche UID, GID et groupes",
+      "description": "Show the UID, GID and groups",
       "platform": 1
     },
     {
       "command": "id jdupont",
-      "description": "UID, GID et groupes",
+      "description": "UID, GID and groups",
       "platform": 1
     },
     {
       "command": "getent group sudo",
-      "description": "Membres du groupe sudo",
+      "description": "Members of the sudo group",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "groups-cmd"
+  "linuxCommandTemplateId": "groups-cmd",
+  "translations": {
+    "fr": {
+      "title": "Lister les groupes d'un utilisateur",
+      "description": "Affiche tous les groupes Active Directory dont un utilisateur est membre.",
+      "notes": "Affiche les groupes directs et indirects (imbriqués). Utile pour l'audit des permissions.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName de l'utilisateur"
+          }
+        },
+        "linux": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Utilisateur (vide = utilisateur actuel)"
+          }
+        }
+      },
+      "examples": {
+        "Get-ADGroup -Filter {GroupCategory -eq 'Security' -and GroupScope -eq 'Global'}": "Liste uniquement les groupes de sécurité globaux. GroupCategory peut être 'Security' ou 'Distribution'. GroupScope peut être 'DomainLocal', 'Global' ou 'Universal'. Les groupes de sécurité globaux sont les plus courants pour les permissions sur ressources.",
+        "groups": "Affiche vos groupes",
+        "groups john": "Affiche les groupes de john",
+        "id john": "Affiche UID, GID et groupes",
+        "id jdupont": "UID, GID et groupes",
+        "getent group sudo": "Membres du groupe sudo"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "bitlocker-ad-compliance-report",
-  "title": "Générer un rapport de conformité BitLocker pour la direction",
-  "description": "Génère un rapport exécutif de conformité BitLocker avec statistiques, graphiques et ordinateurs non conformes.",
+  "title": "Build a BitLocker compliance report for management",
+  "description": "Build an executive BitLocker compliance report with statistics, charts and the non-compliant computers.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -23,45 +23,61 @@
   "examples": [
     {
       "command": "$all = Get-ADComputer -Filter *; $total = $all.Count; $encrypted = ($all | Where-Object { (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -ne $null }).Count; [PSCustomObject]@{ TotalComputers=$total; Encrypted=$encrypted; NotEncrypted=($total-$encrypted); ComplianceRate=\"$(($encrypted/$total*100).ToString('N1'))%\" }",
-      "description": "Rapport de conformité synthétique (une ligne)",
-      "platform": 1
+      "description": "Summary compliance report (one line)",
+      "platform": 0
     },
     {
       "command": "$report = @(); $ous = Get-ADOrganizationalUnit -Filter *; foreach($ou in $ous) { $computers = Get-ADComputer -Filter * -SearchBase $ou.DistinguishedName -SearchScope OneLevel; $total = $computers.Count; if($total -gt 0) { $encrypted = ($computers | Where-Object { (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -ne $null }).Count; $report += [PSCustomObject]@{OU=$ou.Name; Total=$total; Encrypted=$encrypted; Compliance=\"$(($encrypted/$total*100).ToString('N0'))%\"} } }; $report | Format-Table",
-      "description": "Rapport de conformité par OU (département/site)",
-      "platform": 1
+      "description": "Compliance report per OU (department or site)",
+      "platform": 0
     },
     {
       "command": "$notCompliant = Get-ADComputer -Filter * | Where-Object { (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -eq $null } | Select-Object Name,DistinguishedName; $notCompliant | Export-Csv C:\\BitLocker-NonCompliant-$(Get-Date -Format 'yyyyMMdd').csv -NoTypeInformation; Write-Host \"$($notCompliant.Count) non-compliant computers exported\"",
-      "description": "Exporte la liste des ordinateurs NON CONFORMES pour action corrective",
-      "platform": 1
+      "description": "Export the list of NON-COMPLIANT computers for corrective action",
+      "platform": 0
     },
     {
       "command": "$allComputers = Get-ADComputer -Filter *; $total = $allComputers.Count; $encrypted = 0; $notEncrypted = @(); foreach($pc in $allComputers) { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $pc.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; if($hasKeys) { $encrypted++ } else { $notEncrypted += $pc.Name } }; $compliance = ($encrypted/$total*100).ToString('N1'); Write-Host \"`n=== BITLOCKER COMPLIANCE REPORT ===\" -ForegroundColor Cyan; Write-Host \"Total computers: $total\" -ForegroundColor White; Write-Host \"Encrypted: $encrypted ($compliance%)\" -ForegroundColor Green; Write-Host \"Not encrypted: $($total-$encrypted) ($((($total-$encrypted)/$total*100).ToString('N1'))%)\" -ForegroundColor Red; Write-Host \"`nNON-COMPLIANT computers:\" -ForegroundColor Yellow; $notEncrypted | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
-      "platform": 1
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
+      "platform": 0
     },
     {
       "command": "$allComputers = Get-ADComputer -Filter *; $total = $allComputers.Count; $encrypted = 0; $notEncrypted = @(); foreach($pc in $allComputers) { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $pc.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; if($hasKeys) { $encrypted++ } else { $notEncrypted += $pc.Name } }; $compliance = ($encrypted/$total*100).ToString('N1'); Write-Host \"`n=== BITLOCKER COMPLIANCE REPORT ===\" -ForegroundColor Cyan; Write-Host \"Total computers: $total\" -ForegroundColor White; Write-Host \"Encrypted: $encrypted ($compliance%)\" -ForegroundColor Green; Write-Host \"Not encrypted: $($total-$encrypted) ($((($total-$encrypted)/$total*100).ToString('N1'))%)\" -ForegroundColor Red; Write-Host \"`nNON-COMPLIANT computers:\" -ForegroundColor Yellow; $notEncrypted | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
-      "platform": 1
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
+      "platform": 0
     },
     {
       "command": "$allComputers = Get-ADComputer -Filter *; $total = $allComputers.Count; $encrypted = 0; $notEncrypted = @(); foreach($pc in $allComputers) { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $pc.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; if($hasKeys) { $encrypted++ } else { $notEncrypted += $pc.Name } }; $compliance = ($encrypted/$total*100).ToString('N1'); Write-Host \"`n=== BITLOCKER COMPLIANCE REPORT ===\" -ForegroundColor Cyan; Write-Host \"Total computers: $total\" -ForegroundColor White; Write-Host \"Encrypted: $encrypted ($compliance%)\" -ForegroundColor Green; Write-Host \"Not encrypted: $($total-$encrypted) ($((($total-$encrypted)/$total*100).ToString('N1'))%)\" -ForegroundColor Red; Write-Host \"`nNON-COMPLIANT computers:\" -ForegroundColor Yellow; $notEncrypted | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
-      "platform": 1
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
+      "platform": 0
     },
     {
       "command": "$allComputers = Get-ADComputer -Filter *; $total = $allComputers.Count; $encrypted = 0; $notEncrypted = @(); foreach($pc in $allComputers) { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $pc.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; if($hasKeys) { $encrypted++ } else { $notEncrypted += $pc.Name } }; $compliance = ($encrypted/$total*100).ToString('N1'); Write-Host \"`n=== BITLOCKER COMPLIANCE REPORT ===\" -ForegroundColor Cyan; Write-Host \"Total computers: $total\" -ForegroundColor White; Write-Host \"Encrypted: $encrypted ($compliance%)\" -ForegroundColor Green; Write-Host \"Not encrypted: $($total-$encrypted) ($((($total-$encrypted)/$total*100).ToString('N1'))%)\" -ForegroundColor Red; Write-Host \"`nNON-COMPLIANT computers:\" -ForegroundColor Yellow; $notEncrypted | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
-      "platform": 1
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
+      "platform": 0
     }
   ],
-  "notes": "RAPPORT EXÉCUTIF: Pour direction/RSSI/audit. OBJECTIF: 100% conformité pour laptops (obligatoire!), 80-100% pour desktops selon politique. KPI: Taux de conformité, tendance, ordinateurs critiques non conformes. FRÉQUENCE: Mensuel recommandé. ACTION: Laptops non conformes = PRIORITÉ 1 (risque perte/vol).",
+  "notes": "EXECUTIVE REPORT: for management, the CISO or auditors. GOAL: 100% compliance for laptops (mandatory!), 80-100% for desktops depending on the policy. KPIs: compliance rate, trend, critical non-compliant computers. FREQUENCY: monthly recommended. ACTION: non-compliant laptops = PRIORITY 1 (risk of loss or theft).",
   "links": [
     {
       "title": "BitLocker Compliance and Reporting",
       "url": "https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/operations-guide"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Générer un rapport de conformité BitLocker pour la direction",
+      "description": "Génère un rapport exécutif de conformité BitLocker avec statistiques, graphiques et ordinateurs non conformes.",
+      "notes": "RAPPORT EXÉCUTIF: Pour direction/RSSI/audit. OBJECTIF: 100% conformité pour laptops (obligatoire!), 80-100% pour desktops selon politique. KPI: Taux de conformité, tendance, ordinateurs critiques non conformes. FRÉQUENCE: Mensuel recommandé. ACTION: Laptops non conformes = PRIORITÉ 1 (risque perte/vol).",
+      "examples": {
+        "$all = Get-ADComputer -Filter *; $total = $all.Count; $encrypted = ($all | Where-Object { (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -ne $null }).Count; [PSCustomObject]@{ TotalComputers=$total; Encrypted=$encrypted; NotEncrypted=($total-$encrypted); ComplianceRate=\"$(($encrypted/$total*100).ToString('N1'))%\" }": "Rapport de conformité synthétique (une ligne)",
+        "$report = @(); $ous = Get-ADOrganizationalUnit -Filter *; foreach($ou in $ous) { $computers = Get-ADComputer -Filter * -SearchBase $ou.DistinguishedName -SearchScope OneLevel; $total = $computers.Count; if($total -gt 0) { $encrypted = ($computers | Where-Object { (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -ne $null }).Count; $report += [PSCustomObject]@{OU=$ou.Name; Total=$total; Encrypted=$encrypted; Compliance=\"$(($encrypted/$total*100).ToString('N0'))%\"} } }; $report | Format-Table": "Rapport de conformité par OU (département/site)",
+        "$notCompliant = Get-ADComputer -Filter * | Where-Object { (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -eq $null } | Select-Object Name,DistinguishedName; $notCompliant | Export-Csv C:\\BitLocker-NonCompliant-$(Get-Date -Format 'yyyyMMdd').csv -NoTypeInformation; Write-Host \"$($notCompliant.Count) non-compliant computers exported\"": "Exporte la liste des ordinateurs NON CONFORMES pour action corrective",
+        "$allComputers = Get-ADComputer -Filter *; $total = $allComputers.Count; $encrypted = 0; $notEncrypted = @(); foreach($pc in $allComputers) { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $pc.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; if($hasKeys) { $encrypted++ } else { $notEncrypted += $pc.Name } }; $compliance = ($encrypted/$total*100).ToString('N1'); Write-Host \"`n=== BITLOCKER COMPLIANCE REPORT ===\" -ForegroundColor Cyan; Write-Host \"Total computers: $total\" -ForegroundColor White; Write-Host \"Encrypted: $encrypted ($compliance%)\" -ForegroundColor Green; Write-Host \"Not encrypted: $($total-$encrypted) ($((($total-$encrypted)/$total*100).ToString('N1'))%)\" -ForegroundColor Red; Write-Host \"`nNON-COMPLIANT computers:\" -ForegroundColor Yellow; $notEncrypted | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$allComputers = Get-ADComputer -Filter *; $total = $allComputers.Count; $encrypted = 0; $notEncrypted = @(); foreach($pc in $allComputers) { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $pc.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; if($hasKeys) { $encrypted++ } else { $notEncrypted += $pc.Name } }; $compliance = ($encrypted/$total*100).ToString('N1'); Write-Host \"`n=== BITLOCKER COMPLIANCE REPORT ===\" -ForegroundColor Cyan; Write-Host \"Total computers: $total\" -ForegroundColor White; Write-Host \"Encrypted: $encrypted ($compliance%)\" -ForegroundColor Green; Write-Host \"Not encrypted: $($total-$encrypted) ($((($total-$encrypted)/$total*100).ToString('N1'))%)\" -ForegroundColor Red; Write-Host \"`nNON-COMPLIANT computers:\" -ForegroundColor Yellow; $notEncrypted | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "$allComputers = Get-ADComputer -Filter *; $total = $allComputers.Count; $encrypted = 0; $notEncrypted = @(); foreach($pc in $allComputers) { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $pc.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; if($hasKeys) { $encrypted++ } else { $notEncrypted += $pc.Name } }; $compliance = ($encrypted/$total*100).ToString('N1'); Write-Host \"`n=== BITLOCKER COMPLIANCE REPORT ===\" -ForegroundColor Cyan; Write-Host \"Total computers: $total\" -ForegroundColor White; Write-Host \"Encrypted: $encrypted ($compliance%)\" -ForegroundColor Green; Write-Host \"Not encrypted: $($total-$encrypted) ($((($total-$encrypted)/$total*100).ToString('N1'))%)\" -ForegroundColor Red; Write-Host \"`nNON-COMPLIANT computers:\" -ForegroundColor Yellow; $notEncrypted | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "$allComputers = Get-ADComputer -Filter *; $total = $allComputers.Count; $encrypted = 0; $notEncrypted = @(); foreach($pc in $allComputers) { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $pc.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; if($hasKeys) { $encrypted++ } else { $notEncrypted += $pc.Name } }; $compliance = ($encrypted/$total*100).ToString('N1'); Write-Host \"`n=== BITLOCKER COMPLIANCE REPORT ===\" -ForegroundColor Cyan; Write-Host \"Total computers: $total\" -ForegroundColor White; Write-Host \"Encrypted: $encrypted ($compliance%)\" -ForegroundColor Green; Write-Host \"Not encrypted: $($total-$encrypted) ($((($total-$encrypted)/$total*100).ToString('N1'))%)\" -ForegroundColor Red; Write-Host \"`nNON-COMPLIANT computers:\" -ForegroundColor Yellow; $notEncrypted | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

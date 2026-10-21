@@ -1,7 +1,7 @@
 {
   "id": "ansible-playbook-limit",
-  "title": "Limiter l'exécution à certains hôtes (--limit)",
-  "description": "Exécute un playbook uniquement sur un sous-ensemble d'hôtes",
+  "title": "Limit the run to some hosts (--limit)",
+  "description": "Run a playbook on a subset of hosts only",
   "category": "services-automation",
   "platform": 2,
   "level": 1,
@@ -20,27 +20,27 @@
     "parameters": [
       {
         "name": "playbookPath",
-        "label": "Chemin du playbook",
+        "label": "Playbook path",
         "type": "string",
         "defaultValue": "site.yml",
         "required": true,
-        "description": "Chemin vers le fichier playbook YAML"
+        "description": "Path to the YAML playbook file"
       },
       {
         "name": "inventory",
-        "label": "Inventaire",
+        "label": "Inventory",
         "type": "string",
         "defaultValue": "inventory.ini",
         "required": true,
-        "description": "Fichier d'inventaire des hôtes"
+        "description": "Host inventory file"
       },
       {
         "name": "hostPattern",
-        "label": "Pattern d'hôtes",
+        "label": "Host pattern",
         "type": "string",
         "defaultValue": "webservers",
         "required": true,
-        "description": "Pattern pour limiter les hôtes ciblés"
+        "description": "Pattern that limits the targeted hosts"
       }
     ]
   },
@@ -53,32 +53,32 @@
     "parameters": [
       {
         "name": "playbookPath",
-        "label": "Chemin du playbook",
+        "label": "Playbook path",
         "type": "string",
         "defaultValue": "site.yml",
         "required": true,
-        "description": "Chemin vers le fichier playbook YAML"
+        "description": "Path to the YAML playbook file"
       },
       {
         "name": "inventory",
-        "label": "Inventaire",
+        "label": "Inventory",
         "type": "string",
         "defaultValue": "inventory.ini",
         "required": true,
-        "description": "Fichier d'inventaire des hôtes"
+        "description": "Host inventory file"
       },
       {
         "name": "hostPattern",
-        "label": "Pattern d'hôtes",
+        "label": "Host pattern",
         "type": "string",
         "defaultValue": "webservers",
         "required": true,
-        "description": "Pattern pour limiter les hôtes ciblés"
+        "description": "Pattern that limits the targeted hosts"
       }
     ]
   },
   "examples": [],
-  "notes": "Utilisez --limit pour tester un playbook sur un sous-ensemble d'hôtes avant un déploiement complet.",
+  "notes": "Use --limit to test a playbook on a subset of hosts before a full deployment.",
   "links": [
     {
       "title": "Ansible Patterns",
@@ -88,40 +88,68 @@
   "windowsExamples": [
     {
       "command": "ansible-playbook site.yml -i hosts --limit \"webservers\"",
-      "description": "Execute uniquement sur le groupe webservers.",
+      "description": "Run on the webservers group only.",
       "platform": 0
     },
     {
       "command": "ansible-playbook deploy.yml --limit \"server1,server2\"",
-      "description": "Execute uniquement sur les hotes specifies.",
+      "description": "Run on the named hosts only.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-playbook site.yml --limit \"webservers\"",
-      "description": "Exécute uniquement sur le groupe webservers",
+      "description": "Run on the webservers group only",
       "platform": 1
     },
     {
       "command": "ansible-playbook update.yml --limit \"server1.example.com,server2.example.com\"",
-      "description": "Exécute uniquement sur les hôtes spécifiés",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook site.yml -i /etc/ansible/hosts --limit \"*.contoso.com\"",
-      "description": "Exemple utilisant le paramètre 'playbookPath': Chemin vers le fichier playbook YAML. Remplacez /etc/ansible/playbooks/deploy.yml par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook /etc/ansible/playbooks/deploy.yml -i inventory.ini --limit \"*.contoso.com\"",
-      "description": "Exemple utilisant le paramètre 'inventory': Fichier d'inventaire des hôtes. Remplacez /etc/ansible/hosts par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook /etc/ansible/playbooks/deploy.yml -i /etc/ansible/hosts --limit \"webservers\"",
-      "description": "Exemple utilisant le paramètre 'hostPattern': Pattern pour limiter les hôtes ciblés. Remplacez *.contoso.com par la valeur appropriée selon votre environnement.",
+      "description": "Run on the named hosts only",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Limiter l'exécution à certains hôtes (--limit)",
+      "description": "Exécute un playbook uniquement sur un sous-ensemble d'hôtes",
+      "notes": "Utilisez --limit pour tester un playbook sur un sous-ensemble d'hôtes avant un déploiement complet.",
+      "parameters": {
+        "windows": {
+          "playbookPath": {
+            "label": "Chemin du playbook",
+            "description": "Chemin vers le fichier playbook YAML"
+          },
+          "inventory": {
+            "label": "Inventaire",
+            "description": "Fichier d'inventaire des hôtes"
+          },
+          "hostPattern": {
+            "label": "Pattern d'hôtes",
+            "description": "Pattern pour limiter les hôtes ciblés"
+          }
+        },
+        "linux": {
+          "playbookPath": {
+            "label": "Chemin du playbook",
+            "description": "Chemin vers le fichier playbook YAML"
+          },
+          "inventory": {
+            "label": "Inventaire",
+            "description": "Fichier d'inventaire des hôtes"
+          },
+          "hostPattern": {
+            "label": "Pattern d'hôtes",
+            "description": "Pattern pour limiter les hôtes ciblés"
+          }
+        }
+      },
+      "examples": {
+        "ansible-playbook site.yml -i hosts --limit \"webservers\"": "Exécute uniquement sur le groupe webservers.",
+        "ansible-playbook deploy.yml --limit \"server1,server2\"": "Exécute uniquement sur les hôtes spécifiés.",
+        "ansible-playbook site.yml --limit \"webservers\"": "Exécute uniquement sur le groupe webservers",
+        "ansible-playbook update.yml --limit \"server1.example.com,server2.example.com\"": "Exécute uniquement sur les hôtes spécifiés"
+      }
+    }
+  }
 }

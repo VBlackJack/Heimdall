@@ -1,7 +1,7 @@
 {
   "id": "dmesg-kernel-errors",
-  "title": "Afficher les messages du noyau",
-  "description": "Consulte les messages du noyau Linux, utile pour diagnostiquer les problèmes matériels et drivers",
+  "title": "Show the kernel messages",
+  "description": "Read the Linux kernel messages, useful to diagnose hardware and driver problems",
   "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
@@ -20,74 +20,92 @@
     "parameters": [
       {
         "name": "level",
-        "label": "Niveau",
+        "label": "Level",
         "type": "string",
         "defaultValue": "err,warn",
         "required": true,
-        "description": "Niveau de sévérité (emerg, alert, crit, err, warn, notice, info, debug)"
+        "description": "Severity level (emerg, alert, crit, err, warn, notice, info, debug)"
       },
       {
         "name": "lines",
-        "label": "Nombre de lignes",
+        "label": "Number of lines",
         "type": "number",
         "defaultValue": "100",
         "required": true,
-        "description": "Nombre de lignes à afficher"
+        "description": "Number of lines to show"
       }
     ]
   },
   "examples": [
     {
       "command": "dmesg --level=err,warn --human",
-      "description": "Affiche les erreurs et avertissements du noyau",
+      "description": "Show the kernel errors and warnings",
       "platform": 1
     },
     {
       "command": "dmesg | grep -i usb",
-      "description": "Recherche les messages concernant l'USB",
-      "platform": 1
-    },
-    {
-      "command": "dmesg --level=err,warn --human --color=always | tail -n 100",
-      "description": "Exemple utilisant le paramètre 'level': Niveau de sévérité (emerg, alert, crit, err, warn, notice, info, debug). Remplacez Error par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "dmesg --level=Error --human --color=always | tail -n 100",
-      "description": "Exemple utilisant le paramètre 'lines': Nombre de lignes à afficher. Remplacez 100 par la valeur appropriée selon votre environnement.",
+      "description": "Search the messages about USB",
       "platform": 1
     },
     {
       "command": "dmesg",
-      "description": "Afficher les messages du noyau",
+      "description": "Show the kernel messages",
       "platform": 1
     },
     {
       "command": "dmesg -T",
-      "description": "Avec timestamps lisibles",
+      "description": "With readable timestamps",
       "platform": 1
     },
     {
       "command": "dmesg -w",
-      "description": "Suivre en temps réel",
+      "description": "Follow in real time",
       "platform": 1
     },
     {
       "command": "dmesg | grep -i error",
-      "description": "Filtrer les erreurs",
+      "description": "Filter the errors",
       "platform": 1
     },
     {
       "command": "dmesg -l err,warn",
-      "description": "Afficher erreurs et warnings seulement",
+      "description": "Show errors and warnings only",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo pour voir tous les messages sur certaines distributions. -w pour suivre en temps réel.",
+  "notes": "Requires sudo to see every message on some distributions. -w to follow in real time.",
   "links": [
     {
       "title": "dmesg man page",
       "url": "https://man7.org/linux/man-pages/man1/dmesg.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les messages du noyau",
+      "description": "Consulte les messages du noyau Linux, utile pour diagnostiquer les problèmes matériels et drivers",
+      "notes": "Nécessite sudo pour voir tous les messages sur certaines distributions. -w pour suivre en temps réel.",
+      "parameters": {
+        "linux": {
+          "level": {
+            "label": "Niveau",
+            "description": "Niveau de sévérité (emerg, alert, crit, err, warn, notice, info, debug)"
+          },
+          "lines": {
+            "label": "Nombre de lignes",
+            "description": "Nombre de lignes à afficher"
+          }
+        }
+      },
+      "examples": {
+        "dmesg --level=err,warn --human": "Affiche les erreurs et avertissements du noyau",
+        "dmesg | grep -i usb": "Recherche les messages concernant l'USB",
+        "dmesg": "Afficher les messages du noyau",
+        "dmesg -T": "Avec timestamps lisibles",
+        "dmesg -w": "Suivre en temps réel",
+        "dmesg | grep -i error": "Filtrer les erreurs",
+        "dmesg -l err,warn": "Afficher erreurs et warnings seulement"
+      }
+    }
+  }
 }

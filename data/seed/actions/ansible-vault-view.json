@@ -1,7 +1,7 @@
 {
   "id": "ansible-vault-view",
-  "title": "Visualiser un fichier chiffré",
-  "description": "Affiche le contenu d'un fichier chiffré sans le modifier",
+  "title": "View an encrypted file",
+  "description": "Show the content of an encrypted file without changing it",
   "category": "services-automation",
   "platform": 2,
   "level": 0,
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "filePath",
-        "label": "Fichier à visualiser",
+        "label": "File to view",
         "type": "string",
         "defaultValue": "secrets.yml",
         "required": true,
-        "description": "Chemin du fichier chiffré à afficher"
+        "description": "Path of the encrypted file to show"
       }
     ]
   },
@@ -37,16 +37,16 @@
     "parameters": [
       {
         "name": "filePath",
-        "label": "Fichier à visualiser",
+        "label": "File to view",
         "type": "string",
         "defaultValue": "secrets.yml",
         "required": true,
-        "description": "Chemin du fichier chiffré"
+        "description": "Path of the encrypted file"
       }
     ]
   },
   "examples": [],
-  "notes": "Commande en lecture seule, idéale pour consulter rapidement des secrets sans risque de modification.",
+  "notes": "Read-only command, ideal to look at secrets quickly with no risk of changing them.",
   "links": [
     {
       "title": "Ansible Vault",
@@ -56,25 +56,46 @@
   "windowsExamples": [
     {
       "command": "ansible-vault view C:\\Data\\report.xlsx",
-      "description": "Exemple Windows utilisant ansible-vault. Remplacez les paramètres entre <> par vos valeurs.",
+      "description": "Windows example using ansible-vault. Replace the parameters between <> with your values.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-vault view vars/secrets.yml",
-      "description": "Affiche le contenu déchiffré",
-      "platform": 1
-    },
-    {
-      "command": "ansible-vault view secrets.yml",
-      "description": "Exemple utilisant le paramètre 'filePath': Chemin du fichier chiffré à afficher. Remplacez C:\\Data\\report.xlsx par la valeur appropriée selon votre environnement.",
+      "description": "Show the decrypted content",
       "platform": 1
     },
     {
       "command": "ansible-vault view group_vars/prod/vault.yml",
-      "description": "Dans group_vars",
+      "description": "In group_vars",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Visualiser un fichier chiffré",
+      "description": "Affiche le contenu d'un fichier chiffré sans le modifier",
+      "notes": "Commande en lecture seule, idéale pour consulter rapidement des secrets sans risque de modification.",
+      "parameters": {
+        "windows": {
+          "filePath": {
+            "label": "Fichier à visualiser",
+            "description": "Chemin du fichier chiffré à afficher"
+          }
+        },
+        "linux": {
+          "filePath": {
+            "label": "Fichier à visualiser",
+            "description": "Chemin du fichier chiffré"
+          }
+        }
+      },
+      "examples": {
+        "ansible-vault view C:\\Data\\report.xlsx": "Exemple Windows utilisant ansible-vault. Remplacez les paramètres entre <> par vos valeurs.",
+        "ansible-vault view vars/secrets.yml": "Affiche le contenu déchiffré",
+        "ansible-vault view group_vars/prod/vault.yml": "Dans group_vars"
+      }
+    }
+  }
 }

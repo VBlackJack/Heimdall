@@ -1,7 +1,7 @@
 {
   "id": "ad-move-object",
-  "title": "Déplacer un objet AD vers une autre OU",
-  "description": "Déplace un utilisateur, ordinateur ou autre objet vers une unité d'organisation différente.",
+  "title": "Move an AD object to another OU",
+  "description": "Move a user, a computer or another object to a different organizational unit.",
   "category": "active-directory",
   "platform": 0,
   "level": 1,
@@ -20,39 +20,56 @@
     "parameters": [
       {
         "name": "objectDN",
-        "label": "DN de l'objet",
+        "label": "Object DN",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Distinguished Name complet de l'objet à déplacer"
+        "description": "Full Distinguished Name of the object to move"
       },
       {
         "name": "targetOU",
-        "label": "OU de destination",
+        "label": "Target OU",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Distinguished Name de l'OU de destination"
+        "description": "Distinguished Name of the target OU"
       }
     ]
   },
   "examples": [
     {
       "command": "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=IT,DC=contoso,DC=com\"",
-      "description": "Déplace Jean Dupont vers l'OU IT",
-      "platform": 0
-    },
-    {
-      "command": "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=Archive,DC=contoso,DC=com\"",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Move-ADObject -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Move Jean Dupont to the IT OU",
       "platform": 0
     }
   ],
-  "notes": "Nécessite le DN complet de l'objet. Utiliser Get-ADUser/Get-ADComputer -Identity xxx pour obtenir le DN.",
+  "notes": "Requires the full DN of the object. Use Get-ADUser/Get-ADComputer -Identity xxx to get the DN.",
   "links": [
     {
       "title": "Documentation Move-ADObject",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/move-adobject"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Déplacer un objet AD vers une autre OU",
+      "description": "Déplace un utilisateur, ordinateur ou autre objet vers une unité d'organisation différente.",
+      "notes": "Nécessite le DN complet de l'objet. Utiliser Get-ADUser/Get-ADComputer -Identity xxx pour obtenir le DN.",
+      "parameters": {
+        "windows": {
+          "objectDN": {
+            "label": "DN de l'objet",
+            "description": "Distinguished Name complet de l'objet à déplacer"
+          },
+          "targetOU": {
+            "label": "OU de destination",
+            "description": "Distinguished Name de l'OU de destination"
+          }
+        }
+      },
+      "examples": {
+        "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=IT,DC=contoso,DC=com\"": "Déplace Jean Dupont vers l'OU IT"
+      }
+    }
+  }
 }

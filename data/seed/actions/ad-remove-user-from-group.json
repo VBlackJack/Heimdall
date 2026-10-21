@@ -1,7 +1,7 @@
 {
   "id": "ad-remove-user-from-group",
-  "title": "Retirer un utilisateur d'un groupe AD",
-  "description": "Retire un utilisateur d'un groupe Active Directory.",
+  "title": "Remove a user from an AD group",
+  "description": "Remove a user from an Active Directory group.",
   "category": "active-directory",
   "platform": 0,
   "level": 1,
@@ -20,49 +20,74 @@
     "parameters": [
       {
         "name": "groupName",
-        "label": "Nom du groupe",
+        "label": "Group name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du groupe AD"
+        "description": "Name of the AD group"
       },
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName de l'utilisateur à retirer"
+        "description": "SamAccountName of the user to remove"
       }
     ]
   },
   "examples": [
     {
       "command": "Remove-ADGroupMember -Identity 'Domain Admins' -Members jdupont -Confirm:$false",
-      "description": "Retire jdupont du groupe Domain Admins sans confirmation. -Confirm:$false supprime l'invite de confirmation (par défaut, Remove-ADGroupMember demande toujours confirmation pour les opérations sensibles). Le retrait est immédiat mais l'utilisateur doit se reconnecter pour perdre les droits.",
+      "description": "Remove jdupont from the Domain Admins group without confirmation. -Confirm:$false suppresses the confirmation prompt (by default, Remove-ADGroupMember always asks for confirmation on sensitive operations). The removal is immediate, but the user must log on again to lose the rights.",
       "platform": 0
     },
     {
       "command": "Remove-ADGroupMember -Identity 'IT_Support' -Members jdupont,mmartin -Confirm:$false",
-      "description": "Retire plusieurs utilisateurs simultanément d'un groupe. -Members accepte un tableau de valeurs. Plus efficace que des commandes individuelles. Utile lors des départs de collaborateurs ou réorganisations.",
+      "description": "Remove several users from a group at once. -Members accepts an array of values. More efficient than separate commands. Useful when people leave or during reorganizations.",
       "platform": 0
     },
     {
       "command": "Remove-ADGroupMember -Identity 'Groupe_Projet_X' -Members jdupont -WhatIf",
-      "description": "Simulation du retrait avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter. Vérifiez toujours avec -WhatIf avant de retirer des membres de groupes sensibles. Retirez -WhatIf après validation.",
+      "description": "Simulate the removal with -WhatIf (dry run). Shows what would be done without running it. Always check with -WhatIf before removing members from sensitive groups. Remove -WhatIf after checking.",
       "platform": 0
     },
     {
       "command": "Get-ADGroupMember -Identity 'IT_Support' | Export-Csv C:\\Temp\\IT_Support_Backup.csv -NoTypeInformation; Remove-ADGroupMember -Identity 'IT_Support' -Members jdupont -Confirm:$false",
-      "description": "Bonne pratique : sauvegarde les membres du groupe avant retrait. L'export CSV permet une restauration facile en cas d'erreur. Les deux commandes sont séparées par un point-virgule pour exécution séquentielle. Toujours sauvegarder avant modifications critiques.",
+      "description": "Good practice: back up the group members before removing one. The CSV export makes a restore easy in case of error. The two commands are separated by a semicolon to run in sequence. Always back up before critical changes.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits d'administration AD. Retirer l'option -Confirm:$false pour demander confirmation.",
+  "notes": "Requires AD administration rights. Drop the -Confirm:$false option to ask for confirmation.",
   "links": [
     {
       "title": "Documentation Remove-ADGroupMember",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/remove-adgroupmember"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Retirer un utilisateur d'un groupe AD",
+      "description": "Retire un utilisateur d'un groupe Active Directory.",
+      "notes": "Nécessite des droits d'administration AD. Retirer l'option -Confirm:$false pour demander confirmation.",
+      "parameters": {
+        "windows": {
+          "groupName": {
+            "label": "Nom du groupe",
+            "description": "Nom du groupe AD"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName de l'utilisateur à retirer"
+          }
+        }
+      },
+      "examples": {
+        "Remove-ADGroupMember -Identity 'Domain Admins' -Members jdupont -Confirm:$false": "Retire jdupont du groupe Domain Admins sans confirmation. -Confirm:$false supprime l'invite de confirmation (par défaut, Remove-ADGroupMember demande toujours confirmation pour les opérations sensibles). Le retrait est immédiat mais l'utilisateur doit se reconnecter pour perdre les droits.",
+        "Remove-ADGroupMember -Identity 'IT_Support' -Members jdupont,mmartin -Confirm:$false": "Retire plusieurs utilisateurs simultanément d'un groupe. -Members accepte un tableau de valeurs. Plus efficace que des commandes individuelles. Utile lors des départs de collaborateurs ou réorganisations.",
+        "Remove-ADGroupMember -Identity 'Groupe_Projet_X' -Members jdupont -WhatIf": "Simulation du retrait avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter. Vérifiez toujours avec -WhatIf avant de retirer des membres de groupes sensibles. Retirez -WhatIf après validation.",
+        "Get-ADGroupMember -Identity 'IT_Support' | Export-Csv C:\\Temp\\IT_Support_Backup.csv -NoTypeInformation; Remove-ADGroupMember -Identity 'IT_Support' -Members jdupont -Confirm:$false": "Bonne pratique : sauvegarde les membres du groupe avant retrait. L'export CSV permet une restauration facile en cas d'erreur. Les deux commandes sont séparées par un point-virgule pour exécution séquentielle. Toujours sauvegarder avant modifications critiques."
+      }
+    }
+  }
 }

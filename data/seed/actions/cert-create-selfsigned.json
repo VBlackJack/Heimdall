@@ -1,7 +1,7 @@
 {
   "id": "cert-create-selfsigned",
-  "title": "Créer un certificat auto-signé",
-  "description": "Génère un nouveau certificat auto-signé pour des tests, développement ou usage interne. Non recommandé pour la production publique.",
+  "title": "Create a self-signed certificate",
+  "description": "Generate a self-signed certificate for testing, development or internal use. Not recommended for public production.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -24,65 +24,93 @@
     "parameters": [
       {
         "name": "dnsName",
-        "label": "Nom DNS",
+        "label": "DNS name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "localhost",
         "required": true,
-        "description": "Nom DNS ou Subject du certificat (ex: localhost, *.example.com)"
+        "description": "DNS name or subject of the certificate (e.g. localhost, *.example.com)"
       },
       {
         "name": "validityYears",
-        "label": "Validité (années)",
+        "label": "Validity (years)",
         "type": "string",
         "defaultValue": "1",
         "required": true,
-        "description": "Durée de validité en années"
+        "description": "Validity period in years"
       }
     ]
   },
   "examples": [
     {
       "command": "New-SelfSignedCertificate -DnsName 'localhost' -CertStoreLocation Cert:\\LocalMachine\\My",
-      "description": "Certificat pour localhost",
+      "description": "Certificate for localhost",
       "platform": 0
     },
     {
       "command": "New-SelfSignedCertificate -DnsName 'myapp.local', 'www.myapp.local' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2)",
-      "description": "Certificat multi-domaines valide 2 ans",
+      "description": "Multi-domain certificate valid for 2 years",
       "platform": 0
     },
     {
       "command": "$cert = New-SelfSignedCertificate -DnsName 'dev.example.com' -CertStoreLocation Cert:\\CurrentUser\\My; Export-PfxCertificate -Cert $cert -FilePath 'C:\\cert.pfx' -Password (ConvertTo-SecureString -String 'pass' -AsPlainText -Force)",
-      "description": "Crée et exporte immédiatement",
+      "description": "Create and export at once",
       "platform": 0
     },
     {
       "command": "New-SelfSignedCertificate -DnsName 'www.contoso.com' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2) -KeyExportPolicy Exportable -KeySpec KeyExchange | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "New-SelfSignedCertificate -DnsName 'www.contoso.com' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2) -KeyExportPolicy Exportable -KeySpec KeyExchange | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "New-SelfSignedCertificate -DnsName 'www.contoso.com' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2) -KeyExportPolicy Exportable -KeySpec KeyExchange | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "New-SelfSignedCertificate -DnsName 'www.contoso.com' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2) -KeyExportPolicy Exportable -KeySpec KeyExchange | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Les certificats auto-signés génèrent des avertissements de sécurité dans les navigateurs. Pour IIS, liez le certificat au site après création.",
+  "notes": "Self-signed certificates trigger security warnings in browsers. For IIS, bind the certificate to the site after creating it.",
   "links": [
     {
       "title": "Documentation New-SelfSignedCertificate",
       "url": "https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer un certificat auto-signé",
+      "description": "Génère un nouveau certificat auto-signé pour des tests, développement ou usage interne. Non recommandé pour la production publique.",
+      "notes": "Les certificats auto-signés génèrent des avertissements de sécurité dans les navigateurs. Pour IIS, liez le certificat au site après création.",
+      "parameters": {
+        "windows": {
+          "dnsName": {
+            "label": "Nom DNS",
+            "description": "Nom DNS ou Subject du certificat (ex: localhost, *.example.com)"
+          },
+          "validityYears": {
+            "label": "Validité (années)",
+            "description": "Durée de validité en années"
+          }
+        }
+      },
+      "examples": {
+        "New-SelfSignedCertificate -DnsName 'localhost' -CertStoreLocation Cert:\\LocalMachine\\My": "Certificat pour localhost",
+        "New-SelfSignedCertificate -DnsName 'myapp.local', 'www.myapp.local' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2)": "Certificat multi-domaines valide 2 ans",
+        "$cert = New-SelfSignedCertificate -DnsName 'dev.example.com' -CertStoreLocation Cert:\\CurrentUser\\My; Export-PfxCertificate -Cert $cert -FilePath 'C:\\cert.pfx' -Password (ConvertTo-SecureString -String 'pass' -AsPlainText -Force)": "Crée et exporte immédiatement",
+        "New-SelfSignedCertificate -DnsName 'www.contoso.com' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2) -KeyExportPolicy Exportable -KeySpec KeyExchange | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "New-SelfSignedCertificate -DnsName 'www.contoso.com' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2) -KeyExportPolicy Exportable -KeySpec KeyExchange | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "New-SelfSignedCertificate -DnsName 'www.contoso.com' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2) -KeyExportPolicy Exportable -KeySpec KeyExchange | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "New-SelfSignedCertificate -DnsName 'www.contoso.com' -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(2) -KeyExportPolicy Exportable -KeySpec KeyExchange | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

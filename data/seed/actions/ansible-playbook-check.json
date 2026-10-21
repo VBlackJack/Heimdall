@@ -1,7 +1,7 @@
 {
   "id": "ansible-playbook-check",
-  "title": "Exécuter un playbook en mode dry-run (--check)",
-  "description": "Exécute un playbook Ansible en mode test sans appliquer les changements",
+  "title": "Run a playbook in dry-run mode (--check)",
+  "description": "Run an Ansible playbook in test mode without applying the changes",
   "category": "services-automation",
   "platform": 2,
   "level": 1,
@@ -21,19 +21,19 @@
     "parameters": [
       {
         "name": "playbookPath",
-        "label": "Chemin du playbook",
+        "label": "Playbook path",
         "type": "string",
         "defaultValue": "site.yml",
         "required": true,
-        "description": "Chemin vers le fichier playbook YAML"
+        "description": "Path to the YAML playbook file"
       },
       {
         "name": "inventory",
-        "label": "Inventaire",
+        "label": "Inventory",
         "type": "string",
         "defaultValue": "inventory.ini",
         "required": true,
-        "description": "Fichier d'inventaire des hôtes"
+        "description": "Host inventory file"
       }
     ]
   },
@@ -46,24 +46,24 @@
     "parameters": [
       {
         "name": "playbookPath",
-        "label": "Chemin du playbook",
+        "label": "Playbook path",
         "type": "string",
         "defaultValue": "site.yml",
         "required": true,
-        "description": "Chemin vers le fichier playbook YAML"
+        "description": "Path to the YAML playbook file"
       },
       {
         "name": "inventory",
-        "label": "Inventaire",
+        "label": "Inventory",
         "type": "string",
         "defaultValue": "inventory.ini",
         "required": true,
-        "description": "Fichier d'inventaire des hôtes"
+        "description": "Host inventory file"
       }
     ]
   },
   "examples": [],
-  "notes": "Le mode --check simule l'exécution sans appliquer les changements. --diff affiche les différences avant/après.",
+  "notes": "The --check mode simulates the run without applying the changes. --diff shows the before/after differences.",
   "links": [
     {
       "title": "Ansible Check Mode",
@@ -73,40 +73,66 @@
   "windowsExamples": [
     {
       "command": "ansible-playbook site.yml -i inventory.ini --check --diff",
-      "description": "Simule l'execution et affiche les modifications prevues.",
+      "description": "Simulate the run and show the planned changes.",
       "platform": 0
     },
     {
       "command": "ansible-playbook deploy.yml --check -v",
-      "description": "Mode dry-run avec sortie verbose.",
+      "description": "Dry-run mode with verbose output.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-playbook deploy.yml -i production --check --diff",
-      "description": "Simule le déploiement et affiche les modifications",
+      "description": "Simulate the deployment and show the changes",
       "platform": 1
     },
     {
       "command": "ansible-playbook update.yml --check -v",
-      "description": "Test avec sortie verbeux",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook site.yml -i /etc/ansible/hosts --check --diff",
-      "description": "Exemple utilisant le paramètre 'playbookPath': Chemin vers le fichier playbook YAML. Remplacez /etc/ansible/playbooks/deploy.yml par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook /etc/ansible/playbooks/deploy.yml -i inventory.ini --check --diff",
-      "description": "Exemple utilisant le paramètre 'inventory': Fichier d'inventaire des hôtes. Remplacez /etc/ansible/hosts par la valeur appropriée selon votre environnement.",
+      "description": "Test with verbose output",
       "platform": 1
     },
     {
       "command": "ansible-playbook --check deploy.yml",
-      "description": "Mode check",
+      "description": "Check mode",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exécuter un playbook en mode dry-run (--check)",
+      "description": "Exécute un playbook Ansible en mode test sans appliquer les changements",
+      "notes": "Le mode --check simule l'exécution sans appliquer les changements. --diff affiche les différences avant/après.",
+      "parameters": {
+        "windows": {
+          "playbookPath": {
+            "label": "Chemin du playbook",
+            "description": "Chemin vers le fichier playbook YAML"
+          },
+          "inventory": {
+            "label": "Inventaire",
+            "description": "Fichier d'inventaire des hôtes"
+          }
+        },
+        "linux": {
+          "playbookPath": {
+            "label": "Chemin du playbook",
+            "description": "Chemin vers le fichier playbook YAML"
+          },
+          "inventory": {
+            "label": "Inventaire",
+            "description": "Fichier d'inventaire des hôtes"
+          }
+        }
+      },
+      "examples": {
+        "ansible-playbook site.yml -i inventory.ini --check --diff": "Simule l'exécution et affiche les modifications prévues.",
+        "ansible-playbook deploy.yml --check -v": "Mode dry-run avec sortie verbose.",
+        "ansible-playbook deploy.yml -i production --check --diff": "Simule le déploiement et affiche les modifications",
+        "ansible-playbook update.yml --check -v": "Test avec sortie verbeux",
+        "ansible-playbook --check deploy.yml": "Mode check"
+      }
+    }
+  }
 }

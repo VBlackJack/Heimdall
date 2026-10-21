@@ -1,7 +1,7 @@
 {
   "id": "defender-restore-quarantine",
-  "title": "Restaurer un fichier de quarantaine Defender",
-  "description": "Restaure un fichier précédemment mis en quarantaine par Windows Defender.",
+  "title": "Restore a file from Defender quarantine",
+  "description": "Restore a file that Windows Defender previously put in quarantine.",
   "category": "security",
   "platform": 0,
   "level": 2,
@@ -21,30 +21,43 @@
   "examples": [
     {
       "command": "Get-MpThreatDetection | Select-Object ThreatID,ThreatName,Resources,RemediationTime",
-      "description": "Liste tous les fichiers en quarantaine avec leurs détails",
+      "description": "List every quarantined file with its details",
       "platform": 0
     },
     {
       "command": "Get-MpThreatDetection | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-MpThreatDetection | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-MpThreatDetection | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "⚠️ ATTENTION: Restaurer un fichier détecté peut réinfecter votre système! Ne restaurez que si vous êtes CERTAIN qu'il s'agit d'un faux positif. Pour restaurer via GUI: Windows Security > Protection contre les virus > Historique de protection > Restaurer. PowerShell a des capacités limitées pour la restauration.",
+  "notes": "⚠️ WARNING: restoring a detected file can reinfect your system! Restore it only if you are SURE it is a false positive. To restore through the GUI: Windows Security > Virus & threat protection > Protection history > Restore. PowerShell has limited restore capabilities.",
   "links": [
     {
       "title": "Defender Quarantine Management",
       "url": "https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/restore-quarantined-files-microsoft-defender-antivirus"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Restaurer un fichier de quarantaine Defender",
+      "description": "Restaure un fichier précédemment mis en quarantaine par Windows Defender.",
+      "notes": "⚠️ ATTENTION: Restaurer un fichier détecté peut réinfecter votre système! Ne restaurez que si vous êtes CERTAIN qu'il s'agit d'un faux positif. Pour restaurer via GUI: Windows Security > Protection contre les virus > Historique de protection > Restaurer. PowerShell a des capacités limitées pour la restauration.",
+      "examples": {
+        "Get-MpThreatDetection | Select-Object ThreatID,ThreatName,Resources,RemediationTime": "Liste tous les fichiers en quarantaine avec leurs détails",
+        "Get-MpThreatDetection | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-MpThreatDetection | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-MpThreatDetection | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }
