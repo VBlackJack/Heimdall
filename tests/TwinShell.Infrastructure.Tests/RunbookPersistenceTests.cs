@@ -153,6 +153,36 @@ public sealed class RunbookPersistenceTests
         (await NewService(readContext).GetAllBatchesAsync()).Should().BeEmpty();
     }
 
+    // A run is not an edit: Git sync compares UpdatedAt to decide whether the local copy changed.
+    [Fact]
+    public async Task MarkExecuted_SetsTheLastRun_AndLeavesUpdatedAtAsItWas()
+    {
+        await using TempDatabase database = await TempDatabase.CreateAsync();
+
+        string id;
+        DateTime updatedBefore;
+        await using (TwinShellDbContext context = database.NewContext())
+        {
+            id = (await NewService(context).CreateBatchAsync(Runbook("status"))).Id;
+        }
+
+        await using (TwinShellDbContext context = database.NewContext())
+        {
+            updatedBefore = (await NewService(context).GetBatchByIdAsync(id))!.UpdatedAt;
+        }
+
+        DateTime ranAt = updatedBefore.AddHours(1);
+        await using (TwinShellDbContext context = database.NewContext())
+        {
+            await NewService(context).MarkExecutedAsync(id, ranAt);
+        }
+
+        await using TwinShellDbContext readContext = database.NewContext();
+        CommandBatch reloaded = (await NewService(readContext).GetBatchByIdAsync(id))!;
+        reloaded.LastExecutedAt.Should().Be(ranAt);
+        reloaded.UpdatedAt.Should().Be(updatedBefore);
+    }
+
     private static BatchService NewService(TwinShellDbContext context) => new(new BatchRepository(context));
 
     private static CommandBatch Runbook(params string[] stepTitles) => new()

@@ -44,6 +44,13 @@ public interface IBatchRepository
     Task UpdateAsync(CommandBatch batch);
 
     /// <summary>
+    /// Records when a batch was last run, and nothing else: a run is not an edit, so the
+    /// batch's UpdatedAt, which Git sync compares to detect local changes, is left as it is.
+    /// No-op when the batch does not exist.
+    /// </summary>
+    Task MarkExecutedAsync(string id, DateTime executedAtUtc);
+
+    /// <summary>
     /// Deletes a batch
     /// </summary>
     Task DeleteAsync(string id);

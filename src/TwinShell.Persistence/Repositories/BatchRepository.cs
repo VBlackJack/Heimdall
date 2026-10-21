@@ -85,6 +85,21 @@ public sealed class BatchRepository : IBatchRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task MarkExecutedAsync(string id, DateTime executedAtUtc)
+    {
+        var entity = await _context.CommandBatches
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (entity == null)
+        {
+            return;
+        }
+
+        // Only the run timestamp: UpdatedAt is what Git sync compares, and a run is not an edit.
+        entity.LastExecutedAt = executedAtUtc;
+        await _context.SaveChangesAsync();
+    }
+
     public async Task DeleteAsync(string id)
     {
         var entity = await _context.CommandBatches

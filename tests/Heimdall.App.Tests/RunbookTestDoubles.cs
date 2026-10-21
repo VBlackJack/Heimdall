@@ -59,8 +59,21 @@ internal sealed class FakeBatchService : IBatchService
         return Task.FromResult(batch);
     }
 
+    public Task MarkExecutedAsync(string id, DateTime executedAtUtc)
+    {
+        var stored = _store.FirstOrDefault(batch => batch.Id == id);
+        if (stored is not null)
+        {
+            stored.LastExecutedAt = executedAtUtc;
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task UpdateBatchAsync(CommandBatch batch)
     {
+        // As the real service: an update is an edit, stamped now.
+        batch.UpdatedAt = DateTime.UtcNow;
         for (var index = 0; index < batch.Commands.Count; index++)
         {
             batch.Commands[index].Order = index;

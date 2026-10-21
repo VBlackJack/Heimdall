@@ -57,6 +57,14 @@ public interface IBatchService
     Task UpdateBatchAsync(CommandBatch batch);
 
     /// <summary>
+    /// Records when a batch was last run without counting the run as an edit: only
+    /// LastExecutedAt changes, UpdatedAt is left alone
+    /// </summary>
+    /// <param name="id">Batch ID</param>
+    /// <param name="executedAtUtc">When the run started, in UTC</param>
+    Task MarkExecutedAsync(string id, DateTime executedAtUtc);
+
+    /// <summary>
     /// Deletes a batch
     /// </summary>
     /// <param name="id">Batch ID</param>

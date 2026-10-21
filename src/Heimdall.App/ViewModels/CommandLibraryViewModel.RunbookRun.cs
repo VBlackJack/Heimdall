@@ -77,7 +77,7 @@ public sealed partial class CommandLibraryViewModel
             CanSendToTerminal = CanSendToTerminalProbe,
             SetClipboard = SetClipboardText,
             RecordHistory = RecordRunbookHistory,
-            RunStarted = () => MarkRunbookRun(runbookId)
+            RunStarted = () => _ = MarkRunbookRun(runbookId)
         });
         run.StopRequested += OnRunbookStopRequested;
         ActiveRun = run;
@@ -104,21 +104,20 @@ public sealed partial class CommandLibraryViewModel
 
     /// <summary>
     /// Stores the run's start as the runbook's last run. Fire and forget, like the history: a
-    /// failure is logged and never interrupts the run.
+    /// failure is logged and never interrupts the run. The returned task is for tests.
     /// </summary>
-    private void MarkRunbookRun(string runbookId)
-    {
-        _ = Task.Run(async () =>
+    /// <remarks>
+    /// Through <see cref="IBatchService.MarkExecutedAsync"/>, never an update of the runbook: an
+    /// update stamps UpdatedAt, which Git sync reads as a local edit newer than the remote copy.
+    /// </remarks>
+    internal Task MarkRunbookRun(string runbookId)
+        => Task.Run(async () =>
         {
             try
             {
                 using var scope = _serviceProvider.CreateScope();
                 var batchService = scope.ServiceProvider.GetRequiredService<IBatchService>();
-                var runbook = await batchService.GetBatchByIdAsync(runbookId);
-                if (runbook is null) return;
-
-                runbook.LastExecutedAt = DateTime.UtcNow;
-                await batchService.UpdateBatchAsync(runbook);
+                await batchService.MarkExecutedAsync(runbookId, DateTime.UtcNow);
             }
             catch (Exception ex)
             {
@@ -126,5 +125,4 @@ public sealed partial class CommandLibraryViewModel
                     $"[CommandLibrary] Failed to record the runbook's last run: {ex.Message}");
             }
         });
-    }
 }

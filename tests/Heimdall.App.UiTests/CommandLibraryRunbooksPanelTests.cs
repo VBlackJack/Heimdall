@@ -141,6 +141,8 @@ public sealed class CommandLibraryRunbooksPanelTests
 
         public Task UpdateBatchAsync(CommandBatch batch) => Task.CompletedTask;
 
+        public Task MarkExecutedAsync(string id, DateTime executedAtUtc) => Task.CompletedTask;
+
         public Task DeleteBatchAsync(string id) => Task.CompletedTask;
 
         public Task<IEnumerable<CommandBatch>> SearchBatchesAsync(string query) => GetAllBatchesAsync();

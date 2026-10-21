@@ -247,6 +247,27 @@ public sealed class RunbookRunTests
         Assert.True(run.Library.IsRunbookListVisible);
     }
 
+    // Mutant: route the last run through UpdateBatchAsync, which stamps UpdatedAt as an edit.
+    [Fact]
+    public async Task StartingARun_SetsTheLastRun_AndLeavesUpdatedAtAlone()
+    {
+        var lastEdit = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        var runbook = Runbook(variables: [("unit", "nginx")], RunbookTestHelpers.ActionStep("status", ("unit", "{{unit}}")));
+        runbook.UpdatedAt = lastEdit;
+        await using var run = await StartAsync(runbook, "SSH", Status);
+
+        await run.Run.SendAsync();
+        var deadline = DateTime.UtcNow + RecordWait;
+        while (run.Batches.Stored[0].LastExecutedAt is null && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(20));
+        }
+
+        var stored = run.Batches.Stored[0];
+        Assert.NotNull(stored.LastExecutedAt);
+        Assert.Equal(lastEdit, stored.UpdatedAt);
+    }
+
     private static ActionModel Dangerous(ActionModel action)
     {
         action = CommandLibraryTestHelpers.CreateLinuxAction(
@@ -290,7 +311,7 @@ public sealed class RunbookRunTests
         var dialogs = new SilentDialogService { ConfirmResult = confirm };
         var library = await RunbookTestHelpers.CreateLibraryAsync(batches, history, dialogs, Host, connectionType, actions);
 
-        var fixture = new RunFixture(library, history, dialogs);
+        var fixture = new RunFixture(library, history, dialogs, batches);
         if (hasTerminal)
         {
             library.SendCommandHandler = fixture.Sent.Add;
@@ -313,8 +334,11 @@ public sealed class RunbookRunTests
     private sealed class RunFixture(
         CommandLibraryViewModel library,
         CollectingHistoryService history,
-        SilentDialogService dialogs) : IAsyncDisposable
+        SilentDialogService dialogs,
+        FakeBatchService batches) : IAsyncDisposable
     {
+        public FakeBatchService Batches { get; } = batches;
+
         public CommandLibraryViewModel Library { get; } = library;
 
         public RunbookRunViewModel Run => Library.ActiveRun

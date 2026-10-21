@@ -89,6 +89,11 @@ public sealed class BatchService : IBatchService
         await _repository.UpdateAsync(batch).ConfigureAwait(false);
     }
 
+    public async Task MarkExecutedAsync(string id, DateTime executedAtUtc)
+    {
+        await _repository.MarkExecutedAsync(id, executedAtUtc).ConfigureAwait(false);
+    }
+
     public async Task DeleteBatchAsync(string id)
     {
         await _repository.DeleteAsync(id).ConfigureAwait(false);
