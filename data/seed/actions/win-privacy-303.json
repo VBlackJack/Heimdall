@@ -2,7 +2,7 @@
   "id": "win-privacy-303",
   "title": "Désactiver télémétrie Google",
   "description": "Désactive la télémétrie de Google Update et Chrome (si installés). Bloque les services de tracking Google.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

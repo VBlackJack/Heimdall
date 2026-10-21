@@ -2,7 +2,7 @@
   "id": "ad-get-user-groups",
   "title": "Lister les groupes d'un utilisateur",
   "description": "Affiche tous les groupes Active Directory dont un utilisateur est membre.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 2,
   "level": 0,
   "tags": [

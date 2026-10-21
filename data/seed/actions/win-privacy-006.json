@@ -2,7 +2,7 @@
   "id": "win-privacy-006",
   "title": "Désactiver l'accès au calendrier",
   "description": "Bloque l'accès des applications au calendrier Windows. Protection de la vie privée professionnelle.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

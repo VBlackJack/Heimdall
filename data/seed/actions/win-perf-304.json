@@ -2,7 +2,7 @@
   "id": "win-perf-304",
   "title": "Désactiver Storage Sense",
   "description": "Désactive Storage Sense, la fonctionnalité automatique de nettoyage de disque de Windows.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

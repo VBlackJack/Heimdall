@@ -2,7 +2,7 @@
   "id": "linux-curl-check",
   "title": "Test HTTP/API (Curl)",
   "description": "Transfère des données via URL. L'outil standard pour tester les API et sites web.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

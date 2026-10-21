@@ -2,7 +2,7 @@
   "id": "rsync-sync-files",
   "title": "Synchroniser des fichiers avec rsync",
   "description": "Synchronise et copie des fichiers localement ou à distance de manière incrémentale",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "systemd-detect-virt",
   "title": "Détecter la virtualisation",
   "description": "Détecte si le système tourne dans un environnement virtualisé",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 1,
   "level": 0,
   "tags": [

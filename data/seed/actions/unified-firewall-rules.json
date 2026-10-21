@@ -2,7 +2,7 @@
   "id": "unified-firewall-rules",
   "title": "Lister les règles de pare-feu actives",
   "description": "Affiche toutes les règles de pare-feu actives sur le système",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 2,
   "level": 0,
   "tags": [

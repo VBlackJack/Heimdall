@@ -2,7 +2,7 @@
   "id": "dnf-update",
   "title": "Mettre à jour les paquets avec DNF",
   "description": "Met à jour tous les paquets avec DNF (RHEL 8+/Fedora)",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [

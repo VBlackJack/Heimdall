@@ -2,7 +2,7 @@
   "id": "systemctl-restart",
   "title": "Redémarrer un service systemd",
   "description": "Redémarre un service (arrêt puis démarrage)",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [

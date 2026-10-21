@@ -2,7 +2,7 @@
   "id": "linux-disk-lsblk",
   "title": "Lister disques physiques (lsblk)",
   "description": "Affiche les périphériques blocs (disques, partitions) et leurs points de montage.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

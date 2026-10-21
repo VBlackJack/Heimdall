@@ -2,7 +2,7 @@
   "id": "hyperv-get-vm-stats",
   "title": "Obtenir les statistiques d'une VM",
   "description": "Affiche des statistiques détaillées d'utilisation des ressources (CPU, mémoire, disque, réseau) pour une machine virtuelle Hyper-V.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 0,
   "level": 0,
   "tags": [

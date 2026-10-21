@@ -2,7 +2,7 @@
   "id": "fsck-check-filesystem",
   "title": "Vérifier et réparer un filesystem",
   "description": "Vérifie l'intégrité d'un système de fichiers et tente de réparer les erreurs",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "perf-process-handles",
   "title": "Analyser les handles ouverts par processus",
   "description": "Analyse et affiche le nombre de handles (fichiers, registre, threads, etc.) ouverts par chaque processus. Utile pour détecter les fuites de ressources.",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [

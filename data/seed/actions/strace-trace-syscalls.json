@@ -2,7 +2,7 @@
   "id": "strace-trace-syscalls",
   "title": "Tracer les appels système d'un processus",
   "description": "Trace tous les appels système effectués par un processus (debugging)",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 1,
   "level": 1,
   "tags": [

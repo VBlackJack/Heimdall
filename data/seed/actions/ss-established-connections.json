@@ -2,7 +2,7 @@
   "id": "ss-established-connections",
   "title": "Lister les connexions établies",
   "description": "Affiche toutes les connexions réseau actuellement établies",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [

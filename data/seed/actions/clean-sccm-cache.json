@@ -2,7 +2,7 @@
   "id": "clean-sccm-cache",
   "title": "Vider le cache SCCM",
   "description": "Supprime tous les fichiers du cache du client Configuration Manager",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 2,
   "tags": [

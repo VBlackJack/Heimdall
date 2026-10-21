@@ -2,7 +2,7 @@
   "id": "defender-enable-realtime",
   "title": "Activer/Désactiver la protection temps réel Defender",
   "description": "Active ou désactive la protection en temps réel de Windows Defender.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

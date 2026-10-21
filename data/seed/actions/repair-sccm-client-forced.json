@@ -2,7 +2,7 @@
   "id": "repair-sccm-client-forced",
   "title": "Réparer le client SCCM (installation forcée)",
   "description": "Lance la réparation forcée du client Configuration Manager avec réinstallation",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

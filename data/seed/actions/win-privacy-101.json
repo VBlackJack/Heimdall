@@ -2,7 +2,7 @@
   "id": "win-privacy-101",
   "title": "Désactiver toute synchronisation cloud",
   "description": "Désactive TOUTE synchronisation Windows avec le cloud Microsoft (paramètres, mots de passe, thèmes, navigateur). Configuration RGPD maximale.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 2,
   "tags": [

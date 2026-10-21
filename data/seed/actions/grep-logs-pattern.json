@@ -2,7 +2,7 @@
   "id": "grep-logs-pattern",
   "title": "Rechercher un pattern dans les logs",
   "description": "Recherche un pattern spécifique dans les fichiers de logs système",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

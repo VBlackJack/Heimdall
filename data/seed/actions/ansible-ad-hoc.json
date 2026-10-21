@@ -2,7 +2,7 @@
   "id": "ansible-ad-hoc",
   "title": "Exécuter une commande Ansible ad-hoc",
   "description": "Exécute une commande ponctuelle sur un groupe d'hôtes sans playbook",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

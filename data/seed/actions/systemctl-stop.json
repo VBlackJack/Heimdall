@@ -2,7 +2,7 @@
   "id": "systemctl-stop",
   "title": "Arrêter un service systemd",
   "description": "Arrête immédiatement un service systemd en cours d'exécution",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [

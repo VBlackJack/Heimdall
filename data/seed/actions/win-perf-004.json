@@ -2,7 +2,7 @@
   "id": "win-perf-004",
   "title": "Configurer DNS Quad9",
   "description": "Configure les serveurs DNS Quad9 (9.9.9.9 et 149.112.112.112) avec blocage automatique des domaines malveillants.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

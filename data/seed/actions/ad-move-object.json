@@ -2,7 +2,7 @@
   "id": "ad-move-object",
   "title": "Déplacer un objet AD vers une autre OU",
   "description": "Déplace un utilisateur, ordinateur ou autre objet vers une unité d'organisation différente.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

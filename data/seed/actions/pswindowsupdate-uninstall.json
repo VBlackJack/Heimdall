@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-uninstall",
   "title": "Désinstaller une mise à jour Windows",
   "description": "Désinstalle une mise à jour Windows spécifique par son numéro KB",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 2,
   "tags": [

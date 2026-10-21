@@ -2,7 +2,7 @@
   "id": "win-pkg-008",
   "title": "Ajouter une source Winget",
   "description": "Ajoute une nouvelle source de packages Winget personnalisée.",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "build-npm-install",
   "title": "Installer les dépendances npm",
   "description": "Installe les dépendances Node.js d'un projet.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

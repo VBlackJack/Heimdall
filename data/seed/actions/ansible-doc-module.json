@@ -2,7 +2,7 @@
   "id": "ansible-doc-module",
   "title": "Consulter la documentation d'un module",
   "description": "Affiche la documentation complète d'un module Ansible",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

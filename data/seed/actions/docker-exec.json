@@ -2,7 +2,7 @@
   "id": "docker-exec",
   "title": "Exécuter une commande dans un conteneur",
   "description": "Exécute une commande dans un conteneur Docker en cours d'exécution",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 1,
   "tags": [

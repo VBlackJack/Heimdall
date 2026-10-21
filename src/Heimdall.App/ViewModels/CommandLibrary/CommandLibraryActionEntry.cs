@@ -66,8 +66,15 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     /// <summary>Action description; empty string if none.</summary>
     public string Description => Source.Description ?? string.Empty;
 
-    /// <summary>Action category, used for grouping and filtering.</summary>
+    /// <summary>Action category as stored (a key or free text), used for filtering.</summary>
     public string Category => Source.Category;
+
+    /// <summary>
+    /// Category label in the operator's language, used for grouping. Delegates to
+    /// <see cref="CommandPresentationResolver.ResolveCategoryLabel"/>.
+    /// </summary>
+    public string CategoryLabel =>
+        CommandPresentationResolver.ResolveCategoryLabel(Source.Category, _viewModel.LocalizeKey);
 
     /// <summary>Filled or hollow star glyph reflecting the current favorite state.</summary>
     public string FavoriteIcon => _viewModel.IsFavorite(Source.Id) ? "\u2605" : "\u2606";
@@ -131,12 +138,16 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     /// The description is deliberately left out: it repeats the title for most seeded
     /// actions and would bury the risk word at the end of a long utterance.
     /// </para>
+    /// <para>
+    /// The category label comes last: the group header that shows it to a sighted user is
+    /// not part of the row, and the key it is stored as is not something to read aloud.
+    /// </para>
     /// </remarks>
     public string AccessibleName
     {
         get
         {
-            var parts = new List<string>(3) { Title };
+            var parts = new List<string>(4) { Title };
 
             var risk = RiskLabel;
             if (!string.IsNullOrWhiteSpace(risk))
@@ -148,6 +159,12 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
             if (!string.IsNullOrWhiteSpace(platform))
             {
                 parts.Add(platform);
+            }
+
+            var category = CategoryLabel;
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                parts.Add(category);
             }
 
             return string.Join(", ", parts);

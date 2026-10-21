@@ -2,7 +2,7 @@
   "id": "win-privacy-004",
   "title": "Désactiver l'accès au système de fichiers",
   "description": "Restreint l'accès des applications au système de fichiers complet. Protection des données sensibles.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

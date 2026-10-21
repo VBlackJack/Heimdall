@@ -2,7 +2,7 @@
   "id": "iotop-disk-io",
   "title": "Monitorer l'activité I/O disque",
   "description": "Affiche en temps réel quels processus utilisent le plus l'I/O disque",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

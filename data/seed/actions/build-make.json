@@ -2,7 +2,7 @@
   "id": "build-make",
   "title": "Compiler avec Make",
   "description": "Exécute un Makefile pour compiler un projet C/C++.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 1,
   "level": 0,
   "tags": [

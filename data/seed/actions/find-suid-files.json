@@ -2,7 +2,7 @@
   "id": "find-suid-files",
   "title": "Rechercher les fichiers SUID/SGID",
   "description": "Liste tous les fichiers avec bits SUID ou SGID (potentiellement dangereux)",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [

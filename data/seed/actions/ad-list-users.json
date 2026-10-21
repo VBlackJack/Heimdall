@@ -2,7 +2,7 @@
   "id": "ad-list-users",
   "title": "Lister tous les utilisateurs Active Directory",
   "description": "Affiche une liste complète de tous les comptes utilisateurs dans Active Directory avec leurs propriétés principales.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

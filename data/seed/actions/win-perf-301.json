@@ -2,7 +2,7 @@
   "id": "win-perf-301",
   "title": "Désactiver Superfetch/SysMain",
   "description": "Désactive le service Superfetch (SysMain) qui précharge des applications en RAM. Utile sur SSD.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

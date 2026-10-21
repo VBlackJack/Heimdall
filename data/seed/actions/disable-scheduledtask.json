@@ -2,7 +2,7 @@
   "id": "disable-scheduledtask",
   "title": "Désactiver une tâche planifiée",
   "description": "Désactive une tâche planifiée pour empêcher son exécution automatique",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 0,
   "tags": [

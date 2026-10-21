@@ -2,7 +2,7 @@
   "id": "ad-get-ou-details",
   "title": "Obtenir les détails d'une OU",
   "description": "Affiche toutes les propriétés détaillées d'une unité d'organisation.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

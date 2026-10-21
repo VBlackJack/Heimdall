@@ -2,7 +2,7 @@
   "id": "network-trace-route",
   "title": "Tracer la route réseau",
   "description": "Affiche le chemin complet des paquets réseau vers une destination.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 2,
   "level": 0,
   "tags": [

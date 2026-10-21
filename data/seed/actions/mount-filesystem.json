@@ -2,7 +2,7 @@
   "id": "mount-filesystem",
   "title": "Monter un système de fichiers",
   "description": "Monte une partition ou un périphérique sur un point de montage",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 1,
   "tags": [

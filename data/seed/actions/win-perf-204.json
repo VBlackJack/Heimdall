@@ -2,7 +2,7 @@
   "id": "win-perf-204",
   "title": "Lister les services désactivés",
   "description": "Affiche la liste de tous les services Windows actuellement désactivés pour vérification.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "apt-clean",
   "title": "Nettoyer le cache APT",
   "description": "Supprime les fichiers .deb téléchargés du cache local",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 0,
   "tags": [

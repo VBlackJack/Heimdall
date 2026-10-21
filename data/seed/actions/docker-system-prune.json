@@ -2,7 +2,7 @@
   "id": "docker-system-prune",
   "title": "Nettoyage disque Docker (System Prune)",
   "description": "Supprime les données Docker inutilisées (conteneurs stoppés, réseaux, images sans tag) pour libérer de l'espace.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 1,
   "tags": [

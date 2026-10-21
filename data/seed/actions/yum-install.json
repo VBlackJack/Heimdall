@@ -2,7 +2,7 @@
   "id": "yum-install",
   "title": "Installer un paquet avec YUM",
   "description": "Installe un paquet avec YUM sur RHEL/CentOS (anciennes versions)",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [

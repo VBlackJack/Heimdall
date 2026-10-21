@@ -2,7 +2,7 @@
   "id": "win-perf-406",
   "title": "Configurer exclusions Windows Defender",
   "description": "Ajoute des exclusions à Windows Defender pour améliorer les performances (dossiers de jeux, outils de dev, etc.).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

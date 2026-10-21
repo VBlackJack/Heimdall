@@ -2,7 +2,7 @@
   "id": "bitlocker-ad-audit-domain",
   "title": "Auditer BitLocker sur tout le domaine Active Directory",
   "description": "Génère un rapport complet de tous les ordinateurs du domaine avec leur statut BitLocker (chiffré/non chiffré).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

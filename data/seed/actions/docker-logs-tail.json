@@ -2,7 +2,7 @@
   "id": "docker-logs-tail",
   "title": "Voir les logs conteneur (Docker Logs)",
   "description": "Affiche les logs de la sortie standard (stdout/stderr) d'un conteneur.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 0,
   "tags": [

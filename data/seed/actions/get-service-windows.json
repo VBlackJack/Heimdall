@@ -2,7 +2,7 @@
   "id": "get-service-windows",
   "title": "Lister les services Windows",
   "description": "Affiche tous les services Windows avec leur état (Running, Stopped, etc.)",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 0,
   "tags": [

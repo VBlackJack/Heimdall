@@ -2,7 +2,7 @@
   "id": "sql-list-databases",
   "title": "Lister toutes les bases de données SQL Server",
   "description": "Affiche la liste complète de toutes les bases de données sur une instance SQL Server avec leur taille, état et mode de récupération.",
-  "category": "💽 Database",
+  "category": "database",
   "platform": 0,
   "level": 0,
   "tags": [

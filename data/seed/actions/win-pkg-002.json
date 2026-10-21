@@ -2,7 +2,7 @@
   "id": "win-pkg-002",
   "title": "Lister les applications installées via Winget",
   "description": "Affiche la liste de toutes les applications installées et gérées par Winget.",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 0,
   "tags": [

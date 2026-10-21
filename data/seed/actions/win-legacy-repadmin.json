@@ -2,7 +2,7 @@
   "id": "win-legacy-repadmin",
   "title": "Diagnostic Réplication AD (RepAdmin)",
   "description": "Outil en ligne de commande pour diagnostiquer et gérer la réplication Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

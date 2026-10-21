@@ -2,7 +2,7 @@
   "id": "ad-list-computers",
   "title": "Lister tous les ordinateurs AD",
   "description": "Affiche la liste de tous les comptes ordinateur dans Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

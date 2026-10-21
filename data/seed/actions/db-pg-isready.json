@@ -2,7 +2,7 @@
   "id": "db-pg-isready",
   "title": "Vérifier statut PostgreSQL (pg_isready)",
   "description": "Vérifie l'état de la connexion au serveur PostgreSQL.",
-  "category": "💽 Database",
+  "category": "database",
   "platform": 2,
   "level": 0,
   "tags": [

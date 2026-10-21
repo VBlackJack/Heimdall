@@ -2,7 +2,7 @@
   "id": "last-logins",
   "title": "Afficher l'historique des connexions",
   "description": "Liste les dernières connexions utilisateurs au système",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

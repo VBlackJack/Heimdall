@@ -2,7 +2,7 @@
   "id": "du-directory-size",
   "title": "Calculer la taille d'un répertoire",
   "description": "Calcule l'espace disque utilisé par un répertoire et ses sous-répertoires",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

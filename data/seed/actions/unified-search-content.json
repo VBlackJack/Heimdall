@@ -2,7 +2,7 @@
   "id": "unified-search-content",
   "title": "Rechercher dans le contenu de fichiers",
   "description": "Recherche une chaîne de caractères dans le contenu des fichiers.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [

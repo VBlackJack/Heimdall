@@ -2,7 +2,7 @@
   "id": "hyperv-export-vm",
   "title": "Exporter une machine virtuelle",
   "description": "Exporte une VM Hyper-V complète (configuration, disques virtuels, snapshots) vers un dossier pour sauvegarde ou migration.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "bitlocker-remove-protector",
   "title": "Supprimer un protecteur de clé BitLocker",
   "description": "Retire un protecteur de clé spécifique (TPM, Password, RecoveryPassword, etc.) d'un volume BitLocker.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

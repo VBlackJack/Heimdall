@@ -2,7 +2,7 @@
   "id": "win-pkg-007",
   "title": "Afficher les détails d'un package Winget",
   "description": "Affiche les informations détaillées d'un package spécifique (version, éditeur, description, etc.).",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 0,
   "tags": [

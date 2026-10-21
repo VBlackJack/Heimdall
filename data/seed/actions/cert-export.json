@@ -2,7 +2,7 @@
   "id": "cert-export",
   "title": "Exporter un certificat",
   "description": "Exporte un certificat du magasin Windows vers un fichier .cer ou .pfx.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

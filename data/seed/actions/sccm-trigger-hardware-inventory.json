@@ -2,7 +2,7 @@
   "id": "sccm-trigger-hardware-inventory",
   "title": "Forcer l'inventaire matériel SCCM",
   "description": "Déclenche immédiatement la collecte de l'inventaire matériel et l'envoie au serveur SCCM",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

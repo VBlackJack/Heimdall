@@ -2,7 +2,7 @@
   "id": "performance-system-health-report",
   "title": "Générer un rapport de santé système complet",
   "description": "Collecte et affiche un rapport complet sur la santé du système: CPU, RAM, disque, services, uptime",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "ad-create-group",
   "title": "Créer un nouveau groupe AD",
   "description": "Crée un nouveau groupe de sécurité ou de distribution dans Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

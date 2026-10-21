@@ -2,7 +2,7 @@
   "id": "windowsupdate-install-all",
   "title": "Installer toutes les mises à jour Windows disponibles",
   "description": "Télécharge et installe automatiquement toutes les mises à jour Windows disponibles",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

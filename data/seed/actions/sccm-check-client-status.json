@@ -2,7 +2,7 @@
   "id": "sccm-check-client-status",
   "title": "Vérifier l'état du client SCCM",
   "description": "Affiche l'état détaillé du client SCCM incluant la version, le site assigné et la dernière communication",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

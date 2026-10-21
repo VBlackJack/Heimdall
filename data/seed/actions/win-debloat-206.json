@@ -2,7 +2,7 @@
   "id": "win-debloat-206",
   "title": "Supprimer Widgets",
   "description": "⚠️ DANGEROUS: Désinstalle le panneau Widgets de Windows 11.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 2,
   "tags": [

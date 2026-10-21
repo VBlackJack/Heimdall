@@ -2,7 +2,7 @@
   "id": "unified-service-restart",
   "title": "Redémarrer un service",
   "description": "Redémarre un service Windows.",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "linux-list-services",
   "title": "Lister tous les services",
   "description": "Affiche la liste de tous les services systemd avec leur état.",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [

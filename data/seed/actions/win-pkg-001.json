@@ -2,7 +2,7 @@
   "id": "win-pkg-001",
   "title": "Installer une application via Winget",
   "description": "Installe une application Windows à l'aide du gestionnaire de packages Winget.",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [

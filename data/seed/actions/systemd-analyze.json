@@ -2,7 +2,7 @@
   "id": "systemd-analyze",
   "title": "Analyser le temps de démarrage",
   "description": "Analyse et affiche le temps de démarrage du système et des services",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [

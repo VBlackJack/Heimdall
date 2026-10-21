@@ -2,7 +2,7 @@
   "id": "logrotate-status",
   "title": "Vérifier l'état de la rotation des logs",
   "description": "Affiche l'état actuel de la rotation des logs système",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

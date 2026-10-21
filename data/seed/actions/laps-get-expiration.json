@@ -2,7 +2,7 @@
   "id": "laps-get-expiration",
   "title": "Vérifier la date d'expiration du mot de passe LAPS",
   "description": "Affiche la date d'expiration du mot de passe administrateur local géré par LAPS.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

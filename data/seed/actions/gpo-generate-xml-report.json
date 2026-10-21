@@ -2,7 +2,7 @@
   "id": "gpo-generate-xml-report",
   "title": "Générer un rapport XML d'une GPO",
   "description": "Génère un rapport XML détaillé des paramètres d'une stratégie de groupe.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

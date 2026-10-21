@@ -2,7 +2,7 @@
   "id": "nethogs-bandwidth",
   "title": "Monitorer la bande passante par processus",
   "description": "Affiche l'utilisation réseau en temps réel par processus",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

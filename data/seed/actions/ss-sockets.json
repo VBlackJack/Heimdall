@@ -2,7 +2,7 @@
   "id": "ss-sockets",
   "title": "Afficher les sockets réseau (ss)",
   "description": "Liste les sockets réseau actifs (remplaçant moderne de netstat)",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

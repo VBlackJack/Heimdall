@@ -2,7 +2,7 @@
   "id": "journalctl-by-unit",
   "title": "Consulter les logs d'un service spécifique",
   "description": "Affiche les logs journald d'une unité systemd spécifique (service, timer, etc.)",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

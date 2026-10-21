@@ -2,7 +2,7 @@
   "id": "wsus-force-client-sync",
   "title": "Forcer la synchronisation d'un client avec WSUS",
   "description": "Force le client Windows Update à se synchroniser immédiatement avec le serveur WSUS",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

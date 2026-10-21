@@ -2,7 +2,7 @@
   "id": "top-monitor",
   "title": "Monitorer les processus en temps réel",
   "description": "Affiche en temps réel la consommation CPU, mémoire et la liste des processus",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

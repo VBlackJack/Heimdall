@@ -2,7 +2,7 @@
   "id": "win-debloat-202",
   "title": "Désinstaller OneDrive (complet)",
   "description": "⚠️ DANGEROUS: Désinstallation complète de OneDrive avec nettoyage du registre et des fichiers (30+ étapes).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 2,
   "tags": [

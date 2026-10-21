@@ -2,7 +2,7 @@
   "id": "bitlocker-enable-recovery",
   "title": "Activer BitLocker avec mot de passe de récupération",
   "description": "Active le chiffrement BitLocker sur un volume avec protection par mot de passe de récupération.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

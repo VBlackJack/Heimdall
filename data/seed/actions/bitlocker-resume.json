@@ -2,7 +2,7 @@
   "id": "bitlocker-resume",
   "title": "Réactiver la protection BitLocker",
   "description": "Réactive la protection BitLocker après une suspension temporaire.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

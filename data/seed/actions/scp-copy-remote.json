@@ -2,7 +2,7 @@
   "id": "scp-copy-remote",
   "title": "Copier des fichiers via SSH",
   "description": "Copie des fichiers de manière sécurisée entre systèmes via SSH",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

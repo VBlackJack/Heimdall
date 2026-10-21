@@ -2,7 +2,7 @@
   "id": "unified-tree",
   "title": "Afficher l'arborescence de dossiers",
   "description": "Affiche la structure hiérarchique d'un répertoire.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [

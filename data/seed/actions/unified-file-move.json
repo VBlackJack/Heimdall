@@ -2,7 +2,7 @@
   "id": "unified-file-move",
   "title": "Déplacer ou renommer des fichiers",
   "description": "Déplace ou renomme des fichiers et dossiers.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 1,
   "tags": [

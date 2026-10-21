@@ -2,7 +2,7 @@
   "id": "blkid-show-uuid",
   "title": "Afficher les UUID des partitions",
   "description": "Affiche les UUID et informations des périphériques de bloc",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

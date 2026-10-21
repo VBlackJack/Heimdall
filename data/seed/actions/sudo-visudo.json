@@ -2,7 +2,7 @@
   "id": "sudo-visudo",
   "title": "Éditer la configuration sudo",
   "description": "Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 2,
   "tags": [

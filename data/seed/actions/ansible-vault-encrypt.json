@@ -2,7 +2,7 @@
   "id": "ansible-vault-encrypt",
   "title": "Chiffrer un fichier avec Ansible Vault",
   "description": "Chiffre un fichier contenant des données sensibles avec Ansible Vault",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 2,
   "level": 1,
   "tags": [

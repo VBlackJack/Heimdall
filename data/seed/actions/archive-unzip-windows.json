@@ -2,7 +2,7 @@
   "id": "archive-unzip-windows",
   "title": "Extraire une archive ZIP",
   "description": "Extrait le contenu d'une archive ZIP.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 0,
   "level": 0,
   "tags": [

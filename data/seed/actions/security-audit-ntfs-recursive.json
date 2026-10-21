@@ -2,7 +2,7 @@
   "id": "security-audit-ntfs-recursive",
   "title": "Auditer récursivement les permissions NTFS",
   "description": "Analyse récursivement tous les sous-dossiers et génère un rapport des permissions NTFS",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "sysinternals-psexec-system",
   "title": "Ouvrir un Shell en tant que SYSTEM (PsExec)",
   "description": "Lance une invite de commande interactive avec les privilèges NT AUTHORITY\\SYSTEM. C'est le niveau de privilège le plus élevé sur Windows, au-dessus de l'Administrateur.",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 2,
   "tags": [

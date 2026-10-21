@@ -2,7 +2,7 @@
   "id": "build-dotnet-publish",
   "title": "Publier un projet .NET",
   "description": "Publie un projet .NET pour le déploiement.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

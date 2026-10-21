@@ -2,7 +2,7 @@
   "id": "show-pending-updates",
   "title": "Afficher les mises à jour en attente",
   "description": "Liste toutes les mises à jour disponibles mais non installées",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

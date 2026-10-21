@@ -2,7 +2,7 @@
   "id": "register-scheduledtask",
   "title": "Créer une tâche planifiée",
   "description": "Enregistre une nouvelle tâche planifiée dans le Planificateur de tâches Windows",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 1,
   "tags": [

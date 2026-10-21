@@ -2,7 +2,7 @@
   "id": "win-privacy-208",
   "title": "Désactiver la caméra écran de verrouillage",
   "description": "Désactive l'accès à la caméra depuis l'écran de verrouillage Windows. Sécurité renforcée.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

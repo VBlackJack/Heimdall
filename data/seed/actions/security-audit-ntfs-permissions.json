@@ -2,7 +2,7 @@
   "id": "security-audit-ntfs-permissions",
   "title": "Auditer les permissions NTFS d'un dossier",
   "description": "Affiche les permissions NTFS détaillées d'un dossier ou fichier avec les droits accordés à chaque utilisateur/groupe",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "ansible-vault-edit",
   "title": "Éditer un fichier chiffré avec Ansible Vault",
   "description": "Ouvre un fichier chiffré dans l'éditeur pour modification",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 2,
   "level": 1,
   "tags": [

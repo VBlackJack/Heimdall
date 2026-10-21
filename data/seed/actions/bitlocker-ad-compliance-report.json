@@ -2,7 +2,7 @@
   "id": "bitlocker-ad-compliance-report",
   "title": "Générer un rapport de conformité BitLocker pour la direction",
   "description": "Génère un rapport exécutif de conformité BitLocker avec statistiques, graphiques et ordinateurs non conformes.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

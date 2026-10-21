@@ -2,7 +2,7 @@
   "id": "sysinternals-sdelete",
   "title": "Suppression sécurisée (SDelete)",
   "description": "Supprime définitivement des fichiers ou nettoie l'espace libre pour empêcher la récupération de données (norme DoD).",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 0,
   "level": 2,
   "tags": [

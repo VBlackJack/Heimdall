@@ -2,7 +2,7 @@
   "id": "unified-file-hash",
   "title": "Calculer le hash d'un fichier",
   "description": "Calcule l'empreinte cryptographique (hash SHA256) d'un fichier pour vérification d'intégrité.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 2,
   "level": 0,
   "tags": [

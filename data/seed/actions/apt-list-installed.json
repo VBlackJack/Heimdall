@@ -2,7 +2,7 @@
   "id": "apt-list-installed",
   "title": "Lister les paquets installés",
   "description": "Affiche la liste de tous les paquets installés sur le système",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 0,
   "tags": [

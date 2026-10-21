@@ -2,7 +2,7 @@
   "id": "eventlog-get-critical-errors",
   "title": "Rechercher les erreurs critiques dans les logs système",
   "description": "Extrait les événements de niveau Critique et Erreur des dernières heures depuis le journal System",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "selinux-status",
   "title": "Vérifier l'état de SELinux",
   "description": "Affiche l'état et le mode de SELinux (Security-Enhanced Linux)",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [

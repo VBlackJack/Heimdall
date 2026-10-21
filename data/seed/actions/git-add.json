@@ -2,7 +2,7 @@
   "id": "git-add",
   "title": "Ajouter des fichiers à l'index Git",
   "description": "Ajoute les modifications de fichiers à l'index (staging area)",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

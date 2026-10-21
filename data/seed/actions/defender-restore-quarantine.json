@@ -2,7 +2,7 @@
   "id": "defender-restore-quarantine",
   "title": "Restaurer un fichier de quarantaine Defender",
   "description": "Restaure un fichier précédemment mis en quarantaine par Windows Defender.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "win-legacy-robocopy",
   "title": "Copie de fichiers robuste (Robocopy)",
   "description": "L'outil de copie le plus fiable de Windows. Supporte la reprise sur erreur, le multithreading, et la préservation des attributs/permissions.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 0,
   "level": 1,
   "tags": [

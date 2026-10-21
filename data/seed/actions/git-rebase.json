@@ -2,7 +2,7 @@
   "id": "git-rebase",
   "title": "Rebaser une branche",
   "description": "Réapplique des commits sur une nouvelle base",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "unified-create-local-user",
   "title": "Créer un utilisateur local",
   "description": "Crée un nouveau compte utilisateur local sur le système.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 2,
   "level": 1,
   "tags": [

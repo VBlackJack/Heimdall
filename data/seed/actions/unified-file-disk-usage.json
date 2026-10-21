@@ -2,7 +2,7 @@
   "id": "unified-file-disk-usage",
   "title": "Vérifier l'espace disque",
   "description": "Affiche l'utilisation de l'espace disque pour les volumes.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [

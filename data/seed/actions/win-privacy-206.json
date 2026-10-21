@@ -2,7 +2,7 @@
   "id": "win-privacy-206",
   "title": "Désactiver la reconnaissance vocale cloud",
   "description": "Désactive la reconnaissance vocale en ligne (Cortana, dictée cloud). Les données vocales restent locales.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

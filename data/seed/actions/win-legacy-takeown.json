@@ -2,7 +2,7 @@
   "id": "win-legacy-takeown",
   "title": "S'approprier un fichier/dossier (TakeOwn)",
   "description": "Permet à l'administrateur de devenir propriétaire d'un fichier refusé, souvent prérequis avant d'utiliser ICACLS.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "linux-logger-test",
   "title": "Tester l'envoi de logs (Logger)",
   "description": "Envoie manuellement un message au démon syslog local ou distant. Utile pour vérifier que le routage des logs fonctionne (ex: vers un SIEM).",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

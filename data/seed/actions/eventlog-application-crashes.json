@@ -2,7 +2,7 @@
   "id": "eventlog-application-crashes",
   "title": "Lister les crashs d'applications récents",
   "description": "Extrait tous les événements de crash d'application (EventID 1000) du journal Application",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

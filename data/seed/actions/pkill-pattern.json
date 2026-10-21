@@ -2,7 +2,7 @@
   "id": "pkill-pattern",
   "title": "Terminer des processus par pattern",
   "description": "Envoie un signal aux processus correspondant à un pattern de nom",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 1,
   "tags": [

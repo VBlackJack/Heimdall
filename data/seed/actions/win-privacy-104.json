@@ -2,7 +2,7 @@
   "id": "win-privacy-104",
   "title": "Désactiver sync des mots de passe",
   "description": "Désactive la synchronisation des mots de passe et identifiants Windows. Sécurité maximale.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 2,
   "tags": [

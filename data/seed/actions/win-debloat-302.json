@@ -2,7 +2,7 @@
   "id": "win-debloat-302",
   "title": "Désactiver Recall",
   "description": "Désactive la fonctionnalité Recall AI de Windows 11 (enregistrement de l'activité).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

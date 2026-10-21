@@ -2,7 +2,7 @@
   "id": "bitlocker-check-encryption-progress",
   "title": "Vérifier la progression du chiffrement BitLocker",
   "description": "Affiche le pourcentage de progression du chiffrement ou déchiffrement d'un volume BitLocker.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

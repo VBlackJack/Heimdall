@@ -2,7 +2,7 @@
   "id": "eventlog-failed-authentication",
   "title": "Détecter les tentatives d'authentification échouées",
   "description": "Liste les événements d'échec d'authentification (EventID 4625) dans le journal Security",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

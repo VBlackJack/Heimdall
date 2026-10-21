@@ -2,7 +2,7 @@
   "id": "journalctl-boot",
   "title": "Afficher les logs d'un démarrage spécifique",
   "description": "Liste les logs d'une session de boot spécifique du système",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

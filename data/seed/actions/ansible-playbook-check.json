@@ -2,7 +2,7 @@
   "id": "ansible-playbook-check",
   "title": "Exécuter un playbook en mode dry-run (--check)",
   "description": "Exécute un playbook Ansible en mode test sans appliquer les changements",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 1,
   "tags": [

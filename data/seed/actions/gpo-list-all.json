@@ -2,7 +2,7 @@
   "id": "gpo-list-all",
   "title": "Lister toutes les GPO du domaine",
   "description": "Affiche la liste complète des stratégies de groupe (GPO) configurées dans le domaine.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "laps-get-computers-with-laps",
   "title": "Lister tous les ordinateurs avec LAPS activé",
   "description": "Affiche la liste de tous les ordinateurs du domaine qui ont LAPS configuré et actif.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

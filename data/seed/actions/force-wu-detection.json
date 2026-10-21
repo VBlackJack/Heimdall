@@ -2,7 +2,7 @@
   "id": "force-wu-detection",
   "title": "Forcer la détection des mises à jour",
   "description": "Force Windows Update à rechercher immédiatement les nouvelles mises à jour",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

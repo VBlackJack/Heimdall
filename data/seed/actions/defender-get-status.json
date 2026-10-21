@@ -2,7 +2,7 @@
   "id": "defender-get-status",
   "title": "Obtenir le statut complet de Windows Defender",
   "description": "Affiche l'état détaillé de Windows Defender (protection temps réel, définitions, dernière analyse, etc.).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

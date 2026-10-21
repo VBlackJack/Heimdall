@@ -2,7 +2,7 @@
   "id": "watch-repeat-command",
   "title": "Répéter une commande périodiquement",
   "description": "Exécute une commande à intervalle régulier et affiche le résultat",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [

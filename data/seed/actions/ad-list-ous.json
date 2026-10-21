@@ -2,7 +2,7 @@
   "id": "ad-list-ous",
   "title": "Lister toutes les unités d'organisation (OU)",
   "description": "Affiche la liste de toutes les unités d'organisation dans Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

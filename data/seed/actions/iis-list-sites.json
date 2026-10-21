@@ -2,7 +2,7 @@
   "id": "iis-list-sites",
   "title": "Lister tous les sites IIS",
   "description": "Affiche la liste complète de tous les sites web configurés dans Internet Information Services avec leur état, bindings et pool d'application associé.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [

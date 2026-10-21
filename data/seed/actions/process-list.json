@@ -2,7 +2,7 @@
   "id": "process-list",
   "title": "Lister les processus en cours",
   "description": "Affiche la liste de tous les processus en cours d'exécution.",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 2,
   "level": 0,
   "tags": [

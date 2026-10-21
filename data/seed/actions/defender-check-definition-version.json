@@ -2,7 +2,7 @@
   "id": "defender-check-definition-version",
   "title": "Vérifier la version des définitions Defender",
   "description": "Affiche la version actuelle des définitions antivirus et vérifie si elles sont à jour.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

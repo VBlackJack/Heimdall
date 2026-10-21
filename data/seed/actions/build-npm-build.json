@@ -2,7 +2,7 @@
   "id": "build-npm-build",
   "title": "Construire un projet npm",
   "description": "Exécute le script de build défini dans package.json.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

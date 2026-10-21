@@ -2,7 +2,7 @@
   "id": "performance-monitor-cpu",
   "title": "Surveiller l'utilisation CPU en temps réel",
   "description": "Collecte et affiche l'utilisation du processeur en temps réel avec plusieurs échantillons",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "performance-top-memory-processes",
   "title": "Lister les processus consommant le plus de mémoire",
   "description": "Affiche les processus classés par utilisation mémoire (RAM) décroissante",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [

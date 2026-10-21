@@ -2,7 +2,7 @@
   "id": "ad-set-user-properties",
   "title": "Modifier les propriétés d'un utilisateur AD",
   "description": "Modifie les propriétés d'un utilisateur AD (département, titre, téléphone, etc.).",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "win-debloat-002",
   "title": "Supprimer les extensions média",
   "description": "Supprime les extensions média optionnelles (HEIF, VP9, WebP, AV1) pour libérer de l'espace.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

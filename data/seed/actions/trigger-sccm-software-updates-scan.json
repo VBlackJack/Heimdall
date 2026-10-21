@@ -2,7 +2,7 @@
   "id": "trigger-sccm-software-updates-scan",
   "title": "Déclencher scan des mises à jour SCCM",
   "description": "Force la recherche immédiate des mises à jour disponibles",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

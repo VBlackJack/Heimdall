@@ -2,7 +2,7 @@
   "id": "defender-set-cpu-limit",
   "title": "Limiter l'utilisation CPU de Defender",
   "description": "Configure la limite maximale d'utilisation CPU pour les analyses Windows Defender.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

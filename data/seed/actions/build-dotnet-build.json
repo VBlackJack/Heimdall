@@ -2,7 +2,7 @@
   "id": "build-dotnet-build",
   "title": "Compiler un projet .NET",
   "description": "Compile un projet ou une solution .NET.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

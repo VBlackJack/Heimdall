@@ -2,7 +2,7 @@
   "id": "linux-rsyslog-restart",
   "title": "Gérer le service Rsyslog",
   "description": "Redémarre ou vérifie le statut du démon de journalisation.",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 1,
   "tags": [

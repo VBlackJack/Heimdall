@@ -2,7 +2,7 @@
   "id": "win-perf-402",
   "title": "Désactiver Core Isolation",
   "description": "Désactive l'isolation des cœurs (Memory Integrity/VBS) pour améliorer les performances en jeu (perte de 5-10% FPS avec VBS actif).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

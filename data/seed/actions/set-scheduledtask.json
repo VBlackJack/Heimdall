@@ -2,7 +2,7 @@
   "id": "set-scheduledtask",
   "title": "Modifier une tâche planifiée",
   "description": "Modifie les propriétés d'une tâche planifiée existante",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "network-test-connection",
   "title": "Tester la connectivité réseau",
   "description": "Teste la connectivité réseau vers une adresse IP ou un nom d'hôte.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 2,
   "level": 0,
   "tags": [

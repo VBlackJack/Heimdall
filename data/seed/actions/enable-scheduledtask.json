@@ -2,7 +2,7 @@
   "id": "enable-scheduledtask",
   "title": "Activer une tâche planifiée",
   "description": "Active une tâche planifiée désactivée pour qu'elle puisse s'exécuter selon son planning",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 0,
   "tags": [

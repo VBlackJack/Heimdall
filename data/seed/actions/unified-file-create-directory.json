@@ -2,7 +2,7 @@
   "id": "unified-file-create-directory",
   "title": "Créer un répertoire",
   "description": "Crée un nouveau dossier, y compris les dossiers parents si nécessaire.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [

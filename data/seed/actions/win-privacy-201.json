@@ -2,7 +2,7 @@
   "id": "win-privacy-201",
   "title": "Désactiver Activity Feed",
   "description": "Désactive l'Activity Feed (chronologie) qui collecte l'historique des activités Windows.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

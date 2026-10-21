@@ -2,7 +2,7 @@
   "id": "win-debloat-404",
   "title": "Désactiver le crypto wallet Edge",
   "description": "Désactive le portefeuille crypto et les fonctionnalités Web3 dans Microsoft Edge.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

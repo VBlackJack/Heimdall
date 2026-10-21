@@ -2,7 +2,7 @@
   "id": "system-uptime",
   "title": "Afficher le temps de fonctionnement du système",
   "description": "Montre depuis combien de temps le système est démarré.",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 2,
   "level": 0,
   "tags": [

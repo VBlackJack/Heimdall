@@ -2,7 +2,7 @@
   "id": "eventlog-export-to-csv",
   "title": "Exporter les événements vers un fichier CSV",
   "description": "Exporte les événements d'un journal spécifique vers un fichier CSV pour analyse",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

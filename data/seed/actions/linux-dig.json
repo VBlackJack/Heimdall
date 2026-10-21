@@ -2,7 +2,7 @@
   "id": "linux-dig",
   "title": "Diagnostic DNS expert (Dig)",
   "description": "Interroge les serveurs DNS. Plus précis et complet que nslookup.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

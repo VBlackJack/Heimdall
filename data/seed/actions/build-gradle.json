@@ -2,7 +2,7 @@
   "id": "build-gradle",
   "title": "Construire un projet Gradle",
   "description": "Compile et package un projet avec Gradle.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

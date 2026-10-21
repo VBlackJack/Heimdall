@@ -2,7 +2,7 @@
   "id": "sccm-trigger-app-deployment-eval",
   "title": "Déclencher l'évaluation des déploiements d'applications",
   "description": "Force l'évaluation de tous les déploiements d'applications SCCM pour vérifier les nouvelles applications disponibles",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

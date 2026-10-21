@@ -2,7 +2,7 @@
   "id": "lsblk-list-disks",
   "title": "Lister les disques et partitions",
   "description": "Affiche tous les périphériques de bloc (disques, partitions) en arborescence",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

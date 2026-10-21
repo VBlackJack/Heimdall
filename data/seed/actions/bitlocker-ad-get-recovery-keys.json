@@ -2,7 +2,7 @@
   "id": "bitlocker-ad-get-recovery-keys",
   "title": "Récupérer les clés BitLocker depuis Active Directory",
   "description": "Récupère les clés de récupération BitLocker stockées dans Active Directory pour un ordinateur spécifique (commande admin domaine).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "unified-find-files",
   "title": "Rechercher des fichiers par nom",
   "description": "Recherche des fichiers ou dossiers par nom ou motif.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [

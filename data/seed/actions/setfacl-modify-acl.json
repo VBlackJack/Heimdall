@@ -2,7 +2,7 @@
   "id": "setfacl-modify-acl",
   "title": "Modifier les ACL d'un fichier",
   "description": "Définit ou modifie les listes de contrôle d'accès (ACL) étendues",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [

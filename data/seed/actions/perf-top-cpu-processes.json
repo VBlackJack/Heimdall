@@ -2,7 +2,7 @@
   "id": "perf-top-cpu-processes",
   "title": "Analyser les processus consommant le plus de CPU",
   "description": "Identifie et affiche les processus consommant le plus de ressources CPU en temps réel avec leurs statistiques détaillées.",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 2,
   "level": 0,
   "tags": [

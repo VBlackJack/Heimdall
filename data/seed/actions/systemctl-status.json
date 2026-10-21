@@ -2,7 +2,7 @@
   "id": "systemctl-status",
   "title": "Vérifier l'état d'un service",
   "description": "Affiche l'état détaillé d'une unité systemd (actif, logs récents, etc.)",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [

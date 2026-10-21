@@ -2,7 +2,7 @@
   "id": "linux-disk-df",
   "title": "Vérifier espace disque (df)",
   "description": "Affiche l'espace disque utilisé et disponible sur tous les systèmes de fichiers montés.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

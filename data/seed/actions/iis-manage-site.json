@@ -2,7 +2,7 @@
   "id": "iis-manage-site",
   "title": "Démarrer ou arrêter un site IIS",
   "description": "Permet de démarrer, arrêter ou redémarrer un site web IIS spécifique. Utile pour la maintenance ou le troubleshooting.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 1,
   "tags": [

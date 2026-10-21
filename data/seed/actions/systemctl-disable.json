@@ -2,7 +2,7 @@
   "id": "systemctl-disable",
   "title": "Désactiver un service au démarrage",
   "description": "Empêche un service de démarrer automatiquement au boot",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [

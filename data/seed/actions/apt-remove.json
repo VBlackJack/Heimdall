@@ -2,7 +2,7 @@
   "id": "apt-remove",
   "title": "Désinstaller un paquet APT",
   "description": "Supprime un paquet installé tout en conservant les fichiers de configuration",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [

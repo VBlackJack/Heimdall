@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-reboot-status",
   "title": "Vérifier si un redémarrage est nécessaire",
   "description": "Vérifie si des mises à jour en attente nécessitent un redémarrage système",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

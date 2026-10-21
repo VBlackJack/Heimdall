@@ -2,7 +2,7 @@
   "id": "ansible-vault-decrypt",
   "title": "Déchiffrer un fichier Ansible Vault",
   "description": "Déchiffre définitivement un fichier chiffré avec Ansible Vault",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 2,
   "level": 1,
   "tags": [

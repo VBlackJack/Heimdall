@@ -2,7 +2,7 @@
   "id": "uptime-load",
   "title": "Afficher l'uptime et la charge système",
   "description": "Affiche depuis combien de temps le système tourne et la charge moyenne",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

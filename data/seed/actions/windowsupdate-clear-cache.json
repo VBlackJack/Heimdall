@@ -2,7 +2,7 @@
   "id": "windowsupdate-clear-cache",
   "title": "Nettoyer le cache Windows Update",
   "description": "Arrête les services Windows Update et nettoie le dossier SoftwareDistribution pour résoudre les problèmes de mises à jour",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

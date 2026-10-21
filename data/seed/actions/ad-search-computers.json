@@ -2,7 +2,7 @@
   "id": "ad-search-computers",
   "title": "Rechercher des ordinateurs AD",
   "description": "Recherche des ordinateurs Active Directory par nom ou système d'exploitation.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

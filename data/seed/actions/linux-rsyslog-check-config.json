@@ -2,7 +2,7 @@
   "id": "linux-rsyslog-check-config",
   "title": "Vérifier configuration Rsyslog",
   "description": "Vérifie la syntaxe du fichier de configuration rsyslog.conf sans démarrer le démon. À lancer impérativement après chaque modification.",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

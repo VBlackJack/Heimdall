@@ -2,7 +2,7 @@
   "id": "defender-update-signatures",
   "title": "Mettre à jour les définitions Windows Defender",
   "description": "Force la mise à jour immédiate des signatures antivirus et antimalware de Defender.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "cert-import",
   "title": "Importer un certificat",
   "description": "Importe un certificat (.cer, .pfx, .p12) dans un magasin de certificats Windows spécifique.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

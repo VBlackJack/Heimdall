@@ -2,7 +2,7 @@
   "id": "win-debloat-205",
   "title": "Supprimer Xbox (tous composants)",
   "description": "⚠️ DANGEROUS: Supprime tous les composants Xbox (App, Game Bar, Gaming Services).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "cert-check-expiration",
   "title": "Vérifier l'expiration des certificats",
   "description": "Analyse tous les certificats installés et identifie ceux qui sont expirés ou proches de l'expiration (< 30 jours).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

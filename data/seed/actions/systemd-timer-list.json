@@ -2,7 +2,7 @@
   "id": "systemd-timer-list",
   "title": "Lister les timers systemd",
   "description": "Affiche tous les timers systemd (alternative moderne à cron)",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "sccm-trigger-software-inventory",
   "title": "Forcer l'inventaire logiciel SCCM",
   "description": "Déclenche immédiatement la collecte de l'inventaire logiciel et l'envoie au serveur SCCM",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

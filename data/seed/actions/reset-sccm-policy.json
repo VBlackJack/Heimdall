@@ -2,7 +2,7 @@
   "id": "reset-sccm-policy",
   "title": "Réinitialiser les stratégies SCCM",
   "description": "Supprime toutes les stratégies machine et utilisateur du client SCCM",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 2,
   "tags": [

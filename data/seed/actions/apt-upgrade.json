@@ -2,7 +2,7 @@
   "id": "apt-upgrade",
   "title": "Mettre à niveau les paquets installés",
   "description": "Met à jour tous les paquets installés vers leurs dernières versions disponibles",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [

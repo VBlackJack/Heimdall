@@ -2,7 +2,7 @@
   "id": "at-schedule-task",
   "title": "Planifier une tâche ponctuelle",
   "description": "Planifie l'exécution d'une commande à une date/heure précise (usage unique)",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [

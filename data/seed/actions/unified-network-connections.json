@@ -2,7 +2,7 @@
   "id": "unified-network-connections",
   "title": "Afficher les connexions réseau actives",
   "description": "Affiche les ports ouverts et les connexions réseau actives",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 2,
   "level": 0,
   "tags": [

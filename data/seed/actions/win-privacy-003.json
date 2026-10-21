@@ -2,7 +2,7 @@
   "id": "win-privacy-003",
   "title": "Désactiver l'accès au microphone",
   "description": "Désactive l'accès des applications au microphone pour éviter l'écoute non autorisée. Conforme RGPD.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "archive-zip-windows",
   "title": "Créer une archive ZIP",
   "description": "Compresse des fichiers ou dossiers dans une archive ZIP.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 0,
   "level": 0,
   "tags": [

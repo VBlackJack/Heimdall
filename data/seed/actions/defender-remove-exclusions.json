@@ -2,7 +2,7 @@
   "id": "defender-remove-exclusions",
   "title": "Supprimer une exclusion Defender",
   "description": "Retire un dossier, fichier ou processus de la liste des exclusions Windows Defender.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

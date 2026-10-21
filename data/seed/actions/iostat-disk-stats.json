@@ -2,7 +2,7 @@
   "id": "iostat-disk-stats",
   "title": "Statistiques d'I/O disque",
   "description": "Affiche les statistiques d'entrées/sorties des disques et partitions",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

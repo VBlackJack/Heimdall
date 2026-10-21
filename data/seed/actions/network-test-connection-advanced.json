@@ -2,7 +2,7 @@
   "id": "network-test-connection-advanced",
   "title": "Test de connectivité réseau avancé",
   "description": "Teste la connectivité réseau vers un hôte avec traceroute, test de port et informations de routage détaillées",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [

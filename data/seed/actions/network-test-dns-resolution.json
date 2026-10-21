@@ -2,7 +2,7 @@
   "id": "network-test-dns-resolution",
   "title": "Tester la résolution DNS",
   "description": "Résout un nom de domaine en adresse IP et affiche les informations DNS détaillées",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [

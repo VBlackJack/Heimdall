@@ -2,7 +2,7 @@
   "id": "win-pkg-004",
   "title": "Mettre à jour toutes les applications Winget",
   "description": "Met à jour toutes les applications installées vers leurs dernières versions disponibles.",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [

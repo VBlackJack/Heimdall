@@ -2,7 +2,7 @@
   "id": "git-diff",
   "title": "Afficher les différences",
   "description": "Affiche les différences entre commits, branches ou fichiers",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

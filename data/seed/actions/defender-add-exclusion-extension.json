@@ -2,7 +2,7 @@
   "id": "defender-add-exclusion-extension",
   "title": "Ajouter une exclusion d'extension de fichier Defender",
   "description": "Exclut tous les fichiers d'une extension spécifique de l'analyse Defender.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

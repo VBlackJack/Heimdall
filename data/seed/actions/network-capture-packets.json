@@ -2,7 +2,7 @@
   "id": "network-capture-packets",
   "title": "Capturer le trafic réseau",
   "description": "Démarre une capture de paquets réseau avec netsh trace pour analyse ultérieure",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 2,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "defender-schedule-scan",
   "title": "Planifier une analyse Defender automatique",
   "description": "Configure une planification pour les analyses automatiques de Windows Defender.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

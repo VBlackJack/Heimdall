@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-list-hidden",
   "title": "Lister les mises à jour masquées",
   "description": "Affiche toutes les mises à jour Windows qui ont été masquées",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

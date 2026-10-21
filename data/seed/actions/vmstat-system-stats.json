@@ -2,7 +2,7 @@
   "id": "vmstat-system-stats",
   "title": "Statistiques système globales",
   "description": "Affiche les statistiques de mémoire virtuelle, CPU, I/O et processus",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

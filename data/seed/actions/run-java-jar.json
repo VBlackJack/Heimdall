@@ -2,7 +2,7 @@
   "id": "run-java-jar",
   "title": "Exécuter un fichier JAR Java",
   "description": "Lance une application Java packagée en JAR.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

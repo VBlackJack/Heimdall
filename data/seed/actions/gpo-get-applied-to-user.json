@@ -2,7 +2,7 @@
   "id": "gpo-get-applied-to-user",
   "title": "Lister les GPO appliquées à un utilisateur",
   "description": "Affiche toutes les GPO appliquées à un utilisateur spécifique.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

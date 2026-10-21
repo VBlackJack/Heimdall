@@ -2,7 +2,7 @@
   "id": "gpo-set-link-order",
   "title": "Définir l'ordre de lien d'une GPO",
   "description": "Modifie l'ordre de traitement d'un lien GPO sur une OU.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

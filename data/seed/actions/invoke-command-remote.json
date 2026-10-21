@@ -2,7 +2,7 @@
   "id": "invoke-command-remote",
   "title": "Exécuter une commande à distance",
   "description": "Exécute une commande PowerShell sur un ou plusieurs ordinateurs distants via PSRemoting",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 1,
   "tags": [

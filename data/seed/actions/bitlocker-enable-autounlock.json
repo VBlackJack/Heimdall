@@ -2,7 +2,7 @@
   "id": "bitlocker-enable-autounlock",
   "title": "Activer le déverrouillage automatique BitLocker",
   "description": "Active le déverrouillage automatique pour un volume de données BitLocker (déverrouillé quand le volume système est déverrouillé).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

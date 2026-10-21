@@ -2,7 +2,7 @@
   "id": "win-debloat-204",
   "title": "Désinstaller Copilot",
   "description": "⚠️ DANGEROUS: Désinstalle Windows Copilot AI.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 2,
   "tags": [

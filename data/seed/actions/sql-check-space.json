@@ -2,7 +2,7 @@
   "id": "sql-check-space",
   "title": "Vérifier l'espace disque des bases SQL",
   "description": "Analyse l'espace disque utilisé et disponible pour chaque base de données SQL Server, incluant les fichiers de données (.mdf) et journaux (.ldf).",
-  "category": "💽 Database",
+  "category": "database",
   "platform": 0,
   "level": 0,
   "tags": [

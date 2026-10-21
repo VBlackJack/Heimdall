@@ -2,7 +2,7 @@
   "id": "zypper-install",
   "title": "Installer un paquet avec Zypper",
   "description": "Installe un paquet avec Zypper (openSUSE/SLES)",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [

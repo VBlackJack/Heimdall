@@ -2,7 +2,7 @@
   "id": "ad-get-user-details",
   "title": "Obtenir les détails complets d'un utilisateur AD",
   "description": "Affiche toutes les propriétés détaillées d'un utilisateur Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

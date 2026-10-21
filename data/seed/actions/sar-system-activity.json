@@ -2,7 +2,7 @@
   "id": "sar-system-activity",
   "title": "Rapport d'activité système (SAR)",
   "description": "Collecte et affiche l'historique de l'activité système (CPU, mémoire, I/O, réseau)",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "getfacl-show-acl",
   "title": "Afficher les ACL d'un fichier",
   "description": "Affiche les listes de contrôle d'accès (ACL) étendues d'un fichier",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [

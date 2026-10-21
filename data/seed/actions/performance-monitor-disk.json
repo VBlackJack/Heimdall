@@ -2,7 +2,7 @@
   "id": "performance-monitor-disk",
   "title": "Surveiller l'utilisation du disque",
   "description": "Collecte les statistiques d'utilisation des disques (temps actif, lectures/écritures par seconde)",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "gpo-backup-all",
   "title": "Sauvegarder toutes les GPO",
   "description": "Crée une sauvegarde de toutes les stratégies de groupe du domaine.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

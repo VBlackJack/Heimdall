@@ -2,7 +2,7 @@
   "id": "cert-create-selfsigned",
   "title": "Créer un certificat auto-signé",
   "description": "Génère un nouveau certificat auto-signé pour des tests, développement ou usage interne. Non recommandé pour la production publique.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

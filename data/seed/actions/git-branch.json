@@ -2,7 +2,7 @@
   "id": "git-branch",
   "title": "Gérer les branches Git",
   "description": "Crée, liste ou supprime des branches",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

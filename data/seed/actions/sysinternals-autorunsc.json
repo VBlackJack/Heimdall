@@ -2,7 +2,7 @@
   "id": "sysinternals-autorunsc",
   "title": "Lister les programmes au démarrage (Autoruns)",
   "description": "Version ligne de commande d'Autoruns. Liste tout ce qui démarre automatiquement (clés Run, Services, Drivers, Tâches planifiées).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

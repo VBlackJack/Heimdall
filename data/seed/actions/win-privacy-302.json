@@ -2,7 +2,7 @@
   "id": "win-privacy-302",
   "title": "Désactiver télémétrie VS Code",
   "description": "Désactive la télémétrie de Visual Studio Code et les rapports d'erreurs Microsoft.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

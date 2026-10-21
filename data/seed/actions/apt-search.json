@@ -2,7 +2,7 @@
   "id": "apt-search",
   "title": "Rechercher un paquet dans les dépôts",
   "description": "Recherche des paquets disponibles par nom ou description",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "ad-test-connectivity",
   "title": "Tester la connectivité Active Directory",
   "description": "Teste la connectivité avec un contrôleur de domaine Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

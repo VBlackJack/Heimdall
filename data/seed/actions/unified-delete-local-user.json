@@ -2,7 +2,7 @@
   "id": "unified-delete-local-user",
   "title": "Supprimer un utilisateur local",
   "description": "Supprime un compte utilisateur local du système.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 2,
   "level": 2,
   "tags": [

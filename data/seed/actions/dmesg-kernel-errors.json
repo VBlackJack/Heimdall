@@ -2,7 +2,7 @@
   "id": "dmesg-kernel-errors",
   "title": "Afficher les messages du noyau",
   "description": "Consulte les messages du noyau Linux, utile pour diagnostiquer les problèmes matériels et drivers",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

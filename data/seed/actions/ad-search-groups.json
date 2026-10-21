@@ -2,7 +2,7 @@
   "id": "ad-search-groups",
   "title": "Rechercher des groupes AD",
   "description": "Recherche des groupes Active Directory par nom ou description.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

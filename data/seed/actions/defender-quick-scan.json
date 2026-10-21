@@ -2,7 +2,7 @@
   "id": "defender-quick-scan",
   "title": "Lancer une analyse rapide Windows Defender",
   "description": "Lance une analyse rapide des zones système critiques (mémoire, démarrage, fichiers actifs).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

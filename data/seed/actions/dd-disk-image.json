@@ -2,7 +2,7 @@
   "id": "dd-disk-image",
   "title": "Créer une image disque",
   "description": "Copie bit à bit des données (disques, partitions, fichiers)",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 2,
   "tags": [

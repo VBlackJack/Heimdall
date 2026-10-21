@@ -2,7 +2,7 @@
   "id": "build-maven",
   "title": "Construire un projet Maven",
   "description": "Compile et package un projet Java avec Maven.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

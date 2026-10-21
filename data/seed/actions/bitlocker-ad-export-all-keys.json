@@ -2,7 +2,7 @@
   "id": "bitlocker-ad-export-all-keys",
   "title": "Exporter toutes les clés BitLocker du domaine",
   "description": "Exporte un rapport CSV de tous les ordinateurs du domaine avec leurs clés de récupération BitLocker (admin domaine).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

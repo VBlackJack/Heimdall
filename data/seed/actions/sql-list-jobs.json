@@ -2,7 +2,7 @@
   "id": "sql-list-jobs",
   "title": "Lister les jobs SQL Server Agent",
   "description": "Affiche tous les jobs configurés dans SQL Server Agent avec leur statut, dernière exécution et prochaine planification.",
-  "category": "💽 Database",
+  "category": "database",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "iftop-bandwidth-monitor",
   "title": "Monitorer la bande passante réseau",
   "description": "Affiche l'utilisation de la bande passante réseau en temps réel par connexion",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

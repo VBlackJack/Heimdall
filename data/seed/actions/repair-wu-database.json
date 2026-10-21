@@ -2,7 +2,7 @@
   "id": "repair-wu-database",
   "title": "Réparer la base de données Windows Update",
   "description": "Utilise l'outil DISM pour réparer les composants Windows Update corrompus",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 2,
   "tags": [

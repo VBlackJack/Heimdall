@@ -2,7 +2,7 @@
   "id": "defender-get-threats",
   "title": "Lister les menaces détectées par Defender",
   "description": "Affiche l'historique des menaces détectées et bloquées par Windows Defender.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

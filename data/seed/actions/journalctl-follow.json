@@ -2,7 +2,7 @@
   "id": "journalctl-follow",
   "title": "Suivre les logs système en temps réel",
   "description": "Affiche en continu les nouveaux messages du journal systemd (équivalent tail -f)",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

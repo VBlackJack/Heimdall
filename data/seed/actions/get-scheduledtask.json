@@ -2,7 +2,7 @@
   "id": "get-scheduledtask",
   "title": "Lister les tâches planifiées Windows",
   "description": "Affiche toutes les tâches planifiées configurées dans le Planificateur de tâches Windows",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 0,
   "tags": [

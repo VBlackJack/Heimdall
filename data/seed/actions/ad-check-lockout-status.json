@@ -2,7 +2,7 @@
   "id": "ad-check-lockout-status",
   "title": "Vérifier le statut de verrouillage d'un compte",
   "description": "Vérifie si un compte utilisateur est verrouillé et affiche les détails du verrouillage.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

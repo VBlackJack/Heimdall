@@ -2,7 +2,7 @@
   "id": "windowsupdate-dism-repair",
   "title": "Réparer Windows Update avec DISM",
   "description": "Utilise DISM pour réparer l'image Windows et résoudre les problèmes de Windows Update",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

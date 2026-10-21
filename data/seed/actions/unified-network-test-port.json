@@ -2,7 +2,7 @@
   "id": "unified-network-test-port",
   "title": "Tester l'ouverture d'un port TCP",
   "description": "Vérifie si un port TCP spécifique est ouvert et accessible sur un hôte distant",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 2,
   "level": 0,
   "tags": [

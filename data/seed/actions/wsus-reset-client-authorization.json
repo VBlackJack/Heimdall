@@ -2,7 +2,7 @@
   "id": "wsus-reset-client-authorization",
   "title": "Réinitialiser l'autorisation WSUS du client",
   "description": "Réinitialise l'identifiant du client WSUS pour forcer une nouvelle autorisation sur le serveur",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

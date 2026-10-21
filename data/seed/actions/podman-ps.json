@@ -2,7 +2,7 @@
   "id": "podman-ps",
   "title": "Lister les conteneurs Podman",
   "description": "Affiche les conteneurs Podman (alternative rootless à Docker)",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 1,
   "level": 0,
   "tags": [

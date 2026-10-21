@@ -2,7 +2,7 @@
   "id": "git-log",
   "title": "Afficher l'historique des commits",
   "description": "Affiche l'historique des commits du dépôt",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

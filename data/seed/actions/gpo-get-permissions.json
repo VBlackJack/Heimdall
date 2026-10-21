@@ -2,7 +2,7 @@
   "id": "gpo-get-permissions",
   "title": "Obtenir les permissions d'une GPO",
   "description": "Affiche les permissions de sécurité configurées sur une stratégie de groupe.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

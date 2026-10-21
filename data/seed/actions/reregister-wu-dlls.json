@@ -2,7 +2,7 @@
   "id": "reregister-wu-dlls",
   "title": "Réenregistrer les DLL Windows Update",
   "description": "Réenregistre toutes les DLL critiques du système Windows Update",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

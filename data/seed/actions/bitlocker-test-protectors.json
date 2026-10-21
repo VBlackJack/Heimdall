@@ -2,7 +2,7 @@
   "id": "bitlocker-test-protectors",
   "title": "Tester les protecteurs de clé BitLocker",
   "description": "Vérifie que tous les protecteurs de clé BitLocker d'un volume sont valides et fonctionnels.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

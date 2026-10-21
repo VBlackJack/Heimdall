@@ -2,7 +2,7 @@
   "id": "ad-check-replication",
   "title": "Vérifier la réplication Active Directory",
   "description": "Vérifie l'état de la réplication entre les contrôleurs de domaine.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

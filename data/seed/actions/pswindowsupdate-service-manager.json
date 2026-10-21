@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-service-manager",
   "title": "Lister les services de mise à jour configurés",
   "description": "Affiche tous les services de mise à jour Windows configurés (Windows Update, WSUS, Microsoft Update)",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

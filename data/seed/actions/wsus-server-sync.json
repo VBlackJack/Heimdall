@@ -2,7 +2,7 @@
   "id": "wsus-server-sync",
   "title": "Synchroniser le serveur WSUS avec Microsoft Update",
   "description": "Lance la synchronisation du serveur WSUS avec Microsoft Update pour récupérer les nouvelles mises à jour",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

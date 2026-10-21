@@ -2,7 +2,7 @@
   "id": "export-scheduledtask",
   "title": "Exporter une tâche planifiée",
   "description": "Exporte la définition d'une tâche planifiée au format XML pour sauvegarde ou migration",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 0,
   "tags": [

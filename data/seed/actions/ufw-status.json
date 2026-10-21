@@ -2,7 +2,7 @@
   "id": "ufw-status",
   "title": "Vérifier l'état du firewall UFW",
   "description": "Affiche l'état et les règles du firewall UFW (Uncomplicated Firewall)",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [

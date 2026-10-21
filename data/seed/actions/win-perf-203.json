@@ -2,7 +2,7 @@
   "id": "win-perf-203",
   "title": "Restaurer les services par défaut",
   "description": "Restaure tous les services Windows à leur configuration par défaut (annule WIN-PERF-201).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

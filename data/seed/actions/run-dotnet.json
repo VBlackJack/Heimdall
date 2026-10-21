@@ -2,7 +2,7 @@
   "id": "run-dotnet",
   "title": "Exécuter un projet .NET",
   "description": "Lance un projet .NET en mode développement.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [

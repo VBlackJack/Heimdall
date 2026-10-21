@@ -2,7 +2,7 @@
   "id": "linux-service-stop",
   "title": "Arrêter un service",
   "description": "Arrête un service systemd en cours d'exécution.",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [

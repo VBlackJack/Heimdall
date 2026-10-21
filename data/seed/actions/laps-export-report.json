@@ -2,7 +2,7 @@
   "id": "laps-export-report",
   "title": "Générer un rapport complet LAPS",
   "description": "Génère un rapport CSV de tous les ordinateurs LAPS avec mots de passe et dates d'expiration.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

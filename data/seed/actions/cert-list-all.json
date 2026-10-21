@@ -2,7 +2,7 @@
   "id": "cert-list-all",
   "title": "Lister tous les certificats installés",
   "description": "Affiche tous les certificats installés dans les magasins Windows Certificate Store (LocalMachine et CurrentUser) avec leur expiration et usage.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

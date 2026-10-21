@@ -2,7 +2,7 @@
   "id": "archive-tar-linux",
   "title": "Créer une archive TAR/GZ",
   "description": "Compresse des fichiers ou dossiers dans une archive tar.gz.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

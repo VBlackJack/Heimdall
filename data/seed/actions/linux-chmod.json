@@ -2,7 +2,7 @@
   "id": "linux-chmod",
   "title": "Changer permissions (chmod)",
   "description": "Modifie les droits d'accès (Lecture/Écriture/Exécution) des fichiers.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [

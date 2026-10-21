@@ -2,7 +2,7 @@
   "id": "defender-configure-cloud-protection",
   "title": "Configurer la protection cloud Defender",
   "description": "Active ou configure la protection cloud de Windows Defender (analyse dans le cloud Microsoft).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

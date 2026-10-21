@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-installer-status",
   "title": "Vérifier le statut de l'installeur Windows Update",
   "description": "Affiche si l'installeur Windows Update est en cours d'exécution",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

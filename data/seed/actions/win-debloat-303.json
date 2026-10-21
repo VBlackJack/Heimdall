@@ -2,7 +2,7 @@
   "id": "win-debloat-303",
   "title": "Désactiver Internet Explorer",
   "description": "Désactive le composant Internet Explorer (IE11) de Windows.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

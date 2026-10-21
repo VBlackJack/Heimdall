@@ -2,7 +2,7 @@
   "id": "gpo-force-update",
   "title": "Forcer la mise à jour des GPO",
   "description": "Force l'application immédiate des stratégies de groupe sans attendre le délai de rafraîchissement.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "gpo-restore",
   "title": "Restaurer une GPO",
   "description": "Restaure une stratégie de groupe à partir d'une sauvegarde.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

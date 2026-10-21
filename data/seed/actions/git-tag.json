@@ -2,7 +2,7 @@
   "id": "git-tag",
   "title": "Gérer les tags Git",
   "description": "Crée, liste ou supprime des tags (versions)",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "test-wsus-connectivity",
   "title": "Tester la connexion au serveur WSUS",
   "description": "Vérifie la configuration et la connectivité au serveur WSUS",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

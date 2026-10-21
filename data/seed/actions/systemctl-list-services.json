@@ -2,7 +2,7 @@
   "id": "systemctl-list-services",
   "title": "Lister tous les services systemd",
   "description": "Affiche la liste de toutes les unités de type service",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [

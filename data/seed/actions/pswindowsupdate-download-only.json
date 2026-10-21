@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-download-only",
   "title": "Télécharger les mises à jour sans installer",
   "description": "Télécharge les mises à jour Windows disponibles sans les installer",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

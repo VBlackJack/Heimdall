@@ -20,6 +20,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Localization;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
@@ -52,6 +53,35 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     public LocalizationManager? Localizer { get; set; }
 
     public List<string> AvailableCategories { get; set; } = [];
+
+    // Set by UseCategoryLabels: maps a chosen label back to its key on save.
+    private Func<string, string>? _categoryLocalize;
+
+    /// <summary>
+    /// Offers <paramref name="categories"/> by their labels and shows the current category
+    /// by its label; on save, a label of a shipped category goes back to its key.
+    /// </summary>
+    /// <param name="categories">The categories in use, as stored (keys or free text).</param>
+    /// <param name="localize">Resolves a locale key in the operator's language.</param>
+    /// <remarks>
+    /// The combo is editable, so what comes back is text: the label of a shipped category,
+    /// or a category the operator typed, which is stored as typed.
+    /// </remarks>
+    public void UseCategoryLabels(IEnumerable<string> categories, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(categories);
+        ArgumentNullException.ThrowIfNull(localize);
+
+        _categoryLocalize = localize;
+        AvailableCategories = categories
+            .Select(category => CommandPresentationResolver.ResolveCategoryLabel(category, localize))
+            .ToList();
+
+        var wasInitializing = _isInitializing;
+        _isInitializing = true;
+        Category = CommandPresentationResolver.ResolveCategoryLabel(Category, localize);
+        _isInitializing = wasInitializing;
+    }
 
     // ── Dialog state ──────────────────────────────────────────────
 
@@ -412,7 +442,9 @@ public partial class CommandActionDialogViewModel : ObservableValidator
             PublicId = _editPublicId ?? Guid.NewGuid(),
             Title = Title.Trim(),
             Description = Description.Trim(),
-            Category = Category.Trim(),
+            Category = _categoryLocalize is null
+                ? Category.Trim()
+                : CommandPresentationResolver.ResolveCategoryKey(Category, _categoryLocalize),
             Platform = Platform,
             Level = Level,
             Tags = string.IsNullOrWhiteSpace(Tags)

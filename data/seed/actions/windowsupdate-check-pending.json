@@ -2,7 +2,7 @@
   "id": "windowsupdate-check-pending",
   "title": "Vérifier les mises à jour Windows en attente",
   "description": "Liste toutes les mises à jour Windows disponibles mais non encore installées",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

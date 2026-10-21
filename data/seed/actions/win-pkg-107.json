@@ -2,7 +2,7 @@
   "id": "win-pkg-107",
   "title": "Ajouter une source Chocolatey",
   "description": "Ajoute une nouvelle source de packages Chocolatey personnalisée.",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "ad-enable-account",
   "title": "Activer un compte utilisateur AD",
   "description": "Active un compte utilisateur Active Directory qui a été désactivé.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

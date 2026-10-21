@@ -2,7 +2,7 @@
   "id": "eventlog-system-startup-shutdown",
   "title": "Historique des démarrages et arrêts système",
   "description": "Liste tous les événements de démarrage (EventID 6005) et arrêt (EventID 6006) du système",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "security-check-admin-group",
   "title": "Lister les membres du groupe Administrateurs local",
   "description": "Affiche tous les utilisateurs et groupes membres du groupe Administrateurs local",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

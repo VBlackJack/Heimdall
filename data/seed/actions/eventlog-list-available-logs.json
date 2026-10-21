@@ -2,7 +2,7 @@
   "id": "eventlog-list-available-logs",
   "title": "Lister tous les journaux d'événements disponibles",
   "description": "Affiche la liste de tous les journaux d'événements disponibles sur le système avec leurs statistiques",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "ad-search-user",
   "title": "Rechercher un utilisateur AD par nom",
   "description": "Recherche un utilisateur spécifique dans Active Directory par son nom ou prénom.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

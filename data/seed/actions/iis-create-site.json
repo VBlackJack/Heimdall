@@ -2,7 +2,7 @@
   "id": "iis-create-site",
   "title": "Créer un nouveau site IIS",
   "description": "Crée un nouveau site web dans IIS avec un nom, un chemin physique et un binding spécifiques.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 2,
   "tags": [

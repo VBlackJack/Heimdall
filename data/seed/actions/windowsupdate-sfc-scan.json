@@ -2,7 +2,7 @@
   "id": "windowsupdate-sfc-scan",
   "title": "Vérifier l'intégrité des fichiers système (SFC)",
   "description": "Exécute System File Checker pour détecter et réparer les fichiers système corrompus",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

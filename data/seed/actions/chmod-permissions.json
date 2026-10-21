@@ -2,7 +2,7 @@
   "id": "chmod-permissions",
   "title": "Modifier les permissions d'un fichier",
   "description": "Change les permissions (lecture, écriture, exécution) d'un fichier ou répertoire",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [

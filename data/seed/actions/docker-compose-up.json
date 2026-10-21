@@ -2,7 +2,7 @@
   "id": "docker-compose-up",
   "title": "Démarrer une stack Docker Compose",
   "description": "Lance tous les services définis dans un fichier docker-compose.yml",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 1,
   "tags": [

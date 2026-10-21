@@ -2,7 +2,7 @@
   "id": "windowsupdate-force-scan",
   "title": "Forcer la recherche immédiate de mises à jour",
   "description": "Force Windows Update à rechercher immédiatement de nouvelles mises à jour",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

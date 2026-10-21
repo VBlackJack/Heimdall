@@ -2,7 +2,7 @@
   "id": "win-legacy-dcdiag",
   "title": "Santé Contrôleur de Domaine (DCDiag)",
   "description": "Analyse l'état d'un contrôleur de domaine (DNS, Réplication, Système, NetLogon).",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

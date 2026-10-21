@@ -2,7 +2,7 @@
   "id": "sysinternals-psloggedon",
   "title": "Qui est connecté ? (PsLoggedOn)",
   "description": "Affiche les utilisateurs connectés localement et via des partages de ressources.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

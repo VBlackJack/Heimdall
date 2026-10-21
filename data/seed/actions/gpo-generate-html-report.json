@@ -2,7 +2,7 @@
   "id": "gpo-generate-html-report",
   "title": "Générer un rapport HTML d'une GPO",
   "description": "Génère un rapport HTML détaillé des paramètres d'une stratégie de groupe.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

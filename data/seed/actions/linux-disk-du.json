@@ -2,7 +2,7 @@
   "id": "linux-disk-du",
   "title": "Analyser taille dossiers (du)",
   "description": "Estime l'espace disque utilisé par les fichiers et répertoires.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

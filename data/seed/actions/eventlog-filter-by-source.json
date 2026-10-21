@@ -2,7 +2,7 @@
   "id": "eventlog-filter-by-source",
   "title": "Filtrer les événements par source/fournisseur",
   "description": "Recherche tous les événements provenant d'une source spécifique (ProviderName)",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

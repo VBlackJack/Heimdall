@@ -2,7 +2,7 @@
   "id": "systemctl-enable",
   "title": "Activer un service au démarrage",
   "description": "Configure un service pour démarrer automatiquement au boot",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [

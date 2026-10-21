@@ -2,7 +2,7 @@
   "id": "systemctl-reload",
   "title": "Recharger la configuration d'un service",
   "description": "Recharge la configuration du service sans l'arrêter (si supporté)",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [

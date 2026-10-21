@@ -2,7 +2,7 @@
   "id": "bitlocker-lock",
   "title": "Verrouiller un volume BitLocker",
   "description": "Verrouille immédiatement un volume BitLocker (le rend inaccessible sans déverrouillage).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

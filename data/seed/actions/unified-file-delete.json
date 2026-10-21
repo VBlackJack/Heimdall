@@ -2,7 +2,7 @@
   "id": "unified-file-delete",
   "title": "Supprimer des fichiers ou dossiers",
   "description": "Supprime des fichiers ou des répertoires de manière permanente.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "apt-autoremove",
   "title": "Supprimer les paquets inutilisés",
   "description": "Supprime les paquets de dépendances qui ne sont plus nécessaires",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [

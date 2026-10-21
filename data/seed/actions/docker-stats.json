@@ -2,7 +2,7 @@
   "id": "docker-stats",
   "title": "Statistiques des conteneurs Docker",
   "description": "Affiche en temps réel l'utilisation CPU, mémoire, réseau et I/O des conteneurs",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 0,
   "tags": [

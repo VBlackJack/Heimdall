@@ -162,7 +162,7 @@ public sealed partial class CommandLibraryViewModel
         {
             _actionsView.SortDescriptions.Clear();
             _actionsView.GroupDescriptions.Add(
-                new PropertyGroupDescription(nameof(CommandLibraryActionEntry.Category)));
+                new PropertyGroupDescription(nameof(CommandLibraryActionEntry.CategoryLabel)));
         }
     }
 

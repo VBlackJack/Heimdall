@@ -2,7 +2,7 @@
   "id": "archive-untar-linux",
   "title": "Extraire une archive TAR/GZ",
   "description": "Extrait le contenu d'une archive tar ou tar.gz.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

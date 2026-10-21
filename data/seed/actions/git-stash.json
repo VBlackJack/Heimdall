@@ -2,7 +2,7 @@
   "id": "git-stash",
   "title": "Sauvegarder temporairement des modifications",
   "description": "Met de côté temporairement les modifications non commitées",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

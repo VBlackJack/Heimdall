@@ -2,7 +2,7 @@
   "id": "gpo-delete",
   "title": "Supprimer une GPO",
   "description": "Supprime une stratégie de groupe du domaine.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 2,
   "tags": [

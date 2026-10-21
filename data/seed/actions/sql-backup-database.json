@@ -2,7 +2,7 @@
   "id": "sql-backup-database",
   "title": "Sauvegarder une base de données SQL Server",
   "description": "Effectue une sauvegarde complète (FULL) d'une base de données SQL Server vers un fichier .bak spécifié.",
-  "category": "💽 Database",
+  "category": "database",
   "platform": 0,
   "level": 2,
   "tags": [

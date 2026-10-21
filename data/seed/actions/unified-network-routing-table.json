@@ -2,7 +2,7 @@
   "id": "unified-network-routing-table",
   "title": "Afficher la table de routage",
   "description": "Affiche la table de routage IP complète avec les routes par défaut et statiques",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 2,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "reset-wsus-client-id",
   "title": "Réinitialiser l'ID client WSUS",
   "description": "Supprime le SusClientId pour forcer la re-création lors de la prochaine connexion",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

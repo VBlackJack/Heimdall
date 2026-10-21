@@ -2,7 +2,7 @@
   "id": "fail2ban-status",
   "title": "Vérifier l'état de Fail2ban",
   "description": "Affiche l'état des jails Fail2ban et les IP bannies",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [

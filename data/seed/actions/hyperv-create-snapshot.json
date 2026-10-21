@@ -2,7 +2,7 @@
   "id": "hyperv-create-snapshot",
   "title": "Créer un snapshot (point de contrôle) d'une VM",
   "description": "Crée un point de contrôle (snapshot) d'une machine virtuelle Hyper-V, capturant son état actuel pour une restauration ultérieure.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 0,
   "level": 1,
   "tags": [

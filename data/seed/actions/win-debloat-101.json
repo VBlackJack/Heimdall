@@ -2,7 +2,7 @@
   "id": "win-debloat-101",
   "title": "Supprimer les apps Microsoft inutiles",
   "description": "Supprime 38 applications Microsoft préinstallées considérées comme non essentielles (3D Viewer, Alarms, BingNews, etc.).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

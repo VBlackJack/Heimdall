@@ -2,7 +2,7 @@
   "id": "docker-ps",
   "title": "Lister les conteneurs Docker",
   "description": "Affiche la liste des conteneurs Docker en cours d'exécution",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 0,
   "tags": [

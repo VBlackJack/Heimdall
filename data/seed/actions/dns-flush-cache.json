@@ -2,7 +2,7 @@
   "id": "dns-flush-cache",
   "title": "Vider le cache DNS",
   "description": "Efface le cache DNS local pour forcer la résolution fraîche des noms de domaine.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 2,
   "level": 1,
   "tags": [

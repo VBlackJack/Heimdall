@@ -693,7 +693,7 @@ public sealed class JsonSyncService : SyncServiceBase
                     // Update existing (remote is newer or same)
                     existing.Title = model.Title;
                     existing.Description = model.Description;
-                    existing.Category = model.Category;
+                    existing.Category = CategoryMigration.Normalize(model.Category);
                     existing.Platform = platform;
                     existing.Level = level;
                     existing.Tags = model.Tags ?? new List<string>();
@@ -720,7 +720,7 @@ public sealed class JsonSyncService : SyncServiceBase
                         PublicId = model.Id,
                         Title = model.Title,
                         Description = model.Description,
-                        Category = model.Category,
+                        Category = CategoryMigration.Normalize(model.Category),
                         Platform = platform,
                         Level = level,
                         Tags = model.Tags ?? new List<string>(),

@@ -2,7 +2,7 @@
   "id": "mpstat-cpu-stats",
   "title": "Statistiques CPU par processeur",
   "description": "Affiche les statistiques d'utilisation CPU par processeur individuel",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

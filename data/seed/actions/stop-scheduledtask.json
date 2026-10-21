@@ -2,7 +2,7 @@
   "id": "stop-scheduledtask",
   "title": "Arrêter une tâche planifiée",
   "description": "Arrête l'exécution en cours d'une tâche planifiée",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 1,
   "tags": [

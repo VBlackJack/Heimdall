@@ -2,7 +2,7 @@
   "id": "bitlocker-suspend",
   "title": "Suspendre temporairement la protection BitLocker",
   "description": "Suspend la protection BitLocker temporairement (utile pour mises à jour BIOS/firmware).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

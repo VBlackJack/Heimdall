@@ -2,7 +2,7 @@
   "id": "sysinternals-accesschk",
   "title": "Auditer les permissions (AccessChk)",
   "description": "Vérifie les droits d'accès effectifs des utilisateurs sur des fichiers, clés de registre ou services.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

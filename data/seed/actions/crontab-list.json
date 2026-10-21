@@ -2,7 +2,7 @@
   "id": "crontab-list",
   "title": "Lister les tâches cron",
   "description": "Affiche les tâches planifiées cron de l'utilisateur",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "sccm-trigger-update-scan",
   "title": "Déclencher l'analyse des mises à jour SCCM",
   "description": "Force le client SCCM à analyser immédiatement les mises à jour logicielles disponibles",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

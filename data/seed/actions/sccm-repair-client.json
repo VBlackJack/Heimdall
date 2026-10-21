@@ -2,7 +2,7 @@
   "id": "sccm-repair-client",
   "title": "Réparer le client SCCM",
   "description": "Exécute la réparation automatique du client SCCM pour résoudre les problèmes de communication",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

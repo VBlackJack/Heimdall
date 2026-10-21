@@ -2,7 +2,7 @@
   "id": "ad-create-user",
   "title": "Créer un nouvel utilisateur AD",
   "description": "Crée un nouveau compte utilisateur dans Active Directory avec les paramètres de base.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

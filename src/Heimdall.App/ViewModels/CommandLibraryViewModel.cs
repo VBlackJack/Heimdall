@@ -926,9 +926,11 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         var previous = CategoryFilterIndex;
         CategoryFilterItems.Clear();
         CategoryFilterItems.Add(LocalizeKey("ToolCmdLibFilterCategoryAll"));
+
+        // Shown by label, filtered by key: the index maps back into _categoryList.
         foreach (var cat in _categoryList)
         {
-            CategoryFilterItems.Add(cat);
+            CategoryFilterItems.Add(CommandPresentationResolver.ResolveCategoryLabel(cat, LocalizeKey));
         }
         CategoryFilterIndex = ClampFilterIndex(previous, CategoryFilterItems.Count);
     }
@@ -964,7 +966,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         _actionsView.SortDescriptions.Clear();
         _actionsView.GroupDescriptions.Clear();
         _actionsView.GroupDescriptions.Add(
-            new PropertyGroupDescription(nameof(CommandLibraryActionEntry.Category)));
+            new PropertyGroupDescription(nameof(CommandLibraryActionEntry.CategoryLabel)));
     }
 
     /// <summary>

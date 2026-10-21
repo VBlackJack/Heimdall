@@ -2,7 +2,7 @@
   "id": "lynis-audit",
   "title": "Audit de sécurité avec Lynis",
   "description": "Lance un audit de sécurité complet du système avec Lynis",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [

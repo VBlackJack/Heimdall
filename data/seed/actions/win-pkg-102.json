@@ -2,7 +2,7 @@
   "id": "win-pkg-102",
   "title": "Lister les packages Chocolatey installés",
   "description": "Affiche la liste de tous les packages installés via Chocolatey.",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 0,
   "tags": [

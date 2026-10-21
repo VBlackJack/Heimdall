@@ -2,7 +2,7 @@
   "id": "apt-install",
   "title": "Installer un paquet avec APT",
   "description": "Installe un ou plusieurs paquets avec leurs dépendances (Debian/Ubuntu)",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [

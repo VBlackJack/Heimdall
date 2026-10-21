@@ -2,7 +2,7 @@
   "id": "ad-get-domain-controllers",
   "title": "Lister tous les contrôleurs de domaine",
   "description": "Affiche la liste de tous les contrôleurs de domaine Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

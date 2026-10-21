@@ -2,7 +2,7 @@
   "id": "nmap-port-scan",
   "title": "Scanner les ports ouverts",
   "description": "Scanne les ports ouverts sur un hôte ou réseau avec nmap",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 1,
   "tags": [

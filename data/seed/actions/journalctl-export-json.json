@@ -2,7 +2,7 @@
   "id": "journalctl-export-json",
   "title": "Exporter les logs au format JSON",
   "description": "Exporte les logs systemd au format JSON pour analyse",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

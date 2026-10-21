@@ -2,7 +2,7 @@
   "id": "unified-memory-usage",
   "title": "Afficher l'utilisation de la mémoire",
   "description": "Affiche l'utilisation de la mémoire RAM du système",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 2,
   "level": 0,
   "tags": [

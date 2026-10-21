@@ -2,7 +2,7 @@
   "id": "db-sqlcmd-query",
   "title": "Requête SQL Server (SqlCmd)",
   "description": "Exécute une requête T-SQL sur un serveur Microsoft SQL Server depuis la ligne de commande.",
-  "category": "💽 Database",
+  "category": "database",
   "platform": 0,
   "level": 1,
   "tags": [

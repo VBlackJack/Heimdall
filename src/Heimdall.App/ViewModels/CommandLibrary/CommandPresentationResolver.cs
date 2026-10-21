@@ -15,6 +15,7 @@
  */
 
 using TwinShell.Core.Enums;
+using TwinShell.Core.Models;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.ViewModels.CommandLibrary;
@@ -30,6 +31,73 @@ namespace Heimdall.App.ViewModels.CommandLibrary;
 /// </summary>
 public static class CommandPresentationResolver
 {
+    /// <summary>
+    /// The glyph and the locale key of the label for each shipped category key. The glyph
+    /// is data, the same in every language, so it lives here rather than in the catalogues.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, (string Glyph, string LabelKey)> KnownCategories =
+        new Dictionary<string, (string Glyph, string LabelKey)>(StringComparer.Ordinal)
+        {
+            [CommandCategories.Security] = ("🔒", "ToolCmdLibCategorySecurity"),
+            [CommandCategories.ActiveDirectory] = ("🏢", "ToolCmdLibCategoryActiveDirectory"),
+            [CommandCategories.ServicesAutomation] = ("⚙️", "ToolCmdLibCategoryServicesAutomation"),
+            [CommandCategories.WindowsUpdates] = ("🔄", "ToolCmdLibCategoryWindowsUpdates"),
+            [CommandCategories.MonitoringLogs] = ("📊", "ToolCmdLibCategoryMonitoringLogs"),
+            [CommandCategories.FilesStorage] = ("📁", "ToolCmdLibCategoryFilesStorage"),
+            [CommandCategories.NetworkDns] = ("🌐", "ToolCmdLibCategoryNetworkDns"),
+            [CommandCategories.PackageManagement] = ("📦", "ToolCmdLibCategoryPackageManagement"),
+            [CommandCategories.Development] = ("🔧", "ToolCmdLibCategoryDevelopment"),
+            [CommandCategories.Performance] = ("⚡", "ToolCmdLibCategoryPerformance"),
+            [CommandCategories.ContainersVms] = ("🐳", "ToolCmdLibCategoryContainersVms"),
+            [CommandCategories.Database] = ("💽", "ToolCmdLibCategoryDatabase"),
+            [CommandCategories.WindowsDebloat] = ("🧹", "ToolCmdLibCategoryWindowsDebloat"),
+        };
+
+    /// <summary>
+    /// The label an operator reads for <paramref name="category"/>: the glyph and the
+    /// localized name for a shipped category key, the string itself for anything else.
+    /// </summary>
+    /// <remarks>
+    /// Single source of truth for every surface that shows a category: the group header and
+    /// the filter combo of the library, the editor's category combo, the row's accessible
+    /// name, the picker and the palette. A category an operator created is free text and is
+    /// shown as typed.
+    /// </remarks>
+    public static string ResolveCategoryLabel(string? category, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+
+        if (string.IsNullOrEmpty(category))
+        {
+            return string.Empty;
+        }
+
+        return KnownCategories.TryGetValue(category, out var known)
+            ? known.Glyph + " " + localize(known.LabelKey)
+            : category;
+    }
+
+    /// <summary>
+    /// The category to store for what an operator chose or typed in a category combo: the
+    /// key when <paramref name="labelOrCategory"/> is the label of a shipped category in the
+    /// current language, the text itself otherwise.
+    /// </summary>
+    public static string ResolveCategoryKey(string? labelOrCategory, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+
+        var text = (labelOrCategory ?? string.Empty).Trim();
+        foreach (var key in KnownCategories.Keys)
+        {
+            if (string.Equals(ResolveCategoryLabel(key, localize), text, StringComparison.Ordinal))
+            {
+                return key;
+            }
+        }
+
+        return text;
+    }
+
     /// <summary>
     /// Builds the presentation for the given action, resolving localized risk
     /// and platform text through <paramref name="localize"/>.

@@ -2,7 +2,7 @@
   "id": "defender-add-exclusion-folder",
   "title": "Ajouter une exclusion de dossier dans Defender",
   "description": "Exclut un dossier de l'analyse en temps réel de Windows Defender (améliore performances).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

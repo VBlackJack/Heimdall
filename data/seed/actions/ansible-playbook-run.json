@@ -2,7 +2,7 @@
   "id": "ansible-playbook-run",
   "title": "Exécuter un playbook Ansible",
   "description": "Exécute un playbook Ansible sur les hôtes définis dans l'inventaire",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 1,
   "tags": [

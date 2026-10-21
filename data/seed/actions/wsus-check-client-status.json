@@ -2,7 +2,7 @@
   "id": "wsus-check-client-status",
   "title": "Vérifier la configuration WSUS du client",
   "description": "Affiche la configuration actuelle du client WSUS en lisant le registre",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

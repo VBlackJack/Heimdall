@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-show-update",
   "title": "Afficher une mise à jour masquée",
   "description": "Réaffiche une mise à jour précédemment masquée pour permettre son installation",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

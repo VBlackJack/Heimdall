@@ -2,7 +2,7 @@
   "id": "bitlocker-add-tpm-protector",
   "title": "Ajouter un protecteur TPM à BitLocker",
   "description": "Ajoute une protection TPM (Trusted Platform Module) à un volume BitLocker existant.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

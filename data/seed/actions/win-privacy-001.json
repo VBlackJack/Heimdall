@@ -2,7 +2,7 @@
   "id": "win-privacy-001",
   "title": "Désactiver l'accès à la localisation",
   "description": "Désactive l'accès des applications à la localisation de l'appareil pour protéger la vie privée. Conforme RGPD.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

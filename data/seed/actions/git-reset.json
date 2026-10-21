@@ -2,7 +2,7 @@
   "id": "git-reset",
   "title": "Réinitialiser l'état du dépôt",
   "description": "Réinitialise HEAD à un état spécifique",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 2,
   "tags": [

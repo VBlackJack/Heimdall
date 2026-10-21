@@ -2,7 +2,7 @@
   "id": "repair-windows-store",
   "title": "Réparer le Windows Store",
   "description": "Réinitialise le cache du Windows Store qui peut affecter Windows Update",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

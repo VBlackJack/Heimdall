@@ -2,7 +2,7 @@
   "id": "start-scheduledtask",
   "title": "Démarrer une tâche planifiée",
   "description": "Démarre immédiatement l'exécution d'une tâche planifiée",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 1,
   "tags": [

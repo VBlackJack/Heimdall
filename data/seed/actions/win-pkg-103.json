@@ -2,7 +2,7 @@
   "id": "win-pkg-103",
   "title": "Mettre à jour un package Chocolatey",
   "description": "Met à jour un package spécifique vers sa dernière version disponible via Chocolatey.",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [

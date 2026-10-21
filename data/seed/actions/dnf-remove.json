@@ -2,7 +2,7 @@
   "id": "dnf-remove",
   "title": "Désinstaller un paquet avec DNF",
   "description": "Supprime un paquet installé avec DNF",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [

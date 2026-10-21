@@ -2,7 +2,7 @@
   "id": "wsus-server-cleanup",
   "title": "Effectuer la maintenance du serveur WSUS",
   "description": "Exécute les tâches de maintenance WSUS: suppression des mises à jour obsolètes, dépassées et des ordinateurs inactifs",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

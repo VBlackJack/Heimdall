@@ -2,7 +2,7 @@
   "id": "wsus-server-unapproved-critical",
   "title": "Lister les mises à jour critiques non approuvées sur WSUS",
   "description": "Affiche toutes les mises à jour critiques non encore approuvées sur le serveur WSUS",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

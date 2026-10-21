@@ -2,7 +2,7 @@
   "id": "unified-file-copy",
   "title": "Copier des fichiers ou dossiers",
   "description": "Copie des fichiers ou des répertoires avec leurs sous-dossiers.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [

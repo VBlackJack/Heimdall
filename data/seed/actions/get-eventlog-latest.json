@@ -2,7 +2,7 @@
   "id": "get-eventlog-latest",
   "title": "Consulter les événements Windows récents",
   "description": "Affiche les derniers événements du journal Windows (System, Application, Security)",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

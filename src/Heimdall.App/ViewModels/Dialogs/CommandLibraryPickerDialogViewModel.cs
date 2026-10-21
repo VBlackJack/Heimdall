@@ -202,7 +202,7 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
                 {
                     ActionId = action.Id,
                     Title = action.Title,
-                    Category = action.Category,
+                    Category = CommandPresentationResolver.ResolveCategoryLabel(action.Category, key => _localizer[key]),
                     HasLinuxTemplate = action.LinuxCommandTemplate is not null,
                     HasWindowsTemplate = action.WindowsCommandTemplate is not null,
                     LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],

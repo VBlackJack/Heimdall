@@ -2,7 +2,7 @@
   "id": "ansible-galaxy-install",
   "title": "Installer un rôle Ansible Galaxy",
   "description": "Télécharge et installe un rôle depuis Ansible Galaxy",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

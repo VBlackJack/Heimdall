@@ -2,7 +2,7 @@
   "id": "ansible-inventory-list",
   "title": "Lister l'inventaire Ansible",
   "description": "Affiche la liste complète des hôtes dans l'inventaire Ansible",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "win-perf-401",
   "title": "Désactiver HAGS (Hardware Accelerated GPU Scheduling)",
   "description": "Désactive l'ordonnancement GPU accéléré par matériel (peut causer des micro-stutters dans certains jeux).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "unified-disk-space",
   "title": "Afficher l'espace disque disponible",
   "description": "Affiche l'espace disque utilisé et disponible sur les partitions",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [

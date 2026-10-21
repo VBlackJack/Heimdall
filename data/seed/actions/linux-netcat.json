@@ -2,7 +2,7 @@
   "id": "linux-netcat",
   "title": "Couteau suisse réseau (Netcat)",
   "description": "Outil polyvalent pour lire/écrire sur des connexions réseau TCP/UDP.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 1,
   "tags": [

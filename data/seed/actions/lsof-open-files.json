@@ -2,7 +2,7 @@
   "id": "lsof-open-files",
   "title": "Lister les fichiers ouverts",
   "description": "Liste tous les fichiers ouverts par les processus (fichiers, sockets, etc.)",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

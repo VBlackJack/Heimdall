@@ -2,7 +2,7 @@
   "id": "gpo-get-rsop",
   "title": "Obtenir le RSoP (Resultant Set of Policy)",
   "description": "Génère un rapport RSoP détaillé des stratégies appliquées à un utilisateur/ordinateur.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

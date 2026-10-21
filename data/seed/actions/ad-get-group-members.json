@@ -2,7 +2,7 @@
   "id": "ad-get-group-members",
   "title": "Lister les membres d'un groupe AD",
   "description": "Affiche tous les membres d'un groupe Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

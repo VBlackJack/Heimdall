@@ -2,7 +2,7 @@
   "id": "wsus-configure-client",
   "title": "Configurer le client WSUS via le registre",
   "description": "Configure les paramètres du client WSUS en modifiant les clés de registre appropriées",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "win-pkg-006",
   "title": "Rechercher un package Winget",
   "description": "Recherche des packages disponibles dans les sources Winget configurées.",
-  "category": "📦 Package Management",
+  "category": "package-management",
   "platform": 0,
   "level": 0,
   "tags": [

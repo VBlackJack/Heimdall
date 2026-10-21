@@ -2,7 +2,7 @@
   "id": "reset-windows-update-complete",
   "title": "Réinitialiser complètement Windows Update",
   "description": "Arrête les services WU, supprime les caches SoftwareDistribution et Catroot2, puis redémarre les services",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 2,
   "tags": [

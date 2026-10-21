@@ -2,7 +2,7 @@
   "id": "gpo-backup",
   "title": "Sauvegarder une GPO",
   "description": "Crée une sauvegarde d'une stratégie de groupe spécifique.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

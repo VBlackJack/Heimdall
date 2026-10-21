@@ -2,7 +2,7 @@
   "id": "dig-dns-lookup",
   "title": "Requête DNS avec dig",
   "description": "Effectue des requêtes DNS détaillées pour résoudre des noms de domaine",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "ulimit-resource-limits",
   "title": "Afficher/définir les limites de ressources",
   "description": "Affiche ou modifie les limites de ressources des processus (fichiers, mémoire, CPU)",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 1,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "perf-network-connections",
   "title": "Monitorer les connexions réseau actives",
   "description": "Affiche toutes les connexions réseau TCP/UDP actives avec les ports locaux/distants, état et processus associé.",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 2,
   "level": 0,
   "tags": [

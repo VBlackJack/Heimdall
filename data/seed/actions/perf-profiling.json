@@ -2,7 +2,7 @@
   "id": "perf-profiling",
   "title": "Profiler les performances CPU",
   "description": "Analyse les performances CPU et identifie les hotspots",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 1,
   "level": 1,
   "tags": [

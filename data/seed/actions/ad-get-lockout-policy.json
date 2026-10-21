@@ -2,7 +2,7 @@
   "id": "ad-get-lockout-policy",
   "title": "Obtenir la politique de verrouillage de compte",
   "description": "Affiche les paramètres de verrouillage de compte du domaine.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

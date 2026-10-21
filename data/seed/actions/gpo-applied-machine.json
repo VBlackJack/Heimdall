@@ -2,7 +2,7 @@
   "id": "gpo-applied-machine",
   "title": "Lister les GPO appliquées à une machine",
   "description": "Affiche toutes les stratégies de groupe appliquées à un ordinateur spécifique.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

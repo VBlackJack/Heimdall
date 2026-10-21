@@ -2,7 +2,7 @@
   "id": "trigger-sccm-hardware-inventory",
   "title": "Déclencher inventaire matériel SCCM",
   "description": "Force l'exécution immédiate d'un cycle d'inventaire matériel",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "defender-ad-get-protection-status-domain",
   "title": "Auditer l'état de Windows Defender sur tout le domaine",
   "description": "Vérifie l'état de Windows Defender (protection active/inactive) sur tous les ordinateurs du domaine via requêtes à distance.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

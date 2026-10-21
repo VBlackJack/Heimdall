@@ -2,7 +2,7 @@
   "id": "hyperv-manage-vm",
   "title": "Démarrer, arrêter ou suspendre une VM",
   "description": "Permet de contrôler l'état d'une machine virtuelle Hyper-V: démarrage, arrêt propre, arrêt forcé, suspension ou reprise.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 0,
   "level": 1,
   "tags": [

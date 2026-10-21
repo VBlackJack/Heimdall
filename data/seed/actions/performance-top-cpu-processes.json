@@ -2,7 +2,7 @@
   "id": "performance-top-cpu-processes",
   "title": "Lister les processus consommant le plus de CPU",
   "description": "Affiche les processus classés par utilisation CPU décroissante",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [

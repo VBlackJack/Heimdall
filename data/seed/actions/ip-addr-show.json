@@ -2,7 +2,7 @@
   "id": "ip-addr-show",
   "title": "Afficher les adresses IP",
   "description": "Affiche toutes les interfaces réseau et leurs adresses IP",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

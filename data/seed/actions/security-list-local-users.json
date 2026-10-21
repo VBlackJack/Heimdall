@@ -2,7 +2,7 @@
   "id": "security-list-local-users",
   "title": "Lister tous les utilisateurs locaux",
   "description": "Affiche tous les comptes utilisateurs locaux avec leur statut (activé/désactivé) et dernière connexion",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

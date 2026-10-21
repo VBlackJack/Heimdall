@@ -2,7 +2,7 @@
   "id": "ad-add-user-to-group",
   "title": "Ajouter un utilisateur à un groupe AD",
   "description": "Ajoute un utilisateur comme membre d'un groupe Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [

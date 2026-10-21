@@ -2,7 +2,7 @@
   "id": "windowsupdate-history",
   "title": "Consulter l'historique des mises à jour installées",
   "description": "Affiche l'historique complet des mises à jour Windows installées sur le système",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

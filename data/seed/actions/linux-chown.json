@@ -2,7 +2,7 @@
   "id": "linux-chown",
   "title": "Changer propriétaire (chown)",
   "description": "Change le propriétaire et le groupe d'un fichier ou dossier.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [

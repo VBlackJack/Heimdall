@@ -2,7 +2,7 @@
   "id": "git-status",
   "title": "Afficher le statut Git",
   "description": "Affiche l'état des fichiers dans le répertoire de travail et l'index",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

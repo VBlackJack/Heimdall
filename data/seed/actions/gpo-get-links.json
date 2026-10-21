@@ -2,7 +2,7 @@
   "id": "gpo-get-links",
   "title": "Lister les liens d'une GPO",
   "description": "Affiche toutes les OUs auxquelles une GPO est liée.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

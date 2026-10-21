@@ -2,7 +2,7 @@
   "id": "bitlocker-get-status-all",
   "title": "Obtenir le statut BitLocker de tous les disques",
   "description": "Affiche l'état de chiffrement BitLocker pour tous les volumes du système.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

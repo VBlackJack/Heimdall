@@ -2,7 +2,7 @@
   "id": "mkfs-format",
   "title": "Formater une partition",
   "description": "Crée un système de fichiers sur une partition",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 2,
   "tags": [

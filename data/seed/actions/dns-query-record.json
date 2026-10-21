@@ -2,7 +2,7 @@
   "id": "dns-query-record",
   "title": "Interroger un enregistrement DNS",
   "description": "Effectue une requête DNS pour résoudre un nom de domaine ou interroger un type d'enregistrement spécifique.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 2,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "usermod-modify-user",
   "title": "Modifier un utilisateur existant",
   "description": "Modifie les propriétés d'un compte utilisateur (groupes, shell, home, etc.)",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [

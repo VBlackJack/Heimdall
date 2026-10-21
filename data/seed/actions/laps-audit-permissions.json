@@ -2,7 +2,7 @@
   "id": "laps-audit-permissions",
   "title": "Auditer les permissions d'accès aux mots de passe LAPS",
   "description": "Vérifie qui a les droits de lecture sur les attributs LAPS dans Active Directory.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "ansible-config-view",
   "title": "Afficher la configuration Ansible",
   "description": "Affiche la configuration actuelle d'Ansible avec toutes les sources",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "sccm-trigger-machine-policy",
   "title": "Déclencher la récupération de la stratégie machine SCCM",
   "description": "Force le client SCCM à récupérer et appliquer immédiatement les stratégies machine depuis le serveur",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

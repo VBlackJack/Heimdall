@@ -2,7 +2,7 @@
   "id": "unified-service-status",
   "title": "Vérifier le statut d'un service",
   "description": "Affiche l'état actuel d'un service Windows.",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

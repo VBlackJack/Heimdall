@@ -2,7 +2,7 @@
   "id": "eventlog-search-by-eventid",
   "title": "Rechercher des événements par EventID spécifique",
   "description": "Recherche tous les événements correspondant à un EventID spécifique dans un journal donné",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [

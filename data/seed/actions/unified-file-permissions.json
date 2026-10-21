@@ -2,7 +2,7 @@
   "id": "unified-file-permissions",
   "title": "Modifier les permissions de fichiers",
   "description": "Modifie les permissions NTFS d'un fichier ou dossier.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 2,
   "level": 1,
   "tags": [

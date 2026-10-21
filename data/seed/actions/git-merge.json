@@ -2,7 +2,7 @@
   "id": "git-merge",
   "title": "Fusionner des branches",
   "description": "Fusionne une ou plusieurs branches dans la branche actuelle",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 2,
   "tags": [

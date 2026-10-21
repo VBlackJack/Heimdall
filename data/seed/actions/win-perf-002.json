@@ -2,7 +2,7 @@
   "id": "win-perf-002",
   "title": "Configurer DNS Cloudflare (1.1.1.1)",
   "description": "Configure les serveurs DNS Cloudflare (1.1.1.1 et 1.0.0.1) pour une résolution DNS ultra-rapide et orientée confidentialité.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 1,
   "tags": [

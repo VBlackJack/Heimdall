@@ -2,7 +2,7 @@
   "id": "run-npm-start",
   "title": "Démarrer un projet npm",
   "description": "Exécute le script de démarrage d'un projet Node.js.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "win-privacy-008",
   "title": "Désactiver l'accès aux notifications",
   "description": "Bloque l'accès des applications au système de notifications. Réduit les distractions et tracking.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

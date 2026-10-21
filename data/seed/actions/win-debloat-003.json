@@ -2,7 +2,7 @@
   "id": "win-debloat-003",
   "title": "Lister les applications tierces installées",
   "description": "Affiche une liste complète de toutes les applications tierces installées via AppX.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 0,
   "tags": [

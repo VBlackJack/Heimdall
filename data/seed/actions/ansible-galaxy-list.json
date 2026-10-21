@@ -2,7 +2,7 @@
   "id": "ansible-galaxy-list",
   "title": "Lister les rôles installés",
   "description": "Affiche la liste de tous les rôles Ansible installés localement",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "sysinternals-tcpvcon",
   "title": "Connexions TCP détaillées (Tcpvcon)",
   "description": "Version ligne de commande de TCPView. Affiche les connexions réseau avec les processus associés.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "win-perf-403",
   "title": "Réduire latence souris",
   "description": "Optimise les paramètres de latence de la souris pour améliorer la réactivité (gaming).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

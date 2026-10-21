@@ -2,7 +2,7 @@
   "id": "traceroute-path",
   "title": "Tracer le chemin réseau",
   "description": "Affiche le chemin des paquets vers une destination (tous les routeurs intermédiaires)",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

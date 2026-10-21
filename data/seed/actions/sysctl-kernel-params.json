@@ -2,7 +2,7 @@
   "id": "sysctl-kernel-params",
   "title": "Afficher/modifier les paramètres kernel",
   "description": "Affiche ou modifie les paramètres du noyau Linux en temps réel",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 1,
   "level": 1,
   "tags": [

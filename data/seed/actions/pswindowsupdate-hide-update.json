@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-hide-update",
   "title": "Masquer une mise à jour spécifique",
   "description": "Masque une mise à jour Windows pour empêcher son installation automatique",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [

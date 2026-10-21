@@ -2,7 +2,7 @@
   "id": "sysinternals-pskill",
   "title": "Tuer un processus (PsKill)",
   "description": "Tue des processus par nom ou ID, localement ou à distance. Plus robuste que taskkill.",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 0,
   "level": 1,
   "tags": [

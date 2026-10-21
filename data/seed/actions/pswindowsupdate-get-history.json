@@ -2,7 +2,7 @@
   "id": "pswindowsupdate-get-history",
   "title": "Afficher l'historique des mises à jour (PSWindowsUpdate)",
   "description": "Liste l'historique détaillé de toutes les mises à jour Windows installées avec dates et statuts",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

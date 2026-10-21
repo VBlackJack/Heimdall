@@ -2,7 +2,7 @@
   "id": "defender-add-exclusion-process",
   "title": "Ajouter une exclusion de processus Defender",
   "description": "Exclut un processus spécifique de l'analyse Windows Defender (utile pour outils de dev).",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "sql-restore-database",
   "title": "Restaurer une base de données SQL Server",
   "description": "Restaure une base de données SQL Server à partir d'un fichier de sauvegarde .bak.",
-  "category": "💽 Database",
+  "category": "database",
   "platform": 0,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "dns-show-cache",
   "title": "Afficher le cache DNS",
   "description": "Affiche le contenu actuel du cache DNS local.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [

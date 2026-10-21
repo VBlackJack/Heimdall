@@ -2,7 +2,7 @@
   "id": "docker-exec-interactive",
   "title": "Entrer dans un conteneur (Docker Exec)",
   "description": "Ouvre un shell interactif (bash/sh) à l'intérieur d'un conteneur en cours d'exécution pour le débogage.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "laps-force-rotation",
   "title": "Forcer la rotation immédiate du mot de passe LAPS",
   "description": "Force le renouvellement immédiat du mot de passe administrateur local géré par LAPS.",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [

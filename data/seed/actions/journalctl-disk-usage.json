@@ -2,7 +2,7 @@
   "id": "journalctl-disk-usage",
   "title": "Vérifier l'espace disque des logs systemd",
   "description": "Affiche l'espace disque utilisé par les journaux systemd",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

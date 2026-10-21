@@ -2,7 +2,7 @@
   "id": "ad-delete-user",
   "title": "Supprimer un compte utilisateur AD",
   "description": "Supprime définitivement un compte utilisateur Active Directory. Opération irréversible : le SID, les appartenances aux groupes et les données associées sont perdus.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 2,
   "tags": [

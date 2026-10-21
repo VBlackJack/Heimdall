@@ -2,7 +2,7 @@
   "id": "restart-service",
   "title": "Redémarrer un service Windows",
   "description": "Arrête puis redémarre un service Windows",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 1,
   "tags": [

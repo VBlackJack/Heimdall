@@ -2,7 +2,7 @@
   "id": "iis-list-apppools",
   "title": "Lister tous les pools d'application IIS",
   "description": "Affiche tous les pools d'application (Application Pools) configurés dans IIS avec leur état, version .NET et mode de pipeline.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [

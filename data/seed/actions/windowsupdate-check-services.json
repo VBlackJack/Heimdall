@@ -2,7 +2,7 @@
   "id": "windowsupdate-check-services",
   "title": "Vérifier l'état des services Windows Update",
   "description": "Vérifie l'état et le type de démarrage des services critiques pour Windows Update",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

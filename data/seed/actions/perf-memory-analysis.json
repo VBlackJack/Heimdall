@@ -2,7 +2,7 @@
   "id": "perf-memory-analysis",
   "title": "Analyser l'utilisation mémoire détaillée",
   "description": "Analyse détaillée de l'utilisation de la mémoire système: RAM totale, disponible, utilisée, et répartition par processus.",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 2,
   "level": 0,
   "tags": [

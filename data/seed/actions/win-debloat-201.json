@@ -2,7 +2,7 @@
   "id": "win-debloat-201",
   "title": "Désinstaller Microsoft Store",
   "description": "⚠️ DANGEROUS: Désinstalle complètement le Microsoft Store. Cette action est difficilement réversible.",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "tar-create-archive",
   "title": "Créer une archive tar",
   "description": "Crée une archive compressée de fichiers et répertoires",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

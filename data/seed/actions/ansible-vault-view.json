@@ -2,7 +2,7 @@
   "id": "ansible-vault-view",
   "title": "Visualiser un fichier chiffré",
   "description": "Affiche le contenu d'un fichier chiffré sans le modifier",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

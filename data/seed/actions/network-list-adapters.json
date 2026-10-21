@@ -2,7 +2,7 @@
   "id": "network-list-adapters",
   "title": "Lister les adaptateurs réseau",
   "description": "Affiche tous les adaptateurs réseau avec leur état, vitesse et adresses IP",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [

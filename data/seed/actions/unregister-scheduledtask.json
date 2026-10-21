@@ -2,7 +2,7 @@
   "id": "unregister-scheduledtask",
   "title": "Supprimer une tâche planifiée",
   "description": "Supprime une tâche planifiée du Planificateur de tâches Windows",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 1,
   "tags": [

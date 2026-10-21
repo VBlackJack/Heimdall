@@ -2,7 +2,7 @@
   "id": "ad-get-computer-details",
   "title": "Obtenir les détails d'un ordinateur AD",
   "description": "Affiche toutes les propriétés détaillées d'un compte ordinateur.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "security-audit-rdp-sessions",
   "title": "Auditer les connexions RDP récentes",
   "description": "Liste les événements de connexion Bureau à distance (RDP) réussies et échouées",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [

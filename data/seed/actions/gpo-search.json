@@ -2,7 +2,7 @@
   "id": "gpo-search",
   "title": "Rechercher des GPO par nom",
   "description": "Recherche des stratégies de groupe par leur nom.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

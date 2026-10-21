@@ -2,7 +2,7 @@
   "id": "process-kill",
   "title": "Terminer un processus",
   "description": "Force l'arrêt d'un processus spécifique par son ID ou son nom.",
-  "category": "⚡ Performance",
+  "category": "performance",
   "platform": 2,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "logs-clear-eventlog",
   "title": "Vider un journal d'événements",
   "description": "Efface tous les événements d'un journal Windows spécifique.",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 2,
   "tags": [

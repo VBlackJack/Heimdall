@@ -2,7 +2,7 @@
   "id": "file-ownership-linux",
   "title": "Changer le propriétaire de fichiers",
   "description": "Modifie le propriétaire et le groupe d'un fichier ou dossier.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 1,
   "tags": [

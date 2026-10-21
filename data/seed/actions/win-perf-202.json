@@ -2,7 +2,7 @@
   "id": "win-perf-202",
   "title": "Désactiver uniquement services de télémétrie",
   "description": "Désactive uniquement les services de télémétrie et de collecte de données Windows (approche conservatrice).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

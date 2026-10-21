@@ -2,7 +2,7 @@
   "id": "journalctl-errors-last-24h",
   "title": "Consulter les erreurs système des dernières 24h",
   "description": "Affiche tous les messages d'erreur et critiques du journal systemd des dernières 24 heures",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

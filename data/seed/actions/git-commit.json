@@ -2,7 +2,7 @@
   "id": "git-commit",
   "title": "Créer un commit Git",
   "description": "Enregistre les modifications de l'index dans l'historique du dépôt",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 1,
   "tags": [

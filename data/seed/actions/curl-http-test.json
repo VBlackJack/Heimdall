@@ -2,7 +2,7 @@
   "id": "curl-http-test",
   "title": "Tester une requête HTTP",
   "description": "Effectue une requête HTTP/HTTPS et affiche la réponse",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [

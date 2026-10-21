@@ -2,7 +2,7 @@
   "id": "get-scheduledtaskinfo",
   "title": "Voir l'historique d'une tâche planifiée",
   "description": "Affiche les informations d'exécution et l'historique d'une tâche planifiée",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 0,
   "level": 0,
   "tags": [

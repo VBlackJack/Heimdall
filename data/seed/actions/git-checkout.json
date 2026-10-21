@@ -2,7 +2,7 @@
   "id": "git-checkout",
   "title": "Changer de branche ou restaurer des fichiers",
   "description": "Bascule sur une autre branche ou restaure des fichiers du working directory",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 1,
   "tags": [

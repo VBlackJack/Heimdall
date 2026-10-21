@@ -2,7 +2,7 @@
   "id": "journalctl-kernel",
   "title": "Afficher uniquement les messages du noyau",
   "description": "Filtre les logs journald pour n'afficher que les messages du kernel",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "auth-log-failed",
   "title": "Analyser les échecs d'authentification",
   "description": "Liste les tentatives de connexion échouées depuis /var/log/auth.log",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "hyperv-list-vms",
   "title": "Lister toutes les machines virtuelles Hyper-V",
   "description": "Affiche la liste complète de toutes les machines virtuelles configurées dans Hyper-V avec leur état, mémoire allouée et version de configuration.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 0,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "chown-ownership",
   "title": "Modifier le propriétaire d'un fichier",
   "description": "Change le propriétaire (user et/ou group) d'un fichier ou répertoire",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [

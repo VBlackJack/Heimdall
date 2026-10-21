@@ -2,7 +2,7 @@
   "id": "win-debloat-103",
   "title": "Supprimer les apps de communication",
   "description": "Supprime les applications de communication Microsoft (Skype, People, Mail, Calendar).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

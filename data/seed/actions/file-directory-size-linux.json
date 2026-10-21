@@ -2,7 +2,7 @@
   "id": "file-directory-size-linux",
   "title": "Taille d'un répertoire",
   "description": "Calcule la taille totale d'un répertoire et de son contenu.",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

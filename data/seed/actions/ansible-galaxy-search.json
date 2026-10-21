@@ -2,7 +2,7 @@
   "id": "ansible-galaxy-search",
   "title": "Rechercher des rôles Ansible Galaxy",
   "description": "Recherche des rôles disponibles sur Ansible Galaxy",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [

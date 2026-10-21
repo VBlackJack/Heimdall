@@ -2,7 +2,7 @@
   "id": "k8s-get-pods",
   "title": "Lister les Pods (Kubectl)",
   "description": "Affiche la liste des pods Kubernetes avec leur statut, IP et nœud.",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 0,
   "tags": [

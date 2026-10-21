@@ -2,7 +2,7 @@
   "id": "linux-find-files",
   "title": "Recherche avancée (find)",
   "description": "Cherche des fichiers selon critères (nom, taille, date, permissions).",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [

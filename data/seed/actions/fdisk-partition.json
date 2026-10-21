@@ -2,7 +2,7 @@
   "id": "fdisk-partition",
   "title": "Gérer les partitions avec fdisk",
   "description": "Outil de partitionnement de disques (MBR/GPT)",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 2,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "run-python-script",
   "title": "Exécuter un script Python",
   "description": "Lance un script Python.",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "security-enable-rdp-firewall",
   "title": "Activer la règle pare-feu pour RDP",
   "description": "Active la règle de pare-feu Windows permettant les connexions Bureau à distance (RDP)",
-  "category": "🔒 Security & Encryption",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [

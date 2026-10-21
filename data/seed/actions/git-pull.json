@@ -2,7 +2,7 @@
   "id": "git-pull",
   "title": "Récupérer et fusionner depuis le dépôt distant",
   "description": "Récupère les modifications du dépôt distant et les fusionne avec la branche locale",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 2,
   "level": 1,
   "tags": [

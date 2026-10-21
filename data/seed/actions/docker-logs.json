@@ -2,7 +2,7 @@
   "id": "docker-logs",
   "title": "Consulter les logs d'un conteneur",
   "description": "Affiche les logs stdout/stderr d'un conteneur Docker",
-  "category": "🐳 Containers & VMs",
+  "category": "containers-vms",
   "platform": 2,
   "level": 0,
   "tags": [

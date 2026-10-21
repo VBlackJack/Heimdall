@@ -2,7 +2,7 @@
   "id": "win-privacy-105",
   "title": "Désactiver sync du navigateur",
   "description": "Désactive la synchronisation des paramètres de navigateur (favoris, historique, onglets).",
-  "category": "🧹 Windows Debloat",
+  "category": "windows-debloat",
   "platform": 0,
   "level": 1,
   "tags": [

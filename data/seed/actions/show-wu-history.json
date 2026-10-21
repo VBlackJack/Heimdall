@@ -2,7 +2,7 @@
   "id": "show-wu-history",
   "title": "Afficher l'historique Windows Update",
   "description": "Liste les 50 dernières mises à jour installées avec leur statut",
-  "category": "🔄 Windows Updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [

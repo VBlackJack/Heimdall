@@ -2,7 +2,7 @@
   "id": "iis-recycle-apppool",
   "title": "Recycler un pool d'application IIS",
   "description": "Force le recyclage (redémarrage) d'un pool d'application IIS. Utile pour appliquer des changements de configuration ou libérer de la mémoire.",
-  "category": "🌐 Network & DNS",
+  "category": "network-dns",
   "platform": 0,
   "level": 1,
   "tags": [

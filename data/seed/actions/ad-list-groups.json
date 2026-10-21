@@ -2,7 +2,7 @@
   "id": "ad-list-groups",
   "title": "Lister tous les groupes AD",
   "description": "Affiche la liste de tous les groupes Active Directory avec leurs propriétés.",
-  "category": "🏢 Active Directory & GPO",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [

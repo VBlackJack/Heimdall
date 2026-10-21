@@ -2,7 +2,7 @@
   "id": "db-mysqladmin-ping",
   "title": "Vérifier statut MySQL (MySQLAdmin)",
   "description": "Vérifie si le serveur MySQL est en vie et répond.",
-  "category": "💽 Database",
+  "category": "database",
   "platform": 2,
   "level": 0,
   "tags": [

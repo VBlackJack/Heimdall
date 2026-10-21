@@ -2,7 +2,7 @@
   "id": "ansible-playbook-tags",
   "title": "Exécuter des tâches spécifiques avec --tags",
   "description": "Exécute uniquement les tâches marquées avec des tags spécifiques",
-  "category": "⚙️ Services & Automation",
+  "category": "services-automation",
   "platform": 2,
   "level": 1,
   "tags": [

@@ -2,7 +2,7 @@
   "id": "unified-logs-errors",
   "title": "Afficher les erreurs système récentes",
   "description": "Affiche les erreurs récentes du journal système",
-  "category": "📊 Monitoring & Logs",
+  "category": "monitoring-logs",
   "platform": 2,
   "level": 0,
   "tags": [

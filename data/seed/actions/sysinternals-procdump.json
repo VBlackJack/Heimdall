@@ -2,7 +2,7 @@
   "id": "sysinternals-procdump",
   "title": "Capturer un Dump Mémoire (ProcDump)",
   "description": "Génère un dump mémoire d'un processus pour analyse (crash, hang, memory leak).",
-  "category": "🔧 Development",
+  "category": "development",
   "platform": 0,
   "level": 1,
   "tags": [

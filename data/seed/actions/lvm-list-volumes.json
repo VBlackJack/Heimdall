@@ -2,7 +2,7 @@
   "id": "lvm-list-volumes",
   "title": "Lister les volumes logiques LVM",
   "description": "Affiche les volumes logiques, groupes de volumes et volumes physiques LVM",
-  "category": "📁 Files & Storage",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [
