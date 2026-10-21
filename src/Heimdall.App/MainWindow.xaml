@@ -3548,7 +3548,7 @@
                                                           IsTextSearchEnabled="True"
                                                           ItemsSource="{Binding Settings.InstalledFontFamilies}"
                                                           Text="{Binding Settings.TerminalFontFamily, UpdateSourceTrigger=LostFocus}"
-                                                          Width="200" HorizontalAlignment="Left"
+                                                          MinWidth="200" HorizontalAlignment="Left"
                                                           AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTerminalFontLabel}"/>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalFontFamily]}"/>
                                             </StackPanel>

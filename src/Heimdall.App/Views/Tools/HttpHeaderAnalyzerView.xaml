@@ -122,7 +122,7 @@
                                FontSize="{StaticResource FontSizeBody}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <ComboBox x:Name="CmbRouteVia"
-                              Width="240"
+                              MinWidth="240"
                               Background="{DynamicResource CardBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
