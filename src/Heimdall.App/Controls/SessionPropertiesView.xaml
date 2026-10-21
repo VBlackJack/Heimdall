@@ -119,10 +119,11 @@
                        TextTrimming="CharacterEllipsis"/>
         </Button>
 
-        <Border Margin="0,10,0,0" Padding="12,8"
+        <Border x:Name="Spv_PropertiesCard"
+                Margin="0,10,0,0" Padding="12,8"
                 Background="{DynamicResource CardBrush}"
                 CornerRadius="{StaticResource CornerRadiusSm}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>

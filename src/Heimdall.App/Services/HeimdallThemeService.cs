@@ -262,8 +262,9 @@ public sealed class HeimdallThemeService
     }
 
     /// <summary>
-    /// Writes the semantic and accent text colours derived from the active theme into the
-    /// application resources, where the bridge's dynamic references find them.
+    /// Writes the semantic and accent text colours and the strong border colour derived from the
+    /// active theme into the application resources, where the bridge's dynamic references find
+    /// them.
     /// </summary>
     private static void RefreshDerivedTextColors(Application app)
     {

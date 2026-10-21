@@ -38,6 +38,7 @@ public sealed class ThemeSurfaceTokenContrastTests
 {
     private const string ThemeUriFormat = "/ThemeForge.Theme;component/Themes/{0}.xaml";
     private const double MinimumTextContrast = 4.5;
+    private const double MinimumBoundaryContrast = 3.0;
 
     private static readonly string[] SemanticTextBrushes =
     [
@@ -143,8 +144,44 @@ public sealed class ThemeSurfaceTokenContrastTests
     }
 
     /// <summary>
-    /// A theme colour that already reads at 4.5 to 1 on both grounds is used as it is, byte for
-    /// byte; one that does not is moved, and only then.
+    /// A line that carries a boundary (the sidebar divider, a grid header separator, a section
+    /// card) reaches 3 to 1 on the window background and on a card, WCAG 1.4.11. The theme's own
+    /// border does not: on Drakul BorderColor is the card colour #44475A, 1.00 to 1 on a card and
+    /// 1.56 on the background. Where the theme's border already passes, the strong border is that
+    /// same colour.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void AStrongBorderIsVisibleOnTheBackgroundAndOnACard(string theme)
+    {
+        ResourceDictionary palette = Palette(theme);
+        Assert.True(palette.Contains("BorderStrongBrush"), $"{theme}: the bridge resolves no BorderStrongBrush");
+
+        Color border = ColorOf(palette, "BorderBrush");
+        Color strong = ColorOf(palette, "BorderStrongBrush");
+        List<string> faint = [];
+        bool borderPasses = true;
+        foreach (string ground in new[] { "BackgroundBrush", "CardBrush" })
+        {
+            Color under = ColorOf(palette, ground);
+            borderPasses &= Contrast(Over(border, under), under) >= MinimumBoundaryContrast;
+            if (Contrast(Over(strong, under), under) < MinimumBoundaryContrast)
+            {
+                faint.Add(Report(theme, "BorderStrongBrush on " + ground, strong, under));
+            }
+        }
+
+        Assert.True(faint.Count == 0, string.Join(Environment.NewLine, faint));
+        if (borderPasses)
+        {
+            Assert.True(border == strong, $"{theme}: BorderColor {border} already passes and was changed to {strong}");
+        }
+    }
+
+    /// <summary>
+    /// A theme colour that already reaches its pair's target on both grounds (4.5 to 1 for text,
+    /// 3 to 1 for the strong border) is used as it is, byte for byte; one that does not is moved,
+    /// and only then.
     /// </summary>
     [Theory]
     [MemberData(nameof(Themes))]
@@ -156,11 +193,11 @@ public sealed class ThemeSurfaceTokenContrastTests
         ResourceDictionary derived = new();
         ThemeTextColours.Apply(derived, key => colours[key]);
 
-        foreach ((string sourceKey, string textKey) in ThemeTextColours.Pairs)
+        foreach ((string sourceKey, string textKey, double target) in ThemeTextColours.Pairs)
         {
             Color source = Assert.IsType<Color>(colours[sourceKey]);
             Color text = Assert.IsType<Color>(derived[textKey]);
-            bool passes = Contrast(source, background) >= MinimumTextContrast && Contrast(source, card) >= MinimumTextContrast;
+            bool passes = Contrast(source, background) >= target && Contrast(source, card) >= target;
 
             if (passes)
             {
@@ -189,7 +226,7 @@ public sealed class ThemeSurfaceTokenContrastTests
             ResourceDictionary colours = ThemeColours(theme);
             ResourceDictionary derived = new();
             ThemeTextColours.Apply(derived, key => colours[key]);
-            foreach ((string sourceKey, string textKey) in ThemeTextColours.Pairs)
+            foreach ((string sourceKey, string textKey, _) in ThemeTextColours.Pairs)
             {
                 if ((Color)colours[sourceKey] == (Color)derived[textKey])
                 {

@@ -37,7 +37,7 @@
             French, and the tool gained templates, a scan merge and printing.
         -->
         <Border Grid.Row="0" Padding="{StaticResource ToolHeaderPadding}" Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
             <DockPanel>
                 <Button x:Name="BtnHelp" DockPanel.Dock="Right" Content="?" Click="OnHelpClick"
                         Style="{DynamicResource ToolHelpButtonStyle}"

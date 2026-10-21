@@ -89,7 +89,7 @@
                 Panel.ZIndex="100"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderThickness="0,0,0,1"
-                BorderBrush="{DynamicResource BorderBrush}">
+                BorderBrush="{DynamicResource BorderStrongBrush}">
             <!-- A Grid with a star column rather than a DockPanel: a DockPanel hands its docked
                  child an unbounded width, so a WrapPanel inside one would measure every tab on one
                  line and never wrap. The star column is what gives the navigation region a finite
@@ -383,7 +383,7 @@
                 <Border x:Name="TreeViewPanel" Grid.Column="0"
                         Background="{DynamicResource SurfaceBrush}"
                         BorderThickness="0,0,1,0"
-                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderBrush="{DynamicResource BorderStrongBrush}"
                         >
                     <DockPanel>
                         <!-- Sidebar tab selector: Servers / Tools + collapse sidebar button -->
@@ -5926,7 +5926,7 @@
         <Border Grid.Row="2"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderThickness="0,1,0,0"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 AutomationProperties.Name="{loc:Translate A11yStatusBar}">
             <DockPanel Margin="8,0">
                 <TextBlock Text="{Binding StatusText, NotifyOnTargetUpdated=True}"

@@ -29,6 +29,11 @@
     <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource TextSecondaryColor}" />
     <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextSecondaryColor}" Opacity="0.55" />
     <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}" />
+    <!-- A line that carries a boundary: the sidebar divider, grid header separators, tool header
+         and footer rules, section cards. BorderStrongColor is not in any theme: HeimdallThemeService
+         derives it from BorderColor on every theme change, so it reaches 3 to 1 on the background
+         and on a card (WCAG 1.4.11, Theming/ThemeTextColours.cs). BorderBrush stays decorative. -->
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="{DynamicResource BorderStrongColor}" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="{DynamicResource TextSecondaryColor}" />
     <SolidColorBrush x:Key="HighlightBrush" Color="{DynamicResource SelectionColor}" />
     <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}" />
