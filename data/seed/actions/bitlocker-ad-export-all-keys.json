@@ -1,7 +1,7 @@
 {
   "id": "bitlocker-ad-export-all-keys",
-  "title": "Exporter toutes les clés BitLocker du domaine",
-  "description": "Exporte un rapport CSV de tous les ordinateurs du domaine avec leurs clés de récupération BitLocker (admin domaine).",
+  "title": "Export every BitLocker key of the domain",
+  "description": "Export a CSV report of every computer of the domain with its BitLocker recovery keys (domain administrator).",
   "category": "security",
   "platform": 0,
   "level": 2,
@@ -23,45 +23,61 @@
   "examples": [
     {
       "command": "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; foreach($k in $keys) { $report += [PSCustomObject]@{Computer=$_.Name; Password=$k.'msFVE-RecoveryPassword'} } }; $report | Export-Csv C:\\BitLocker-Keys-Full.csv -NoTypeInformation",
-      "description": "Exporte TOUTES les clés BitLocker du domaine dans un CSV",
+      "description": "Export ALL the BitLocker keys of the domain to a CSV",
       "platform": 1
     },
     {
       "command": "Get-ADComputer -Filter * -SearchBase 'OU=Laptops,DC=contoso,DC=com' | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; if($keys) { Write-Host \"$($_.Name): $($keys[0].'msFVE-RecoveryPassword')\" } }",
-      "description": "Exporte les clés BitLocker uniquement pour une OU (ex: Laptops)",
+      "description": "Export the BitLocker keys of one OU only (e.g. Laptops)",
       "platform": 1
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword,whenCreated -ErrorAction SilentlyContinue; $report += [PSCustomObject]@{Computer=$_.Name; KeyCount=$keys.Count; LatestKey=($keys | Sort-Object whenCreated -Descending | Select-Object -First 1).'msFVE-RecoveryPassword'} }; $report | Where-Object {$_.KeyCount -gt 0}",
-      "description": "Rapport avec nombre de clés et dernière clé de récupération par ordinateur",
+      "description": "Report with the number of keys and the latest recovery key per computer",
       "platform": 1
     },
     {
       "command": "$date = Get-Date -Format 'yyyyMMdd'; Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; foreach($k in $keys) { \"$($_.Name): $($k.'msFVE-RecoveryPassword')\" | Out-File \"C:\\BitLocker-Backup-$date.txt\" -Append } }",
-      "description": "Sauvegarde toutes les clés dans un fichier texte daté",
+      "description": "Save every key to a dated text file",
       "platform": 1
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "⚠️⚠️⚠️ ULTRA-SENSIBLE: Ce rapport contient TOUTES les clés BitLocker du domaine! STOCKAGE OBLIGATOIRE: Coffre-fort physique, Azure Key Vault, gestionnaire de mots de passe enterprise avec chiffrement hardware. NE JAMAIS: envoyer par email, stocker sur disque non chiffré, partager par Teams/Slack. ACCÈS: Limiter aux admins sécurité senior uniquement. AUDIT: Logger qui génère ce rapport. DESTRUCTION: Supprimer après sauvegarde sécurisée.",
+  "notes": "⚠️⚠️⚠️ HIGHLY SENSITIVE: this report holds ALL the BitLocker keys of the domain! MANDATORY STORAGE: physical safe, Azure Key Vault, or an enterprise password manager with hardware encryption. NEVER: send it by email, store it on an unencrypted disk, share it through Teams or Slack. ACCESS: limit it to senior security administrators only. AUDIT: log who generates this report. DESTRUCTION: delete it after a secure backup.",
   "links": [
     {
       "title": "BitLocker Key Management Best Practices",
       "url": "https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/operations-guide"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exporter toutes les clés BitLocker du domaine",
+      "description": "Exporte un rapport CSV de tous les ordinateurs du domaine avec leurs clés de récupération BitLocker (admin domaine).",
+      "notes": "⚠️⚠️⚠️ ULTRA-SENSIBLE: Ce rapport contient TOUTES les clés BitLocker du domaine! STOCKAGE OBLIGATOIRE: Coffre-fort physique, Azure Key Vault, gestionnaire de mots de passe enterprise avec chiffrement hardware. NE JAMAIS: envoyer par email, stocker sur disque non chiffré, partager par Teams/Slack. ACCÈS: Limiter aux admins sécurité senior uniquement. AUDIT: Logger qui génère ce rapport. DESTRUCTION: Supprimer après sauvegarde sécurisée.",
+      "examples": {
+        "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; foreach($k in $keys) { $report += [PSCustomObject]@{Computer=$_.Name; Password=$k.'msFVE-RecoveryPassword'} } }; $report | Export-Csv C:\\BitLocker-Keys-Full.csv -NoTypeInformation": "Exporte TOUTES les clés BitLocker du domaine dans un CSV",
+        "Get-ADComputer -Filter * -SearchBase 'OU=Laptops,DC=contoso,DC=com' | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; if($keys) { Write-Host \"$($_.Name): $($keys[0].'msFVE-RecoveryPassword')\" } }": "Exporte les clés BitLocker uniquement pour une OU (ex: Laptops)",
+        "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword,whenCreated -ErrorAction SilentlyContinue; $report += [PSCustomObject]@{Computer=$_.Name; KeyCount=$keys.Count; LatestKey=($keys | Sort-Object whenCreated -Descending | Select-Object -First 1).'msFVE-RecoveryPassword'} }; $report | Where-Object {$_.KeyCount -gt 0}": "Rapport avec nombre de clés et dernière clé de récupération par ordinateur",
+        "$date = Get-Date -Format 'yyyyMMdd'; Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; foreach($k in $keys) { \"$($_.Name): $($k.'msFVE-RecoveryPassword')\" | Out-File \"C:\\BitLocker-Backup-$date.txt\" -Append } }": "Sauvegarde toutes les clés dans un fichier texte daté",
+        "$report = @(); Get-ADComputer -Filter * | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$report = @(); Get-ADComputer -Filter * | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "$report = @(); Get-ADComputer -Filter * | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

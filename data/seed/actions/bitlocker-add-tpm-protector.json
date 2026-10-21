@@ -1,7 +1,7 @@
 {
   "id": "bitlocker-add-tpm-protector",
-  "title": "Ajouter un protecteur TPM à BitLocker",
-  "description": "Ajoute une protection TPM (Trusted Platform Module) à un volume BitLocker existant.",
+  "title": "Add a TPM protector to BitLocker",
+  "description": "Add TPM (Trusted Platform Module) protection to an existing BitLocker volume.",
   "category": "security",
   "platform": 0,
   "level": 2,
@@ -19,46 +19,68 @@
     "parameters": [
       {
         "name": "driveLetter",
-        "label": "Lettre du disque",
+        "label": "Drive letter",
         "type": "driveletter",
         "defaultValue": "C",
         "required": true,
-        "description": "Lettre du volume"
+        "description": "Volume letter"
       }
     ]
   },
   "examples": [
     {
       "command": "Add-BitLockerKeyProtector -MountPoint C: -TpmProtector",
-      "description": "Ajoute la protection TPM seule (déverrouillage automatique au boot)",
+      "description": "Add TPM protection alone (automatic unlock at boot)",
       "platform": 0
     },
     {
       "command": "Add-BitLockerKeyProtector -MountPoint C: -TpmAndPinProtector",
-      "description": "Ajoute TPM + PIN (saisie PIN au démarrage, sécurité renforcée)",
+      "description": "Add TPM + PIN (PIN typed at startup, stronger security)",
       "platform": 0
     },
     {
       "command": "Add-BitLockerKeyProtector -MountPoint C: -TpmAndStartupKeyProtector -StartupKeyPath 'E:\\'",
-      "description": "Ajoute TPM + clé USB de démarrage (nécessite la clé USB au boot)",
+      "description": "Add TPM + USB startup key (the USB key is required at boot)",
       "platform": 0
     },
     {
       "command": "(Get-Tpm).TpmReady",
-      "description": "Vérifie si le TPM est prêt et fonctionnel avant d'ajouter le protecteur",
+      "description": "Check that the TPM is ready and working before adding the protector",
       "platform": 0
     },
     {
       "command": "Add-BitLockerKeyProtector -MountPoint \"C:\" -TpmProtector",
-      "description": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume. Remplacez D par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'driveLetter' parameter: volume letter. Replace D with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "TPM: déverrouillage transparent au boot (pratique mais moins sécurisé). TPM+PIN: saisie d'un code au démarrage (équilibre sécurité/praticité). TPM+StartupKey: nécessite une clé USB au démarrage (haute sécurité). Le PC doit avoir un TPM 1.2+ activé dans le BIOS.",
+  "notes": "TPM: transparent unlock at boot (convenient but less secure). TPM+PIN: a code to type at startup (balance between security and convenience). TPM+StartupKey: requires a USB key at startup (high security). The PC must have a TPM 1.2+ enabled in the BIOS.",
   "links": [
     {
       "title": "Add-BitLockerKeyProtector Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/bitlocker/add-bitlockerkeyprotector"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Ajouter un protecteur TPM à BitLocker",
+      "description": "Ajoute une protection TPM (Trusted Platform Module) à un volume BitLocker existant.",
+      "notes": "TPM: déverrouillage transparent au boot (pratique mais moins sécurisé). TPM+PIN: saisie d'un code au démarrage (équilibre sécurité/praticité). TPM+StartupKey: nécessite une clé USB au démarrage (haute sécurité). Le PC doit avoir un TPM 1.2+ activé dans le BIOS.",
+      "parameters": {
+        "windows": {
+          "driveLetter": {
+            "label": "Lettre du disque",
+            "description": "Lettre du volume"
+          }
+        }
+      },
+      "examples": {
+        "Add-BitLockerKeyProtector -MountPoint C: -TpmProtector": "Ajoute la protection TPM seule (déverrouillage automatique au boot)",
+        "Add-BitLockerKeyProtector -MountPoint C: -TpmAndPinProtector": "Ajoute TPM + PIN (saisie PIN au démarrage, sécurité renforcée)",
+        "Add-BitLockerKeyProtector -MountPoint C: -TpmAndStartupKeyProtector -StartupKeyPath 'E:\\'": "Ajoute TPM + clé USB de démarrage (nécessite la clé USB au boot)",
+        "(Get-Tpm).TpmReady": "Vérifie si le TPM est prêt et fonctionnel avant d'ajouter le protecteur",
+        "Add-BitLockerKeyProtector -MountPoint \"C:\" -TpmProtector": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume. Remplacez D par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

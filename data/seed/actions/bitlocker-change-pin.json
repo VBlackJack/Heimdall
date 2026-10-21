@@ -1,7 +1,7 @@
 {
   "id": "bitlocker-change-pin",
-  "title": "Changer le PIN BitLocker",
-  "description": "Modifie le code PIN utilisé pour déverrouiller BitLocker au démarrage (TPM+PIN).",
+  "title": "Change the BitLocker PIN",
+  "description": "Change the PIN used to unlock BitLocker at startup (TPM+PIN).",
   "category": "security",
   "platform": 0,
   "level": 2,
@@ -19,31 +19,50 @@
     "parameters": [
       {
         "name": "driveLetter",
-        "label": "Lettre du disque",
+        "label": "Drive letter",
         "type": "driveletter",
         "defaultValue": "C",
         "required": true,
-        "description": "Lettre du volume système"
+        "description": "Letter of the system volume"
       }
     ]
   },
   "examples": [
     {
       "command": "$newPin = ConvertTo-SecureString '123456' -AsPlainText -Force; Add-BitLockerKeyProtector -MountPoint C: -TpmAndPinProtector -Pin $newPin",
-      "description": "Ajoute un nouveau protecteur TPM+PIN avec le PIN '123456'",
+      "description": "Add a new TPM+PIN protector with the PIN '123456'",
       "platform": 0
     },
     {
       "command": "$oldPin = (Get-BitLockerVolume C:).KeyProtector | Where-Object {$_.KeyProtectorType -eq 'TpmPin'}; Remove-BitLockerKeyProtector -MountPoint C: -KeyProtectorId $oldPin.KeyProtectorId",
-      "description": "Supprime l'ancien protecteur TPM+PIN",
+      "description": "Remove the old TPM+PIN protector",
       "platform": 0
     }
   ],
-  "notes": "Pour changer le PIN: 1) Ajouter nouveau protecteur TPM+PIN avec nouveau code, 2) Supprimer l'ancien protecteur TPM+PIN. Le PIN doit faire 6-20 caractères. Redémarrage requis pour tester le nouveau PIN. ⚠️ Conservez toujours le RecoveryPassword!",
+  "notes": "To change the PIN: 1) add a new TPM+PIN protector with the new code, 2) remove the old TPM+PIN protector. The PIN must be 6-20 characters long. Restart to test the new PIN. ⚠️ Always keep the RecoveryPassword!",
   "links": [
     {
       "title": "BitLocker PIN Management",
       "url": "https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/faq"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Changer le PIN BitLocker",
+      "description": "Modifie le code PIN utilisé pour déverrouiller BitLocker au démarrage (TPM+PIN).",
+      "notes": "Pour changer le PIN: 1) Ajouter nouveau protecteur TPM+PIN avec nouveau code, 2) Supprimer l'ancien protecteur TPM+PIN. Le PIN doit faire 6-20 caractères. Redémarrage requis pour tester le nouveau PIN. ⚠️ Conservez toujours le RecoveryPassword!",
+      "parameters": {
+        "windows": {
+          "driveLetter": {
+            "label": "Lettre du disque",
+            "description": "Lettre du volume système"
+          }
+        }
+      },
+      "examples": {
+        "$newPin = ConvertTo-SecureString '123456' -AsPlainText -Force; Add-BitLockerKeyProtector -MountPoint C: -TpmAndPinProtector -Pin $newPin": "Ajoute un nouveau protecteur TPM+PIN avec le PIN '123456'",
+        "$oldPin = (Get-BitLockerVolume C:).KeyProtector | Where-Object {$_.KeyProtectorType -eq 'TpmPin'}; Remove-BitLockerKeyProtector -MountPoint C: -KeyProtectorId $oldPin.KeyProtectorId": "Supprime l'ancien protecteur TPM+PIN"
+      }
+    }
+  }
 }

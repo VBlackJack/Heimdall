@@ -1,7 +1,7 @@
 {
   "id": "auth-log-failed",
-  "title": "Analyser les échecs d'authentification",
-  "description": "Liste les tentatives de connexion échouées depuis /var/log/auth.log",
+  "title": "Analyze authentication failures",
+  "description": "List the failed logon attempts from /var/log/auth.log",
   "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
@@ -20,36 +20,56 @@
     "parameters": [
       {
         "name": "lines",
-        "label": "Nombre de lignes",
+        "label": "Number of lines",
         "type": "number",
         "defaultValue": "50",
         "required": true,
-        "description": "Nombre d'échecs à afficher"
+        "description": "Number of failures to show"
       }
     ]
   },
   "examples": [
     {
       "command": "grep \"Failed password\" /var/log/auth.log | tail -n 50",
-      "description": "Affiche les 50 dernières tentatives échouées",
+      "description": "Show the last 50 failed attempts",
       "platform": 1
     },
     {
       "command": "grep \"authentication failure\" /var/log/auth.log",
-      "description": "Recherche tous les échecs d'authentification",
+      "description": "Search every authentication failure",
       "platform": 1
     },
     {
       "command": "grep -c \"failed\" auth.log",
-      "description": "Compter les occurrences",
+      "description": "Count the occurrences",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. Sur RHEL/CentOS, utiliser /var/log/secure au lieu de auth.log.",
+  "notes": "Requires sudo. On RHEL/CentOS, use /var/log/secure instead of auth.log.",
   "links": [
     {
       "title": "Linux authentication logs",
       "url": "https://www.cyberciti.biz/faq/linux-log-files-location-and-how-do-i-view-logs-files/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Analyser les échecs d'authentification",
+      "description": "Liste les tentatives de connexion échouées depuis /var/log/auth.log",
+      "notes": "Nécessite sudo. Sur RHEL/CentOS, utiliser /var/log/secure au lieu de auth.log.",
+      "parameters": {
+        "linux": {
+          "lines": {
+            "label": "Nombre de lignes",
+            "description": "Nombre d'échecs à afficher"
+          }
+        }
+      },
+      "examples": {
+        "grep \"Failed password\" /var/log/auth.log | tail -n 50": "Affiche les 50 dernières tentatives échouées",
+        "grep \"authentication failure\" /var/log/auth.log": "Recherche tous les échecs d'authentification",
+        "grep -c \"failed\" auth.log": "Compter les occurrences"
+      }
+    }
+  }
 }

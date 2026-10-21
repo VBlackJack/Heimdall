@@ -1,12 +1,12 @@
 {
   "id": "archive-unzip-windows",
-  "title": "Extraire une archive ZIP",
-  "description": "Extrait le contenu d'une archive ZIP.",
+  "title": "Extract a ZIP archive",
+  "description": "Extract the content of a ZIP archive.",
   "category": "files-storage",
   "platform": 0,
   "level": 0,
   "tags": [
-    "décompression",
+    "decompression",
     "unzip",
     "extract",
     "windows"
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "zipPath",
-        "label": "Fichier ZIP",
+        "label": "ZIP file",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ZIP"
+        "description": "Path of the ZIP file"
       },
       {
         "name": "destinationPath",
@@ -32,27 +32,50 @@
         "type": "string",
         "defaultValue": ".",
         "required": true,
-        "description": "Dossier de destination"
+        "description": "Destination folder"
       }
     ]
   },
   "examples": [
     {
       "command": "Expand-Archive -Path \"backup.zip\" -DestinationPath \"C:\\Restored\"",
-      "description": "Extrait une archive ZIP",
+      "description": "Extract a ZIP archive",
       "platform": 0
     },
     {
       "command": "Expand-Archive -Path \"C:\\Backup\\archive.zip\" -DestinationPath \".\" -Force",
-      "description": "Exemple utilisant le paramètre 'destinationPath': Dossier de destination. Remplacez D:\\Backup\\data.csv par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'destinationPath' parameter: destination folder. Replace D:\\Backup\\data.csv with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "-Force écrase les fichiers existants.",
+  "notes": "-Force overwrites the existing files.",
   "links": [
     {
       "title": "Documentation Expand-Archive",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.archive/expand-archive"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Extraire une archive ZIP",
+      "description": "Extrait le contenu d'une archive ZIP.",
+      "notes": "-Force écrase les fichiers existants.",
+      "parameters": {
+        "windows": {
+          "zipPath": {
+            "label": "Fichier ZIP",
+            "description": "Chemin du fichier ZIP"
+          },
+          "destinationPath": {
+            "label": "Destination",
+            "description": "Dossier de destination"
+          }
+        }
+      },
+      "examples": {
+        "Expand-Archive -Path \"backup.zip\" -DestinationPath \"C:\\Restored\"": "Extrait une archive ZIP",
+        "Expand-Archive -Path \"C:\\Backup\\archive.zip\" -DestinationPath \".\" -Force": "Exemple utilisant le paramètre 'destinationPath': Dossier de destination. Remplacez D:\\Backup\\data.csv par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }
