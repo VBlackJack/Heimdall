@@ -103,6 +103,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private readonly IAppVersionProvider _appVersionProvider;
     private readonly IUpdateInstallFlow _installFlow;
     private readonly IBrowserLauncher _browserLauncher;
+    private readonly IGitIdentityReader? _gitIdentityReader;
+
+    // Read once per view model: the answer does not change while the panel is open, and a
+    // missing git must not cost its timeout on every reload.
+    private Task<GitIdentity?>? _gitIdentity;
     private readonly IProfileImportService? _profileImportService;
     private readonly ICredentialGuardService _credentialGuardService;
 
@@ -1382,9 +1387,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         ICredentialGuardService? credentialGuardService = null,
         TrustedWebCertificatesSettingsViewModel? trustedWebCertificates = null,
         Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
-        Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null)
+        Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
+        IGitIdentityReader? gitIdentityReader = null)
     {
         _configManager = configManager;
+        _gitIdentityReader = gitIdentityReader;
         _sharedSessions = sharedSessions;
         _sharedSecrets = sharedSecrets;
         _localizer = localizer;
@@ -1953,7 +1960,65 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         ClearExternalToolsValidationError();
         ReloadSavedSettings();
         SettingsLoaded?.Invoke();
+
+        GitAuthorPrefill = PrefillGitAuthorAsync();
     }
+
+    /// <summary>
+    /// The prefill started by the last <see cref="LoadFromSettings"/>, for a caller that has to
+    /// wait for it. Completed when there was nothing to do.
+    /// </summary>
+    internal Task GitAuthorPrefill { get; private set; } = Task.CompletedTask;
+
+    /// <summary>
+    /// Fills the Git sync author fields from <c>git config --global</c> while they still hold
+    /// the shipped placeholders, so the sync's commits carry a person rather than
+    /// "Heimdall User".
+    /// </summary>
+    /// <remarks>
+    /// Each field is filled only if it still holds its placeholder when the answer arrives, so
+    /// a value the operator typed meanwhile is never overwritten. A filled field counts as an
+    /// edit: the panel offers Save, and nothing is written until the operator saves.
+    /// </remarks>
+    private async Task PrefillGitAuthorAsync()
+    {
+        if (_gitIdentityReader is null || !IsGitAuthorPlaceholder())
+        {
+            return;
+        }
+
+        GitIdentity? identity;
+        try
+        {
+            identity = await (_gitIdentity ??= _gitIdentityReader.ReadGlobalIdentityAsync());
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[Settings] Git identity prefill failed: {ex.Message}");
+            return;
+        }
+
+        if (identity is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(identity.Name)
+            && string.Equals(CmdLibGitSyncAuthorName, AppSettings.DefaultCmdLibGitSyncAuthorName, StringComparison.Ordinal))
+        {
+            CmdLibGitSyncAuthorName = identity.Name;
+        }
+
+        if (!string.IsNullOrWhiteSpace(identity.Email)
+            && string.Equals(CmdLibGitSyncAuthorEmail, AppSettings.DefaultCmdLibGitSyncAuthorEmail, StringComparison.Ordinal))
+        {
+            CmdLibGitSyncAuthorEmail = identity.Email;
+        }
+    }
+
+    private bool IsGitAuthorPlaceholder() =>
+        string.Equals(CmdLibGitSyncAuthorName, AppSettings.DefaultCmdLibGitSyncAuthorName, StringComparison.Ordinal)
+        || string.Equals(CmdLibGitSyncAuthorEmail, AppSettings.DefaultCmdLibGitSyncAuthorEmail, StringComparison.Ordinal);
 
     /// <summary>
     /// Seeds the text of every number field from the number that field edits.
