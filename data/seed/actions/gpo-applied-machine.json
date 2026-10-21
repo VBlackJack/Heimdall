@@ -1,7 +1,7 @@
 {
   "id": "gpo-applied-machine",
-  "title": "Lister les GPO appliquées à une machine",
-  "description": "Affiche toutes les stratégies de groupe appliquées à un ordinateur spécifique.",
+  "title": "List the GPOs applied to a computer",
+  "description": "Show every Group Policy applied to a given computer.",
   "category": "active-directory",
   "platform": 0,
   "level": 1,
@@ -20,31 +20,51 @@
     "parameters": [
       {
         "name": "targetHost",
-        "label": "Machine cible",
+        "label": "Target computer",
         "type": "string",
         "defaultValue": "localhost",
         "required": false,
-        "description": "Nom de la machine cible (localhost par défaut)"
+        "description": "Name of the target computer (localhost by default)"
       }
     ]
   },
   "examples": [
     {
       "command": "gpresult /R /S PC-PARIS-001",
-      "description": "Affiche les GPO appliquées sur FRPANSI001PC",
+      "description": "Show the GPOs applied on FRPANSI001PC",
       "platform": 0
     },
     {
       "command": "gpresult /R",
-      "description": "Affiche les GPO appliquées sur la machine locale",
+      "description": "Show the GPOs applied on the local computer",
       "platform": 0
     },
     {
       "command": "gpresult /R /S localhost",
-      "description": "Exemple utilisant le paramètre 'targetHost': Nom de la machine cible (localhost par défaut). Remplacez PC-PARIS-001 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'targetHost' parameter: name of the target computer (localhost by default). Replace PC-PARIS-001 with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "À lancer avec droits administrateur. Utiliser /H pour générer un rapport HTML.",
-  "links": []
+  "notes": "Run with administrator rights. Use /H to generate an HTML report.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Lister les GPO appliquées à une machine",
+      "description": "Affiche toutes les stratégies de groupe appliquées à un ordinateur spécifique.",
+      "notes": "À lancer avec droits administrateur. Utiliser /H pour générer un rapport HTML.",
+      "parameters": {
+        "windows": {
+          "targetHost": {
+            "label": "Machine cible",
+            "description": "Nom de la machine cible (localhost par défaut)"
+          }
+        }
+      },
+      "examples": {
+        "gpresult /R /S PC-PARIS-001": "Affiche les GPO appliquées sur FRPANSI001PC",
+        "gpresult /R": "Affiche les GPO appliquées sur la machine locale",
+        "gpresult /R /S localhost": "Exemple utilisant le paramètre 'targetHost': Nom de la machine cible (localhost par défaut). Remplacez PC-PARIS-001 par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

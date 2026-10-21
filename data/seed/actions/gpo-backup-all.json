@@ -1,7 +1,7 @@
 {
   "id": "gpo-backup-all",
-  "title": "Sauvegarder toutes les GPO",
-  "description": "Crée une sauvegarde de toutes les stratégies de groupe du domaine.",
+  "title": "Back up all GPOs",
+  "description": "Create a backup of every Group Policy of the domain.",
   "category": "active-directory",
   "platform": 0,
   "level": 1,
@@ -20,26 +20,45 @@
     "parameters": [
       {
         "name": "backupPath",
-        "label": "Chemin de sauvegarde",
+        "label": "Backup path",
         "type": "string",
         "defaultValue": "C:\\GPOBackups",
         "required": true,
-        "description": "Chemin du dossier de sauvegarde"
+        "description": "Path of the backup folder"
       }
     ]
   },
   "examples": [
     {
       "command": "Backup-GPO -All -Path \"C:\\GPOBackups\"",
-      "description": "Sauvegarde toutes les GPO dans C:\\GPOBackups",
+      "description": "Back up all GPOs to C:\\GPOBackups",
       "platform": 0
     },
     {
       "command": "Backup-GPO -All -Path \"D:\\Backups\\daily\"",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Backup-GPO -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Standard run of the None command. See the official documentation with Get-Help Backup-GPO -Full for details on the available parameters and advanced use cases.",
       "platform": 0
     }
   ],
-  "notes": "Recommandé avant toute modification majeure. Peut prendre du temps sur de gros domaines.",
-  "links": []
+  "notes": "Recommended before any major change. Can take a while on large domains.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Sauvegarder toutes les GPO",
+      "description": "Crée une sauvegarde de toutes les stratégies de groupe du domaine.",
+      "notes": "Recommandé avant toute modification majeure. Peut prendre du temps sur de gros domaines.",
+      "parameters": {
+        "windows": {
+          "backupPath": {
+            "label": "Chemin de sauvegarde",
+            "description": "Chemin du dossier de sauvegarde"
+          }
+        }
+      },
+      "examples": {
+        "Backup-GPO -All -Path \"C:\\GPOBackups\"": "Sauvegarde toutes les GPO dans C:\\GPOBackups",
+        "Backup-GPO -All -Path \"D:\\Backups\\daily\"": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Backup-GPO -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+      }
+    }
+  }
 }

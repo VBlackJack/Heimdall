@@ -1,7 +1,7 @@
 {
   "id": "git-log",
-  "title": "Afficher l'historique des commits",
-  "description": "Affiche l'historique des commits du dépôt",
+  "title": "Show the commit history",
+  "description": "Show the commit history of the repository.",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -19,11 +19,11 @@
     "parameters": [
       {
         "name": "count",
-        "label": "Nombre",
+        "label": "Count",
         "type": "number",
         "defaultValue": "20",
         "required": false,
-        "description": "Nombre de commits à afficher"
+        "description": "Number of commits to show"
       }
     ]
   },
@@ -36,41 +36,68 @@
     "parameters": [
       {
         "name": "count",
-        "label": "Nombre",
+        "label": "Count",
         "type": "number",
         "defaultValue": "20",
         "required": false,
-        "description": "Nombre de commits"
+        "description": "Number of commits"
       }
     ]
   },
   "examples": [
     {
       "command": "git log --oneline",
-      "description": "Affiche l'historique en format compact",
+      "description": "Show the history in a compact format",
       "platform": 2
     },
     {
       "command": "git log --graph --all",
-      "description": "Affiche toutes les branches avec un graphe",
+      "description": "Show every branch with a graph",
       "platform": 2
     },
     {
       "command": "git log --author=\"John\"",
-      "description": "Filtre par auteur",
+      "description": "Filter by author",
       "platform": 2
     },
     {
       "command": "git log --oneline --graph --decorate -n 20",
-      "description": "Exemple utilisant le paramètre 'count': Nombre de commits à afficher. Remplacez 10 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'count' parameter: number of commits to show. Replace 10 with the value that fits your environment.",
       "platform": 2
     }
   ],
-  "notes": "Utilisez --graph pour visualiser les branches, --stat pour voir les statistiques de modifications.",
+  "notes": "Use --graph to see the branches, --stat to see change statistics.",
   "links": [
     {
       "title": "Git Log Documentation",
       "url": "https://git-scm.com/docs/git-log"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'historique des commits",
+      "description": "Affiche l'historique des commits du dépôt",
+      "notes": "Utilisez --graph pour visualiser les branches, --stat pour voir les statistiques de modifications.",
+      "parameters": {
+        "windows": {
+          "count": {
+            "label": "Nombre",
+            "description": "Nombre de commits à afficher"
+          }
+        },
+        "linux": {
+          "count": {
+            "label": "Nombre",
+            "description": "Nombre de commits"
+          }
+        }
+      },
+      "examples": {
+        "git log --oneline": "Affiche l'historique en format compact",
+        "git log --graph --all": "Affiche toutes les branches avec un graphe",
+        "git log --author=\"John\"": "Filtre par auteur",
+        "git log --oneline --graph --decorate -n 20": "Exemple utilisant le paramètre 'count': Nombre de commits à afficher. Remplacez 10 par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }
