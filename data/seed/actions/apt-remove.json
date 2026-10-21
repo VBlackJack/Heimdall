@@ -1,7 +1,7 @@
 {
   "id": "apt-remove",
-  "title": "Désinstaller un paquet APT",
-  "description": "Supprime un paquet installé tout en conservant les fichiers de configuration",
+  "title": "Uninstall an APT package",
+  "description": "Remove an installed package but keep its configuration files",
   "category": "package-management",
   "platform": 1,
   "level": 1,
@@ -21,56 +21,80 @@
     "parameters": [
       {
         "name": "package",
-        "label": "Nom du paquet",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "nginx",
         "required": true,
-        "description": "Nom du paquet à supprimer"
+        "description": "Name of the package to remove"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo apt remove nginx",
-      "description": "Supprime nginx en gardant la configuration",
+      "description": "Remove nginx and keep its configuration",
       "platform": 1
     },
     {
       "command": "sudo apt purge nginx",
-      "description": "Supprime nginx et ses fichiers de configuration",
+      "description": "Remove nginx and its configuration files",
       "platform": 1
     },
     {
       "command": "apt remove -y nginx -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
       "command": "apt remove -y nginx --dry-run",
-      "description": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+      "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     },
     {
       "command": "apt remove -y nginx",
-      "description": "Exemple utilisant le paramètre 'package': Nom du paquet à supprimer. Remplacez nginx par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'package' parameter: name of the package to remove. Replace nginx with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "apt remove apache2",
-      "description": "Désinstaller Apache",
+      "description": "Uninstall Apache",
       "platform": 1
     },
     {
       "command": "apt autoremove",
-      "description": "Supprimer les paquets inutilisés",
+      "description": "Remove unused packages",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. Utiliser purge au lieu de remove pour supprimer aussi la configuration.",
+  "notes": "Requires sudo. Use purge instead of remove to delete the configuration too.",
   "links": [
     {
       "title": "APT remove vs purge",
       "url": "https://manpages.ubuntu.com/manpages/jammy/man8/apt.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Désinstaller un paquet APT",
+      "description": "Supprime un paquet installé tout en conservant les fichiers de configuration",
+      "notes": "Nécessite sudo. Utiliser purge au lieu de remove pour supprimer aussi la configuration.",
+      "parameters": {
+        "linux": {
+          "package": {
+            "label": "Nom du paquet",
+            "description": "Nom du paquet à supprimer"
+          }
+        }
+      },
+      "examples": {
+        "sudo apt remove nginx": "Supprime nginx en gardant la configuration",
+        "sudo apt purge nginx": "Supprime nginx et ses fichiers de configuration",
+        "apt remove -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "apt remove -y nginx --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+        "apt remove -y nginx": "Exemple utilisant le paramètre 'package': Nom du paquet à supprimer. Remplacez nginx par la valeur appropriée selon votre environnement.",
+        "apt remove apache2": "Désinstaller Apache",
+        "apt autoremove": "Supprimer les paquets inutilisés"
+      }
+    }
+  }
 }

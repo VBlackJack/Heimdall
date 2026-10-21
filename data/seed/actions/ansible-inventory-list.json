@@ -1,7 +1,7 @@
 {
   "id": "ansible-inventory-list",
-  "title": "Lister l'inventaire Ansible",
-  "description": "Affiche la liste complète des hôtes dans l'inventaire Ansible",
+  "title": "List the Ansible inventory",
+  "description": "Show the full list of hosts in the Ansible inventory",
   "category": "services-automation",
   "platform": 2,
   "level": 0,
@@ -19,11 +19,11 @@
     "parameters": [
       {
         "name": "inventory",
-        "label": "Inventaire",
+        "label": "Inventory",
         "type": "string",
         "defaultValue": "inventory.ini",
         "required": true,
-        "description": "Fichier d'inventaire"
+        "description": "Inventory file"
       }
     ]
   },
@@ -36,16 +36,16 @@
     "parameters": [
       {
         "name": "inventory",
-        "label": "Inventaire",
+        "label": "Inventory",
         "type": "string",
         "defaultValue": "inventory.ini",
         "required": true,
-        "description": "Fichier d'inventaire"
+        "description": "Inventory file"
       }
     ]
   },
   "examples": [],
-  "notes": "Utilisez --graph pour une vue hiérarchique de l'inventaire.",
+  "notes": "Use --graph for a hierarchical view of the inventory.",
   "links": [
     {
       "title": "Ansible Inventory",
@@ -55,40 +55,69 @@
   "windowsExamples": [
     {
       "command": "ansible-inventory --list -i inventory.ini",
-      "description": "Liste l'inventaire au format JSON.",
+      "description": "List the inventory in JSON format.",
       "platform": 0
     },
     {
       "command": "ansible-inventory --graph -i hosts",
-      "description": "Affiche l'inventaire sous forme d'arbre hierarchique.",
+      "description": "Show the inventory as a hierarchical tree.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-inventory --list -i production",
-      "description": "Liste l'inventaire de production au format JSON",
+      "description": "List the production inventory in JSON format",
       "platform": 1
     },
     {
       "command": "ansible-inventory --graph",
-      "description": "Affiche l'inventaire sous forme d'arbre",
+      "description": "Show the inventory as a tree",
       "platform": 1
     },
     {
       "command": "ansible-inventory --list -i inventory.ini",
-      "description": "Exemple utilisant le paramètre 'inventory': Fichier d'inventaire. Remplacez /etc/ansible/hosts par la valeur appropriée selon votre environnement.",
+      "description": "List the inventory in JSON format.",
       "platform": 1
     },
     {
       "command": "ansible-inventory --list",
-      "description": "Lister tout",
+      "description": "List everything",
       "platform": 1
     },
     {
       "command": "ansible-inventory -i inventory.ini --list",
-      "description": "Inventaire spécifique",
+      "description": "Specific inventory",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister l'inventaire Ansible",
+      "description": "Affiche la liste complète des hôtes dans l'inventaire Ansible",
+      "notes": "Utilisez --graph pour une vue hiérarchique de l'inventaire.",
+      "parameters": {
+        "windows": {
+          "inventory": {
+            "label": "Inventaire",
+            "description": "Fichier d'inventaire"
+          }
+        },
+        "linux": {
+          "inventory": {
+            "label": "Inventaire",
+            "description": "Fichier d'inventaire"
+          }
+        }
+      },
+      "examples": {
+        "ansible-inventory --list -i inventory.ini": "Liste l'inventaire au format JSON.",
+        "ansible-inventory --graph -i hosts": "Affiche l'inventaire sous forme d'arbre hiérarchique.",
+        "ansible-inventory --list -i production": "Liste l'inventaire de production au format JSON",
+        "ansible-inventory --graph": "Affiche l'inventaire sous forme d'arbre",
+        "ansible-inventory --list": "Lister tout",
+        "ansible-inventory -i inventory.ini --list": "Inventaire spécifique"
+      }
+    }
+  }
 }

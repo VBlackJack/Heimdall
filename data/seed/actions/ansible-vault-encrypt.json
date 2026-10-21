@@ -1,7 +1,7 @@
 {
   "id": "ansible-vault-encrypt",
-  "title": "Chiffrer un fichier avec Ansible Vault",
-  "description": "Chiffre un fichier contenant des données sensibles avec Ansible Vault",
+  "title": "Encrypt a file with Ansible Vault",
+  "description": "Encrypt a file that holds sensitive data with Ansible Vault",
   "category": "security",
   "platform": 2,
   "level": 1,
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "filePath",
-        "label": "Fichier à chiffrer",
+        "label": "File to encrypt",
         "type": "string",
         "defaultValue": "secrets.yml",
         "required": true,
-        "description": "Chemin du fichier à chiffrer"
+        "description": "Path of the file to encrypt"
       }
     ]
   },
@@ -37,16 +37,16 @@
     "parameters": [
       {
         "name": "filePath",
-        "label": "Fichier à chiffrer",
+        "label": "File to encrypt",
         "type": "string",
         "defaultValue": "secrets.yml",
         "required": true,
-        "description": "Chemin du fichier à chiffrer"
+        "description": "Path of the file to encrypt"
       }
     ]
   },
   "examples": [],
-  "notes": "Utilisez un mot de passe fort et stockez-le de manière sécurisée. Pour exécuter un playbook avec des fichiers chiffrés, utilisez --ask-vault-pass.",
+  "notes": "Use a strong password and store it securely. To run a playbook with encrypted files, use --ask-vault-pass.",
   "links": [
     {
       "title": "Ansible Vault",
@@ -56,35 +56,64 @@
   "windowsExamples": [
     {
       "command": "ansible-vault encrypt C:\\Data\\report.xlsx",
-      "description": "Exemple Windows utilisant ansible-vault. Remplacez les paramètres entre <> par vos valeurs.",
+      "description": "Windows example using ansible-vault. Replace the parameters between <> with your values.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-vault encrypt vars/secrets.yml",
-      "description": "Chiffre le fichier de secrets",
+      "description": "Encrypt the secrets file",
       "platform": 1
     },
     {
       "command": "ansible-vault decrypt vars/secrets.yml",
-      "description": "Déchiffre le fichier de secrets",
+      "description": "Decrypt the secrets file",
       "platform": 1
     },
     {
       "command": "ansible-vault encrypt secrets.yml",
-      "description": "Exemple utilisant le paramètre 'filePath': Chemin du fichier à chiffrer. Remplacez C:\\Data\\report.xlsx par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'filePath' parameter: path of the file to encrypt. Replace C:\\Data\\report.xlsx with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "ansible-vault encrypt --vault-id prod@prompt secrets.yml",
-      "description": "Avec vault ID",
+      "description": "With a vault ID",
       "platform": 1
     },
     {
       "command": "ansible-vault encrypt_string 'secret' --name 'password'",
-      "description": "Chiffrer une string",
+      "description": "Encrypt a string",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Chiffrer un fichier avec Ansible Vault",
+      "description": "Chiffre un fichier contenant des données sensibles avec Ansible Vault",
+      "notes": "Utilisez un mot de passe fort et stockez-le de manière sécurisée. Pour exécuter un playbook avec des fichiers chiffrés, utilisez --ask-vault-pass.",
+      "parameters": {
+        "windows": {
+          "filePath": {
+            "label": "Fichier à chiffrer",
+            "description": "Chemin du fichier à chiffrer"
+          }
+        },
+        "linux": {
+          "filePath": {
+            "label": "Fichier à chiffrer",
+            "description": "Chemin du fichier à chiffrer"
+          }
+        }
+      },
+      "examples": {
+        "ansible-vault encrypt C:\\Data\\report.xlsx": "Exemple Windows utilisant ansible-vault. Remplacez les paramètres entre <> par vos valeurs.",
+        "ansible-vault encrypt vars/secrets.yml": "Chiffre le fichier de secrets",
+        "ansible-vault decrypt vars/secrets.yml": "Déchiffre le fichier de secrets",
+        "ansible-vault encrypt secrets.yml": "Exemple utilisant le paramètre 'filePath': Chemin du fichier à chiffrer. Remplacez C:\\Data\\report.xlsx par la valeur appropriée selon votre environnement.",
+        "ansible-vault encrypt --vault-id prod@prompt secrets.yml": "Avec vault ID",
+        "ansible-vault encrypt_string 'secret' --name 'password'": "Chiffrer une string"
+      }
+    }
+  }
 }

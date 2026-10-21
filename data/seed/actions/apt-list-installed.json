@@ -1,7 +1,7 @@
 {
   "id": "apt-list-installed",
-  "title": "Lister les paquets installés",
-  "description": "Affiche la liste de tous les paquets installés sur le système",
+  "title": "List the installed packages",
+  "description": "Show the list of every package installed on the system",
   "category": "package-management",
   "platform": 1,
   "level": 0,
@@ -20,46 +20,68 @@
     "parameters": [
       {
         "name": "filter",
-        "label": "Filtre",
+        "label": "Filter",
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Pattern pour filtrer la liste (. = tous)"
+        "description": "Pattern that filters the list (. = all)"
       }
     ]
   },
   "examples": [
     {
       "command": "apt list --installed",
-      "description": "Liste tous les paquets installés",
+      "description": "List every installed package",
       "platform": 1
     },
     {
       "command": "apt list --installed | grep python",
-      "description": "Liste uniquement les paquets Python",
+      "description": "List the Python packages only",
       "platform": 1
     },
     {
       "command": "dpkg -l",
-      "description": "Alternative avec dpkg",
+      "description": "Alternative with dpkg",
       "platform": 1
     },
     {
       "command": "apt list --installed -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
       "command": "apt list --installed --dry-run",
-      "description": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+      "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo. dpkg -l est une alternative. Ajouter | wc -l pour compter.",
+  "notes": "Does not require sudo. dpkg -l is an alternative. Add | wc -l to count.",
   "links": [
     {
       "title": "APT list",
       "url": "https://manpages.ubuntu.com/manpages/jammy/man8/apt.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les paquets installés",
+      "description": "Affiche la liste de tous les paquets installés sur le système",
+      "notes": "Ne nécessite pas sudo. dpkg -l est une alternative. Ajouter | wc -l pour compter.",
+      "parameters": {
+        "linux": {
+          "filter": {
+            "label": "Filtre",
+            "description": "Pattern pour filtrer la liste (. = tous)"
+          }
+        }
+      },
+      "examples": {
+        "apt list --installed": "Liste tous les paquets installés",
+        "apt list --installed | grep python": "Liste uniquement les paquets Python",
+        "dpkg -l": "Alternative avec dpkg",
+        "apt list --installed -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "apt list --installed --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques."
+      }
+    }
+  }
 }
