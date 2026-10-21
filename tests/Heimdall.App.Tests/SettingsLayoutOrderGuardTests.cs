@@ -239,6 +239,12 @@ public sealed class SettingsLayoutOrderGuardTests
         {
             XElement viewer = section.Elements().Single(element => element.Name.LocalName == "ScrollViewer");
             Assert.Equal("Disabled", viewer.Attribute("HorizontalScrollBarVisibility")?.Value);
+
+            // The viewer fills the column so its scroll bar sits at the window edge; the panel
+            // inside caps the section width and keeps it against the rail instead of centring.
+            XElement panel = viewer.Elements().Single();
+            Assert.Equal("{StaticResource SettingsContentMaxWidth}", panel.Attribute("MaxWidth")?.Value);
+            Assert.Equal("Left", panel.Attribute("HorizontalAlignment")?.Value);
         });
 
         XDocument theme = XDocument.Load(
@@ -247,6 +253,11 @@ public sealed class SettingsLayoutOrderGuardTests
         Assert.DoesNotContain(
             itemStyle.Elements().Where(element => element.Name.LocalName == "Setter"),
             setter => setter.Attribute("Property")?.Value == "HorizontalContentAlignment");
+
+        XElement controlStyle = theme.Descendants().Single(element => element.Attribute(Xaml + "Key")?.Value == "SettingsRailTabControlStyle");
+        Assert.DoesNotContain(
+            controlStyle.Descendants().Where(element => element.Name.LocalName == "ColumnDefinition"),
+            column => column.Attribute("MaxWidth") is not null);
     }
 
     private static XElement SettingsRoot()
