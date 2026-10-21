@@ -47,10 +47,9 @@
     <!-- A line under a rail control that belongs to its content column, not to the rail: the rail
          width plus the inset, margin and card padding the section text starts at. -->
     <Thickness x:Key="SettingsRailFooterMargin">258,8,0,12</Thickness>
-    <!-- The gap between the rail and the open section, and the widest the section grows: the
-         section text width plus the left and right margins of SettingsTabContentMargin. -->
+    <!-- The gap between the rail and the open section. The section itself is capped by the
+         SettingsContentMaxWidth of its content panel, so its scroll bar stays at the window edge. -->
     <Thickness x:Key="SettingsRailContentInset">8,0,0,0</Thickness>
-    <sys:Double x:Key="SettingsRailContentMaxWidth">940</sys:Double>
     <!-- How tall a settings list grows before it scrolls. A section holds little else, so a
          trust list gets most of the height; a list of a few entries above an edit panel gets less. -->
     <sys:Double x:Key="SettingsListMaxHeight">440</sys:Double>
@@ -1400,12 +1399,12 @@
                                 Margin="{StaticResource SettingsRailContentInset}"
                                 Background="{DynamicResource BackgroundBrush}"
                                 CornerRadius="{StaticResource CornerRadiusLg}">
-                            <!-- One star column capped at the section width: every section gets the
-                                 same width and stays left against the rail. A capped stretch alone
-                                 would centre the section in a wide window. -->
+                            <!-- The section fills the column, so its scroll bar sits at the window edge;
+                                 each section panel caps its own width (SettingsContentMaxWidth) and
+                                 stays left against the rail. -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsRailContentMaxWidth}"/>
+                                    <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <ContentPresenter x:Name="PART_SelectedContentHost"
                                                   HorizontalAlignment="Stretch"
