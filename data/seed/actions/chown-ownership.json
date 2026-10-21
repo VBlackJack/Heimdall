@@ -10,7 +10,8 @@
     "owner",
     "permissions",
     "user",
-    "group"
+    "group",
+    "linux"
   ],
   "linuxCommandTemplateId": "chown-cmd",
   "linuxCommandTemplate": {
@@ -90,6 +91,11 @@
       "command": "chown -h jdupont:users /tmp/mylink",
       "description": "Change the owner of a symbolic link",
       "platform": 1
+    },
+    {
+      "command": "chown root:root /etc/cron.d/mycron",
+      "description": "Give a system file back to root",
+      "platform": 1
     }
   ],
   "notes": "Requires sudo. -R for recursive. user:group, user alone or :group alone.",
@@ -129,7 +135,8 @@
         "chown root:admin /etc/config.conf": "Définir root comme propriétaire avec groupe admin",
         "chown -R jdupont:users /home/jdupont/documents": "Changer récursivement le propriétaire d'un dossier",
         "chown --reference=/etc/passwd /etc/shadow": "Copier le propriétaire d'un fichier de référence",
-        "chown -h jdupont:users /tmp/mylink": "Changer le propriétaire d'un lien symbolique"
+        "chown -h jdupont:users /tmp/mylink": "Changer le propriétaire d'un lien symbolique",
+        "chown root:root /etc/cron.d/mycron": "Rend un fichier système à root"
       }
     }
   }

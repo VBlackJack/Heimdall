@@ -9,7 +9,8 @@
     "network",
     "traceroute",
     "diagnostic",
-    "routing"
+    "routing",
+    "mtr"
   ],
   "windowsCommandTemplateId": "network-trace-route-windows-cmd",
   "windowsCommandTemplate": {
@@ -46,8 +47,13 @@
     ]
   },
   "examples": [],
-  "notes": "Can be slow. On Linux, install traceroute when it is missing: sudo apt install traceroute",
-  "links": [],
+  "notes": "Can be slow. On Linux, install traceroute when it is missing: sudo apt install traceroute. mtr combines ping and traceroute. -n disables DNS resolution.",
+  "links": [
+    {
+      "title": "traceroute",
+      "url": "https://man7.org/linux/man-pages/man8/traceroute.8.html"
+    }
+  ],
   "windowsExamples": [
     {
       "command": "tracert google.com",
@@ -85,13 +91,18 @@
       "command": "traceroute -m 15 remote-server.com",
       "description": "Limit to 15 hops",
       "platform": 1
+    },
+    {
+      "command": "mtr google.com",
+      "description": "Interactive, continuous version (mtr)",
+      "platform": 1
     }
   ],
   "translations": {
     "fr": {
       "title": "Tracer la route réseau",
       "description": "Affiche le chemin complet des paquets réseau vers une destination.",
-      "notes": "Peut être lent. Sur Linux, installer traceroute si non disponible : sudo apt install traceroute",
+      "notes": "Peut être lent. Sur Linux, installer traceroute si non disponible : sudo apt install traceroute. mtr combine ping et traceroute. -n désactive la résolution DNS.",
       "parameters": {
         "windows": {
           "target": {
@@ -113,7 +124,8 @@
         "traceroute -n 8.8.8.8": "Traceroute sans résolution DNS",
         "traceroute -T -p 443 server.com": "Traceroute TCP sur port 443",
         "traceroute -I 192.168.1.1": "Traceroute ICMP",
-        "traceroute -m 15 remote-server.com": "Limiter à 15 sauts maximum"
+        "traceroute -m 15 remote-server.com": "Limiter à 15 sauts maximum",
+        "mtr google.com": "Version interactive et continue (mtr)"
       }
     }
   }
