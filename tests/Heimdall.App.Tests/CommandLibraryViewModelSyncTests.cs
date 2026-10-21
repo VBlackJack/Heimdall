@@ -64,6 +64,55 @@ public sealed class CommandLibraryViewModelSyncTests
         Assert.Null(fixture.DialogService.LastErrorTitle);
     }
 
+    /// <summary>
+    /// The import keeps a local action that is newer than the repository's copy; the library
+    /// used to say nothing about it, so an edit made elsewhere silently failed to arrive.
+    /// </summary>
+    [Fact]
+    public async Task SyncAsync_ActionsKeptLocal_AreCountedInTheStatusAndListedInTheSummary()
+    {
+        var result = GitOperationResult.Ok("Sync complete.");
+        result.Conflicts =
+        [
+            KeptLocal("Action", "Tail log"),
+            KeptLocal("Action", "Restart nginx"),
+            KeptLocal("Batch", "Morning checks"),
+        ];
+        var fixture = await CreateFixtureAsync(result);
+
+        await fixture.ViewModel.SyncAsync();
+
+        Assert.Equal("2 actions kept local: your copy is newer than the repository's", fixture.ViewModel.SyncKeptLocalSummary);
+        Assert.Equal("Tail log" + Environment.NewLine + "Restart nginx", fixture.ViewModel.SyncKeptLocalTitles);
+        Assert.Contains("- Tail log", fixture.DialogService.LastInfoMessage, StringComparison.Ordinal);
+        Assert.Contains("- Restart nginx", fixture.DialogService.LastInfoMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Morning checks", fixture.DialogService.LastInfoMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SyncAsync_OneActionKeptLocal_UsesTheSingularAndAnotherSyncClearsIt()
+    {
+        var result = GitOperationResult.Ok("Sync complete.");
+        result.Conflicts = [KeptLocal("Action", "Tail log")];
+        var fixture = await CreateFixtureAsync(result);
+
+        await fixture.ViewModel.SyncAsync();
+        Assert.Equal("1 action kept local: your copy is newer than the repository's", fixture.ViewModel.SyncKeptLocalSummary);
+
+        result.Conflicts = [];
+        await fixture.ViewModel.SyncAsync();
+        Assert.Equal(string.Empty, fixture.ViewModel.SyncKeptLocalSummary);
+        Assert.Equal("Sync complete.", fixture.DialogService.LastInfoMessage);
+    }
+
+    private static SyncConflict KeptLocal(string entityType, string name) => new()
+    {
+        EntityType = entityType,
+        EntityId = Guid.NewGuid(),
+        EntityName = name,
+        Resolution = ConflictResolution.KeepLocal,
+    };
+
     private static async Task<TestFixture> CreateFixtureAsync(GitOperationResult? syncResult = null)
     {
         var localizer = await CommandLibraryTestHelpers.CreateAppLocalizerAsync();

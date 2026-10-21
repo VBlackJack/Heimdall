@@ -56,6 +56,8 @@ public static class MessageKeys
     public const string ValidationParameterNotAnOfferedValue = "Validation.ParameterNotAnOfferedValue";
     public const string ValidationParameterMustBeNumber = "Validation.ParameterMustBeNumber";
     public const string ValidationParameterMustBeDriveLetter = "Validation.ParameterMustBeDriveLetter";
+    public const string ValidationParameterCountTooHigh = "Validation.ParameterCountTooHigh";
+    public const string ValidationParameterCommandTooLong = "Validation.ParameterCommandTooLong";
 
     // Execution messages
     public const string ExecutionError = "Execution.Error";
@@ -198,6 +200,43 @@ public static class MessageKeys
     public const string GitSyncConnectionTestFailed = "GitSync.ConnectionTestFailed";
     public const string GitSyncExportSucceededPushFailed = "GitSync.ExportSucceededPushFailed";
     public const string GitSyncFailedToExportAndPush = "GitSync.FailedToExportAndPush";
+
+    // Git Sync result messages: what a sync operation returns, which the Command Library
+    // shows in its sync summary. They are Heimdall locale keys, resolved through the
+    // localization bridge, so they live in locales/*.json beside the other sync keys.
+    public const string GitSyncResultBusy = "ToolCmdLibSyncResultBusy";
+    public const string GitSyncResultBusyDetails = "ToolCmdLibSyncResultBusyDetails";
+    public const string GitSyncResultCancelled = "ToolCmdLibSyncResultCancelled";
+    public const string GitSyncResultCancelledDetails = "ToolCmdLibSyncResultCancelledDetails";
+    public const string GitSyncResultNotConfigured = "ToolCmdLibSyncResultNotConfigured";
+    public const string GitSyncResultInvalidPath = "ToolCmdLibSyncResultInvalidPath";
+    public const string GitSyncResultInvalidPathDetails = "ToolCmdLibSyncResultInvalidPathDetails";
+    public const string GitSyncResultInvalidRemoteUrl = "ToolCmdLibSyncResultInvalidRemoteUrl";
+    public const string GitSyncResultRepositoryReady = "ToolCmdLibSyncResultRepositoryReady";
+    public const string GitSyncResultDirectoryNotEmpty = "ToolCmdLibSyncResultDirectoryNotEmpty";
+    public const string GitSyncResultDirectoryNotEmptyDetails = "ToolCmdLibSyncResultDirectoryNotEmptyDetails";
+    public const string GitSyncResultCloned = "ToolCmdLibSyncResultCloned";
+    public const string GitSyncResultCloneFailed = "ToolCmdLibSyncResultCloneFailed";
+    public const string GitSyncResultInitializeFailed = "ToolCmdLibSyncResultInitializeFailed";
+    public const string GitSyncResultMergeConflicts = "ToolCmdLibSyncResultMergeConflicts";
+    public const string GitSyncResultPullCompleted = "ToolCmdLibSyncResultPullCompleted";
+    public const string GitSyncResultImportFailed = "ToolCmdLibSyncResultImportFailed";
+    public const string GitSyncResultPullFailed = "ToolCmdLibSyncResultPullFailed";
+    public const string GitSyncResultSyncFailed = "ToolCmdLibSyncResultSyncFailed";
+    public const string GitSyncResultRepositoryNotInitialized = "ToolCmdLibSyncResultRepositoryNotInitialized";
+    public const string GitSyncResultExportFailed = "ToolCmdLibSyncResultExportFailed";
+    public const string GitSyncResultNothingToPush = "ToolCmdLibSyncResultNothingToPush";
+    public const string GitSyncResultPushed = "ToolCmdLibSyncResultPushed";
+    public const string GitSyncResultPushRejected = "ToolCmdLibSyncResultPushRejected";
+    public const string GitSyncResultPushRejectedDetails = "ToolCmdLibSyncResultPushRejectedDetails";
+    public const string GitSyncResultPushFailed = "ToolCmdLibSyncResultPushFailed";
+    public const string GitSyncResultExportAndPushFailed = "ToolCmdLibSyncResultExportAndPushFailed";
+    public const string GitSyncResultSyncComplete = "ToolCmdLibSyncResultSyncComplete";
+    public const string GitSyncResultSyncCompletePushFailed = "ToolCmdLibSyncResultSyncCompletePushFailed";
+    public const string GitSyncResultBranchNotFound = "ToolCmdLibSyncResultBranchNotFound";
+    public const string GitSyncResultConnected = "ToolCmdLibSyncResultConnected";
+    public const string GitSyncResultConnectFailed = "ToolCmdLibSyncResultConnectFailed";
+    public const string GitSyncResultConnectionTestFailed = "ToolCmdLibSyncResultConnectionTestFailed";
 
     // Clipboard messages
     public const string ClipboardCommandCopied = "Clipboard.CommandCopied";

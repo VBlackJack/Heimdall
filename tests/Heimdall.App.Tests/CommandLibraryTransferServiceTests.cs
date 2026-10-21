@@ -352,6 +352,70 @@ public sealed class CommandLibraryTransferServiceTests
         });
     }
 
+    /// <summary>
+    /// The import door used to count the single quotes before the first occurrence, which
+    /// calls <c>'*{x}*'</c> single-quoted although the double-quoted string around it makes
+    /// the shell expand <c>$(...)</c> there, and never looked at a second occurrence. It
+    /// now reads the generator's lexer: inline only when every occurrence is literal.
+    /// </summary>
+    [Theory]
+    [InlineData(Platform.Windows, "Get-ADUser -Filter \"Name -like '*{x}*'\"")]
+    [InlineData(Platform.Linux, "sh -c \"grep '{x}' /etc/hosts\"")]
+    [InlineData(Platform.Linux, "grep '{x}' /etc/hosts && echo {x}")]
+    public async Task ImportAsync_InlinePlaceholderTheShellStillReads_IsRewrittenToShellQuote(Platform platform, string pattern)
+    {
+        var stored = await ImportSingleTemplateAsync(platform, pattern);
+
+        Assert.Equal(QuotingMode.ShellQuote, FindParameter(stored.Parameters, "x").Quoting);
+    }
+
+    [Theory]
+    [InlineData(Platform.Windows, "Get-ADUser -Filter '{x}'")]
+    [InlineData(Platform.Linux, "grep '{x}' /etc/hosts | grep -v '{x}.bak'")]
+    public async Task ImportAsync_InlinePlaceholderOnlyInSingleQuotes_KeepsInlineInQuotes(Platform platform, string pattern)
+    {
+        var stored = await ImportSingleTemplateAsync(platform, pattern);
+
+        Assert.Equal(QuotingMode.InlineInQuotes, FindParameter(stored.Parameters, "x").Quoting);
+    }
+
+    private static async Task<CommandTemplate> ImportSingleTemplateAsync(Platform platform, string pattern)
+    {
+        var publicId = Guid.NewGuid();
+        var template = new CommandTemplate
+        {
+            Id = "lexer-tpl",
+            Name = "lexer",
+            Platform = platform,
+            CommandPattern = pattern,
+            Parameters = [InlineParameter("x")]
+        };
+        var action = new ActionModel
+        {
+            Id = "lexer-1",
+            PublicId = publicId,
+            Title = "Lexer",
+            Category = "Net",
+            WindowsCommandTemplate = platform == Platform.Windows ? template : null,
+            LinuxCommandTemplate = platform == Platform.Linux ? template : null,
+        };
+
+        var service = new CommandLibraryTransferService();
+        var actionService = new FakeActionService([]);
+        var json = JsonSerializer.Serialize(new { actions = new[] { action } });
+        CommandTemplate? stored = null;
+
+        await WithTempFileAsync(json, async path =>
+        {
+            var result = await service.ImportAsync(actionService, path);
+            Assert.Equal(1, result.Imported);
+            var saved = await actionService.GetActionByPublicIdAsync(publicId);
+            stored = platform == Platform.Windows ? saved!.WindowsCommandTemplate : saved!.LinuxCommandTemplate;
+        });
+
+        return stored!;
+    }
+
     private static TemplateParameter InlineParameter(string name)
         => new()
         {

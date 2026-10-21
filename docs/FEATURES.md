@@ -180,10 +180,13 @@ generator that produces the final command for you.
 - Shipped actions follow the installed version: when an update changes the catalogue, the shipped actions are replaced at the next launch, while your own actions, the favorites and history of actions still shipped are kept
 
 **Building the command**
-- Typed parameters: text, integer, boolean, hostname, IP address, path, and **choice** (a fixed set of values offered as a drop-down)
+- Typed parameters: text, integer, number, drive letter, boolean, hostname, IP address, path, and **choice** (a fixed set of values offered as a drop-down)
 - A choice parameter accepts only what it offers, matched without regard to case or surrounding space; whether a value may be absent is left to the parameter's own Required flag
 - The editor warns when the command pattern and the declared parameters disagree - a `{placeholder}` with no parameter, or a parameter the pattern never uses. It warns and never blocks, because braces are ordinary shell punctuation
 - Live preview of the generated command, with shell quoting applied to substituted values
+- A value no shell reads specially (`8080`, `/var/log/syslog`, `id_ed25519`) goes in bare, so `--add-port={port}/{protocol}` gives `--add-port=8080/tcp`; anything with a space, a quote or a shell character keeps its quotes
+- An optional parameter left empty is left out of the command, with the space it leaves, instead of being passed as an empty `''` argument; a required one left empty is still refused
+- Commands up to 4,096 characters generate, from patterns up to 4,000 characters and parameter values up to 1,024
 - Opened from a session, the library prefills a host parameter with the session's host and a user parameter (`user`, `username`, `login`, `account`, `samaccountname`) with the session's user name; a parameter's default is kept when the session has no user
 
 **Running it**
@@ -220,9 +223,11 @@ generator that produces the final command for you.
 - Export first asks what the file should contain: **My actions** (the default: the actions you created or imported, and your runbooks), **Current filter** (what the list shows now, search included) or **Everything** (the seeded catalogue too); the warning about secrets in free-text fields follows the choice
 - An import merges the runbooks it carries by their identity, as it does actions: one you already have is updated, a new one is added. Git synchronization carries runbooks too, with their variables and parameter values
 - Import and export as JSON, and Git synchronization for a shared team library; **Sync on startup** runs once after the vault is unlocked, and a failure is reported on the status bar
+- After a sync, the library's title bar says how many of your actions were kept local because your copy was newer than the repository's; their titles are in its tooltip and in the sync summary
+- The Git sync author name and e-mail address start from your `git config --global` identity when Git is installed and the fields still hold their placeholders; nothing is written until you save
 - Actions that arrive from an import have their risk level and platform clamped to known values, so an unrecognized level is treated as dangerous rather than harmless
 - An export keeps the English text of each action with its translations; an export taken before the categories were localized imports into the current categories
-- **Workstation debloat pack**: 72 actions that strip a personal Windows workstation (store apps, Edge, OneDrive, telemetry, performance tweaks) ship apart from the catalogue, in `data/packs/windows-workstation-debloat.json` in the installation folder. Import that file with the library's Import button if you want them. They are aimed at a workstation, not a server; they arrive as your own actions, so you can edit and export them; their text is French only for now; and nine of them open with a command-length error until their scripts are rewritten
+- **Workstation debloat pack**: 72 actions that strip a personal Windows workstation (store apps, Edge, OneDrive, telemetry, performance tweaks) ship apart from the catalogue, in `data/packs/windows-workstation-debloat.json` in the installation folder. Import that file with the library's Import button if you want them. They are aimed at a workstation, not a server; they arrive as your own actions, so you can edit and export them; and their text is French only for now. Every one of them generates, the longest script included
 
 ### Quick Connect (Ctrl+K)
 - Command palette for ad-hoc connections without saving a server profile
@@ -356,7 +361,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,347 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,384 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 

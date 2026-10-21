@@ -22,6 +22,7 @@ using Heimdall.Core.Import;
 using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Microsoft.Extensions.DependencyInjection;
+using TwinShell.Core.Interfaces;
 
 namespace Heimdall.App.Tests;
 
@@ -221,6 +222,62 @@ public sealed class ServerDialogViewModelPostConnectTests
         Assert.False(vm.PostConnectSteps[0].IsBroken);
         Assert.Null(vm.PostConnectSteps[1].LinkedActionTitle);
         Assert.True(vm.PostConnectSteps[1].IsBroken);
+    }
+
+    /// <summary>
+    /// The step shows the linked action's title the way the picker that linked it did: in the
+    /// operator's language, not the stored English pivot.
+    /// </summary>
+    [Fact]
+    public async Task InitializePostConnectLinksAsync_ShowsTheTitleInTheCurrentLanguage()
+    {
+        var action = CommandLibraryTestHelpers.CreateLinuxAction(
+            "tail-log", "Tail log", "tail -f {path}", CommandLibraryTestHelpers.RequiredParameter("path", "Path"));
+        action.Translations = [new TwinShell.Core.Models.ActionTranslation { ActionId = "tail-log", CultureCode = "fr", Title = "Suivre un journal" }];
+        var provider = CommandLibraryTestHelpers.CreateResolverServiceProvider(action);
+        var vm = new ServerDialogViewModel
+        {
+            ServiceScopeFactory = provider.GetRequiredService<IServiceScopeFactory>(),
+            Localizer = await CommandLibraryTestHelpers.CreateAppLocalizerAsync("fr"),
+        };
+        vm.LoadPostConnectSteps([new PostConnectStep { Id = "1", CommandLibraryId = "tail-log", Input = "pwd" }]);
+
+        await vm.InitializePostConnectLinksAsync();
+
+        Assert.Equal("Suivre un journal", vm.PostConnectSteps[0].LinkedActionTitle);
+    }
+
+    /// <summary>
+    /// The step rows are bound to the dialog; the titles have to be set on the dialog's
+    /// thread. The service yields so that the await really has a continuation to place,
+    /// as in <see cref="CommandLibraryPickerThreadAffinityTests"/>.
+    /// </summary>
+    [Fact]
+    public void InitializePostConnectLinksAsync_SetsTheStepTitlesOnTheDialogsThread()
+    {
+        int ownerThreadId = 0;
+        var setterThreadIds = new List<int>();
+
+        StaDispatcherRunner.Run(async () =>
+        {
+            ownerThreadId = Environment.CurrentManagedThreadId;
+            var services = new ServiceCollection();
+            services.AddScoped<IActionService>(_ => new YieldingActionService(new FakeActionService(
+                [CommandLibraryTestHelpers.CreateLinuxAction("tail-log", "Tail log", "tail -f {path}", CommandLibraryTestHelpers.RequiredParameter("path", "Path"))])));
+            var vm = new ServerDialogViewModel
+            {
+                ServiceScopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>()
+            };
+            vm.LoadPostConnectSteps([new PostConnectStep { Id = "1", CommandLibraryId = "tail-log", Input = "pwd" }]);
+            vm.PostConnectSteps[0].PropertyChanged += (_, _) => setterThreadIds.Add(Environment.CurrentManagedThreadId);
+
+            await vm.InitializePostConnectLinksAsync();
+
+            Assert.Equal("Tail log", vm.PostConnectSteps[0].LinkedActionTitle);
+        });
+
+        Assert.NotEmpty(setterThreadIds);
+        Assert.All(setterThreadIds, id => Assert.Equal(ownerThreadId, id));
     }
 
     [Fact]

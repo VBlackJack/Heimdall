@@ -4510,7 +4510,8 @@ public sealed partial class SettingsViewModelTests : IDisposable
         IUpdateInstallFlow? installFlow = null,
         IBrowserLauncher? browserLauncher = null,
         Heimdall.App.Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
-        Heimdall.App.Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null)
+        Heimdall.App.Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
+        IGitIdentityReader? gitIdentityReader = null)
     {
         localizer ??= new LocalizationManager();
         dialog ??= new FakeDialogService();
@@ -4547,7 +4548,89 @@ public sealed partial class SettingsViewModelTests : IDisposable
             browserLauncher,
             profileImportService,
             sharedSessions: sharedSessions,
-            sharedSecrets: sharedSecrets);
+            sharedSecrets: sharedSecrets,
+            gitIdentityReader: gitIdentityReader);
+    }
+
+    // ── Git sync author prefill (D-03) ────────────────────────────
+
+    /// <summary>
+    /// The sync signed its commits "Heimdall User &lt;heimdall@local&gt;" unless the operator
+    /// found the two fields; the identity Git already knows now fills the placeholders.
+    /// </summary>
+    [Fact]
+    public async Task LoadFromSettings_PlaceholderGitAuthor_IsFilledFromGitConfig()
+    {
+        var config = new FakeConfigManager();
+        var viewModel = CreateViewModel(config, gitIdentityReader: new FixedGitIdentityReader(new GitIdentity("Ada Lovelace", "ada@example.org")));
+
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.GitAuthorPrefill;
+
+        Assert.Equal("Ada Lovelace", viewModel.CmdLibGitSyncAuthorName);
+        Assert.Equal("ada@example.org", viewModel.CmdLibGitSyncAuthorEmail);
+
+        // Part of the loaded state, not an edit: opening the panel leaves it clean.
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public async Task LoadFromSettings_PrefilledGitAuthor_IsWrittenWithTheNextSave()
+    {
+        var config = new FakeConfigManager();
+        var viewModel = CreateViewModel(config, gitIdentityReader: new FixedGitIdentityReader(new GitIdentity("Ada Lovelace", "ada@example.org")));
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.GitAuthorPrefill;
+
+        viewModel.CmdLibGitSyncBranch = "develop";
+        Assert.True(viewModel.IsDirty);
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.NotNull(config.SavedSettings);
+        Assert.Equal("Ada Lovelace", config.SavedSettings!.CmdLibGitSyncAuthorName);
+        Assert.Equal("ada@example.org", config.SavedSettings.CmdLibGitSyncAuthorEmail);
+    }
+
+    [Fact]
+    public async Task LoadFromSettings_GitAnswersNothing_KeepsThePlaceholders()
+    {
+        var config = new FakeConfigManager();
+        var viewModel = CreateViewModel(config, gitIdentityReader: new FixedGitIdentityReader(null));
+
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.GitAuthorPrefill;
+
+        Assert.Equal(AppSettings.DefaultCmdLibGitSyncAuthorName, viewModel.CmdLibGitSyncAuthorName);
+        Assert.Equal(AppSettings.DefaultCmdLibGitSyncAuthorEmail, viewModel.CmdLibGitSyncAuthorEmail);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public async Task LoadFromSettings_AuthorAlreadyChosen_IsNotReplacedAndGitIsNotAsked()
+    {
+        var config = new FakeConfigManager();
+        config.Settings.CmdLibGitSyncAuthorName = "Grace Hopper";
+        config.Settings.CmdLibGitSyncAuthorEmail = "grace@example.org";
+        var reader = new FixedGitIdentityReader(new GitIdentity("Ada Lovelace", "ada@example.org"));
+        var viewModel = CreateViewModel(config, gitIdentityReader: reader);
+
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.GitAuthorPrefill;
+
+        Assert.Equal("Grace Hopper", viewModel.CmdLibGitSyncAuthorName);
+        Assert.Equal("grace@example.org", viewModel.CmdLibGitSyncAuthorEmail);
+        Assert.Equal(0, reader.Calls);
+    }
+
+    private sealed class FixedGitIdentityReader(GitIdentity? identity) : IGitIdentityReader
+    {
+        public int Calls { get; private set; }
+
+        public Task<GitIdentity?> ReadGlobalIdentityAsync()
+        {
+            Calls++;
+            return Task.FromResult(identity);
+        }
     }
 
     /// <summary>

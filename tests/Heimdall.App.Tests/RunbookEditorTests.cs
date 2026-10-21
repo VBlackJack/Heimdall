@@ -125,7 +125,7 @@ public sealed class RunbookEditorTests
         Assert.Equal("nginx", stored.Variables["unit"]);
         var step = Assert.Single(stored.Commands);
         Assert.Equal("{{unit}}", step.Parameters["unit"]);
-        Assert.Equal("systemctl status 'nginx'", step.Command);
+        Assert.Equal("systemctl status nginx", step.Command);
         Assert.Equal(Platform.Linux, step.Platform);
         Assert.Equal(library.SelectedRunbook?.Source.Id, stored.Id);
     }

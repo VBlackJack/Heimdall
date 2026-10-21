@@ -87,25 +87,39 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1">
             <Grid>
+                <!-- The rows take the list's width and no more: with horizontal scrolling on, the
+                     list measured its rows at an infinite width, the star column behaved as Auto,
+                     and a long description pushed the badges past the window. -->
                 <ListView ItemsSource="{Binding ActionsView}"
                           SelectedItem="{Binding SelectedAction}"
                           Background="{DynamicResource CardBrush}"
                           BorderThickness="0"
                           Foreground="{DynamicResource TextPrimaryBrush}"
+                          HorizontalContentAlignment="Stretch"
+                          Grid.IsSharedSizeScope="True"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           AutomationProperties.Name="{loc:Translate LabelCommandLibraryPickerResults}">
+                    <!-- The row's spoken name goes on the container: UI Automation never reads
+                         a name set inside the template, and the row announced its class name. -->
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:CommandLibraryPickerItem}">
-                            <Grid Margin="0,0,0,8"
-                                  AutomationProperties.Name="{Binding Title}">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="150"/>
-                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="PickerCategory"/>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="PickerBadges"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Title}"
                                                Foreground="{DynamicResource TextPrimaryBrush}"
-                                               FontWeight="SemiBold"/>
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Text="{Binding Presentation.Description}"
                                                Visibility="{Binding Presentation.Description, Converter={StaticResource NullToVisibilityConverter}}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
@@ -114,7 +128,7 @@
                                                Margin="0,2,0,0"/>
                                 </StackPanel>
                                 <TextBlock Grid.Column="1"
-                                           Margin="8,0,0,0"
+                                           Margin="12,0,12,0"
                                            VerticalAlignment="Center"
                                            Text="{Binding Category}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>

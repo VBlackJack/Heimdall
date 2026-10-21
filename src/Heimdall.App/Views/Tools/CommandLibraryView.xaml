@@ -135,6 +135,14 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"
                            Margin="{StaticResource MarginInlineControl}"/>
+                <TextBlock Text="{Binding SyncKeptLocalSummary}"
+                           ToolTip="{Binding SyncKeptLocalTitles}"
+                           Visibility="{Binding SyncKeptLocalSummary, Converter={StaticResource NullToVisibilityConverter}}"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="{StaticResource MarginInlineControl}"/>
             </DockPanel>
         </Border>
 
@@ -1061,27 +1069,46 @@
                            DataContext="{Binding ActiveRun}"
                            Visibility="{Binding DataContext.IsRunbookRunVisible, ElementName=RunbooksPanel, Converter={StaticResource BoolToVisibilityConverter}}"
                            Margin="12,8,12,8">
-                    <DockPanel DockPanel.Dock="Top">
-                        <Button DockPanel.Dock="Right"
-                                Content="{loc:Translate ToolCmdLibRunbookStop}"
-                                Command="{Binding StopCommand}"
-                                ToolTip="{loc:Translate ToolCmdLibRunbookStopTooltip}"
-                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookStop}"
-                                Style="{DynamicResource SecondaryButtonStyle}"/>
-                        <TextBlock DockPanel.Dock="Right"
-                                   Text="{Binding ExecutionModeText}"
-                                   ToolTip="{loc:Translate ToolCmdLibRunbookModeTooltip}"
-                                   FontSize="{StaticResource FontSizeCaption}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"
-                                   Margin="{StaticResource MarginInlineControl}"/>
-                        <TextBlock Text="{Binding Title}"
+                    <!-- The status takes every pixel the Stop button leaves: the mode line sat beside
+                         it in the same row and left the "Running: ..." text about 65 px. The mode
+                         goes under the status, and both trim only as a last resort. -->
+                    <Grid x:Name="RunbookRunHeader" DockPanel.Dock="Top">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="0"
+                                   Text="{Binding Title}"
+                                   ToolTip="{Binding Title}"
                                    FontSize="{StaticResource FontSizeBody}"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center"/>
-                    </DockPanel>
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="0"
+                                   Text="{Binding ExecutionModeText}"
+                                   ToolTip="{loc:Translate ToolCmdLibRunbookModeTooltip}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Row="0"
+                                Grid.RowSpan="2"
+                                Grid.Column="1"
+                                Content="{loc:Translate ToolCmdLibRunbookStop}"
+                                Command="{Binding StopCommand}"
+                                ToolTip="{loc:Translate ToolCmdLibRunbookStopTooltip}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookStop}"
+                                VerticalAlignment="Center"
+                                Margin="{StaticResource MarginInlineControl}"
+                                Style="{DynamicResource SecondaryButtonStyle}"/>
+                    </Grid>
 
                     <StackPanel DockPanel.Dock="Top"
                                 Visibility="{Binding HasVariables, Converter={StaticResource BoolToVisibilityConverter}}"

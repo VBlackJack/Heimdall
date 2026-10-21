@@ -19,6 +19,7 @@ using System.Text.Json;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Import;
 using TwinShell.Core.Models;
+using TwinShell.Core.Services;
 
 namespace Heimdall.App.Tests;
 
@@ -64,6 +65,45 @@ public sealed class WorkstationDebloatPackTests
 
         using var document = JsonDocument.Parse(json);
         Assert.Equal(PackActionCount, document.RootElement.GetProperty("totalActions").GetInt32());
+    }
+
+    /// <summary>
+    /// Nine of the pack's scripts were longer than the generator's old 1024-character bound
+    /// and opened on a length error. Every template has to generate within the bound now,
+    /// with its shipped defaults and a plain value for a required field left empty.
+    /// </summary>
+    [Fact]
+    public void EveryPackTemplate_GeneratesWithinTheCommandBound()
+    {
+        var actions = CommandLibraryTransferService.ParseImportJson(File.ReadAllText(PackPath()))!;
+        var generator = new CommandGeneratorService(new FakeTwinShellLocalizationService());
+        var failures = new List<string>();
+
+        foreach (var template in actions.SelectMany(action => new[] { action.WindowsCommandTemplate, action.LinuxCommandTemplate }))
+        {
+            if (template is null)
+            {
+                continue;
+            }
+
+            var values = template.Parameters.ToDictionary(
+                parameter => parameter.Name,
+                parameter => !string.IsNullOrWhiteSpace(parameter.DefaultValue) || !parameter.Required
+                    ? parameter.DefaultValue ?? string.Empty
+                    : parameter.IsChoice ? parameter.AllowedValues![0] : "1",
+                StringComparer.Ordinal);
+
+            try
+            {
+                generator.GenerateCommand(template, values);
+            }
+            catch (InvalidOperationException ex)
+            {
+                failures.Add($"{template.Id} ({template.CommandPattern.Length} characters): {ex.Message}");
+            }
+        }
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
     [Fact]

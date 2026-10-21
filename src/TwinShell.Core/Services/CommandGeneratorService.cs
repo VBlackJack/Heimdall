@@ -40,6 +40,10 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
     private static readonly Regex DriveLetterRegex = new Regex(@"^[A-Za-z]$", RegexOptions.Compiled);
 
+    // A value made only of these characters reads the same to bash and PowerShell with or
+    // without quotes; see IsSafeBareValue.
+    private static readonly Regex SafeBareValueRegex = new Regex(@"^[A-Za-z0-9._/:=@+,%-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     // BUGFIX: Declare dangerous characters as static readonly for better performance
     private static readonly char[] DangerousChars = { '&', '|', ';', '`', '$', '(', ')', '<', '>', '\n', '\r' };
 
@@ -73,8 +77,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
         if (template.Parameters.Count > ValidationConstants.MaxParametersPerTemplate)
         {
-            throw new InvalidOperationException(
-                $"Command template declares too many parameters ({template.Parameters.Count}); maximum is {ValidationConstants.MaxParametersPerTemplate}");
+            throw new InvalidOperationException(TooManyParametersMessage(template.Parameters.Count));
         }
 
         // PERFORMANCE: Use StringBuilder for multiple string replacements (40-60% fewer allocations)
@@ -91,23 +94,92 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 ? parameterValues[parameter.Name]
                 : parameter.DefaultValue ?? string.Empty;
 
-            // Validate the value according to the parameter type
-            if (!ValidateParameterValue(template, parameter, value, out var validationError))
-            {
-                throw new InvalidOperationException($"Invalid parameter '{parameter.Name}': {validationError}");
-            }
-
-            // Escape the value for shell safety using the target platform
-            var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform, parameter.Quoting);
-
-            // Replace {parameterName} with actual value using StringBuilder
             // Built by the shared helper rather than spelled out here, so the substitution
             // and the checks that reason about placeholders cannot drift apart.
             var placeholder = CommandPatternQuoting.Placeholder(parameter.Name);
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                if (parameter.Required)
+                {
+                    throw new InvalidOperationException(
+                        _localizationService.GetFormattedString(MessageKeys.ValidationParameterRequired, parameter.Label));
+                }
+
+                // An optional value left empty means "leave the argument out": quoting it
+                // would hand the command an empty argument instead (hostname '').
+                var withoutPlaceholder = RemoveEmptyPlaceholder(command.ToString(), placeholder);
+                command.Clear().Append(withoutPlaceholder);
+                continue;
+            }
+
+            // Validate the value according to the parameter type. The message already names
+            // the parameter, in the operator's language.
+            if (!ValidateParameterValue(template, parameter, value, out var validationError))
+            {
+                throw new InvalidOperationException(validationError);
+            }
+
+            // Escape the value for shell safety using the target platform. A value goes in
+            // bare only where every occurrence stands outside quotes and after no dollar sign:
+            // after $ the shell would read it as a variable name, and inside a quoted span the
+            // pattern's own quoting decides.
+            var everyOccurrenceBare = CommandPatternQuoting
+                .GetPlaceholderQuoteContexts(template.CommandPattern, parameter.Name, template.Platform == Platform.Windows)
+                .All(context => context == CommandPatternQuoting.QuoteContext.Bare);
+            var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform, parameter.Quoting, everyOccurrenceBare);
+
             command.Replace(placeholder, escapedValue);
         }
 
         return EnforceCommandLength(command.ToString());
+    }
+
+    /// <summary>
+    /// Removes every occurrence of <paramref name="placeholder"/> from
+    /// <paramref name="command"/> together with the run of spaces each one leaves.
+    /// </summary>
+    /// <remarks>
+    /// Only the spaces next to a removed placeholder are touched: two spaces written into
+    /// the pattern elsewhere, inside a quoted grep expression for instance, are the
+    /// author's and stay. A placeholder that ends the command takes the space before it
+    /// along, so <c>hostname {name}</c> becomes <c>hostname</c>.
+    /// </remarks>
+    internal static string RemoveEmptyPlaceholder(string command, string placeholder)
+    {
+        var result = new StringBuilder(command.Length);
+        var index = 0;
+
+        while (true)
+        {
+            var found = command.IndexOf(placeholder, index, StringComparison.Ordinal);
+            if (found < 0)
+            {
+                result.Append(command, index, command.Length - index);
+                break;
+            }
+
+            result.Append(command, index, found - index);
+            index = found + placeholder.Length;
+
+            if (result.Length == 0 || result[^1] == ' ')
+            {
+                while (index < command.Length && command[index] == ' ')
+                {
+                    index++;
+                }
+            }
+
+            if (index >= command.Length)
+            {
+                while (result.Length > 0 && result[^1] == ' ')
+                {
+                    result.Length--;
+                }
+            }
+        }
+
+        return result.ToString();
     }
 
     public Dictionary<string, string> GetDefaultParameterValues(CommandTemplate template)
@@ -166,7 +238,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
         if (template.Parameters.Count > ValidationConstants.MaxParametersPerTemplate)
         {
-            errors.Add($"Command template declares too many parameters ({template.Parameters.Count}); maximum is {ValidationConstants.MaxParametersPerTemplate}");
+            errors.Add(TooManyParametersMessage(template.Parameters.Count));
             return false;
         }
 
@@ -269,6 +341,16 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterDangerousCharacters, parameter.Label));
                         }
                         break;
+
+                    default:
+                        // A type this switch does not know (a choice, or a name typed by
+                        // hand into an imported file) is still quoted like a string, so it
+                        // gets at least the checks no quoting replaces.
+                        if (ContainsRefusedCharacters(template, parameter, value))
+                        {
+                            errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterDangerousCharacters, parameter.Label));
+                        }
+                        break;
                 }
             }
         }
@@ -276,16 +358,29 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
         return errors.Count == 0;
     }
 
-    private static string EnforceCommandLength(string command)
+    private string EnforceCommandLength(string command)
     {
         if (command.Length > ValidationConstants.MaxCommandLength)
         {
-            throw new InvalidOperationException(
-                $"Generated command exceeds maximum length of {ValidationConstants.MaxCommandLength} characters (was {command.Length})");
+            throw new InvalidOperationException(_localizationService.GetFormattedString(
+                MessageKeys.ValidationParameterCommandTooLong,
+                command.Length.ToString(CultureInfo.InvariantCulture),
+                ValidationConstants.MaxCommandLength.ToString(CultureInfo.InvariantCulture)));
         }
 
         return command;
     }
+
+    /// <summary>
+    /// The refusal of a template that declares more than
+    /// <see cref="ValidationConstants.MaxParametersPerTemplate"/> parameters, in the operator's
+    /// language: it reaches them through the same error line as every other refusal.
+    /// </summary>
+    private string TooManyParametersMessage(int count) =>
+        _localizationService.GetFormattedString(
+            MessageKeys.ValidationParameterCountTooHigh,
+            count.ToString(CultureInfo.InvariantCulture),
+            ValidationConstants.MaxParametersPerTemplate.ToString(CultureInfo.InvariantCulture));
 
     /// <summary>
     /// Validates a parameter value based on its type
@@ -323,21 +418,22 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             return false;
         }
 
+        // The same keys ValidateParameters reports, so a refusal reads the same in the
+        // operator's language whichever path met it first.
+        string? key = null;
         switch (parameter.Type.ToLower())
         {
             case TemplateParameterTypes.Hostname:
                 if (!IsValidHostname(value))
                 {
-                    error = "Invalid hostname format";
-                    return false;
+                    key = MessageKeys.ValidationParameterInvalidHostname;
                 }
                 break;
 
             case TemplateParameterTypes.IpAddress:
                 if (!IPAddress.TryParse(value, out _))
                 {
-                    error = "Invalid IP address";
-                    return false;
+                    key = MessageKeys.ValidationParameterInvalidIPAddress;
                 }
                 break;
 
@@ -345,58 +441,76 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             case TemplateParameterTypes.Integer:
                 if (!int.TryParse(value, out _))
                 {
-                    error = "Must be an integer";
-                    return false;
+                    key = MessageKeys.ValidationParameterMustBeInteger;
                 }
                 break;
 
             case TemplateParameterTypes.Number:
                 if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                 {
-                    error = "Must be a number";
-                    return false;
+                    key = MessageKeys.ValidationParameterMustBeNumber;
+                }
+                break;
+
+            case TemplateParameterTypes.Bool:
+            case TemplateParameterTypes.Boolean:
+                if (!bool.TryParse(value, out _))
+                {
+                    key = MessageKeys.ValidationParameterMustBeBoolean;
                 }
                 break;
 
             case TemplateParameterTypes.DriveLetter:
                 if (!DriveLetterRegex.IsMatch(value))
                 {
-                    error = "Must be a single drive letter";
-                    return false;
+                    key = MessageKeys.ValidationParameterMustBeDriveLetter;
                 }
                 break;
 
             case TemplateParameterTypes.Path:
                 if (!IsValidPath(value))
                 {
-                    error = "Invalid path format";
-                    return false;
+                    key = MessageKeys.ValidationParameterInvalidPath;
                 }
-                if (ContainsRefusedCharacters(template, parameter, value))
+                else if (ContainsRefusedCharacters(template, parameter, value))
                 {
-                    error = "Contains dangerous characters";
-                    return false;
+                    key = MessageKeys.ValidationParameterDangerousCharacters;
                 }
                 break;
 
             case TemplateParameterTypes.Text:
                 if (string.IsNullOrWhiteSpace(value) && parameter.Required)
                 {
-                    error = "Required field";
+                    key = MessageKeys.ValidationParameterRequired;
+                }
+                else if (value.Length > ValidationConstants.MaxParameterLength)
+                {
+                    error = _localizationService.GetFormattedString(
+                        MessageKeys.ValidationParameterMaxLength,
+                        parameter.Label,
+                        ValidationConstants.MaxParameterLength.ToString(CultureInfo.InvariantCulture));
                     return false;
                 }
-                // PERFORMANCE: Use constant instead of magic number
-                if (value.Length > ValidationConstants.MaxParameterLength)
+                else if (ContainsRefusedCharacters(template, parameter, value))
                 {
-                    error = $"String exceeds maximum length of {ValidationConstants.MaxParameterLength}";
-                    return false;
-                }
-                if (ContainsRefusedCharacters(template, parameter, value))
-                {
-                    error = "Contains dangerous characters";
-                    return false;
+                    key = MessageKeys.ValidationParameterDangerousCharacters;
                 }
                 break;
+
+            default:
+                // Same rule as ValidateParameters: an unknown type is quoted like a string,
+                // so it gets at least the checks no quoting replaces.
+                if (ContainsRefusedCharacters(template, parameter, value))
+                {
+                    key = MessageKeys.ValidationParameterDangerousCharacters;
+                }
+                break;
+        }
+
+        if (key is not null)
+        {
+            error = _localizationService.GetFormattedString(key, parameter.Label);
+            return false;
         }
 
         return true;
@@ -405,7 +519,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     /// <summary>
     /// Escapes a parameter value based on its type
     /// </summary>
-    private string EscapeParameterValue(string value, string parameterType, Platform platform, QuotingMode? quotingMode)
+    private string EscapeParameterValue(string value, string parameterType, Platform platform, QuotingMode? quotingMode, bool everyOccurrenceBare)
     {
         switch (parameterType.ToLower())
         {
@@ -421,11 +535,43 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             case TemplateParameterTypes.Path:
             case TemplateParameterTypes.Text:
             default:
-                // Quote for shell safety using the target platform
-                return (quotingMode ?? QuotingMode.ShellQuote) == QuotingMode.InlineInQuotes
-                    ? EscapeInlineInSingleQuotes(value, platform)
-                    : QuoteForShell(value, platform);
+                if ((quotingMode ?? QuotingMode.ShellQuote) == QuotingMode.InlineInQuotes)
+                {
+                    // The quotes are the pattern's: only the content is escaped.
+                    return EscapeInlineInSingleQuotes(value, platform);
+                }
+
+                return everyOccurrenceBare && IsSafeBareValue(value, platform) ? value : QuoteForShell(value, platform);
         }
+    }
+
+    /// <summary>
+    /// True when <paramref name="value"/> means the same to the shell with or without
+    /// quotes, so it can be substituted bare: <c>--add-port=8080/tcp</c> rather than
+    /// <c>--add-port='8080'/'tcp'</c>, <c>~/.ssh/id_ed25519.pub</c> rather than
+    /// <c>~/.ssh/'id_ed25519'.pub</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The class holds no space, no quote, no glob character and no <c>$</c>, so no shell
+    /// splits, expands or substitutes anything in such a value.
+    /// </para>
+    /// <para>
+    /// PowerShell reads three of its characters differently at the start of an argument or
+    /// between words, so on Windows those values keep their quotes: a leading <c>-</c> makes
+    /// a parameter name of the value, a leading <c>@</c> splats a variable, and a comma
+    /// builds an array of two arguments out of one. Bash gives none of them a meaning.
+    /// </para>
+    /// </remarks>
+    internal static bool IsSafeBareValue(string value, Platform platform)
+    {
+        if (!SafeBareValueRegex.IsMatch(value))
+        {
+            return false;
+        }
+
+        return platform != Platform.Windows
+            || (value[0] is not ('-' or '@') && !value.Contains(','));
     }
 
     /// <summary>

@@ -15,16 +15,19 @@
  */
 
 using FluentAssertions;
+using TwinShell.Core.Constants;
 using TwinShell.Infrastructure.Services;
 
 namespace TwinShell.Infrastructure.Tests;
 
 public sealed class JsonSchemaValidatorTests
 {
+    // The bound is the one the library stores (ValidationConstants), read here rather than
+    // written out, so the sync cannot refuse a pattern the library accepted.
     [Fact]
-    public void ValidateTemplate_CommandPatternWithOneThousandCharacters_IsValid()
+    public void ValidateTemplate_CommandPatternAtTheStoredBound_IsValid()
     {
-        string json = CreateTemplateJson(new string('a', 1000));
+        string json = CreateTemplateJson(new string('a', ValidationConstants.MaxTemplateCommandPatternLength));
 
         SchemaValidationResult result = JsonSchemaValidator.ValidateTemplate(json);
 
@@ -32,9 +35,9 @@ public sealed class JsonSchemaValidatorTests
     }
 
     [Fact]
-    public void ValidateTemplate_CommandPatternWithOneThousandOneCharacters_IsInvalid()
+    public void ValidateTemplate_CommandPatternOneCharacterOverTheStoredBound_IsInvalid()
     {
-        string json = CreateTemplateJson(new string('a', 1001));
+        string json = CreateTemplateJson(new string('a', ValidationConstants.MaxTemplateCommandPatternLength + 1));
 
         SchemaValidationResult result = JsonSchemaValidator.ValidateTemplate(json);
 

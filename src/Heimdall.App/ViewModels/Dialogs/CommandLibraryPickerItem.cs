@@ -19,7 +19,7 @@ using TwinShell.Core.Models;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
-public sealed class CommandLibraryPickerItem
+public sealed class CommandLibraryPickerItem : IAccessibleItemViewModel
 {
     public required string ActionId { get; init; }
     public required string Title { get; init; }
@@ -49,4 +49,35 @@ public sealed class CommandLibraryPickerItem
     /// main view uses (<c>ToolCmdLibPlatformLabelWin</c> / <c>...Lin</c> / <c>...Both</c>).
     /// </summary>
     public required string PlatformBadge { get; init; }
+
+    /// <summary>
+    /// What a screen reader announces for this row: the title, the risk, the platform, then
+    /// the category, the order the library's own rows use.
+    /// </summary>
+    /// <remarks>
+    /// The row paints these in separate text blocks, and a name written on the template's grid
+    /// is inert: UI Automation reads the generated container, so the row announced the item's
+    /// class name. The description is left out for the reason the library rows give: it would
+    /// bury the risk word at the end of a long utterance.
+    /// </remarks>
+    public string AccessibleName
+    {
+        get
+        {
+            var parts = new List<string>(4) { Title };
+
+            foreach (var part in new[] { Presentation.RiskLabel, PlatformBadge, Category })
+            {
+                if (!string.IsNullOrWhiteSpace(part))
+                {
+                    parts.Add(part);
+                }
+            }
+
+            return string.Join(", ", parts);
+        }
+    }
+
+    /// <inheritdoc/>
+    public string? AccessibleHelpText => null;
 }
