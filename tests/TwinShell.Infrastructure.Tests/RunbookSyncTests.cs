@@ -78,14 +78,52 @@ public sealed class RunbookSyncTests
         }
         finally
         {
-            try
+            DeleteFolder(exportPath);
+        }
+    }
+
+    // The first import creates the batch; the second updates it in place from the same file; the
+    // third is the one that sees what the second stored. When the repository stamped now over the
+    // remote timestamp it was given, the third import found a "newer" local copy and reported a
+    // conflict for a file nobody had changed.
+    [Fact]
+    public async Task ImportingTheSameUnchangedFolderAgain_ReportsNoConflict()
+    {
+        string exportPath = Path.Combine(Path.GetTempPath(), "heimdall_runbook_resync_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(exportPath);
+
+        try
+        {
+            await using TwinShellSyncFixture exportFixture = await TwinShellSyncFixture.CreateAsync();
+            await exportFixture.SeedAsync();
+            (await exportFixture.SyncService.ExportDataToYamlAsync(exportPath)).Success.Should().BeTrue();
+
+            await using TwinShellSyncFixture importFixture = await TwinShellSyncFixture.CreateAsync();
+            List<SyncImportResult> imports = [];
+            for (int pass = 0; pass < 3; pass++)
             {
-                Directory.Delete(exportPath, recursive: true);
+                imports.Add(await importFixture.SyncService.ImportDataFromYamlAsync(exportPath));
             }
-            catch (IOException)
-            {
-                // A handle still open on a CI agent leaves a temp folder behind; nothing to fix.
-            }
+
+            imports[0].BatchesCreated.Should().Be(1);
+            imports.Should().AllSatisfy(result => result.Conflicts.Should().BeEmpty());
+            imports[2].BatchesSkipped.Should().Be(0);
+        }
+        finally
+        {
+            DeleteFolder(exportPath);
+        }
+    }
+
+    private static void DeleteFolder(string path)
+    {
+        try
+        {
+            Directory.Delete(path, recursive: true);
+        }
+        catch (IOException)
+        {
+            // A handle still open on a CI agent leaves a temp folder behind; nothing to fix.
         }
     }
 }

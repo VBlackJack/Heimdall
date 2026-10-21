@@ -80,7 +80,9 @@ public sealed class BatchRepository : IBatchRepository
         existingEntity.TagsJson = CommandBatchMapper.SerializeTags(batch.Tags);
         existingEntity.VariablesJson = CommandBatchMapper.SerializeVariables(batch.Variables);
         existingEntity.LastExecutedAt = batch.LastExecutedAt;
-        existingEntity.UpdatedAt = DateTime.UtcNow;
+        // The caller's timestamp, not now: BatchService stamps an edit, and Git sync's import
+        // passes the remote timestamp, which must survive or the next sync sees a local edit.
+        existingEntity.UpdatedAt = batch.UpdatedAt;
 
         await _context.SaveChangesAsync();
     }

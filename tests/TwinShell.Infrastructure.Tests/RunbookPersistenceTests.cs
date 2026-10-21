@@ -183,6 +183,33 @@ public sealed class RunbookPersistenceTests
         reloaded.UpdatedAt.Should().Be(updatedBefore);
     }
 
+    // Git sync's import hands the repository the remote timestamp; stamping now in its place
+    // made every imported batch look locally newer than the shared copy.
+    [Fact]
+    public async Task RepositoryUpdate_KeepsTheUpdatedAtItWasGiven()
+    {
+        await using TempDatabase database = await TempDatabase.CreateAsync();
+
+        string id;
+        await using (TwinShellDbContext context = database.NewContext())
+        {
+            id = (await NewService(context).CreateBatchAsync(Runbook("status"))).Id;
+        }
+
+        DateTime remoteEdit = new(2026, 3, 4, 5, 6, 7, DateTimeKind.Utc);
+        await using (TwinShellDbContext context = database.NewContext())
+        {
+            BatchRepository repository = new(context);
+            CommandBatch loaded = (await repository.GetByIdAsync(id))!;
+            loaded.UpdatedAt = remoteEdit;
+            await repository.UpdateAsync(loaded);
+        }
+
+        await using TwinShellDbContext readContext = database.NewContext();
+        CommandBatch reloaded = (await NewService(readContext).GetBatchByIdAsync(id))!;
+        reloaded.UpdatedAt.Should().Be(remoteEdit);
+    }
+
     private static BatchService NewService(TwinShellDbContext context) => new(new BatchRepository(context));
 
     private static CommandBatch Runbook(params string[] stepTitles) => new()
