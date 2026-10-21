@@ -177,13 +177,13 @@ public sealed partial class CommandLibraryViewModel
     public bool ShouldShowAction(CommandLibraryActionEntry entry)
     {
         // Platform filter (1 = Windows, 2 = Linux, "Both" passes either)
-        if (PlatformFilterIndex == 1
+        if (PlatformFilterIndex == PlatformFilterWindows
             && entry.Source.Platform != Platform.Windows
             && entry.Source.Platform != Platform.Both)
         {
             return false;
         }
-        if (PlatformFilterIndex == 2
+        if (PlatformFilterIndex == PlatformFilterLinux
             && entry.Source.Platform != Platform.Linux
             && entry.Source.Platform != Platform.Both)
         {

@@ -172,6 +172,9 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Recherche plein texte avec classement par pertinence sur les titres, les tags, les descriptions et le texte des commandes
 - Filtres par catégorie, tag, plateforme et niveau de risque ; chaque filtre conserve sa sélection après un rechargement de la bibliothèque
 - Favoris, et badge de risque par action (info, run, dangereux)
+- Chaque ligne montre la commande elle-même sous son titre, en police à chasse fixe sur une seule ligne : le modèle sur lequel la ligne s'ouvre avec le filtre de plateforme courant (Windows sauf si le filtre est Linux, ou le seul modèle disponible), coupé à 96 caractères comme les aperçus d'extraits de la palette de commandes
+- Ouverte depuis une session, la bibliothèque démarre avec le filtre de plateforme de cette session. Un profil peut déclarer le système d'exploitation de sa machine distante (onglet Général, **Système d'exploitation distant**) : Windows ou Linux est alors pris tel quel, et Automatique garde la déduction tirée du protocole (SSH pour Linux ; RDP, WinRM et Local pour Windows). Les étapes post-connexion liées à la bibliothèque et leur sélecteur suivent la même déclaration, si bien qu'une connexion SSH vers un serveur Windows OpenSSH reçoit le modèle Windows
+
 - Les actions livrées et leurs catégories s'affichent dans la langue de l'interface, et un changement de langue recharge la bibliothèque en gardant l'action sélectionnée. Le catalogue est rédigé en anglais avec une traduction française à côté ; l'espagnol n'a pas encore de traduction livrée et affiche le texte anglais
 - Les actions livrées suivent la version installée : quand une mise à jour modifie le catalogue, les actions livrées sont remplacées au lancement suivant, tandis que vos propres actions, les favoris et l'historique des actions toujours livrées sont conservés
 
@@ -180,20 +183,25 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Un paramètre choice n'accepte que ce qu'il propose, la correspondance ignorant la casse et les espaces autour ; savoir si une valeur peut être absente reste du ressort de l'indicateur Requis du paramètre
 - L'éditeur signale quand le motif de commande et les paramètres déclarés divergent : un `{placeholder}` sans paramètre, ou un paramètre que le motif n'utilise jamais. Il avertit et ne bloque jamais, parce que les accolades sont de la ponctuation shell ordinaire
 - Aperçu en direct de la commande générée, avec échappement shell appliqué aux valeurs substituées
+- Ouverte depuis une session, la bibliothèque préremplit un paramètre d'hôte avec l'hôte de la session et un paramètre d'utilisateur (`user`, `username`, `login`, `account`, `samaccountname`) avec le nom d'utilisateur de la session ; la valeur par défaut du paramètre est conservée quand la session n'a pas d'utilisateur
 
 **L'exécuter**
 - Copier dans le presse-papiers, ou envoyer vers le terminal de la session depuis laquelle la bibliothèque a été ouverte
+- **Insérer** (`Maj+Entrée`), entre Copier et Envoyer, tape la commande à l'invite de ce terminal sans l'exécuter, pour que vous puissiez la relire, la modifier et appuyer vous-même sur Entrée. Rien ne s'exécute, donc la confirmation des commandes dangereuses n'est jamais demandée ; un saut de ligne dans la commande devient une espace, et l'historique l'enregistre comme copiée, pas envoyée
 - Les commandes marquées dangereuses demandent confirmation avant envoi
 - **Envoyer vers plusieurs terminaux ouverts** : cochez les terminaux dans un panneau à côté du bouton Envoyer et la même commande part vers chacun. Elle atteint des terminaux déjà ouverts et n'en connecte jamais aucun ; tous reçoivent le même texte ; une seule confirmation nomme combien vont recevoir, quel que soit le risque déclaré de l'action ; et un terminal qui refuse n'arrête pas les autres : le résumé nomme ceux qui n'ont pas reçu
-- Clavier : `Entrée` copie, `Ctrl+Entrée` envoie, `Ctrl+D` duplique l'action sélectionnée
+- Clavier : `Entrée` copie, `Maj+Entrée` insère, `Ctrl+Entrée` envoie, `Ctrl+D` duplique l'action sélectionnée
 
 **Historique**
-- Chaque commande copiée ou envoyée est enregistrée avec son titre, sa catégorie et son horodatage
+- Chaque commande copiée ou envoyée est enregistrée avec son titre, sa catégorie et son horodatage, l'hôte de la session depuis laquelle la bibliothèque a été ouverte, et le fait qu'elle a été envoyée ou seulement copiée
+- Une case **Cet hôte uniquement** en haut du panneau, cochée par défaut quand la bibliothèque appartient à une session, ne montre que ce qui est parti vers cet hôte ; elle garde son état quand le panneau se recharge
+- Envoyée signifie que le texte a atteint le terminal, pas qu'il a réussi : un terminal ne renvoie rien, aucun code de sortie n'est donc enregistré
 - La commande elle-même et les valeurs de ses paramètres sont chiffrées avant d'atteindre la base, sous le coffre à mot de passe maître quand il est configuré et via DPAPI sinon
 - Rejouez une commande passée dans le générateur, avec ses paramètres
 - Rien n'est enregistré coffre verrouillé, et les lignes sont purgées au-delà de 90 jours
 
 **Partager**
+- L'export demande d'abord ce que le fichier doit contenir : **Mes actions** (par défaut : les actions que vous avez créées ou importées), **Filtre actuel** (ce que la liste montre, recherche comprise) ou **Tout** (le catalogue fourni compris) ; l'avertissement sur les secrets des champs libres suit ce choix
 - Import et export en JSON, et synchronisation Git pour une bibliothèque d'équipe ; **Synchroniser au démarrage** s'exécute une fois après le déverrouillage du coffre, et un échec est signalé dans la barre d'état
 - Les actions issues d'un import voient leur niveau de risque et leur plateforme ramenés à des valeurs connues : un niveau non reconnu est traité comme dangereux plutôt qu'anodin
 - Un export conserve le texte anglais de chaque action avec ses traductions ; un export pris avant la localisation des catégories s'importe dans les catégories actuelles

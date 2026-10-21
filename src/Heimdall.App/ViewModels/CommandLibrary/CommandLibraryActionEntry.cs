@@ -70,6 +70,15 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     public string Category => Source.Category;
 
     /// <summary>
+    /// The command pattern this row's action would open on under the current platform filter,
+    /// on one line and shortened like the palette's snippet previews.
+    /// </summary>
+    /// <remarks>
+    /// Read from the owning view model at bind time, like the favorite glyph: the platform
+    /// filter's change already refreshes the list view, which re-binds every row.
+    /// </remarks>
+    public string CommandPreview => _viewModel.ResolveCommandPreview(Source);
+
     /// Category label in the operator's language, used for grouping. Delegates to
     /// <see cref="CommandPresentationResolver.ResolveCategoryLabel"/>.
     /// </summary>

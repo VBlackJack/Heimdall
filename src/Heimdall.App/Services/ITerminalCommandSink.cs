@@ -37,4 +37,15 @@ public interface ITerminalCommandSink
     /// </remarks>
     /// <param name="command">The command string to inject.</param>
     void WriteCommand(string command);
+
+    /// <summary>
+    /// Types the given text at the prompt without submitting it, so the operator can review
+    /// and edit it before pressing Enter themselves.
+    /// </summary>
+    /// <remarks>
+    /// Like <see cref="WriteCommand"/>, the formatting lives below the interface: line breaks
+    /// are removed by the implementor, never by the caller.
+    /// </remarks>
+    /// <param name="text">The text to type.</param>
+    void WriteText(string text);
 }

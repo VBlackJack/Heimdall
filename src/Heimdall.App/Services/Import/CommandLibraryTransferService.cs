@@ -51,9 +51,9 @@ public sealed class CommandLibraryTransferService(
     };
 
     /// <inheritdoc/>
-    public async Task<int> ExportAsync(IActionService actionService, string path)
+    public async Task<int> ExportAsync(IReadOnlyList<ActionModel> actions, string path)
     {
-        var actions = (await actionService.GetAllActionsAsync()).ToList();
+        ArgumentNullException.ThrowIfNull(actions);
 
         var envelope = new
         {

@@ -169,11 +169,12 @@ public sealed class CommandLibraryShortcutTests
     }
 
     /// <summary>
-    /// The three chords were picked because the window does not already take them. A
-    /// fourth one added without that check would collide silently, so the set is pinned.
+    /// The chords were picked because the window does not already take them. One added
+    /// without that check would collide silently, so the set is pinned. Shift+Return joined
+    /// it for Insert after the same check: the window claims Shift+F10, not Shift+Return.
     /// </summary>
     [StaFact]
-    public void TheViewDeclaresExactlyTheThreeIntendedShortcuts()
+    public void TheViewDeclaresExactlyTheIntendedShortcuts()
     {
         Window? window = null;
 
@@ -188,7 +189,7 @@ public sealed class CommandLibraryShortcutTests
                 .OrderBy(text => text, StringComparer.Ordinal)
                 .ToList();
 
-            Assert.Equal(["Control+D", "Control+Return", "None+Return"], declared);
+            Assert.Equal(["Control+D", "Control+Return", "None+Return", "Shift+Return"], declared);
         });
 
         WpfTestHost.Invoke(() => window!.Close());

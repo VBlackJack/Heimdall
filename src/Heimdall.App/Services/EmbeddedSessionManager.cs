@@ -1611,12 +1611,22 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             };
         }
 
+        // A library docked beside a terminal learns the session it serves - host, user, protocol
+        // and declared operating system - from that session's profile. Limited to the library:
+        // it is the one tool that reads them as facts about the session it writes into, and
+        // prefilling every other docked tool would change what those tools open with.
+        if (string.Equals(toolId, ToolRegistry.CommandLibraryToolId, StringComparison.OrdinalIgnoreCase))
+        {
+            context = WithSessionProfile(context, ResolveSessionProfile(sessionTab));
+        }
+
         // Inject busy state callback so tools can signal long-running operations.
         // Inject send-to-terminal callback for command injection into sibling terminals.
         context = (context ?? new ToolContext()) with
         {
             SetBusyAction = busy => sessionTab.IsBusy = busy,
             SendCommandAction = command => TrySendCommandToSession(sessionTab, command),
+            InsertTextAction = text => TryInsertTextIntoSession(sessionTab, text),
             CanSendToTerminal = () => SessionHasTerminalSink(sessionTab),
             CommandBroadcaster = new SessionBroadcaster(this, sessionTab)
         };
@@ -1626,11 +1636,101 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     }
 
     /// <inheritdoc />
+    public Func<string, ServerProfileDto?>? ProfileResolver { get; set; }
+
+    /// <summary>
+    /// The profile behind the terminal a docked tool writes into, or null when the tab is a tool
+    /// tab, has no profile, or no resolver is wired.
+    /// </summary>
+    /// <remarks>
+    /// The pane chosen is the first terminal sink, the same one
+    /// <see cref="TrySendCommandToFirstSink"/> writes to, so the host a command is recorded
+    /// against is the host it reaches. A tab without a terminal yet falls back to its primary
+    /// pane.
+    /// </remarks>
+    private ServerProfileDto? ResolveSessionProfile(SessionTabViewModel sessionTab)
+    {
+        if (ConnectionTypeCatalog.IsToolConnectionType(sessionTab.ConnectionType))
+        {
+            return null;
+        }
+
+        if (sessionTab.IsAdHoc && sessionTab.AdHocProfileSnapshot is { } snapshot)
+        {
+            return snapshot;
+        }
+
+        var sinkPane = SplitTreeHelper.EnumerateLeaves(sessionTab.RootContent)
+            .FirstOrDefault(pane => pane.HostControl is ITerminalCommandSink);
+        var profileId = sessionTab.ProfileLookupServerIdFor(sinkPane);
+        return string.IsNullOrWhiteSpace(profileId) ? null : ProfileResolver?.Invoke(profileId);
+    }
+
+    /// <summary>
+    /// Fills the session facts a context does not already carry from <paramref name="profile"/>:
+    /// the host, the user, the connection type and the declared operating system.
+    /// </summary>
+    /// <remarks>
+    /// What the caller put in the context wins: a context built for a specific host is about
+    /// that host, whatever tab it is opened in.
+    /// </remarks>
+    internal static ToolContext? WithSessionProfile(ToolContext? context, ServerProfileDto? profile)
+    {
+        if (profile is null)
+        {
+            return context;
+        }
+
+        context ??= new ToolContext();
+        var username = ServerItemViewModel.GetUsername(profile);
+        return context with
+        {
+            TargetHost = string.IsNullOrWhiteSpace(context.TargetHost)
+                ? NullIfBlank(profile.RemoteServer)
+                : context.TargetHost,
+            Username = string.IsNullOrWhiteSpace(context.Username) ? NullIfBlank(username) : context.Username,
+            ConnectionType = string.IsNullOrWhiteSpace(context.ConnectionType)
+                ? NullIfBlank(profile.ConnectionType)
+                : context.ConnectionType,
+            RemoteOs = context.RemoteOs != RemoteOs.Auto ? context.RemoteOs : profile.RemoteOs,
+        };
+
+        static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    /// <inheritdoc />
     public bool TrySendCommandToSession(SessionTabViewModel session, string command)
     {
         if (session is null) return false;
 
         return TrySendCommandToFirstSink(session.RootContent, command);
+    }
+
+    /// <summary>
+    /// Types text at the prompt of the session's first terminal without submitting it, the same
+    /// terminal <see cref="TrySendCommandToSession"/> writes to.
+    /// </summary>
+    /// <returns><c>true</c> when a terminal received the text.</returns>
+    public bool TryInsertTextIntoSession(SessionTabViewModel session, string text)
+    {
+        if (session is null) return false;
+
+        return TryInsertTextIntoFirstSink(session.RootContent, text);
+    }
+
+    /// <summary>
+    /// Pure helper that forwards text to the first terminal sink of the split tree, unsubmitted.
+    /// </summary>
+    /// <returns>
+    /// <c>true</c> when a sink was found and written to; <c>false</c> when there is none.
+    /// </returns>
+    internal static bool TryInsertTextIntoFirstSink(ISplitContent? root, string text)
+    {
+        var sink = FindFirstTerminalSink(root);
+        if (sink is null) return false;
+
+        sink.WriteText(text);
+        return true;
     }
 
     /// <summary>

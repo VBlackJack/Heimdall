@@ -443,14 +443,8 @@ public sealed partial class CommandPaletteViewModel
     /// <summary>Maximum number of servers surfaced in the empty-query seed (normal, non-split mode).</summary>
     private const int MaxServerSuggestions = 10;
 
-    /// <summary>Maximum length of the command preview shown next to a snippet result.</summary>
-    private const int SnippetPreviewMaxLength = 96;
-
     /// <summary>Decorative prefix marking an active session as a split-merge candidate.</summary>
     private const string MergeArrowPrefix = "↔ ";
-
-    /// <summary>Ellipsis glyph appended to truncated previews.</summary>
-    private const string EllipsisGlyph = "...";
 
     /// <summary>
     /// Returns true when the input looks like a bare IP address or hostname
@@ -548,11 +542,7 @@ public sealed partial class CommandPaletteViewModel
     /// </summary>
     private ServerItemViewModel BuildSnippetItem(ActionModel action)
     {
-        var preview = ResolveSnippetCommand(action);
-        if (preview.Length > SnippetPreviewMaxLength)
-        {
-            preview = preview[..SnippetPreviewMaxLength] + EllipsisGlyph;
-        }
+        var preview = CommandPreviewText.ToPreview(ResolveSnippetCommand(action));
 
         return new ServerItemViewModel
         {

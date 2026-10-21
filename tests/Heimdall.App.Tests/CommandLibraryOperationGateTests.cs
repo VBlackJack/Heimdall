@@ -179,7 +179,7 @@ public sealed class CommandLibraryOperationGateTests
             return _gate.Task;
         }
 
-        public Task<int> ExportAsync(IActionService actionService, string path) => Task.FromResult(0);
+        public Task<int> ExportAsync(IReadOnlyList<TwinShell.Core.Models.Action> actions, string path) => Task.FromResult(0);
 
         /// <summary>
         /// Waits for the import to reach the service, bounded so that a regression which

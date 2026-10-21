@@ -274,7 +274,7 @@ public sealed partial class CommandLibraryViewModel
         // session the operator is in, so a row per target would all replay to the same place.
         if (delivered > 0)
         {
-            RecordHistory();
+            RecordHistory(isExecuted: true);
         }
 
         RefreshBroadcastTargets();

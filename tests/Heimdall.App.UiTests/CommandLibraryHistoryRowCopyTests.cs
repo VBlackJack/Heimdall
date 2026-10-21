@@ -116,6 +116,7 @@ public sealed class CommandLibraryHistoryRowCopyTests
     [StaTheory]
     [InlineData(CommandLibraryViewModel.CopyTarget)]
     [InlineData(CommandLibraryViewModel.SendTarget)]
+    [InlineData(CommandLibraryViewModel.InsertTarget)]
     [InlineData(CommandLibraryViewModel.CopyExampleTarget)]
     public void EveryDeclaredFeedbackTargetResolvesToAControl(string target)
     {

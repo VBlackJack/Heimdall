@@ -13,10 +13,12 @@
          was checked against what the window already takes: Ctrl+B/E/F/N/O/S/T/W/Tab are
          registered globally, and the window's preview handler only claims Apps, Shift+F10,
          F11 and Escape-while-fullscreen. Return and Ctrl+Return match the convention the
-         other tools already use for a primary and a consequential action. -->
+         other tools already use for a primary and a consequential action. Shift+Return types
+         the command at the prompt without running it; the window claims no Shift+Return. -->
     <UserControl.InputBindings>
         <KeyBinding Key="Return" Command="{Binding CopyCommand}"/>
         <KeyBinding Key="Return" Modifiers="Control" Command="{Binding SendCommand}"/>
+        <KeyBinding Key="Return" Modifiers="Shift" Command="{Binding InsertCommand}"/>
         <KeyBinding Key="D" Modifiers="Control" Command="{Binding DuplicateSelectedCommand}"/>
     </UserControl.InputBindings>
     <Grid>
@@ -346,6 +348,15 @@
                                        FontSize="{StaticResource FontSizeCaption}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        TextTrimming="CharacterEllipsis"/>
+                            <!-- The command itself, for the template a click would open on under
+                                 the current platform filter. Not part of the row's spoken name,
+                                 which stays title then badges. -->
+                            <TextBlock Text="{Binding CommandPreview}"
+                                       FontFamily="{StaticResource FontFamilyMonospace}"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
                     </DockPanel>
                 </DataTemplate>
@@ -613,6 +624,21 @@
                                 Padding="{StaticResource PaddingButtonCopy}"
                                 FontSize="{StaticResource FontSizeBody}"
                                 Margin="{StaticResource MarginInlineSm}" TabIndex="5"/>
+                        <!-- Insert sits between Copy and Send: it reaches the terminal like Send and
+                             runs nothing, like Copy. Enabled under Send's condition. -->
+                        <Button x:Name="BtnInsert"
+                                Command="{Binding InsertCommand}"
+                                IsEnabled="{Binding IsSendEnabled}"
+                                Visibility="{Binding IsInsertVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                ToolTip="{loc:Translate ToolCmdLibBtnInsertTooltip}"
+                                ToolTipService.ShowOnDisabled="True"
+                                Content="{loc:Translate ToolCmdLibBtnInsert}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibBtnInsert}"
+                                AutomationProperties.HelpText="{loc:Translate ToolCmdLibBtnInsertTooltip}"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="{StaticResource PaddingButtonCopy}"
+                                FontSize="{StaticResource FontSizeBody}"
+                                Margin="{StaticResource MarginInlineSm}" TabIndex="5"/>
                         <Button x:Name="BtnSend"
                                 Command="{Binding SendCommand}"
                                 IsEnabled="{Binding IsSendEnabled}"
@@ -758,6 +784,15 @@
                             Style="{DynamicResource GhostButtonStyle}"
                             FontSize="14" MinWidth="28" Height="28"
                             Padding="4"/>
+                    <!-- Only offered when the library was opened for a host: without one there is
+                         nothing to compare a row against. -->
+                    <CheckBox DockPanel.Dock="Right"
+                              Content="{loc:Translate ToolCmdLibHistoryThisHostOnly}"
+                              AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryThisHostOnly}"
+                              IsChecked="{Binding HistoryThisHostOnly, Mode=TwoWay}"
+                              Visibility="{Binding HasTargetHost, Converter={StaticResource BoolToVisibilityConverter}}"
+                              VerticalAlignment="Center"
+                              Margin="{StaticResource MarginInlineControl}"/>
                     <TextBlock Text="{loc:Translate ToolCmdLibHistoryTitle}"
                                FontSize="{StaticResource FontSizeBody}"
                                FontWeight="SemiBold"
@@ -775,6 +810,9 @@
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
+                            <!-- Title, host, sent or copied, and time, as the action rows do it:
+                                 the row's TextBlocks give its container no name of their own. -->
+                            <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             <Setter Property="Padding" Value="12,4"/>
                             <Setter Property="Cursor" Value="Hand"/>
@@ -844,11 +882,36 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            VerticalAlignment="Center"
                                            Margin="{StaticResource MarginInlineControl}"/>
+                                <!-- Sent or copied: where the text went, never how it ended.
+                                     A terminal has no return channel, so there is no exit code. -->
+                                <TextBlock DockPanel.Dock="Right"
+                                           Text="{loc:Translate ToolCmdLibHistorySent}"
+                                           Visibility="{Binding IsExecuted, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="{StaticResource MarginInlineControl}"/>
+                                <TextBlock DockPanel.Dock="Right"
+                                           Text="{loc:Translate ToolCmdLibHistoryCopied}"
+                                           Visibility="{Binding IsCopied, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="{StaticResource MarginInlineControl}"/>
                                 <StackPanel>
-                                    <TextBlock Text="{Binding ActionTitle}"
-                                               FontSize="{StaticResource FontSizeCaption}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               TextTrimming="CharacterEllipsis"/>
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right"
+                                                   Text="{Binding TargetHost}"
+                                                   Visibility="{Binding HasTargetHost, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Margin="{StaticResource MarginInlineControl}"/>
+                                        <TextBlock Text="{Binding ActionTitle}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </DockPanel>
                                     <ScrollViewer HorizontalScrollBarVisibility="Auto"
                                                   VerticalScrollBarVisibility="Disabled"
                                                   Visibility="{Binding IsReadable, Converter={StaticResource BoolToVisibilityConverter}}">

@@ -54,6 +54,27 @@ internal static class TerminalCommandFormatter
         return line + AppConstants.TerminalSubmitKey;
     }
 
+    /// <summary>
+    /// Prepares text to be typed at the prompt without running it: no submit key, and no line
+    /// break anywhere.
+    /// </summary>
+    /// <remarks>
+    /// <para>Trailing terminators go exactly as <see cref="Submit"/> removes them. A break inside
+    /// the text is replaced by a space rather than kept: on a terminal any CR or LF submits the
+    /// line before it, so a multi-line pattern would run its first line the moment it was
+    /// inserted, which is the opposite of what Insert offers.</para>
+    /// </remarks>
+    public static string Insert(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        string line = text.TrimEnd('\r', '\n');
+        return line
+            .Replace("\r\n", " ", StringComparison.Ordinal)
+            .Replace('\r', ' ')
+            .Replace('\n', ' ');
+    }
+
     private enum LocalShellKind
     {
         Cmd,

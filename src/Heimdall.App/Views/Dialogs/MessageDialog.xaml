@@ -50,7 +50,7 @@
         </ScrollViewer>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal"
+        <StackPanel x:Name="ButtonPanel" Grid.Row="2" Orientation="Horizontal"
                     HorizontalAlignment="Right">
             <Button x:Name="BtnTertiary"
                     Click="OnTertiaryClick"
