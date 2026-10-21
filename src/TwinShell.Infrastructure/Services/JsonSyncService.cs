@@ -647,7 +647,8 @@ public sealed class JsonSyncService : SyncServiceBase
                     platform = Platform.Windows;
                 }
 
-                if (!Enum.TryParse<CriticalityLevel>(model.Level, true, out var level))
+                // Accepts the legacy "Warning" and "Danger" an older schema declared.
+                if (!CriticalityLevelNames.TryParse(model.Level, out var level))
                 {
                     level = CriticalityLevel.Info;
                 }

@@ -17,6 +17,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
+using TwinShell.Core.Helpers;
 
 namespace TwinShell.Infrastructure.Services;
 
@@ -35,7 +36,7 @@ public static class JsonSchemaValidator
     {
         CategorySchema = JsonSchema.FromText(CategorySchemaJson);
         TemplateSchema = JsonSchema.FromText(TemplateSchemaJson);
-        ActionSchema = JsonSchema.FromText(ActionSchemaJson);
+        ActionSchema = JsonSchema.FromText(BuildActionSchemaJson());
         BatchSchema = JsonSchema.FromText(BatchSchemaJson);
     }
 
@@ -247,6 +248,18 @@ public static class JsonSchemaValidator
     }
     """;
 
+    private const string LevelNamesPlaceholder = "[\"__LEVEL_NAMES__\"]";
+
+    /// <summary>
+    /// The action schema with its level list taken from <see cref="CriticalityLevelNames"/>,
+    /// the one source shared with the import that reads the level.
+    /// </summary>
+    internal static string BuildActionSchemaJson()
+        => ActionSchemaJson.Replace(
+            LevelNamesPlaceholder,
+            JsonSerializer.Serialize(CriticalityLevelNames.AcceptedNames),
+            StringComparison.Ordinal);
+
     private const string ActionSchemaJson = """
     {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -277,7 +290,7 @@ public static class JsonSchemaValidator
             },
             "level": {
                 "type": "string",
-                "enum": ["Info", "Warning", "Danger"]
+                "enum": ["__LEVEL_NAMES__"]
             },
             "tags": {
                 "type": ["array", "null"],
