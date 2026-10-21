@@ -188,7 +188,7 @@ public sealed class GitSyncServiceCancellationTests
     /// <see cref="GitSyncService"/> to run import/export through a scope while the
     /// optional sync-history repository stays absent.
     /// </summary>
-    private sealed class SingleServiceScopeFactory : IServiceScopeFactory, IServiceScope, IServiceProvider
+    internal sealed class SingleServiceScopeFactory : IServiceScopeFactory, IServiceScope, IServiceProvider
     {
         private readonly ISyncService _syncService;
 
@@ -207,7 +207,7 @@ public sealed class GitSyncServiceCancellationTests
         }
     }
 
-    private sealed class GitRepositoryFixture : IDisposable
+    internal sealed class GitRepositoryFixture : IDisposable
     {
         private GitRepositoryFixture(string rootPath, string localPath, string barePath, string branchName)
         {
@@ -336,7 +336,7 @@ public sealed class GitSyncServiceCancellationTests
         }
     }
 
-    private sealed class ControllableSyncService : ISyncService
+    internal sealed class ControllableSyncService : ISyncService
     {
         internal Func<string, CancellationToken, Task<SyncImportResult>> ImportHandler { get; set; } =
             (string _, CancellationToken _) => Task.FromResult(new SyncImportResult { Success = true });
@@ -372,7 +372,7 @@ public sealed class GitSyncServiceCancellationTests
         }
     }
 
-    private sealed class FakeSettingsService : ISettingsService
+    internal sealed class FakeSettingsService : ISettingsService
     {
         internal FakeSettingsService(UserSettings settings)
         {

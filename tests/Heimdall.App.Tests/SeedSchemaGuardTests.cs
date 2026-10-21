@@ -67,7 +67,8 @@ public sealed class SeedSchemaGuardTests
         var files = Directory.EnumerateFiles(CommandGeneratorServiceTests.FindSeedActionsDirectory(), "*.json")
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToList();
-        // 442 files since the workstation debloat actions moved to data/packs.
+        // A floor against a discovery that finds nothing, not the count: the seed set grows and
+        // shrinks, and docs/TOOLS.md states its current size.
         Assert.True(files.Count >= 400, $"Expected the seed catalogue, found {files.Count} files.");
 
         var offenders = new List<string>();

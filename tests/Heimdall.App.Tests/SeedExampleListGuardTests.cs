@@ -44,7 +44,8 @@ public sealed class SeedExampleListGuardTests
 
     /// <summary>
     /// The three guards iterate the lists, so finding none would leave them green over
-    /// nothing. The catalogue holds well over a thousand lists across 442 files.
+    /// nothing. The catalogue holds well over a thousand lists; its file count moves with
+    /// every seed change, and docs/TOOLS.md states the current one.
     /// </summary>
     [Fact]
     public void TheSeedExampleListsAreFound()

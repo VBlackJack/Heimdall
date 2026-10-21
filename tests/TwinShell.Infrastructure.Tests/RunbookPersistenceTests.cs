@@ -210,6 +210,33 @@ public sealed class RunbookPersistenceTests
         reloaded.UpdatedAt.Should().Be(remoteEdit);
     }
 
+    // Git sync's import sets IsUserCreated from the shared copy on an updated runbook; the
+    // repository used to leave the column alone, so the imported value was lost.
+    [Fact]
+    public async Task RepositoryUpdate_StoresTheUserCreatedFlagItWasGiven()
+    {
+        await using TempDatabase database = await TempDatabase.CreateAsync();
+
+        string id;
+        await using (TwinShellDbContext context = database.NewContext())
+        {
+            id = (await NewService(context).CreateBatchAsync(Runbook("status"))).Id;
+        }
+
+        await using (TwinShellDbContext context = database.NewContext())
+        {
+            BatchRepository repository = new(context);
+            CommandBatch loaded = (await repository.GetByIdAsync(id))!;
+            loaded.IsUserCreated.Should().BeTrue("a created runbook starts user-created");
+            loaded.IsUserCreated = false;
+            await repository.UpdateAsync(loaded);
+        }
+
+        await using TwinShellDbContext readContext = database.NewContext();
+        CommandBatch reloaded = (await NewService(readContext).GetBatchByIdAsync(id))!;
+        reloaded.IsUserCreated.Should().BeFalse();
+    }
+
     private static BatchService NewService(TwinShellDbContext context) => new(new BatchRepository(context));
 
     private static CommandBatch Runbook(params string[] stepTitles) => new()
