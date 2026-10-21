@@ -30,6 +30,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- ═══════════ ROW 0 - HEADER ═══════════ -->
@@ -55,6 +56,17 @@
                         Command="{Binding ToggleHistoryCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnHistory}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnHistory}"
+                        Style="{DynamicResource GhostButtonStyle}"
+                        FontSize="14" MinWidth="28" Height="28"
+                        Padding="4"
+                        Margin="{StaticResource MarginInlineControl}"
+                        TabIndex="14"/>
+                <Button DockPanel.Dock="Right"
+                        x:Name="BtnRunbooks"
+                        Content="&#xE9D5;" FontFamily="{StaticResource FontFamilyIcons}"
+                        Command="{Binding ToggleRunbooksCommand}"
+                        ToolTip="{loc:Translate ToolCmdLibBtnRunbooks}"
+                        AutomationProperties.Name="{loc:Translate ToolCmdLibBtnRunbooks}"
                         Style="{DynamicResource GhostButtonStyle}"
                         FontSize="14" MinWidth="28" Height="28"
                         Padding="4"
@@ -941,6 +953,99 @@
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            Margin="0,8,0,8"/>
             </DockPanel>
+        </Border>
+
+        <!-- ═══════════ ROW 7 - RUNBOOKS PANEL ═══════════ -->
+        <Border Grid.Row="7"
+                x:Name="RunbooksPanel"
+                Visibility="{Binding IsRunbooksVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                MaxHeight="420">
+            <Grid>
+                <!-- The list of runbooks -->
+                <DockPanel x:Name="RunbookListPanel">
+                    <DockPanel DockPanel.Dock="Top" Margin="12,8,12,4">
+                        <Button DockPanel.Dock="Right"
+                                Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
+                                Command="{Binding DeleteRunbookCommand}"
+                                ToolTip="{loc:Translate ToolCmdLibRunbookDelete}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookDelete}"
+                                Style="{DynamicResource GhostButtonStyle}"
+                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                        <Button DockPanel.Dock="Right"
+                                Content="&#xE8C8;" FontFamily="{StaticResource FontFamilyIcons}"
+                                Command="{Binding DuplicateRunbookCommand}"
+                                ToolTip="{loc:Translate ToolCmdLibRunbookDuplicate}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookDuplicate}"
+                                Style="{DynamicResource GhostButtonStyle}"
+                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                        <Button DockPanel.Dock="Right"
+                                Content="&#xE70F;" FontFamily="{StaticResource FontFamilyIcons}"
+                                Command="{Binding EditRunbookCommand}"
+                                ToolTip="{loc:Translate ToolCmdLibRunbookEdit}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookEdit}"
+                                Style="{DynamicResource GhostButtonStyle}"
+                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                        <Button DockPanel.Dock="Right"
+                                Content="&#xE710;" FontFamily="{StaticResource FontFamilyIcons}"
+                                Command="{Binding NewRunbookCommand}"
+                                ToolTip="{loc:Translate ToolCmdLibRunbookNew}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookNew}"
+                                Style="{DynamicResource GhostButtonStyle}"
+                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                        <TextBlock Text="{loc:Translate ToolCmdLibRunbooksTitle}"
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Text="{loc:Translate ToolCmdLibRunbooksEmpty}"
+                               Visibility="{Binding IsRunbooksEmpty, Converter={StaticResource BoolToVisibilityConverter}}"
+                               Style="{StaticResource ToolEmptyStateTextStyle}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,8"/>
+                    <ListView ItemsSource="{Binding Runbooks}"
+                              SelectedItem="{Binding SelectedRunbook, Mode=TwoWay}"
+                              AutomationProperties.Name="{loc:Translate ToolCmdLibRunbooksTitle}"
+                              Background="Transparent" BorderThickness="0"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="12,4"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Right"
+                                               Text="{Binding LastRunText}"
+                                               FontSize="{StaticResource FontSizeSmallCaption}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="{StaticResource MarginInlineControl}"/>
+                                    <TextBlock DockPanel.Dock="Right"
+                                               Text="{Binding StepCountText}"
+                                               FontSize="{StaticResource FontSizeSmallCaption}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="{StaticResource MarginInlineControl}"/>
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="{StaticResource FontSizeBody}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"/>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </DockPanel>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

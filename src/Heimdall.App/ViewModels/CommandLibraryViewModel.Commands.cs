@@ -232,6 +232,7 @@ public sealed partial class CommandLibraryViewModel
             return;
         }
         IsGeneratorVisible = false;
+        IsRunbooksVisible = false;
         IsHistoryVisible = true;
         await LoadHistoryAsync();
     }

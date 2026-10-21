@@ -608,6 +608,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         SendCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SendTooltip));
         OnPropertyChanged(nameof(ShowCopyHint));
+        RefreshRunbookRunSendState();
     }
 
     /// <summary>
@@ -723,6 +724,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         ImportCommand.NotifyCanExecuteChanged();
         ExportCommand.NotifyCanExecuteChanged();
         SyncCommand.NotifyCanExecuteChanged();
+        NotifyRunbookCommands();
     }
 
     // ── Partial property-change hooks ─────────────────────────────
@@ -1008,7 +1010,10 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// </summary>
     public void AutoSelectPlatform(string? connectionType, RemoteOs remoteOs = RemoteOs.Auto)
     {
-        PlatformFilterIndex = RemoteOsResolver.Resolve(remoteOs, connectionType) switch
+        // Kept for the runbooks, whose action steps open on the session's platform whatever
+        // the filter is later set to.
+        _sessionPlatform = RemoteOsResolver.Resolve(remoteOs, connectionType);
+        PlatformFilterIndex = _sessionPlatform switch
         {
             RemoteOs.Linux => PlatformFilterLinux,
             RemoteOs.Windows => PlatformFilterWindows,
@@ -1078,6 +1083,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
             ApplyActiveTemplate();
             IsHistoryVisible = false;
+            IsRunbooksVisible = false;
             IsGeneratorVisible = true;
         }
         finally
@@ -1347,7 +1353,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// user name can fill. Matched on the name alone, like <see cref="IsHostParameter"/>: no
     /// parameter type says "user".
     /// </summary>
-    private static bool IsUserParameter(string name)
+    internal static bool IsUserParameter(string name)
     {
         var n = name.ToLowerInvariant();
         return n is "user" or "username" or "login" or "account" or "samaccountname";
@@ -1362,7 +1368,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         return IsHostParameter(parameter.Name, parameter.Type);
     }
 
-    private static bool IsHostParameter(string name, string? type)
+    internal static bool IsHostParameter(string name, string? type)
     {
         if (string.Equals(type, "hostname", StringComparison.OrdinalIgnoreCase)
             || string.Equals(type, "ipaddress", StringComparison.OrdinalIgnoreCase))
