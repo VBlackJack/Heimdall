@@ -4,7 +4,7 @@
   "description": "Move a clustered role (a resource group) to another node of the failover cluster.",
   "category": "services-automation",
   "platform": 0,
-  "level": 1,
+  "level": 2,
   "tags": [
     "cluster",
     "failover",
