@@ -43,6 +43,8 @@ public sealed class HeimdallThemeBridgeTests
         "SuccessTextBrush",
         "WarningTextBrush",
         "ErrorTextBrush",
+        "InfoTextBrush",
+        "AccentTextBrush",
         "BadgeTextBrush",
         "TextOnAccentBrush",
         "FocusIndicatorBrush",
@@ -118,7 +120,7 @@ public sealed class HeimdallThemeBridgeTests
             .ToList();
 
         Assert.Empty(duplicateKeys);
-        Assert.Equal(66, brushKeys.Count);
+        Assert.Equal(68, brushKeys.Count);
         Assert.Equal(
             ExpectedBrushKeys.OrderBy(key => key, StringComparer.Ordinal),
             brushKeys.OrderBy(key => key, StringComparer.Ordinal));
