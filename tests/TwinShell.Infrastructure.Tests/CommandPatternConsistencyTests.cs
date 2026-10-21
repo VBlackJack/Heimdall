@@ -163,7 +163,7 @@ public sealed class CommandPatternConsistencyTests
         var pattern = "mysql -p'" + CommandPatternQuoting.Placeholder("password") + "'";
 
         Assert.Empty(CommandPatternQuoting.FindUnusedParameters(pattern, ["password"]));
-        Assert.True(CommandPatternQuoting.IsPlaceholderInsideSingleQuotedSpan(pattern, "password"));
+        Assert.True(CommandPatternQuoting.IsPlaceholderOnlyInSingleQuotedSpans(pattern, "password", powerShell: false));
     }
 
     // ── Degenerate input ──────────────────────────────────────────

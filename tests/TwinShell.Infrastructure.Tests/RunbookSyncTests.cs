@@ -51,7 +51,7 @@ public sealed class RunbookSyncTests
                         Order = 0,
                         ActionId = "status",
                         ActionTitle = "Service status",
-                        Command = "systemctl status 'nginx'",
+                        Command = "systemctl status nginx",
                         Platform = Platform.Linux,
                         Parameters = new Dictionary<string, string>(StringComparer.Ordinal) { ["unit"] = "{{unit}}" }
                     }

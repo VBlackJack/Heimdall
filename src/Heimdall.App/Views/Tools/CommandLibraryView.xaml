@@ -135,6 +135,14 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"
                            Margin="{StaticResource MarginInlineControl}"/>
+                <TextBlock Text="{Binding SyncKeptLocalSummary}"
+                           ToolTip="{Binding SyncKeptLocalTitles}"
+                           Visibility="{Binding SyncKeptLocalSummary, Converter={StaticResource NullToVisibilityConverter}}"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="{StaticResource MarginInlineControl}"/>
             </DockPanel>
         </Border>
 

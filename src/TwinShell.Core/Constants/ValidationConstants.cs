@@ -22,14 +22,15 @@ namespace TwinShell.Core.Constants;
 public static class ValidationConstants
 {
     /// <summary>
-    /// Maximum length for a parameter value (256 characters).
+    /// Maximum length for a parameter value (1024 characters).
     /// </summary>
-    public const int MaxParameterLength = 256;
+    public const int MaxParameterLength = 1024;
 
     /// <summary>
-    /// Maximum length for a command (1024 characters).
+    /// Maximum length for a command (4096 characters): room for a multi-line PowerShell
+    /// script such as the workstation debloat pack carries.
     /// </summary>
-    public const int MaxCommandLength = 1024;
+    public const int MaxCommandLength = 4096;
 
     /// <summary>
     /// Maximum number of parameters a single command template may declare (50).
@@ -144,9 +145,9 @@ public static class ValidationConstants
     public const int MaxTemplateNameLength = 200;
 
     /// <summary>
-    /// Maximum length for command template pattern (1000 characters).
+    /// Maximum length for command template pattern (4000 characters).
     /// </summary>
-    public const int MaxTemplateCommandPatternLength = 1000;
+    public const int MaxTemplateCommandPatternLength = 4000;
 
     // ===== Service Limits =====
 

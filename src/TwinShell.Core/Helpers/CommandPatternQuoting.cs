@@ -134,43 +134,23 @@ public static class CommandPatternQuoting
     }
 
     /// <summary>
-    /// Returns <c>true</c> when the first occurrence of the
-    /// <paramref name="parameterName"/> placeholder ("{name}") inside
-    /// <paramref name="commandPattern"/> falls within an open single-quoted span,
-    /// i.e. an odd number of single quotes precede it. This is the precondition
-    /// for <c>QuotingMode.InlineInQuotes</c>, which only escapes the value and
-    /// relies on surrounding quotes already present in the pattern.
+    /// True when <paramref name="parameterName"/> appears in <paramref name="commandPattern"/>
+    /// and every occurrence sits in a literal single-quoted span: the precondition for
+    /// <c>QuotingMode.InlineInQuotes</c>, which only escapes the value and relies on the
+    /// pattern's own quotes.
     /// </summary>
-    /// <param name="commandPattern">The command pattern containing the placeholder.</param>
-    /// <param name="parameterName">The parameter name without braces.</param>
-    /// <returns>
-    /// <c>true</c> when the placeholder is inside a single-quoted span;
-    /// <c>false</c> when it is outside one or absent from the pattern.
-    /// </returns>
-    public static bool IsPlaceholderInsideSingleQuotedSpan(string commandPattern, string parameterName)
+    /// <remarks>
+    /// Read off <see cref="GetPlaceholderQuoteContexts"/>, the lexer the generator uses,
+    /// rather than a count of the single quotes before the first occurrence: the count
+    /// called <c>-Filter "Name -like '*{x}*'"</c> single-quoted although the shell expands
+    /// <c>$(...)</c> there, and never looked at a second occurrence.
+    /// </remarks>
+    public static bool IsPlaceholderOnlyInSingleQuotedSpans(string? commandPattern, string parameterName, bool powerShell)
     {
-        if (string.IsNullOrEmpty(commandPattern) || string.IsNullOrEmpty(parameterName))
-        {
-            return false;
-        }
+        ArgumentNullException.ThrowIfNull(parameterName);
 
-        string placeholder = Placeholder(parameterName);
-        int placeholderIndex = commandPattern.IndexOf(placeholder, StringComparison.Ordinal);
-        if (placeholderIndex < 0)
-        {
-            return false;
-        }
-
-        int quoteCount = 0;
-        for (int index = 0; index < placeholderIndex; index++)
-        {
-            if (commandPattern[index] == '\'')
-            {
-                quoteCount++;
-            }
-        }
-
-        return quoteCount % 2 == 1;
+        var contexts = GetPlaceholderQuoteContexts(commandPattern, parameterName, powerShell);
+        return contexts.Count > 0 && contexts.All(context => context == QuoteContext.SingleQuoted);
     }
 
     /// <summary>
@@ -227,12 +207,18 @@ public static class CommandPatternQuoting
         var state = LexerState.Bare;
         int index = 0;
 
+        // Where the last unescaped dollar sign outside quotes stood: a placeholder right
+        // after it is ${name}, which both bash and PowerShell read as a variable, so the
+        // value is not literal there whatever quoting it gets.
+        int bareDollarIndex = -1;
+
         while (index < commandPattern.Length)
         {
             if (string.CompareOrdinal(commandPattern, index, placeholder, 0, placeholder.Length) == 0)
             {
                 contexts.Add(state switch
                 {
+                    LexerState.Bare when bareDollarIndex == index - 1 => QuoteContext.Expanding,
                     LexerState.Bare => QuoteContext.Bare,
                     LexerState.Single => QuoteContext.SingleQuoted,
                     _ => QuoteContext.Expanding,
@@ -249,6 +235,11 @@ public static class CommandPatternQuoting
                     {
                         index += 2;
                         continue;
+                    }
+
+                    if (c == '$')
+                    {
+                        bareDollarIndex = index;
                     }
 
                     if (!powerShell && c == '$' && index + 1 < commandPattern.Length && commandPattern[index + 1] == '\'')

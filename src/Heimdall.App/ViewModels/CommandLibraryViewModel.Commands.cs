@@ -307,18 +307,26 @@ public sealed partial class CommandLibraryViewModel
         if (!saved) return;
 
         await RunActionServiceOperationAsync(
-            async actionService =>
-            {
-                var action = vm.ToAction();
-                await actionService.CreateActionAsync(action);
-                RememberCreatedCategory(action.Category);
-                await ReloadAsync();
-            },
+            actionService => CreateAndSelectAsync(actionService, vm.ToAction()),
             "Create action",
             "ToolCmdLibErrorTitle");
     }
 
     /// <summary>
+    /// Stores <paramref name="action"/>, reloads the library and selects the new row, the
+    /// way the capture path opens on the action it just created.
+    /// </summary>
+    /// <remarks>
+    /// The reload rebuilds every row, so without the select the operator was left with no
+    /// selection and had to find the action they had just written.
+    /// </remarks>
+    private async Task CreateAndSelectAsync(IActionService actionService, TwinShell.Core.Models.Action action)
+    {
+        var created = await actionService.CreateActionAsync(action);
+        RememberCreatedCategory(action.Category);
+        await ReloadAsync((created ?? action).Id);
+    }
+
     /// Opens the Add dialog prefilled with a command captured from a terminal, creates the
     /// action when the operator saves, and selects it.
     /// </summary>
@@ -342,20 +350,10 @@ public sealed partial class CommandLibraryViewModel
         var saved = await ShowActionDialogAsync(vm);
         if (!saved) return;
 
-        string? createdId = null;
         await RunActionServiceOperationAsync(
-            async actionService =>
-            {
-                var action = vm.ToAction();
-                await actionService.CreateActionAsync(action);
-                RememberCreatedCategory(action.Category);
-                createdId = action.Id;
-                await ReloadAsync();
-            },
+            actionService => CreateAndSelectAsync(actionService, vm.ToAction()),
             "Create captured action",
             "ToolCmdLibErrorTitle");
-
-        SelectActionById(createdId);
     }
 
     /// <summary>
@@ -407,13 +405,7 @@ public sealed partial class CommandLibraryViewModel
         if (!saved) return;
 
         await RunActionServiceOperationAsync(
-            async actionService =>
-            {
-                var action = vm.ToAction();
-                await actionService.CreateActionAsync(action);
-                RememberCreatedCategory(action.Category);
-                await ReloadAsync();
-            },
+            actionService => CreateAndSelectAsync(actionService, vm.ToAction()),
             "Duplicate action",
             "ToolCmdLibErrorTitle");
     }
@@ -696,22 +688,25 @@ public sealed partial class CommandLibraryViewModel
 
         IsSyncing = true;
         SyncStatusMessage = LocalizeKey("ToolCmdLibSyncInProgress");
+        SyncKeptLocalSummary = string.Empty;
+        SyncKeptLocalTitles = string.Empty;
         try
         {
             var result = await Task.Run(() => _gitSyncService.FullSyncAsync());
             await ReloadAsync();
 
             var presentation = CommandLibrarySyncResultMapper.Map(result, LocalizeKey);
+            var body = presentation.Body + DescribeKeptLocalActions(result);
             switch (presentation.Kind)
             {
                 case SyncDialogKind.Warning:
-                    _dialogService.ShowWarning(presentation.Title, presentation.Body);
+                    _dialogService.ShowWarning(presentation.Title, body);
                     break;
                 case SyncDialogKind.Error:
-                    _dialogService.ShowError(presentation.Title, presentation.Body);
+                    _dialogService.ShowError(presentation.Title, body);
                     break;
                 default:
-                    _dialogService.ShowInfo(presentation.Title, presentation.Body);
+                    _dialogService.ShowInfo(presentation.Title, body);
                     break;
             }
         }
@@ -732,6 +727,40 @@ public sealed partial class CommandLibraryViewModel
             IsSyncing = false;
             SyncStatusMessage = string.Empty;
         }
+    }
+
+    /// <summary>The entity type the sync import gives an action in a conflict it records.</summary>
+    private const string SyncActionEntityType = "Action";
+
+    /// <summary>
+    /// Sets the status line for the actions the sync kept local, and returns the paragraph
+    /// the summary dialog appends: the same sentence and the titles, or nothing when the
+    /// sync kept none.
+    /// </summary>
+    /// <remarks>
+    /// The import keeps a local action that is newer than its remote copy and goes on. Said
+    /// nowhere, an edit made on another machine silently failed to arrive, and the operator
+    /// had no way to know which action held the stale text.
+    /// </remarks>
+    private string DescribeKeptLocalActions(GitOperationResult result)
+    {
+        var titles = (result.Conflicts ?? [])
+            .Where(conflict => conflict.Resolution == ConflictResolution.KeepLocal
+                && string.Equals(conflict.EntityType, SyncActionEntityType, StringComparison.OrdinalIgnoreCase))
+            .Select(conflict => conflict.EntityName)
+            .ToList();
+
+        if (titles.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        SyncKeptLocalSummary = _localizer.FormatCount(
+            titles.Count, "ToolCmdLibSyncKeptLocalOne", "ToolCmdLibSyncKeptLocal", titles.Count);
+        SyncKeptLocalTitles = string.Join(Environment.NewLine, titles);
+
+        return Environment.NewLine + Environment.NewLine + SyncKeptLocalSummary + Environment.NewLine
+            + string.Join(Environment.NewLine, titles.Select(title => "- " + title));
     }
 
     /// <summary>

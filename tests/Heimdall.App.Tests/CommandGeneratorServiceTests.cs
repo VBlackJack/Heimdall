@@ -58,7 +58,8 @@ public sealed class CommandGeneratorServiceTests
 
         string command = service.GenerateCommand(template, values);
 
-        command.Should().Be("Add-ADGroupMember -Identity 'Domain Admins' -Members 'jdupont'");
+        // F-12: a value that reads the same without quotes arrives bare.
+        command.Should().Be("Add-ADGroupMember -Identity 'Domain Admins' -Members jdupont");
         command.Should().NotContain("\"'", "the generator must not double-wrap the single-quoted value (D2 Lot A)");
     }
 
@@ -102,8 +103,8 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void GenerateCommand_NoParameters_PatternExceedsMaxLength_Throws()
     {
-        CommandGeneratorService service = CreateService();
-        CommandTemplate template = CreateTemplate("long-pattern", "Long pattern", new string('a', 1100));
+        CommandGeneratorService service = CreateArgumentEchoingService();
+        CommandTemplate template = CreateTemplate("long-pattern", "Long pattern", new string('a', ValidationConstants.MaxCommandLength + 1));
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
 
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
@@ -114,9 +115,11 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void GenerateCommand_GeneratedResultExceedsMaxLength_Throws()
     {
-        CommandGeneratorService service = CreateService();
+        CommandGeneratorService service = CreateArgumentEchoingService();
         TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("val", "Value");
-        string pattern = new string('a', 800) + "{val}" + new string('b', 100);
+        // Pattern and value each fit; together they pass the command bound.
+        string pattern = new string('a', ValidationConstants.MaxCommandLength - ValidationConstants.MaxParameterLength)
+            + "{val}" + new string('b', 100);
         CommandTemplate template = CreateTemplate("expanded-command", "Expanded command", pattern, parameter);
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -131,7 +134,7 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void GenerateCommand_TooManyParameters_Throws()
     {
-        CommandGeneratorService service = CreateService();
+        CommandGeneratorService service = CreateArgumentEchoingService();
         TemplateParameter[] parameters = CreateParameters(ValidationConstants.MaxParametersPerTemplate + 1);
         CommandTemplate template = CreateTemplate("too-many", "Too many", "echo ok", parameters);
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -157,7 +160,7 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void ValidateParameters_TooManyParameters_ReturnsFalseWithCountError()
     {
-        CommandGeneratorService service = CreateService();
+        CommandGeneratorService service = CreateArgumentEchoingService();
         TemplateParameter[] parameters = CreateParameters(ValidationConstants.MaxParametersPerTemplate + 1);
         CommandTemplate template = CreateTemplate("too-many-validation", "Too many validation", "echo ok", parameters);
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -645,14 +648,30 @@ public sealed class CommandGeneratorServiceTests
         string parameterName)
     {
         CommandGeneratorService service = CreateService();
-        Dictionary<string, string> values = CreateSeedGenerationValues(template, parameterName);
+
+        // F-09: a choice refuses any value it does not offer, "A B" included, so the theory
+        // used to throw on such a parameter instead of testing it. It sends the first offered
+        // value instead, which has to arrive inside the pattern's quotes, escaped if it holds
+        // a quote of its own.
+        TemplateParameter target = template.Parameters.Single(parameter => parameter.Name == parameterName);
+        string targetValue = target.IsChoice ? target.AllowedValues![0] : "A B";
+        Dictionary<string, string> values = CreateSeedGenerationValues(template, parameterName, targetValue);
 
         string command = service.GenerateCommand(template, values);
 
-        ContainsValueInsideSingleQuotedSpan(command, "A B")
+        if (targetValue.Contains('\''))
+        {
+            string escaped = template.Platform == Platform.Windows
+                ? targetValue.Replace("'", "''", StringComparison.Ordinal)
+                : targetValue.Replace("'", "'\\''", StringComparison.Ordinal);
+            command.Should().Contain(escaped, $"{fileName} / {templateName} / {parameterName} must escape the quote inside the existing span");
+            return;
+        }
+
+        ContainsValueInsideSingleQuotedSpan(command, targetValue)
             .Should()
             .BeTrue($"{fileName} / {templateName} / {parameterName} should keep the value inside one existing single-quoted span");
-        command.Should().NotContain("''A B''", $"{fileName} / {templateName} / {parameterName} must not double-wrap");
+        command.Should().NotContain("''" + targetValue + "''", $"{fileName} / {templateName} / {parameterName} must not double-wrap");
     }
 
     // A-02: every shipped template opens with the defaults it ships, so each one has to
@@ -704,11 +723,80 @@ public sealed class CommandGeneratorServiceTests
             // fails and the entry has to leave the list, so the list cannot outlive the defect.
             generate.Should().Throw<InvalidOperationException>(
                     $"{seedTemplate} is listed as longer than the generator accepts; remove it from the list once it fits")
-                .WithMessage($"*{ValidationConstants.MaxCommandLength}*");
+                .WithMessage(MessageKeys.ValidationParameterCommandTooLong);
             return;
         }
 
         generate.Should().NotThrow($"{seedTemplate} must generate with its shipped defaults");
+    }
+
+    // F-08: an empty optional value used to arrive as '' (hostname '', git pull ''). The
+    // generator now leaves such an argument out, so an empty quoted token left in a command
+    // built from the shipped defaults comes from the pattern: quotes written around a
+    // placeholder whose default is empty (-HostHeader '{hostHeader}').
+    [Theory]
+    [MemberData(nameof(EverySeedTemplate))]
+    public void GenerateCommand_EverySeedTemplate_ShippedDefaultsQuoteNothingEmpty(string seedTemplate)
+    {
+        string[] parts = seedTemplate.Split(" / ", StringSplitOptions.None);
+        CommandTemplate template = LoadSeedTemplate(parts[0], parts[1]);
+        Dictionary<string, string> values = new(StringComparer.Ordinal);
+        foreach (TemplateParameter parameter in template.Parameters)
+        {
+            string value = parameter.DefaultValue ?? string.Empty;
+            if (parameter.Required && string.IsNullOrWhiteSpace(value))
+            {
+                value = parameter.IsChoice ? parameter.AllowedValues![0] : SafeValueForParameter(parameter);
+            }
+
+            values[parameter.Name] = value;
+        }
+
+        string command = CreateService().GenerateCommand(template, values);
+        bool quotesNothing = EmptyQuotedToken.IsMatch(command);
+
+        if (EmptyQuotedSeedTemplates.Contains(seedTemplate))
+        {
+            // Pinned from the other side too: once the seed is fixed this fails and the entry
+            // has to leave the list, so the list cannot outlive the defect.
+            quotesNothing.Should().BeTrue(
+                $"{seedTemplate} is listed as quoting an empty default; remove it from the list once it does not: {command}");
+            return;
+        }
+
+        quotesNothing.Should().BeFalse($"{seedTemplate} must not quote an empty value: {command}");
+    }
+
+    /// <summary>
+    /// A pair of single or double quotes holding nothing and standing as a token of its own,
+    /// alone or after <c>=</c>. Doubled quotes inside a value (<c>'it''s'</c>) and the bash
+    /// close-escape-reopen sequence (<c>'\''</c>) touch other characters and do not match.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex EmptyQuotedToken = new(
+        @"(^|[\s=])(''|"""")(\s|$)",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Shipped templates whose pattern writes quotes around a placeholder whose default is
+    /// empty, so the generator cannot leave the argument out. A seed-side defect, fixed in
+    /// the seed files, not here.
+    /// </summary>
+    /// <remarks>
+    /// Empty since iis-create-site moved its optional -HostHeader clause into an example.
+    /// Kept, with the theory pinning every entry from both sides, so a defect that returns is
+    /// listed knowingly and leaves the list once fixed.
+    /// </remarks>
+    private static readonly HashSet<string> EmptyQuotedSeedTemplates = new(StringComparer.Ordinal);
+
+    [Fact]
+    public void EmptyQuotedSeedTemplates_NameOnlyTemplatesTheCatalogueShips()
+    {
+        HashSet<string> shipped = EverySeedTemplate()
+            .Select(row => (string)row[0])
+            .ToHashSet(StringComparer.Ordinal);
+
+        EmptyQuotedSeedTemplates.Where(entry => !shipped.Contains(entry))
+            .Should().BeEmpty("a listed template must still have a seed row, or the list outlives the defect");
     }
 
     /// <summary>
@@ -846,7 +934,8 @@ public sealed class CommandGeneratorServiceTests
 
         string command = service.GenerateCommand(template, values);
 
-        command.Should().Be("Set-MpPreference -ScanScheduleDay 0 -ScanScheduleTime '02:00:00'");
+        // F-12: a time holds nothing PowerShell reads differently unquoted, so it arrives bare.
+        command.Should().Be("Set-MpPreference -ScanScheduleDay 0 -ScanScheduleTime 02:00:00");
     }
 
     // D2 Lot B step 2c: users enter false/true while the template supplies the PowerShell $ prefix.
@@ -1028,15 +1117,17 @@ public sealed class CommandGeneratorServiceTests
     }
 
     // E-01: paths of another machine validate and come out quoted, on both platforms.
+    // F-12: a path made only of characters no shell reads specially comes out bare.
     [Theory]
-    [InlineData("/var/log/syslog")]
-    [InlineData("/etc/nginx/nginx.conf")]
-    [InlineData("C:\\inetpub\\wwwroot")]
-    [InlineData("C:\\Program Files (x86)\\App")]
-    [InlineData("~/backup")]
-    [InlineData("relative/dir")]
-    public void GenerateCommand_RemotePath_ValidatesAndComesOutQuoted(string value)
+    [InlineData("/var/log/syslog", false)]
+    [InlineData("/etc/nginx/nginx.conf", false)]
+    [InlineData("C:\\inetpub\\wwwroot", true)]
+    [InlineData("C:\\Program Files (x86)\\App", true)]
+    [InlineData("~/backup", true)]
+    [InlineData("relative/dir", false)]
+    public void GenerateCommand_RemotePath_ValidatesAndComesOutQuoted(string value, bool quoted)
     {
+        string argument = quoted ? "'" + value + "'" : value;
         CommandGeneratorService service = CreateService();
         CommandTemplate windows = WindowsTemplate(
             "Get-Item -Path {p}",
@@ -1051,8 +1142,8 @@ public sealed class CommandGeneratorServiceTests
 
         windowsErrors.Should().BeEmpty();
         linuxErrors.Should().BeEmpty();
-        service.GenerateCommand(windows, values).Should().Be("Get-Item -Path '" + value + "'");
-        service.GenerateCommand(linux, values).Should().Be("tail -n 50 '" + value + "'");
+        service.GenerateCommand(windows, values).Should().Be("Get-Item -Path " + argument);
+        service.GenerateCommand(linux, values).Should().Be("tail -n 50 " + argument);
     }
 
     // E-01: the localized path reports the same refusals as the generation path.
@@ -1135,6 +1226,32 @@ public sealed class CommandGeneratorServiceTests
     private static CommandGeneratorService CreateService() =>
         new CommandGeneratorService(new FakeTwinShellLocalizationService());
 
+    /// <summary>
+    /// A generator whose messages are the key followed by its arguments, for the tests that
+    /// check a refusal carries its figures as well as its key.
+    /// </summary>
+    private static CommandGeneratorService CreateArgumentEchoingService() =>
+        new CommandGeneratorService(new ArgumentEchoingLocalizationService());
+
+    private sealed class ArgumentEchoingLocalizationService : TwinShell.Core.Interfaces.ILocalizationService
+    {
+        public System.Globalization.CultureInfo CurrentCulture => System.Globalization.CultureInfo.InvariantCulture;
+
+        public System.Globalization.CultureInfo[] SupportedCultures => [System.Globalization.CultureInfo.InvariantCulture];
+
+        public event EventHandler? LanguageChanged;
+
+        public void ChangeLanguage(System.Globalization.CultureInfo culture) => LanguageChanged?.Invoke(this, EventArgs.Empty);
+
+        public void ChangeLanguage(string cultureCode) => LanguageChanged?.Invoke(this, EventArgs.Empty);
+
+        public string GetString(string key) => key;
+
+        public string GetString(string key, string fallback) => fallback;
+
+        public string GetFormattedString(string key, params object[] args) => key + " " + string.Join(" ", args);
+    }
+
     private static CommandTemplate CreateTemplate(
         string id,
         string title,
@@ -1181,7 +1298,8 @@ public sealed class CommandGeneratorServiceTests
 
                 foreach (TemplateParameter parameter in item.Template.Parameters.Where(parameter =>
                     parameter.Quoting == QuotingMode.InlineInQuotes &&
-                    IsPlaceholderInsideSingleQuotedSpan(item.Template.CommandPattern, parameter.Name)))
+                    CommandPatternQuoting.IsPlaceholderOnlyInSingleQuotedSpans(
+                        item.Template.CommandPattern, parameter.Name, item.Template.Platform == Platform.Windows)))
                 {
                     yield return new object[]
                     {
@@ -1315,27 +1433,6 @@ public sealed class CommandGeneratorServiceTests
         }
 
         return false;
-    }
-
-    private static bool IsPlaceholderInsideSingleQuotedSpan(string commandPattern, string parameterName)
-    {
-        string placeholder = "{" + parameterName + "}";
-        int placeholderIndex = commandPattern.IndexOf(placeholder, StringComparison.Ordinal);
-        if (placeholderIndex < 0)
-        {
-            return false;
-        }
-
-        int quoteCount = 0;
-        for (int index = 0; index < placeholderIndex; index++)
-        {
-            if (commandPattern[index] == '\'')
-            {
-                quoteCount++;
-            }
-        }
-
-        return quoteCount % 2 == 1;
     }
 
     private static string SafeValueForParameter(TemplateParameter parameter)
