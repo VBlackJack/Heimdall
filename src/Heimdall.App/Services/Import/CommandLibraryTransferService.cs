@@ -251,8 +251,8 @@ public sealed class CommandLibraryTransferService(
                 continue;
             }
 
-            if (!CommandPatternQuoting.IsPlaceholderInsideSingleQuotedSpan(
-                    template.CommandPattern, parameter.Name))
+            if (!CommandPatternQuoting.IsPlaceholderOnlyInSingleQuotedSpans(
+                    template.CommandPattern, parameter.Name ?? string.Empty, template.Platform == Platform.Windows))
             {
                 parameter.Quoting = QuotingMode.ShellQuote;
             }

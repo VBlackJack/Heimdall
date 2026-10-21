@@ -134,43 +134,23 @@ public static class CommandPatternQuoting
     }
 
     /// <summary>
-    /// Returns <c>true</c> when the first occurrence of the
-    /// <paramref name="parameterName"/> placeholder ("{name}") inside
-    /// <paramref name="commandPattern"/> falls within an open single-quoted span,
-    /// i.e. an odd number of single quotes precede it. This is the precondition
-    /// for <c>QuotingMode.InlineInQuotes</c>, which only escapes the value and
-    /// relies on surrounding quotes already present in the pattern.
+    /// True when <paramref name="parameterName"/> appears in <paramref name="commandPattern"/>
+    /// and every occurrence sits in a literal single-quoted span: the precondition for
+    /// <c>QuotingMode.InlineInQuotes</c>, which only escapes the value and relies on the
+    /// pattern's own quotes.
     /// </summary>
-    /// <param name="commandPattern">The command pattern containing the placeholder.</param>
-    /// <param name="parameterName">The parameter name without braces.</param>
-    /// <returns>
-    /// <c>true</c> when the placeholder is inside a single-quoted span;
-    /// <c>false</c> when it is outside one or absent from the pattern.
-    /// </returns>
-    public static bool IsPlaceholderInsideSingleQuotedSpan(string commandPattern, string parameterName)
+    /// <remarks>
+    /// Read off <see cref="GetPlaceholderQuoteContexts"/>, the lexer the generator uses,
+    /// rather than a count of the single quotes before the first occurrence: the count
+    /// called <c>-Filter "Name -like '*{x}*'"</c> single-quoted although the shell expands
+    /// <c>$(...)</c> there, and never looked at a second occurrence.
+    /// </remarks>
+    public static bool IsPlaceholderOnlyInSingleQuotedSpans(string? commandPattern, string parameterName, bool powerShell)
     {
-        if (string.IsNullOrEmpty(commandPattern) || string.IsNullOrEmpty(parameterName))
-        {
-            return false;
-        }
+        ArgumentNullException.ThrowIfNull(parameterName);
 
-        string placeholder = Placeholder(parameterName);
-        int placeholderIndex = commandPattern.IndexOf(placeholder, StringComparison.Ordinal);
-        if (placeholderIndex < 0)
-        {
-            return false;
-        }
-
-        int quoteCount = 0;
-        for (int index = 0; index < placeholderIndex; index++)
-        {
-            if (commandPattern[index] == '\'')
-            {
-                quoteCount++;
-            }
-        }
-
-        return quoteCount % 2 == 1;
+        var contexts = GetPlaceholderQuoteContexts(commandPattern, parameterName, powerShell);
+        return contexts.Count > 0 && contexts.All(context => context == QuoteContext.SingleQuoted);
     }
 
     /// <summary>

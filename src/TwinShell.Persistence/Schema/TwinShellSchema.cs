@@ -375,8 +375,11 @@ public static class TwinShellSchema
 
         foreach (TemplateParameter parameter in parameters)
         {
+            // The row carries no platform, so the step asks the lexer under both shells'
+            // rules and marks the parameter inline only where they agree it is literal.
             if (parameter.Quoting == null
-                && CommandPatternQuoting.IsPlaceholderInsideSingleQuotedSpan(commandPattern, parameter.Name))
+                && CommandPatternQuoting.IsPlaceholderOnlyInSingleQuotedSpans(commandPattern, parameter.Name, powerShell: false)
+                && CommandPatternQuoting.IsPlaceholderOnlyInSingleQuotedSpans(commandPattern, parameter.Name, powerShell: true))
             {
                 parameter.Quoting = QuotingMode.InlineInQuotes;
                 changed = true;
