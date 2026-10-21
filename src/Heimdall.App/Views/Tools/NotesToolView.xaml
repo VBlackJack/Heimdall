@@ -41,7 +41,7 @@
 
         <Style x:Key="NotesMetaLineTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
-            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBadge}"/>
             <Setter Property="Opacity" Value="0.92"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -353,7 +353,7 @@
                                                     Visibility="Collapsed">
                                             <TextBlock Text="{Binding Icon}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       FontSize="11"
+                                                       FontSize="{StaticResource FontSizeSmallCaption}"
                                                        Opacity="0.88"
                                                        Margin="0,0,4,0"
                                                        VerticalAlignment="Center"/>

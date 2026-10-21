@@ -39,15 +39,10 @@ public sealed class HardcodedColorGuardTests
     private static readonly IReadOnlyDictionary<string, string> IntentionalColorFiles =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            // Theme definition file: the bridge itself defines fixed slots
-            // (overlay scrim).
-            [@"Themes\HeimdallThemeBridge.xaml"] = "theme bridge definition",
             // Syntax/diff/markdown highlighting palettes — content, not chrome.
             [@"Themes\DraculaSyntaxPalette.cs"] = "fixed Dracula syntax palette",
             [@"Services\MarkdownHighlighting.cs"] = "markdown highlighting palette",
-            [@"Services\MarkdownLivePreviewTransformer.cs"] = "markdown live-preview palette",
             [@"Services\MarkdownPreviewBuilder.cs"] = "markdown HTML preview palette",
-            [@"Views\Tools\TextDiffView.xaml.cs"] = "diff highlighting palette",
             // Terminal color schemes (Dracula/Solarized/Monokai/Nord).
             [@"Views\EmbeddedSshView.xaml.cs"] = "terminal color schemes",
             // Exported HTML/CSS styling (rendered outside the app).

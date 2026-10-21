@@ -553,7 +553,7 @@ public sealed class ToolsTabPopulationService
         var pinBtn = new Button
         {
             Content = isFav ? "\uE735" : "\uE734",
-            FontSize = 12,
+            FontSize = (double)Application.Current.FindResource("IconSizeSmall"),
             Style = (Style)Application.Current.FindResource("GhostButtonStyle"),
             Padding = new Thickness(2),
             Opacity = isFav ? 1.0 : 0.4,

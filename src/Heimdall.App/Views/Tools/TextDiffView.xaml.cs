@@ -102,15 +102,27 @@ public partial class TextDiffView : UserControl, IToolView
     private void UpdateHelpText() => TxtHelpContent.Text = L("ToolHelpDIFF").Replace("\\n", "\n", StringComparison.Ordinal);
     private string L(string key) => _localizer?[key] ?? key;
 
+    // The tint of a changed line and of a changed word over the status colour (alpha 48 and 96).
+    private const double DiffLineTintOpacity = 48.0 / 255.0;
+    private const double DiffWordTintOpacity = 96.0 / 255.0;
+
     private void BuildDerivedBrushes()
     {
-        var removed = (TryFindResource("ErrorBrush") as SolidColorBrush)?.Color ?? System.Windows.Media.Color.FromArgb(255, 255, 0, 0);
-        var added = (TryFindResource("SuccessBrush") as SolidColorBrush)?.Color ?? System.Windows.Media.Color.FromArgb(255, 0, 180, 0);
-        Resources["DiffRemovedLineBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, removed.R, removed.G, removed.B));
-        Resources["DiffAddedLineBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, added.R, added.G, added.B));
-        Resources["DiffRemovedWordBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(96, removed.R, removed.G, removed.B));
-        Resources["DiffAddedWordBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(96, added.R, added.G, added.B));
-        Resources["DiffRemovedPrefixBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, removed.R, removed.G, removed.B));
-        Resources["DiffAddedPrefixBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, added.R, added.G, added.B));
+        // The theme bridge defines both status text brushes for every theme.
+        if (TryFindResource("ErrorTextBrush") is not SolidColorBrush removed
+            || TryFindResource("SuccessTextBrush") is not SolidColorBrush added)
+        {
+            return;
+        }
+
+        Resources["DiffRemovedLineBrush"] = Tint(removed.Color, DiffLineTintOpacity);
+        Resources["DiffAddedLineBrush"] = Tint(added.Color, DiffLineTintOpacity);
+        Resources["DiffRemovedWordBrush"] = Tint(removed.Color, DiffWordTintOpacity);
+        Resources["DiffAddedWordBrush"] = Tint(added.Color, DiffWordTintOpacity);
+        Resources["DiffRemovedPrefixBrush"] = new SolidColorBrush(removed.Color);
+        Resources["DiffAddedPrefixBrush"] = new SolidColorBrush(added.Color);
     }
+
+    private static SolidColorBrush Tint(System.Windows.Media.Color color, double opacity) =>
+        new(color) { Opacity = opacity };
 }

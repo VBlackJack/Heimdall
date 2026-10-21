@@ -1719,7 +1719,7 @@
                                                      IsHitTestVisible stays True; the Border's Background="Transparent"
                                                      ensures IsMouseOver persists when hovering over child elements. -->
                                                 <Button x:Name="TabCloseButton" DockPanel.Dock="Right"
-                                                        Width="24" Height="24" Margin="6,0,0,0" Padding="2"
+                                                        Width="24" Height="24" Margin="6,0,0,0" Padding="{StaticResource SpacingXxs}"
                                                         Focusable="False" Content="&#xE711;"
                                                         FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeSmallCaption}"
                                                         Opacity="{StaticResource TabCloseButtonIdleOpacity}" IsHitTestVisible="True"
@@ -2407,7 +2407,7 @@
                                                             Command="{Binding DataContext.Tunnels.CloseCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{DynamicResource GhostButtonStyle}"
-                                                            Padding="2" Margin="0"
+                                                            Padding="{StaticResource SpacingXxs}" Margin="0"
                                                             ToolTip="{Binding Tag, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                             VerticalAlignment="Center"
                                                             HorizontalAlignment="Center"
@@ -2540,7 +2540,7 @@
                                                 Command="{Binding DataContext.Tunnels.CloseCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{DynamicResource GhostButtonStyle}"
-                                                Padding="2" Margin="0"
+                                                Padding="{StaticResource SpacingXxs}" Margin="0"
                                                 ToolTip="{loc:Translate TunnelCtxClose}"
                                                 VerticalAlignment="Center"
                                                 HorizontalAlignment="Center"
@@ -5966,7 +5966,7 @@
                         VerticalAlignment="Center">
                 <TextBlock Text="&#xE8B7;"
                            FontFamily="{StaticResource FontFamilyIcons}"
-                           FontSize="40"
+                           FontSize="{StaticResource IconSizeXLarge}"
                            Foreground="{DynamicResource AccentTextBrush}"
                            HorizontalAlignment="Center"/>
                 <TextBlock Margin="0,12,0,0"
@@ -6625,8 +6625,8 @@
                                                             Style="{DynamicResource GhostButtonStyle}"
                                                             ToolTip="{loc:Translate PaletteSnippetBtnSendExample}"
                                                             AutomationProperties.Name="{loc:Translate PaletteSnippetBtnSendExample}"
-                                                            FontSize="11" Width="24" Height="24"
-                                                            Padding="2"
+                                                            FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                                            Padding="{StaticResource SpacingXxs}"
                                                             Focusable="False"/>
                                                     <Button Content="&#xE8C8;"
                                                             FontFamily="{StaticResource FontFamilyIcons}"
@@ -6635,8 +6635,8 @@
                                                             Style="{DynamicResource GhostButtonStyle}"
                                                             ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                             AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
-                                                            FontSize="11" Width="24" Height="24"
-                                                            Padding="2"
+                                                            FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                                            Padding="{StaticResource SpacingXxs}"
                                                             Focusable="False"/>
                                                 </StackPanel>
                                             </Grid>

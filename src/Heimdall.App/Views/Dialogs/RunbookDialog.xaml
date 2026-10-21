@@ -107,7 +107,7 @@
                                          BorderBrush="{DynamicResource BorderBrush}"/>
                                 <Button Grid.Column="2"
                                         Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
-                                        FontSize="10" Width="24" Height="24"
+                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                         Command="{Binding DataContext.RemoveVariableCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
                                         ToolTip="{loc:Translate ToolCmdLibRunbookRemoveVariable}"
@@ -151,7 +151,7 @@
                                     <DockPanel>
                                         <Button DockPanel.Dock="Right"
                                                 Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
-                                                FontSize="10" Width="24" Height="24"
+                                                FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                                 Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 ToolTip="{loc:Translate ToolCmdLibRunbookRemoveStep}"
@@ -159,7 +159,7 @@
                                                 Style="{DynamicResource GhostButtonStyle}"/>
                                         <Button DockPanel.Dock="Right"
                                                 Content="&#xE74B;" FontFamily="{StaticResource FontFamilyIcons}"
-                                                FontSize="10" Width="24" Height="24"
+                                                FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                                 Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 ToolTip="{loc:Translate ToolCmdLibRunbookMoveDown}"
@@ -167,7 +167,7 @@
                                                 Style="{DynamicResource GhostButtonStyle}"/>
                                         <Button DockPanel.Dock="Right"
                                                 Content="&#xE74A;" FontFamily="{StaticResource FontFamilyIcons}"
-                                                FontSize="10" Width="24" Height="24"
+                                                FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                                 Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 ToolTip="{loc:Translate ToolCmdLibRunbookMoveUp}"

@@ -145,7 +145,7 @@
 
             <!-- Error display -->
             <TextBlock x:Name="TxtError" TextWrapping="Wrap" Visibility="Collapsed"
-                       FontSize="{StaticResource FontSizeBody}" Margin="16"
+                       FontSize="{StaticResource FontSizeBody}" Margin="{StaticResource SpacingMl}"
                        Foreground="{DynamicResource ErrorTextBrush}"/>
         </Grid>
 
