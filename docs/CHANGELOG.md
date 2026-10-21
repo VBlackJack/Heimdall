@@ -14,7 +14,7 @@ All notable changes to Heimdall are documented in this file.
 
 ## 2026-10-21: shared MobaXterm sessions a team can use on day one, a command library in your language with runbooks, and a masked copy of terminal output (v2026.102101)
 
-### Command Library (#656-#662)
+### Command Library (#656-#663, #665)
 
 - **A sound catalogue** (#656). Every shipped template generates with its shipped defaults
   (theory `GenerateCommand_EverySeedTemplate_AcceptsItsShippedDefaults`, one row per template);
@@ -89,6 +89,38 @@ All notable changes to Heimdall are documented in this file.
   parameters. `MarkExecutedAsync` writes `LastExecutedAt` only, and `BatchRepository.UpdateAsync`
   stores the `UpdatedAt` it is given, so a sync import keeps the remote timestamp. 59 new locale
   keys; documented key count 7,347.
+- **Catalogue finishing** (#661). Seven clusters of near-duplicate Linux actions merged into one
+  each (ten ids removed; a favorite on one of them is lost at the seed refresh). `sudo` prefixed
+  on 36 patterns and 116 examples that need root, with the notes saying so. `sysctl-kernel-params`
+  and `hostname-show` are Info, `run-dotnet` is in `development`, and the last flag parameters
+  (`ss`, `lvm`, `rsync`, `tar`, `sar`, `scp`, `strace`, `systemd-timer-list`, `ulimit`,
+  `unified-delete-local-user`) are choices; the sysctl name stays free text. 527 shipped actions.
+- **Generator, import and editor finishing** (#663). An empty optional value is left out of the
+  command and the spaces it leaves are collapsed (guard
+  `GenerateCommand_EverySeedTemplate_ShippedDefaultsQuoteNothingEmpty`, 37 templates generated
+  `''` before). A `ShellQuote` value matching `^[A-Za-z0-9._/:=@+,%-]+$` goes in bare where the
+  lexer classes every occurrence Bare, except on Windows a leading `-` or `@` or a comma (a
+  parameter name, a splat, an array). `ValidateParameterValue` uses the same `MessageKeys` as the
+  validation path, the two template bounds included; unknown parameter types get the
+  control-character check; `${x}` is classed Expanding; the import door and the schema migration
+  read the lexer (`IsPlaceholderOnlyInSingleQuotedSpans`) and `IsPlaceholderInsideSingleQuotedSpan`
+  is gone; the double-wrap theory accepts a choice inside quotes. Add and Duplicate go through
+  `CreateAndSelectAsync` and `ReloadAsync(selectActionId)` re-resolves the selection among the
+  fresh entries. Post-connect step titles go through `ActionLocalizer`, and
+  `InitializePostConnectLinksAsync` no longer sets bound properties after `ConfigureAwait(false)`.
+  `TemplateParameterTypes.Offered` gains `number` and `driveletter`.
+  `MaxTemplateCommandPatternLength` 4000, `MaxCommandLength` 4096, `MaxParameterLength` 1024,
+  the sync schema reading the constant. `GitSyncService` carries the import's kept-local
+  conflicts; the library's status line and the sync summary show them. `IGitIdentityReader` /
+  `GitConfigIdentityReader` prefill the Git author in Settings from `git config --global` while
+  the fields hold the placeholder, as part of the loaded baseline (the panel opens clean).
+- **Last touches** (#665). `BatchRepository.UpdateAsync` writes `IsUserCreated`. The picker's
+  results list disables horizontal scrolling with one star column, shared-size Auto columns, and
+  rows named on their container (`CommandLibraryPickerItem : IAccessibleItemViewModel`). The run
+  header is a grid giving the status the star column, the mode line under it and Stop in the
+  Auto column. Every `GitOperationResult` message goes through `MessageKeys.GitSyncResult*` (33
+  keys in three locales); three results that passed TwinShell keys Heimdall never had are fixed.
+  Documented key count 7,384.
 
 ### Shared MobaXterm sessions (#646, #648-#652)
 
