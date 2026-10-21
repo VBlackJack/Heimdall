@@ -39,6 +39,9 @@ namespace Heimdall.App.Services;
 /// </summary>
 public sealed class ToolsTabPopulationService
 {
+    /// <summary>Opacity of the category tint drawn behind a Tools tab card icon.</summary>
+    private const double ToolCardIconTintOpacity = 0.12;
+
     private readonly ToolRegistry _toolRegistry;
 
     public sealed record ExternalToolProviderGroup(
@@ -584,19 +587,26 @@ public sealed class ToolsTabPopulationService
         };
         if (iconPath is not null)
         {
-            var iconBorder = new Border
+            // The tint and the icon are siblings: an Opacity on a parent applies
+            // to its children, so a tinted parent would fade the icon with it.
+            var iconTint = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Opacity = ToolCardIconTintOpacity
+            };
+            iconTint.SetResourceReference(Border.BackgroundProperty, categoryBrushKey);
+
+            var iconTile = new Grid
             {
                 Width = 32,
                 Height = 32,
-                CornerRadius = new CornerRadius(6),
-                Opacity = 0.12,
                 Margin = new Thickness(0, 0, 10, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Child = iconPath
+                VerticalAlignment = VerticalAlignment.Center
             };
-            iconBorder.SetResourceReference(Border.BackgroundProperty, categoryBrushKey);
-            content.Children.Add(iconBorder);
-            DockPanel.SetDock(iconBorder, Dock.Left);
+            iconTile.Children.Add(iconTint);
+            iconTile.Children.Add(iconPath);
+            content.Children.Add(iconTile);
+            DockPanel.SetDock(iconTile, Dock.Left);
         }
         content.Children.Add(textStack);
 

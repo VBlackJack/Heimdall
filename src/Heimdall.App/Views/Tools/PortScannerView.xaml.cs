@@ -542,7 +542,21 @@ public partial class PortScannerView : UserControl, IToolView
 
     private string L(string key) => _localizer?[key] ?? key;
 
-    private string FormatStat(string key, int value) => $"{L(key)}: {value}";
+    private string FormatStat(string key, int value) => FormatStatLabel(L(key), value);
+
+    /// <summary>
+    /// Joins a counter label and its value with exactly one colon. Locale values
+    /// may already end with one ("Open:", French "Ouverts :"), so it is only
+    /// added when missing.
+    /// </summary>
+    internal static string FormatStatLabel(string label, int value)
+    {
+        const char Separator = ':';
+        string trimmed = label.TrimEnd();
+        return trimmed.EndsWith(Separator)
+            ? $"{trimmed} {value}"
+            : $"{trimmed}{Separator} {value}";
+    }
 
     private Func<string, string> CreateLocalize() => key => _localizer?[key] ?? key;
 
