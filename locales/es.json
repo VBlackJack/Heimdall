@@ -411,6 +411,8 @@
   "ServerDialogKeyPassphraseSaved": "Contraseña de clave guardada",
   "ServerDialogClearStoredKeyPassphrase": "Eliminar la contraseña de clave guardada para esta sesión",
   "ServerDialogSelectedMonitorsOfflineKept": "Se conservan los monitores guardados para esta sesión que no están conectados ahora mismo.",
+  "Validation.ParameterCommandTooLong": "El comando generado tiene {0} caracteres; se permiten {1} como máximo.",
+  "Validation.ParameterCountTooHigh": "La plantilla declara {0} parámetros; se permiten {1} como máximo.",
   "Validation.ParameterDangerousCharacters": "{0} contiene caracteres no permitidos en un comando.",
   "Validation.ParameterInvalidHostname": "{0} no es un nombre de host válido.",
   "Validation.ParameterInvalidIPAddress": "{0} no es una dirección IP válida.",

@@ -411,6 +411,8 @@
   "ServerDialogKeyPassphraseSaved": "Passphrase saved",
   "ServerDialogClearStoredKeyPassphrase": "Remove the passphrase saved for this session",
   "ServerDialogSelectedMonitorsOfflineKept": "Monitors saved for this session that are not connected right now are kept.",
+  "Validation.ParameterCommandTooLong": "The generated command is {0} characters long; at most {1} are allowed.",
+  "Validation.ParameterCountTooHigh": "The template declares {0} parameters; at most {1} are allowed.",
   "Validation.ParameterDangerousCharacters": "{0} contains characters that are not allowed in a command.",
   "Validation.ParameterInvalidHostname": "{0} is not a valid host name.",
   "Validation.ParameterInvalidIPAddress": "{0} is not a valid IP address.",

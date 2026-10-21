@@ -56,6 +56,8 @@ public static class MessageKeys
     public const string ValidationParameterNotAnOfferedValue = "Validation.ParameterNotAnOfferedValue";
     public const string ValidationParameterMustBeNumber = "Validation.ParameterMustBeNumber";
     public const string ValidationParameterMustBeDriveLetter = "Validation.ParameterMustBeDriveLetter";
+    public const string ValidationParameterCountTooHigh = "Validation.ParameterCountTooHigh";
+    public const string ValidationParameterCommandTooLong = "Validation.ParameterCommandTooLong";
 
     // Execution messages
     public const string ExecutionError = "Execution.Error";

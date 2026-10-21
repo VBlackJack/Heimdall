@@ -187,6 +187,44 @@ public sealed class GeneratorValidationMessagesAreTranslatedTests
         Assert.Contains(thrown.Message, ParameterMessageKeys);
     }
 
+    /// <summary>
+    /// The two refusals that are about the template rather than one value, too many parameters
+    /// and a command past the length bound, reached the operator as English sentences after
+    /// every per-value message had been localized.
+    /// </summary>
+    [Fact]
+    public void EveryRejectionIsADeclaredMessageKey_ForTheTemplateBounds()
+    {
+        var service = new CommandGeneratorService(new FakeTwinShellLocalizationService());
+        var crowded = new CommandTemplate
+        {
+            Id = "crowded",
+            Name = "crowded",
+            Platform = Platform.Linux,
+            CommandPattern = "echo ok",
+            Parameters = Enumerable.Range(0, ValidationConstants.MaxParametersPerTemplate + 1)
+                .Select(index => CommandLibraryTestHelpers.OptionalParameter("p" + index, "P" + index))
+                .ToList(),
+        };
+        var overlong = new CommandTemplate
+        {
+            Id = "overlong",
+            Name = "overlong",
+            Platform = Platform.Linux,
+            CommandPattern = new string('a', ValidationConstants.MaxCommandLength + 1),
+        };
+        var noValues = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        service.ValidateParameters(crowded, noValues, out var errors);
+        var crowdedThrown = Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(crowded, noValues));
+        var overlongThrown = Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(overlong, noValues));
+
+        Assert.Equal([MessageKeys.ValidationParameterCountTooHigh], errors);
+        Assert.Equal(MessageKeys.ValidationParameterCountTooHigh, crowdedThrown.Message);
+        Assert.Equal(MessageKeys.ValidationParameterCommandTooLong, overlongThrown.Message);
+        Assert.Contains(overlongThrown.Message, ParameterMessageKeys);
+    }
+
     private static Dictionary<string, string> LoadLocale(string locale)
     {
         var path = Path.Combine(ViewSource.RepoRoot(), "locales", locale + ".json");

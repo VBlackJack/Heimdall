@@ -77,8 +77,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
         if (template.Parameters.Count > ValidationConstants.MaxParametersPerTemplate)
         {
-            throw new InvalidOperationException(
-                $"Command template declares too many parameters ({template.Parameters.Count}); maximum is {ValidationConstants.MaxParametersPerTemplate}");
+            throw new InvalidOperationException(TooManyParametersMessage(template.Parameters.Count));
         }
 
         // PERFORMANCE: Use StringBuilder for multiple string replacements (40-60% fewer allocations)
@@ -239,7 +238,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
         if (template.Parameters.Count > ValidationConstants.MaxParametersPerTemplate)
         {
-            errors.Add($"Command template declares too many parameters ({template.Parameters.Count}); maximum is {ValidationConstants.MaxParametersPerTemplate}");
+            errors.Add(TooManyParametersMessage(template.Parameters.Count));
             return false;
         }
 
@@ -359,16 +358,29 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
         return errors.Count == 0;
     }
 
-    private static string EnforceCommandLength(string command)
+    private string EnforceCommandLength(string command)
     {
         if (command.Length > ValidationConstants.MaxCommandLength)
         {
-            throw new InvalidOperationException(
-                $"Generated command exceeds maximum length of {ValidationConstants.MaxCommandLength} characters (was {command.Length})");
+            throw new InvalidOperationException(_localizationService.GetFormattedString(
+                MessageKeys.ValidationParameterCommandTooLong,
+                command.Length.ToString(CultureInfo.InvariantCulture),
+                ValidationConstants.MaxCommandLength.ToString(CultureInfo.InvariantCulture)));
         }
 
         return command;
     }
+
+    /// <summary>
+    /// The refusal of a template that declares more than
+    /// <see cref="ValidationConstants.MaxParametersPerTemplate"/> parameters, in the operator's
+    /// language: it reaches them through the same error line as every other refusal.
+    /// </summary>
+    private string TooManyParametersMessage(int count) =>
+        _localizationService.GetFormattedString(
+            MessageKeys.ValidationParameterCountTooHigh,
+            count.ToString(CultureInfo.InvariantCulture),
+            ValidationConstants.MaxParametersPerTemplate.ToString(CultureInfo.InvariantCulture));
 
     /// <summary>
     /// Validates a parameter value based on its type

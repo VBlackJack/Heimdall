@@ -103,7 +103,7 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void GenerateCommand_NoParameters_PatternExceedsMaxLength_Throws()
     {
-        CommandGeneratorService service = CreateService();
+        CommandGeneratorService service = CreateArgumentEchoingService();
         CommandTemplate template = CreateTemplate("long-pattern", "Long pattern", new string('a', ValidationConstants.MaxCommandLength + 1));
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -115,7 +115,7 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void GenerateCommand_GeneratedResultExceedsMaxLength_Throws()
     {
-        CommandGeneratorService service = CreateService();
+        CommandGeneratorService service = CreateArgumentEchoingService();
         TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("val", "Value");
         // Pattern and value each fit; together they pass the command bound.
         string pattern = new string('a', ValidationConstants.MaxCommandLength - ValidationConstants.MaxParameterLength)
@@ -134,7 +134,7 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void GenerateCommand_TooManyParameters_Throws()
     {
-        CommandGeneratorService service = CreateService();
+        CommandGeneratorService service = CreateArgumentEchoingService();
         TemplateParameter[] parameters = CreateParameters(ValidationConstants.MaxParametersPerTemplate + 1);
         CommandTemplate template = CreateTemplate("too-many", "Too many", "echo ok", parameters);
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -160,7 +160,7 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void ValidateParameters_TooManyParameters_ReturnsFalseWithCountError()
     {
-        CommandGeneratorService service = CreateService();
+        CommandGeneratorService service = CreateArgumentEchoingService();
         TemplateParameter[] parameters = CreateParameters(ValidationConstants.MaxParametersPerTemplate + 1);
         CommandTemplate template = CreateTemplate("too-many-validation", "Too many validation", "echo ok", parameters);
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -723,7 +723,7 @@ public sealed class CommandGeneratorServiceTests
             // fails and the entry has to leave the list, so the list cannot outlive the defect.
             generate.Should().Throw<InvalidOperationException>(
                     $"{seedTemplate} is listed as longer than the generator accepts; remove it from the list once it fits")
-                .WithMessage($"*{ValidationConstants.MaxCommandLength}*");
+                .WithMessage(MessageKeys.ValidationParameterCommandTooLong);
             return;
         }
 
@@ -1225,6 +1225,32 @@ public sealed class CommandGeneratorServiceTests
 
     private static CommandGeneratorService CreateService() =>
         new CommandGeneratorService(new FakeTwinShellLocalizationService());
+
+    /// <summary>
+    /// A generator whose messages are the key followed by its arguments, for the tests that
+    /// check a refusal carries its figures as well as its key.
+    /// </summary>
+    private static CommandGeneratorService CreateArgumentEchoingService() =>
+        new CommandGeneratorService(new ArgumentEchoingLocalizationService());
+
+    private sealed class ArgumentEchoingLocalizationService : TwinShell.Core.Interfaces.ILocalizationService
+    {
+        public System.Globalization.CultureInfo CurrentCulture => System.Globalization.CultureInfo.InvariantCulture;
+
+        public System.Globalization.CultureInfo[] SupportedCultures => [System.Globalization.CultureInfo.InvariantCulture];
+
+        public event EventHandler? LanguageChanged;
+
+        public void ChangeLanguage(System.Globalization.CultureInfo culture) => LanguageChanged?.Invoke(this, EventArgs.Empty);
+
+        public void ChangeLanguage(string cultureCode) => LanguageChanged?.Invoke(this, EventArgs.Empty);
+
+        public string GetString(string key) => key;
+
+        public string GetString(string key, string fallback) => fallback;
+
+        public string GetFormattedString(string key, params object[] args) => key + " " + string.Join(" ", args);
+    }
 
     private static CommandTemplate CreateTemplate(
         string id,

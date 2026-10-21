@@ -55,9 +55,10 @@ public sealed class CommandPaletteRegenerateErrorTests
 
         InvokeRegenerateSnippetCommand(viewModel);
 
+        // The generator's own message is localized too; this fake localizer hands back its key.
         var expectedError = string.Format(
             localizer["ToolCmdLibGenerateError"],
-            $"Generated command exceeds maximum length of {ValidationConstants.MaxCommandLength} characters (was {ValidationConstants.MaxCommandLength + 1})");
+            MessageKeys.ValidationParameterCommandTooLong);
         viewModel.SnippetGeneratedCommand.Should().Be(failingTemplate.CommandPattern);
         viewModel.SnippetValidationError.Should().Be(expectedError);
         viewModel.IsSnippetCommandValid.Should().BeFalse();

@@ -411,6 +411,8 @@
   "ServerDialogKeyPassphraseSaved": "Passphrase enregistr\u00e9e",
   "ServerDialogClearStoredKeyPassphrase": "Supprimer la passphrase enregistr\u00e9e pour cette session",
   "ServerDialogSelectedMonitorsOfflineKept": "Les moniteurs enregistr\u00e9s pour cette session qui ne sont pas connect\u00e9s actuellement sont conserv\u00e9s.",
+  "Validation.ParameterCommandTooLong": "La commande g\u00e9n\u00e9r\u00e9e fait {0} caract\u00e8res ; {1} au plus sont autoris\u00e9s.",
+  "Validation.ParameterCountTooHigh": "Le mod\u00e8le d\u00e9clare {0} param\u00e8tres ; {1} au plus sont autoris\u00e9s.",
   "Validation.ParameterDangerousCharacters": "{0} contient des caract\u00e8res interdits dans une commande.",
   "Validation.ParameterInvalidHostname": "{0} n'est pas un nom d'h\u00f4te valide.",
   "Validation.ParameterInvalidIPAddress": "{0} n'est pas une adresse IP valide.",
