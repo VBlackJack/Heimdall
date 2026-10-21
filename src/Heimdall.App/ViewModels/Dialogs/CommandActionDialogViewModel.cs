@@ -506,6 +506,48 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         return vm;
     }
 
+    /// <summary>
+    /// Builds a dialog for a new action that starts from a command captured in a terminal.
+    /// </summary>
+    /// <param name="capture">The captured command, its platform and its tag.</param>
+    /// <param name="category">
+    /// The category to start in: the one of the last action created in this session, or null
+    /// to leave it for the operator.
+    /// </param>
+    /// <remarks>
+    /// The pattern goes on the one platform the session resolves to, never on both: a line
+    /// typed at a bash prompt is not a PowerShell command. The title stays empty because only
+    /// the operator knows what the command is for. The risk starts at Run: a command someone
+    /// just ran may change state, and Info would promise it does not. The dialog starts clean,
+    /// so cancelling it asks nothing; the capture is one gesture away in the terminal.
+    /// </remarks>
+    public static CommandActionDialogViewModel ForCapturedCommand(
+        Heimdall.App.Services.CapturedCommand capture,
+        string? category)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+
+        var vm = new CommandActionDialogViewModel { _isInitializing = true };
+        vm.IsEditMode = false;
+        vm.Title = "";
+        vm.Category = category?.Trim() ?? "";
+        vm.Level = CriticalityLevel.Run;
+        vm.Tags = capture.Tag ?? "";
+        if (capture.Platform == Heimdall.Core.Configuration.RemoteOs.Windows)
+        {
+            vm.Platform = Platform.Windows;
+            vm.WindowsPattern = capture.Text;
+        }
+        else
+        {
+            vm.Platform = Platform.Linux;
+            vm.LinuxPattern = capture.Text;
+        }
+
+        vm._isInitializing = false;
+        return vm;
+    }
+
     public static CommandActionDialogViewModel FromAction(ActionModel action)
     {
         ArgumentNullException.ThrowIfNull(action);
