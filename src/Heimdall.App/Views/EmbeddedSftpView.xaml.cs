@@ -60,9 +60,6 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
 {
     private const long MaxInlineEditFileBytes = 16L * 1024 * 1024;
 
-    private const double FileListWidthPadding = 10;
-    private const double MinimumNameColumnWidth = 200;
-
     // The arrows appended to the header of the column the list is sorted by.
     private const string SortArrowAscending = " \u25B2";
     private const string SortArrowDescending = " \u25BC";
@@ -1194,15 +1191,10 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
             .Where(column => !ReferenceEquals(column, nameColumn))
             .Sum(column => column.ActualWidth);
 
-        double available = FileListView.ActualWidth
-            - fixedWidth
-            - SystemParameters.VerticalScrollBarWidth
-            - FileListWidthPadding;
-
-        if (available > MinimumNameColumnWidth)
-        {
-            nameColumn.Width = available;
-        }
+        nameColumn.Width = SftpViewMetrics.FitNameColumnWidth(
+            FileListView.ActualWidth,
+            fixedWidth,
+            SystemParameters.VerticalScrollBarWidth);
     }
 
     private void OnToolbarSizeChanged(object sender, SizeChangedEventArgs e)

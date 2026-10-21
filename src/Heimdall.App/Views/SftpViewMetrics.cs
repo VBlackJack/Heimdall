@@ -49,6 +49,30 @@ public static class SftpViewMetrics
     /// <summary>The resource key of the icon font the glyphs of this view are drawn with.</summary>
     public const string IconFontFamilyKey = "FontFamilyIcons";
 
+    /// <summary>
+    /// The width a file-browser row adds around its columns: the one-pixel border of each side and
+    /// the four-pixel padding of each side from <c>FileBrowserStyles.xaml</c>, plus the two pixels
+    /// <see cref="System.Windows.Controls.GridViewRowPresenter"/> reserves after the last column.
+    /// Counting ten left the rows two pixels wider than the space computed for them.
+    /// </summary>
+    public const double FileListRowChromeWidth = 12;
+
+    /// <summary>The narrowest the name column is stretched down to before the list scrolls sideways.</summary>
+    public const double MinimumNameColumnWidth = 200;
+
+    /// <summary>
+    /// The width that makes the name column fill a file list, so the rows fit its viewport and the
+    /// list scrolls sideways only when even the narrowest name column does not fit.
+    /// </summary>
+    /// <param name="listWidth">The rendered width of the list.</param>
+    /// <param name="otherColumnsWidth">The sum of the widths of every column but the name column.</param>
+    /// <param name="verticalScrollBarWidth">The width reserved for the vertical scrollbar.</param>
+    /// <returns>The name column width, never under <see cref="MinimumNameColumnWidth"/>.</returns>
+    public static double FitNameColumnWidth(double listWidth, double otherColumnsWidth, double verticalScrollBarWidth) =>
+        Math.Max(
+            MinimumNameColumnWidth,
+            listWidth - otherColumnsWidth - verticalScrollBarWidth - FileListRowChromeWidth);
+
     /// <summary>The glyph of a folder, shown on a bookmark.</summary>
     public const string FolderGlyph = "";
 }

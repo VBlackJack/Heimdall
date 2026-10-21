@@ -34,9 +34,6 @@ namespace Heimdall.App.Views;
 /// </summary>
 public partial class LocalFileBrowserView : UserControl
 {
-    private const double FileListWidthPadding = 10;
-    private const double MinimumNameColumnWidth = 200;
-
     // The arrows appended to the header of the column the list is sorted by.
     private const string SortArrowAscending = " \u25B2";
     private const string SortArrowDescending = " \u25BC";
@@ -195,15 +192,10 @@ public partial class LocalFileBrowserView : UserControl
             fixedWidth += gridView.Columns[i].ActualWidth;
         }
 
-        double available = FileListView.ActualWidth
-            - fixedWidth
-            - SystemParameters.VerticalScrollBarWidth
-            - FileListWidthPadding;
-
-        if (available > MinimumNameColumnWidth)
-        {
-            gridView.Columns[0].Width = available;
-        }
+        gridView.Columns[0].Width = SftpViewMetrics.FitNameColumnWidth(
+            FileListView.ActualWidth,
+            fixedWidth,
+            SystemParameters.VerticalScrollBarWidth);
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
