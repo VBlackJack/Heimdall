@@ -20,8 +20,13 @@
   },
   "examples": [
     {
-      "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -Verbose",
-      "description": "Show detailed information about the command's execution. -Verbose turns on the diagnostic messages that show exactly what happens. Essential for troubleshooting and to understand the internal operations.",
+      "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }\"",
+      "description": "Delete every element of the client cache (the action's own command)",
+      "platform": 0
+    },
+    {
+      "command": "(Get-WmiObject -Namespace root\\ccm\\SoftMgmtAgent -Class CacheInfoEx | Measure-Object -Property ContentSize -Sum).Sum",
+      "description": "Show only the total size of the cached content (sum of ContentSize), without deleting anything",
       "platform": 0
     }
   ],
@@ -33,7 +38,8 @@
       "description": "Supprime tous les fichiers du cache du client Configuration Manager",
       "notes": "Droits administrateur requis. Libère de l'espace disque en supprimant les packages téléchargés.",
       "examples": {
-        "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
+        "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }\"": "Supprime tous les éléments du cache client (la commande de l'action elle-même)",
+        "(Get-WmiObject -Namespace root\\ccm\\SoftMgmtAgent -Class CacheInfoEx | Measure-Object -Property ContentSize -Sum).Sum": "Affiche uniquement la taille totale du contenu en cache (somme de ContentSize), sans rien supprimer"
       }
     }
   }

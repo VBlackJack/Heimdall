@@ -15,13 +15,14 @@
     "id": "ad-disable-computer-cmd",
     "platform": 0,
     "name": "Disable-ADAccount",
-    "commandPattern": "Disable-ADAccount -Identity {computerName}$",
+    "commandPattern": "Disable-ADAccount -Identity '{computerName}$'",
     "parameters": [
       {
         "name": "computerName",
         "label": "Computer name",
         "type": "string",
         "defaultValue": "",
+        "quoting": "InlineInQuotes",
         "required": true,
         "description": "Name of the AD computer (without the $)"
       }
@@ -29,8 +30,18 @@
   },
   "examples": [
     {
-      "command": "Disable-ADAccount -Identity jdupont",
-      "description": "Disable the account of jdupont at once. The user can no longer log on, but the account and all its data stay in AD. Disabling is reversible with Enable-ADAccount. Recommended for temporary departures (long leave, suspensions).",
+      "command": "Disable-ADAccount -Identity 'PC-SALES-01$'",
+      "description": "Disable the computer account PC-SALES-01 (the sAMAccountName of a computer ends with $)",
+      "platform": 0
+    },
+    {
+      "command": "Get-ADComputer -Filter {Enabled -eq $true} -Properties LastLogonDate | Where-Object {$_.LastLogonDate -lt (Get-Date).AddDays(-90)} | Disable-ADAccount -WhatIf",
+      "description": "Simulate disabling every enabled computer that has not logged on for 90 days; remove -WhatIf to run it",
+      "platform": 0
+    },
+    {
+      "command": "Disable-ADAccount -Identity 'PC-SALES-01$' -PassThru | Select-Object Name,Enabled",
+      "description": "Disable the computer account and show its state to confirm it",
       "platform": 0
     }
   ],
@@ -55,7 +66,9 @@
         }
       },
       "examples": {
-        "Disable-ADAccount -Identity jdupont": "Désactive immédiatement le compte de jdupont. L'utilisateur ne pourra plus se connecter mais le compte et toutes ses données restent dans AD. La désactivation est réversible avec Enable-ADAccount. Méthode recommandée pour les départs temporaires (congés longs, suspensions)."
+        "Disable-ADAccount -Identity 'PC-SALES-01$'": "Désactive le compte ordinateur PC-SALES-01 (le sAMAccountName d'un ordinateur se termine par $)",
+        "Get-ADComputer -Filter {Enabled -eq $true} -Properties LastLogonDate | Where-Object {$_.LastLogonDate -lt (Get-Date).AddDays(-90)} | Disable-ADAccount -WhatIf": "Simule la désactivation de tous les ordinateurs actifs sans connexion depuis 90 jours ; retirez -WhatIf pour l'exécuter",
+        "Disable-ADAccount -Identity 'PC-SALES-01$' -PassThru | Select-Object Name,Enabled": "Désactive le compte ordinateur et affiche son état pour le confirmer"
       }
     }
   }
