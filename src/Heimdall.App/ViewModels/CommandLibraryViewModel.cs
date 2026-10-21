@@ -186,12 +186,9 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
             return;
         }
 
-        var selectedId = SelectedEntry?.Source.Id;
-
         try
         {
             await ReloadAsync();
-            SelectActionById(selectedId);
         }
         catch (Exception ex)
         {
@@ -1041,13 +1038,31 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// Reloads the entire library (used after CRUD and Git sync). Preserves
     /// the current filter state by re-applying the search after the reload.
     /// </summary>
-    public async Task ReloadAsync()
+    public Task ReloadAsync() => ReloadAsync(SelectedEntry?.Source.Id);
+
+    /// <summary>
+    /// Reloads the library and selects <paramref name="selectActionId"/> among the fresh
+    /// entries, or nothing when it is null or no longer loaded.
+    /// </summary>
+    /// <remarks>
+    /// The one path every reload goes through, so <see cref="SelectedEntry"/> never points at
+    /// an entry from before the reload: the old row is dropped first and the selection is
+    /// resolved again by action id, the way the capture path opens on a new action.
+    /// </remarks>
+    public async Task ReloadAsync(string? selectActionId)
     {
         var preservedSearch = SearchText;
+        SelectedEntry = null;
         ResetSelection();
         ResetSearchState();
         await InitializeAsync(_targetHost, initialActionId: null, _username);
         await ApplySearchAsync(preservedSearch);
+
+        // A deleted action is simply gone: no selection, and no "not found" warning in the log.
+        if (_allEntries.Any(entry => string.Equals(entry.Source.Id, selectActionId, StringComparison.Ordinal)))
+        {
+            SelectActionById(selectActionId);
+        }
     }
 
     // ── Selection ─────────────────────────────────────────────────

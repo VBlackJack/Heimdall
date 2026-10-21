@@ -22,6 +22,7 @@ using Heimdall.Core.Import;
 using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Microsoft.Extensions.DependencyInjection;
+using TwinShell.Core.Interfaces;
 
 namespace Heimdall.App.Tests;
 
@@ -244,6 +245,39 @@ public sealed class ServerDialogViewModelPostConnectTests
         await vm.InitializePostConnectLinksAsync();
 
         Assert.Equal("Suivre un journal", vm.PostConnectSteps[0].LinkedActionTitle);
+    }
+
+    /// <summary>
+    /// The step rows are bound to the dialog; the titles have to be set on the dialog's
+    /// thread. The service yields so that the await really has a continuation to place,
+    /// as in <see cref="CommandLibraryPickerThreadAffinityTests"/>.
+    /// </summary>
+    [Fact]
+    public void InitializePostConnectLinksAsync_SetsTheStepTitlesOnTheDialogsThread()
+    {
+        int ownerThreadId = 0;
+        var setterThreadIds = new List<int>();
+
+        StaDispatcherRunner.Run(async () =>
+        {
+            ownerThreadId = Environment.CurrentManagedThreadId;
+            var services = new ServiceCollection();
+            services.AddScoped<IActionService>(_ => new YieldingActionService(new FakeActionService(
+                [CommandLibraryTestHelpers.CreateLinuxAction("tail-log", "Tail log", "tail -f {path}", CommandLibraryTestHelpers.RequiredParameter("path", "Path"))])));
+            var vm = new ServerDialogViewModel
+            {
+                ServiceScopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>()
+            };
+            vm.LoadPostConnectSteps([new PostConnectStep { Id = "1", CommandLibraryId = "tail-log", Input = "pwd" }]);
+            vm.PostConnectSteps[0].PropertyChanged += (_, _) => setterThreadIds.Add(Environment.CurrentManagedThreadId);
+
+            await vm.InitializePostConnectLinksAsync();
+
+            Assert.Equal("Tail log", vm.PostConnectSteps[0].LinkedActionTitle);
+        });
+
+        Assert.NotEmpty(setterThreadIds);
+        Assert.All(setterThreadIds, id => Assert.Equal(ownerThreadId, id));
     }
 
     [Fact]

@@ -322,8 +322,7 @@ public sealed partial class CommandLibraryViewModel
     private async Task CreateAndSelectAsync(IActionService actionService, TwinShell.Core.Models.Action action)
     {
         var created = await actionService.CreateActionAsync(action);
-        await ReloadAsync();
-        SelectActionById((created ?? action).Id);
+        await ReloadAsync((created ?? action).Id);
     }
 
     /// <summary>

@@ -383,7 +383,9 @@ public partial class ServerDialogViewModel
         var culture = Localizer?.CurrentLocale;
         using var scope = ServiceScopeFactory.CreateScope();
         var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
-        var actions = (await actionService.GetAllActionsAsync().ConfigureAwait(false))
+        // No ConfigureAwait(false): the loop below sets bound properties of the step rows,
+        // which belong to the dialog's thread.
+        var actions = (await actionService.GetAllActionsAsync())
             .Where(action => linkedIds.Contains(action.Id, StringComparer.Ordinal))
             .ToDictionary(
                 action => action.Id,
