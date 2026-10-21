@@ -1,7 +1,7 @@
 {
   "id": "sccm-trigger-machine-policy",
-  "title": "Déclencher la récupération de la stratégie machine SCCM",
-  "description": "Force le client SCCM à récupérer et appliquer immédiatement les stratégies machine depuis le serveur",
+  "title": "Trigger the SCCM machine policy retrieval",
+  "description": "Force the SCCM client to retrieve and apply the machine policies from the server now",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -22,30 +22,43 @@
   "examples": [
     {
       "command": "ss -tulpn",
-      "description": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+      "description": "🔥 LINUX STANDARD: list every listening TCP/UDP port (-tul) with its process (-p) and without DNS resolution (-n). The reference command to find out 'who listens on this port'.",
       "platform": 1
     },
     {
       "command": "ss -s",
-      "description": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+      "description": "Quick statistical summary of the sockets (Total, TCP, UDP). Useful to spot socket exhaustion or a DDoS attack.",
       "platform": 1
     },
     {
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000021}'",
-      "description": "Déclenche la récupération de la stratégie machine",
+      "description": "Trigger the machine policy retrieval",
       "platform": 0
     },
     {
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000022}'",
-      "description": "Déclenche l'évaluation de la stratégie machine",
+      "description": "Trigger the machine policy evaluation",
       "platform": 0
     }
   ],
-  "notes": "Schedule ID {21} = Machine Policy Retrieval, {22} = Machine Policy Evaluation. Nécessite le client SCCM installé. Vérifier CCM.log pour confirmation.",
+  "notes": "Schedule ID {21} = Machine Policy Retrieval, {22} = Machine Policy Evaluation. Requires an installed SCCM client. Check CCM.log for confirmation.",
   "links": [
     {
       "title": "SCCM Client Actions",
       "url": "https://www.anoopcnair.com/trigger-sccm-client-agent-actions-powershell/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Déclencher la récupération de la stratégie machine SCCM",
+      "description": "Force le client SCCM à récupérer et appliquer immédiatement les stratégies machine depuis le serveur",
+      "notes": "Schedule ID {21} = Machine Policy Retrieval, {22} = Machine Policy Evaluation. Nécessite le client SCCM installé. Vérifier CCM.log pour confirmation.",
+      "examples": {
+        "ss -tulpn": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+        "ss -s": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+        "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000021}'": "Déclenche la récupération de la stratégie machine",
+        "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000022}'": "Déclenche l'évaluation de la stratégie machine"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "sccm-trigger-software-inventory",
-  "title": "Forcer l'inventaire logiciel SCCM",
-  "description": "Déclenche immédiatement la collecte de l'inventaire logiciel et l'envoie au serveur SCCM",
+  "title": "Force the SCCM software inventory",
+  "description": "Collect the software inventory now and send it to the SCCM server",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -22,25 +22,37 @@
   "examples": [
     {
       "command": "ss -tulpn",
-      "description": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+      "description": "🔥 LINUX STANDARD: list every listening TCP/UDP port (-tul) with its process (-p) and without DNS resolution (-n). The reference command to find out 'who listens on this port'.",
       "platform": 1
     },
     {
       "command": "ss -s",
-      "description": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+      "description": "Quick statistical summary of the sockets (Total, TCP, UDP). Useful to spot socket exhaustion or a DDoS attack.",
       "platform": 1
     },
     {
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000002}'",
-      "description": "Déclenche l'inventaire logiciel",
+      "description": "Trigger the software inventory",
       "platform": 0
     }
   ],
-  "notes": "Schedule ID {02} = Software Inventory Cycle. L'inventaire logiciel collecte les informations sur les fichiers et applications installés.",
+  "notes": "Schedule ID {02} = Software Inventory Cycle. The software inventory collects information about installed files and applications.",
   "links": [
     {
       "title": "SCCM Client Actions",
       "url": "https://techuisitive.com/how-to-initiate-sccm-client-agent-actions-using-powershell/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Forcer l'inventaire logiciel SCCM",
+      "description": "Déclenche immédiatement la collecte de l'inventaire logiciel et l'envoie au serveur SCCM",
+      "notes": "Schedule ID {02} = Software Inventory Cycle. L'inventaire logiciel collecte les informations sur les fichiers et applications installés.",
+      "examples": {
+        "ss -tulpn": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+        "ss -s": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+        "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000002}'": "Déclenche l'inventaire logiciel"
+      }
+    }
+  }
 }

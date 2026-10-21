@@ -1,7 +1,7 @@
 {
   "id": "security-check-admin-group",
-  "title": "Lister les membres du groupe Administrateurs local",
-  "description": "Affiche tous les utilisateurs et groupes membres du groupe Administrateurs local",
+  "title": "List the members of the local Administrators group",
+  "description": "Show every user and group that is a member of the local Administrators group",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Get-LocalGroupMember -Group 'Administrators'",
-      "description": "Liste les membres du groupe Administrateurs",
+      "description": "List the members of the Administrators group",
       "platform": 0
     },
     {
       "command": "net localgroup Administrators",
-      "description": "Alternative avec commande net",
+      "description": "Alternative with the net command",
       "platform": 0
     },
     {
       "command": "Get-LocalGroupMember -Group 'Administrators' | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-LocalGroupMember -Group 'Administrators' | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-LocalGroupMember -Group 'Administrators' | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "Vérifiez régulièrement ce groupe. ObjectClass: User (utilisateur) ou Group (groupe). PrincipalSource: Local ou ActiveDirectory. Limitez le nombre d'administrateurs.",
+  "notes": "Review this group regularly. ObjectClass: User or Group. PrincipalSource: Local or ActiveDirectory. Keep the number of administrators low.",
   "links": [
     {
       "title": "Get-LocalGroupMember Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/get-localgroupmember"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les membres du groupe Administrateurs local",
+      "description": "Affiche tous les utilisateurs et groupes membres du groupe Administrateurs local",
+      "notes": "Vérifiez régulièrement ce groupe. ObjectClass: User (utilisateur) ou Group (groupe). PrincipalSource: Local ou ActiveDirectory. Limitez le nombre d'administrateurs.",
+      "examples": {
+        "Get-LocalGroupMember -Group 'Administrators'": "Liste les membres du groupe Administrateurs",
+        "net localgroup Administrators": "Alternative avec commande net",
+        "Get-LocalGroupMember -Group 'Administrators' | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-LocalGroupMember -Group 'Administrators' | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-LocalGroupMember -Group 'Administrators' | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "security-enable-rdp-firewall",
-  "title": "Activer la règle pare-feu pour RDP",
-  "description": "Active la règle de pare-feu Windows permettant les connexions Bureau à distance (RDP)",
+  "title": "Enable the firewall rule for RDP",
+  "description": "Enable the Windows Firewall rule that allows Remote Desktop (RDP) connections",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -22,15 +22,25 @@
   "examples": [
     {
       "command": "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0",
-      "description": "Active RDP au niveau système (registre)",
+      "description": "Enable RDP at the system level (registry)",
       "platform": 0
     }
   ],
-  "notes": "ATTENTION: Ouvre le port 3389. Assurez-vous que seuls les utilisateurs autorisés peuvent se connecter. Vérifiez aussi le paramètre système RDP.",
+  "notes": "WARNING: opens port 3389. Make sure only authorized users can connect. Also check the system RDP setting.",
   "links": [
     {
       "title": "Enable-NetFirewallRule Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/netsecurity/enable-netfirewallrule"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Activer la règle pare-feu pour RDP",
+      "description": "Active la règle de pare-feu Windows permettant les connexions Bureau à distance (RDP)",
+      "notes": "ATTENTION: Ouvre le port 3389. Assurez-vous que seuls les utilisateurs autorisés peuvent se connecter. Vérifiez aussi le paramètre système RDP.",
+      "examples": {
+        "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0": "Active RDP au niveau système (registre)"
+      }
+    }
+  }
 }
