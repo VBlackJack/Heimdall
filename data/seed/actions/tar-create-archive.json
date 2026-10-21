@@ -22,10 +22,16 @@
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "czf",
+          "cJf",
+          "cf",
+          "czvf"
+        ],
         "defaultValue": "czf",
         "required": true,
-        "description": "Options (c=create, z=gzip, j=bzip2, x=extract, f=file, v=verbose)"
+        "description": "czf = gzip, cJf = xz, cf = no compression, czvf = gzip listing each file"
       },
       {
         "name": "archive",
@@ -78,7 +84,7 @@
         "linux": {
           "options": {
             "label": "Options",
-            "description": "Options (c=create, z=gzip, j=bzip2, x=extract, f=file, v=verbose)"
+            "description": "czf = gzip, cJf = xz, cf = sans compression, czvf = gzip en listant chaque fichier"
           },
           "archive": {
             "label": "Archive",

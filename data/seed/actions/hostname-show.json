@@ -1,10 +1,10 @@
 {
   "id": "hostname-show",
-  "title": "Show or change the hostname",
-  "description": "Show or change the hostname of the system.",
+  "title": "Show the hostname",
+  "description": "Show the hostname of the system. Warning: the hostnamectl set-hostname examples rename the machine and need root.",
   "category": "monitoring-logs",
   "platform": 1,
-  "level": 1,
+  "level": 0,
   "tags": [
     "hostname",
     "system",
@@ -51,7 +51,7 @@
       "platform": 1
     },
     {
-      "command": "hostnamectl set-hostname server01",
+      "command": "sudo hostnamectl set-hostname server01",
       "description": "Change the hostname",
       "platform": 1
     },
@@ -61,7 +61,7 @@
       "platform": 1
     }
   ],
-  "notes": "hostnamectl is recommended on systemd for permanent changes.",
+  "notes": "hostnamectl is recommended on systemd for permanent changes. Changing the name requires root (sudo).",
   "links": [
     {
       "title": "hostname command",
@@ -70,9 +70,9 @@
   ],
   "translations": {
     "fr": {
-      "title": "Afficher/modifier le nom d'hôte",
-      "description": "Affiche ou modifie le nom d'hôte du système",
-      "notes": "hostnamectl est recommandé sur systemd pour changements permanents.",
+      "title": "Afficher le nom d'hôte",
+      "description": "Affiche le nom d'hôte du système. Attention : les exemples hostnamectl set-hostname renomment la machine et nécessitent les droits root.",
+      "notes": "hostnamectl est recommandé sur systemd pour changements permanents. Changer le nom nécessite les droits root (sudo).",
       "examples": {
         "hostname": "Affiche le nom d'hôte",
         "hostname -I": "Affiche toutes les adresses IP",
@@ -80,7 +80,7 @@
         "hostname -v -f": "Affiche le FQDN avec une sortie détaillée (-v)",
         "hostname -f": "Afficher le FQDN",
         "hostname -s": "Affiche le nom court",
-        "hostnamectl set-hostname server01": "Changer le hostname",
+        "sudo hostnamectl set-hostname server01": "Changer le hostname",
         "hostnamectl": "Informations détaillées"
       }
     }

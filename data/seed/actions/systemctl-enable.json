@@ -17,7 +17,7 @@
     "id": "systemctl-enable-cmd",
     "platform": 1,
     "name": "systemctl",
-    "commandPattern": "systemctl enable {service}",
+    "commandPattern": "sudo systemctl enable {service}",
     "parameters": [
       {
         "name": "service",
@@ -41,7 +41,7 @@
       "platform": 1
     },
     {
-      "command": "systemctl enable docker",
+      "command": "sudo systemctl enable docker",
       "description": "Enable Docker at boot",
       "platform": 1
     }
@@ -69,7 +69,7 @@
       "examples": {
         "sudo systemctl enable nginx": "Active nginx au démarrage",
         "sudo systemctl enable --now nginx": "Active et démarre immédiatement",
-        "systemctl enable docker": "Activer Docker au démarrage"
+        "sudo systemctl enable docker": "Activer Docker au démarrage"
       }
     }
   }

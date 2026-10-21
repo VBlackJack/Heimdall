@@ -400,7 +400,7 @@ Persistence uses SQLite through `TwinShellDbContext`. The shared database path
 is under the user's local application data in a `TwinShell` directory.
 
 Seed data lives in `data/seed/actions/`. Files whose names start with `_` are
-ignored; the current seed set contains 537 action JSON files. Their text is an
+ignored; the current seed set contains 527 action JSON files. Their text is an
 English pivot with other languages under `translations`, and their categories
 are ASCII keys that the view resolves to localized labels. At startup the seed
 directory is hashed; when the hash differs from the one recorded in the

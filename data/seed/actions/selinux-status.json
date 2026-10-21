@@ -37,17 +37,17 @@
       "platform": 1
     },
     {
-      "command": "setenforce Permissive",
+      "command": "sudo setenforce Permissive",
       "description": "Switch to permissive mode",
       "platform": 1
     },
     {
-      "command": "ausearch -m avc -ts recent",
+      "command": "sudo ausearch -m avc -ts recent",
       "description": "Latest denials",
       "platform": 1
     }
   ],
-  "notes": "Reading does not require sudo. Mostly on RHEL/CentOS/Fedora.",
+  "notes": "Reading does not require sudo. Mostly on RHEL/CentOS/Fedora. setenforce and ausearch require root (sudo).",
   "links": [
     {
       "title": "SELinux documentation",
@@ -58,13 +58,13 @@
     "fr": {
       "title": "Vérifier l'état de SELinux",
       "description": "Affiche l'état et le mode de SELinux (Security-Enhanced Linux)",
-      "notes": "Ne nécessite pas sudo pour lecture. Principalement sur RHEL/CentOS/Fedora.",
+      "notes": "Ne nécessite pas sudo pour lecture. Principalement sur RHEL/CentOS/Fedora. setenforce et ausearch nécessitent les droits root (sudo).",
       "examples": {
         "getenforce": "Affiche le mode SELinux (Enforcing/Permissive/Disabled)",
         "sestatus": "État détaillé de SELinux",
         "sudo setenforce 0": "Passe en mode Permissive (temporaire)",
-        "setenforce Permissive": "Passer en mode permissif",
-        "ausearch -m avc -ts recent": "Derniers refus"
+        "sudo setenforce Permissive": "Passer en mode permissif",
+        "sudo ausearch -m avc -ts recent": "Derniers refus"
       }
     }
   }

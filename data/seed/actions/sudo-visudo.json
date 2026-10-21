@@ -17,7 +17,7 @@
     "id": "visudo-cmd",
     "platform": 1,
     "name": "visudo",
-    "commandPattern": "visudo",
+    "commandPattern": "sudo visudo",
     "parameters": []
   },
   "examples": [
@@ -32,17 +32,7 @@
       "platform": 1
     },
     {
-      "command": "visudo",
-      "description": "Edit the sudoers file safely to configure sudo rights.",
-      "platform": 1
-    },
-    {
-      "command": "visudo -c",
-      "description": "Check the sudoers syntax",
-      "platform": 1
-    },
-    {
-      "command": "visudo -f /etc/sudoers.d/custom",
+      "command": "sudo visudo -f /etc/sudoers.d/custom",
       "description": "Edit a custom sudoers file",
       "platform": 1
     },
@@ -52,7 +42,7 @@
       "platform": 1
     }
   ],
-  "notes": "ALWAYS use visudo, NEVER edit /etc/sudoers directly. It checks the syntax before saving.",
+  "notes": "ALWAYS use visudo, NEVER edit /etc/sudoers directly. It checks the syntax before saving. Requires root (sudo).",
   "links": [
     {
       "title": "visudo documentation",
@@ -63,13 +53,11 @@
     "fr": {
       "title": "Éditer la configuration sudo",
       "description": "Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo",
-      "notes": "TOUJOURS utiliser visudo, JAMAIS éditer /etc/sudoers directement. Vérifie la syntaxe avant sauvegarde.",
+      "notes": "TOUJOURS utiliser visudo, JAMAIS éditer /etc/sudoers directement. Vérifie la syntaxe avant sauvegarde. Nécessite les droits root (sudo).",
       "examples": {
         "sudo visudo": "Édite /etc/sudoers en mode sécurisé",
         "sudo visudo -c": "Vérifie la syntaxe du fichier sudoers",
-        "visudo": "Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo.",
-        "visudo -c": "Vérifier la syntaxe de sudoers",
-        "visudo -f /etc/sudoers.d/custom": "Éditer un fichier sudoers personnalisé",
+        "sudo visudo -f /etc/sudoers.d/custom": "Éditer un fichier sudoers personnalisé",
         "sudo -l -U jdupont": "Afficher les permissions sudo d'un utilisateur"
       }
     }

@@ -17,7 +17,7 @@
     "id": "iftop-cmd",
     "platform": 1,
     "name": "iftop",
-    "commandPattern": "iftop -i {interface}",
+    "commandPattern": "sudo iftop -i {interface}",
     "parameters": [
       {
         "name": "interface",
@@ -46,27 +46,12 @@
       "platform": 1
     },
     {
-      "command": "iftop -i eth0",
-      "description": "Example using the 'interface' parameter: network interface to monitor. Replace eth0 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "iftop",
-      "description": "Monitor the bandwidth",
-      "platform": 1
-    },
-    {
-      "command": "iftop -n",
-      "description": "Do not resolve hostnames",
-      "platform": 1
-    },
-    {
-      "command": "iftop -P",
+      "command": "sudo iftop -P",
       "description": "Show the ports",
       "platform": 1
     },
     {
-      "command": "iftop -B",
+      "command": "sudo iftop -B",
       "description": "Show in bytes/s",
       "platform": 1
     },
@@ -100,11 +85,8 @@
         "sudo iftop": "Monitore l'interface par défaut",
         "sudo iftop -i eth0": "Monitore l'interface eth0",
         "sudo iftop -n": "Désactive la résolution DNS (plus rapide)",
-        "iftop -i eth0": "Exemple utilisant le paramètre 'interface': Interface réseau à monitorer. Remplacez eth0 par la valeur appropriée selon votre environnement.",
-        "iftop": "Monitorer la bande passante",
-        "iftop -n": "Ne pas résoudre les hostnames",
-        "iftop -P": "Afficher les ports",
-        "iftop -B": "Afficher en bytes/s",
+        "sudo iftop -P": "Afficher les ports",
+        "sudo iftop -B": "Afficher en bytes/s",
         "nload": "Alternative nload"
       }
     }

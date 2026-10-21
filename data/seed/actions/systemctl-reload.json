@@ -16,7 +16,7 @@
     "id": "systemctl-reload-cmd",
     "platform": 1,
     "name": "systemctl",
-    "commandPattern": "systemctl reload {service}",
+    "commandPattern": "sudo systemctl reload {service}",
     "parameters": [
       {
         "name": "service",

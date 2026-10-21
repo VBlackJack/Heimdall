@@ -17,7 +17,7 @@
     "id": "nethogs-cmd",
     "platform": 1,
     "name": "nethogs",
-    "commandPattern": "nethogs {interface}",
+    "commandPattern": "sudo nethogs {interface}",
     "parameters": [
       {
         "name": "interface",
@@ -41,27 +41,17 @@
       "platform": 1
     },
     {
-      "command": "nethogs eth0",
-      "description": "Example using the 'interface' parameter: network interface (empty = all). Replace eth0 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "nethogs",
-      "description": "Bandwidth per process",
-      "platform": 1
-    },
-    {
-      "command": "nethogs -t",
+      "command": "sudo nethogs -t",
       "description": "Text mode (for scripts)",
       "platform": 1
     },
     {
-      "command": "nethogs -d 5",
+      "command": "sudo nethogs -d 5",
       "description": "Refresh every 5 seconds",
       "platform": 1
     },
     {
-      "command": "nethogs -v 2",
+      "command": "sudo nethogs -v 2",
       "description": "Maximum verbosity",
       "platform": 1
     }
@@ -89,11 +79,9 @@
       "examples": {
         "sudo nethogs": "Monitore toutes les interfaces",
         "sudo nethogs eth0": "Monitore uniquement eth0",
-        "nethogs eth0": "Exemple utilisant le paramètre 'interface': Interface réseau (vide = toutes). Remplacez eth0 par la valeur appropriée selon votre environnement.",
-        "nethogs": "Bande passante par processus",
-        "nethogs -t": "Mode texte (pour scripts)",
-        "nethogs -d 5": "Rafraîchir toutes les 5 secondes",
-        "nethogs -v 2": "Verbosité maximale"
+        "sudo nethogs -t": "Mode texte (pour scripts)",
+        "sudo nethogs -d 5": "Rafraîchir toutes les 5 secondes",
+        "sudo nethogs -v 2": "Verbosité maximale"
       }
     }
   }
