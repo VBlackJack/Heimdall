@@ -79,7 +79,7 @@ public sealed class ToolContextProvider : ObservableObject, IToolContextProvider
     }
 
     /// <inheritdoc />
-    public string ContextBrushKey => HasTarget ? "AccentBrush" : "TextDisabledBrush";
+    public string ContextBrushKey => HasTarget ? "AccentTextBrush" : "TextSecondaryBrush";
 
     /// <inheritdoc />
     public void SetSelectedServer(ServerItemViewModel? server)

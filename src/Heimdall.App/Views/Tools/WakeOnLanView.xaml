@@ -199,7 +199,7 @@
                                  BorderBrush="{DynamicResource BorderBrush}"
                                  FontFamily="Consolas"
                                  FontSize="{StaticResource FontSizeSmallCaption}"
-                                 Foreground="{DynamicResource AccentBrush}"
+                                 Foreground="{DynamicResource AccentTextBrush}"
                                  HorizontalScrollBarVisibility="Auto"
                                  IsReadOnly="True"
                                  Text="{Binding History}"

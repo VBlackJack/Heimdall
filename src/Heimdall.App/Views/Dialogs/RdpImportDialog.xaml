@@ -18,6 +18,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource BackgroundBrush}"
         ResizeMode="CanResizeWithGrip"
+        behaviors:DialogChromeBehavior.HideCaptionButtons="True"
         ShowInTaskbar="False">
 
     <Window.Resources>
@@ -48,7 +49,7 @@
                        TextWrapping="Wrap"/>
             <TextBlock Margin="0,6,0,0"
                        Text="{Binding SummaryText}"
-                       Foreground="{DynamicResource TextDisabledBrush}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
                        FontSize="{StaticResource FontSizeCaption}"/>
         </StackPanel>
 

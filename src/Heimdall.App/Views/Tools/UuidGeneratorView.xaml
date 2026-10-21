@@ -120,13 +120,13 @@
                              IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolUuidResult}"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}" />
                 </DockPanel>
 
                 <StackPanel Orientation="Horizontal" Margin="{StaticResource MarginSectionSeparator}">
                     <ComboBox x:Name="CmbVersion"
-                              Width="160"
+                              MinWidth="160"
                               Margin="0,0,16,0"
                               Background="{DynamicResource CardBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
@@ -204,7 +204,7 @@
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Auto"
                                  Background="{DynamicResource CardBrush}"
-                                 Foreground="{DynamicResource AccentBrush}"
+                                 Foreground="{DynamicResource AccentTextBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}" />
                         <Button x:Name="BtnCopyBatch"
                                 TabIndex="7"

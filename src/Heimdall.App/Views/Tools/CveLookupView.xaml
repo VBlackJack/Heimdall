@@ -140,7 +140,7 @@
                                Text="{loc:Translate ToolCveEmptyState}" />
                     <TextBlock Margin="{StaticResource MarginSubsectionTop}"
                                FontSize="{StaticResource FontSizeCaption}"
-                               Foreground="{DynamicResource TextDisabledBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Text="{Binding DbInfoText}"
                                TextAlignment="Center" />
                 </StackPanel>
@@ -242,7 +242,7 @@
                                                    Grid.ColumnSpan="2"
                                                    Margin="0,4,0,0"
                                                    FontSize="{StaticResource FontSizeCaption}"
-                                                   Foreground="{DynamicResource TextDisabledBrush}">
+                                                   Foreground="{DynamicResource TextSecondaryBrush}">
                                             <Run Text="{Binding AffectedLabel, Mode=OneTime}" />
                                             <Run FontFamily="Consolas"
                                                  Text="{Binding AffectedVersions, Mode=OneTime}" />

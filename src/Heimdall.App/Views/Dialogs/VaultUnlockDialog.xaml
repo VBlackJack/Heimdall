@@ -86,7 +86,7 @@
             <ProgressBar IsIndeterminate="True"
                          Height="4"
                          Background="{DynamicResource CardBrush}"
-                         Foreground="{DynamicResource AccentBrush}"
+                         Foreground="{DynamicResource AccentTextBrush}"
                          BorderThickness="0"/>
         </StackPanel>
 

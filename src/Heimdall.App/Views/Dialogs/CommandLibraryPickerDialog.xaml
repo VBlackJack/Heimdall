@@ -18,6 +18,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource BackgroundBrush}"
         ResizeMode="CanResizeWithGrip"
+        behaviors:DialogChromeBehavior.HideCaptionButtons="True"
         ShowInTaskbar="False">
 
     <Window.Resources>
@@ -149,7 +150,7 @@
                                                    Foreground="{DynamicResource BadgeTextBrush}"/>
                                     </Border>
                                     <TextBlock Text="{Binding PlatformBadge}"
-                                               Foreground="{DynamicResource AccentBrush}"
+                                               Foreground="{DynamicResource AccentTextBrush}"
                                                FontWeight="SemiBold"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>

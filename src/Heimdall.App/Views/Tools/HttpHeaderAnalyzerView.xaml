@@ -122,7 +122,7 @@
                                FontSize="{StaticResource FontSizeBody}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <ComboBox x:Name="CmbRouteVia"
-                              Width="240"
+                              MinWidth="240"
                               Background="{DynamicResource CardBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
@@ -207,7 +207,7 @@
                                                        TextWrapping="Wrap"/>
                                             <TextBlock Margin="0,2,0,0"
                                                        FontSize="{StaticResource FontSizeCaption}"
-                                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Text="{Binding Recommendation}"
                                                        TextWrapping="Wrap"
                                                        Visibility="{Binding Recommendation, Converter={StaticResource NullToVisibilityConverter}}"/>
@@ -255,7 +255,7 @@
                                                        TextWrapping="Wrap"/>
                                             <TextBlock Margin="0,2,0,0"
                                                        FontSize="{StaticResource FontSizeCaption}"
-                                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Text="{Binding Recommendation}"
                                                        TextWrapping="Wrap"
                                                        Visibility="{Binding Recommendation, Converter={StaticResource NullToVisibilityConverter}}"/>

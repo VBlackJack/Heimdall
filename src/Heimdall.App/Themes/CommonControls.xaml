@@ -677,7 +677,7 @@
                                        Margin="0"
                                        Padding="{TemplateBinding Padding}"
                                        VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        IsHitTestVisible="False"
                                        Text="{TemplateBinding Tag}"
                                        Visibility="Collapsed"/>
@@ -2544,7 +2544,7 @@
                                           VerticalScrollBarVisibility="Hidden"/>
                             <TextBlock x:Name="Watermark"
                                        Text="{TemplateBinding Tag}"
-                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        Padding="{TemplateBinding Padding}"
                                        VerticalAlignment="Center"
                                        IsHitTestVisible="False"

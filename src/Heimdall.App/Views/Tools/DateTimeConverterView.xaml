@@ -164,7 +164,7 @@
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeUnixLabel}"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"/>
                 </DockPanel>
 
@@ -188,7 +188,7 @@
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeIsoUtcLabel}"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"/>
                 </DockPanel>
 
@@ -212,7 +212,7 @@
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeIsoLocalLabel}"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"/>
                 </DockPanel>
 
@@ -236,7 +236,7 @@
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeLocalTimeLabel}"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"/>
                 </DockPanel>
 
@@ -270,7 +270,7 @@
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeTimezoneLabel}"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"/>
                 </DockPanel>
 
@@ -280,7 +280,7 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                 <TextBlock Text="{Binding RelativeTimeText}"
                            FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
-                           Foreground="{DynamicResource AccentBrush}"
+                           Foreground="{DynamicResource AccentTextBrush}"
                            Margin="{StaticResource MarginStackItem}"/>
                 </StackPanel>
 

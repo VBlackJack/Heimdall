@@ -153,7 +153,7 @@
                             <TextBlock x:Name="NoResultsHintText"
                                        Margin="0,6,0,0"
                                        FontSize="{StaticResource FontSizeCaption}"
-                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"/>
                         </StackPanel>

@@ -141,7 +141,7 @@
                                        Text="{Binding CurrentCode}"
                                        FontSize="{StaticResource IconSizeXLarge}" FontWeight="Bold"
                                        FontFamily="Consolas"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        AutomationProperties.AutomationId="TotpGenerator.CodeText"
                                        AutomationProperties.Name="{loc:Translate ToolTotpCodeLabel}"
                                        VerticalAlignment="Center"/>
@@ -157,7 +157,7 @@
                         <ProgressBar x:Name="ProgressTime"
                                      Height="6" Width="300"
                                      Minimum="0" Maximum="{Binding TimeStepSeconds}" Value="{Binding RemainingSeconds}"
-                                     Foreground="{DynamicResource AccentBrush}"
+                                     Foreground="{DynamicResource AccentTextBrush}"
                                      AutomationProperties.AutomationId="TotpGenerator.ProgressTime"
                                      AutomationProperties.Name="{loc:Translate ToolTotpTimeRemaining}"
                                      Background="{DynamicResource SurfaceBrush}"/>

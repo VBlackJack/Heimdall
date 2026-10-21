@@ -100,7 +100,7 @@
                                FontSize="{StaticResource FontSizeBody}" Margin="{StaticResource MarginInlineSm}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"/>
-                    <ComboBox x:Name="CmbRouteVia" Width="240"
+                    <ComboBox x:Name="CmbRouteVia" MinWidth="240"
                               TabIndex="2"
                               Background="{DynamicResource CardBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
@@ -134,7 +134,7 @@
                         <StackPanel>
                             <TextBlock x:Name="TxtCardIdentity" Text=""
                                        FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        Margin="{StaticResource MarginStackItem}"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -205,7 +205,7 @@
                         <StackPanel>
                             <TextBlock x:Name="TxtCardProtocol" Text=""
                                        FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        Margin="{StaticResource MarginStackItem}"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -263,7 +263,7 @@
                         <StackPanel>
                             <TextBlock x:Name="TxtCardFindings" Text=""
                                        FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        Margin="{StaticResource MarginStackItem}"/>
                             <ItemsControl ItemsSource="{Binding Findings}">
                                 <ItemsControl.ItemTemplate>

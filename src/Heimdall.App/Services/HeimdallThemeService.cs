@@ -126,6 +126,9 @@ public sealed class HeimdallThemeService
             return;
         }
 
+        // ThemeForge raises no change for a theme already applied; the derived text colours are
+        // written here as well so they exist even then.
+        RefreshDerivedTextColors(app);
         RefreshHeimdallBridge(app);
 
         foreach (Window window in app.Windows)
@@ -258,6 +261,21 @@ public sealed class HeimdallThemeService
         }
     }
 
+    /// <summary>
+    /// Writes the semantic and accent text colours derived from the active theme into the
+    /// application resources, where the bridge's dynamic references find them.
+    /// </summary>
+    private static void RefreshDerivedTextColors(Application app)
+    {
+        if (!app.Dispatcher.CheckAccess())
+        {
+            app.Dispatcher.Invoke(() => RefreshDerivedTextColors(app));
+            return;
+        }
+
+        ThemeTextColours.Apply(app.Resources, app.TryFindResource);
+    }
+
     private static bool IsHeimdallBridgeSource(Uri source)
     {
         string original = source.OriginalString.Replace('\\', '/');
@@ -304,6 +322,14 @@ public sealed class HeimdallThemeService
     {
         _currentTheme = args.CurrentTheme;
         _currentAccentTint = _themeService?.CurrentAccentTint.ToString() ?? _currentAccentTint;
+
+        // Raised after a theme swap and after an accent tint change alike, once the new colours
+        // are merged: the derived text colours follow both.
+        if (Application.Current is Application app)
+        {
+            RefreshDerivedTextColors(app);
+        }
+
         ThemeChanged?.Invoke(args.CurrentTheme);
     }
 }

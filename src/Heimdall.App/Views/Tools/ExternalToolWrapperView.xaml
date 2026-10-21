@@ -172,7 +172,7 @@
                                VerticalAlignment="Center"/>
                     <TextBlock x:Name="TxtExePath" Text=""
                                FontSize="{StaticResource FontSizeSmallCaption}"
-                               Foreground="{DynamicResource TextDisabledBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center" Margin="{StaticResource MarginInlineControl}"/>
                 </StackPanel>
             </DockPanel>

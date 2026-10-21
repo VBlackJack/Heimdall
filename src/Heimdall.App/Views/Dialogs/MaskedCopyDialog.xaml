@@ -14,6 +14,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource BackgroundBrush}"
         ResizeMode="CanResizeWithGrip"
+        behaviors:DialogChromeBehavior.HideCaptionButtons="True"
         ShowInTaskbar="False">
 
     <Window.Resources>

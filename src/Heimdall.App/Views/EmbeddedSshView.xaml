@@ -320,7 +320,7 @@
                                          Height="2"
                                          Width="220"
                                          Margin="0,16,0,16"
-                                         Foreground="{DynamicResource AccentBrush}"
+                                         Foreground="{DynamicResource AccentTextBrush}"
                                          Background="Transparent"
                                          BorderThickness="0"/>
                             <Button x:Name="AutoReconnectCancelButton"
@@ -361,7 +361,7 @@
                                          Height="2"
                                          Width="220"
                                          Margin="0,16,0,16"
-                                         Foreground="{DynamicResource AccentBrush}"
+                                         Foreground="{DynamicResource AccentTextBrush}"
                                          Background="Transparent"
                                          BorderThickness="0"/>
                             <Button x:Name="ConnectingCancelButton"
@@ -399,7 +399,7 @@
                                      AutomationProperties.LabeledBy="{x:Reference HealthCpuLabel}"
                                      Height="14"
                                      Minimum="0" Maximum="100" Value="0"
-                                     Foreground="{DynamicResource AccentBrush}"
+                                     Foreground="{DynamicResource AccentTextBrush}"
                                      Background="{DynamicResource BackgroundBrush}"/>
                         <TextBlock x:Name="CpuPercentText"
                                    FontSize="{StaticResource FontSizeCaption}"
@@ -417,7 +417,7 @@
                                      AutomationProperties.LabeledBy="{x:Reference HealthRamLabel}"
                                      Height="14"
                                      Minimum="0" Maximum="100" Value="0"
-                                     Foreground="{DynamicResource AccentBrush}"
+                                     Foreground="{DynamicResource AccentTextBrush}"
                                      Background="{DynamicResource BackgroundBrush}"/>
                         <TextBlock x:Name="RamDetailText"
                                    FontSize="{StaticResource FontSizeCaption}"
@@ -435,7 +435,7 @@
                                      AutomationProperties.LabeledBy="{x:Reference HealthDiskLabel}"
                                      Height="14"
                                      Minimum="0" Maximum="100" Value="0"
-                                     Foreground="{DynamicResource AccentBrush}"
+                                     Foreground="{DynamicResource AccentTextBrush}"
                                      Background="{DynamicResource BackgroundBrush}"/>
                         <TextBlock x:Name="DiskDetailText"
                                    FontSize="{StaticResource FontSizeCaption}"

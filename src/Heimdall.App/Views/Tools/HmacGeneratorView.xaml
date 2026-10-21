@@ -234,7 +234,7 @@
                              Padding="{StaticResource PaddingInput}"
                              IsReadOnly="True"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
                          VerticalAlignment="Center"
                          AutomationProperties.AutomationId="HmacGenerator.OutputField"

@@ -111,7 +111,7 @@
                             TabIndex="3" />
                     <ComboBox x:Name="CmbDnsServer"
                               DockPanel.Dock="Right"
-                              Width="160"
+                              MinWidth="160"
                               Margin="{StaticResource MarginInlineControl}"
                               VerticalAlignment="Center"
                               Background="{DynamicResource CardBrush}"
@@ -123,7 +123,7 @@
                               AutomationProperties.Name="{loc:Translate ToolDnsServerLabel}" />
                     <ComboBox x:Name="CmbRecordType"
                               DockPanel.Dock="Right"
-                              Width="100"
+                              MinWidth="100"
                               Margin="{StaticResource MarginInlineControl}"
                               VerticalAlignment="Center"
                               Background="{DynamicResource CardBrush}"
@@ -161,7 +161,7 @@
                                Text="{loc:Translate ToolTunnelRouteVia}"
                                VerticalAlignment="Center" />
                     <ComboBox x:Name="CmbRouteVia"
-                              Width="240"
+                              MinWidth="240"
                               Background="{DynamicResource CardBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"
@@ -209,7 +209,7 @@
                             <TextBlock Text="{Binding ResultHeader}"
                                        FontSize="{StaticResource FontSizeBodyLarge}"
                                        FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        VerticalAlignment="Center" />
                         </DockPanel>
                         <TextBlock Text="{Binding Results}"

@@ -93,7 +93,7 @@
                                FontSize="{StaticResource FontSizeCaption}"
                                VerticalAlignment="Center" Margin="{StaticResource MarginInlineXs}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <ComboBox x:Name="CmbRouteVia" Width="180"
+                    <ComboBox x:Name="CmbRouteVia" MinWidth="180"
                               Background="{DynamicResource CardBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"
@@ -290,7 +290,7 @@
                                Foreground="{DynamicResource BorderBrush}"/>
 
                     <TextBlock x:Name="TxtTotal" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
-                               Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"
                                Margin="{StaticResource MarginInlineXs}"/>
                 </WrapPanel>
 

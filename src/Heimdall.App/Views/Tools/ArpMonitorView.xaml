@@ -93,7 +93,7 @@
                 <TextBlock x:Name="LblInterval" Text=""
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            FontSize="{StaticResource FontSizeBody}" VerticalAlignment="Center" Margin="12,0,4,0"/>
-                <ComboBox x:Name="CmbInterval" Width="80"
+                <ComboBox x:Name="CmbInterval" MinWidth="80"
                           SelectedIndex="1"
                           VerticalAlignment="Center"
                           Background="{DynamicResource CardBrush}"

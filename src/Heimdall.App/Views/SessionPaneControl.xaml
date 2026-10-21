@@ -52,7 +52,7 @@
                            HorizontalAlignment="Center"/>
                 <TextBlock Text="{Binding Status, Converter={StaticResource SessionStatusToDisplayConverter}}"
                            FontSize="{StaticResource FontSizeCaption}"
-                           Foreground="{DynamicResource TextDisabledBrush}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,4,0,0"/>
             </StackPanel>

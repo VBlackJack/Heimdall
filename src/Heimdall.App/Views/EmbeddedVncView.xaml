@@ -127,7 +127,7 @@
                      Panel.ZIndex="1"
                      Height="2"
                      IsIndeterminate="True"
-                     Foreground="{DynamicResource AccentBrush}"
+                     Foreground="{DynamicResource AccentTextBrush}"
                      Background="Transparent"
                      BorderThickness="0"
                      IsHitTestVisible="False"/>

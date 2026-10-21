@@ -35,9 +35,14 @@
     <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}" />
     <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}" />
     <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}" />
-    <SolidColorBrush x:Key="SuccessTextBrush" Color="{DynamicResource SuccessColor}" />
-    <SolidColorBrush x:Key="WarningTextBrush" Color="{DynamicResource WarningColor}" />
-    <SolidColorBrush x:Key="ErrorTextBrush" Color="{DynamicResource ErrorColor}" />
+    <!-- Semantic and accent text. The *TextColor keys are not in any theme: HeimdallThemeService
+         derives them from the theme colour of the same meaning on every theme change, so each
+         reads at 4.5 to 1 on the background and on a card (Theming/ThemeTextColours.cs). -->
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="{DynamicResource SuccessTextColor}" />
+    <SolidColorBrush x:Key="WarningTextBrush" Color="{DynamicResource WarningTextColor}" />
+    <SolidColorBrush x:Key="ErrorTextBrush" Color="{DynamicResource ErrorTextColor}" />
+    <SolidColorBrush x:Key="InfoTextBrush" Color="{DynamicResource InfoTextColor}" />
+    <SolidColorBrush x:Key="AccentTextBrush" Color="{DynamicResource AccentTextColor}" />
     <SolidColorBrush x:Key="BadgeTextBrush" Color="{DynamicResource BackgroundColor}" />
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="{DynamicResource BackgroundColor}" />
     <SolidColorBrush x:Key="FocusIndicatorBrush" Color="{DynamicResource CyanColor}" />

@@ -56,7 +56,7 @@
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding TunnelRoute}"
                                    FontSize="{StaticResource FontSizeCaption}"
-                                   Foreground="{DynamicResource TextDisabledBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"
                                    Margin="0,4,0,0"/>
                     </StackPanel>
@@ -107,7 +107,7 @@
                            VerticalAlignment="Center">
                     <TextBlock x:Name="Mw_AppTitle" Text="{loc:Translate AppName}"
                                FontSize="{StaticResource FontSizeLarge}" FontWeight="Bold"
-                               Foreground="{DynamicResource AccentBrush}"
+                               Foreground="{DynamicResource AccentTextBrush}"
                                VerticalAlignment="Center"
                                Margin="0,0,24,0"/>
 
@@ -246,7 +246,7 @@
                             <TextBlock Text="&#xE71E;"
                                        FontFamily="{StaticResource FontFamilyIcons}"
                                        FontSize="{StaticResource FontSizeBody}"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        VerticalAlignment="Center"
                                        Margin="0,0,6,0"/>
                             <TextBlock Text="{loc:Translate QuickConnectShortcut}"
@@ -265,7 +265,7 @@
                      Panel.ZIndex="10"
                      Height="2"
                      IsIndeterminate="True"
-                     Foreground="{DynamicResource AccentBrush}"
+                     Foreground="{DynamicResource AccentTextBrush}"
                      Background="Transparent"
                      BorderThickness="0"
                      IsHitTestVisible="False"
@@ -1441,7 +1441,7 @@
                                            DockPanel.Dock="Top"
                                            Margin="10,16,10,0"
                                            FontSize="{StaticResource FontSizeCaption}"
-                                           Foreground="{DynamicResource TextDisabledBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            HorizontalAlignment="Center"
                                            Text="{Binding Sidebar.NoResultsText}"
                                            Visibility="{Binding Sidebar.HasNoResults, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -1763,7 +1763,7 @@
                                                                        FontSize="{StaticResource SessionTabBroadcastGlyphFontSize}"
                                                                        HorizontalAlignment="Center"
                                                                        VerticalAlignment="Center"
-                                                                       Foreground="{DynamicResource AccentBrush}"
+                                                                       Foreground="{DynamicResource AccentTextBrush}"
                                                                        Visibility="{Binding IsBroadcastTarget, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                         </Border>
                                                     </Button>
@@ -1807,7 +1807,7 @@
                                                         </Ellipse>
                                                     </Grid>
                                                     <TextBlock x:Name="TabPinGlyph" Text="&#xE718;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource SessionTabPinGlyphFontSize}"
-                                                               Foreground="{DynamicResource AccentBrush}"
+                                                               Foreground="{DynamicResource AccentTextBrush}"
                                                                VerticalAlignment="Center" Margin="0,0,4,0"
                                                                Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}"
                                                                AutomationProperties.Name="{loc:Translate SessionPinTab}"/>
@@ -1862,7 +1862,7 @@
                                                                    Visibility="Collapsed"/>
                                                     </Grid>
                                                     <TextBlock x:Name="BusyIndicator" Text="&#x25CF;" FontSize="{StaticResource SessionTabBusyGlyphFontSize}"
-                                                               Foreground="{DynamicResource AccentBrush}"
+                                                               Foreground="{DynamicResource AccentTextBrush}"
                                                                VerticalAlignment="Center" Margin="5,0,0,0"
                                                                Visibility="Collapsed"
                                                                AutomationProperties.Name="{loc:Translate A11yOperationInProgress}">
@@ -1901,7 +1901,7 @@
                                                             Style="{DynamicResource SecondaryButtonStyle}">
                                                         <TextBlock Text="{Binding PostConnectProgressText}"
                                                                    FontSize="{StaticResource FontSizeSmallCaption}"
-                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                                    FontWeight="SemiBold"
                                                                    VerticalAlignment="Center"/>
                                                     </Button>
@@ -2020,7 +2020,7 @@
                                     IsHitTestVisible="False">
                                 <TextBlock Text="{Binding DataContext.DropToMergeText, RelativeSource={RelativeSource AncestorType=Window}}"
                                            FontSize="{StaticResource FontSizeSubtitle}"
-                                           Foreground="{DynamicResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentTextBrush}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            Opacity="0.8"/>
@@ -2074,7 +2074,7 @@
                                 <!-- Subtle shortcut hints for detail panel actions -->
                                 <TextBlock x:Name="Mw_DetailActionHints" Text="{Binding DetailActionHintsText}"
                                            FontSize="{StaticResource FontSizeSmallCaption}"
-                                           Foreground="{DynamicResource TextDisabledBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,8,0,0"/>
                             </StackPanel>
                         </Border>
@@ -2139,7 +2139,7 @@
                                         <TextBlock Text="&#xE774;"
                                                    FontFamily="{StaticResource FontFamilyIcons}"
                                                    FontSize="{StaticResource IconSizeEmptyState}"
-                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"/>
                                     </Border>
@@ -2213,7 +2213,7 @@
                                         <TextBlock Text="&#xE8B7;"
                                                    FontFamily="{StaticResource FontFamilyIcons}"
                                                    FontSize="{StaticResource IconSizeLarge}"
-                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"/>
                                     </Border>
@@ -2243,7 +2243,7 @@
                                             <TextBlock Text="&#xE71E;"
                                                        FontFamily="{StaticResource FontFamilyIcons}"
                                                        FontSize="{StaticResource FontSizeBody}"
-                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       Foreground="{DynamicResource AccentTextBrush}"
                                                        VerticalAlignment="Center"
                                                        Margin="0,0,6,0"/>
                                             <TextBlock Text="{loc:Translate QuickConnectShortcut}"
@@ -2305,7 +2305,7 @@
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock Text="&#xE945;" FontFamily="{StaticResource FontFamilyIcons}"
                                                    FontSize="{StaticResource FontSizeBody}" Margin="0,0,6,0"
-                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextPrimaryBrush}"
@@ -2569,7 +2569,7 @@
                                 <TextBlock Text="&#xE71B;"
                                            FontFamily="{StaticResource FontFamilyIcons}"
                                            FontSize="{StaticResource IconSizeLarge}"
-                                           Foreground="{DynamicResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentTextBrush}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"/>
                             </Border>
@@ -2586,7 +2586,7 @@
                                     Content="{loc:Translate TunnelsManageGatewaysLink}"
                                     Style="{DynamicResource GhostButtonStyle}"
                                     FontSize="{StaticResource FontSizeCaption}"
-                                    Foreground="{DynamicResource AccentBrush}"
+                                    Foreground="{DynamicResource AccentTextBrush}"
                                     HorizontalAlignment="Center"
                                     Margin="0,0,0,16"
                                     Click="OnNavigateToGatewaySettings"
@@ -2685,7 +2685,7 @@
                                 <TextBlock Text="&#xE787;"
                                            FontFamily="{StaticResource FontFamilyIcons}"
                                            FontSize="{StaticResource IconSizeLarge}"
-                                           Foreground="{DynamicResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentTextBrush}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"/>
                             </Border>
@@ -3604,7 +3604,7 @@
                                                           IsTextSearchEnabled="True"
                                                           ItemsSource="{Binding Settings.InstalledFontFamilies}"
                                                           Text="{Binding Settings.TerminalFontFamily, UpdateSourceTrigger=LostFocus}"
-                                                          Width="200" HorizontalAlignment="Left"
+                                                          MinWidth="200" HorizontalAlignment="Left"
                                                           AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTerminalFontLabel}"/>
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalFontFamily]}"/>
                                             </StackPanel>
@@ -5738,7 +5738,7 @@
                                 <TextBlock Text="&#xE7F4;"
                                            FontFamily="{StaticResource FontFamilyIcons}"
                                            FontSize="{StaticResource IconSizeHero}"
-                                           Foreground="{DynamicResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentTextBrush}"
                                            HorizontalAlignment="Center"
                                            Margin="0,0,0,10"/>
                                 <TextBlock x:Name="Mw_AboutAppName" Text="{loc:Translate AppName}"
@@ -5967,7 +5967,7 @@
                 <TextBlock Text="&#xE8B7;"
                            FontFamily="{StaticResource FontFamilyIcons}"
                            FontSize="40"
-                           Foreground="{DynamicResource AccentBrush}"
+                           Foreground="{DynamicResource AccentTextBrush}"
                            HorizontalAlignment="Center"/>
                 <TextBlock Margin="0,12,0,0"
                            Text="{loc:Translate DialogImportRdpDropOverlay}"
@@ -5994,7 +5994,7 @@
                 <!-- Subtle F1 shortcut hint - visible when status shows default ready text -->
                 <TextBlock x:Name="Mw_StatusBarShortcutHint" Text="{loc:Translate StatusBarShortcutHint}"
                            FontSize="{StaticResource FontSizeSmallCaption}"
-                           Foreground="{DynamicResource TextDisabledBrush}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"
                            Margin="12,0,0,0"/>
                 <StackPanel Orientation="Horizontal"
@@ -6050,7 +6050,7 @@
                         <TextBlock x:Name="Mw_TftpDisabledHint"
                                    Margin="0,2,0,0"
                                    FontSize="{StaticResource FontSizeSmallCaption}"
-                                   Foreground="{DynamicResource TextDisabledBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    Text="{loc:Translate LblTftpDisabledHint}"
                                    Visibility="Collapsed"/>
                     </StackPanel>
@@ -6179,7 +6179,7 @@
                     <TextBlock x:Name="PaletteModeLabel"
                                Text=""
                                FontSize="{StaticResource FontSizeCaption}"
-                               Foreground="{DynamicResource AccentBrush}"
+                               Foreground="{DynamicResource AccentTextBrush}"
                                FontWeight="SemiBold"
                                Visibility="Collapsed"
                                Margin="14,8,14,0"/>
@@ -6293,13 +6293,13 @@
                                                     Margin="20,2,0,0">
                                             <TextBlock Text="{Binding Endpoint}"
                                                        FontSize="{StaticResource FontSizeCaption}"
-                                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Visibility="{Binding Endpoint, Converter={StaticResource NullToVisibilityConverter}}"
                                                        TextTrimming="CharacterEllipsis"
                                                        MaxWidth="220"/>
                                             <TextBlock Text="{Binding Username, StringFormat={}  ·  {0}}"
                                                        FontSize="{StaticResource FontSizeCaption}"
-                                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Visibility="{Binding Username, Converter={StaticResource NullToVisibilityConverter}}"/>
 <!-- group now rendered as a section header above the row, suffix removed -->
                                         </StackPanel>
@@ -6364,7 +6364,7 @@
                     <TextBlock Text="{Binding CommandPalette.SnippetDetailTitle}"
                                FontSize="{StaticResource FontSizeSubtitle}"
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource AccentBrush}"
+                               Foreground="{DynamicResource AccentTextBrush}"
                                TextTrimming="CharacterEllipsis"
                                Padding="14,8"/>
 
@@ -6444,7 +6444,7 @@
                                     <TextBlock Text="{Binding PreviewCommand}"
                                                FontSize="{StaticResource FontSizeCaption}"
                                                FontFamily="{StaticResource FontFamilyMonospace}"
-                                               Foreground="{DynamicResource TextDisabledBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                TextTrimming="CharacterEllipsis"
                                                HorizontalAlignment="Left"
                                                MaxWidth="620"
@@ -6606,7 +6606,7 @@
                                                         <TextBlock Text="{Binding Command}"
                                                                    FontFamily="{StaticResource FontFamilyMonospace}"
                                                                    FontSize="{StaticResource FontSizeCaption}"
-                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                                    TextTrimming="CharacterEllipsis"/>
                                                         <TextBlock Text="{Binding Description}"
                                                                    FontSize="{StaticResource FontSizeSmallCaption}"
@@ -6663,7 +6663,7 @@
                                                Margin="0,2,0,0">
                                         <Hyperlink NavigateUri="{Binding Url}"
                                                    RequestNavigate="OnPaletteLinkNavigate"
-                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                    AutomationProperties.Name="{Binding Title}">
                                             <Run Text="{Binding Title, Mode=OneWay}"/>
                                         </Hyperlink>
