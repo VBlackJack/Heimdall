@@ -24,11 +24,6 @@
       "command": "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d",
       "description": "Enable Microsoft Update",
       "platform": 0
-    },
-    {
-      "command": "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d -Confirm:$false",
-      "description": "Standard run of the Add command. See the official documentation with Get-Help Add-WUServiceManager -Full for details on the available parameters and advanced use cases.",
-      "platform": 0
     }
   ],
   "notes": "Lets the computer receive updates for Office, SQL Server and other Microsoft products. Requires administrator rights and PSWindowsUpdate.",
@@ -44,8 +39,7 @@
       "description": "Ajoute Microsoft Update comme source de mises à jour (inclut Office, SQL, etc.)",
       "notes": "Permet de recevoir les mises à jour pour Office, SQL Server et autres produits Microsoft. Nécessite droits administrateur et PSWindowsUpdate.",
       "examples": {
-        "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d": "Active Microsoft Update",
-        "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d -Confirm:$false": "Exécution standard de la commande Add. Consultez la documentation officielle avec Get-Help Add-WUServiceManager -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d": "Active Microsoft Update"
       }
     }
   }

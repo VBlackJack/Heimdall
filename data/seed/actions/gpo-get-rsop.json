@@ -33,11 +33,6 @@
       "command": "gpresult /H \"C:\\GPOReports\\rsop.html\" /F",
       "description": "Generate a full HTML RSoP report",
       "platform": 0
-    },
-    {
-      "command": "gpresult /H \"C:\\Reports\\output.txt\" /F",
-      "description": "Standard run of the None command. See the official documentation with Get-Help gpresult -Full for details on the available parameters and advanced use cases.",
-      "platform": 0
     }
   ],
   "notes": "The RSoP report shows every applied GPO and its effective settings. /F forces the file to be overwritten.",
@@ -56,8 +51,7 @@
         }
       },
       "examples": {
-        "gpresult /H \"C:\\GPOReports\\rsop.html\" /F": "Génère un rapport RSoP HTML complet",
-        "gpresult /H \"C:\\Reports\\output.txt\" /F": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help gpresult -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "gpresult /H \"C:\\GPOReports\\rsop.html\" /F": "Génère un rapport RSoP HTML complet"
       }
     }
   }

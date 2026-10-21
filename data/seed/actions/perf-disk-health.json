@@ -36,7 +36,7 @@
     },
     {
       "command": "Get-CimInstance -ClassName Win32_DiskDrive | Select-Object",
-      "description": "WMIC alternative (legacy) (modernized from wmic) (modernized from wmic)",
+      "description": "Read the disk drives through CIM, the replacement for the legacy WMIC",
       "platform": 0
     },
     {
@@ -70,7 +70,7 @@
       "examples": {
         "Get-PhysicalDisk | Where-Object {$_.HealthStatus -ne 'Healthy'}": "Affiche uniquement les disques avec problèmes",
         "Get-Disk | Select-Object Number, FriendlyName, HealthStatus, OperationalStatus, PartitionStyle": "État détaillé de tous les disques",
-        "Get-CimInstance -ClassName Win32_DiskDrive | Select-Object": "Alternative WMIC (legacy) (modernisé depuis wmic) (modernisé depuis wmic)",
+        "Get-CimInstance -ClassName Win32_DiskDrive | Select-Object": "Lit les disques via CIM, qui remplace l'ancien WMIC",
         "Get-PhysicalDisk | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
         "Get-PhysicalDisk | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "Get-PhysicalDisk | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."

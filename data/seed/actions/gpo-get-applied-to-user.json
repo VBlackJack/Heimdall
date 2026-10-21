@@ -33,11 +33,6 @@
       "command": "gpresult /R /USER CONTOSO\\jdupont",
       "description": "Show the GPOs applied to the user jdupont",
       "platform": 0
-    },
-    {
-      "command": "gpresult /R /USER jdupont",
-      "description": "Standard run of the None command. See the official documentation with Get-Help gpresult -Full for details on the available parameters and advanced use cases.",
-      "platform": 0
     }
   ],
   "notes": "For a detailed HTML report, use /H instead of /R. Requires administrator rights.",
@@ -56,8 +51,7 @@
         }
       },
       "examples": {
-        "gpresult /R /USER CONTOSO\\jdupont": "Affiche les GPO appliquées à l'utilisateur jdupont",
-        "gpresult /R /USER jdupont": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help gpresult -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "gpresult /R /USER CONTOSO\\jdupont": "Affiche les GPO appliquées à l'utilisateur jdupont"
       }
     }
   }

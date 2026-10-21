@@ -41,11 +41,6 @@
       "command": "Copy-GPO -SourceName \"Security-Policy-IT\" -TargetName \"Security-Policy-Finance\"",
       "description": "Copy the IT GPO to a new Finance GPO",
       "platform": 0
-    },
-    {
-      "command": "Copy-GPO -SourceName \"Default-Domain-Policy\" -TargetName \"Custom-Security-Policy\"",
-      "description": "Standard run of the None command. See the official documentation with Get-Help Copy-GPO -Full for details on the available parameters and advanced use cases.",
-      "platform": 0
     }
   ],
   "notes": "Copies every setting but not the GPO links. The links must be created again by hand.",
@@ -73,8 +68,7 @@
         }
       },
       "examples": {
-        "Copy-GPO -SourceName \"Security-Policy-IT\" -TargetName \"Security-Policy-Finance\"": "Copie la GPO IT vers une nouvelle GPO Finance",
-        "Copy-GPO -SourceName \"Default-Domain-Policy\" -TargetName \"Custom-Security-Policy\"": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Copy-GPO -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "Copy-GPO -SourceName \"Security-Policy-IT\" -TargetName \"Security-Policy-Finance\"": "Copie la GPO IT vers une nouvelle GPO Finance"
       }
     }
   }

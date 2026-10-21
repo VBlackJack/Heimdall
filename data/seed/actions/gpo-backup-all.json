@@ -33,11 +33,6 @@
       "command": "Backup-GPO -All -Path \"C:\\GPOBackups\"",
       "description": "Back up all GPOs to C:\\GPOBackups",
       "platform": 0
-    },
-    {
-      "command": "Backup-GPO -All -Path \"D:\\Backups\\daily\"",
-      "description": "Standard run of the None command. See the official documentation with Get-Help Backup-GPO -Full for details on the available parameters and advanced use cases.",
-      "platform": 0
     }
   ],
   "notes": "Recommended before any major change. Can take a while on large domains.",
@@ -56,8 +51,7 @@
         }
       },
       "examples": {
-        "Backup-GPO -All -Path \"C:\\GPOBackups\"": "Sauvegarde toutes les GPO dans C:\\GPOBackups",
-        "Backup-GPO -All -Path \"D:\\Backups\\daily\"": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Backup-GPO -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "Backup-GPO -All -Path \"C:\\GPOBackups\"": "Sauvegarde toutes les GPO dans C:\\GPOBackups"
       }
     }
   }

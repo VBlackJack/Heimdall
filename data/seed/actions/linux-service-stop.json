@@ -30,8 +30,13 @@
   },
   "examples": [
     {
-      "command": "sudo systemctl stop wuauserv",
-      "description": "Example using the 'serviceName' parameter: name of the service to stop. Replace wuauserv with the value that fits your environment.",
+      "command": "sudo systemctl stop nginx",
+      "description": "Stop the nginx service",
+      "platform": 1
+    },
+    {
+      "command": "sudo systemctl stop sshd",
+      "description": "Stop the SSH server: open SSH sessions can drop, keep another way in",
       "platform": 1
     }
   ],
@@ -51,7 +56,8 @@
         }
       },
       "examples": {
-        "sudo systemctl stop wuauserv": "Exemple utilisant le paramètre 'serviceName': Nom du service à arrêter. Remplacez wuauserv par la valeur appropriée selon votre environnement."
+        "sudo systemctl stop nginx": "Arrête le service nginx",
+        "sudo systemctl stop sshd": "Arrête le serveur SSH : les sessions SSH ouvertes peuvent être coupées, gardez un autre accès"
       }
     }
   }
