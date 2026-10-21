@@ -174,13 +174,17 @@ public sealed class GeneratorValidationMessagesAreTranslatedTests
             Parameters = [CommandLibraryTestHelpers.RequiredParameter("v", "Value", type)],
         };
 
-        service.ValidateParameters(
-            template,
-            new Dictionary<string, string>(StringComparer.Ordinal) { ["v"] = badValue },
-            out var errors);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal) { ["v"] = badValue };
+        service.ValidateParameters(template, values, out var errors);
 
         Assert.NotEmpty(errors);
         Assert.All(errors, error => Assert.Contains(error, ParameterMessageKeys));
+
+        // The generation path has its own checks and reaches the operator through
+        // ToolCmdLibGenerateError, where "Invalid hostname format" and its siblings used to
+        // arrive in English whatever the language.
+        var thrown = Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+        Assert.Contains(thrown.Message, ParameterMessageKeys);
     }
 
     private static Dictionary<string, string> LoadLocale(string locale)

@@ -114,10 +114,11 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 continue;
             }
 
-            // Validate the value according to the parameter type
+            // Validate the value according to the parameter type. The message already names
+            // the parameter, in the operator's language.
             if (!ValidateParameterValue(template, parameter, value, out var validationError))
             {
-                throw new InvalidOperationException($"Invalid parameter '{parameter.Name}': {validationError}");
+                throw new InvalidOperationException(validationError);
             }
 
             // Escape the value for shell safety using the target platform
@@ -389,21 +390,22 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             return false;
         }
 
+        // The same keys ValidateParameters reports, so a refusal reads the same in the
+        // operator's language whichever path met it first.
+        string? key = null;
         switch (parameter.Type.ToLower())
         {
             case TemplateParameterTypes.Hostname:
                 if (!IsValidHostname(value))
                 {
-                    error = "Invalid hostname format";
-                    return false;
+                    key = MessageKeys.ValidationParameterInvalidHostname;
                 }
                 break;
 
             case TemplateParameterTypes.IpAddress:
                 if (!IPAddress.TryParse(value, out _))
                 {
-                    error = "Invalid IP address";
-                    return false;
+                    key = MessageKeys.ValidationParameterInvalidIPAddress;
                 }
                 break;
 
@@ -411,58 +413,67 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             case TemplateParameterTypes.Integer:
                 if (!int.TryParse(value, out _))
                 {
-                    error = "Must be an integer";
-                    return false;
+                    key = MessageKeys.ValidationParameterMustBeInteger;
                 }
                 break;
 
             case TemplateParameterTypes.Number:
                 if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                 {
-                    error = "Must be a number";
-                    return false;
+                    key = MessageKeys.ValidationParameterMustBeNumber;
+                }
+                break;
+
+            case TemplateParameterTypes.Bool:
+            case TemplateParameterTypes.Boolean:
+                if (!bool.TryParse(value, out _))
+                {
+                    key = MessageKeys.ValidationParameterMustBeBoolean;
                 }
                 break;
 
             case TemplateParameterTypes.DriveLetter:
                 if (!DriveLetterRegex.IsMatch(value))
                 {
-                    error = "Must be a single drive letter";
-                    return false;
+                    key = MessageKeys.ValidationParameterMustBeDriveLetter;
                 }
                 break;
 
             case TemplateParameterTypes.Path:
                 if (!IsValidPath(value))
                 {
-                    error = "Invalid path format";
-                    return false;
+                    key = MessageKeys.ValidationParameterInvalidPath;
                 }
-                if (ContainsRefusedCharacters(template, parameter, value))
+                else if (ContainsRefusedCharacters(template, parameter, value))
                 {
-                    error = "Contains dangerous characters";
-                    return false;
+                    key = MessageKeys.ValidationParameterDangerousCharacters;
                 }
                 break;
 
             case TemplateParameterTypes.Text:
                 if (string.IsNullOrWhiteSpace(value) && parameter.Required)
                 {
-                    error = "Required field";
+                    key = MessageKeys.ValidationParameterRequired;
+                }
+                else if (value.Length > ValidationConstants.MaxParameterLength)
+                {
+                    error = _localizationService.GetFormattedString(
+                        MessageKeys.ValidationParameterMaxLength,
+                        parameter.Label,
+                        ValidationConstants.MaxParameterLength.ToString(CultureInfo.InvariantCulture));
                     return false;
                 }
-                // PERFORMANCE: Use constant instead of magic number
-                if (value.Length > ValidationConstants.MaxParameterLength)
+                else if (ContainsRefusedCharacters(template, parameter, value))
                 {
-                    error = $"String exceeds maximum length of {ValidationConstants.MaxParameterLength}";
-                    return false;
-                }
-                if (ContainsRefusedCharacters(template, parameter, value))
-                {
-                    error = "Contains dangerous characters";
-                    return false;
+                    key = MessageKeys.ValidationParameterDangerousCharacters;
                 }
                 break;
+        }
+
+        if (key is not null)
+        {
+            error = _localizationService.GetFormattedString(key, parameter.Label);
+            return false;
         }
 
         return true;
