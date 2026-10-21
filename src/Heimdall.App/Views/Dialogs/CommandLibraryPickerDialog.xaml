@@ -99,10 +99,17 @@
                           Grid.IsSharedSizeScope="True"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           AutomationProperties.Name="{loc:Translate LabelCommandLibraryPickerResults}">
+                    <!-- The row's spoken name goes on the container: UI Automation never reads
+                         a name set inside the template, and the row announced its class name. -->
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:CommandLibraryPickerItem}">
-                            <Grid Margin="0,0,0,8"
-                                  AutomationProperties.Name="{Binding Title}">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="PickerCategory"/>

@@ -35,6 +35,8 @@ public sealed class CommandLibraryPickerDialogMarkupTests
 
     private const string ResultsListName = "{loc:Translate LabelCommandLibraryPickerResults}";
 
+    private const string AccessibilityBehaviorProperty = "behaviors:ItemContainerAccessibilityBehavior.IsEnabled";
+
     [Fact]
     public void TheResultsList_DisablesHorizontalScrolling()
     {
@@ -81,6 +83,33 @@ public sealed class CommandLibraryPickerDialogMarkupTests
             .ToList();
 
         Assert.Equal(["CharacterEllipsis", "CharacterEllipsis"], trimming);
+    }
+
+    /// <summary>
+    /// UI Automation reads the generated container, never the template, so the row's name is
+    /// applied there by the behaviour from the item's own accessible name.
+    /// </summary>
+    [Fact]
+    public void TheRows_AreNamedOnTheirContainer()
+    {
+        XElement style = Assert.Single(
+            ResultsList().Element(Presentation + "ListView.ItemContainerStyle")!.Elements(Presentation + "Style"));
+
+        XElement setter = Assert.Single(
+            style.Elements(Presentation + "Setter"),
+            candidate => (string?)candidate.Attribute("Property") == AccessibilityBehaviorProperty);
+
+        Assert.Equal("True", (string?)setter.Attribute("Value"));
+    }
+
+    /// <summary>
+    /// A name on the template's grid is inert, and leaving it there reads as though the row
+    /// were named.
+    /// </summary>
+    [Fact]
+    public void TheRowGrid_CarriesNoInertName()
+    {
+        Assert.Null(RowGrid().Attribute("AutomationProperties.Name"));
     }
 
     /// <summary>
