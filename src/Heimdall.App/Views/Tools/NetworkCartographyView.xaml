@@ -268,7 +268,7 @@
                     <TextBlock x:Name="TxtStats" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"/>
-                    <TextBlock x:Name="TxtStatsSeparator" Text=" | " Foreground="{DynamicResource TextDisabledBrush}" VerticalAlignment="Center"
+                    <TextBlock x:Name="TxtStatsSeparator" Text=" | " Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
                                FontSize="{StaticResource FontSizeBody}" Margin="4,0"
                                Visibility="Collapsed"/>
                     <TextBlock x:Name="TxtKbStats" Text="" FontSize="{StaticResource FontSizeCaption}" FontFamily="Consolas"

@@ -56,7 +56,7 @@
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding TunnelRoute}"
                                    FontSize="{StaticResource FontSizeCaption}"
-                                   Foreground="{DynamicResource TextDisabledBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"
                                    Margin="0,4,0,0"/>
                     </StackPanel>
@@ -1441,7 +1441,7 @@
                                            DockPanel.Dock="Top"
                                            Margin="10,16,10,0"
                                            FontSize="{StaticResource FontSizeCaption}"
-                                           Foreground="{DynamicResource TextDisabledBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            HorizontalAlignment="Center"
                                            Text="{Binding Sidebar.NoResultsText}"
                                            Visibility="{Binding Sidebar.HasNoResults, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -2074,7 +2074,7 @@
                                 <!-- Subtle shortcut hints for detail panel actions -->
                                 <TextBlock x:Name="Mw_DetailActionHints" Text="{Binding DetailActionHintsText}"
                                            FontSize="{StaticResource FontSizeSmallCaption}"
-                                           Foreground="{DynamicResource TextDisabledBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,8,0,0"/>
                             </StackPanel>
                         </Border>
@@ -5938,7 +5938,7 @@
                 <!-- Subtle F1 shortcut hint - visible when status shows default ready text -->
                 <TextBlock x:Name="Mw_StatusBarShortcutHint" Text="{loc:Translate StatusBarShortcutHint}"
                            FontSize="{StaticResource FontSizeSmallCaption}"
-                           Foreground="{DynamicResource TextDisabledBrush}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"
                            Margin="12,0,0,0"/>
                 <StackPanel Orientation="Horizontal"
@@ -5994,7 +5994,7 @@
                         <TextBlock x:Name="Mw_TftpDisabledHint"
                                    Margin="0,2,0,0"
                                    FontSize="{StaticResource FontSizeSmallCaption}"
-                                   Foreground="{DynamicResource TextDisabledBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    Text="{loc:Translate LblTftpDisabledHint}"
                                    Visibility="Collapsed"/>
                     </StackPanel>
@@ -6237,13 +6237,13 @@
                                                     Margin="20,2,0,0">
                                             <TextBlock Text="{Binding Endpoint}"
                                                        FontSize="{StaticResource FontSizeCaption}"
-                                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Visibility="{Binding Endpoint, Converter={StaticResource NullToVisibilityConverter}}"
                                                        TextTrimming="CharacterEllipsis"
                                                        MaxWidth="220"/>
                                             <TextBlock Text="{Binding Username, StringFormat={}  ·  {0}}"
                                                        FontSize="{StaticResource FontSizeCaption}"
-                                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Visibility="{Binding Username, Converter={StaticResource NullToVisibilityConverter}}"/>
 <!-- group now rendered as a section header above the row, suffix removed -->
                                         </StackPanel>
@@ -6388,7 +6388,7 @@
                                     <TextBlock Text="{Binding PreviewCommand}"
                                                FontSize="{StaticResource FontSizeCaption}"
                                                FontFamily="{StaticResource FontFamilyMonospace}"
-                                               Foreground="{DynamicResource TextDisabledBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                TextTrimming="CharacterEllipsis"
                                                HorizontalAlignment="Left"
                                                MaxWidth="620"
