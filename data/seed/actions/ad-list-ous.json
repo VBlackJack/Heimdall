@@ -1,7 +1,7 @@
 {
   "id": "ad-list-ous",
-  "title": "Lister toutes les unités d'organisation (OU)",
-  "description": "Affiche la liste de toutes les unités d'organisation dans Active Directory.",
+  "title": "List all organizational units (OU)",
+  "description": "Show the list of every organizational unit in Active Directory.",
   "category": "active-directory",
   "platform": 0,
   "level": 0,
@@ -22,25 +22,37 @@
   "examples": [
     {
       "command": "Get-ADOrganizationalUnit -Filter * -Properties Description | Select-Object Name,DistinguishedName,Description | Format-Table -AutoSize",
-      "description": "Liste toutes les OUs avec leurs descriptions",
+      "description": "List every OU with its description",
       "platform": 0
     },
     {
       "command": "Get-ADOrganizationalUnit -Filter * -Properties Description | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ADOrganizationalUnit -Filter * -Properties Description | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Affiche toutes les OUs du domaine. Utile pour identifier les chemins pour la création d'objets.",
+  "notes": "Shows every OU of the domain. Useful to find the paths for creating objects.",
   "links": [
     {
       "title": "Documentation Get-ADOrganizationalUnit",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adorganizationalunit"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister toutes les unités d'organisation (OU)",
+      "description": "Affiche la liste de toutes les unités d'organisation dans Active Directory.",
+      "notes": "Affiche toutes les OUs du domaine. Utile pour identifier les chemins pour la création d'objets.",
+      "examples": {
+        "Get-ADOrganizationalUnit -Filter * -Properties Description | Select-Object Name,DistinguishedName,Description | Format-Table -AutoSize": "Liste toutes les OUs avec leurs descriptions",
+        "Get-ADOrganizationalUnit -Filter * -Properties Description | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ADOrganizationalUnit -Filter * -Properties Description | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

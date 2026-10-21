@@ -1,7 +1,7 @@
 {
   "id": "ad-set-user-properties",
-  "title": "Modifier les propriétés d'un utilisateur AD",
-  "description": "Modifie les propriétés d'un utilisateur AD (département, titre, téléphone, etc.).",
+  "title": "Change the properties of an AD user",
+  "description": "Change the properties of an AD user (department, title, phone and more).",
   "category": "active-directory",
   "platform": 0,
   "level": 1,
@@ -20,35 +20,35 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName de l'utilisateur"
+        "description": "SamAccountName of the user"
       },
       {
         "name": "department",
-        "label": "Département",
+        "label": "Department",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Département de l'utilisateur"
+        "description": "Department of the user"
       },
       {
         "name": "title",
-        "label": "Titre",
+        "label": "Title",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Titre/Poste de l'utilisateur"
+        "description": "Title or position of the user"
       },
       {
         "name": "phone",
-        "label": "Téléphone",
+        "label": "Phone",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Numéro de téléphone"
+        "description": "Phone number"
       },
       {
         "name": "email",
@@ -56,42 +56,80 @@
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Adresse email"
+        "description": "Email address"
       }
     ]
   },
   "examples": [
     {
       "command": "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33123456789\" -EmailAddress \"j.dupont@contoso.com\"",
-      "description": "Met à jour les informations de jdupont",
+      "description": "Update the information of jdupont",
       "platform": 0
     },
     {
       "command": "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33 1 23 45 67 89\" -EmailAddress \"jdupont@contoso.com\" -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33 1 23 45 67 89\" -EmailAddress \"jdupont@contoso.com\" -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the confirmation prompts. Useful in automated scripts, but use with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33 1 23 45 67 89\" -EmailAddress \"jdupont@contoso.com\" -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the modified or created object to the pipeline. By default the Set- and New- cmdlets return nothing. -PassThru turns the output on, for chained operations or an immediate check.",
       "platform": 0
     },
     {
       "command": "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33 1 23 45 67 89\" -EmailAddress \"jdupont@contoso.com\" -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the command's execution. -Verbose turns on the diagnostic messages that show exactly what happens. Essential for troubleshooting and to understand the internal operations.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits d'administration AD. Seules les propriétés spécifiées seront modifiées.",
+  "notes": "Requires AD administration rights. Only the properties given are changed.",
   "links": [
     {
       "title": "Documentation Set-ADUser",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/set-aduser"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Modifier les propriétés d'un utilisateur AD",
+      "description": "Modifie les propriétés d'un utilisateur AD (département, titre, téléphone, etc.).",
+      "notes": "Nécessite des droits d'administration AD. Seules les propriétés spécifiées seront modifiées.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName de l'utilisateur"
+          },
+          "department": {
+            "label": "Département",
+            "description": "Département de l'utilisateur"
+          },
+          "title": {
+            "label": "Titre",
+            "description": "Titre/Poste de l'utilisateur"
+          },
+          "phone": {
+            "label": "Téléphone",
+            "description": "Numéro de téléphone"
+          },
+          "email": {
+            "label": "Email",
+            "description": "Adresse email"
+          }
+        }
+      },
+      "examples": {
+        "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33123456789\" -EmailAddress \"j.dupont@contoso.com\"": "Met à jour les informations de jdupont",
+        "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33 1 23 45 67 89\" -EmailAddress \"jdupont@contoso.com\" -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33 1 23 45 67 89\" -EmailAddress \"jdupont@contoso.com\" -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33 1 23 45 67 89\" -EmailAddress \"jdupont@contoso.com\" -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "Set-ADUser -Identity jdupont -Department \"IT\" -Title \"System Administrator\" -OfficePhone \"+33 1 23 45 67 89\" -EmailAddress \"jdupont@contoso.com\" -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
+      }
+    }
+  }
 }
