@@ -48,6 +48,15 @@ public sealed class BoundaryLineBrushMarkupTests
         Assert.Equal(StrongBorder, (string?)sidebar.Attribute("BorderBrush"));
     }
 
+    /// <summary>The top rule of the properties panel shown under the session tree, the divider between the tree and the panel.</summary>
+    [Fact]
+    public void TheSidebarPropertiesPanelDividerIsAStrongBorder()
+    {
+        XElement panel = Named(Markup("MainWindow.xaml"), "PropertiesPanel");
+
+        Assert.Equal(StrongBorder, (string?)panel.Attribute("BorderBrush"));
+    }
+
     /// <summary>The separator under a DataGrid column header and under a ListView column header.</summary>
     [Fact]
     public void GridColumnHeaderSeparatorsAreStrongBorders()
