@@ -1,7 +1,7 @@
 {
   "id": "gpo-search",
-  "title": "Rechercher des GPO par nom",
-  "description": "Recherche des stratégies de groupe par leur nom.",
+  "title": "Find GPOs by name",
+  "description": "Find Group Policies by their name.",
   "category": "active-directory",
   "platform": 0,
   "level": 0,
@@ -19,32 +19,52 @@
     "parameters": [
       {
         "name": "searchTerm",
-        "label": "Terme de recherche",
+        "label": "Search term",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Terme à rechercher dans le nom de la GPO"
+        "description": "Term to look for in the GPO name"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-GPO -All | Where-Object {$_.DisplayName -like '*Security*'} | Select-Object DisplayName,GpoStatus,CreationTime",
-      "description": "Recherche toutes les GPO contenant 'Security'",
+      "description": "Find every GPO whose name contains 'Security'",
       "platform": 0
     },
     {
       "command": "Get-GPO -All | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "Get-GPO -All | Where-Object {$_.DisplayName -like '*Admin*'} | Select-Object DisplayName,GpoStatus,CreationTime",
-      "description": "Exemple utilisant le paramètre 'searchTerm': Terme à rechercher dans le nom de la GPO. Remplacez Admin par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'searchTerm' parameter: term to look for in the GPO name. Replace Admin with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Recherche insensible à la casse avec wildcard automatique.",
-  "links": []
+  "notes": "Case-insensitive search with an automatic wildcard.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Rechercher des GPO par nom",
+      "description": "Recherche des stratégies de groupe par leur nom.",
+      "notes": "Recherche insensible à la casse avec wildcard automatique.",
+      "parameters": {
+        "windows": {
+          "searchTerm": {
+            "label": "Terme de recherche",
+            "description": "Terme à rechercher dans le nom de la GPO"
+          }
+        }
+      },
+      "examples": {
+        "Get-GPO -All | Where-Object {$_.DisplayName -like '*Security*'} | Select-Object DisplayName,GpoStatus,CreationTime": "Recherche toutes les GPO contenant 'Security'",
+        "Get-GPO -All | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-GPO -All | Where-Object {$_.DisplayName -like '*Admin*'} | Select-Object DisplayName,GpoStatus,CreationTime": "Exemple utilisant le paramètre 'searchTerm': Terme à rechercher dans le nom de la GPO. Remplacez Admin par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }
