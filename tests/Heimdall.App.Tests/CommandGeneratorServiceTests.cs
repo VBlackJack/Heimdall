@@ -58,7 +58,8 @@ public sealed class CommandGeneratorServiceTests
 
         string command = service.GenerateCommand(template, values);
 
-        command.Should().Be("Add-ADGroupMember -Identity 'Domain Admins' -Members 'jdupont'");
+        // F-12: a value that reads the same without quotes arrives bare.
+        command.Should().Be("Add-ADGroupMember -Identity 'Domain Admins' -Members jdupont");
         command.Should().NotContain("\"'", "the generator must not double-wrap the single-quoted value (D2 Lot A)");
     }
 
@@ -913,7 +914,8 @@ public sealed class CommandGeneratorServiceTests
 
         string command = service.GenerateCommand(template, values);
 
-        command.Should().Be("Set-MpPreference -ScanScheduleDay 0 -ScanScheduleTime '02:00:00'");
+        // F-12: a time holds nothing PowerShell reads differently unquoted, so it arrives bare.
+        command.Should().Be("Set-MpPreference -ScanScheduleDay 0 -ScanScheduleTime 02:00:00");
     }
 
     // D2 Lot B step 2c: users enter false/true while the template supplies the PowerShell $ prefix.
@@ -1095,15 +1097,17 @@ public sealed class CommandGeneratorServiceTests
     }
 
     // E-01: paths of another machine validate and come out quoted, on both platforms.
+    // F-12: a path made only of characters no shell reads specially comes out bare.
     [Theory]
-    [InlineData("/var/log/syslog")]
-    [InlineData("/etc/nginx/nginx.conf")]
-    [InlineData("C:\\inetpub\\wwwroot")]
-    [InlineData("C:\\Program Files (x86)\\App")]
-    [InlineData("~/backup")]
-    [InlineData("relative/dir")]
-    public void GenerateCommand_RemotePath_ValidatesAndComesOutQuoted(string value)
+    [InlineData("/var/log/syslog", false)]
+    [InlineData("/etc/nginx/nginx.conf", false)]
+    [InlineData("C:\\inetpub\\wwwroot", true)]
+    [InlineData("C:\\Program Files (x86)\\App", true)]
+    [InlineData("~/backup", true)]
+    [InlineData("relative/dir", false)]
+    public void GenerateCommand_RemotePath_ValidatesAndComesOutQuoted(string value, bool quoted)
     {
+        string argument = quoted ? "'" + value + "'" : value;
         CommandGeneratorService service = CreateService();
         CommandTemplate windows = WindowsTemplate(
             "Get-Item -Path {p}",
@@ -1118,8 +1122,8 @@ public sealed class CommandGeneratorServiceTests
 
         windowsErrors.Should().BeEmpty();
         linuxErrors.Should().BeEmpty();
-        service.GenerateCommand(windows, values).Should().Be("Get-Item -Path '" + value + "'");
-        service.GenerateCommand(linux, values).Should().Be("tail -n 50 '" + value + "'");
+        service.GenerateCommand(windows, values).Should().Be("Get-Item -Path " + argument);
+        service.GenerateCommand(linux, values).Should().Be("tail -n 50 " + argument);
     }
 
     // E-01: the localized path reports the same refusals as the generation path.

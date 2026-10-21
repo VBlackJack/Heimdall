@@ -78,6 +78,89 @@ public sealed class CommandGeneratorValueShapingTests
         errors.Should().ContainSingle();
     }
 
+    [Theory]
+    [InlineData("8080")]
+    [InlineData("/var/log/syslog")]
+    [InlineData("id_ed25519")]
+    [InlineData("user@host:/srv/data")]
+    public void GenerateCommand_SafeValue_ArrivesBareOnBothPlatforms(string value)
+    {
+        foreach (var platform in new[] { Platform.Linux, Platform.Windows })
+        {
+            var template = Template(platform, "run {v}", CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+
+            var command = CreateService().GenerateCommand(template, Values(("v", value)));
+
+            command.Should().Be("run " + value, $"{value} holds nothing {platform} reads specially");
+        }
+    }
+
+    [Fact]
+    public void GenerateCommand_SafeValuesAroundLiteralText_StayOneToken()
+    {
+        var template = Template(
+            Platform.Linux,
+            "firewall-cmd --add-port={port}/{protocol} && cat ~/.ssh/{key}.pub",
+            CommandLibraryTestHelpers.RequiredParameter("port", "Port"),
+            CommandLibraryTestHelpers.RequiredParameter("protocol", "Protocol"),
+            CommandLibraryTestHelpers.RequiredParameter("key", "Key"));
+
+        var command = CreateService().GenerateCommand(
+            template,
+            Values(("port", "8080"), ("protocol", "tcp"), ("key", "id_ed25519")));
+
+        command.Should().Be("firewall-cmd --add-port=8080/tcp && cat ~/.ssh/id_ed25519.pub");
+    }
+
+    [Theory]
+    [InlineData(Platform.Linux, "a b", "'a b'")]
+    [InlineData(Platform.Linux, "x;y", "'x;y'")]
+    [InlineData(Platform.Linux, "it's", "'it'\\''s'")]
+    [InlineData(Platform.Linux, "$HOME", "'$HOME'")]
+    [InlineData(Platform.Windows, "a b", "'a b'")]
+    [InlineData(Platform.Windows, "x;y", "'x;y'")]
+    [InlineData(Platform.Windows, "it's", "'it''s'")]
+    [InlineData(Platform.Windows, "$env:TEMP", "'$env:TEMP'")]
+    public void GenerateCommand_ValueTheShellWouldRead_StaysQuoted(Platform platform, string value, string expected)
+    {
+        var template = Template(platform, "run {v}", CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+
+        var command = CreateService().GenerateCommand(template, Values(("v", value)));
+
+        command.Should().Be("run " + expected);
+    }
+
+    /// <summary>
+    /// PowerShell reads a leading dash as a parameter name, a leading at sign as a splat and a
+    /// comma as an array separator; bash gives none of them a meaning.
+    /// </summary>
+    [Theory]
+    [InlineData("-Force")]
+    [InlineData("@args")]
+    [InlineData("a,b")]
+    public void GenerateCommand_ValuePowerShellReadsUnquoted_StaysQuotedOnWindowsOnly(string value)
+    {
+        var service = CreateService();
+        var windows = Template(Platform.Windows, "run {v}", CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        var linux = Template(Platform.Linux, "run {v}", CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+
+        service.GenerateCommand(windows, Values(("v", value))).Should().Be("run '" + value + "'");
+        service.GenerateCommand(linux, Values(("v", value))).Should().Be("run " + value);
+    }
+
+    [Fact]
+    public void GenerateCommand_InlineInQuotesSafeValue_KeepsThePatternsQuotesOnly()
+    {
+        var template = Template(
+            Platform.Linux,
+            "grep '{v}' file",
+            new TemplateParameter { Name = "v", Label = "Value", Type = "string", Required = true, Quoting = QuotingMode.InlineInQuotes });
+
+        var command = CreateService().GenerateCommand(template, Values(("v", "8080")));
+
+        command.Should().Be("grep '8080' file");
+    }
+
     internal static CommandGeneratorService CreateService() =>
         new(new FakeTwinShellLocalizationService());
 

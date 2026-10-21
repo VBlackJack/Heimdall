@@ -40,6 +40,10 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
     private static readonly Regex DriveLetterRegex = new Regex(@"^[A-Za-z]$", RegexOptions.Compiled);
 
+    // A value made only of these characters reads the same to bash and PowerShell with or
+    // without quotes; see IsSafeBareValue.
+    private static readonly Regex SafeBareValueRegex = new Regex(@"^[A-Za-z0-9._/:=@+,%-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     // BUGFIX: Declare dangerous characters as static readonly for better performance
     private static readonly char[] DangerousChars = { '&', '|', ';', '`', '$', '(', ')', '<', '>', '\n', '\r' };
 
@@ -483,11 +487,43 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             case TemplateParameterTypes.Path:
             case TemplateParameterTypes.Text:
             default:
-                // Quote for shell safety using the target platform
-                return (quotingMode ?? QuotingMode.ShellQuote) == QuotingMode.InlineInQuotes
-                    ? EscapeInlineInSingleQuotes(value, platform)
-                    : QuoteForShell(value, platform);
+                if ((quotingMode ?? QuotingMode.ShellQuote) == QuotingMode.InlineInQuotes)
+                {
+                    // The quotes are the pattern's: only the content is escaped.
+                    return EscapeInlineInSingleQuotes(value, platform);
+                }
+
+                return IsSafeBareValue(value, platform) ? value : QuoteForShell(value, platform);
         }
+    }
+
+    /// <summary>
+    /// True when <paramref name="value"/> means the same to the shell with or without
+    /// quotes, so it can be substituted bare: <c>--add-port=8080/tcp</c> rather than
+    /// <c>--add-port='8080'/'tcp'</c>, <c>~/.ssh/id_ed25519.pub</c> rather than
+    /// <c>~/.ssh/'id_ed25519'.pub</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The class holds no space, no quote, no glob character and no <c>$</c>, so no shell
+    /// splits, expands or substitutes anything in such a value.
+    /// </para>
+    /// <para>
+    /// PowerShell reads three of its characters differently at the start of an argument or
+    /// between words, so on Windows those values keep their quotes: a leading <c>-</c> makes
+    /// a parameter name of the value, a leading <c>@</c> splats a variable, and a comma
+    /// builds an array of two arguments out of one. Bash gives none of them a meaning.
+    /// </para>
+    /// </remarks>
+    internal static bool IsSafeBareValue(string value, Platform platform)
+    {
+        if (!SafeBareValueRegex.IsMatch(value))
+        {
+            return false;
+        }
+
+        return platform != Platform.Windows
+            || (value[0] is not ('-' or '@') && !value.Contains(','));
     }
 
     /// <summary>
