@@ -6494,6 +6494,7 @@
   "ToolCmdLibImportCountUpdatedOne": "{0} mise \u00e0 jour",
   "ToolCmdLibImportCountSkipped": "{0} ignor\u00e9es",
   "ToolCmdLibImportCountSkippedOne": "{0} ignor\u00e9e",
+  "ToolCmdLibImportRunbooksMessage": "Runbooks importés ou mis à jour : {0}",
   "ToolCmdLibBtnAdd": "Ajouter une commande",
   "ToolCmdLibBtnEdit": "\u00c9diter",
   "ToolCmdLibBtnDelete": "Supprimer",

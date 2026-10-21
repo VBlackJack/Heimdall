@@ -466,7 +466,8 @@ public sealed partial class CommandLibraryViewModel
             async actionService =>
             {
                 var actions = await SelectExportActionsAsync(scope, actionService);
-                var count = await _transferService.ExportAsync(actions, path);
+                var runbooks = await SelectExportRunbooksAsync(scope);
+                var count = await _transferService.ExportAsync(actions, runbooks, path);
                 _dialogService.ShowInfo(
                     LocalizeKey("ToolCmdLibExportSuccess"),
                     string.Format(LocalizeKey("ToolCmdLibExportSuccessMessage"), count, path));
@@ -501,9 +502,34 @@ public sealed partial class CommandLibraryViewModel
     }
 
     /// <summary>
+    /// The runbooks an export of <paramref name="scope"/> writes: the operator's own for "My
+    /// actions" and "Everything", none for "Current filter", which is about the actions the list
+    /// shows. A library without a runbook store exports none.
+    /// </summary>
+    internal async Task<IReadOnlyList<TwinShell.Core.Models.CommandBatch>> SelectExportRunbooksAsync(
+        CommandLibraryExportScope scope)
+    {
+        if (scope == CommandLibraryExportScope.CurrentFilter)
+        {
+            return [];
+        }
+
+        using var serviceScope = _serviceProvider.CreateScope();
+        var batchService = serviceScope.ServiceProvider.GetService<IBatchService>();
+        if (batchService is null)
+        {
+            return [];
+        }
+
+        return (await batchService.GetAllBatchesAsync())
+            .Where(runbook => runbook.IsUserCreated)
+            .ToList();
+    }
+
+    /// <summary>
     /// Prompts for a source file, parses the JSON envelope, and merges the
     /// contained actions into the database. System (seed) actions are never
-    /// overwritten.
+    /// overwritten. Runbooks the file carries are merged by public id.
     /// </summary>
     [RelayCommand(CanExecute = nameof(IsLibraryIdle))]
     public async Task ImportAsync()
@@ -516,7 +542,9 @@ public sealed partial class CommandLibraryViewModel
         await RunActionServiceOperationAsync(
             async actionService =>
             {
-                var result = await _transferService.ImportAsync(actionService, path);
+                using var batchScope = _serviceProvider.CreateScope();
+                var batchService = batchScope.ServiceProvider.GetService<IBatchService>();
+                var result = await _transferService.ImportAsync(actionService, batchService, path);
                 switch (result.Outcome)
                 {
                     case CommandLibraryImportOutcome.FileTooLarge:
@@ -536,31 +564,55 @@ public sealed partial class CommandLibraryViewModel
                         return;
                     default:
                         await ReloadAsync();
+                        var runbookCount = result.RunbooksImported + result.RunbooksUpdated;
+                        if (runbookCount > 0 && IsRunbooksVisible)
+                        {
+                            await LoadRunbooksAsync();
+                        }
+
                         _dialogService.ShowInfo(
                             LocalizeKey("ToolCmdLibImportResultTitle"),
-                            string.Format(
-                                LocalizeKey("ToolCmdLibImportResultMessage"),
-                                _localizer.FormatCount(
-                                    result.Imported,
-                                    "ToolCmdLibImportCountImportedOne",
-                                    "ToolCmdLibImportCountImported",
-                                    result.Imported),
-                                _localizer.FormatCount(
-                                    result.Updated,
-                                    "ToolCmdLibImportCountUpdatedOne",
-                                    "ToolCmdLibImportCountUpdated",
-                                    result.Updated),
-                                _localizer.FormatCount(
-                                    result.Skipped,
-                                    "ToolCmdLibImportCountSkippedOne",
-                                    "ToolCmdLibImportCountSkipped",
-                                    result.Skipped)));
+                            FormatImportSummary(result, runbookCount));
                         return;
                 }
             },
             "Import",
             "ToolCmdLibImportError");
     }
+
+    /// <summary>
+    /// The import summary: the action counts, then, when the file carried runbooks that were
+    /// added or updated, one line saying how many.
+    /// </summary>
+    private string FormatImportSummary(CommandLibraryImportResult result, int runbookCount)
+    {
+        var summary = FormatActionImportSummary(result);
+        return runbookCount > 0
+            ? summary + Environment.NewLine + string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                LocalizeKey("ToolCmdLibImportRunbooksMessage"),
+                runbookCount)
+            : summary;
+    }
+
+    private string FormatActionImportSummary(CommandLibraryImportResult result)
+        => string.Format(
+            LocalizeKey("ToolCmdLibImportResultMessage"),
+            _localizer.FormatCount(
+                result.Imported,
+                "ToolCmdLibImportCountImportedOne",
+                "ToolCmdLibImportCountImported",
+                result.Imported),
+            _localizer.FormatCount(
+                result.Updated,
+                "ToolCmdLibImportCountUpdatedOne",
+                "ToolCmdLibImportCountUpdated",
+                result.Updated),
+            _localizer.FormatCount(
+                result.Skipped,
+                "ToolCmdLibImportCountSkippedOne",
+                "ToolCmdLibImportCountSkipped",
+                result.Skipped));
 
     // ── Git Sync ──────────────────────────────────────────────────
 

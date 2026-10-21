@@ -15,6 +15,7 @@
  */
 
 using TwinShell.Core.Interfaces;
+using TwinShell.Core.Models;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.Services.Import;
@@ -34,4 +35,20 @@ public interface ICommandLibraryTransferService
 
     /// <summary>Parses and merges actions from the given JSON file into the database. System (non-user-created) actions are never overwritten.</summary>
     Task<CommandLibraryImportResult> ImportAsync(IActionService actionService, string path);
+
+    /// <summary>
+    /// Exports the given actions and runbooks; the envelope carries the runbooks in an optional
+    /// <c>runbooks</c> array. Returns the exported action count. A transfer that knows nothing of
+    /// runbooks exports the actions alone.
+    /// </summary>
+    Task<int> ExportAsync(IReadOnlyList<ActionModel> actions, IReadOnlyList<CommandBatch> runbooks, string path)
+        => ExportAsync(actions, path);
+
+    /// <summary>
+    /// Imports the actions, then merges the runbooks the file carries by public id into
+    /// <paramref name="batchService"/> when one is given. A transfer that knows nothing of
+    /// runbooks imports the actions alone.
+    /// </summary>
+    Task<CommandLibraryImportResult> ImportAsync(IActionService actionService, IBatchService? batchService, string path)
+        => ImportAsync(actionService, path);
 }
