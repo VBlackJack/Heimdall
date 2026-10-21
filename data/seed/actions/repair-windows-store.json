@@ -1,7 +1,7 @@
 {
   "id": "repair-windows-store",
-  "title": "Réparer le Windows Store",
-  "description": "Réinitialise le cache du Windows Store qui peut affecter Windows Update",
+  "title": "Repair the Windows Store",
+  "description": "Reset the Windows Store cache, which can affect Windows Update",
   "category": "windows-updates",
   "platform": 0,
   "level": 1,
@@ -21,10 +21,20 @@
   "examples": [
     {
       "command": "wsreset.exe",
-      "description": "Réinitialise le cache du Windows Store",
+      "description": "Reset the Windows Store cache",
       "platform": 0
     }
   ],
-  "notes": "Une fenêtre vide s'ouvrira puis se fermera automatiquement. Ne nécessite pas de droits administrateur.",
-  "links": []
+  "notes": "An empty window opens and then closes by itself. Does not require administrator rights.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Réparer le Windows Store",
+      "description": "Réinitialise le cache du Windows Store qui peut affecter Windows Update",
+      "notes": "Une fenêtre vide s'ouvrira puis se fermera automatiquement. Ne nécessite pas de droits administrateur.",
+      "examples": {
+        "wsreset.exe": "Réinitialise le cache du Windows Store"
+      }
+    }
+  }
 }

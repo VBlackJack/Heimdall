@@ -1,7 +1,7 @@
 {
   "id": "run-dotnet",
-  "title": "Exécuter un projet .NET",
-  "description": "Lance un projet .NET en mode développement.",
+  "title": "Run a .NET project",
+  "description": "Start a .NET project in development mode.",
   "category": "files-storage",
   "platform": 2,
   "level": 0,
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "projectPath",
-        "label": "Projet",
+        "label": "Project",
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Chemin du projet .csproj"
+        "description": "Path of the .csproj project"
       }
     ]
   },
@@ -37,16 +37,16 @@
     "parameters": [
       {
         "name": "projectPath",
-        "label": "Projet",
+        "label": "Project",
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Chemin du projet .csproj"
+        "description": "Path of the .csproj project"
       }
     ]
   },
   "examples": [],
-  "notes": "Les arguments après -- sont passés à l'application. --no-build évite la recompilation.",
+  "notes": "Arguments after -- are passed to the application. --no-build skips the rebuild.",
   "links": [
     {
       "title": "Documentation dotnet run",
@@ -56,35 +56,64 @@
   "windowsExamples": [
     {
       "command": "dotnet run",
-      "description": "Lance le projet du dossier courant",
+      "description": "Run the project in the current folder",
       "platform": 0
     },
     {
       "command": "dotnet run --configuration Release",
-      "description": "Lance en mode Release",
+      "description": "Run in Release mode",
       "platform": 0
     },
     {
       "command": "dotnet run -- arg1 arg2",
-      "description": "Lance avec des arguments",
+      "description": "Run with arguments",
       "platform": 0
     },
     {
       "command": "dotnet run --project \".\"",
-      "description": "Exemple utilisant le paramètre 'projectPath': Chemin du projet .csproj. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'projectPath' parameter: Path of the .csproj project. Replace C:\\Projects\\MyApp with the value that fits your environment.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "dotnet run --project \"./MyApp\"",
-      "description": "Lance un projet .NET depuis un chemin relatif",
+      "description": "Run a .NET project from a relative path",
       "platform": 1
     },
     {
       "command": "dotnet restore",
-      "description": "Restaurer les dépendances NuGet",
+      "description": "Restore the NuGet dependencies",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exécuter un projet .NET",
+      "description": "Lance un projet .NET en mode développement.",
+      "notes": "Les arguments après -- sont passés à l'application. --no-build évite la recompilation.",
+      "parameters": {
+        "windows": {
+          "projectPath": {
+            "label": "Projet",
+            "description": "Chemin du projet .csproj"
+          }
+        },
+        "linux": {
+          "projectPath": {
+            "label": "Projet",
+            "description": "Chemin du projet .csproj"
+          }
+        }
+      },
+      "examples": {
+        "dotnet run": "Lance le projet du dossier courant",
+        "dotnet run --configuration Release": "Lance en mode Release",
+        "dotnet run -- arg1 arg2": "Lance avec des arguments",
+        "dotnet run --project \".\"": "Exemple utilisant le paramètre 'projectPath': Chemin du projet .csproj. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement.",
+        "dotnet run --project \"./MyApp\"": "Lance un projet .NET depuis un chemin relatif",
+        "dotnet restore": "Restaurer les dépendances NuGet"
+      }
+    }
+  }
 }

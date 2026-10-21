@@ -1,7 +1,7 @@
 {
   "id": "reset-wsus-client-id",
-  "title": "Réinitialiser l'ID client WSUS",
-  "description": "Supprime le SusClientId pour forcer la re-création lors de la prochaine connexion",
+  "title": "Reset the WSUS client ID",
+  "description": "Delete the SusClientId so it is created again at the next connection",
   "category": "windows-updates",
   "platform": 0,
   "level": 1,
@@ -21,15 +21,26 @@
   "examples": [
     {
       "command": "wuauclt /resetauthorization /detectnow",
-      "description": "Force la détection après réinitialisation de l'ID",
+      "description": "Force a detection after resetting the ID",
       "platform": 0
     },
     {
       "command": "net stop wuauserv && reg delete HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate /v SusClientId /f && reg delete HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate /v SusClientIdValidation /f && net start wuauserv && wuauclt /resetauthorization /detectnow",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help net -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Standard run of the command. See the official documentation with Get-Help net -Full for the available parameters and advanced uses.",
       "platform": 0
     }
   ],
-  "notes": "Droits administrateur requis. Utile quand un PC cloné apparaît en double dans WSUS.",
-  "links": []
+  "notes": "Requires administrator rights. Useful when a cloned PC shows up twice in WSUS.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Réinitialiser l'ID client WSUS",
+      "description": "Supprime le SusClientId pour forcer la re-création lors de la prochaine connexion",
+      "notes": "Droits administrateur requis. Utile quand un PC cloné apparaît en double dans WSUS.",
+      "examples": {
+        "wuauclt /resetauthorization /detectnow": "Force la détection après réinitialisation de l'ID",
+        "net stop wuauserv && reg delete HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate /v SusClientId /f && reg delete HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate /v SusClientIdValidation /f && net start wuauserv && wuauclt /resetauthorization /detectnow": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help net -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+      }
+    }
+  }
 }

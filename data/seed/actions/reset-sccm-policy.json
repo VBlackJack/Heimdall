@@ -1,7 +1,7 @@
 {
   "id": "reset-sccm-policy",
-  "title": "Réinitialiser les stratégies SCCM",
-  "description": "Supprime toutes les stratégies machine et utilisateur du client SCCM",
+  "title": "Reset the SCCM policies",
+  "description": "Delete every machine and user policy of the SCCM client",
   "category": "windows-updates",
   "platform": 0,
   "level": 2,
@@ -21,20 +21,32 @@
   "examples": [
     {
       "command": "ss -tulpn",
-      "description": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+      "description": "🔥 LINUX STANDARD: list every listening TCP/UDP port (-tul) with its process (-p) and without DNS resolution (-n). The reference command to find out 'who listens on this port'.",
       "platform": 1
     },
     {
       "command": "ss -s",
-      "description": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+      "description": "Quick statistical summary of the sockets (Total, TCP, UDP). Useful to spot socket exhaustion or a DDoS attack.",
       "platform": 1
     },
     {
       "command": "powershell -Command \"Invoke-WmiMethod -Namespace root\\ccm -Class SMS_Client -Name ResetPolicy -ArgumentList 1\"",
-      "description": "Réinitialise toutes les stratégies SCCM",
+      "description": "Reset every SCCM policy",
       "platform": 0
     }
   ],
-  "notes": "Supprime toutes les stratégies. Le client les re-téléchargera automatiquement. Droits administrateur requis.",
-  "links": []
+  "notes": "Deletes every policy. The client downloads them again by itself. Requires administrator rights.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Réinitialiser les stratégies SCCM",
+      "description": "Supprime toutes les stratégies machine et utilisateur du client SCCM",
+      "notes": "Supprime toutes les stratégies. Le client les re-téléchargera automatiquement. Droits administrateur requis.",
+      "examples": {
+        "ss -tulpn": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+        "ss -s": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+        "powershell -Command \"Invoke-WmiMethod -Namespace root\\ccm -Class SMS_Client -Name ResetPolicy -ArgumentList 1\"": "Réinitialise toutes les stratégies SCCM"
+      }
+    }
+  }
 }

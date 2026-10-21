@@ -1,7 +1,7 @@
 {
   "id": "repair-wu-database",
-  "title": "Réparer la base de données Windows Update",
-  "description": "Utilise l'outil DISM pour réparer les composants Windows Update corrompus",
+  "title": "Repair the Windows Update database",
+  "description": "Use DISM to repair corrupted Windows Update components",
   "category": "windows-updates",
   "platform": 0,
   "level": 2,
@@ -22,15 +22,25 @@
   "examples": [
     {
       "command": "DISM /Online /Cleanup-Image /RestoreHealth && sfc /scannow",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help DISM -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Standard run of the command. See the official documentation with Get-Help DISM -Full for the available parameters and advanced uses.",
       "platform": 0
     }
   ],
-  "notes": "⏱️ Peut prendre 15-30 minutes selon la vitesse du PC et de la connexion Internet. Droits administrateur requis.",
+  "notes": "⏱️ Can take 15-30 minutes depending on the speed of the PC and of the Internet connection. Requires administrator rights.",
   "links": [
     {
       "title": "DISM Documentation",
       "url": "https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-operating-system-package-servicing-command-line-options"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Réparer la base de données Windows Update",
+      "description": "Utilise l'outil DISM pour réparer les composants Windows Update corrompus",
+      "notes": "⏱️ Peut prendre 15-30 minutes selon la vitesse du PC et de la connexion Internet. Droits administrateur requis.",
+      "examples": {
+        "DISM /Online /Cleanup-Image /RestoreHealth && sfc /scannow": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help DISM -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+      }
+    }
+  }
 }
