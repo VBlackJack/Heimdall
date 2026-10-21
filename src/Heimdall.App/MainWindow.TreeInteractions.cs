@@ -1455,6 +1455,104 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// Where keyboard focus goes once the startup selection has been restored.
+    /// </summary>
+    internal enum StartupFocusHandoff
+    {
+        /// <summary>Focus is somewhere meaningful, or nowhere better is available: leave it.</summary>
+        Keep,
+
+        /// <summary>Focus the row of the restored selection.</summary>
+        SelectedRow,
+
+        /// <summary>Focus the session filter box.</summary>
+        FilterBox,
+    }
+
+    /// <summary>
+    /// Decides where startup focus goes when it has landed on the session tree's container.
+    /// </summary>
+    /// <remarks>
+    /// The container takes focus before its rows exist, and the focus frame then outlines the
+    /// whole sidebar until a row is clicked. Only that case moves: focus anywhere else, such as on
+    /// the tour's Next button, was put there on purpose. The restored row comes first because it
+    /// is already selected, so focusing it changes nothing else; any other row would select itself
+    /// on focus and replace the start page. The filter box is the fallback. The container keeps
+    /// its own frame otherwise, which a keyboard user tabbing into an empty tree needs.
+    /// </remarks>
+    /// <param name="focusIsOnTreeContainer">Whether focus is on the tree but on none of its rows.</param>
+    /// <param name="selectedRowRealized">Whether the restored selection has a row to focus.</param>
+    /// <param name="filterBoxFocusable">Whether the filter box is shown and enabled.</param>
+    /// <returns>Where focus should go.</returns>
+    internal static StartupFocusHandoff ResolveStartupFocusHandoff(
+        bool focusIsOnTreeContainer,
+        bool selectedRowRealized,
+        bool filterBoxFocusable)
+    {
+        if (!focusIsOnTreeContainer)
+        {
+            return StartupFocusHandoff.Keep;
+        }
+
+        if (selectedRowRealized)
+        {
+            return StartupFocusHandoff.SelectedRow;
+        }
+
+        return filterBoxFocusable ? StartupFocusHandoff.FilterBox : StartupFocusHandoff.Keep;
+    }
+
+    /// <summary>
+    /// Puts the selection restored from the settings on its tree row, then moves startup focus
+    /// off the tree's container.
+    /// </summary>
+    /// <remarks>
+    /// The view model restored the last selection from the settings; WPF's own row selection has
+    /// to follow, so Enter, F2 and the keyboard menu have their fallback. Body-level steps, in
+    /// that order, so a guard can read them.
+    /// </remarks>
+    /// <param name="viewModel">The loaded main view model.</param>
+    private void RestoreStartupSelection(MainViewModel viewModel)
+    {
+        RestoreTreeSelectionRow(viewModel.ServerList.SelectedServer);
+        HandStartupFocusFromTreeContainer(viewModel.ServerList.SelectedServer);
+    }
+
+    /// <summary>
+    /// Moves startup focus off the session tree's container once the restored selection is in place.
+    /// </summary>
+    /// <param name="restored">The selection restored from the settings, if any.</param>
+    private void HandStartupFocusFromTreeContainer(ServerItemViewModel? restored)
+    {
+        // Idle runs after the background-priority restore of the selected row.
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.ApplicationIdle,
+            new Action(() =>
+            {
+                TreeViewItem? row = restored is null ? null : GetOrRealizeSessionTreeItem(restored);
+                bool onContainer = Keyboard.FocusedElement is DependencyObject focused
+                    && (ReferenceEquals(focused, SessionTreeView)
+                        || (SessionTreeView.IsAncestorOf(focused) && FindAncestor<TreeViewItem>(focused) is null));
+
+                switch (ResolveStartupFocusHandoff(
+                    onContainer,
+                    row is not null,
+                    Mw_FilterBox.IsVisible && Mw_FilterBox.IsEnabled))
+                {
+                    case StartupFocusHandoff.SelectedRow:
+                        row!.BringIntoView();
+                        row.Focus();
+                        break;
+                    case StartupFocusHandoff.FilterBox:
+                        Mw_FilterBox.Focus();
+                        break;
+                    case StartupFocusHandoff.Keep:
+                        break;
+                }
+            }));
+    }
+
+    /// <summary>
     /// Puts keyboard focus back on a session's row after a rebuild replaced its container.
     /// </summary>
     private void RefocusSessionRow(ServerItemViewModel server)
