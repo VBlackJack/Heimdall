@@ -17,30 +17,22 @@
     "id": "sysctl-cmd",
     "platform": 1,
     "name": "sysctl",
-    "commandPattern": "sysctl {parameter}",
+    "commandPattern": "sysctl {name}",
     "parameters": [
       {
-        "name": "parameter",
+        "name": "name",
         "label": "Parameter",
-        "type": "choice",
-        "allowedValues": [
-          "-a",
-          "vm.swappiness",
-          "net.ipv4.ip_forward",
-          "fs.file-max",
-          "net.core.somaxconn",
-          "kernel.hostname"
-        ],
-        "defaultValue": "-a",
+        "type": "string",
+        "defaultValue": "kernel.hostname",
         "required": true,
-        "description": "Parameter to show: -a for all, or one of the common names (any other name is in the examples)"
+        "description": "Name of the kernel parameter to show, such as vm.swappiness (sysctl -a in the examples shows them all)"
       }
     ]
   },
   "examples": [
     {
       "command": "sysctl -a",
-      "description": "List every kernel parameter",
+      "description": "Show every parameter",
       "platform": 1
     },
     {
@@ -88,14 +80,14 @@
       "notes": "Modifications temporaires. Éditer /etc/sysctl.conf pour permanence. sysctl -p recharge le fichier. Écrire une valeur (-w, -p) nécessite les droits root (sudo).",
       "parameters": {
         "linux": {
-          "parameter": {
+          "name": {
             "label": "Paramètre",
-            "description": "Paramètre à afficher : -a pour tous, ou l'un des noms courants (les autres noms figurent dans les exemples)"
+            "description": "Nom du paramètre du noyau à afficher, comme vm.swappiness (sysctl -a dans les exemples les affiche tous)"
           }
         }
       },
       "examples": {
-        "sysctl -a": "Liste tous les paramètres kernel",
+        "sysctl -a": "Affiche tous les paramètres",
         "sysctl net.ipv4.ip_forward": "Affiche un paramètre spécifique",
         "sudo sysctl -w net.ipv4.ip_forward=1": "Modifie un paramètre (temporaire)",
         "sysctl vm.swappiness": "Valeur de swappiness",
