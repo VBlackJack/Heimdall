@@ -1,7 +1,7 @@
 {
   "id": "win-pkg-001",
-  "title": "Installer une application via Winget",
-  "description": "Installe une application Windows à l'aide du gestionnaire de packages Winget.",
+  "title": "Install an application with Winget",
+  "description": "Install a Windows application with the Winget package manager.",
   "category": "package-management",
   "platform": 0,
   "level": 1,
@@ -21,31 +21,50 @@
     "parameters": [
       {
         "name": "packageName",
-        "label": "Nom du package",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou ID du package à installer (ex: Microsoft.PowerToys)"
+        "description": "Name or ID of the package to install (e.g. Microsoft.PowerToys)"
       }
     ]
   },
   "examples": [
     {
       "command": "winget install Microsoft.PowerToys --silent",
-      "description": "Installe PowerToys de manière silencieuse",
+      "description": "Install PowerToys silently",
       "platform": 0
     },
     {
       "command": "winget install Microsoft.VisualStudioCode --silent --accept-package-agreements --accept-source-agreements",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Standard run of the command. See the official documentation with Get-Help winget -Full for the available parameters and advanced uses.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite Windows 10 1809 ou supérieur. L'option --silent évite les interactions utilisateur.",
+  "notes": "Requires Windows 10 1809 or later. The --silent option avoids user interaction.",
   "links": [
     {
       "title": "Documentation officielle Winget",
       "url": "https://learn.microsoft.com/en-us/windows/package-manager/winget/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Installer une application via Winget",
+      "description": "Installe une application Windows à l'aide du gestionnaire de packages Winget.",
+      "notes": "Nécessite Windows 10 1809 ou supérieur. L'option --silent évite les interactions utilisateur.",
+      "parameters": {
+        "windows": {
+          "packageName": {
+            "label": "Nom du package",
+            "description": "Nom ou ID du package à installer (ex: Microsoft.PowerToys)"
+          }
+        }
+      },
+      "examples": {
+        "winget install Microsoft.PowerToys --silent": "Installe PowerToys de manière silencieuse",
+        "winget install Microsoft.VisualStudioCode --silent --accept-package-agreements --accept-source-agreements": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+      }
+    }
+  }
 }

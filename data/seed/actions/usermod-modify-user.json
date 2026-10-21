@@ -1,7 +1,7 @@
 {
   "id": "usermod-modify-user",
-  "title": "Modifier un utilisateur existant",
-  "description": "Modifie les propriétés d'un compte utilisateur (groupes, shell, home, etc.)",
+  "title": "Modify an existing user",
+  "description": "Modify the properties of a user account (groups, shell, home, etc.)",
   "category": "security",
   "platform": 1,
   "level": 1,
@@ -16,78 +16,108 @@
     "id": "usermod-cmd",
     "platform": 1,
     "name": "usermod",
-    "commandPattern": "usermod {options} {username}",
+    "commandPattern": "usermod -aG {group} {username}",
     "parameters": [
       {
-        "name": "options",
-        "label": "Options",
+        "name": "group",
+        "label": "Group",
         "type": "string",
-        "defaultValue": "-aG sudo",
+        "defaultValue": "sudo",
         "required": true,
-        "description": "Options (-aG=add groups, -s=shell, -L=lock, -U=unlock)"
+        "description": "Supplementary group to add the user to"
       },
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "User name",
         "type": "string",
         "defaultValue": "john",
         "required": true,
-        "description": "Utilisateur à modifier"
+        "description": "User to modify"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo usermod -aG sudo john",
-      "description": "Ajoute john au groupe sudo",
+      "description": "Add john to the sudo group",
       "platform": 1
     },
     {
       "command": "sudo usermod -s /bin/zsh john",
-      "description": "Change le shell de john",
+      "description": "Change john's shell",
       "platform": 1
     },
     {
       "command": "sudo usermod -L john",
-      "description": "Verrouille le compte de john",
+      "description": "Lock john's account",
       "platform": 1
     },
     {
       "command": "usermod -aG sudo jdupont",
-      "description": "Exemple utilisant le paramètre 'options': Options (-aG=add groups, -s=shell, -L=lock, -U=unlock). Remplacez -v -f par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'options' parameter: Options (-aG=add groups, -s=shell, -L=lock, -U=unlock). Replace -v -f with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "usermod -v -f john",
-      "description": "Exemple utilisant le paramètre 'username': Utilisateur à modifier. Remplacez jdupont par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'username' parameter: User to modify. Replace jdupont with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "usermod -L baduser",
-      "description": "Verrouiller le compte utilisateur",
+      "description": "Lock the user account",
       "platform": 1
     },
     {
       "command": "usermod -U baduser",
-      "description": "Déverrouiller le compte utilisateur",
+      "description": "Unlock the user account",
       "platform": 1
     },
     {
       "command": "usermod -s /bin/zsh jdupont",
-      "description": "Changer le shell de l'utilisateur",
+      "description": "Change the user's shell",
       "platform": 1
     },
     {
       "command": "usermod -d /new/home -m user",
-      "description": "Déplacer le home directory",
+      "description": "Move the home directory",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. -aG pour ajouter à un groupe sans supprimer les autres. -L verrouille, -U déverrouille.",
+  "notes": "Requires sudo. -aG adds to a group without removing the others. -L locks, -U unlocks.",
   "links": [
     {
       "title": "usermod documentation",
       "url": "https://man7.org/linux/man-pages/man8/usermod.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Modifier un utilisateur existant",
+      "description": "Modifie les propriétés d'un compte utilisateur (groupes, shell, home, etc.)",
+      "notes": "Nécessite sudo. -aG pour ajouter à un groupe sans supprimer les autres. -L verrouille, -U déverrouille.",
+      "parameters": {
+        "linux": {
+          "group": {
+            "label": "Groupe",
+            "description": "Groupe supplémentaire auquel ajouter l'utilisateur"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Utilisateur à modifier"
+          }
+        }
+      },
+      "examples": {
+        "sudo usermod -aG sudo john": "Ajoute john au groupe sudo",
+        "sudo usermod -s /bin/zsh john": "Change le shell de john",
+        "sudo usermod -L john": "Verrouille le compte de john",
+        "usermod -aG sudo jdupont": "Exemple utilisant le paramètre 'options': Options (-aG=add groups, -s=shell, -L=lock, -U=unlock). Remplacez -v -f par la valeur appropriée selon votre environnement.",
+        "usermod -v -f john": "Exemple utilisant le paramètre 'username': Utilisateur à modifier. Remplacez jdupont par la valeur appropriée selon votre environnement.",
+        "usermod -L baduser": "Verrouiller le compte utilisateur",
+        "usermod -U baduser": "Déverrouiller le compte utilisateur",
+        "usermod -s /bin/zsh jdupont": "Changer le shell de l'utilisateur",
+        "usermod -d /new/home -m user": "Déplacer le home directory"
+      }
+    }
+  }
 }

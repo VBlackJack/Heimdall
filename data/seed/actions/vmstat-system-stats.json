@@ -1,7 +1,7 @@
 {
   "id": "vmstat-system-stats",
-  "title": "Statistiques système globales",
-  "description": "Affiche les statistiques de mémoire virtuelle, CPU, I/O et processus",
+  "title": "Global system statistics",
+  "description": "Show virtual memory, CPU, I/O and process statistics",
   "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
@@ -21,74 +21,104 @@
     "parameters": [
       {
         "name": "interval",
-        "label": "Intervalle (secondes)",
+        "label": "Interval (seconds)",
         "type": "number",
         "defaultValue": "5",
         "required": true,
-        "description": "Intervalle entre les mesures"
+        "description": "Interval between samples"
       },
       {
         "name": "count",
-        "label": "Nombre de mesures",
+        "label": "Number of samples",
         "type": "number",
         "defaultValue": "5",
         "required": true,
-        "description": "Nombre de mesures à effectuer"
+        "description": "Number of samples to take"
       }
     ]
   },
   "examples": [
     {
       "command": "vmstat 5 5",
-      "description": "Statistiques toutes les 5 secondes, 5 fois",
+      "description": "Statistics every 5 seconds, 5 times",
       "platform": 1
     },
     {
       "command": "vmstat -s",
-      "description": "Statistiques mémoire détaillées",
+      "description": "Detailed memory statistics",
       "platform": 1
     },
     {
       "command": "vmstat -d",
-      "description": "Statistiques disques",
+      "description": "Disk statistics",
       "platform": 1
     },
     {
       "command": "vmstat 5 10",
-      "description": "Exemple utilisant le paramètre 'interval': Intervalle entre les mesures. Remplacez 3600 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'interval' parameter: Interval between samples. Replace 3600 with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "vmstat 3600 5",
-      "description": "Exemple utilisant le paramètre 'count': Nombre de mesures à effectuer. Remplacez 10 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'count' parameter: Number of samples to take. Replace 10 with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "vmstat 1 10",
-      "description": "Stats système toutes les secondes, 10 fois",
+      "description": "System stats every second, 10 times",
       "platform": 1
     },
     {
       "command": "vmstat -w",
-      "description": "Format large",
+      "description": "Wide format",
       "platform": 1
     },
     {
       "command": "vmstat -a",
-      "description": "Mémoire active/inactive",
+      "description": "Active/inactive memory",
       "platform": 1
     },
     {
       "command": "vmstat 1 5",
-      "description": "Stats toutes les secondes, 5 fois",
+      "description": "Stats every second, 5 times",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo. Colonnes: r=runnable, b=blocked, swpd=swap, free=RAM libre, etc.",
+  "notes": "Does not require sudo. Columns: r=runnable, b=blocked, swpd=swap, free=free RAM, etc.",
   "links": [
     {
       "title": "vmstat command",
       "url": "https://man7.org/linux/man-pages/man8/vmstat.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Statistiques système globales",
+      "description": "Affiche les statistiques de mémoire virtuelle, CPU, I/O et processus",
+      "notes": "Ne nécessite pas sudo. Colonnes: r=runnable, b=blocked, swpd=swap, free=RAM libre, etc.",
+      "parameters": {
+        "linux": {
+          "interval": {
+            "label": "Intervalle (secondes)",
+            "description": "Intervalle entre les mesures"
+          },
+          "count": {
+            "label": "Nombre de mesures",
+            "description": "Nombre de mesures à effectuer"
+          }
+        }
+      },
+      "examples": {
+        "vmstat 5 5": "Statistiques toutes les 5 secondes, 5 fois",
+        "vmstat -s": "Statistiques mémoire détaillées",
+        "vmstat -d": "Statistiques disques",
+        "vmstat 5 10": "Exemple utilisant le paramètre 'interval': Intervalle entre les mesures. Remplacez 3600 par la valeur appropriée selon votre environnement.",
+        "vmstat 3600 5": "Exemple utilisant le paramètre 'count': Nombre de mesures à effectuer. Remplacez 10 par la valeur appropriée selon votre environnement.",
+        "vmstat 1 10": "Stats système toutes les secondes, 10 fois",
+        "vmstat -w": "Format large",
+        "vmstat -a": "Mémoire active/inactive",
+        "vmstat 1 5": "Stats toutes les secondes, 5 fois"
+      }
+    }
+  }
 }

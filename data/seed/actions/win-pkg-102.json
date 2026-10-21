@@ -1,7 +1,7 @@
 {
   "id": "win-pkg-102",
-  "title": "Lister les packages Chocolatey installés",
-  "description": "Affiche la liste de tous les packages installés via Chocolatey.",
+  "title": "List the installed Chocolatey packages",
+  "description": "Show the list of every package installed with Chocolatey.",
   "category": "package-management",
   "platform": 0,
   "level": 0,
@@ -23,20 +23,31 @@
   "examples": [
     {
       "command": "choco list --local-only",
-      "description": "Liste tous les packages Chocolatey installés localement",
+      "description": "List every Chocolatey package installed locally",
       "platform": 0
     },
     {
       "command": "choco list --local-only --limit-output",
-      "description": "Liste avec sortie simplifiée (nom|version)",
+      "description": "List with simplified output (name|version)",
       "platform": 0
     }
   ],
-  "notes": "L'option --local-only affiche uniquement les packages installés sur cette machine.",
+  "notes": "The --local-only option shows only the packages installed on this machine.",
   "links": [
     {
       "title": "Chocolatey list documentation",
       "url": "https://docs.chocolatey.org/en-us/choco/commands/list"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les packages Chocolatey installés",
+      "description": "Affiche la liste de tous les packages installés via Chocolatey.",
+      "notes": "L'option --local-only affiche uniquement les packages installés sur cette machine.",
+      "examples": {
+        "choco list --local-only": "Liste tous les packages Chocolatey installés localement",
+        "choco list --local-only --limit-output": "Liste avec sortie simplifiée (nom|version)"
+      }
+    }
+  }
 }

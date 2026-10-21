@@ -1,7 +1,7 @@
 {
   "id": "unified-search-content",
-  "title": "Rechercher dans le contenu de fichiers",
-  "description": "Recherche une chaîne de caractères dans le contenu des fichiers.",
+  "title": "Search file contents",
+  "description": "Search for a string in the content of files.",
   "category": "files-storage",
   "platform": 2,
   "level": 0,
@@ -10,10 +10,9 @@
     "windows",
     "grep",
     "search",
-    "recherche",
-    "contenu"
+    "content"
   ],
-  "notes": "Windows: Select-String est l'équivalent PowerShell de grep. Supporte les regex.\nLinux: -r récursif, -i insensible à la casse, -n affiche les numéros de ligne. --include pour filtrer les fichiers.",
+  "notes": "Windows: Select-String is the PowerShell equivalent of grep. Supports regex.\nLinux: -r recursive, -i case-insensitive, -n shows line numbers. --include to filter the files.",
   "links": [
     {
       "title": "Documentation Select-String",
@@ -29,64 +28,64 @@
     "parameters": [
       {
         "name": "searchPath",
-        "label": "Chemin de recherche",
+        "label": "Search path",
         "type": "string",
         "defaultValue": ".",
         "required": true,
-        "description": "Dossier où chercher"
+        "description": "Folder to search"
       },
       {
         "name": "filePattern",
-        "label": "Type de fichiers",
+        "label": "File type",
         "type": "string",
         "defaultValue": "*.txt",
         "required": true,
-        "description": "Motif de fichiers (ex: *.txt, *.log)"
+        "description": "File pattern (e.g. *.txt, *.log)"
       },
       {
         "name": "searchTerm",
-        "label": "Terme recherché",
+        "label": "Search term",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Texte ou regex à rechercher"
+        "description": "Text or regex to search for"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "Get-ChildItem -Path \"C:\\Logs\" -Filter \"*.log\" -Recurse | Select-String -Pattern \"ERROR\"",
-      "description": "Cherche ERROR dans tous les fichiers .log",
+      "description": "Find ERROR in every .log file",
       "platform": 0
     },
     {
       "command": "Select-String -Path \"*.cs\" -Pattern \"TODO\" -Recurse",
-      "description": "Trouve tous les TODO dans les fichiers C#",
+      "description": "Find every TODO in the C# files",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results as a table fitted to the console. Format-Table -AutoSize adjusts the column widths for readable output. Handy for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \".\" -Filter \"{filePattern}\" -Recurse | Select-String -Pattern \"{searchTerm}\"",
-      "description": "Exemple utilisant le paramètre 'searchPath': Dossier où chercher. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'searchPath' parameter: Folder to search. Replace <searchPath> with the value that fits your environment.",
       "platform": 0
     }
   ],
@@ -99,48 +98,95 @@
     "parameters": [
       {
         "name": "searchTerm",
-        "label": "Terme recherché",
+        "label": "Search term",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Texte ou regex à rechercher"
+        "description": "Text or regex to search for"
       },
       {
         "name": "searchPath",
-        "label": "Chemin de recherche",
+        "label": "Search path",
         "type": "string",
         "defaultValue": ".",
         "required": true,
-        "description": "Dossier où chercher"
+        "description": "Folder to search"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "grep -r \"ERROR\" /var/log",
-      "description": "Cherche ERROR dans tous les fichiers de /var/log",
+      "description": "Find ERROR in every file under /var/log",
       "platform": 1
     },
     {
       "command": "grep -rn \"TODO\" --include=\"*.py\"",
-      "description": "Trouve TODO dans les fichiers Python avec numéros de ligne",
+      "description": "Find TODO in the Python files with line numbers",
       "platform": 1
     },
     {
       "command": "grep -i \"password\" config.txt",
-      "description": "Recherche insensible à la casse",
+      "description": "Case-insensitive search",
       "platform": 1
     },
     {
       "command": "grep -r \"<searchTerm>\" \"{searchPath}\"",
-      "description": "Exemple utilisant le paramètre 'searchTerm': Texte ou regex à rechercher. Remplacez <searchTerm> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'searchTerm' parameter: Text or regex to search for. Replace <searchTerm> with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "grep -r \"{searchTerm}\" \".\"",
-      "description": "Exemple utilisant le paramètre 'searchPath': Dossier où chercher. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'searchPath' parameter: Folder to search. Replace <searchPath> with the value that fits your environment.",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Rechercher dans le contenu de fichiers",
+      "description": "Recherche une chaîne de caractères dans le contenu des fichiers.",
+      "notes": "Windows: Select-String est l'équivalent PowerShell de grep. Supporte les regex.\nLinux: -r récursif, -i insensible à la casse, -n affiche les numéros de ligne. --include pour filtrer les fichiers.",
+      "parameters": {
+        "windows": {
+          "searchPath": {
+            "label": "Chemin de recherche",
+            "description": "Dossier où chercher"
+          },
+          "filePattern": {
+            "label": "Type de fichiers",
+            "description": "Motif de fichiers (ex: *.txt, *.log)"
+          },
+          "searchTerm": {
+            "label": "Terme recherché",
+            "description": "Texte ou regex à rechercher"
+          }
+        },
+        "linux": {
+          "searchTerm": {
+            "label": "Terme recherché",
+            "description": "Texte ou regex à rechercher"
+          },
+          "searchPath": {
+            "label": "Chemin de recherche",
+            "description": "Dossier où chercher"
+          }
+        }
+      },
+      "examples": {
+        "Get-ChildItem -Path \"C:\\Logs\" -Filter \"*.log\" -Recurse | Select-String -Pattern \"ERROR\"": "Cherche ERROR dans tous les fichiers .log",
+        "Select-String -Path \"*.cs\" -Pattern \"TODO\" -Recurse": "Trouve tous les TODO dans les fichiers C#",
+        "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "Get-ChildItem -Path \".\" -Filter \"{filePattern}\" -Recurse | Select-String -Pattern \"{searchTerm}\"": "Exemple utilisant le paramètre 'searchPath': Dossier où chercher. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
+        "grep -r \"ERROR\" /var/log": "Cherche ERROR dans tous les fichiers de /var/log",
+        "grep -rn \"TODO\" --include=\"*.py\"": "Trouve TODO dans les fichiers Python avec numéros de ligne",
+        "grep -i \"password\" config.txt": "Recherche insensible à la casse",
+        "grep -r \"<searchTerm>\" \"{searchPath}\"": "Exemple utilisant le paramètre 'searchTerm': Texte ou regex à rechercher. Remplacez <searchTerm> par la valeur appropriée selon votre environnement.",
+        "grep -r \"{searchTerm}\" \".\"": "Exemple utilisant le paramètre 'searchPath': Dossier où chercher. Remplacez <searchPath> par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

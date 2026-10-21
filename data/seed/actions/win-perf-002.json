@@ -1,7 +1,7 @@
 {
   "id": "win-perf-002",
-  "title": "Configurer DNS Cloudflare (1.1.1.1)",
-  "description": "Configure les serveurs DNS Cloudflare (1.1.1.1 et 1.0.0.1) pour une résolution DNS ultra-rapide et orientée confidentialité.",
+  "title": "Configure Cloudflare DNS (1.1.1.1)",
+  "description": "Configure the Cloudflare DNS servers (1.1.1.1 and 1.0.0.1) for very fast, privacy-oriented DNS resolution.",
   "category": "network-dns",
   "platform": 0,
   "level": 1,
@@ -11,7 +11,7 @@
     "network",
     "cloudflare",
     "privacy",
-    "optimisation",
+    "optimization",
     "windows"
   ],
   "windowsCommandTemplateId": "win-perf-002-cmd",
@@ -23,57 +23,81 @@
     "parameters": [
       {
         "name": "InterfaceName",
-        "label": "Nom de l'interface réseau",
+        "label": "Network interface name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "Ethernet",
         "required": false,
-        "description": "Nom de l'interface réseau (Ethernet, Wi-Fi, etc.)"
+        "description": "Name of the network interface (Ethernet, Wi-Fi, etc.)"
       }
     ]
   },
   "examples": [
     {
       "command": "ss -tulpn",
-      "description": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+      "description": "🔥 LINUX STANDARD: list every listening TCP/UDP port (-tul) with its process (-p) and without DNS resolution (-n). The reference command to find out 'who listens on this port'.",
       "platform": 1
     },
     {
       "command": "ss -s",
-      "description": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+      "description": "Quick statistical summary of the sockets (Total, TCP, UDP). Useful to spot socket exhaustion or a DDoS attack.",
       "platform": 1
     },
     {
       "command": "Set-DnsClientServerAddress -InterfaceAlias 'Ethernet' -ServerAddresses ('1.1.1.1','1.0.0.1')",
-      "description": "Configure DNS Cloudflare sur l'interface Ethernet",
+      "description": "Configure Cloudflare DNS on the Ethernet interface",
       "platform": 1
     },
     {
       "command": "$interface = Get-NetAdapter | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "$interface = Get-NetAdapter | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results as a table fitted to the console. Format-Table -AutoSize adjusts the column widths for readable output. Handy for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "$interface = Get-NetAdapter | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "$interface = Get-NetAdapter | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "DNS Cloudflare: le plus rapide (14ms en moyenne). Forte orientation confidentialité (ne vend pas vos données). Recommandé pour le gaming et la navigation générale.",
+  "notes": "Cloudflare DNS: the fastest (14 ms on average). Strongly privacy-oriented (does not sell your data). Recommended for gaming and general browsing.",
   "links": [
     {
       "title": "Cloudflare DNS",
       "url": "https://1.1.1.1/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Configurer DNS Cloudflare (1.1.1.1)",
+      "description": "Configure les serveurs DNS Cloudflare (1.1.1.1 et 1.0.0.1) pour une résolution DNS ultra-rapide et orientée confidentialité.",
+      "notes": "DNS Cloudflare: le plus rapide (14ms en moyenne). Forte orientation confidentialité (ne vend pas vos données). Recommandé pour le gaming et la navigation générale.",
+      "parameters": {
+        "windows": {
+          "InterfaceName": {
+            "label": "Nom de l'interface réseau",
+            "description": "Nom de l'interface réseau (Ethernet, Wi-Fi, etc.)"
+          }
+        }
+      },
+      "examples": {
+        "ss -tulpn": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+        "ss -s": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+        "Set-DnsClientServerAddress -InterfaceAlias 'Ethernet' -ServerAddresses ('1.1.1.1','1.0.0.1')": "Configure DNS Cloudflare sur l'interface Ethernet",
+        "$interface = Get-NetAdapter | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$interface = Get-NetAdapter | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "$interface = Get-NetAdapter | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "$interface = Get-NetAdapter | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

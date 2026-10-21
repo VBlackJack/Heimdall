@@ -1,18 +1,17 @@
 {
   "id": "unified-tree",
-  "title": "Afficher l'arborescence de dossiers",
-  "description": "Affiche la structure hiérarchique d'un répertoire.",
+  "title": "Show a folder tree",
+  "description": "Show the hierarchical structure of a directory.",
   "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [
     "linux",
     "windows",
-    "arborescence",
-    "structure",
-    "tree"
+    "tree",
+    "structure"
   ],
-  "notes": "Windows: /F affiche les fichiers. /A utilise des caractères ASCII. Utiliser > pour rediriger vers un fichier.\nLinux: -L pour limiter la profondeur. -d pour dossiers seulement. Installer avec: sudo apt install tree.",
+  "notes": "Windows: /F shows the files. /A uses ASCII characters. Use > to redirect to a file.\nLinux: -L limits the depth. -d for folders only. Install it with: sudo apt install tree.",
   "links": [],
   "windowsCommandTemplateId": "search-tree-windows-cmd",
   "windowsCommandTemplate": {
@@ -23,28 +22,28 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Dossier à afficher"
+        "description": "Folder to show"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "tree C:\\Projects /F",
-      "description": "Affiche l'arborescence avec les fichiers",
+      "description": "Show the tree with the files",
       "platform": 0
     },
     {
       "command": "tree /A > structure.txt",
-      "description": "Sauvegarde l'arborescence en ASCII dans un fichier",
+      "description": "Save the tree in ASCII to a file",
       "platform": 0
     },
     {
       "command": "tree \".\" /F /A",
-      "description": "Exemple utilisant le paramètre 'path': Dossier à afficher. Remplacez <path> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'path' parameter: Folder to show. Replace <path> with the value that fits your environment.",
       "platform": 0
     }
   ],
@@ -57,55 +56,89 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Dossier à afficher"
+        "description": "Folder to show"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "tree -L 2",
-      "description": "Limite à 2 niveaux de profondeur",
+      "description": "Limit to 2 levels of depth",
       "platform": 1
     },
     {
       "command": "tree -d",
-      "description": "Affiche uniquement les dossiers",
+      "description": "Show only the folders",
       "platform": 1
     },
     {
       "command": "tree -h",
-      "description": "Affiche les tailles en format lisible",
+      "description": "Show sizes in a readable format",
       "platform": 1
     },
     {
       "command": "tree \".\"",
-      "description": "Exemple utilisant le paramètre 'path': Dossier à afficher. Remplacez <path> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'path' parameter: Folder to show. Replace <path> with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "tree /var/www",
-      "description": "Arborescence du dossier web",
+      "description": "Tree of the web folder",
       "platform": 1
     },
     {
       "command": "tree -L 2 /home",
-      "description": "Limiter à 2 niveaux",
+      "description": "Limit to 2 levels",
       "platform": 1
     },
     {
       "command": "tree -d /etc",
-      "description": "Afficher uniquement les dossiers",
+      "description": "Show only the folders",
       "platform": 1
     },
     {
       "command": "tree -h /var/log",
-      "description": "Afficher les tailles",
+      "description": "Show the sizes",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'arborescence de dossiers",
+      "description": "Affiche la structure hiérarchique d'un répertoire.",
+      "notes": "Windows: /F affiche les fichiers. /A utilise des caractères ASCII. Utiliser > pour rediriger vers un fichier.\nLinux: -L pour limiter la profondeur. -d pour dossiers seulement. Installer avec: sudo apt install tree.",
+      "parameters": {
+        "windows": {
+          "path": {
+            "label": "Chemin",
+            "description": "Dossier à afficher"
+          }
+        },
+        "linux": {
+          "path": {
+            "label": "Chemin",
+            "description": "Dossier à afficher"
+          }
+        }
+      },
+      "examples": {
+        "tree C:\\Projects /F": "Affiche l'arborescence avec les fichiers",
+        "tree /A > structure.txt": "Sauvegarde l'arborescence en ASCII dans un fichier",
+        "tree \".\" /F /A": "Exemple utilisant le paramètre 'path': Dossier à afficher. Remplacez <path> par la valeur appropriée selon votre environnement.",
+        "tree -L 2": "Limite à 2 niveaux de profondeur",
+        "tree -d": "Affiche uniquement les dossiers",
+        "tree -h": "Affiche les tailles en format lisible",
+        "tree \".\"": "Exemple utilisant le paramètre 'path': Dossier à afficher. Remplacez <path> par la valeur appropriée selon votre environnement.",
+        "tree /var/www": "Arborescence du dossier web",
+        "tree -L 2 /home": "Limiter à 2 niveaux",
+        "tree -d /etc": "Afficher uniquement les dossiers",
+        "tree -h /var/log": "Afficher les tailles"
+      }
+    }
+  }
 }

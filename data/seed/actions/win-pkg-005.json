@@ -1,7 +1,7 @@
 {
   "id": "win-pkg-005",
-  "title": "Désinstaller une application Winget",
-  "description": "Désinstalle une application précédemment installée via Winget.",
+  "title": "Uninstall a Winget application",
+  "description": "Uninstall an application previously installed with Winget.",
   "category": "package-management",
   "platform": 0,
   "level": 2,
@@ -21,31 +21,50 @@
     "parameters": [
       {
         "name": "packageName",
-        "label": "Nom du package",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou ID du package à désinstaller"
+        "description": "Name or ID of the package to uninstall"
       }
     ]
   },
   "examples": [
     {
       "command": "winget uninstall Microsoft.PowerToys --silent",
-      "description": "Désinstalle PowerToys",
+      "description": "Uninstall PowerToys",
       "platform": 0
     },
     {
       "command": "winget uninstall Microsoft.VisualStudioCode --silent",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Standard run of the command. See the official documentation with Get-Help winget -Full for the available parameters and advanced uses.",
       "platform": 0
     }
   ],
-  "notes": "⚠️ ATTENTION : Cette action supprime l'application du système. Assurez-vous de sauvegarder vos données.",
+  "notes": "⚠️ WARNING: this action removes the application from the system. Make sure to back up your data.",
   "links": [
     {
       "title": "Winget uninstall documentation",
       "url": "https://learn.microsoft.com/en-us/windows/package-manager/winget/uninstall"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Désinstaller une application Winget",
+      "description": "Désinstalle une application précédemment installée via Winget.",
+      "notes": "⚠️ ATTENTION : Cette action supprime l'application du système. Assurez-vous de sauvegarder vos données.",
+      "parameters": {
+        "windows": {
+          "packageName": {
+            "label": "Nom du package",
+            "description": "Nom ou ID du package à désinstaller"
+          }
+        }
+      },
+      "examples": {
+        "winget uninstall Microsoft.PowerToys --silent": "Désinstalle PowerToys",
+        "winget uninstall Microsoft.VisualStudioCode --silent": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+      }
+    }
+  }
 }
