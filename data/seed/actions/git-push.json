@@ -1,7 +1,7 @@
 {
   "id": "git-push",
-  "title": "Pousser les commits vers le dépôt distant",
-  "description": "Envoie les commits locaux vers le dépôt distant",
+  "title": "Push commits to the remote repository",
+  "description": "Send the local commits to the remote repository.",
   "category": "development",
   "platform": 2,
   "level": 1,
@@ -23,15 +23,15 @@
         "type": "string",
         "defaultValue": "origin",
         "required": false,
-        "description": "Nom du dépôt distant"
+        "description": "Name of the remote repository"
       },
       {
         "name": "branch",
-        "label": "Branche",
+        "label": "Branch",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom de la branche"
+        "description": "Branch name"
       }
     ]
   },
@@ -48,35 +48,68 @@
         "type": "string",
         "defaultValue": "origin",
         "required": false,
-        "description": "Nom du dépôt distant"
+        "description": "Name of the remote repository"
       },
       {
         "name": "branch",
-        "label": "Branche",
+        "label": "Branch",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom de la branche"
+        "description": "Branch name"
       }
     ]
   },
   "examples": [
     {
       "command": "git push origin main",
-      "description": "Pousse les commits vers la branche main",
+      "description": "Push the commits to the main branch",
       "platform": 2
     },
     {
       "command": "git push -u origin feature-branch",
-      "description": "Pousse et configure le tracking de la branche",
+      "description": "Push and set up branch tracking",
       "platform": 2
     }
   ],
-  "notes": "Utilisez -f (force) avec précaution car cela peut écraser l'historique distant.",
+  "notes": "Use -f (force) with care: it can overwrite the remote history.",
   "links": [
     {
       "title": "Git Push Documentation",
       "url": "https://git-scm.com/docs/git-push"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Pousser les commits vers le dépôt distant",
+      "description": "Envoie les commits locaux vers le dépôt distant",
+      "notes": "Utilisez -f (force) avec précaution car cela peut écraser l'historique distant.",
+      "parameters": {
+        "windows": {
+          "remote": {
+            "label": "Dépôt distant",
+            "description": "Nom du dépôt distant"
+          },
+          "branch": {
+            "label": "Branche",
+            "description": "Nom de la branche"
+          }
+        },
+        "linux": {
+          "remote": {
+            "label": "Dépôt distant",
+            "description": "Nom du dépôt distant"
+          },
+          "branch": {
+            "label": "Branche",
+            "description": "Nom de la branche"
+          }
+        }
+      },
+      "examples": {
+        "git push origin main": "Pousse les commits vers la branche main",
+        "git push -u origin feature-branch": "Pousse et configure le tracking de la branche"
+      }
+    }
+  }
 }

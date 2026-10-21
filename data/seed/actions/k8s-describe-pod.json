@@ -1,7 +1,7 @@
 {
   "id": "k8s-describe-pod",
-  "title": "Diagnostiquer un Pod (Kubectl Describe)",
-  "description": "Affiche les détails complets d'un pod, y compris les événements (Events) qui expliquent pourquoi il ne démarre pas.",
+  "title": "Diagnose a pod (kubectl describe)",
+  "description": "Show the full details of a pod, including the events (Events) that explain why it does not start.",
   "category": "containers-vms",
   "platform": 2,
   "level": 0,
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "podName",
-        "label": "Nom du Pod",
+        "label": "Pod name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom exact du pod"
+        "description": "Exact name of the pod"
       },
       {
         "name": "namespace",
@@ -32,7 +32,7 @@
         "type": "string",
         "defaultValue": "default",
         "required": true,
-        "description": "Namespace du pod"
+        "description": "Namespace of the pod"
       }
     ]
   },
@@ -44,11 +44,11 @@
     "parameters": [
       {
         "name": "podName",
-        "label": "Nom du Pod",
+        "label": "Pod name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom exact du pod"
+        "description": "Exact name of the pod"
       },
       {
         "name": "namespace",
@@ -56,7 +56,7 @@
         "type": "string",
         "defaultValue": "default",
         "required": true,
-        "description": "Namespace du pod"
+        "description": "Namespace of the pod"
       }
     ]
   },
@@ -64,10 +64,41 @@
   "linuxExamples": [
     {
       "command": "kubectl describe pod my-app-xyz -n prod",
-      "description": "🔥 POURQUOI ÇA PLANTE ? : Regardez la section 'Events' tout en bas de la sortie. C'est là que K8s explique les erreurs (ImagePullBackOff, OOMKilled, FailedScheduling).",
+      "description": "🔥 WHY DOES IT CRASH?: look at the 'Events' section at the very bottom of the output. That is where K8s explains the errors (ImagePullBackOff, OOMKilled, FailedScheduling).",
       "platform": 1
     }
   ],
   "linuxCommandTemplateId": "0031e0a8-2119-4cdd-b19f-405372f2dbec",
-  "windowsCommandTemplateId": "727348e4-a095-45aa-bfdd-33e3d368c08b"
+  "windowsCommandTemplateId": "727348e4-a095-45aa-bfdd-33e3d368c08b",
+  "translations": {
+    "fr": {
+      "title": "Diagnostiquer un Pod (Kubectl Describe)",
+      "description": "Affiche les détails complets d'un pod, y compris les événements (Events) qui expliquent pourquoi il ne démarre pas.",
+      "parameters": {
+        "windows": {
+          "podName": {
+            "label": "Nom du Pod",
+            "description": "Nom exact du pod"
+          },
+          "namespace": {
+            "label": "Namespace",
+            "description": "Namespace du pod"
+          }
+        },
+        "linux": {
+          "podName": {
+            "label": "Nom du Pod",
+            "description": "Nom exact du pod"
+          },
+          "namespace": {
+            "label": "Namespace",
+            "description": "Namespace du pod"
+          }
+        }
+      },
+      "examples": {
+        "kubectl describe pod my-app-xyz -n prod": "🔥 POURQUOI ÇA PLANTE ? : Regardez la section 'Events' tout en bas de la sortie. C'est là que K8s explique les erreurs (ImagePullBackOff, OOMKilled, FailedScheduling)."
+      }
+    }
+  }
 }

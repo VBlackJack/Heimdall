@@ -1,7 +1,7 @@
 {
   "id": "iis-recycle-apppool",
-  "title": "Recycler un pool d'application IIS",
-  "description": "Force le recyclage (redémarrage) d'un pool d'application IIS. Utile pour appliquer des changements de configuration ou libérer de la mémoire.",
+  "title": "Recycle an IIS application pool",
+  "description": "Force the recycling (restart) of an IIS application pool. Useful to apply configuration changes or to free memory.",
   "category": "network-dns",
   "platform": 0,
   "level": 1,
@@ -23,52 +23,75 @@
     "parameters": [
       {
         "name": "appPoolName",
-        "label": "Nom du pool",
+        "label": "Pool name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "DefaultAppPool",
         "required": true,
-        "description": "Nom du pool d'application à recycler"
+        "description": "Name of the application pool to recycle"
       }
     ]
   },
   "examples": [
     {
       "command": "Restart-WebAppPool -Name 'DefaultAppPool'",
-      "description": "Recycle le pool par défaut",
+      "description": "Recycle the default pool",
       "platform": 0
     },
     {
       "command": "Restart-WebAppPool -Name 'MonAppPool'",
-      "description": "Recycle un pool spécifique",
+      "description": "Recycle a given pool",
       "platform": 0
     },
     {
       "command": "Get-IISAppPool | Where-Object {$_.State -eq 'Started'} | ForEach-Object {Restart-WebAppPool $_.Name}",
-      "description": "Recycle tous les pools actifs",
+      "description": "Recycle every active pool",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Restart-WebAppPool -Name 'DefaultAppPool' -PassThru",
-      "description": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
+      "description": "Run the action and return the resulting object for an immediate check. -PassThru confirms that the operation succeeded by showing the final status. Useful for scripts with error handling.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Restart-WebAppPool -Name 'DefaultAppPool' -Force",
-      "description": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances.",
+      "description": "Force the action even when something resists (dependent services, protected processes, etc.). -Force bypasses some safeguards. Use it with care after checking the dependencies.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Restart-WebAppPool -Name 'DefaultAppPool'",
-      "description": "Exemple utilisant le paramètre 'appPoolName': Nom du pool d'application à recycler. Remplacez DefaultAppPool par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'appPoolName' parameter: name of the application pool to recycle. Replace DefaultAppPool with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Le recyclage arrête puis redémarre le processus w3wp.exe. Peut causer une brève interruption de service.",
+  "notes": "Recycling stops and restarts the w3wp.exe process. Can cause a short service interruption.",
   "links": [
     {
       "title": "Documentation Restart-WebAppPool",
       "url": "https://learn.microsoft.com/en-us/powershell/module/webadministration/restart-webapppool"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Recycler un pool d'application IIS",
+      "description": "Force le recyclage (redémarrage) d'un pool d'application IIS. Utile pour appliquer des changements de configuration ou libérer de la mémoire.",
+      "notes": "Le recyclage arrête puis redémarre le processus w3wp.exe. Peut causer une brève interruption de service.",
+      "parameters": {
+        "windows": {
+          "appPoolName": {
+            "label": "Nom du pool",
+            "description": "Nom du pool d'application à recycler"
+          }
+        }
+      },
+      "examples": {
+        "Restart-WebAppPool -Name 'DefaultAppPool'": "Recycle le pool par défaut",
+        "Restart-WebAppPool -Name 'MonAppPool'": "Recycle un pool spécifique",
+        "Get-IISAppPool | Where-Object {$_.State -eq 'Started'} | ForEach-Object {Restart-WebAppPool $_.Name}": "Recycle tous les pools actifs",
+        "Import-Module WebAdministration; Restart-WebAppPool -Name 'DefaultAppPool' -PassThru": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
+        "Import-Module WebAdministration; Restart-WebAppPool -Name 'DefaultAppPool' -Force": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances.",
+        "Import-Module WebAdministration; Restart-WebAppPool -Name 'DefaultAppPool'": "Exemple utilisant le paramètre 'appPoolName': Nom du pool d'application à recycler. Remplacez DefaultAppPool par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

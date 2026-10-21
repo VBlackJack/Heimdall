@@ -1,7 +1,7 @@
 {
   "id": "fdisk-partition",
-  "title": "Gérer les partitions avec fdisk",
-  "description": "Outil de partitionnement de disques (MBR/GPT)",
+  "title": "Manage partitions with fdisk",
+  "description": "Disk partitioning tool (MBR/GPT).",
   "category": "files-storage",
   "platform": 1,
   "level": 2,
@@ -21,61 +21,86 @@
     "parameters": [
       {
         "name": "device",
-        "label": "Périphérique",
+        "label": "Device",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Disque à examiner (vide = tous)"
+        "description": "Disk to examine (empty = all)"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo fdisk -l",
-      "description": "Liste toutes les partitions",
+      "description": "List all partitions",
       "platform": 1
     },
     {
       "command": "sudo fdisk /dev/sdb",
-      "description": "Mode interactif pour partitionner /dev/sdb",
+      "description": "Interactive mode to partition /dev/sdb",
       "platform": 1
     },
     {
       "command": "fdisk -l /dev/sda1",
-      "description": "Exemple utilisant le paramètre 'device': Disque à examiner (vide = tous). Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'device' parameter: disk to examine (empty = all). Replace /dev/sda1 with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "fdisk -l",
-      "description": "Lister les disques et partitions",
+      "description": "List disks and partitions",
       "platform": 1
     },
     {
       "command": "fdisk /dev/sdb",
-      "description": "Gérer les partitions de sdb",
+      "description": "Manage the partitions of sdb",
       "platform": 1
     },
     {
       "command": "fdisk -l /dev/sda",
-      "description": "Détails du disque sda",
+      "description": "Details of disk sda",
       "platform": 1
     },
     {
       "command": "parted -l",
-      "description": "Alternative: lister avec parted",
+      "description": "Alternative: list with parted",
       "platform": 1
     },
     {
       "command": "gdisk /dev/sdc",
-      "description": "Gérer les partitions GPT",
+      "description": "Manage GPT partitions",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. DANGER: peut détruire des données. Mode interactif: m=aide, p=afficher, w=écrire.",
+  "notes": "Requires sudo. DANGER: can destroy data. Interactive mode: m=help, p=print, w=write.",
   "links": [
     {
       "title": "fdisk guide",
       "url": "https://man7.org/linux/man-pages/man8/fdisk.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Gérer les partitions avec fdisk",
+      "description": "Outil de partitionnement de disques (MBR/GPT)",
+      "notes": "Nécessite sudo. DANGER: peut détruire des données. Mode interactif: m=aide, p=afficher, w=écrire.",
+      "parameters": {
+        "linux": {
+          "device": {
+            "label": "Périphérique",
+            "description": "Disque à examiner (vide = tous)"
+          }
+        }
+      },
+      "examples": {
+        "sudo fdisk -l": "Liste toutes les partitions",
+        "sudo fdisk /dev/sdb": "Mode interactif pour partitionner /dev/sdb",
+        "fdisk -l /dev/sda1": "Exemple utilisant le paramètre 'device': Disque à examiner (vide = tous). Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
+        "fdisk -l": "Lister les disques et partitions",
+        "fdisk /dev/sdb": "Gérer les partitions de sdb",
+        "fdisk -l /dev/sda": "Détails du disque sda",
+        "parted -l": "Alternative: lister avec parted",
+        "gdisk /dev/sdc": "Gérer les partitions GPT"
+      }
+    }
+  }
 }

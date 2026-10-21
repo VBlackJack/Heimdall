@@ -1,7 +1,7 @@
 {
   "id": "lvm-list-volumes",
-  "title": "Lister les volumes logiques LVM",
-  "description": "Affiche les volumes logiques, groupes de volumes et volumes physiques LVM",
+  "title": "List LVM logical volumes",
+  "description": "Show the LVM logical volumes, volume groups and physical volumes.",
   "category": "files-storage",
   "platform": 1,
   "level": 0,
@@ -21,61 +21,85 @@
     "parameters": [
       {
         "name": "command",
-        "label": "Commande",
-        "type": "string",
+        "label": "Command",
+        "type": "choice",
+        "allowedValues": [
+          "lvs",
+          "vgs",
+          "pvs"
+        ],
         "defaultValue": "lvs",
         "required": true,
-        "description": "Commande LVM (lvs, vgs, pvs)"
+        "description": "LVM command (lvs, vgs, pvs)"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo lvs",
-      "description": "Liste les volumes logiques",
+      "description": "List the logical volumes",
       "platform": 1
     },
     {
       "command": "sudo vgs",
-      "description": "Liste les groupes de volumes",
+      "description": "List the volume groups",
       "platform": 1
     },
     {
       "command": "sudo pvs",
-      "description": "Liste les volumes physiques",
-      "platform": 1
-    },
-    {
-      "command": "lvs",
-      "description": "Exemple utilisant le paramètre 'command': Commande LVM (lvs, vgs, pvs). Remplacez Get-Process par la valeur appropriée selon votre environnement.",
+      "description": "List the physical volumes",
       "platform": 1
     },
     {
       "command": "pvs",
-      "description": "Lister les volumes physiques",
+      "description": "List physical volumes",
       "platform": 1
     },
     {
       "command": "vgs",
-      "description": "Lister les groupes de volumes",
+      "description": "List volume groups",
       "platform": 1
     },
     {
       "command": "lvdisplay",
-      "description": "Détails des volumes logiques",
+      "description": "Details of the logical volumes",
       "platform": 1
     },
     {
       "command": "lvcreate -L 10G -n newvol vg0",
-      "description": "Créer un volume de 10 Go",
+      "description": "Create a 10 GB volume",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. LVM permet de gérer dynamiquement les partitions.",
+  "notes": "Requires sudo. LVM manages partitions dynamically.",
   "links": [
     {
       "title": "LVM guide",
       "url": "https://man7.org/linux/man-pages/man8/lvm.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les volumes logiques LVM",
+      "description": "Affiche les volumes logiques, groupes de volumes et volumes physiques LVM",
+      "notes": "Nécessite sudo. LVM permet de gérer dynamiquement les partitions.",
+      "parameters": {
+        "linux": {
+          "command": {
+            "label": "Commande",
+            "description": "Commande LVM (lvs, vgs, pvs)"
+          }
+        }
+      },
+      "examples": {
+        "sudo lvs": "Liste les volumes logiques",
+        "sudo vgs": "Liste les groupes de volumes",
+        "sudo pvs": "Liste les volumes physiques",
+        "pvs": "Lister les volumes physiques",
+        "vgs": "Lister les groupes de volumes",
+        "lvdisplay": "Détails des volumes logiques",
+        "lvcreate -L 10G -n newvol vg0": "Créer un volume de 10 Go"
+      }
+    }
+  }
 }

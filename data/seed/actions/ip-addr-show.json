@@ -1,7 +1,7 @@
 {
   "id": "ip-addr-show",
-  "title": "Afficher les adresses IP",
-  "description": "Affiche toutes les interfaces réseau et leurs adresses IP",
+  "title": "Show IP addresses",
+  "description": "Show every network interface and its IP addresses.",
   "category": "network-dns",
   "platform": 1,
   "level": 0,
@@ -26,57 +26,82 @@
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom de l'interface (vide = toutes)"
+        "description": "Interface name (empty = all)"
       }
     ]
   },
   "examples": [
     {
       "command": "ip addr show",
-      "description": "Affiche toutes les interfaces et IP",
+      "description": "Show every interface and IP",
       "platform": 1
     },
     {
       "command": "ip addr show eth0",
-      "description": "Affiche uniquement eth0",
+      "description": "Show only eth0",
       "platform": 1
     },
     {
       "command": "ip -br addr",
-      "description": "Format court (brief)",
+      "description": "Short format (brief)",
       "platform": 1
     },
     {
       "command": "ip route show",
-      "description": "Afficher la table de routage",
+      "description": "Show the routing table",
       "platform": 1
     },
     {
       "command": "ip link set eth0 up",
-      "description": "Activer l'interface eth0",
+      "description": "Bring the eth0 interface up",
       "platform": 1
     },
     {
       "command": "ip addr add 192.168.1.100/24 dev eth0",
-      "description": "Ajouter une adresse IP",
+      "description": "Add an IP address",
       "platform": 1
     },
     {
       "command": "ip neigh show",
-      "description": "Afficher la table ARP",
+      "description": "Show the ARP table",
       "platform": 1
     },
     {
       "command": "ip -4 addr",
-      "description": "IPv4 uniquement",
+      "description": "IPv4 only",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo pour la lecture. Remplace ifconfig. -br pour format condensé.",
+  "notes": "Reading does not require sudo. Replaces ifconfig. -br for a condensed format.",
   "links": [
     {
       "title": "ip command",
       "url": "https://man7.org/linux/man-pages/man8/ip.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les adresses IP",
+      "description": "Affiche toutes les interfaces réseau et leurs adresses IP",
+      "notes": "Ne nécessite pas sudo pour la lecture. Remplace ifconfig. -br pour format condensé.",
+      "parameters": {
+        "linux": {
+          "interface": {
+            "label": "Interface",
+            "description": "Nom de l'interface (vide = toutes)"
+          }
+        }
+      },
+      "examples": {
+        "ip addr show": "Affiche toutes les interfaces et IP",
+        "ip addr show eth0": "Affiche uniquement eth0",
+        "ip -br addr": "Format court (brief)",
+        "ip route show": "Afficher la table de routage",
+        "ip link set eth0 up": "Activer l'interface eth0",
+        "ip addr add 192.168.1.100/24 dev eth0": "Ajouter une adresse IP",
+        "ip neigh show": "Afficher la table ARP",
+        "ip -4 addr": "IPv4 uniquement"
+      }
+    }
+  }
 }

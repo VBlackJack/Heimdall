@@ -1,7 +1,7 @@
 {
   "id": "journalctl-disk-usage",
-  "title": "Vérifier l'espace disque des logs systemd",
-  "description": "Affiche l'espace disque utilisé par les journaux systemd",
+  "title": "Check the disk space of the systemd logs",
+  "description": "Show the disk space used by the systemd journals.",
   "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
@@ -22,15 +22,25 @@
   "examples": [
     {
       "command": "journalctl --disk-usage",
-      "description": "Affiche l'espace disque utilisé par les journaux systemd. Les journaux peuvent occuper plusieurs Go sur des systèmes actifs. Utilisez cette commande pour surveiller l'espace et décider si un nettoyage est nécessaire (voir journalctl --vacuum-size ou --vacuum-time).",
+      "description": "Show the disk space used by the systemd journals. The journals can take several GB on busy systems. Use this command to watch the space and decide whether a cleanup is needed (see journalctl --vacuum-size or --vacuum-time).",
       "platform": 1
     }
   ],
-  "notes": "Utilisez --vacuum-size ou --vacuum-time pour nettoyer les anciens logs. Nécessite sudo.",
+  "notes": "Use --vacuum-size or --vacuum-time to clean up old logs. Requires sudo.",
   "links": [
     {
       "title": "journalctl maintenance",
       "url": "https://www.freedesktop.org/software/systemd/man/journalctl.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier l'espace disque des logs systemd",
+      "description": "Affiche l'espace disque utilisé par les journaux systemd",
+      "notes": "Utilisez --vacuum-size ou --vacuum-time pour nettoyer les anciens logs. Nécessite sudo.",
+      "examples": {
+        "journalctl --disk-usage": "Affiche l'espace disque utilisé par les journaux systemd. Les journaux peuvent occuper plusieurs Go sur des systèmes actifs. Utilisez cette commande pour surveiller l'espace et décider si un nettoyage est nécessaire (voir journalctl --vacuum-size ou --vacuum-time)."
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "git-checkout",
-  "title": "Changer de branche ou restaurer des fichiers",
-  "description": "Bascule sur une autre branche ou restaure des fichiers du working directory",
+  "title": "Switch branches or restore files",
+  "description": "Switch to another branch or restore files of the working directory.",
   "category": "development",
   "platform": 2,
   "level": 1,
@@ -19,11 +19,11 @@
     "parameters": [
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Branche ou fichier à checkout"
+        "description": "Branch or file to check out"
       }
     ]
   },
@@ -36,27 +36,22 @@
     "parameters": [
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Branche ou fichier"
+        "description": "Branch or file"
       }
     ]
   },
   "examples": [
     {
       "command": "git checkout main",
-      "description": "Bascule sur la branche main",
-      "platform": 2
-    },
-    {
-      "command": "git checkout srv-web-01.contoso.com",
-      "description": "Exemple utilisant le paramètre 'target': Branche ou fichier à checkout. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
+      "description": "Switch to the main branch",
       "platform": 2
     }
   ],
-  "notes": "Utilisez -b pour créer et basculer sur une nouvelle branche. Préférez 'git switch' et 'git restore' dans Git moderne.",
+  "notes": "Use -b to create and switch to a new branch. Prefer 'git switch' and 'git restore' in modern Git.",
   "links": [
     {
       "title": "Git Checkout Documentation",
@@ -66,15 +61,41 @@
   "windowsExamples": [
     {
       "command": "git checkout -b new-feature",
-      "description": "Crée et bascule sur une nouvelle branche",
+      "description": "Create and switch to a new branch",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "git checkout -- file.txt",
-      "description": "Restaure un fichier depuis le dernier commit",
+      "description": "Restore a file from the last commit",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Changer de branche ou restaurer des fichiers",
+      "description": "Bascule sur une autre branche ou restaure des fichiers du working directory",
+      "notes": "Utilisez -b pour créer et basculer sur une nouvelle branche. Préférez 'git switch' et 'git restore' dans Git moderne.",
+      "parameters": {
+        "windows": {
+          "target": {
+            "label": "Cible",
+            "description": "Branche ou fichier à checkout"
+          }
+        },
+        "linux": {
+          "target": {
+            "label": "Cible",
+            "description": "Branche ou fichier"
+          }
+        }
+      },
+      "examples": {
+        "git checkout -b new-feature": "Crée et bascule sur une nouvelle branche",
+        "git checkout -- file.txt": "Restaure un fichier depuis le dernier commit",
+        "git checkout main": "Bascule sur la branche main"
+      }
+    }
+  }
 }

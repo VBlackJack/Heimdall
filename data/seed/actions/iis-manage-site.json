@@ -1,7 +1,7 @@
 {
   "id": "iis-manage-site",
-  "title": "Démarrer ou arrêter un site IIS",
-  "description": "Permet de démarrer, arrêter ou redémarrer un site web IIS spécifique. Utile pour la maintenance ou le troubleshooting.",
+  "title": "Start or stop an IIS site",
+  "description": "Start, stop or restart a given IIS website. Useful for maintenance or troubleshooting.",
   "category": "network-dns",
   "platform": 0,
   "level": 1,
@@ -20,49 +20,62 @@
     "id": "iis-manage-site-cmd",
     "platform": 0,
     "name": "Start/Stop-IISSite",
-    "commandPattern": "Import-Module WebAdministration; {action}-WebSite -Name '{siteName}'",
+    "commandPattern": "Import-Module WebAdministration; & '{action}-WebSite' -Name '{siteName}'",
     "parameters": [
       {
         "name": "siteName",
-        "label": "Nom du site",
+        "label": "Site name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du site IIS à gérer"
+        "description": "Name of the IIS site to manage"
       },
       {
         "name": "action",
         "label": "Action",
         "type": "string",
+        "quoting": "InlineInQuotes",
         "defaultValue": "Start",
         "required": true,
-        "description": "Action à effectuer: Start, Stop, Restart"
+        "description": "Action to run: Start, Stop"
       }
     ]
   },
   "examples": [
     {
       "command": "Start-WebSite -Name 'Default Web Site'",
-      "description": "Démarre le site web par défaut",
-      "platform": 0
-    },
-    {
-      "command": "Import-Module WebAdministration; Restart-WebSite -Name 'Default Web Site'",
-      "description": "Exemple utilisant le paramètre 'siteName': Nom du site IIS à gérer. Remplacez Default Web Site par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "Import-Module WebAdministration; Start-WebSite -Name 'Default Web Site'",
-      "description": "Exemple utilisant le paramètre 'action': Action à effectuer: Start, Stop, Restart. Remplacez Restart par la valeur appropriée selon votre environnement.",
+      "description": "Start the default website",
       "platform": 0
     }
   ],
-  "notes": "Privilèges administrateur requis. Pour redémarrer, utilisez Stop puis Start, ou recyclez le pool d'application.",
+  "notes": "Requires administrator privileges. To restart, use Stop then Start, or recycle the application pool.",
   "links": [
     {
       "title": "Documentation WebAdministration",
       "url": "https://learn.microsoft.com/en-us/powershell/module/webadministration/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Démarrer ou arrêter un site IIS",
+      "description": "Permet de démarrer, arrêter ou redémarrer un site web IIS spécifique. Utile pour la maintenance ou le troubleshooting.",
+      "notes": "Privilèges administrateur requis. Pour redémarrer, utilisez Stop puis Start, ou recyclez le pool d'application.",
+      "parameters": {
+        "windows": {
+          "siteName": {
+            "label": "Nom du site",
+            "description": "Nom du site IIS à gérer"
+          },
+          "action": {
+            "label": "Action",
+            "description": "Action à effectuer : Start, Stop"
+          }
+        }
+      },
+      "examples": {
+        "Start-WebSite -Name 'Default Web Site'": "Démarre le site web par défaut"
+      }
+    }
+  }
 }

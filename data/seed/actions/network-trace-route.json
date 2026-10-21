@@ -1,7 +1,7 @@
 {
   "id": "network-trace-route",
-  "title": "Tracer la route réseau",
-  "description": "Affiche le chemin complet des paquets réseau vers une destination.",
+  "title": "Trace the network route",
+  "description": "Show the full path of the network packets to a destination.",
   "category": "network-dns",
   "platform": 2,
   "level": 0,
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Adresse IP ou nom d'hôte"
+        "description": "IP address or hostname"
       }
     ]
   },
@@ -37,54 +37,84 @@
     "parameters": [
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Adresse IP ou nom d'hôte"
+        "description": "IP address or hostname"
       }
     ]
   },
   "examples": [],
-  "notes": "Peut être lent. Sur Linux, installer traceroute si non disponible : sudo apt install traceroute",
+  "notes": "Can be slow. On Linux, install traceroute when it is missing: sudo apt install traceroute",
   "links": [],
   "windowsExamples": [
     {
       "command": "tracert google.com",
-      "description": "Trace la route vers google.com (Windows)",
+      "description": "Trace the route to google.com (Windows)",
       "platform": 0
     },
     {
       "command": "tracert srv-web-01.contoso.com",
-      "description": "Exemple utilisant le paramètre 'target': Adresse IP ou nom d'hôte. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'target' parameter: IP address or hostname. Replace srv-web-01.contoso.com with the value that fits your environment.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "traceroute google.com",
-      "description": "Trace la route vers google.com (Linux)",
+      "description": "Trace the route to google.com (Linux)",
       "platform": 1
     },
     {
       "command": "traceroute -n 8.8.8.8",
-      "description": "Traceroute sans résolution DNS",
+      "description": "Traceroute without DNS resolution",
       "platform": 1
     },
     {
       "command": "traceroute -T -p 443 server.com",
-      "description": "Traceroute TCP sur port 443",
+      "description": "TCP traceroute on port 443",
       "platform": 1
     },
     {
       "command": "traceroute -I 192.168.1.1",
-      "description": "Traceroute ICMP",
+      "description": "ICMP traceroute",
       "platform": 1
     },
     {
       "command": "traceroute -m 15 remote-server.com",
-      "description": "Limiter à 15 sauts maximum",
+      "description": "Limit to 15 hops",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tracer la route réseau",
+      "description": "Affiche le chemin complet des paquets réseau vers une destination.",
+      "notes": "Peut être lent. Sur Linux, installer traceroute si non disponible : sudo apt install traceroute",
+      "parameters": {
+        "windows": {
+          "target": {
+            "label": "Cible",
+            "description": "Adresse IP ou nom d'hôte"
+          }
+        },
+        "linux": {
+          "target": {
+            "label": "Cible",
+            "description": "Adresse IP ou nom d'hôte"
+          }
+        }
+      },
+      "examples": {
+        "tracert google.com": "Trace la route vers google.com (Windows)",
+        "tracert srv-web-01.contoso.com": "Exemple utilisant le paramètre 'target': Adresse IP ou nom d'hôte. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
+        "traceroute google.com": "Trace la route vers google.com (Linux)",
+        "traceroute -n 8.8.8.8": "Traceroute sans résolution DNS",
+        "traceroute -T -p 443 server.com": "Traceroute TCP sur port 443",
+        "traceroute -I 192.168.1.1": "Traceroute ICMP",
+        "traceroute -m 15 remote-server.com": "Limiter à 15 sauts maximum"
+      }
+    }
+  }
 }

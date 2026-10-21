@@ -1,7 +1,7 @@
 {
   "id": "linux-disk-df",
-  "title": "Vérifier espace disque (df)",
-  "description": "Affiche l'espace disque utilisé et disponible sur tous les systèmes de fichiers montés.",
+  "title": "Check disk space (df)",
+  "description": "Show the used and free disk space of every mounted filesystem.",
   "category": "files-storage",
   "platform": 1,
   "level": 0,
@@ -22,19 +22,30 @@
   "examples": [
     {
       "command": "df -hT",
-      "description": "🔥 VUE GLOBALE : Affiche l'espace en format humain (GB, MB) et le type de système de fichiers (ext4, xfs).",
+      "description": "🔥 OVERVIEW: show the space in human format (GB, MB) and the filesystem type (ext4, xfs).",
       "platform": 1
     },
     {
       "command": "df -h .",
-      "description": "Affiche l'espace libre uniquement pour le dossier courant.",
+      "description": "Show the free space for the current folder only.",
       "platform": 1
     },
     {
       "command": "df -i",
-      "description": "Affiche l'utilisation des Inodes (parfois le disque est plein d'inodes même s'il reste de la place en Go).",
+      "description": "Show the inode usage (a disk can run out of inodes while GB are still free).",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "a7f71b4b-d990-4438-8097-a1d3b590bd63"
+  "linuxCommandTemplateId": "a7f71b4b-d990-4438-8097-a1d3b590bd63",
+  "translations": {
+    "fr": {
+      "title": "Vérifier espace disque (df)",
+      "description": "Affiche l'espace disque utilisé et disponible sur tous les systèmes de fichiers montés.",
+      "examples": {
+        "df -hT": "🔥 VUE GLOBALE : Affiche l'espace en format humain (GB, MB) et le type de système de fichiers (ext4, xfs).",
+        "df -h .": "Affiche l'espace libre uniquement pour le dossier courant.",
+        "df -i": "Affiche l'utilisation des Inodes (parfois le disque est plein d'inodes même s'il reste de la place en Go)."
+      }
+    }
+  }
 }

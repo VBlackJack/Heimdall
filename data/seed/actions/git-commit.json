@@ -1,7 +1,7 @@
 {
   "id": "git-commit",
-  "title": "Créer un commit Git",
-  "description": "Enregistre les modifications de l'index dans l'historique du dépôt",
+  "title": "Create a Git commit",
+  "description": "Record the changes of the index in the repository history.",
   "category": "development",
   "platform": 2,
   "level": 1,
@@ -23,7 +23,7 @@
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Message du commit"
+        "description": "Commit message"
       }
     ]
   },
@@ -40,18 +40,18 @@
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Message du commit"
+        "description": "Commit message"
       }
     ]
   },
   "examples": [
     {
       "command": "git commit --amend",
-      "description": "Modifie le dernier commit",
+      "description": "Amend the last commit",
       "platform": 2
     }
   ],
-  "notes": "Écrivez des messages de commit clairs et descriptifs. Utilisez --amend pour corriger le dernier commit.",
+  "notes": "Write clear, descriptive commit messages. Use --amend to fix the last commit.",
   "links": [
     {
       "title": "Git Commit Documentation",
@@ -61,13 +61,39 @@
   "linuxExamples": [
     {
       "command": "git commit -m \"Fix: correction du bug #123\"",
-      "description": "Crée un commit avec un message",
+      "description": "Create a commit with a message",
       "platform": 1
     },
     {
       "command": "git commit -m \"feat: ajout nouvelle fonctionnalité\"",
-      "description": "Créer un commit",
+      "description": "Create a commit",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer un commit Git",
+      "description": "Enregistre les modifications de l'index dans l'historique du dépôt",
+      "notes": "Écrivez des messages de commit clairs et descriptifs. Utilisez --amend pour corriger le dernier commit.",
+      "parameters": {
+        "windows": {
+          "message": {
+            "label": "Message",
+            "description": "Message du commit"
+          }
+        },
+        "linux": {
+          "message": {
+            "label": "Message",
+            "description": "Message du commit"
+          }
+        }
+      },
+      "examples": {
+        "git commit -m \"Fix: correction du bug #123\"": "Crée un commit avec un message",
+        "git commit -m \"feat: ajout nouvelle fonctionnalité\"": "Créer un commit",
+        "git commit --amend": "Modifie le dernier commit"
+      }
+    }
+  }
 }

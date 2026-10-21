@@ -1,7 +1,7 @@
 {
   "id": "lynis-audit",
-  "title": "Audit de sécurité avec Lynis",
-  "description": "Lance un audit de sécurité complet du système avec Lynis",
+  "title": "Security audit with Lynis",
+  "description": "Run a full security audit of the system with Lynis.",
   "category": "security",
   "platform": 1,
   "level": 0,
@@ -23,45 +23,61 @@
   "examples": [
     {
       "command": "sudo lynis audit system",
-      "description": "Audit complet du système",
+      "description": "Full system audit",
       "platform": 1
     },
     {
       "command": "lynis show version",
-      "description": "Affiche la version de Lynis",
+      "description": "Show the Lynis version",
       "platform": 1
     },
     {
       "command": "lynis audit system",
-      "description": "Lance un audit de sécurité complet du système avec Lynis.",
+      "description": "Run a full security audit of the system with Lynis.",
       "platform": 1
     },
     {
       "command": "lynis show profiles",
-      "description": "Afficher les profils disponibles",
+      "description": "Show the available profiles",
       "platform": 1
     },
     {
       "command": "lynis audit system --quick",
-      "description": "Audit rapide",
+      "description": "Quick audit",
       "platform": 1
     },
     {
       "command": "lynis show details NETW-2705",
-      "description": "Détails d'un test",
+      "description": "Details of a test",
       "platform": 1
     },
     {
       "command": "lynis audit system --pentest",
-      "description": "Mode pentest",
+      "description": "Pentest mode",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo et Lynis installé. Génère un rapport détaillé de sécurité.",
+  "notes": "Requires sudo and Lynis installed. Generates a detailed security report.",
   "links": [
     {
       "title": "Lynis documentation",
       "url": "https://cisofy.com/lynis/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Audit de sécurité avec Lynis",
+      "description": "Lance un audit de sécurité complet du système avec Lynis",
+      "notes": "Nécessite sudo et Lynis installé. Génère un rapport détaillé de sécurité.",
+      "examples": {
+        "sudo lynis audit system": "Audit complet du système",
+        "lynis show version": "Affiche la version de Lynis",
+        "lynis audit system": "Lance un audit de sécurité complet du système avec Lynis.",
+        "lynis show profiles": "Afficher les profils disponibles",
+        "lynis audit system --quick": "Audit rapide",
+        "lynis show details NETW-2705": "Détails d'un test",
+        "lynis audit system --pentest": "Mode pentest"
+      }
+    }
+  }
 }

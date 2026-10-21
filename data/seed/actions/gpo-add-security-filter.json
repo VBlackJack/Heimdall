@@ -1,7 +1,7 @@
 {
   "id": "gpo-add-security-filter",
-  "title": "Ajouter un filtre de sécurité à une GPO",
-  "description": "Ajoute un groupe ou utilisateur au filtrage de sécurité d'une GPO.",
+  "title": "Add a security filter to a GPO",
+  "description": "Add a group or user to the security filtering of a GPO.",
   "category": "active-directory",
   "platform": 0,
   "level": 1,
@@ -20,52 +20,63 @@
     "parameters": [
       {
         "name": "gpoName",
-        "label": "Nom de la GPO",
+        "label": "GPO name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la GPO"
+        "description": "GPO name"
       },
       {
         "name": "targetName",
-        "label": "Utilisateur/Groupe",
+        "label": "User or group",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de l'utilisateur ou du groupe"
+        "description": "Name of the user or group"
       },
       {
         "name": "targetType",
-        "label": "Type de cible",
+        "label": "Target type",
         "type": "string",
         "defaultValue": "Group",
         "required": true,
-        "description": "User, Group, ou Computer"
+        "description": "User, Group or Computer"
       }
     ]
   },
   "examples": [
     {
-      "command": "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"TargetServer\" -TargetType User -PermissionLevel GpoApply -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
-      "platform": 0
-    },
-    {
-      "command": "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"TargetServer\" -TargetType User -PermissionLevel GpoApply -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
-      "platform": 0
-    },
-    {
-      "command": "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"TargetServer\" -TargetType User -PermissionLevel GpoApply -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
-      "platform": 0
-    },
-    {
-      "command": "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"TargetServer\" -TargetType User -PermissionLevel GpoApply -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "command": "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"IT-Admins\" -TargetType Group -PermissionLevel GpoApply",
+      "description": "Apply the Security-Baseline GPO to the IT-Admins group",
       "platform": 0
     }
   ],
-  "notes": "Le filtrage de sécurité limite l'application de la GPO aux groupes/utilisateurs spécifiés. Nécessite aussi Read.",
-  "links": []
+  "notes": "Security filtering limits the GPO to the given groups or users. Read is also required.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Ajouter un filtre de sécurité à une GPO",
+      "description": "Ajoute un groupe ou utilisateur au filtrage de sécurité d'une GPO.",
+      "notes": "Le filtrage de sécurité limite l'application de la GPO aux groupes/utilisateurs spécifiés. Nécessite aussi Read.",
+      "parameters": {
+        "windows": {
+          "gpoName": {
+            "label": "Nom de la GPO",
+            "description": "Nom de la GPO"
+          },
+          "targetName": {
+            "label": "Utilisateur/Groupe",
+            "description": "Nom de l'utilisateur ou du groupe"
+          },
+          "targetType": {
+            "label": "Type de cible",
+            "description": "User, Group, ou Computer"
+          }
+        }
+      },
+      "examples": {
+        "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"IT-Admins\" -TargetType Group -PermissionLevel GpoApply": "Applique la GPO Security-Baseline au groupe IT-Admins"
+      }
+    }
+  }
 }

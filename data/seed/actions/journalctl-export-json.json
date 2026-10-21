@@ -1,7 +1,7 @@
 {
   "id": "journalctl-export-json",
-  "title": "Exporter les logs au format JSON",
-  "description": "Exporte les logs systemd au format JSON pour analyse",
+  "title": "Export the logs as JSON",
+  "description": "Export the systemd logs as JSON for analysis.",
   "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
@@ -20,79 +20,68 @@
     "parameters": [
       {
         "name": "unit",
-        "label": "Unité systemd",
+        "label": "systemd unit",
         "type": "string",
         "defaultValue": "nginx.service",
         "required": true,
-        "description": "Nom de l'unité systemd"
+        "description": "Name of the systemd unit"
       },
       {
         "name": "since",
-        "label": "Depuis",
+        "label": "Since",
         "type": "string",
         "defaultValue": "1 hour ago",
         "required": true,
-        "description": "Période à exporter"
+        "description": "Period to export"
       }
     ]
   },
   "examples": [
     {
-      "command": "journalctl -xe",
-      "description": "🔥 STANDARD : Affiche les logs système les plus récents avec explications étendues. La commande réflexe quand un service Linux refuse de démarrer.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -p 3 -xb",
-      "description": "Affiche uniquement les Erreurs (p 3) survenues depuis le dernier démarrage (boot).",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -n 50",
-      "description": "Affiche les 50 derniers messages du journal systemd. Le flag -n (lines) limite l'output. journalctl est le système de logs central de systemd qui agrège tous les journaux (kernel, services, applications). Première commande pour diagnostiquer n'importe quel problème sous Linux moderne.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -f",
-      "description": "Mode suivi en temps réel (follow). Le flag -f affiche les nouveaux messages au fur et à mesure. Équivalent de 'tail -f' mais pour tous les logs systemd. Essentiel pour observer en direct l'activité système, surveiller un déploiement ou debugger un service problématique. Arrêtez avec Ctrl+C.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -p err",
-      "description": "Affiche uniquement les messages d'erreur. Le flag -p (priority) filtre par niveau de sévérité. Niveaux : emerg, alert, crit, err, warning, notice, info, debug. Utilisez -p err pour se concentrer sur les vrais problèmes sans le bruit des infos/warnings.",
-      "platform": 1
-    },
-    {
       "command": "journalctl -u nginx.service",
-      "description": "Affiche tous les logs d'un service spécifique (ici nginx). Le flag -u (unit) filtre par unité systemd. Équivalent de consulter /var/log/nginx/* mais via journalctl. Toutes les sorties stdout/stderr du service sont capturées. Parfait pour le troubleshooting service par service.",
+      "description": "Show every log of a given service (here nginx). The -u (unit) flag filters by systemd unit. The equivalent of reading /var/log/nginx/* but through journalctl. Every stdout/stderr output of the service is captured. Ideal for troubleshooting one service at a time.",
       "platform": 1
     },
     {
       "command": "journalctl --since \"2024-01-15 10:00:00\" --until \"2024-01-15 11:00:00\"",
-      "description": "Affiche les logs d'une plage horaire précise. Les flags --since et --until acceptent des dates absolues. Format : 'YYYY-MM-DD HH:MM:SS'. Indispensable pour investiguer un incident survenu à un moment précis. Vous pouvez aussi utiliser des dates relatives : --since \"1 hour ago\".",
-      "platform": 1
-    },
-    {
-      "command": "journalctl --since today -p err",
-      "description": "Affiche toutes les erreurs depuis minuit (aujourd'hui). --since today est un raccourci pour depuis 00:00. Combiné avec -p err pour ne voir que les erreurs. Excellente commande pour la revue quotidienne des problèmes : à exécuter chaque matin pour identifier les incidents de la nuit.",
+      "description": "Show the logs of a precise time range. The --since and --until flags accept absolute dates. Format: 'YYYY-MM-DD HH:MM:SS'. Essential to investigate an incident that happened at a precise time. You can also use relative dates: --since \"1 hour ago\".",
       "platform": 1
     },
     {
       "command": "journalctl -u ssh.service --since \"10 minutes ago\"",
-      "description": "Affiche les logs SSH des 10 dernières minutes. --since accepte des durées relatives (minutes, hours, days ago). Utile pour diagnostiquer un problème de connexion SSH juste après qu'il se soit produit. Adaptez le service et la durée selon vos besoins.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -k -n 100",
-      "description": "Affiche les 100 derniers messages du kernel. Le flag -k (kernel) filtre uniquement les messages noyau (équivalent de dmesg). Essentiel pour diagnostiquer les problèmes hardware, drivers, panics kernel, erreurs disque/réseau de bas niveau.",
+      "description": "Show the SSH logs of the last 10 minutes. --since accepts relative durations (minutes, hours, days ago). Useful to diagnose an SSH connection problem right after it happened. Adjust the service and the duration to your needs.",
       "platform": 1
     }
   ],
-  "notes": "Formats disponibles: json, json-pretty, json-sse. Utile pour intégration avec outils d'analyse.",
+  "notes": "Available formats: json, json-pretty, json-sse. Useful to feed analysis tools.",
   "links": [
     {
       "title": "journalctl output formats",
       "url": "https://www.freedesktop.org/software/systemd/man/journalctl.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exporter les logs au format JSON",
+      "description": "Exporte les logs systemd au format JSON pour analyse",
+      "notes": "Formats disponibles: json, json-pretty, json-sse. Utile pour intégration avec outils d'analyse.",
+      "parameters": {
+        "linux": {
+          "unit": {
+            "label": "Unité systemd",
+            "description": "Nom de l'unité systemd"
+          },
+          "since": {
+            "label": "Depuis",
+            "description": "Période à exporter"
+          }
+        }
+      },
+      "examples": {
+        "journalctl -u nginx.service": "Affiche tous les logs d'un service spécifique (ici nginx). Le flag -u (unit) filtre par unité systemd. Équivalent de consulter /var/log/nginx/* mais via journalctl. Toutes les sorties stdout/stderr du service sont capturées. Parfait pour le troubleshooting service par service.",
+        "journalctl --since \"2024-01-15 10:00:00\" --until \"2024-01-15 11:00:00\"": "Affiche les logs d'une plage horaire précise. Les flags --since et --until acceptent des dates absolues. Format : 'YYYY-MM-DD HH:MM:SS'. Indispensable pour investiguer un incident survenu à un moment précis. Vous pouvez aussi utiliser des dates relatives : --since \"1 hour ago\".",
+        "journalctl -u ssh.service --since \"10 minutes ago\"": "Affiche les logs SSH des 10 dernières minutes. --since accepte des durées relatives (minutes, hours, days ago). Utile pour diagnostiquer un problème de connexion SSH juste après qu'il se soit produit. Adaptez le service et la durée selon vos besoins."
+      }
+    }
+  }
 }

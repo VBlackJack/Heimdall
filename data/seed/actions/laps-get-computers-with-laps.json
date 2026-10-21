@@ -1,7 +1,7 @@
 {
   "id": "laps-get-computers-with-laps",
-  "title": "Lister tous les ordinateurs avec LAPS activé",
-  "description": "Affiche la liste de tous les ordinateurs du domaine qui ont LAPS configuré et actif.",
+  "title": "List every computer with LAPS enabled",
+  "description": "Show every computer of the domain that has LAPS configured and active.",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -21,35 +21,49 @@
   "examples": [
     {
       "command": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null} | Select-Object Name",
-      "description": "Liste simple de tous les ordinateurs avec LAPS configuré",
+      "description": "Plain list of every computer with LAPS configured",
       "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null} | Measure-Object",
-      "description": "Compte le nombre total d'ordinateurs avec LAPS actif",
+      "description": "Count the computers with LAPS active",
       "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd | Where-Object {$_.'ms-Mcs-AdmPwd' -eq $null} | Select-Object Name",
-      "description": "⚠️ Liste les ordinateurs SANS LAPS (vulnérables!)",
+      "description": "⚠️ List the computers WITHOUT LAPS (vulnerable!)",
       "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "ms-Mcs-AdmPwd: attribut AD contenant le mot de passe chiffré. ms-Mcs-AdmPwdExpirationTime: date d'expiration. Si ms-Mcs-AdmPwd est $null: LAPS pas configuré sur ce PC (risque sécurité!). Vérifiez régulièrement la couverture LAPS de votre domaine.",
+  "notes": "ms-Mcs-AdmPwd: the AD attribute that holds the encrypted password. ms-Mcs-AdmPwdExpirationTime: the expiration date. When ms-Mcs-AdmPwd is $null, LAPS is not configured on that PC (security risk!). Check the LAPS coverage of your domain regularly.",
   "links": [
     {
       "title": "LAPS Deployment Guide",
       "url": "https://learn.microsoft.com/en-us/windows-server/identity/laps/laps-scenarios-windows-server-active-directory"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister tous les ordinateurs avec LAPS activé",
+      "description": "Affiche la liste de tous les ordinateurs du domaine qui ont LAPS configuré et actif.",
+      "notes": "ms-Mcs-AdmPwd: attribut AD contenant le mot de passe chiffré. ms-Mcs-AdmPwdExpirationTime: date d'expiration. Si ms-Mcs-AdmPwd est $null: LAPS pas configuré sur ce PC (risque sécurité!). Vérifiez régulièrement la couverture LAPS de votre domaine.",
+      "examples": {
+        "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null} | Select-Object Name": "Liste simple de tous les ordinateurs avec LAPS configuré",
+        "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null} | Measure-Object": "Compte le nombre total d'ordinateurs avec LAPS actif",
+        "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd | Where-Object {$_.'ms-Mcs-AdmPwd' -eq $null} | Select-Object Name": "⚠️ Liste les ordinateurs SANS LAPS (vulnérables!)",
+        "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

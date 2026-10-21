@@ -1,7 +1,7 @@
 {
   "id": "network-list-adapters",
-  "title": "Lister les adaptateurs réseau",
-  "description": "Affiche tous les adaptateurs réseau avec leur état, vitesse et adresses IP",
+  "title": "List network adapters",
+  "description": "Show every network adapter with its state, speed and IP addresses.",
   "category": "network-dns",
   "platform": 0,
   "level": 0,
@@ -22,40 +22,55 @@
   "examples": [
     {
       "command": "Get-NetIPAddress",
-      "description": "Affiche toutes les adresses IP configurées sur la machine (IPv4 et IPv6). Retourne l'IP, le masque de sous-réseau (PrefixLength), l'interface réseau associée et le statut. Équivalent moderne de 'ipconfig' avec plus de détails.",
+      "description": "Show every IP address configured on the computer (IPv4 and IPv6). Returns the IP, the subnet mask (PrefixLength), the network interface and the status. The modern equivalent of 'ipconfig', with more details.",
       "platform": 0
     },
     {
       "command": "Get-NetIPAddress -AddressFamily IPv4",
-      "description": "Affiche uniquement les adresses IPv4 (exclut IPv6). Le paramètre -AddressFamily filtre par famille d'adresses. Simplifie l'affichage quand vous ne travaillez qu'en IPv4. Évite le bruit des nombreuses adresses IPv6 link-local.",
-      "platform": 1
+      "description": "Show only the IPv4 addresses (excludes IPv6). The -AddressFamily parameter filters by address family. Simplifies the output when you work in IPv4 only. Avoids the noise of the many link-local IPv6 addresses.",
+      "platform": 0
     },
     {
       "command": "Get-NetIPAddress -InterfaceAlias 'Ethernet' -AddressFamily IPv4",
-      "description": "Affiche l'adresse IPv4 d'une interface réseau spécifique. -InterfaceAlias utilise le nom convivial de l'interface (visible dans 'Paramètres réseau'). Utile quand la machine a plusieurs cartes réseau et que vous voulez interroger une carte précise.",
-      "platform": 1
+      "description": "Show the IPv4 address of a given network interface. -InterfaceAlias uses the friendly name of the interface (the one shown in 'Network settings'). Useful when the computer has several network cards and you want to query one of them.",
+      "platform": 0
     },
     {
       "command": "Get-NetIPAddress | Where-Object {$_.IPAddress -like '192.168.*'} | Select-Object IPAddress,InterfaceAlias,PrefixLength",
-      "description": "Filtre et affiche uniquement les adresses IP du réseau local 192.168.x.x. Where-Object filtre avec wildcard. Select-Object choisit les colonnes pertinentes. Utile pour identifier rapidement les interfaces sur le LAN dans un environnement multi-cartes.",
-      "platform": 1
+      "description": "Filter and show only the IP addresses of the 192.168.x.x local network. Where-Object filters with a wildcard, Select-Object picks the relevant columns. Useful to spot the LAN interfaces quickly on a multi-card computer.",
+      "platform": 0
     },
     {
       "command": "Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -eq 'Dhcp'}",
-      "description": "Affiche uniquement les adresses IPv4 obtenues via DHCP. PrefixOrigin indique comment l'IP a été configurée (Dhcp/Manual/WellKnown). Utile pour distinguer les IPs statiques des IPs dynamiques lors du troubleshooting réseau.",
-      "platform": 1
+      "description": "Show only the IPv4 addresses obtained through DHCP. PrefixOrigin tells how the IP was configured (Dhcp/Manual/WellKnown). Useful to tell static IPs from dynamic ones during network troubleshooting.",
+      "platform": 0
     },
     {
       "command": "Get-NetIPAddress | Export-Csv C:\\Temp\\NetworkConfig.csv -NoTypeInformation",
-      "description": "Exporte toute la configuration IP vers CSV. Utile pour documenter la configuration réseau avant modifications, créer des inventaires ou archiver l'état réseau. Le fichier CSV peut être analysé dans Excel.",
+      "description": "Export the whole IP configuration to CSV. Useful to document the network configuration before changes, build inventories or archive the network state. The CSV file can be analyzed in Excel.",
       "platform": 0
     }
   ],
-  "notes": "Remplace ipconfig /all. Status 'Up' = connecté, 'Disabled' = désactivé. LinkSpeed affiche la vitesse de liaison (1 Gbps, 100 Mbps, etc.).",
+  "notes": "Replaces ipconfig /all. Status 'Up' = connected, 'Disabled' = disabled. LinkSpeed shows the link speed (1 Gbps, 100 Mbps, etc.).",
   "links": [
     {
       "title": "Get-NetAdapter Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/netadapter/get-netadapter"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les adaptateurs réseau",
+      "description": "Affiche tous les adaptateurs réseau avec leur état, vitesse et adresses IP",
+      "notes": "Remplace ipconfig /all. Status 'Up' = connecté, 'Disabled' = désactivé. LinkSpeed affiche la vitesse de liaison (1 Gbps, 100 Mbps, etc.).",
+      "examples": {
+        "Get-NetIPAddress": "Affiche toutes les adresses IP configurées sur la machine (IPv4 et IPv6). Retourne l'IP, le masque de sous-réseau (PrefixLength), l'interface réseau associée et le statut. Équivalent moderne de 'ipconfig' avec plus de détails.",
+        "Get-NetIPAddress -AddressFamily IPv4": "Affiche uniquement les adresses IPv4 (exclut IPv6). Le paramètre -AddressFamily filtre par famille d'adresses. Simplifie l'affichage quand vous ne travaillez qu'en IPv4. Évite le bruit des nombreuses adresses IPv6 link-local.",
+        "Get-NetIPAddress -InterfaceAlias 'Ethernet' -AddressFamily IPv4": "Affiche l'adresse IPv4 d'une interface réseau spécifique. -InterfaceAlias utilise le nom convivial de l'interface (visible dans 'Paramètres réseau'). Utile quand la machine a plusieurs cartes réseau et que vous voulez interroger une carte précise.",
+        "Get-NetIPAddress | Where-Object {$_.IPAddress -like '192.168.*'} | Select-Object IPAddress,InterfaceAlias,PrefixLength": "Filtre et affiche uniquement les adresses IP du réseau local 192.168.x.x. Where-Object filtre avec wildcard. Select-Object choisit les colonnes pertinentes. Utile pour identifier rapidement les interfaces sur le LAN dans un environnement multi-cartes.",
+        "Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -eq 'Dhcp'}": "Affiche uniquement les adresses IPv4 obtenues via DHCP. PrefixOrigin indique comment l'IP a été configurée (Dhcp/Manual/WellKnown). Utile pour distinguer les IPs statiques des IPs dynamiques lors du troubleshooting réseau.",
+        "Get-NetIPAddress | Export-Csv C:\\Temp\\NetworkConfig.csv -NoTypeInformation": "Exporte toute la configuration IP vers CSV. Utile pour documenter la configuration réseau avant modifications, créer des inventaires ou archiver l'état réseau. Le fichier CSV peut être analysé dans Excel."
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "performance-monitor-cpu",
-  "title": "Surveiller l'utilisation CPU en temps réel",
-  "description": "Collecte et affiche l'utilisation du processeur en temps réel avec plusieurs échantillons",
+  "title": "Monitor CPU usage in real time",
+  "description": "Collect and show the processor usage in real time over several samples.",
   "category": "performance",
   "platform": 0,
   "level": 0,
@@ -20,54 +20,80 @@
     "parameters": [
       {
         "name": "intervalSeconds",
-        "label": "Intervalle (secondes)",
+        "label": "Interval (seconds)",
         "type": "number",
         "defaultValue": "2",
         "required": true,
-        "description": "Intervalle entre chaque échantillon en secondes"
+        "description": "Interval between samples in seconds"
       },
       {
         "name": "maxSamples",
-        "label": "Nombre d'échantillons",
+        "label": "Number of samples",
         "type": "number",
         "defaultValue": "10",
         "required": true,
-        "description": "Nombre d'échantillons à collecter"
+        "description": "Number of samples to collect"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-Counter '\\Processor(_Total)\\% Processor Time' -Continuous",
-      "description": "Surveillance CPU continue (Ctrl+C pour arrêter)",
+      "description": "Continuous CPU monitoring (Ctrl+C to stop)",
       "platform": 0
     },
     {
       "command": "(Get-Counter '\\Processor(_Total)\\% Processor Time').CounterSamples.CookedValue",
-      "description": "Obtient la valeur CPU instantanée",
+      "description": "Get the instant CPU value",
       "platform": 0
     },
     {
       "command": "Get-Counter -Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 60 -MaxSamples 10 | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-Counter -Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 60 -MaxSamples 10 | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-Counter -Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 60 -MaxSamples 10 | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Remplace Performance Monitor. Continuous = surveillance continue jusqu'à Ctrl+C. Valeurs >80% indiquent une charge élevée.",
+  "notes": "Replaces Performance Monitor. Continuous = continuous monitoring until Ctrl+C. Values >80% point to a high load.",
   "links": [
     {
       "title": "Get-Counter Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-counter"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Surveiller l'utilisation CPU en temps réel",
+      "description": "Collecte et affiche l'utilisation du processeur en temps réel avec plusieurs échantillons",
+      "notes": "Remplace Performance Monitor. Continuous = surveillance continue jusqu'à Ctrl+C. Valeurs >80% indiquent une charge élevée.",
+      "parameters": {
+        "windows": {
+          "intervalSeconds": {
+            "label": "Intervalle (secondes)",
+            "description": "Intervalle entre chaque échantillon en secondes"
+          },
+          "maxSamples": {
+            "label": "Nombre d'échantillons",
+            "description": "Nombre d'échantillons à collecter"
+          }
+        }
+      },
+      "examples": {
+        "Get-Counter '\\Processor(_Total)\\% Processor Time' -Continuous": "Surveillance CPU continue (Ctrl+C pour arrêter)",
+        "(Get-Counter '\\Processor(_Total)\\% Processor Time').CounterSamples.CookedValue": "Obtient la valeur CPU instantanée",
+        "Get-Counter -Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 60 -MaxSamples 10 | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-Counter -Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 60 -MaxSamples 10 | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-Counter -Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 60 -MaxSamples 10 | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

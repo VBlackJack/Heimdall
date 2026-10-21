@@ -1,7 +1,7 @@
 {
   "id": "git-rebase",
-  "title": "Rebaser une branche",
-  "description": "Réapplique des commits sur une nouvelle base",
+  "title": "Rebase a branch",
+  "description": "Reapply commits on top of a new base.",
   "category": "development",
   "platform": 2,
   "level": 2,
@@ -19,11 +19,11 @@
     "parameters": [
       {
         "name": "branch",
-        "label": "Branche de base",
+        "label": "Base branch",
         "type": "string",
         "defaultValue": "main",
         "required": true,
-        "description": "Branche sur laquelle rebaser"
+        "description": "Branch to rebase onto"
       }
     ]
   },
@@ -36,22 +36,22 @@
     "parameters": [
       {
         "name": "branch",
-        "label": "Branche de base",
+        "label": "Base branch",
         "type": "string",
         "defaultValue": "main",
         "required": true,
-        "description": "Branche sur laquelle rebaser"
+        "description": "Branch to rebase onto"
       }
     ]
   },
   "examples": [
     {
       "command": "git rebase main",
-      "description": "Rebase la branche actuelle sur main",
+      "description": "Rebase the current branch onto main",
       "platform": 2
     }
   ],
-  "notes": "ATTENTION : Ne rebasez jamais des commits déjà poussés sur un dépôt public. Utilisez -i pour un rebase interactif.",
+  "notes": "WARNING: never rebase commits already pushed to a public repository. Use -i for an interactive rebase.",
   "links": [
     {
       "title": "Git Rebase Documentation",
@@ -61,8 +61,33 @@
   "linuxExamples": [
     {
       "command": "git rebase -i HEAD~5",
-      "description": "Rebase interactif des 5 derniers commits",
+      "description": "Interactive rebase of the last 5 commits",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rebaser une branche",
+      "description": "Réapplique des commits sur une nouvelle base",
+      "notes": "ATTENTION : Ne rebasez jamais des commits déjà poussés sur un dépôt public. Utilisez -i pour un rebase interactif.",
+      "parameters": {
+        "windows": {
+          "branch": {
+            "label": "Branche de base",
+            "description": "Branche sur laquelle rebaser"
+          }
+        },
+        "linux": {
+          "branch": {
+            "label": "Branche de base",
+            "description": "Branche sur laquelle rebaser"
+          }
+        }
+      },
+      "examples": {
+        "git rebase -i HEAD~5": "Rebase interactif des 5 derniers commits",
+        "git rebase main": "Rebase la branche actuelle sur main"
+      }
+    }
+  }
 }

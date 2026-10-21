@@ -1,7 +1,7 @@
 {
   "id": "lsof-open-files",
-  "title": "Lister les fichiers ouverts",
-  "description": "Liste tous les fichiers ouverts par les processus (fichiers, sockets, etc.)",
+  "title": "List open files",
+  "description": "List every file opened by the processes (files, sockets, etc.).",
   "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
@@ -17,65 +17,73 @@
     "id": "lsof-cmd",
     "platform": 1,
     "name": "lsof",
-    "commandPattern": "lsof {filter}",
-    "parameters": [
-      {
-        "name": "filter",
-        "label": "Filtre",
-        "type": "string",
-        "defaultValue": "-i",
-        "required": false,
-        "description": "Filtre (-i=network, -u user, -p PID, /path)"
-      }
-    ]
+    "commandPattern": "lsof -i",
+    "parameters": []
   },
   "examples": [
     {
       "command": "sudo lsof -i",
-      "description": "Liste tous les fichiers réseau ouverts",
+      "description": "List every open network file",
       "platform": 1
     },
     {
       "command": "lsof -i :80",
-      "description": "Processus écoutant sur le port 80",
+      "description": "Processes listening on port 80",
       "platform": 1
     },
     {
       "command": "lsof -u username",
-      "description": "Fichiers ouverts par un utilisateur",
+      "description": "Files opened by a user",
       "platform": 1
     },
     {
       "command": "lsof -i",
-      "description": "Exemple utilisant le paramètre 'filter': Filtre (-i=network, -u user, -p PID, /path). Remplacez *.log par la valeur appropriée selon votre environnement.",
+      "description": "List the open network files",
       "platform": 1
     },
     {
       "command": "lsof -u www-data",
-      "description": "Fichiers ouverts par www-data",
+      "description": "Files opened by www-data",
       "platform": 1
     },
     {
       "command": "lsof /var/log/syslog",
-      "description": "Processus utilisant ce fichier",
+      "description": "Processes using this file",
       "platform": 1
     },
     {
       "command": "lsof -i -P -n",
-      "description": "Toutes les connexions réseau",
+      "description": "All network connections",
       "platform": 1
     },
     {
       "command": "lsof +D /tmp",
-      "description": "Fichiers ouverts dans /tmp",
+      "description": "Open files in /tmp",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo pour voir tous les processus. Très puissant pour diagnostiquer les problèmes.",
+  "notes": "Requires sudo to see every process. Very powerful to diagnose problems.",
   "links": [
     {
       "title": "lsof examples",
       "url": "https://man7.org/linux/man-pages/man8/lsof.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les fichiers ouverts",
+      "description": "Liste tous les fichiers ouverts par les processus (fichiers, sockets, etc.)",
+      "notes": "Nécessite sudo pour voir tous les processus. Très puissant pour diagnostiquer les problèmes.",
+      "examples": {
+        "sudo lsof -i": "Liste tous les fichiers réseau ouverts",
+        "lsof -i :80": "Processus écoutant sur le port 80",
+        "lsof -u username": "Fichiers ouverts par un utilisateur",
+        "lsof -i": "Liste les fichiers réseau ouverts",
+        "lsof -u www-data": "Fichiers ouverts par www-data",
+        "lsof /var/log/syslog": "Processus utilisant ce fichier",
+        "lsof -i -P -n": "Toutes les connexions réseau",
+        "lsof +D /tmp": "Fichiers ouverts dans /tmp"
+      }
+    }
+  }
 }

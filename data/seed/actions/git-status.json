@@ -1,7 +1,7 @@
 {
   "id": "git-status",
-  "title": "Afficher le statut Git",
-  "description": "Affiche l'état des fichiers dans le répertoire de travail et l'index",
+  "title": "Show the Git status",
+  "description": "Show the state of the files in the working directory and the index.",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -29,20 +29,31 @@
   "examples": [
     {
       "command": "git status",
-      "description": "Affiche le statut complet",
+      "description": "Show the full status",
       "platform": 2
     },
     {
       "command": "git status -s",
-      "description": "Affiche le statut en format court",
+      "description": "Show the status in short format",
       "platform": 2
     }
   ],
-  "notes": "Utilisez -s pour un format court, -b pour voir la branche actuelle.",
+  "notes": "Use -s for a short format, -b to see the current branch.",
   "links": [
     {
       "title": "Git Status Documentation",
       "url": "https://git-scm.com/docs/git-status"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher le statut Git",
+      "description": "Affiche l'état des fichiers dans le répertoire de travail et l'index",
+      "notes": "Utilisez -s pour un format court, -b pour voir la branche actuelle.",
+      "examples": {
+        "git status": "Affiche le statut complet",
+        "git status -s": "Affiche le statut en format court"
+      }
+    }
+  }
 }

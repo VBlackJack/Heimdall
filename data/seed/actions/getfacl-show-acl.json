@@ -1,7 +1,7 @@
 {
   "id": "getfacl-show-acl",
-  "title": "Afficher les ACL d'un fichier",
-  "description": "Affiche les listes de contrôle d'accès (ACL) étendues d'un fichier",
+  "title": "Show the ACLs of a file",
+  "description": "Show the extended access control lists (ACLs) of a file.",
   "category": "security",
   "platform": 1,
   "level": 0,
@@ -20,56 +20,74 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "/path/to/file",
         "required": true,
-        "description": "Fichier ou répertoire à examiner"
+        "description": "File or directory to examine"
       }
     ]
   },
   "examples": [
     {
       "command": "getfacl /var/www/html",
-      "description": "Affiche les ACL du répertoire",
+      "description": "Show the ACLs of the directory",
       "platform": 1
     },
     {
       "command": "getfacl -R /home/shared",
-      "description": "Affiche les ACL récursivement",
-      "platform": 1
-    },
-    {
-      "command": "getfacl /path/to/file",
-      "description": "Exemple utilisant le paramètre 'path': Fichier ou répertoire à examiner. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
+      "description": "Show the ACLs recursively",
       "platform": 1
     },
     {
       "command": "getfacl -R /home/user",
-      "description": "ACL récursives",
+      "description": "Recursive ACLs",
       "platform": 1
     },
     {
       "command": "getfacl --omit-header file.txt",
-      "description": "Sans en-tête",
+      "description": "Without header",
       "platform": 1
     },
     {
       "command": "getfacl -a /etc/passwd",
-      "description": "Uniquement les ACL d'accès",
+      "description": "Access ACLs only",
       "platform": 1
     },
     {
       "command": "getfacl -d /shared",
-      "description": "ACL par défaut",
+      "description": "Default ACLs",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo pour lecture. Les ACL permettent des permissions plus fines que chmod.",
+  "notes": "Reading does not require sudo. ACLs allow finer permissions than chmod.",
   "links": [
     {
       "title": "ACL guide",
       "url": "https://man7.org/linux/man-pages/man1/getfacl.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les ACL d'un fichier",
+      "description": "Affiche les listes de contrôle d'accès (ACL) étendues d'un fichier",
+      "notes": "Ne nécessite pas sudo pour lecture. Les ACL permettent des permissions plus fines que chmod.",
+      "parameters": {
+        "linux": {
+          "path": {
+            "label": "Chemin",
+            "description": "Fichier ou répertoire à examiner"
+          }
+        }
+      },
+      "examples": {
+        "getfacl /var/www/html": "Affiche les ACL du répertoire",
+        "getfacl -R /home/shared": "Affiche les ACL récursivement",
+        "getfacl -R /home/user": "ACL récursives",
+        "getfacl --omit-header file.txt": "Sans en-tête",
+        "getfacl -a /etc/passwd": "Uniquement les ACL d'accès",
+        "getfacl -d /shared": "ACL par défaut"
+      }
+    }
+  }
 }

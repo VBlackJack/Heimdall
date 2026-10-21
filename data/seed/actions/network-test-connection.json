@@ -1,7 +1,7 @@
 {
   "id": "network-test-connection",
-  "title": "Tester la connectivité réseau",
-  "description": "Teste la connectivité réseau vers une adresse IP ou un nom d'hôte.",
+  "title": "Test network connectivity",
+  "description": "Test the network connectivity to an IP address or a hostname.",
   "category": "network-dns",
   "platform": 2,
   "level": 0,
@@ -20,19 +20,19 @@
     "parameters": [
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Adresse IP ou nom d'hôte à tester"
+        "description": "IP address or hostname to test"
       },
       {
         "name": "count",
-        "label": "Nombre de paquets",
+        "label": "Number of packets",
         "type": "int",
         "defaultValue": "4",
         "required": false,
-        "description": "Nombre de requêtes ping à envoyer"
+        "description": "Number of ping requests to send"
       }
     ]
   },
@@ -45,112 +45,154 @@
     "parameters": [
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Adresse IP ou nom d'hôte à tester"
+        "description": "IP address or hostname to test"
       },
       {
         "name": "count",
-        "label": "Nombre de paquets",
+        "label": "Number of packets",
         "type": "int",
         "defaultValue": "4",
         "required": false,
-        "description": "Nombre de requêtes ping à envoyer"
+        "description": "Number of ping requests to send"
       }
     ]
   },
   "examples": [],
-  "notes": "Un pare-feu peut bloquer les requêtes ICMP. Utiliser -t (Windows) ou sans -c (Linux) pour ping continu.",
+  "notes": "A firewall can block ICMP requests. Use -t (Windows) or omit -c (Linux) for a continuous ping.",
   "links": [],
   "windowsExamples": [
     {
       "command": "Test-Connection -ComputerName google.com -Count 4",
-      "description": "Envoie 4 paquets ICMP (ping) vers google.com. Équivalent PowerShell de 'ping'. Retourne le temps de réponse, le TTL et le statut. Le paramètre -Count limite le nombre de paquets (par défaut : 4). Utile pour vérifier la connectivité Internet basique.",
+      "description": "Send 4 ICMP packets (ping) to google.com. The PowerShell equivalent of 'ping'. Returns the response time, the TTL and the status. The -Count parameter limits the number of packets (default: 4). Useful to check basic Internet connectivity.",
       "platform": 0
     },
     {
       "command": "Test-Connection -ComputerName 192.168.1.1 -Count 1 -Quiet",
-      "description": "Test de connectivité rapide qui retourne uniquement $true ou $false. Le switch -Quiet supprime tous les détails et retourne un booléen simple. Parfait pour les scripts de monitoring : if (Test-Connection -ComputerName server01 -Quiet) { ... }",
+      "description": "Quick connectivity test that returns only $true or $false. The -Quiet switch removes every detail and returns a plain boolean. Ideal for monitoring scripts: if (Test-Connection -ComputerName server01 -Quiet) { ... }",
       "platform": 0
     },
     {
       "command": "Test-Connection -ComputerName server01,server02,server03 -Count 2",
-      "description": "Teste plusieurs hôtes simultanément. -ComputerName accepte un tableau de noms/IPs. PowerShell teste tous les hôtes en parallèle, ce qui est beaucoup plus rapide que des commandes séquentielles. Idéal pour vérifier rapidement la disponibilité d'une liste de serveurs.",
+      "description": "Test several hosts at once. -ComputerName accepts an array of names or IPs. PowerShell tests every host in parallel, which is much faster than sequential commands. Ideal to check the availability of a list of servers quickly.",
       "platform": 0
     },
     {
       "command": "Test-Connection -ComputerName 8.8.8.8 -Count 100 -Delay 1",
-      "description": "Test de connectivité prolongé avec 100 paquets espacés de 1 seconde. Utile pour diagnostiquer des problèmes intermittents, mesurer la stabilité de la connexion et détecter les pertes de paquets. Laissez tourner pendant le troubleshooting.",
+      "description": "Extended connectivity test with 100 packets 1 second apart. Useful to diagnose intermittent problems, measure the stability of the connection and detect packet loss. Leave it running during troubleshooting.",
       "platform": 0
     },
     {
       "command": "Test-Connection -ComputerName server01 -Source DC01",
-      "description": "Exécute le ping depuis un ordinateur distant (DC01 vers server01). Nécessite WinRM activé et des droits admin sur la source. Utile pour tester la connectivité entre deux serveurs distants sans s'y connecter physiquement.",
+      "description": "Run the ping from a remote computer (DC01 to server01). Requires WinRM enabled and admin rights on the source. Useful to test the connectivity between two remote servers without logging on to them.",
       "platform": 0
     },
     {
       "command": "Get-Content C:\\servers.txt | ForEach-Object {Test-Connection $_ -Count 1 -Quiet} | Where-Object {$_ -eq $false}",
-      "description": "Lit une liste de serveurs depuis un fichier et identifie lesquels sont inaccessibles. Get-Content charge le fichier ligne par ligne. Test-Connection -Quiet retourne $true/$false. Where-Object filtre les échecs. Parfait pour les vérifications quotidiennes de disponibilité.",
+      "description": "Read a list of servers from a file and find the unreachable ones. Get-Content loads the file line by line, Test-Connection -Quiet returns $true/$false, Where-Object keeps the failures. Ideal for daily availability checks.",
       "platform": 0
     },
     {
       "command": "Test-Connection -ComputerName google.com -Count 4 | Select-Object Address,ResponseTime | Format-Table -AutoSize",
-      "description": "Affiche uniquement l'adresse et le temps de réponse dans un tableau propre. Select-Object filtre les colonnes pertinentes. Format-Table -AutoSize optimise l'affichage. Utile pour des rapports de performance réseau lisibles.",
+      "description": "Show only the address and the response time in a clean table. Select-Object keeps the relevant columns, Format-Table -AutoSize fits the output. Useful for readable network performance reports.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
-      "command": "ping -c 10 srv-web-01.contoso.com",
-      "description": "Exemple Linux utilisant ping. Remplacez les paramètres entre <> par vos valeurs.",
-      "platform": 1
-    },
-    {
       "command": "ping -c 4 google.com",
-      "description": "Envoyer 4 pings à Google",
+      "description": "Send 4 pings to Google",
       "platform": 1
     },
     {
       "command": "ping -c 10 -i 0.5 192.168.1.1",
-      "description": "Ping rapide (0.5s intervalle)",
+      "description": "Fast ping (0.5 s interval)",
       "platform": 1
     },
     {
       "command": "ping -W 2 -c 3 server.local",
-      "description": "Ping avec timeout de 2 secondes",
+      "description": "Ping with a 2-second timeout",
       "platform": 1
     },
     {
       "command": "ping -f -c 100 localhost",
-      "description": "Flood ping (100 paquets rapides)",
+      "description": "Flood ping (100 fast packets)",
       "platform": 1
     },
     {
       "command": "ping google.com",
-      "description": "Ping continu vers google.com (s'arrête avec Ctrl+C). Envoie des paquets ICMP jusqu'à interruption manuelle. Affiche le temps de réponse, le TTL et les statistiques. Utile pour surveiller la stabilité d'une connexion en temps réel.",
+      "description": "Continuous ping to google.com (stop with Ctrl+C). Sends ICMP packets until interrupted by hand. Shows the response time, the TTL and the statistics. Useful to watch the stability of a connection in real time.",
       "platform": 1
     },
     {
       "command": "ping -c 100 -s 1024 server01",
-      "description": "Test avec des paquets de 1024 octets (au lieu des 64 par défaut). Le flag -s (size) modifie la taille des paquets. Utile pour tester la MTU (Maximum Transmission Unit) et détecter les problèmes de fragmentation sur le réseau.",
+      "description": "Test with 1024-byte packets (instead of the default 64). The -s (size) flag changes the packet size. Useful to test the MTU (Maximum Transmission Unit) and detect fragmentation problems on the network.",
       "platform": 1
     },
     {
       "command": "ping -W 2 -c 4 192.168.1.100",
-      "description": "Ping avec un timeout de 2 secondes par paquet. Le flag -W (timeout) définit le délai d'attente maximum. Utile pour détecter rapidement les hôtes down sans attendre le timeout par défaut (peut être très long).",
+      "description": "Ping with a 2-second timeout per packet. The -W (timeout) flag sets the maximum wait. Useful to detect down hosts quickly without waiting for the default timeout (which can be very long).",
       "platform": 1
     },
     {
       "command": "ping -q -c 10 google.com",
-      "description": "Mode quiet : n'affiche que les statistiques finales (pas chaque paquet). Le flag -q (quiet) réduit l'output. Utile dans les scripts pour ne récupérer que le résumé (paquets perdus, temps min/max/moy).",
+      "description": "Quiet mode: shows only the final statistics (not each packet). The -q (quiet) flag reduces the output. Useful in scripts to get only the summary (lost packets, min/max/avg time).",
       "platform": 1
     },
     {
       "command": "ping -f google.com",
-      "description": "Flood ping : envoie des paquets aussi vite que possible (nécessite root). Le flag -f (flood) ne laisse aucun délai entre les paquets. ATTENTION : à utiliser uniquement pour les tests de performance/stress sur VOS propres serveurs. Peut être considéré comme une attaque DoS sur des systèmes tiers.",
+      "description": "Flood ping: sends packets as fast as possible (requires root). The -f (flood) flag leaves no delay between packets. WARNING: use it only for performance or stress tests on YOUR own servers. Can be seen as a DoS attack on third-party systems.",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester la connectivité réseau",
+      "description": "Teste la connectivité réseau vers une adresse IP ou un nom d'hôte.",
+      "notes": "Un pare-feu peut bloquer les requêtes ICMP. Utiliser -t (Windows) ou sans -c (Linux) pour ping continu.",
+      "parameters": {
+        "windows": {
+          "target": {
+            "label": "Cible",
+            "description": "Adresse IP ou nom d'hôte à tester"
+          },
+          "count": {
+            "label": "Nombre de paquets",
+            "description": "Nombre de requêtes ping à envoyer"
+          }
+        },
+        "linux": {
+          "target": {
+            "label": "Cible",
+            "description": "Adresse IP ou nom d'hôte à tester"
+          },
+          "count": {
+            "label": "Nombre de paquets",
+            "description": "Nombre de requêtes ping à envoyer"
+          }
+        }
+      },
+      "examples": {
+        "Test-Connection -ComputerName google.com -Count 4": "Envoie 4 paquets ICMP (ping) vers google.com. Équivalent PowerShell de 'ping'. Retourne le temps de réponse, le TTL et le statut. Le paramètre -Count limite le nombre de paquets (par défaut : 4). Utile pour vérifier la connectivité Internet basique.",
+        "Test-Connection -ComputerName 192.168.1.1 -Count 1 -Quiet": "Test de connectivité rapide qui retourne uniquement $true ou $false. Le switch -Quiet supprime tous les détails et retourne un booléen simple. Parfait pour les scripts de monitoring : if (Test-Connection -ComputerName server01 -Quiet) { ... }",
+        "Test-Connection -ComputerName server01,server02,server03 -Count 2": "Teste plusieurs hôtes simultanément. -ComputerName accepte un tableau de noms/IPs. PowerShell teste tous les hôtes en parallèle, ce qui est beaucoup plus rapide que des commandes séquentielles. Idéal pour vérifier rapidement la disponibilité d'une liste de serveurs.",
+        "Test-Connection -ComputerName 8.8.8.8 -Count 100 -Delay 1": "Test de connectivité prolongé avec 100 paquets espacés de 1 seconde. Utile pour diagnostiquer des problèmes intermittents, mesurer la stabilité de la connexion et détecter les pertes de paquets. Laissez tourner pendant le troubleshooting.",
+        "Test-Connection -ComputerName server01 -Source DC01": "Exécute le ping depuis un ordinateur distant (DC01 vers server01). Nécessite WinRM activé et des droits admin sur la source. Utile pour tester la connectivité entre deux serveurs distants sans s'y connecter physiquement.",
+        "Get-Content C:\\servers.txt | ForEach-Object {Test-Connection $_ -Count 1 -Quiet} | Where-Object {$_ -eq $false}": "Lit une liste de serveurs depuis un fichier et identifie lesquels sont inaccessibles. Get-Content charge le fichier ligne par ligne. Test-Connection -Quiet retourne $true/$false. Where-Object filtre les échecs. Parfait pour les vérifications quotidiennes de disponibilité.",
+        "Test-Connection -ComputerName google.com -Count 4 | Select-Object Address,ResponseTime | Format-Table -AutoSize": "Affiche uniquement l'adresse et le temps de réponse dans un tableau propre. Select-Object filtre les colonnes pertinentes. Format-Table -AutoSize optimise l'affichage. Utile pour des rapports de performance réseau lisibles.",
+        "ping -c 4 google.com": "Envoyer 4 pings à Google",
+        "ping -c 10 -i 0.5 192.168.1.1": "Ping rapide (0.5s intervalle)",
+        "ping -W 2 -c 3 server.local": "Ping avec timeout de 2 secondes",
+        "ping -f -c 100 localhost": "Flood ping (100 paquets rapides)",
+        "ping google.com": "Ping continu vers google.com (s'arrête avec Ctrl+C). Envoie des paquets ICMP jusqu'à interruption manuelle. Affiche le temps de réponse, le TTL et les statistiques. Utile pour surveiller la stabilité d'une connexion en temps réel.",
+        "ping -c 100 -s 1024 server01": "Test avec des paquets de 1024 octets (au lieu des 64 par défaut). Le flag -s (size) modifie la taille des paquets. Utile pour tester la MTU (Maximum Transmission Unit) et détecter les problèmes de fragmentation sur le réseau.",
+        "ping -W 2 -c 4 192.168.1.100": "Ping avec un timeout de 2 secondes par paquet. Le flag -W (timeout) définit le délai d'attente maximum. Utile pour détecter rapidement les hôtes down sans attendre le timeout par défaut (peut être très long).",
+        "ping -q -c 10 google.com": "Mode quiet : n'affiche que les statistiques finales (pas chaque paquet). Le flag -q (quiet) réduit l'output. Utile dans les scripts pour ne récupérer que le résumé (paquets perdus, temps min/max/moy).",
+        "ping -f google.com": "Flood ping : envoie des paquets aussi vite que possible (nécessite root). Le flag -f (flood) ne laisse aucun délai entre les paquets. ATTENTION : à utiliser uniquement pour les tests de performance/stress sur VOS propres serveurs. Peut être considéré comme une attaque DoS sur des systèmes tiers."
+      }
+    }
+  }
 }

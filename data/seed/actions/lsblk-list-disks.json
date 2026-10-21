@@ -1,7 +1,7 @@
 {
   "id": "lsblk-list-disks",
-  "title": "Lister les disques et partitions",
-  "description": "Affiche tous les périphériques de bloc (disques, partitions) en arborescence",
+  "title": "List disks and partitions",
+  "description": "Show every block device (disks, partitions) as a tree.",
   "category": "files-storage",
   "platform": 1,
   "level": 0,
@@ -17,55 +17,61 @@
     "id": "lsblk-cmd",
     "platform": 1,
     "name": "lsblk",
-    "commandPattern": "lsblk {options}",
-    "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-f",
-        "required": false,
-        "description": "Options (-f=filesystems, -o=columns, -a=all)"
-      }
-    ]
+    "commandPattern": "lsblk -f",
+    "parameters": []
   },
   "examples": [
     {
       "command": "lsblk",
-      "description": "Liste les disques en arborescence",
+      "description": "List the disks as a tree",
       "platform": 1
     },
     {
       "command": "lsblk -f",
-      "description": "Affiche les systèmes de fichiers et UUID",
+      "description": "Show the filesystems and UUIDs",
       "platform": 1
     },
     {
       "command": "lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT",
-      "description": "Colonnes personnalisées",
+      "description": "Custom columns",
       "platform": 1
     },
     {
       "command": "lsblk -o NAME,SIZE,TYPE,MOUNTPOINT",
-      "description": "Colonnes personnalisées",
+      "description": "Custom columns",
       "platform": 1
     },
     {
       "command": "lsblk -d",
-      "description": "Afficher uniquement les disques (pas les partitions)",
+      "description": "Show only the disks (not the partitions)",
       "platform": 1
     },
     {
       "command": "lsblk -J",
-      "description": "Sortie en format JSON",
+      "description": "JSON output",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo. Très utile pour identifier les disques avant partitionnement.",
+  "notes": "Does not require sudo. Very useful to identify the disks before partitioning.",
   "links": [
     {
       "title": "lsblk documentation",
       "url": "https://man7.org/linux/man-pages/man8/lsblk.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les disques et partitions",
+      "description": "Affiche tous les périphériques de bloc (disques, partitions) en arborescence",
+      "notes": "Ne nécessite pas sudo. Très utile pour identifier les disques avant partitionnement.",
+      "examples": {
+        "lsblk": "Liste les disques en arborescence",
+        "lsblk -f": "Affiche les systèmes de fichiers et UUID",
+        "lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT": "Colonnes personnalisées",
+        "lsblk -o NAME,SIZE,TYPE,MOUNTPOINT": "Colonnes personnalisées",
+        "lsblk -d": "Afficher uniquement les disques (pas les partitions)",
+        "lsblk -J": "Sortie en format JSON"
+      }
+    }
+  }
 }

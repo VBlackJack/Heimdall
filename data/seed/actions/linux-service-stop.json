@@ -1,7 +1,7 @@
 {
   "id": "linux-service-stop",
-  "title": "Arrêter un service",
-  "description": "Arrête un service systemd en cours d'exécution.",
+  "title": "Stop a service",
+  "description": "Stop a running systemd service.",
   "category": "services-automation",
   "platform": 1,
   "level": 1,
@@ -20,21 +20,45 @@
     "parameters": [
       {
         "name": "serviceName",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du service à arrêter"
+        "description": "Name of the service to stop"
       }
     ]
   },
   "examples": [
     {
-      "command": "sudo systemctl stop wuauserv",
-      "description": "Exemple utilisant le paramètre 'serviceName': Nom du service à arrêter. Remplacez wuauserv par la valeur appropriée selon votre environnement.",
+      "command": "sudo systemctl stop nginx",
+      "description": "Stop the nginx service",
+      "platform": 1
+    },
+    {
+      "command": "sudo systemctl stop sshd",
+      "description": "Stop the SSH server: open SSH sessions can drop, keep another way in",
       "platform": 1
     }
   ],
-  "notes": "Nécessite les droits sudo. Peut affecter les services dépendants.",
-  "links": []
+  "notes": "Requires sudo. Can affect the dependent services.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Arrêter un service",
+      "description": "Arrête un service systemd en cours d'exécution.",
+      "notes": "Nécessite les droits sudo. Peut affecter les services dépendants.",
+      "parameters": {
+        "linux": {
+          "serviceName": {
+            "label": "Nom du service",
+            "description": "Nom du service à arrêter"
+          }
+        }
+      },
+      "examples": {
+        "sudo systemctl stop nginx": "Arrête le service nginx",
+        "sudo systemctl stop sshd": "Arrête le serveur SSH : les sessions SSH ouvertes peuvent être coupées, gardez un autre accès"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "linux-netcat",
-  "title": "Couteau suisse réseau (Netcat)",
-  "description": "Outil polyvalent pour lire/écrire sur des connexions réseau TCP/UDP.",
+  "title": "Network Swiss army knife (netcat)",
+  "description": "Versatile tool to read from and write to TCP/UDP network connections.",
   "category": "network-dns",
   "platform": 1,
   "level": 1,
@@ -21,11 +21,11 @@
     "parameters": [
       {
         "name": "host",
-        "label": "Hôte",
+        "label": "Host",
         "type": "string",
         "defaultValue": "localhost",
         "required": true,
-        "description": "IP cible"
+        "description": "Target IP"
       },
       {
         "name": "port",
@@ -33,26 +33,49 @@
         "type": "string",
         "defaultValue": "80",
         "required": true,
-        "description": "Port cible"
+        "description": "Target port"
       }
     ]
   },
   "examples": [
     {
       "command": "nc -zv 192.168.1.10 443",
-      "description": "🔥 FAST PORT CHECK : Vérifie si le port 443 est ouvert (-z) en mode verbeux (-v). Plus rapide et fiable que telnet.",
+      "description": "🔥 FAST PORT CHECK: check whether port 443 is open (-z) in verbose mode (-v). Faster and more reliable than telnet.",
       "platform": 1
     },
     {
       "command": "nc -l 8080",
-      "description": "Mode Serveur (-l) : Écoute sur le port 8080. Utile pour vérifier si le pare-feu laisse passer le trafic entrant.",
+      "description": "Server mode (-l): listen on port 8080. Useful to check whether the firewall lets inbound traffic through.",
       "platform": 1
     },
     {
       "command": "nc -zv -w 2 google.com 80",
-      "description": "Test avec timeout de 2 secondes (-w 2).",
+      "description": "Test with a 2-second timeout (-w 2).",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "1e3c236c-393a-40be-aa82-15c364a01213"
+  "linuxCommandTemplateId": "1e3c236c-393a-40be-aa82-15c364a01213",
+  "translations": {
+    "fr": {
+      "title": "Couteau suisse réseau (Netcat)",
+      "description": "Outil polyvalent pour lire/écrire sur des connexions réseau TCP/UDP.",
+      "parameters": {
+        "linux": {
+          "host": {
+            "label": "Hôte",
+            "description": "IP cible"
+          },
+          "port": {
+            "label": "Port",
+            "description": "Port cible"
+          }
+        }
+      },
+      "examples": {
+        "nc -zv 192.168.1.10 443": "🔥 FAST PORT CHECK : Vérifie si le port 443 est ouvert (-z) en mode verbeux (-v). Plus rapide et fiable que telnet.",
+        "nc -l 8080": "Mode Serveur (-l) : Écoute sur le port 8080. Utile pour vérifier si le pare-feu laisse passer le trafic entrant.",
+        "nc -zv -w 2 google.com 80": "Test avec timeout de 2 secondes (-w 2)."
+      }
+    }
+  }
 }

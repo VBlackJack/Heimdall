@@ -1,7 +1,7 @@
 {
   "id": "perf-process-handles",
-  "title": "Analyser les handles ouverts par processus",
-  "description": "Analyse et affiche le nombre de handles (fichiers, registre, threads, etc.) ouverts par chaque processus. Utile pour détecter les fuites de ressources.",
+  "title": "Analyze the open handles per process",
+  "description": "Analyze and show the number of handles (files, registry, threads, etc.) each process holds open. Useful to detect resource leaks.",
   "category": "performance",
   "platform": 0,
   "level": 0,
@@ -24,26 +24,44 @@
     "parameters": [
       {
         "name": "topCount",
-        "label": "Nombre de processus",
+        "label": "Number of processes",
         "type": "string",
         "defaultValue": "15",
         "required": true,
-        "description": "Nombre de processus à afficher"
+        "description": "Number of processes to show"
       }
     ]
   },
   "examples": [
     {
       "command": "(Get-Process).Handles | Measure-Object -Sum",
-      "description": "Nombre total de handles système",
+      "description": "Total number of system handles",
       "platform": 0
     }
   ],
-  "notes": "Un nombre excessif de handles peut indiquer une fuite de ressources. Les handles incluent: fichiers, clés de registre, threads, mutexes, etc.",
+  "notes": "An excessive number of handles can point to a resource leak. Handles include: files, registry keys, threads, mutexes, etc.",
   "links": [
     {
       "title": "Understanding Handles",
       "url": "https://learn.microsoft.com/en-us/windows/win32/sysinfo/handles-and-objects"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Analyser les handles ouverts par processus",
+      "description": "Analyse et affiche le nombre de handles (fichiers, registre, threads, etc.) ouverts par chaque processus. Utile pour détecter les fuites de ressources.",
+      "notes": "Un nombre excessif de handles peut indiquer une fuite de ressources. Les handles incluent: fichiers, clés de registre, threads, mutexes, etc.",
+      "parameters": {
+        "windows": {
+          "topCount": {
+            "label": "Nombre de processus",
+            "description": "Nombre de processus à afficher"
+          }
+        }
+      },
+      "examples": {
+        "(Get-Process).Handles | Measure-Object -Sum": "Nombre total de handles système"
+      }
+    }
+  }
 }

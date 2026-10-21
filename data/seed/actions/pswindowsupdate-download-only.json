@@ -1,7 +1,7 @@
 {
   "id": "pswindowsupdate-download-only",
-  "title": "Télécharger les mises à jour sans installer",
-  "description": "Télécharge les mises à jour Windows disponibles sans les installer",
+  "title": "Download updates without installing them",
+  "description": "Download the available Windows updates without installing them.",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -21,40 +21,55 @@
   "examples": [
     {
       "command": "Get-WindowsUpdate -Download -AcceptAll",
-      "description": "Télécharge toutes les mises à jour disponibles",
+      "description": "Download every available update",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -Download -Category 'Security Updates'",
-      "description": "Télécharge uniquement les mises à jour de sécurité",
+      "description": "Download only the security updates",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -Download -AcceptAll | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -Download -AcceptAll | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -Download -AcceptAll | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -Download -AcceptAll | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Utile pour télécharger en avance et installer plus tard. Nécessite PSWindowsUpdate.",
+  "notes": "Useful to download ahead and install later. Requires PSWindowsUpdate.",
   "links": [
     {
       "title": "Download Windows Updates",
       "url": "https://woshub.com/pswindowsupdate-module/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Télécharger les mises à jour sans installer",
+      "description": "Télécharge les mises à jour Windows disponibles sans les installer",
+      "notes": "Utile pour télécharger en avance et installer plus tard. Nécessite PSWindowsUpdate.",
+      "examples": {
+        "Get-WindowsUpdate -Download -AcceptAll": "Télécharge toutes les mises à jour disponibles",
+        "Get-WindowsUpdate -Download -Category 'Security Updates'": "Télécharge uniquement les mises à jour de sécurité",
+        "Get-WindowsUpdate -Download -AcceptAll | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-WindowsUpdate -Download -AcceptAll | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-WindowsUpdate -Download -AcceptAll | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-WindowsUpdate -Download -AcceptAll | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }
