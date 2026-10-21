@@ -1,7 +1,7 @@
 {
   "id": "git-branch",
-  "title": "Gérer les branches Git",
-  "description": "Crée, liste ou supprime des branches",
+  "title": "Manage Git branches",
+  "description": "Create, list or delete branches.",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -19,11 +19,11 @@
     "parameters": [
       {
         "name": "branchName",
-        "label": "Nom branche",
+        "label": "Branch name",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom de la branche (vide pour lister)"
+        "description": "Branch name (empty to list)"
       }
     ]
   },
@@ -36,41 +36,68 @@
     "parameters": [
       {
         "name": "branchName",
-        "label": "Nom branche",
+        "label": "Branch name",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom de la branche"
+        "description": "Branch name"
       }
     ]
   },
   "examples": [
     {
       "command": "git branch",
-      "description": "Liste toutes les branches locales",
+      "description": "List all local branches",
       "platform": 2
     },
     {
       "command": "git branch feature-login",
-      "description": "Crée une nouvelle branche",
+      "description": "Create a new branch",
       "platform": 2
     },
     {
       "command": "git branch -d old-feature",
-      "description": "Supprime une branche fusionnée",
+      "description": "Delete a merged branch",
       "platform": 2
     },
     {
       "command": "git branch feature/new-feature",
-      "description": "Exemple utilisant le paramètre 'branchName': Nom de la branche (vide pour lister). Remplacez feature/new-feature par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'branchName' parameter: branch name (empty to list). Replace feature/new-feature with the value that fits your environment.",
       "platform": 2
     }
   ],
-  "notes": "Utilisez -a pour voir toutes les branches (locales et distantes), -d pour supprimer une branche.",
+  "notes": "Use -a to see every branch (local and remote), -d to delete a branch.",
   "links": [
     {
       "title": "Git Branch Documentation",
       "url": "https://git-scm.com/docs/git-branch"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Gérer les branches Git",
+      "description": "Crée, liste ou supprime des branches",
+      "notes": "Utilisez -a pour voir toutes les branches (locales et distantes), -d pour supprimer une branche.",
+      "parameters": {
+        "windows": {
+          "branchName": {
+            "label": "Nom branche",
+            "description": "Nom de la branche (vide pour lister)"
+          }
+        },
+        "linux": {
+          "branchName": {
+            "label": "Nom branche",
+            "description": "Nom de la branche"
+          }
+        }
+      },
+      "examples": {
+        "git branch": "Liste toutes les branches locales",
+        "git branch feature-login": "Crée une nouvelle branche",
+        "git branch -d old-feature": "Supprime une branche fusionnée",
+        "git branch feature/new-feature": "Exemple utilisant le paramètre 'branchName': Nom de la branche (vide pour lister). Remplacez feature/new-feature par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

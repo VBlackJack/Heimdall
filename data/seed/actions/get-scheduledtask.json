@@ -1,7 +1,7 @@
 {
   "id": "get-scheduledtask",
-  "title": "Lister les tâches planifiées Windows",
-  "description": "Affiche toutes les tâches planifiées configurées dans le Planificateur de tâches Windows",
+  "title": "List Windows scheduled tasks",
+  "description": "Show every scheduled task configured in the Windows Task Scheduler.",
   "category": "services-automation",
   "platform": 0,
   "level": 0,
@@ -21,64 +21,92 @@
     "parameters": [
       {
         "name": "taskname",
-        "label": "Nom de la tâche",
+        "label": "Task name",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom de la tâche (laissez vide pour toutes)"
+        "description": "Task name (leave empty for all)"
       },
       {
         "name": "taskpath",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Chemin de la tâche (ex: -TaskPath '\\Microsoft\\Windows\\')"
+        "description": "Task path (e.g. -TaskPath '\\Microsoft\\Windows\\')"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-ScheduledTask",
-      "description": "Liste toutes les tâches planifiées",
+      "description": "List all scheduled tasks",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask | Where-Object {$_.State -eq 'Ready'}",
-      "description": "Liste uniquement les tâches actives",
+      "description": "List only the active tasks",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask -TaskName 'MyBackup'",
-      "description": "Affiche une tâche spécifique",
+      "description": "Show a given task",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask -TaskPath '\\' | Where-Object {$_.State -ne 'Disabled'}",
-      "description": "Tâches racine non désactivées",
+      "description": "Root tasks that are not disabled",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask DailyBackup \\Microsoft\\Windows\\ | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask DailyBackup \\Microsoft\\Windows\\ | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask DailyBackup \\Microsoft\\Windows\\ | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Utilisez Get-ScheduledTaskInfo pour voir l'historique d'exécution. State peut être Ready, Running, Disabled.",
+  "notes": "Use Get-ScheduledTaskInfo to see the run history. State can be Ready, Running, Disabled.",
   "links": [
     {
       "title": "Get-ScheduledTask Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/get-scheduledtask"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les tâches planifiées Windows",
+      "description": "Affiche toutes les tâches planifiées configurées dans le Planificateur de tâches Windows",
+      "notes": "Utilisez Get-ScheduledTaskInfo pour voir l'historique d'exécution. State peut être Ready, Running, Disabled.",
+      "parameters": {
+        "windows": {
+          "taskname": {
+            "label": "Nom de la tâche",
+            "description": "Nom de la tâche (laissez vide pour toutes)"
+          },
+          "taskpath": {
+            "label": "Chemin",
+            "description": "Chemin de la tâche (ex: -TaskPath '\\Microsoft\\Windows\\')"
+          }
+        }
+      },
+      "examples": {
+        "Get-ScheduledTask": "Liste toutes les tâches planifiées",
+        "Get-ScheduledTask | Where-Object {$_.State -eq 'Ready'}": "Liste uniquement les tâches actives",
+        "Get-ScheduledTask -TaskName 'MyBackup'": "Affiche une tâche spécifique",
+        "Get-ScheduledTask -TaskPath '\\' | Where-Object {$_.State -ne 'Disabled'}": "Tâches racine non désactivées",
+        "Get-ScheduledTask DailyBackup \\Microsoft\\Windows\\ | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-ScheduledTask DailyBackup \\Microsoft\\Windows\\ | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ScheduledTask DailyBackup \\Microsoft\\Windows\\ | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "find-suid-files",
-  "title": "Rechercher les fichiers SUID/SGID",
-  "description": "Liste tous les fichiers avec bits SUID ou SGID (potentiellement dangereux)",
+  "title": "Find SUID/SGID files",
+  "description": "List every file with the SUID or SGID bit set (potentially dangerous).",
   "category": "security",
   "platform": 1,
   "level": 0,
@@ -21,11 +21,11 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "/",
         "required": true,
-        "description": "Répertoire de recherche"
+        "description": "Search directory"
       },
       {
         "name": "perm",
@@ -40,55 +40,85 @@
   "examples": [
     {
       "command": "sudo find / -perm /4000 -type f 2>/dev/null",
-      "description": "Liste tous les fichiers SUID",
+      "description": "List all SUID files",
       "platform": 1
     },
     {
       "command": "find /usr -perm /6000 -ls",
-      "description": "Fichiers SUID ou SGID dans /usr avec détails",
+      "description": "SUID or SGID files in /usr with details",
       "platform": 1
     },
     {
       "command": "find / -perm /755 -type f",
-      "description": "Exemple utilisant le paramètre 'path': Répertoire de recherche. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'path' parameter: search directory. Replace C:\\Logs\\app.log with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "find C:\\Logs\\app.log -perm /4000 -type f",
-      "description": "Exemple utilisant le paramètre 'perm': 4000=SUID, 2000=SGID, 6000=both. Remplacez 755 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'perm' parameter: 4000=SUID, 2000=SGID, 6000=both. Replace 755 with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "find /var/log -name \"*.log\" -mtime -7",
-      "description": "Fichiers .log modifiés dans les 7 derniers jours",
+      "description": ".log files modified in the last 7 days",
       "platform": 1
     },
     {
       "command": "find /home -size +100M",
-      "description": "Fichiers de plus de 100 Mo",
+      "description": "Files larger than 100 MB",
       "platform": 1
     },
     {
       "command": "find /tmp -type f -name \"*.tmp\" -delete",
-      "description": "Supprimer les fichiers .tmp",
+      "description": "Delete the .tmp files",
       "platform": 1
     },
     {
       "command": "find . -type d -empty",
-      "description": "Trouver les dossiers vides",
+      "description": "Find empty folders",
       "platform": 1
     },
     {
       "command": "find /etc -name \"*.conf\" -exec grep -l \"password\" {} \\;",
-      "description": "Fichiers conf contenant \"password\"",
+      "description": "Conf files that contain \"password\"",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo pour tout le système. SUID/SGID peuvent être des risques de sécurité.",
+  "notes": "Requires sudo for the whole system. SUID/SGID files can be security risks.",
   "links": [
     {
       "title": "SUID security",
       "url": "https://man7.org/linux/man-pages/man1/find.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher les fichiers SUID/SGID",
+      "description": "Liste tous les fichiers avec bits SUID ou SGID (potentiellement dangereux)",
+      "notes": "Nécessite sudo pour tout le système. SUID/SGID peuvent être des risques de sécurité.",
+      "parameters": {
+        "linux": {
+          "path": {
+            "label": "Chemin",
+            "description": "Répertoire de recherche"
+          },
+          "perm": {
+            "label": "Permissions",
+            "description": "4000=SUID, 2000=SGID, 6000=les deux"
+          }
+        }
+      },
+      "examples": {
+        "sudo find / -perm /4000 -type f 2>/dev/null": "Liste tous les fichiers SUID",
+        "find /usr -perm /6000 -ls": "Fichiers SUID ou SGID dans /usr avec détails",
+        "find / -perm /755 -type f": "Exemple utilisant le paramètre 'path': Répertoire de recherche. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
+        "find C:\\Logs\\app.log -perm /4000 -type f": "Exemple utilisant le paramètre 'perm': 4000=SUID, 2000=SGID, 6000=both. Remplacez 755 par la valeur appropriée selon votre environnement.",
+        "find /var/log -name \"*.log\" -mtime -7": "Fichiers .log modifiés dans les 7 derniers jours",
+        "find /home -size +100M": "Fichiers de plus de 100 Mo",
+        "find /tmp -type f -name \"*.tmp\" -delete": "Supprimer les fichiers .tmp",
+        "find . -type d -empty": "Trouver les dossiers vides",
+        "find /etc -name \"*.conf\" -exec grep -l \"password\" {} \\;": "Fichiers conf contenant \"password\""
+      }
+    }
+  }
 }

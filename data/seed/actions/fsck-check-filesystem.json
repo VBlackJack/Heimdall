@@ -1,7 +1,7 @@
 {
   "id": "fsck-check-filesystem",
-  "title": "Vérifier et réparer un filesystem",
-  "description": "Vérifie l'intégrité d'un système de fichiers et tente de réparer les erreurs",
+  "title": "Check and repair a filesystem",
+  "description": "Check the integrity of a filesystem and try to repair the errors.",
   "category": "files-storage",
   "platform": 1,
   "level": 2,
@@ -17,78 +17,96 @@
     "id": "fsck-cmd",
     "platform": 1,
     "name": "fsck",
-    "commandPattern": "fsck {options} {device}",
+    "commandPattern": "fsck -y {device}",
     "parameters": [
       {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-y",
-        "required": false,
-        "description": "Options (-y=auto-repair, -n=no changes)"
-      },
-      {
         "name": "device",
-        "label": "Périphérique",
+        "label": "Device",
         "type": "string",
         "defaultValue": "/dev/sdb1",
         "required": true,
-        "description": "Partition à vérifier (DOIT être démontée)"
+        "description": "Partition to check (MUST be unmounted)"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo fsck -y /dev/sdb1",
-      "description": "Vérifie et répare automatiquement",
+      "description": "Check and repair automatically",
       "platform": 1
     },
     {
       "command": "sudo e2fsck -f /dev/sdb1",
-      "description": "Force la vérification d'une partition ext4",
+      "description": "Force the check of an ext4 partition",
       "platform": 1
     },
     {
       "command": "fsck -y /dev/sda1",
-      "description": "Exemple utilisant le paramètre 'options': Options (-y=auto-repair, -n=no changes). Remplacez -v -f par la valeur appropriée selon votre environnement.",
+      "description": "Repair /dev/sda1 automatically",
       "platform": 1
     },
     {
       "command": "fsck -v -f /dev/sdb1",
-      "description": "Exemple utilisant le paramètre 'device': Partition à vérifier (DOIT être démontée). Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'device' parameter: partition to check (MUST be unmounted). Replace /dev/sda1 with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "fsck /dev/sdb1",
-      "description": "Vérifier le filesystem",
+      "description": "Check the filesystem",
       "platform": 1
     },
     {
       "command": "fsck -y /dev/sdb1",
-      "description": "Réparer automatiquement",
+      "description": "Repair automatically",
       "platform": 1
     },
     {
       "command": "fsck -n /dev/sdb1",
-      "description": "Dry-run (pas de modification)",
+      "description": "Dry run (no changes)",
       "platform": 1
     },
     {
       "command": "e2fsck -f /dev/sdb1",
-      "description": "Forcer la vérification ext4",
+      "description": "Force the ext4 check",
       "platform": 1
     },
     {
       "command": "xfs_repair /dev/sdc1",
-      "description": "Réparer un filesystem XFS",
+      "description": "Repair an XFS filesystem",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. DANGER: partition DOIT être démontée. -y répare automatiquement.",
+  "notes": "Requires sudo. DANGER: the partition MUST be unmounted. -y repairs automatically.",
   "links": [
     {
       "title": "fsck documentation",
       "url": "https://man7.org/linux/man-pages/man8/fsck.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier et réparer un filesystem",
+      "description": "Vérifie l'intégrité d'un système de fichiers et tente de réparer les erreurs",
+      "notes": "Nécessite sudo. DANGER: partition DOIT être démontée. -y répare automatiquement.",
+      "parameters": {
+        "linux": {
+          "device": {
+            "label": "Périphérique",
+            "description": "Partition à vérifier (DOIT être démontée)"
+          }
+        }
+      },
+      "examples": {
+        "sudo fsck -y /dev/sdb1": "Vérifie et répare automatiquement",
+        "sudo e2fsck -f /dev/sdb1": "Force la vérification d'une partition ext4",
+        "fsck -y /dev/sda1": "Répare automatiquement /dev/sda1",
+        "fsck -v -f /dev/sdb1": "Exemple utilisant le paramètre 'device': Partition à vérifier (DOIT être démontée). Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
+        "fsck /dev/sdb1": "Vérifier le filesystem",
+        "fsck -y /dev/sdb1": "Réparer automatiquement",
+        "fsck -n /dev/sdb1": "Dry-run (pas de modification)",
+        "e2fsck -f /dev/sdb1": "Forcer la vérification ext4",
+        "xfs_repair /dev/sdc1": "Réparer un filesystem XFS"
+      }
+    }
+  }
 }

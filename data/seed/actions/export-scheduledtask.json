@@ -1,7 +1,7 @@
 {
   "id": "export-scheduledtask",
-  "title": "Exporter une tâche planifiée",
-  "description": "Exporte la définition d'une tâche planifiée au format XML pour sauvegarde ou migration",
+  "title": "Export a scheduled task",
+  "description": "Export the definition of a scheduled task as XML for backup or migration.",
   "category": "services-automation",
   "platform": 0,
   "level": 0,
@@ -21,69 +21,100 @@
     "parameters": [
       {
         "name": "taskname",
-        "label": "Nom de la tâche",
+        "label": "Task name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "MyTask",
         "required": true,
-        "description": "Nom de la tâche à exporter"
+        "description": "Name of the task to export"
       },
       {
         "name": "taskpath",
-        "label": "Chemin source",
+        "label": "Source path",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Chemin de la tâche"
+        "description": "Task path"
       },
       {
         "name": "outputfile",
-        "label": "Fichier de sortie",
+        "label": "Output file",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Backup\\task.xml",
         "required": true,
-        "description": "Chemin du fichier XML de sortie"
+        "description": "Path of the output XML file"
       }
     ]
   },
   "examples": [
     {
       "command": "Export-ScheduledTask -TaskName 'DailyBackup' | Out-File 'C:\\Backup\\DailyBackup.xml'",
-      "description": "Exporte la tâche vers un fichier XML",
+      "description": "Export the task to an XML file",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask | ForEach-Object { Export-ScheduledTask $_.TaskName | Out-File \"C:\\Backup\\$($_.TaskName).xml\" }",
-      "description": "Exporte toutes les tâches",
+      "description": "Export all tasks",
       "platform": 0
     },
     {
       "command": "Register-ScheduledTask -Xml (Get-Content 'C:\\Backup\\task.xml' | Out-String) -TaskName 'RestoredTask'",
-      "description": "Réimporte une tâche depuis XML",
+      "description": "Import a task again from XML",
       "platform": 0
     },
     {
       "command": "Export-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\ | Out-File 'results.csv'",
-      "description": "Exemple utilisant le paramètre 'taskname': Nom de la tâche à exporter. Remplacez DailyBackup par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'taskname' parameter: name of the task to export. Replace DailyBackup with the value that fits your environment.",
       "platform": 0
     },
     {
       "command": "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'results.csv'",
-      "description": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'taskpath' parameter: task path. Replace \\Microsoft\\Windows\\ with the value that fits your environment.",
       "platform": 0
     },
     {
       "command": "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'C:\\Backup\\task.xml'",
-      "description": "Exemple utilisant le paramètre 'outputfile': Chemin du fichier XML de sortie. Remplacez results.csv par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'outputfile' parameter: path of the output XML file. Replace results.csv with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Utile pour migration entre serveurs ou sauvegarde. Utilisez Register-ScheduledTask avec -Xml pour réimporter.",
+  "notes": "Useful for migration between servers or for backup. Use Register-ScheduledTask with -Xml to import it again.",
   "links": [
     {
       "title": "Export-ScheduledTask Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/export-scheduledtask"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exporter une tâche planifiée",
+      "description": "Exporte la définition d'une tâche planifiée au format XML pour sauvegarde ou migration",
+      "notes": "Utile pour migration entre serveurs ou sauvegarde. Utilisez Register-ScheduledTask avec -Xml pour réimporter.",
+      "parameters": {
+        "windows": {
+          "taskname": {
+            "label": "Nom de la tâche",
+            "description": "Nom de la tâche à exporter"
+          },
+          "taskpath": {
+            "label": "Chemin source",
+            "description": "Chemin de la tâche"
+          },
+          "outputfile": {
+            "label": "Fichier de sortie",
+            "description": "Chemin du fichier XML de sortie"
+          }
+        }
+      },
+      "examples": {
+        "Export-ScheduledTask -TaskName 'DailyBackup' | Out-File 'C:\\Backup\\DailyBackup.xml'": "Exporte la tâche vers un fichier XML",
+        "Get-ScheduledTask | ForEach-Object { Export-ScheduledTask $_.TaskName | Out-File \"C:\\Backup\\$($_.TaskName).xml\" }": "Exporte toutes les tâches",
+        "Register-ScheduledTask -Xml (Get-Content 'C:\\Backup\\task.xml' | Out-String) -TaskName 'RestoredTask'": "Réimporte une tâche depuis XML",
+        "Export-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\ | Out-File 'results.csv'": "Exemple utilisant le paramètre 'taskname': Nom de la tâche à exporter. Remplacez DailyBackup par la valeur appropriée selon votre environnement.",
+        "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'results.csv'": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement.",
+        "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'C:\\Backup\\task.xml'": "Exemple utilisant le paramètre 'outputfile': Chemin du fichier XML de sortie. Remplacez results.csv par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

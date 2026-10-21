@@ -1,7 +1,7 @@
 {
   "id": "force-wu-detection",
-  "title": "Forcer la détection des mises à jour",
-  "description": "Force Windows Update à rechercher immédiatement les nouvelles mises à jour",
+  "title": "Force update detection",
+  "description": "Make Windows Update search for new updates right away.",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -21,15 +21,26 @@
   "examples": [
     {
       "command": "wuauclt /detectnow",
-      "description": "Force uniquement la détection",
+      "description": "Force detection only",
       "platform": 0
     },
     {
       "command": "wuauclt /detectnow /updatenow",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help wuauclt -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Standard run of the None command. See the official documentation with Get-Help wuauclt -Full for details on the available parameters and advanced use cases.",
       "platform": 0
     }
   ],
-  "notes": "Droits administrateur requis. Sur Windows 10/11, préférer 'usoclient StartScan'.",
-  "links": []
+  "notes": "Requires administrator rights. On Windows 10/11, prefer 'usoclient StartScan'.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Forcer la détection des mises à jour",
+      "description": "Force Windows Update à rechercher immédiatement les nouvelles mises à jour",
+      "notes": "Droits administrateur requis. Sur Windows 10/11, préférer 'usoclient StartScan'.",
+      "examples": {
+        "wuauclt /detectnow": "Force uniquement la détection",
+        "wuauclt /detectnow /updatenow": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help wuauclt -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+      }
+    }
+  }
 }

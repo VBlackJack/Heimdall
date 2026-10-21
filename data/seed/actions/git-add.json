@@ -1,7 +1,7 @@
 {
   "id": "git-add",
-  "title": "Ajouter des fichiers à l'index Git",
-  "description": "Ajoute les modifications de fichiers à l'index (staging area)",
+  "title": "Add files to the Git index",
+  "description": "Add file changes to the index (staging area).",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -19,11 +19,11 @@
     "parameters": [
       {
         "name": "files",
-        "label": "Fichiers",
+        "label": "Files",
         "type": "string",
         "defaultValue": ".",
         "required": true,
-        "description": "Fichiers à ajouter (. pour tous)"
+        "description": "Files to add (. for all)"
       }
     ]
   },
@@ -36,31 +36,56 @@
     "parameters": [
       {
         "name": "files",
-        "label": "Fichiers",
+        "label": "Files",
         "type": "string",
         "defaultValue": ".",
         "required": true,
-        "description": "Fichiers à ajouter"
+        "description": "Files to add"
       }
     ]
   },
   "examples": [
     {
       "command": "git add .",
-      "description": "Ajoute tous les fichiers modifiés",
+      "description": "Add every modified file",
       "platform": 2
     },
     {
       "command": "git add src/*.js",
-      "description": "Ajoute tous les fichiers JS du dossier src",
+      "description": "Add every JS file of the src folder",
       "platform": 2
     }
   ],
-  "notes": "Utilisez . pour ajouter tous les fichiers, -A pour inclure suppressions et renames.",
+  "notes": "Use . to add every file, -A to include deletions and renames.",
   "links": [
     {
       "title": "Git Add Documentation",
       "url": "https://git-scm.com/docs/git-add"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Ajouter des fichiers à l'index Git",
+      "description": "Ajoute les modifications de fichiers à l'index (staging area)",
+      "notes": "Utilisez . pour ajouter tous les fichiers, -A pour inclure suppressions et renames.",
+      "parameters": {
+        "windows": {
+          "files": {
+            "label": "Fichiers",
+            "description": "Fichiers à ajouter (. pour tous)"
+          }
+        },
+        "linux": {
+          "files": {
+            "label": "Fichiers",
+            "description": "Fichiers à ajouter"
+          }
+        }
+      },
+      "examples": {
+        "git add .": "Ajoute tous les fichiers modifiés",
+        "git add src/*.js": "Ajoute tous les fichiers JS du dossier src"
+      }
+    }
+  }
 }
