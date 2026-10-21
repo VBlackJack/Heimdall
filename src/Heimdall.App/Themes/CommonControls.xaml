@@ -47,6 +47,9 @@
     <!-- A line under the open section, in the content column: the section margin plus the card
          padding the section text starts at, so it lines up with that text. -->
     <Thickness x:Key="SettingsRailFooterMargin">40,8,0,12</Thickness>
+    <!-- Where the settings rail sits under the toolbar rule: no right margin, so the section
+         scroll bar stays at the window edge. -->
+    <Thickness x:Key="SettingsRailHostMargin">16,0,0,0</Thickness>
     <!-- The space above a group name in the rail, which sets the groups apart. -->
     <Thickness x:Key="SettingsRailGroupHeaderMargin">12,14,0,4</Thickness>
     <!-- The gap between the rail and the open section. The section itself is capped by the
@@ -1366,7 +1369,9 @@
          group, the open one on the right. Each section is short enough to read without scrolling. -->
     <Style x:Key="SettingsRailTabControlStyle" TargetType="{x:Type TabControl}">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <!-- The rail's right divider: with no surface on either side, the line is what parts the
+             rail from the open section. -->
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="TabStripPlacement" Value="Left"/>
@@ -1397,26 +1402,23 @@
                                             KeyboardNavigation.DirectionalNavigation="Cycle"/>
                             </ScrollViewer>
                         </Border>
-                        <!-- The open section sits on the window background, so its cards stand out
-                             from it; on the tab's own card colour they did not. -->
-                        <Border Grid.Column="1"
-                                Margin="{StaticResource SettingsRailContentInset}"
-                                Background="{DynamicResource BackgroundBrush}"
-                                CornerRadius="{StaticResource CornerRadiusLg}">
-                            <!-- The section fills the column, so its scroll bar sits at the window edge;
-                                 each section panel caps its own width (SettingsContentMaxWidth) and
-                                 stays left against the rail. A footer of the group, such as Reset RDP
-                                 defaults, sits under it. -->
-                            <DockPanel LastChildFill="True">
-                                <ContentPresenter DockPanel.Dock="Bottom"
-                                                  Content="{TemplateBinding controls:SettingsRail.ContentFooter}"/>
-                                <ContentPresenter x:Name="PART_SelectedContentHost"
-                                                  HorizontalAlignment="Stretch"
-                                                  Margin="{TemplateBinding Padding}"
-                                                  ContentSource="SelectedContent"
-                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
-                            </DockPanel>
-                        </Border>
+                        <!-- The open section sits straight on the window background, with no surface of
+                             its own: its cards are the only one, so no card sits inside a card. The
+                             section fills the column, so its scroll bar sits at the window edge; each
+                             section panel caps its own width (SettingsContentMaxWidth) and stays left
+                             against the rail. A footer of the group, such as Reset RDP defaults, sits
+                             under it. -->
+                        <DockPanel Grid.Column="1"
+                                   Margin="{StaticResource SettingsRailContentInset}"
+                                   LastChildFill="True">
+                            <ContentPresenter DockPanel.Dock="Bottom"
+                                              Content="{TemplateBinding controls:SettingsRail.ContentFooter}"/>
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              HorizontalAlignment="Stretch"
+                                              Margin="{TemplateBinding Padding}"
+                                              ContentSource="SelectedContent"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </DockPanel>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

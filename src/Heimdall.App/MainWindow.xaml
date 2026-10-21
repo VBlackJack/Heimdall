@@ -2937,7 +2937,7 @@
 
                 <!-- One rail lists every section under the name of its group; the arrow keys walk the
                      sections across the groups and pass over the group names. -->
-                <TabControl Grid.Row="2" x:Name="Mw_SettingsSubTabControl" Margin="16,8,16,0"
+                <TabControl Grid.Row="2" x:Name="Mw_SettingsSubTabControl" Margin="{StaticResource SettingsRailHostMargin}"
                             AutomationProperties.Name="{loc:Translate A11ySettingsSections}"
                             Style="{StaticResource SettingsRailTabControlStyle}"
                             SelectionChanged="OnSettingsRailSelectionChanged">

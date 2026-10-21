@@ -154,6 +154,47 @@ public sealed class SettingsSingleRailMarkupTests
         Assert.Contains("SelectedItem.(controls:SettingsRail.Group)", trigger.Attribute("Binding")?.Value, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The rail and the open section sit on the window background; the section cards are the only
+    /// surface.
+    /// </summary>
+    /// <remarks>
+    /// The settings sat on a rounded card surface, the open section on a rounded background
+    /// surface inside it, and the section cards on the card colour again: a card in a card in a
+    /// card. A divider is all that parts the rail from the section now.
+    /// </remarks>
+    [Fact]
+    public void NoCardSitsInsideACard()
+    {
+        XElement style = Named(Theme(), "SettingsRailTabControlStyle", Xaml + "Key");
+        XElement template = style.Descendants().Single(element => element.Name.LocalName == "ControlTemplate");
+
+        Assert.DoesNotContain(template.DescendantsAndSelf(), element => element.Attribute("Background") is not null);
+        Assert.DoesNotContain(template.DescendantsAndSelf(), element => element.Attribute("CornerRadius") is not null);
+
+        Dictionary<string, string?> setters = style.Elements()
+            .Where(element => element.Name.LocalName == "Setter")
+            .ToDictionary(setter => setter.Attribute("Property")!.Value, setter => setter.Attribute("Value")?.Value);
+        Assert.Equal("Transparent", setters["Background"]);
+        Assert.Equal("{DynamicResource BorderStrongBrush}", setters["BorderBrush"]);
+        XElement divider = template.Descendants().Single(element => element.Attribute("BorderThickness")?.Value == "0,0,1,0");
+        Assert.Equal("{TemplateBinding BorderBrush}", divider.Attribute("BorderBrush")?.Value);
+
+        // The rail reaches the window edge on the right, so the section scroll bar sits there.
+        XElement rail = Named(Window(), "Mw_SettingsSubTabControl");
+        Assert.Equal("{StaticResource SettingsRailHostMargin}", rail.Attribute("Margin")?.Value);
+        XElement margin = Named(Theme(), "SettingsRailHostMargin", Xaml + "Key");
+        Assert.EndsWith(",0,0", margin.Value, StringComparison.Ordinal);
+
+        // The section cards keep the card colour and its outline.
+        List<XElement> cards = Named(Window(), "Mw_SettingsSubTabControl").Descendants()
+            .Where(element => element.Name.LocalName == "Border"
+                && element.Attribute("Background")?.Value == "{DynamicResource CardBrush}")
+            .ToList();
+        Assert.True(cards.Count >= 25, $"only {cards.Count} section cards found; the scan is not reading the settings");
+        Assert.All(cards, card => Assert.Equal("{DynamicResource BorderBrush}", card.Attribute("BorderBrush")?.Value));
+    }
+
     private static List<XElement> RailItems() =>
         Named(Window(), "Mw_SettingsSubTabControl").Elements()
             .Where(element => element.Name.LocalName == "TabItem")
