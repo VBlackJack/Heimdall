@@ -1,0 +1,121 @@
+{
+  "id": "eventlog-filter-by-level",
+  "title": "Filter events by provider and level",
+  "description": "Show the events of one provider at one severity level in a log over the last hours.",
+  "category": "monitoring-logs",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "eventlog",
+    "winevent",
+    "provider",
+    "level",
+    "logs",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "eventlog-filter-by-level-cmd",
+  "windowsCommandTemplate": {
+    "id": "eventlog-filter-by-level-cmd",
+    "platform": 0,
+    "name": "Get-WinEvent",
+    "commandPattern": "Get-WinEvent -FilterHashtable @{LogName='{logName}'; ProviderName='{providerName}'; Level={level}; StartTime=(Get-Date).AddHours(-{hours})} | Select-Object TimeCreated,Id,LevelDisplayName,Message | Format-Table -AutoSize -Wrap",
+    "parameters": [
+      {
+        "name": "logName",
+        "label": "Log",
+        "type": "string",
+        "defaultValue": "System",
+        "quoting": "InlineInQuotes",
+        "required": true,
+        "description": "Name of the event log (System, Application and so on)"
+      },
+      {
+        "name": "providerName",
+        "label": "Provider",
+        "type": "string",
+        "defaultValue": "Service Control Manager",
+        "quoting": "InlineInQuotes",
+        "required": true,
+        "description": "Name of the event source"
+      },
+      {
+        "name": "level",
+        "label": "Level",
+        "type": "int",
+        "defaultValue": "2",
+        "required": true,
+        "description": "1 Critical, 2 Error, 3 Warning, 4 Information"
+      },
+      {
+        "name": "hours",
+        "label": "Hours",
+        "type": "int",
+        "defaultValue": "24",
+        "required": true,
+        "description": "How many hours back to search"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Kernel-Power'; Level=1}",
+      "description": "Show the critical power events, such as unexpected shutdowns",
+      "platform": 0
+    },
+    {
+      "command": "Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MSSQLSERVER'; Level=2,3}",
+      "description": "Show the SQL Server errors and warnings",
+      "platform": 0
+    },
+    {
+      "command": "Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-GroupPolicy'; Level=2} -MaxEvents 20",
+      "description": "Show the last 20 Group Policy errors",
+      "platform": 0
+    },
+    {
+      "command": "Get-WinEvent -ListProvider * -ErrorAction SilentlyContinue | Where-Object Name -like '*Dfs*'",
+      "description": "Find the exact name of a provider",
+      "platform": 0
+    }
+  ],
+  "notes": "The cmdlet raises an error when no event matches. Reading the Security log requires administrator rights.",
+  "links": [
+    {
+      "title": "Get-WinEvent documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Filtrer les événements par fournisseur et par niveau",
+      "description": "Affiche les événements d'un fournisseur à un niveau de gravité donné dans un journal sur les dernières heures.",
+      "notes": "La cmdlet renvoie une erreur quand aucun événement ne correspond. La lecture du journal Security nécessite des droits administrateur.",
+      "parameters": {
+        "windows": {
+          "logName": {
+            "label": "Journal",
+            "description": "Nom du journal d'événements (System, Application, etc.)"
+          },
+          "providerName": {
+            "label": "Fournisseur",
+            "description": "Nom de la source des événements"
+          },
+          "level": {
+            "label": "Niveau",
+            "description": "1 Critique, 2 Erreur, 3 Avertissement, 4 Information"
+          },
+          "hours": {
+            "label": "Heures",
+            "description": "Nombre d'heures à remonter"
+          }
+        }
+      },
+      "examples": {
+        "Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Kernel-Power'; Level=1}": "Affiche les événements d'alimentation critiques, comme les arrêts inattendus",
+        "Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MSSQLSERVER'; Level=2,3}": "Affiche les erreurs et avertissements de SQL Server",
+        "Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-GroupPolicy'; Level=2} -MaxEvents 20": "Affiche les 20 dernières erreurs de stratégie de groupe",
+        "Get-WinEvent -ListProvider * -ErrorAction SilentlyContinue | Where-Object Name -like '*Dfs*'": "Trouve le nom exact d'un fournisseur"
+      }
+    }
+  }
+}

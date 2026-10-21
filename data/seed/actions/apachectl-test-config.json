@@ -1,0 +1,60 @@
+{
+  "id": "apachectl-test-config",
+  "title": "Test the Apache configuration",
+  "description": "Check the Apache HTTP Server configuration syntax without touching the running server.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "apache",
+    "httpd",
+    "apachectl",
+    "linux",
+    "web",
+    "config"
+  ],
+  "linuxCommandTemplateId": "apachectl-test-config-cmd",
+  "linuxCommandTemplate": {
+    "id": "apachectl-test-config-cmd",
+    "platform": 1,
+    "name": "apachectl",
+    "commandPattern": "sudo apachectl configtest",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo apachectl configtest",
+      "description": "Test the configuration before a reload",
+      "platform": 1
+    },
+    {
+      "command": "sudo apache2ctl configtest",
+      "description": "Test the configuration with the Debian and Ubuntu control script",
+      "platform": 1
+    },
+    {
+      "command": "sudo httpd -t -D DUMP_INCLUDES",
+      "description": "Test the configuration and list the files it includes",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. Debian and Ubuntu ship apachectl as a link to apache2ctl, so the command works on both families.",
+  "links": [
+    {
+      "title": "apachectl - Apache HTTP Server Control Interface",
+      "url": "https://httpd.apache.org/docs/2.4/programs/apachectl.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester la configuration Apache",
+      "description": "Vérifie la syntaxe de la configuration d'Apache HTTP Server sans toucher au serveur en cours d'exécution.",
+      "notes": "Nécessite sudo. Debian et Ubuntu fournissent apachectl comme lien vers apache2ctl : la commande fonctionne sur les deux familles.",
+      "examples": {
+        "sudo apachectl configtest": "Teste la configuration avant un rechargement",
+        "sudo apache2ctl configtest": "Teste la configuration avec le script de contrôle de Debian et Ubuntu",
+        "sudo httpd -t -D DUMP_INCLUDES": "Teste la configuration et liste les fichiers inclus"
+      }
+    }
+  }
+}

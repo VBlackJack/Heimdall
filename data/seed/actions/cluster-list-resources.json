@@ -1,0 +1,76 @@
+{
+  "id": "cluster-list-resources",
+  "title": "List the cluster resources",
+  "description": "Show the resources of a failover cluster with their state, role and owner node.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "cluster",
+    "resource",
+    "failoverclusters",
+    "high-availability",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "cluster-list-resources-cmd",
+  "windowsCommandTemplate": {
+    "id": "cluster-list-resources-cmd",
+    "platform": 0,
+    "name": "Get-ClusterResource",
+    "commandPattern": "Get-ClusterResource -Cluster {clusterName} | Select-Object Name,State,OwnerGroup,OwnerNode,ResourceType | Format-Table -AutoSize",
+    "parameters": [
+      {
+        "name": "clusterName",
+        "label": "Cluster",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the failover cluster"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-ClusterResource -Cluster CLU01 | Where-Object State -ne 'Online'",
+      "description": "Find the resources that are not online",
+      "platform": 0
+    },
+    {
+      "command": "Get-ClusterGroup -Cluster CLU01",
+      "description": "Show the roles and the node that owns each one",
+      "platform": 0
+    },
+    {
+      "command": "Get-ClusterResource -Cluster CLU01 -Name 'Cluster IP Address' | Get-ClusterParameter",
+      "description": "Show the private settings of one resource",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the FailoverClusters module (RSAT Failover Clustering tools) and administrator rights on the cluster.",
+  "links": [
+    {
+      "title": "Get-ClusterResource documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/failoverclusters/get-clusterresource"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les ressources du cluster",
+      "description": "Affiche les ressources d'un cluster de basculement avec leur état, leur rôle et leur noeud propriétaire.",
+      "notes": "Nécessite le module FailoverClusters (outils RSAT Clustering de basculement) et des droits administrateur sur le cluster.",
+      "parameters": {
+        "windows": {
+          "clusterName": {
+            "label": "Cluster",
+            "description": "Nom du cluster de basculement"
+          }
+        }
+      },
+      "examples": {
+        "Get-ClusterResource -Cluster CLU01 | Where-Object State -ne 'Online'": "Trouve les ressources qui ne sont pas en ligne",
+        "Get-ClusterGroup -Cluster CLU01": "Affiche les rôles et le noeud propriétaire de chacun",
+        "Get-ClusterResource -Cluster CLU01 -Name 'Cluster IP Address' | Get-ClusterParameter": "Affiche les paramètres privés d'une ressource"
+      }
+    }
+  }
+}

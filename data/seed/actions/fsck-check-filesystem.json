@@ -17,7 +17,7 @@
     "id": "fsck-cmd",
     "platform": 1,
     "name": "fsck",
-    "commandPattern": "fsck -y {device}",
+    "commandPattern": "sudo fsck -y {device}",
     "parameters": [
       {
         "name": "device",
@@ -41,32 +41,22 @@
       "platform": 1
     },
     {
-      "command": "fsck -y /dev/sda1",
+      "command": "sudo fsck -y /dev/sda1",
       "description": "Repair /dev/sda1 automatically",
       "platform": 1
     },
     {
-      "command": "fsck /dev/sdb1",
+      "command": "sudo fsck /dev/sdb1",
       "description": "Check the filesystem",
       "platform": 1
     },
     {
-      "command": "fsck -y /dev/sdb1",
-      "description": "Repair automatically",
-      "platform": 1
-    },
-    {
-      "command": "fsck -n /dev/sdb1",
+      "command": "sudo fsck -n /dev/sdb1",
       "description": "Dry run (no changes)",
       "platform": 1
     },
     {
-      "command": "e2fsck -f /dev/sdb1",
-      "description": "Force the ext4 check",
-      "platform": 1
-    },
-    {
-      "command": "xfs_repair /dev/sdc1",
+      "command": "sudo xfs_repair /dev/sdc1",
       "description": "Repair an XFS filesystem",
       "platform": 1
     }
@@ -94,12 +84,10 @@
       "examples": {
         "sudo fsck -y /dev/sdb1": "Vérifie et répare automatiquement",
         "sudo e2fsck -f /dev/sdb1": "Force la vérification d'une partition ext4",
-        "fsck -y /dev/sda1": "Répare automatiquement /dev/sda1",
-        "fsck /dev/sdb1": "Vérifier le filesystem",
-        "fsck -y /dev/sdb1": "Réparer automatiquement",
-        "fsck -n /dev/sdb1": "Dry-run (pas de modification)",
-        "e2fsck -f /dev/sdb1": "Forcer la vérification ext4",
-        "xfs_repair /dev/sdc1": "Réparer un filesystem XFS"
+        "sudo fsck -y /dev/sda1": "Répare automatiquement /dev/sda1",
+        "sudo fsck /dev/sdb1": "Vérifier le filesystem",
+        "sudo fsck -n /dev/sdb1": "Dry-run (pas de modification)",
+        "sudo xfs_repair /dev/sdc1": "Réparer un filesystem XFS"
       }
     }
   }

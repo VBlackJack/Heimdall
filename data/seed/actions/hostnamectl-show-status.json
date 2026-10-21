@@ -1,0 +1,59 @@
+{
+  "id": "hostnamectl-show-status",
+  "title": "Show the host name and system identity",
+  "description": "Show the host name, the operating system, the kernel, the hardware model and the virtualization type.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "hostnamectl",
+    "systemd",
+    "linux",
+    "hostname",
+    "inventory"
+  ],
+  "linuxCommandTemplateId": "hostnamectl-show-status-cmd",
+  "linuxCommandTemplate": {
+    "id": "hostnamectl-show-status-cmd",
+    "platform": 1,
+    "name": "hostnamectl",
+    "commandPattern": "hostnamectl status",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "hostnamectl status",
+      "description": "Show the identity of the host",
+      "platform": 1
+    },
+    {
+      "command": "cat /etc/os-release",
+      "description": "Show the distribution name and version",
+      "platform": 1
+    },
+    {
+      "command": "uname -r",
+      "description": "Show the release of the running kernel",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs no special rights.",
+  "links": [
+    {
+      "title": "hostnamectl(1)",
+      "url": "https://man7.org/linux/man-pages/man1/hostnamectl.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher le nom d'hôte et l'identité du système",
+      "description": "Affiche le nom d'hôte, le système d'exploitation, le noyau, le modèle matériel et le type de virtualisation.",
+      "notes": "Aucun droit particulier.",
+      "examples": {
+        "hostnamectl status": "Affiche l'identité de l'hôte",
+        "cat /etc/os-release": "Affiche le nom et la version de la distribution",
+        "uname -r": "Affiche la version du noyau en cours d'exécution"
+      }
+    }
+  }
+}

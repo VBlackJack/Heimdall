@@ -983,6 +983,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<TrustedRdpCertificatesSettingsViewModel>();
         services.AddTransient<TrustedWebCertificatesSettingsViewModel>();
         services.AddTransient<CommandLibraryViewModel>();
+        services.AddSingleton<CommandLibrarySessionMemory>();
         services.AddTransient<ImportOpenSshConfigDialogViewModel>();
         services.AddTransient<ImportPuttySessionsDialogViewModel>();
         services.AddTransient<ImportKnownHostsDialogViewModel>();

@@ -1,0 +1,59 @@
+{
+  "id": "firewall-cmd-reload-rules",
+  "title": "Reload the firewalld rules",
+  "description": "Apply the saved firewalld configuration to the running firewall, keeping established connections.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "firewalld",
+    "firewall-cmd",
+    "linux",
+    "firewall",
+    "reload"
+  ],
+  "linuxCommandTemplateId": "firewall-cmd-reload-rules-cmd",
+  "linuxCommandTemplate": {
+    "id": "firewall-cmd-reload-rules-cmd",
+    "platform": 1,
+    "name": "firewall-cmd",
+    "commandPattern": "sudo firewall-cmd --reload",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo firewall-cmd --reload",
+      "description": "Apply the permanent rules",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --runtime-to-permanent",
+      "description": "Save the running rules as the permanent ones",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --state",
+      "description": "Check that firewalld is running",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. Runtime-only rules that were never saved are lost by the reload.",
+  "links": [
+    {
+      "title": "firewall-cmd(1)",
+      "url": "https://firewalld.org/documentation/man-pages/firewall-cmd.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Recharger les règles firewalld",
+      "description": "Applique la configuration firewalld enregistrée au pare-feu actif, en gardant les connexions établies.",
+      "notes": "Nécessite sudo. Les règles uniquement actives, jamais enregistrées, sont perdues au rechargement.",
+      "examples": {
+        "sudo firewall-cmd --reload": "Applique les règles permanentes",
+        "sudo firewall-cmd --runtime-to-permanent": "Enregistre les règles actives comme règles permanentes",
+        "sudo firewall-cmd --state": "Vérifie que firewalld fonctionne"
+      }
+    }
+  }
+}

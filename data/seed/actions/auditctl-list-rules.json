@@ -1,0 +1,65 @@
+{
+  "id": "auditctl-list-rules",
+  "title": "List the audit rules",
+  "description": "List the Linux audit rules loaded in the kernel, with their keys.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "auditctl",
+    "auditd",
+    "linux",
+    "audit",
+    "security"
+  ],
+  "linuxCommandTemplateId": "auditctl-list-rules-cmd",
+  "linuxCommandTemplate": {
+    "id": "auditctl-list-rules-cmd",
+    "platform": 1,
+    "name": "auditctl",
+    "commandPattern": "sudo auditctl -l",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo auditctl -l",
+      "description": "List the loaded rules",
+      "platform": 1
+    },
+    {
+      "command": "sudo auditctl -s",
+      "description": "Show the state of the audit system and the lost events",
+      "platform": 1
+    },
+    {
+      "command": "sudo auditctl -w /etc/sudoers -p wa -k sudoers",
+      "description": "Watch writes to /etc/sudoers under the sudoers key until reboot",
+      "platform": 1
+    },
+    {
+      "command": "ls /etc/audit/rules.d/",
+      "description": "Show the rule files loaded at boot",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo and the auditd service. Rules added with auditctl last until reboot; persistent rules live in /etc/audit/rules.d.",
+  "links": [
+    {
+      "title": "auditctl(8)",
+      "url": "https://man7.org/linux/man-pages/man8/auditctl.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les règles d'audit",
+      "description": "Liste les règles d'audit Linux chargées dans le noyau, avec leurs clés.",
+      "notes": "Nécessite sudo et le service auditd. Les règles ajoutées avec auditctl durent jusqu'au redémarrage ; les règles permanentes sont dans /etc/audit/rules.d.",
+      "examples": {
+        "sudo auditctl -l": "Liste les règles chargées",
+        "sudo auditctl -s": "Affiche l'état du système d'audit et les événements perdus",
+        "sudo auditctl -w /etc/sudoers -p wa -k sudoers": "Surveille les écritures dans /etc/sudoers sous la clé sudoers jusqu'au redémarrage",
+        "ls /etc/audit/rules.d/": "Affiche les fichiers de règles chargés au démarrage"
+      }
+    }
+  }
+}

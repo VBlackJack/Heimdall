@@ -1,0 +1,81 @@
+{
+  "id": "groupadd-create-group",
+  "title": "Create a local group",
+  "description": "Create a new local group on the system.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "groupadd",
+    "linux",
+    "group",
+    "account"
+  ],
+  "linuxCommandTemplateId": "groupadd-create-group-cmd",
+  "linuxCommandTemplate": {
+    "id": "groupadd-create-group-cmd",
+    "platform": 1,
+    "name": "groupadd",
+    "commandPattern": "sudo groupadd {groupName}",
+    "parameters": [
+      {
+        "name": "groupName",
+        "label": "Group name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the group to create"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo groupadd webadmins",
+      "description": "Create the webadmins group",
+      "platform": 1
+    },
+    {
+      "command": "sudo groupadd -g 2001 backup",
+      "description": "Create a group with a fixed GID, to match other hosts",
+      "platform": 1
+    },
+    {
+      "command": "sudo groupadd -r svc-monitor",
+      "description": "Create a system group for a service",
+      "platform": 1
+    },
+    {
+      "command": "getent group webadmins",
+      "description": "Check that the group exists and show its members",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. Fails when the name or the GID is already taken.",
+  "links": [
+    {
+      "title": "groupadd(8)",
+      "url": "https://man7.org/linux/man-pages/man8/groupadd.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer un groupe local",
+      "description": "Crée un nouveau groupe local sur le système.",
+      "notes": "Nécessite sudo. Échoue si le nom ou le GID est déjà pris.",
+      "parameters": {
+        "linux": {
+          "groupName": {
+            "label": "Nom du groupe",
+            "description": "Nom du groupe à créer"
+          }
+        }
+      },
+      "examples": {
+        "sudo groupadd webadmins": "Crée le groupe webadmins",
+        "sudo groupadd -g 2001 backup": "Crée un groupe avec un GID fixe, pour s'aligner sur d'autres hôtes",
+        "sudo groupadd -r svc-monitor": "Crée un groupe système pour un service",
+        "getent group webadmins": "Vérifie que le groupe existe et affiche ses membres"
+      }
+    }
+  }
+}

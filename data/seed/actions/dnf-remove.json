@@ -17,7 +17,7 @@
     "id": "dnf-remove-cmd",
     "platform": 1,
     "name": "dnf",
-    "commandPattern": "dnf remove -y {package}",
+    "commandPattern": "sudo dnf remove -y {package}",
     "parameters": [
       {
         "name": "package",
@@ -41,17 +41,17 @@
       "platform": 1
     },
     {
-      "command": "dnf remove -y nginx -v",
+      "command": "sudo dnf remove -y nginx -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
-      "command": "dnf remove -y nginx --dry-run",
+      "command": "sudo dnf remove -y nginx --dry-run",
       "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     },
     {
-      "command": "dnf remove mariadb",
+      "command": "sudo dnf remove mariadb",
       "description": "Uninstall MariaDB",
       "platform": 1
     }
@@ -79,9 +79,9 @@
       "examples": {
         "sudo dnf remove httpd": "Supprime le serveur Apache",
         "sudo dnf autoremove": "Supprime les dépendances inutilisées",
-        "dnf remove -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "dnf remove -y nginx --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
-        "dnf remove mariadb": "Désinstaller MariaDB"
+        "sudo dnf remove -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "sudo dnf remove -y nginx --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+        "sudo dnf remove mariadb": "Désinstaller MariaDB"
       }
     }
   }

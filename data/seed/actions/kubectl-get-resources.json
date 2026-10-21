@@ -1,0 +1,104 @@
+{
+  "id": "kubectl-get-resources",
+  "title": "List Kubernetes resources of a kind",
+  "description": "List the Kubernetes resources of a chosen kind in a namespace, with their wide columns.",
+  "category": "containers-vms",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "kubectl",
+    "kubernetes",
+    "k8s",
+    "linux",
+    "containers"
+  ],
+  "linuxCommandTemplateId": "kubectl-get-resources-cmd",
+  "linuxCommandTemplate": {
+    "id": "kubectl-get-resources-cmd",
+    "platform": 1,
+    "name": "kubectl",
+    "commandPattern": "kubectl get {resource} -n {namespace} -o wide",
+    "parameters": [
+      {
+        "name": "resource",
+        "label": "Resource",
+        "type": "choice",
+        "allowedValues": [
+          "pods",
+          "deployments",
+          "services",
+          "ingresses",
+          "configmaps",
+          "persistentvolumeclaims",
+          "events",
+          "nodes"
+        ],
+        "defaultValue": "pods",
+        "required": true,
+        "description": "Kind of resource to list"
+      },
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "string",
+        "defaultValue": "default",
+        "required": true,
+        "description": "Kubernetes namespace"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "kubectl get deployments -n web -o wide",
+      "description": "List the deployments of the web namespace",
+      "platform": 1
+    },
+    {
+      "command": "kubectl get nodes -o wide",
+      "description": "List the nodes with their addresses and versions",
+      "platform": 1
+    },
+    {
+      "command": "kubectl get events -n web --sort-by=.lastTimestamp",
+      "description": "Show the latest events of a namespace",
+      "platform": 1
+    },
+    {
+      "command": "kubectl get pods -A --field-selector status.phase=Pending",
+      "description": "Find the pods stuck in Pending in every namespace",
+      "platform": 1
+    }
+  ],
+  "notes": "Uses the current kubeconfig context; nodes are cluster-wide and ignore the namespace.",
+  "links": [
+    {
+      "title": "kubectl get",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les ressources Kubernetes d'un type",
+      "description": "Liste les ressources Kubernetes d'un type choisi dans un espace de noms, avec les colonnes étendues.",
+      "notes": "Utilise le contexte kubeconfig courant ; les noeuds sont globaux au cluster et ignorent l'espace de noms.",
+      "parameters": {
+        "linux": {
+          "resource": {
+            "label": "Ressource",
+            "description": "Type de ressource à lister"
+          },
+          "namespace": {
+            "label": "Espace de noms",
+            "description": "Espace de noms Kubernetes"
+          }
+        }
+      },
+      "examples": {
+        "kubectl get deployments -n web -o wide": "Liste les déploiements de l'espace de noms web",
+        "kubectl get nodes -o wide": "Liste les noeuds avec leurs adresses et leurs versions",
+        "kubectl get events -n web --sort-by=.lastTimestamp": "Affiche les derniers événements d'un espace de noms",
+        "kubectl get pods -A --field-selector status.phase=Pending": "Trouve les pods bloqués en Pending dans tous les espaces de noms"
+      }
+    }
+  }
+}

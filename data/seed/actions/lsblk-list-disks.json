@@ -10,7 +10,9 @@
     "disk",
     "partition",
     "storage",
-    "block"
+    "block",
+    "mount",
+    "linux"
   ],
   "linuxCommandTemplateId": "lsblk-cmd",
   "linuxCommandTemplate": {
@@ -50,6 +52,11 @@
       "command": "lsblk -J",
       "description": "JSON output",
       "platform": 1
+    },
+    {
+      "command": "lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINT,STATE",
+      "description": "Custom output to see the state of the disks",
+      "platform": 1
     }
   ],
   "notes": "Does not require sudo. Very useful to identify the disks before partitioning.",
@@ -70,7 +77,8 @@
         "lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT": "Colonnes personnalisées",
         "lsblk -o NAME,SIZE,TYPE,MOUNTPOINT": "Colonnes personnalisées",
         "lsblk -d": "Afficher uniquement les disques (pas les partitions)",
-        "lsblk -J": "Sortie en format JSON"
+        "lsblk -J": "Sortie en format JSON",
+        "lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINT,STATE": "Affichage personnalisé pour voir l'état des disques"
       }
     }
   }

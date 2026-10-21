@@ -1,0 +1,82 @@
+{
+  "id": "registry-get-values",
+  "title": "Show the values of a registry key",
+  "description": "Show every value stored under one registry key.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "registry",
+    "itemproperty",
+    "regedit",
+    "configuration",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "registry-get-values-cmd",
+  "windowsCommandTemplate": {
+    "id": "registry-get-values-cmd",
+    "platform": 0,
+    "name": "Get-ItemProperty",
+    "commandPattern": "Get-ItemProperty -Path {keyPath}",
+    "parameters": [
+      {
+        "name": "keyPath",
+        "label": "Registry key",
+        "type": "path",
+        "defaultValue": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+        "required": true,
+        "description": "Key path in a registry drive (HKLM: or HKCU:)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' -Name DisplayVersion,CurrentBuild",
+      "description": "Show the Windows version and build",
+      "platform": 0
+    },
+    {
+      "command": "Get-ItemPropertyValue -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server' -Name fDenyTSConnections",
+      "description": "Read one value: 1 means that Remote Desktop connections are refused",
+      "platform": 0
+    },
+    {
+      "command": "Get-ChildItem -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall' | Get-ItemProperty | Select-Object DisplayName,DisplayVersion",
+      "description": "List the installed programs from the uninstall keys",
+      "platform": 0
+    },
+    {
+      "command": "Invoke-Command -ComputerName SRV-APP01 -ScriptBlock { Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\W32Time\\Parameters' }",
+      "description": "Read a key on a remote server through PowerShell remoting",
+      "platform": 0
+    }
+  ],
+  "notes": "Reading HKLM needs no elevation for most keys. The output also shows the PSPath, PSParentPath and PSProvider properties that PowerShell adds.",
+  "links": [
+    {
+      "title": "Get-ItemProperty documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-itemproperty"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les valeurs d'une clé de registre",
+      "description": "Affiche toutes les valeurs enregistrées sous une clé de registre.",
+      "notes": "La lecture de HKLM ne nécessite pas d'élévation pour la plupart des clés. La sortie montre aussi les propriétés PSPath, PSParentPath et PSProvider ajoutées par PowerShell.",
+      "parameters": {
+        "windows": {
+          "keyPath": {
+            "label": "Clé de registre",
+            "description": "Chemin de la clé dans un lecteur de registre (HKLM: ou HKCU:)"
+          }
+        }
+      },
+      "examples": {
+        "Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' -Name DisplayVersion,CurrentBuild": "Affiche la version et la build de Windows",
+        "Get-ItemPropertyValue -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server' -Name fDenyTSConnections": "Lit une seule valeur : 1 signifie que les connexions Bureau à distance sont refusées",
+        "Get-ChildItem -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall' | Get-ItemProperty | Select-Object DisplayName,DisplayVersion": "Liste les programmes installés à partir des clés de désinstallation",
+        "Invoke-Command -ComputerName SRV-APP01 -ScriptBlock { Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\W32Time\\Parameters' }": "Lit une clé sur un serveur distant via la communication à distance PowerShell"
+      }
+    }
+  }
+}

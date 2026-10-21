@@ -9,7 +9,8 @@
     "size",
     "folder",
     "du",
-    "linux"
+    "linux",
+    "disk"
   ],
   "linuxCommandTemplateId": "file-directory-size-linux-cmd",
   "linuxCommandTemplate": {
@@ -38,6 +39,11 @@
       "command": "du -sh /home/*",
       "description": "Size of each home directory",
       "platform": 1
+    },
+    {
+      "command": "du -sh * | sort -rh | head -10",
+      "description": "Show the 10 largest folders or files of the current directory, largest first, to find what fills the disk",
+      "platform": 1
     }
   ],
   "notes": "-s for a sum, -h for a human-readable format. --max-depth limits the depth.",
@@ -57,7 +63,8 @@
       },
       "examples": {
         "du -h --max-depth=1 /home | sort -h": "Liste les dossiers par taille",
-        "du -sh /home/*": "Taille de chaque home"
+        "du -sh /home/*": "Taille de chaque home",
+        "du -sh * | sort -rh | head -10": "Affiche les 10 plus gros dossiers ou fichiers du répertoire courant, du plus gros au plus petit, pour trouver ce qui remplit le disque"
       }
     }
   }

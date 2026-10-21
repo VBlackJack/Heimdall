@@ -1,0 +1,65 @@
+{
+  "id": "nginx-test-config",
+  "title": "Test the nginx configuration",
+  "description": "Check the nginx configuration syntax and the files it includes, without touching the running server.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "nginx",
+    "linux",
+    "web",
+    "config",
+    "syntax"
+  ],
+  "linuxCommandTemplateId": "nginx-test-config-cmd",
+  "linuxCommandTemplate": {
+    "id": "nginx-test-config-cmd",
+    "platform": 1,
+    "name": "nginx",
+    "commandPattern": "sudo nginx -t",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo nginx -t",
+      "description": "Test the configuration before a reload",
+      "platform": 1
+    },
+    {
+      "command": "sudo nginx -t -c /etc/nginx/nginx.conf",
+      "description": "Test a given main configuration file",
+      "platform": 1
+    },
+    {
+      "command": "sudo nginx -T",
+      "description": "Test the configuration and print it with every included file",
+      "platform": 1
+    },
+    {
+      "command": "sudo nginx -t -q",
+      "description": "Test quietly, printing only the errors",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo to read the certificates and the log paths the configuration names. Run it before every reload.",
+  "links": [
+    {
+      "title": "nginx command-line parameters",
+      "url": "https://nginx.org/en/docs/switches.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester la configuration nginx",
+      "description": "Vérifie la syntaxe de la configuration nginx et des fichiers inclus, sans toucher au serveur en cours d'exécution.",
+      "notes": "Nécessite sudo pour lire les certificats et les chemins de journaux que la configuration cite. À lancer avant chaque rechargement.",
+      "examples": {
+        "sudo nginx -t": "Teste la configuration avant un rechargement",
+        "sudo nginx -t -c /etc/nginx/nginx.conf": "Teste un fichier de configuration principal donné",
+        "sudo nginx -T": "Teste la configuration et l'affiche avec tous les fichiers inclus",
+        "sudo nginx -t -q": "Teste en silence, en n'affichant que les erreurs"
+      }
+    }
+  }
+}

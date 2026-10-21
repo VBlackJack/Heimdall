@@ -311,10 +311,69 @@ public sealed partial class CommandLibraryViewModel
             {
                 var action = vm.ToAction();
                 await actionService.CreateActionAsync(action);
+                RememberCreatedCategory(action.Category);
                 await ReloadAsync();
             },
             "Create action",
             "ToolCmdLibErrorTitle");
+    }
+
+    /// <summary>
+    /// Opens the Add dialog prefilled with a command captured from a terminal, creates the
+    /// action when the operator saves, and selects it.
+    /// </summary>
+    /// <remarks>
+    /// <para>Prefilled from <see cref="CommandActionDialogViewModel.ForCapturedCommand"/>, in the
+    /// category of the last action created in this session. Cancelling leaves the library as it
+    /// was, on its list.</para>
+    /// <para>Nothing is written to the command history: the command was captured, not run from
+    /// the library.</para>
+    /// </remarks>
+    public async Task PrefillNewActionAsync(CapturedCommand capture)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        if (ShowActionDialogAsync is null) return;
+
+        var vm = CommandActionDialogViewModel.ForCapturedCommand(capture, SessionMemory.LastCreatedCategory);
+        vm.DialogTitle = LocalizeKey("ToolCmdLibDialogTitleAdd");
+        vm.Localizer = _localizer;
+        vm.AvailableCategories = _categoryList.ToList();
+
+        var saved = await ShowActionDialogAsync(vm);
+        if (!saved) return;
+
+        string? createdId = null;
+        await RunActionServiceOperationAsync(
+            async actionService =>
+            {
+                var action = vm.ToAction();
+                await actionService.CreateActionAsync(action);
+                RememberCreatedCategory(action.Category);
+                createdId = action.Id;
+                await ReloadAsync();
+            },
+            "Create captured action",
+            "ToolCmdLibErrorTitle");
+
+        SelectActionById(createdId);
+    }
+
+    /// <summary>
+    /// The application-wide memory of the library, shared by every library tab; a private one
+    /// when the container does not provide it.
+    /// </summary>
+    private CommandLibrarySessionMemory SessionMemory =>
+        _sessionMemory ??= _serviceProvider.GetService<CommandLibrarySessionMemory>()
+            ?? new CommandLibrarySessionMemory();
+
+    private CommandLibrarySessionMemory? _sessionMemory;
+
+    private void RememberCreatedCategory(string? category)
+    {
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            SessionMemory.LastCreatedCategory = category.Trim();
+        }
     }
 
     /// <summary>
@@ -350,7 +409,9 @@ public sealed partial class CommandLibraryViewModel
         await RunActionServiceOperationAsync(
             async actionService =>
             {
-                await actionService.CreateActionAsync(vm.ToAction());
+                var action = vm.ToAction();
+                await actionService.CreateActionAsync(action);
+                RememberCreatedCategory(action.Category);
                 await ReloadAsync();
             },
             "Duplicate action",

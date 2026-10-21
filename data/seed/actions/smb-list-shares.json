@@ -1,0 +1,65 @@
+{
+  "id": "smb-list-shares",
+  "title": "List the SMB shares",
+  "description": "Show the shares of the file server with their path and connected users.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "smb",
+    "share",
+    "smbshare",
+    "file-server",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "smb-list-shares-cmd",
+  "windowsCommandTemplate": {
+    "id": "smb-list-shares-cmd",
+    "platform": 0,
+    "name": "Get-SmbShare",
+    "commandPattern": "Get-SmbShare | Select-Object Name,Path,Description,CurrentUsers,FolderEnumerationMode | Format-Table -AutoSize",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-SmbShare -Special $false",
+      "description": "Hide the administrative shares (C$, ADMIN$, IPC$)",
+      "platform": 0
+    },
+    {
+      "command": "Get-SmbShareAccess -Name Data",
+      "description": "Show the share permissions of the Data share",
+      "platform": 0
+    },
+    {
+      "command": "Get-SmbShare -Name Data | Format-List *",
+      "description": "Show every setting of one share",
+      "platform": 0
+    },
+    {
+      "command": "Get-SmbShare -CimSession FS01",
+      "description": "List the shares of a remote file server",
+      "platform": 0
+    }
+  ],
+  "notes": "Run it on the file server, or add -CimSession to query one remotely. Requires administrator rights.",
+  "links": [
+    {
+      "title": "Get-SmbShare documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/smbshare/get-smbshare"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les partages SMB",
+      "description": "Affiche les partages du serveur de fichiers avec leur chemin et les utilisateurs connectés.",
+      "notes": "À lancer sur le serveur de fichiers, ou ajoutez -CimSession pour en interroger un à distance. Nécessite des droits administrateur.",
+      "examples": {
+        "Get-SmbShare -Special $false": "Masque les partages administratifs (C$, ADMIN$, IPC$)",
+        "Get-SmbShareAccess -Name Data": "Affiche les autorisations de partage du partage Data",
+        "Get-SmbShare -Name Data | Format-List *": "Affiche tous les réglages d'un partage",
+        "Get-SmbShare -CimSession FS01": "Liste les partages d'un serveur de fichiers distant"
+      }
+    }
+  }
+}

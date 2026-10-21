@@ -1,0 +1,66 @@
+{
+  "id": "apachectl-show-vhosts",
+  "title": "Show the Apache virtual hosts",
+  "description": "Print the virtual hosts Apache has parsed, with their names, ports and configuration files.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "apache",
+    "httpd",
+    "apachectl",
+    "linux",
+    "web",
+    "vhost"
+  ],
+  "linuxCommandTemplateId": "apachectl-show-vhosts-cmd",
+  "linuxCommandTemplate": {
+    "id": "apachectl-show-vhosts-cmd",
+    "platform": 1,
+    "name": "apachectl",
+    "commandPattern": "sudo apachectl -S",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo apachectl -S",
+      "description": "List the virtual hosts and the default server of each port",
+      "platform": 1
+    },
+    {
+      "command": "sudo apachectl -M",
+      "description": "List the loaded modules",
+      "platform": 1
+    },
+    {
+      "command": "ls -l /etc/apache2/sites-enabled/",
+      "description": "Show the enabled site links on Debian and Ubuntu",
+      "platform": 1
+    },
+    {
+      "command": "sudo a2ensite example.conf",
+      "description": "Enable a site on Debian or Ubuntu (reload Apache afterwards)",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. The output also shows the ServerRoot, the main error log and the run user.",
+  "links": [
+    {
+      "title": "httpd - Apache HTTP Server",
+      "url": "https://httpd.apache.org/docs/2.4/programs/httpd.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les hôtes virtuels Apache",
+      "description": "Affiche les hôtes virtuels analysés par Apache, avec leurs noms, ports et fichiers de configuration.",
+      "notes": "Nécessite sudo. La sortie montre aussi le ServerRoot, le journal d'erreurs principal et l'utilisateur d'exécution.",
+      "examples": {
+        "sudo apachectl -S": "Liste les hôtes virtuels et le serveur par défaut de chaque port",
+        "sudo apachectl -M": "Liste les modules chargés",
+        "ls -l /etc/apache2/sites-enabled/": "Affiche les liens des sites activés sur Debian et Ubuntu",
+        "sudo a2ensite example.conf": "Active un site sur Debian ou Ubuntu (recharger Apache ensuite)"
+      }
+    }
+  }
+}

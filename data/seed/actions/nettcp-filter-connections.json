@@ -1,0 +1,103 @@
+{
+  "id": "nettcp-filter-connections",
+  "title": "Find TCP connections by state and port",
+  "description": "Show the TCP connections in one state on one local port, with the owning process.",
+  "category": "network-dns",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "tcp",
+    "netstat",
+    "port",
+    "connection",
+    "network",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "nettcp-filter-connections-cmd",
+  "windowsCommandTemplate": {
+    "id": "nettcp-filter-connections-cmd",
+    "platform": 0,
+    "name": "Get-NetTCPConnection",
+    "commandPattern": "Get-NetTCPConnection -State {state} -LocalPort {localPort} | Select-Object LocalAddress,LocalPort,RemoteAddress,RemotePort,State,OwningProcess,@{Name='Process';Expression={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} | Format-Table -AutoSize",
+    "parameters": [
+      {
+        "name": "state",
+        "label": "State",
+        "type": "choice",
+        "allowedValues": [
+          "Listen",
+          "Established",
+          "TimeWait",
+          "CloseWait",
+          "SynSent",
+          "Bound"
+        ],
+        "defaultValue": "Listen",
+        "required": true,
+        "description": "TCP state of the connections"
+      },
+      {
+        "name": "localPort",
+        "label": "Local port",
+        "type": "int",
+        "defaultValue": "443",
+        "required": true,
+        "description": "Local TCP port"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-NetTCPConnection -State Listen -LocalPort 3389",
+      "description": "Check that Remote Desktop listens",
+      "platform": 0
+    },
+    {
+      "command": "Get-NetTCPConnection -State Established -RemotePort 1433",
+      "description": "Show the open connections to SQL Server instances",
+      "platform": 0
+    },
+    {
+      "command": "Get-NetTCPConnection -State TimeWait | Measure-Object",
+      "description": "Count the connections in TIME_WAIT, a sign of port exhaustion when it climbs",
+      "platform": 0
+    },
+    {
+      "command": "Get-NetTCPConnection -OwningProcess (Get-Process -Name w3wp).Id",
+      "description": "Show the connections of the IIS worker processes",
+      "platform": 0
+    }
+  ],
+  "notes": "No administrator rights needed. The cmdlet raises an error when no connection matches.",
+  "links": [
+    {
+      "title": "Get-NetTCPConnection documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpconnection"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Trouver les connexions TCP par état et par port",
+      "description": "Affiche les connexions TCP dans un état donné sur un port local, avec le processus propriétaire.",
+      "notes": "Aucun droit administrateur requis. La cmdlet renvoie une erreur quand aucune connexion ne correspond.",
+      "parameters": {
+        "windows": {
+          "state": {
+            "label": "État",
+            "description": "État TCP des connexions"
+          },
+          "localPort": {
+            "label": "Port local",
+            "description": "Port TCP local"
+          }
+        }
+      },
+      "examples": {
+        "Get-NetTCPConnection -State Listen -LocalPort 3389": "Vérifie que le Bureau à distance est à l'écoute",
+        "Get-NetTCPConnection -State Established -RemotePort 1433": "Affiche les connexions ouvertes vers des instances SQL Server",
+        "Get-NetTCPConnection -State TimeWait | Measure-Object": "Compte les connexions en TIME_WAIT, signe d'épuisement des ports quand le nombre grimpe",
+        "Get-NetTCPConnection -OwningProcess (Get-Process -Name w3wp).Id": "Affiche les connexions des processus de travail IIS"
+      }
+    }
+  }
+}

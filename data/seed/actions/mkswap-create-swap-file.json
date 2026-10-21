@@ -1,0 +1,98 @@
+{
+  "id": "mkswap-create-swap-file",
+  "title": "Create and enable a swap file",
+  "description": "Allocate a file, format it as swap and enable it at once.",
+  "category": "performance",
+  "platform": 1,
+  "level": 2,
+  "tags": [
+    "mkswap",
+    "swapon",
+    "swap",
+    "linux",
+    "memory"
+  ],
+  "linuxCommandTemplateId": "mkswap-create-swap-file-cmd",
+  "linuxCommandTemplate": {
+    "id": "mkswap-create-swap-file-cmd",
+    "platform": 1,
+    "name": "mkswap",
+    "commandPattern": "sudo fallocate -l {size} {swapFile} && sudo chmod 600 {swapFile} && sudo mkswap {swapFile} && sudo swapon {swapFile}",
+    "parameters": [
+      {
+        "name": "size",
+        "label": "Size",
+        "type": "string",
+        "defaultValue": "2G",
+        "required": true,
+        "description": "Size of the swap file, such as 2G or 512M"
+      },
+      {
+        "name": "swapFile",
+        "label": "Swap file",
+        "type": "path",
+        "defaultValue": "/swapfile",
+        "required": true,
+        "description": "Path of the file to create; an existing file is overwritten"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile",
+      "description": "Add 4 GB of swap",
+      "platform": 1
+    },
+    {
+      "command": "sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress",
+      "description": "Allocate the file with dd where fallocate is not supported",
+      "platform": 1
+    },
+    {
+      "command": "echo '/swapfile none swap defaults 0 0' | sudo tee -a /etc/fstab",
+      "description": "Enable the swap file at every boot",
+      "platform": 1
+    },
+    {
+      "command": "sudo swapoff /swapfile",
+      "description": "Disable the swap file before deleting it",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. mkswap destroys what the target holds, so point it at a new file, never at a partition in use.",
+  "links": [
+    {
+      "title": "mkswap(8)",
+      "url": "https://man7.org/linux/man-pages/man8/mkswap.8.html"
+    },
+    {
+      "title": "fallocate(1)",
+      "url": "https://man7.org/linux/man-pages/man1/fallocate.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer et activer un fichier de swap",
+      "description": "Alloue un fichier, le formate en swap et l'active aussitôt.",
+      "notes": "Nécessite sudo. mkswap détruit le contenu de la cible : la pointer vers un nouveau fichier, jamais vers une partition utilisée.",
+      "parameters": {
+        "linux": {
+          "size": {
+            "label": "Taille",
+            "description": "Taille du fichier de swap, comme 2G ou 512M"
+          },
+          "swapFile": {
+            "label": "Fichier de swap",
+            "description": "Chemin du fichier à créer ; un fichier existant est écrasé"
+          }
+        }
+      },
+      "examples": {
+        "sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile": "Ajoute 4 Go de swap",
+        "sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress": "Alloue le fichier avec dd là où fallocate n'est pas pris en charge",
+        "echo '/swapfile none swap defaults 0 0' | sudo tee -a /etc/fstab": "Active le fichier de swap à chaque démarrage",
+        "sudo swapoff /swapfile": "Désactive le fichier de swap avant de le supprimer"
+      }
+    }
+  }
+}

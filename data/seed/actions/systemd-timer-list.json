@@ -22,10 +22,15 @@
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "--all",
+          "--state=active",
+          "--no-pager"
+        ],
         "defaultValue": "--all",
         "required": false,
-        "description": "Options (--all, --state=active, etc.)"
+        "description": "--all = every timer, including inactive ones; --state=active = active timers only; --no-pager = print without a pager"
       }
     ]
   },
@@ -62,7 +67,7 @@
         "linux": {
           "options": {
             "label": "Options",
-            "description": "Options (--all, --state=active, etc.)"
+            "description": "--all = tous les timers, inactifs compris ; --state=active = timers actifs seulement ; --no-pager = affiche sans pager"
           }
         }
       },

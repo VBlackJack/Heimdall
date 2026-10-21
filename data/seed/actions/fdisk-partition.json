@@ -17,7 +17,7 @@
     "id": "fdisk-cmd",
     "platform": 1,
     "name": "fdisk",
-    "commandPattern": "fdisk -l {device}",
+    "commandPattern": "sudo fdisk -l {device}",
     "parameters": [
       {
         "name": "device",
@@ -41,32 +41,22 @@
       "platform": 1
     },
     {
-      "command": "fdisk -l /dev/sda1",
+      "command": "sudo fdisk -l /dev/sda1",
       "description": "Example using the 'device' parameter: disk to examine (empty = all). Replace /dev/sda1 with the value that fits your environment.",
       "platform": 1
     },
     {
-      "command": "fdisk -l",
-      "description": "List disks and partitions",
-      "platform": 1
-    },
-    {
-      "command": "fdisk /dev/sdb",
-      "description": "Manage the partitions of sdb",
-      "platform": 1
-    },
-    {
-      "command": "fdisk -l /dev/sda",
+      "command": "sudo fdisk -l /dev/sda",
       "description": "Details of disk sda",
       "platform": 1
     },
     {
-      "command": "parted -l",
+      "command": "sudo parted -l",
       "description": "Alternative: list with parted",
       "platform": 1
     },
     {
-      "command": "gdisk /dev/sdc",
+      "command": "sudo gdisk /dev/sdc",
       "description": "Manage GPT partitions",
       "platform": 1
     }
@@ -94,12 +84,10 @@
       "examples": {
         "sudo fdisk -l": "Liste toutes les partitions",
         "sudo fdisk /dev/sdb": "Mode interactif pour partitionner /dev/sdb",
-        "fdisk -l /dev/sda1": "Exemple utilisant le paramètre 'device': Disque à examiner (vide = tous). Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
-        "fdisk -l": "Lister les disques et partitions",
-        "fdisk /dev/sdb": "Gérer les partitions de sdb",
-        "fdisk -l /dev/sda": "Détails du disque sda",
-        "parted -l": "Alternative: lister avec parted",
-        "gdisk /dev/sdc": "Gérer les partitions GPT"
+        "sudo fdisk -l /dev/sda1": "Exemple utilisant le paramètre 'device': Disque à examiner (vide = tous). Remplacez /dev/sda1 par la valeur appropriée selon votre environnement.",
+        "sudo fdisk -l /dev/sda": "Détails du disque sda",
+        "sudo parted -l": "Alternative: lister avec parted",
+        "sudo gdisk /dev/sdc": "Gérer les partitions GPT"
       }
     }
   }

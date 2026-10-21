@@ -1,0 +1,93 @@
+{
+  "id": "chage-set-expiry",
+  "title": "Set the expiry date of an account",
+  "description": "Set the date after which a local account can no longer log in.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "chage",
+    "linux",
+    "account",
+    "expiry"
+  ],
+  "linuxCommandTemplateId": "chage-set-expiry-cmd",
+  "linuxCommandTemplate": {
+    "id": "chage-set-expiry-cmd",
+    "platform": 1,
+    "name": "chage",
+    "commandPattern": "sudo chage -E {expiryDate} {username}",
+    "parameters": [
+      {
+        "name": "expiryDate",
+        "label": "Expiry date",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Date in YYYY-MM-DD format, or -1 to remove the expiry"
+      },
+      {
+        "name": "username",
+        "label": "User name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Login name of the local account"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo chage -E 2026-12-31 contractor1",
+      "description": "Make a contractor account expire at the end of the year",
+      "platform": 1
+    },
+    {
+      "command": "sudo chage -E -1 alice",
+      "description": "Remove the account expiry of alice",
+      "platform": 1
+    },
+    {
+      "command": "sudo chage -M 90 -W 14 alice",
+      "description": "Require a new password every 90 days with a 14-day warning",
+      "platform": 1
+    },
+    {
+      "command": "sudo chage -d 0 alice",
+      "description": "Force a password change at the next login",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. An expired account is refused at login even with a valid SSH key.",
+  "links": [
+    {
+      "title": "chage(1)",
+      "url": "https://man7.org/linux/man-pages/man1/chage.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Définir la date d'expiration d'un compte",
+      "description": "Définit la date après laquelle un compte local ne peut plus se connecter.",
+      "notes": "Nécessite sudo. Un compte expiré est refusé à la connexion, même avec une clé SSH valide.",
+      "parameters": {
+        "linux": {
+          "expiryDate": {
+            "label": "Date d'expiration",
+            "description": "Date au format AAAA-MM-JJ, ou -1 pour retirer l'expiration"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Identifiant du compte local"
+          }
+        }
+      },
+      "examples": {
+        "sudo chage -E 2026-12-31 contractor1": "Fait expirer un compte de prestataire à la fin de l'année",
+        "sudo chage -E -1 alice": "Retire l'expiration du compte de alice",
+        "sudo chage -M 90 -W 14 alice": "Impose un nouveau mot de passe tous les 90 jours avec un préavis de 14 jours",
+        "sudo chage -d 0 alice": "Force un changement de mot de passe à la prochaine connexion"
+      }
+    }
+  }
+}

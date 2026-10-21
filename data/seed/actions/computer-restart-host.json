@@ -1,0 +1,88 @@
+{
+  "id": "computer-restart-host",
+  "title": "Restart a computer",
+  "description": "Restart the local or a remote computer at once, closing the open sessions.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 2,
+  "tags": [
+    "restart",
+    "reboot",
+    "restart-computer",
+    "maintenance",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "computer-restart-host-cmd",
+  "windowsCommandTemplate": {
+    "id": "computer-restart-host-cmd",
+    "platform": 0,
+    "name": "Restart-Computer",
+    "commandPattern": "Restart-Computer -ComputerName {computerName} -Force",
+    "parameters": [
+      {
+        "name": "computerName",
+        "label": "Computer name",
+        "type": "hostname",
+        "defaultValue": "localhost",
+        "required": true,
+        "description": "Computer to restart (localhost for this one)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Restart-Computer -Force",
+      "description": "Restart this computer now",
+      "platform": 0
+    },
+    {
+      "command": "Restart-Computer -ComputerName SRV-APP01 -Force -Wait -For PowerShell -Timeout 600",
+      "description": "Restart a server and wait until PowerShell remoting answers again",
+      "platform": 0
+    },
+    {
+      "command": "Restart-Computer -ComputerName SRV-APP01, SRV-APP02 -Force",
+      "description": "Restart two servers",
+      "platform": 0
+    },
+    {
+      "command": "shutdown /r /t 300 /c 'Planned maintenance'",
+      "description": "Restart in five minutes with a message to the users",
+      "platform": 0
+    },
+    {
+      "command": "shutdown /a",
+      "description": "Cancel a restart scheduled with shutdown",
+      "platform": 0
+    }
+  ],
+  "notes": "-Force restarts even when users are logged on: their unsaved work is lost. Requires administrator rights on the target.",
+  "links": [
+    {
+      "title": "Restart-Computer documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/restart-computer"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Redémarrer un ordinateur",
+      "description": "Redémarre immédiatement l'ordinateur local ou distant, en fermant les sessions ouvertes.",
+      "notes": "-Force redémarre même si des utilisateurs sont connectés : leur travail non enregistré est perdu. Nécessite des droits administrateur sur la cible.",
+      "parameters": {
+        "windows": {
+          "computerName": {
+            "label": "Nom de l'ordinateur",
+            "description": "Ordinateur à redémarrer (localhost pour celui-ci)"
+          }
+        }
+      },
+      "examples": {
+        "Restart-Computer -Force": "Redémarre cet ordinateur maintenant",
+        "Restart-Computer -ComputerName SRV-APP01 -Force -Wait -For PowerShell -Timeout 600": "Redémarre un serveur et attend que la communication à distance PowerShell réponde de nouveau",
+        "Restart-Computer -ComputerName SRV-APP01, SRV-APP02 -Force": "Redémarre deux serveurs",
+        "shutdown /r /t 300 /c 'Planned maintenance'": "Redémarre dans cinq minutes avec un message aux utilisateurs",
+        "shutdown /a": "Annule un redémarrage planifié avec shutdown"
+      }
+    }
+  }
+}

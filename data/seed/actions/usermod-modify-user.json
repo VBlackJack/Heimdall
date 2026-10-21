@@ -16,7 +16,7 @@
     "id": "usermod-cmd",
     "platform": 1,
     "name": "usermod",
-    "commandPattern": "usermod -aG {group} {username}",
+    "commandPattern": "sudo usermod -aG {group} {username}",
     "parameters": [
       {
         "name": "group",
@@ -53,22 +53,22 @@
       "platform": 1
     },
     {
-      "command": "usermod -L baduser",
+      "command": "sudo usermod -L baduser",
       "description": "Lock the user account",
       "platform": 1
     },
     {
-      "command": "usermod -U baduser",
+      "command": "sudo usermod -U baduser",
       "description": "Unlock the user account",
       "platform": 1
     },
     {
-      "command": "usermod -s /bin/zsh jdupont",
+      "command": "sudo usermod -s /bin/zsh jdupont",
       "description": "Change the user's shell",
       "platform": 1
     },
     {
-      "command": "usermod -d /new/home -m user",
+      "command": "sudo usermod -d /new/home -m user",
       "description": "Move the home directory",
       "platform": 1
     }
@@ -101,10 +101,10 @@
         "sudo usermod -aG sudo john": "Ajoute john au groupe sudo",
         "sudo usermod -s /bin/zsh john": "Change le shell de john",
         "sudo usermod -L john": "Verrouille le compte de john",
-        "usermod -L baduser": "Verrouiller le compte utilisateur",
-        "usermod -U baduser": "Déverrouiller le compte utilisateur",
-        "usermod -s /bin/zsh jdupont": "Changer le shell de l'utilisateur",
-        "usermod -d /new/home -m user": "Déplacer le home directory"
+        "sudo usermod -L baduser": "Verrouiller le compte utilisateur",
+        "sudo usermod -U baduser": "Déverrouiller le compte utilisateur",
+        "sudo usermod -s /bin/zsh jdupont": "Changer le shell de l'utilisateur",
+        "sudo usermod -d /new/home -m user": "Déplacer le home directory"
       }
     }
   }

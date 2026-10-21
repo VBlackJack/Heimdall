@@ -1,0 +1,65 @@
+{
+  "id": "timedatectl-show-status",
+  "title": "Show the clock, time zone and NTP status",
+  "description": "Show the local and UTC time, the time zone, and whether the clock is synchronized by NTP.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "timedatectl",
+    "systemd",
+    "linux",
+    "time",
+    "ntp"
+  ],
+  "linuxCommandTemplateId": "timedatectl-show-status-cmd",
+  "linuxCommandTemplate": {
+    "id": "timedatectl-show-status-cmd",
+    "platform": 1,
+    "name": "timedatectl",
+    "commandPattern": "timedatectl status",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "timedatectl status",
+      "description": "Check the time zone and the synchronization state",
+      "platform": 1
+    },
+    {
+      "command": "timedatectl list-timezones | grep Europe",
+      "description": "Find the name of a time zone",
+      "platform": 1
+    },
+    {
+      "command": "timedatectl show-timesync --all",
+      "description": "Show the systemd-timesyncd server and poll settings",
+      "platform": 1
+    },
+    {
+      "command": "sudo timedatectl set-ntp true",
+      "description": "Turn on NTP synchronization",
+      "platform": 1
+    }
+  ],
+  "notes": "Reading needs no special rights. Kerberos and TLS fail when the clock drifts by more than a few minutes.",
+  "links": [
+    {
+      "title": "timedatectl(1)",
+      "url": "https://man7.org/linux/man-pages/man1/timedatectl.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'horloge, le fuseau horaire et l'état NTP",
+      "description": "Affiche l'heure locale et UTC, le fuseau horaire, et si l'horloge est synchronisée par NTP.",
+      "notes": "La lecture ne demande aucun droit. Kerberos et TLS échouent quand l'horloge dérive de plus de quelques minutes.",
+      "examples": {
+        "timedatectl status": "Vérifie le fuseau horaire et l'état de synchronisation",
+        "timedatectl list-timezones | grep Europe": "Trouve le nom d'un fuseau horaire",
+        "timedatectl show-timesync --all": "Affiche le serveur et les réglages d'interrogation de systemd-timesyncd",
+        "sudo timedatectl set-ntp true": "Active la synchronisation NTP"
+      }
+    }
+  }
+}

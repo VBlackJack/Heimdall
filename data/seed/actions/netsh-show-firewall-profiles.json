@@ -1,0 +1,69 @@
+{
+  "id": "netsh-show-firewall-profiles",
+  "title": "Show the firewall profiles",
+  "description": "Show the state, default actions and logging of the Domain, Private and Public firewall profiles.",
+  "category": "security",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "netsh",
+    "firewall",
+    "advfirewall",
+    "profile",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "netsh-show-firewall-profiles-cmd",
+  "windowsCommandTemplate": {
+    "id": "netsh-show-firewall-profiles-cmd",
+    "platform": 0,
+    "name": "netsh",
+    "commandPattern": "netsh advfirewall show allprofiles",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "netsh advfirewall show allprofiles state",
+      "description": "Show only whether each profile is on",
+      "platform": 0
+    },
+    {
+      "command": "netsh advfirewall show currentprofile",
+      "description": "Show the profile in force on the active network",
+      "platform": 0
+    },
+    {
+      "command": "netsh advfirewall show domainprofile logging",
+      "description": "Show where the Domain profile writes its log",
+      "platform": 0
+    },
+    {
+      "command": "Get-NetFirewallProfile | Select-Object Name,Enabled,DefaultInboundAction,DefaultOutboundAction",
+      "description": "Show the same settings with PowerShell",
+      "platform": 0
+    }
+  ],
+  "notes": "Reading the profiles needs no administrator rights.",
+  "links": [
+    {
+      "title": "netsh advfirewall documentation",
+      "url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netsh-advfirewall"
+    },
+    {
+      "title": "Get-NetFirewallProfile documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/netsecurity/get-netfirewallprofile"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les profils du pare-feu",
+      "description": "Affiche l'état, les actions par défaut et la journalisation des profils de pare-feu Domaine, Privé et Public.",
+      "notes": "La lecture des profils ne nécessite pas de droits administrateur.",
+      "examples": {
+        "netsh advfirewall show allprofiles state": "Montre seulement si chaque profil est actif",
+        "netsh advfirewall show currentprofile": "Affiche le profil appliqué au réseau actif",
+        "netsh advfirewall show domainprofile logging": "Montre où le profil Domaine écrit son journal",
+        "Get-NetFirewallProfile | Select-Object Name,Enabled,DefaultInboundAction,DefaultOutboundAction": "Affiche les mêmes réglages avec PowerShell"
+      }
+    }
+  }
+}

@@ -22,10 +22,18 @@
       {
         "name": "option",
         "label": "Option",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "a",
+          "n",
+          "u",
+          "s",
+          "c",
+          "m"
+        ],
         "defaultValue": "a",
         "required": true,
-        "description": "Option (a=all, n=files, u=processes, m=memory)"
+        "description": "Limit: a = all, n = open files, u = processes, s = stack size, c = core file size, m = memory"
       },
       {
         "name": "value",
@@ -80,7 +88,7 @@
         "linux": {
           "option": {
             "label": "Option",
-            "description": "Option (a=all, n=files, u=processes, m=memory)"
+            "description": "Limite : a = toutes, n = fichiers ouverts, u = processus, s = taille de pile, c = taille des fichiers core, m = mémoire"
           },
           "value": {
             "label": "Valeur",

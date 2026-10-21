@@ -8,7 +8,8 @@
   "tags": [
     "process",
     "kill",
-    "terminate"
+    "terminate",
+    "windows"
   ],
   "windowsCommandTemplateId": "process-kill-windows-cmd",
   "windowsCommandTemplate": {
@@ -46,7 +47,12 @@
   },
   "examples": [],
   "notes": "⚠️ WARNING: can lose unsaved data. -9 (SIGKILL) is a forced stop.",
-  "links": [],
+  "links": [
+    {
+      "title": "Stop-Process documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/stop-process"
+    }
+  ],
   "linuxExamples": [
     {
       "command": "kill -9 1234",

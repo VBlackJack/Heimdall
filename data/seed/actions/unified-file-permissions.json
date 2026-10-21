@@ -1,7 +1,7 @@
 {
   "id": "unified-file-permissions",
   "title": "Change file permissions",
-  "description": "Change the NTFS permissions of a file or folder.",
+  "description": "Change the permissions of a file or folder (NTFS ACL on Windows, mode bits on Linux).",
   "category": "files-storage",
   "platform": 2,
   "level": 1,
@@ -12,10 +12,16 @@
     "windows",
     "permissions",
     "security",
-    "acl"
+    "acl",
+    "access"
   ],
   "notes": "Windows: /T for recursive. Permissions: F (Full), M (Modify), RX (ReadExecute), R (Read), W (Write).\nLinux: 755=rwxr-xr-x, 644=rw-r--r--, 777=rwxrwxrwx. -R for recursive. u=user, g=group, o=others, a=all.",
-  "links": [],
+  "links": [
+    {
+      "title": "chmod documentation",
+      "url": "https://man7.org/linux/man-pages/man1/chmod.1.html"
+    }
+  ],
   "windowsCommandTemplateId": "file-permissions-windows-cmd",
   "windowsCommandTemplate": {
     "id": "file-permissions-windows-cmd",
@@ -93,8 +99,8 @@
       "platform": 1
     },
     {
-      "command": "chmod -R 644 /var/www/html",
-      "description": "Set the permissions recursively",
+      "command": "sudo find /var/www/html -type f -exec chmod 644 {} +",
+      "description": "Set 644 on the files only, recursively, so the directories keep their execute bit",
       "platform": 1
     },
     {
@@ -103,8 +109,28 @@
       "platform": 1
     },
     {
-      "command": "chmod {permissions} \"{path}\" -v",
-      "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
+      "command": "chmod +x script.sh",
+      "description": "Make a script executable",
+      "platform": 1
+    },
+    {
+      "command": "chmod -R 755 /var/www/html",
+      "description": "Apply the standard web rights (755) recursively (-R)",
+      "platform": 1
+    },
+    {
+      "command": "chmod 600 ~/.ssh/id_rsa",
+      "description": "Secure an SSH private key (read and write for the owner only)",
+      "platform": 1
+    },
+    {
+      "command": "chmod -R 644 /var/log/*.log",
+      "description": "rw-r--r-- permissions for the log files",
+      "platform": 1
+    },
+    {
+      "command": "chmod go-rwx /etc/secrets",
+      "description": "Remove every permission for group and others",
       "platform": 1
     }
   ],
@@ -112,7 +138,7 @@
   "translations": {
     "fr": {
       "title": "Modifier les permissions de fichiers",
-      "description": "Modifie les permissions NTFS d'un fichier ou dossier.",
+      "description": "Modifie les permissions d'un fichier ou dossier (ACL NTFS sous Windows, bits de mode sous Linux).",
       "notes": "Windows: /T pour récursif. Permissions: F (Full), M (Modify), RX (ReadExecute), R (Read), W (Write).\nLinux: 755=rwxr-xr-x, 644=rw-r--r--, 777=rwxrwxrwx. -R pour récursif. u=user, g=group, o=others, a=all.",
       "parameters": {
         "windows": {
@@ -144,9 +170,13 @@
         "icacls \"C:\\Data\" /grant Users:M": "Donne les droits de modification aux Users",
         "icacls \"C:\\Data\" /grant Administrators:F /T": "Donne le contrôle total récursivement",
         "chmod 755 script.sh": "Rend un script exécutable (rwxr-xr-x)",
-        "chmod -R 644 /var/www/html": "Définit les permissions récursivement",
+        "sudo find /var/www/html -type f -exec chmod 644 {} +": "Applique 644 aux seuls fichiers, récursivement, pour que les répertoires gardent leur droit d'exécution",
         "chmod u+x file.sh": "Ajoute l'exécution pour le propriétaire",
-        "chmod {permissions} \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
+        "chmod +x script.sh": "Rend un script exécutable",
+        "chmod -R 755 /var/www/html": "Applique les droits web standards (755) récursivement (-R)",
+        "chmod 600 ~/.ssh/id_rsa": "Sécurise une clé privée SSH (lecture et écriture pour le propriétaire seulement)",
+        "chmod -R 644 /var/log/*.log": "Permissions rw-r--r-- pour les fichiers de logs",
+        "chmod go-rwx /etc/secrets": "Retire tous les droits pour le groupe et les autres"
       }
     }
   }

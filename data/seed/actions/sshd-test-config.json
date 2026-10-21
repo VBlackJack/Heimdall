@@ -1,0 +1,59 @@
+{
+  "id": "sshd-test-config",
+  "title": "Test the SSH server configuration",
+  "description": "Check the sshd configuration file and the host keys before restarting the SSH server.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "ssh",
+    "sshd",
+    "linux",
+    "config",
+    "syntax"
+  ],
+  "linuxCommandTemplateId": "sshd-test-config-cmd",
+  "linuxCommandTemplate": {
+    "id": "sshd-test-config-cmd",
+    "platform": 1,
+    "name": "sshd",
+    "commandPattern": "sudo sshd -t",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo sshd -t",
+      "description": "Test the configuration; no output means it is valid",
+      "platform": 1
+    },
+    {
+      "command": "sudo sshd -T | grep -iE 'permitrootlogin|passwordauthentication'",
+      "description": "Show the effective root login and password settings",
+      "platform": 1
+    },
+    {
+      "command": "sudo sshd -t -f /etc/ssh/sshd_config.new",
+      "description": "Test a candidate file before putting it in place",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo to read the host keys. Test before every restart: a broken file locks out new SSH sessions.",
+  "links": [
+    {
+      "title": "sshd(8)",
+      "url": "https://man7.org/linux/man-pages/man8/sshd.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester la configuration du serveur SSH",
+      "description": "Vérifie le fichier de configuration de sshd et les clés d'hôte avant de redémarrer le serveur SSH.",
+      "notes": "Nécessite sudo pour lire les clés d'hôte. À tester avant chaque redémarrage : un fichier invalide bloque les nouvelles sessions SSH.",
+      "examples": {
+        "sudo sshd -t": "Teste la configuration ; aucune sortie signifie qu'elle est valide",
+        "sudo sshd -T | grep -iE 'permitrootlogin|passwordauthentication'": "Affiche les réglages effectifs de connexion root et de mot de passe",
+        "sudo sshd -t -f /etc/ssh/sshd_config.new": "Teste un fichier candidat avant de le mettre en place"
+      }
+    }
+  }
+}

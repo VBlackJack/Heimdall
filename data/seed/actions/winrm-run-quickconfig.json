@@ -1,0 +1,59 @@
+{
+  "id": "winrm-run-quickconfig",
+  "title": "Configure WinRM with quickconfig",
+  "description": "Start WinRM, create the HTTP listener and open the firewall exception with the native winrm tool.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 1,
+  "tags": [
+    "winrm",
+    "quickconfig",
+    "remoting",
+    "listener",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "winrm-run-quickconfig-cmd",
+  "windowsCommandTemplate": {
+    "id": "winrm-run-quickconfig-cmd",
+    "platform": 0,
+    "name": "winrm",
+    "commandPattern": "winrm quickconfig -quiet",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "winrm quickconfig",
+      "description": "Run the configuration and confirm each change at the prompt",
+      "platform": 0
+    },
+    {
+      "command": "winrm quickconfig -transport:https",
+      "description": "Create an HTTPS listener (a server authentication certificate must be installed)",
+      "platform": 0
+    },
+    {
+      "command": "winrm enumerate winrm/config/listener",
+      "description": "Show the listeners that exist after the configuration",
+      "platform": 0
+    }
+  ],
+  "notes": "Run it from an elevated prompt. -quiet applies the changes without asking.",
+  "links": [
+    {
+      "title": "Installation and configuration for Windows Remote Management",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/winrm/installation-and-configuration-for-windows-remote-management"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Configurer WinRM avec quickconfig",
+      "description": "Démarre WinRM, crée l'écouteur HTTP et ouvre l'exception de pare-feu avec l'outil natif winrm.",
+      "notes": "À lancer depuis une invite élevée. -quiet applique les changements sans poser de question.",
+      "examples": {
+        "winrm quickconfig": "Lance la configuration et confirme chaque changement à l'invite",
+        "winrm quickconfig -transport:https": "Crée un écouteur HTTPS (un certificat d'authentification serveur doit être installé)",
+        "winrm enumerate winrm/config/listener": "Affiche les écouteurs présents après la configuration"
+      }
+    }
+  }
+}

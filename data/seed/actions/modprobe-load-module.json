@@ -1,0 +1,82 @@
+{
+  "id": "modprobe-load-module",
+  "title": "Load a kernel module",
+  "description": "Load a kernel module together with the modules it depends on.",
+  "category": "performance",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "modprobe",
+    "kernel",
+    "linux",
+    "module",
+    "driver"
+  ],
+  "linuxCommandTemplateId": "modprobe-load-module-cmd",
+  "linuxCommandTemplate": {
+    "id": "modprobe-load-module-cmd",
+    "platform": 1,
+    "name": "modprobe",
+    "commandPattern": "sudo modprobe {module}",
+    "parameters": [
+      {
+        "name": "module",
+        "label": "Module",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the module, without the .ko extension"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo modprobe br_netfilter",
+      "description": "Load the bridge netfilter module Kubernetes needs",
+      "platform": 1
+    },
+    {
+      "command": "sudo modprobe -r usb_storage",
+      "description": "Unload a module that nothing uses",
+      "platform": 1
+    },
+    {
+      "command": "sudo modprobe -n -v nf_conntrack",
+      "description": "Show what would be loaded, without loading it",
+      "platform": 1
+    },
+    {
+      "command": "echo br_netfilter | sudo tee /etc/modules-load.d/k8s.conf",
+      "description": "Load the module at every boot",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. The change lasts until the next reboot unless the module is listed in /etc/modules-load.d.",
+  "links": [
+    {
+      "title": "modprobe(8)",
+      "url": "https://man7.org/linux/man-pages/man8/modprobe.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Charger un module noyau",
+      "description": "Charge un module noyau avec les modules dont il dépend.",
+      "notes": "Nécessite sudo. Le changement dure jusqu'au prochain redémarrage, sauf si le module figure dans /etc/modules-load.d.",
+      "parameters": {
+        "linux": {
+          "module": {
+            "label": "Module",
+            "description": "Nom du module, sans l'extension .ko"
+          }
+        }
+      },
+      "examples": {
+        "sudo modprobe br_netfilter": "Charge le module de filtrage de pont requis par Kubernetes",
+        "sudo modprobe -r usb_storage": "Décharge un module que rien n'utilise",
+        "sudo modprobe -n -v nf_conntrack": "Montre ce qui serait chargé, sans le charger",
+        "echo br_netfilter | sudo tee /etc/modules-load.d/k8s.conf": "Charge le module à chaque démarrage"
+      }
+    }
+  }
+}

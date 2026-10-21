@@ -16,6 +16,7 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views.Dialogs;
@@ -34,7 +35,7 @@ namespace Heimdall.App.Views.Tools;
 /// plumbing, clipboard I/O, link navigation, and the "copied" flash animation
 /// on the Copy/Send buttons.
 /// </summary>
-public partial class CommandLibraryView : UserControl, IToolView
+public partial class CommandLibraryView : UserControl, IToolView, ICommandCaptureTarget
 {
     private LocalizationManager? _localizer;
     private CommandLibraryViewModel? _viewModel;
@@ -92,7 +93,24 @@ public partial class CommandLibraryView : UserControl, IToolView
         _viewModel.RefreshBroadcastTargets();
 
         _viewModel.AutoSelectPlatform(context?.ConnectionType, context?.RemoteOs ?? RemoteOs.Auto);
-        _ = _viewModel.InitializeAsync(context?.TargetHost, context?.InitialActionId, context?.Username);
+        _ = _viewModel.InitializeAsync(
+            context?.TargetHost,
+            context?.InitialActionId,
+            context?.Username,
+            CommandCapture.FromContext(context));
+    }
+
+    /// <summary>
+    /// Opens the editor prefilled with a command captured from a terminal on an
+    /// already-initialized view. Called by <see cref="MainViewModel.OpenToolTabAsync"/> when a
+    /// capture finds a library tab open instead of opening a second one.
+    /// </summary>
+    public void PrefillNewAction(CapturedCommand capture)
+    {
+        if (_viewModel is not null)
+        {
+            _ = _viewModel.PrefillNewActionAsync(capture);
+        }
     }
 
     /// <summary>
@@ -222,7 +240,9 @@ public partial class CommandLibraryView : UserControl, IToolView
         var dialog = new CommandActionDialog
         {
             DataContext = vm,
-            Owner = Window.GetWindow(this)
+            // A capture opens the dialog from a tab created a moment ago, which may not be in
+            // the visual tree yet: the main window owns it then.
+            Owner = Window.GetWindow(this) ?? Application.Current?.MainWindow
         };
 
         var result = dialog.ShowDialog() == true;

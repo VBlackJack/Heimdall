@@ -19,7 +19,7 @@
     "id": "useradd-cmd",
     "platform": 1,
     "name": "useradd",
-    "commandPattern": "useradd -m -s {shell} {username}",
+    "commandPattern": "sudo useradd -m -s {shell} {username}",
     "parameters": [
       {
         "name": "shell",
@@ -67,12 +67,12 @@
       "platform": 1
     },
     {
-      "command": "useradd -m -s /bin/bash jdupont",
+      "command": "sudo useradd -m -s /bin/bash jdupont",
       "description": "Create a user with a home directory and bash",
       "platform": 1
     },
     {
-      "command": "useradd -m -d /opt/app -s /bin/bash appuser",
+      "command": "sudo useradd -m -d /opt/app -s /bin/bash appuser",
       "description": "User with a custom home directory",
       "platform": 1
     }
@@ -142,8 +142,8 @@
         "sudo useradd -m -s /bin/bash john": "Crée l'utilisateur john avec répertoire home",
         "sudo useradd -m -G sudo,docker john": "Crée john et l'ajoute aux groupes sudo et docker",
         "sudo passwd john": "Définit le mot de passe après création",
-        "useradd -m -s /bin/bash jdupont": "Créer un utilisateur avec home et bash",
-        "useradd -m -d /opt/app -s /bin/bash appuser": "Utilisateur avec home personnalisé"
+        "sudo useradd -m -s /bin/bash jdupont": "Créer un utilisateur avec home et bash",
+        "sudo useradd -m -d /opt/app -s /bin/bash appuser": "Utilisateur avec home personnalisé"
       }
     }
   }

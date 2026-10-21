@@ -1,0 +1,82 @@
+{
+  "id": "smartctl-show-health",
+  "title": "Show the SMART health of a disk",
+  "description": "Show the identity, the overall health verdict, the attributes and the error log of a disk.",
+  "category": "files-storage",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "smartctl",
+    "smartmontools",
+    "linux",
+    "disk",
+    "health"
+  ],
+  "linuxCommandTemplateId": "smartctl-show-health-cmd",
+  "linuxCommandTemplate": {
+    "id": "smartctl-show-health-cmd",
+    "platform": 1,
+    "name": "smartctl",
+    "commandPattern": "sudo smartctl -a {device}",
+    "parameters": [
+      {
+        "name": "device",
+        "label": "Device",
+        "type": "path",
+        "defaultValue": "/dev/sda",
+        "required": true,
+        "description": "Disk device, such as /dev/sda or /dev/nvme0"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo smartctl -a /dev/sda",
+      "description": "Show everything SMART reports for the first disk",
+      "platform": 1
+    },
+    {
+      "command": "sudo smartctl -H /dev/nvme0",
+      "description": "Show only the health verdict of an NVMe drive",
+      "platform": 1
+    },
+    {
+      "command": "sudo smartctl -t short /dev/sda",
+      "description": "Start a short self-test in the background",
+      "platform": 1
+    },
+    {
+      "command": "sudo smartctl --scan",
+      "description": "List the devices smartctl can query",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo and the smartmontools package. Disks behind a RAID controller need a -d option naming the controller.",
+  "links": [
+    {
+      "title": "smartctl(8)",
+      "url": "https://manpages.debian.org/bookworm/smartmontools/smartctl.8.en.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher la santé SMART d'un disque",
+      "description": "Affiche l'identité, le verdict de santé global, les attributs et le journal d'erreurs d'un disque.",
+      "notes": "Nécessite sudo et le paquet smartmontools. Les disques derrière un contrôleur RAID demandent une option -d qui nomme le contrôleur.",
+      "parameters": {
+        "linux": {
+          "device": {
+            "label": "Périphérique",
+            "description": "Périphérique disque, comme /dev/sda ou /dev/nvme0"
+          }
+        }
+      },
+      "examples": {
+        "sudo smartctl -a /dev/sda": "Affiche tout ce que SMART indique pour le premier disque",
+        "sudo smartctl -H /dev/nvme0": "Affiche seulement le verdict de santé d'un disque NVMe",
+        "sudo smartctl -t short /dev/sda": "Lance un court autotest en arrière-plan",
+        "sudo smartctl --scan": "Liste les périphériques que smartctl peut interroger"
+      }
+    }
+  }
+}

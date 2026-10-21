@@ -1,0 +1,65 @@
+{
+  "id": "virsh-list-vms",
+  "title": "List the KVM virtual machines",
+  "description": "List every libvirt virtual machine on the host, running or not, with its state.",
+  "category": "containers-vms",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "virsh",
+    "libvirt",
+    "kvm",
+    "linux",
+    "vm"
+  ],
+  "linuxCommandTemplateId": "virsh-list-vms-cmd",
+  "linuxCommandTemplate": {
+    "id": "virsh-list-vms-cmd",
+    "platform": 1,
+    "name": "virsh",
+    "commandPattern": "sudo virsh list --all",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo virsh list --all",
+      "description": "List every virtual machine and its state",
+      "platform": 1
+    },
+    {
+      "command": "sudo virsh dominfo web01",
+      "description": "Show the CPU, memory and autostart setting of one machine",
+      "platform": 1
+    },
+    {
+      "command": "sudo virsh domifaddr web01",
+      "description": "Show the IP addresses of a running machine",
+      "platform": 1
+    },
+    {
+      "command": "sudo virsh list --autostart",
+      "description": "List the machines that start with the host",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo or membership of the libvirt group to see the system machines.",
+  "links": [
+    {
+      "title": "virsh manual",
+      "url": "https://www.libvirt.org/manpages/virsh.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les machines virtuelles KVM",
+      "description": "Liste toutes les machines virtuelles libvirt de l'hôte, démarrées ou non, avec leur état.",
+      "notes": "Nécessite sudo ou l'appartenance au groupe libvirt pour voir les machines du système.",
+      "examples": {
+        "sudo virsh list --all": "Liste chaque machine virtuelle et son état",
+        "sudo virsh dominfo web01": "Affiche le CPU, la mémoire et le démarrage automatique d'une machine",
+        "sudo virsh domifaddr web01": "Affiche les adresses IP d'une machine démarrée",
+        "sudo virsh list --autostart": "Liste les machines qui démarrent avec l'hôte"
+      }
+    }
+  }
+}

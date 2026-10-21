@@ -9,7 +9,8 @@
     "network",
     "traceroute",
     "diagnostic",
-    "routing"
+    "routing",
+    "mtr"
   ],
   "windowsCommandTemplateId": "network-trace-route-windows-cmd",
   "windowsCommandTemplate": {
@@ -46,8 +47,13 @@
     ]
   },
   "examples": [],
-  "notes": "Can be slow. On Linux, install traceroute when it is missing: sudo apt install traceroute",
-  "links": [],
+  "notes": "Can be slow. On Linux, install traceroute when it is missing: sudo apt install traceroute. mtr combines ping and traceroute. -n disables DNS resolution. -T and -I require root (sudo).",
+  "links": [
+    {
+      "title": "traceroute",
+      "url": "https://man7.org/linux/man-pages/man8/traceroute.8.html"
+    }
+  ],
   "windowsExamples": [
     {
       "command": "tracert google.com",
@@ -72,12 +78,12 @@
       "platform": 1
     },
     {
-      "command": "traceroute -T -p 443 server.com",
+      "command": "sudo traceroute -T -p 443 server.com",
       "description": "TCP traceroute on port 443",
       "platform": 1
     },
     {
-      "command": "traceroute -I 192.168.1.1",
+      "command": "sudo traceroute -I 192.168.1.1",
       "description": "ICMP traceroute",
       "platform": 1
     },
@@ -85,13 +91,18 @@
       "command": "traceroute -m 15 remote-server.com",
       "description": "Limit to 15 hops",
       "platform": 1
+    },
+    {
+      "command": "mtr google.com",
+      "description": "Interactive, continuous version (mtr)",
+      "platform": 1
     }
   ],
   "translations": {
     "fr": {
       "title": "Tracer la route réseau",
       "description": "Affiche le chemin complet des paquets réseau vers une destination.",
-      "notes": "Peut être lent. Sur Linux, installer traceroute si non disponible : sudo apt install traceroute",
+      "notes": "Peut être lent. Sur Linux, installer traceroute si non disponible : sudo apt install traceroute. mtr combine ping et traceroute. -n désactive la résolution DNS. -T et -I nécessitent les droits root (sudo).",
       "parameters": {
         "windows": {
           "target": {
@@ -111,9 +122,10 @@
         "tracert srv-web-01.contoso.com": "Exemple utilisant le paramètre 'target': Adresse IP ou nom d'hôte. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
         "traceroute google.com": "Trace la route vers google.com (Linux)",
         "traceroute -n 8.8.8.8": "Traceroute sans résolution DNS",
-        "traceroute -T -p 443 server.com": "Traceroute TCP sur port 443",
-        "traceroute -I 192.168.1.1": "Traceroute ICMP",
-        "traceroute -m 15 remote-server.com": "Limiter à 15 sauts maximum"
+        "sudo traceroute -T -p 443 server.com": "Traceroute TCP sur port 443",
+        "sudo traceroute -I 192.168.1.1": "Traceroute ICMP",
+        "traceroute -m 15 remote-server.com": "Limiter à 15 sauts maximum",
+        "mtr google.com": "Version interactive et continue (mtr)"
       }
     }
   }

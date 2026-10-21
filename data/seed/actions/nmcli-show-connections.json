@@ -1,0 +1,65 @@
+{
+  "id": "nmcli-show-connections",
+  "title": "Show the NetworkManager connections",
+  "description": "List the connection profiles NetworkManager stores, with their type and the device they use.",
+  "category": "network-dns",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "nmcli",
+    "networkmanager",
+    "linux",
+    "network",
+    "connection"
+  ],
+  "linuxCommandTemplateId": "nmcli-show-connections-cmd",
+  "linuxCommandTemplate": {
+    "id": "nmcli-show-connections-cmd",
+    "platform": 1,
+    "name": "nmcli",
+    "commandPattern": "nmcli connection show",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "nmcli connection show --active",
+      "description": "List only the active connections",
+      "platform": 1
+    },
+    {
+      "command": "nmcli connection show 'System eth0'",
+      "description": "Show every setting of one profile",
+      "platform": 1
+    },
+    {
+      "command": "sudo nmcli connection modify 'System eth0' ipv4.dns '10.0.0.53'",
+      "description": "Set the DNS server of a profile",
+      "platform": 1
+    },
+    {
+      "command": "sudo nmcli connection up 'System eth0'",
+      "description": "Activate a profile to apply its changes",
+      "platform": 1
+    }
+  ],
+  "notes": "Reading needs no special rights; changes need sudo. Bringing up the profile of the SSH interface can cut the session.",
+  "links": [
+    {
+      "title": "nmcli(1)",
+      "url": "https://networkmanager.dev/docs/api/latest/nmcli.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les connexions NetworkManager",
+      "description": "Liste les profils de connexion enregistrés par NetworkManager, avec leur type et le périphérique utilisé.",
+      "notes": "La lecture ne demande aucun droit ; les modifications nécessitent sudo. Réactiver le profil de l'interface SSH peut couper la session.",
+      "examples": {
+        "nmcli connection show --active": "Liste seulement les connexions actives",
+        "nmcli connection show 'System eth0'": "Affiche tous les réglages d'un profil",
+        "sudo nmcli connection modify 'System eth0' ipv4.dns '10.0.0.53'": "Définit le serveur DNS d'un profil",
+        "sudo nmcli connection up 'System eth0'": "Active un profil pour appliquer ses modifications"
+      }
+    }
+  }
+}

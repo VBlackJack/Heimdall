@@ -28,7 +28,12 @@
   },
   "examples": [],
   "notes": "On Windows, subtract it from Get-Date to get the duration. On Linux, 'uptime' without options gives more information.",
-  "links": [],
+  "links": [
+    {
+      "title": "Win32_OperatingSystem class",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-operatingsystem"
+    }
+  ],
   "windowsExamples": [
     {
       "command": "(Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime",

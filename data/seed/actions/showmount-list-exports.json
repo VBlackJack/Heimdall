@@ -1,0 +1,76 @@
+{
+  "id": "showmount-list-exports",
+  "title": "List the exports of an NFS server",
+  "description": "Show the directories an NFS server exports and the clients allowed to mount them.",
+  "category": "files-storage",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "showmount",
+    "nfs",
+    "linux",
+    "share",
+    "storage"
+  ],
+  "linuxCommandTemplateId": "showmount-list-exports-cmd",
+  "linuxCommandTemplate": {
+    "id": "showmount-list-exports-cmd",
+    "platform": 1,
+    "name": "showmount",
+    "commandPattern": "showmount -e {server}",
+    "parameters": [
+      {
+        "name": "server",
+        "label": "Server",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name or address of the file server"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "showmount -e nas01",
+      "description": "List what nas01 exports",
+      "platform": 1
+    },
+    {
+      "command": "sudo exportfs -v",
+      "description": "On the server, show the exports with their options",
+      "platform": 1
+    },
+    {
+      "command": "rpcinfo -p nas01",
+      "description": "Check which RPC services the server answers",
+      "platform": 1
+    }
+  ],
+  "notes": "Ships with nfs-utils (RHEL) or nfs-common (Debian). NFSv4-only servers may not answer, because showmount uses the NFSv3 mount protocol.",
+  "links": [
+    {
+      "title": "showmount(8)",
+      "url": "https://man7.org/linux/man-pages/man8/showmount.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les exports d'un serveur NFS",
+      "description": "Affiche les répertoires exportés par un serveur NFS et les clients autorisés à les monter.",
+      "notes": "Fourni par nfs-utils (RHEL) ou nfs-common (Debian). Un serveur uniquement NFSv4 peut ne pas répondre, car showmount utilise le protocole de montage NFSv3.",
+      "parameters": {
+        "linux": {
+          "server": {
+            "label": "Serveur",
+            "description": "Nom ou adresse du serveur de fichiers"
+          }
+        }
+      },
+      "examples": {
+        "showmount -e nas01": "Liste ce que nas01 exporte",
+        "sudo exportfs -v": "Sur le serveur, affiche les exports avec leurs options",
+        "rpcinfo -p nas01": "Vérifie quels services RPC le serveur propose"
+      }
+    }
+  }
+}

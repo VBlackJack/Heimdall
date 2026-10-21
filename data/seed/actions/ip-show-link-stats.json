@@ -1,0 +1,66 @@
+{
+  "id": "ip-show-link-stats",
+  "title": "Show the traffic counters of the interfaces",
+  "description": "Show each network interface with its state, MTU and its packet, byte, error and drop counters.",
+  "category": "network-dns",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "ip",
+    "iproute2",
+    "linux",
+    "network",
+    "interface",
+    "statistics"
+  ],
+  "linuxCommandTemplateId": "ip-show-link-stats-cmd",
+  "linuxCommandTemplate": {
+    "id": "ip-show-link-stats-cmd",
+    "platform": 1,
+    "name": "ip",
+    "commandPattern": "ip -s link show",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "ip -s link show",
+      "description": "Show the counters of every interface",
+      "platform": 1
+    },
+    {
+      "command": "ip -s -s link show dev eth0",
+      "description": "Show the detailed error counters of one interface",
+      "platform": 1
+    },
+    {
+      "command": "ip -br link",
+      "description": "Show one line per interface with its state",
+      "platform": 1
+    },
+    {
+      "command": "ip -br addr",
+      "description": "Show one line per interface with its addresses",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs no special rights. Growing errors or drops point at a cable, a duplex mismatch or a full queue.",
+  "links": [
+    {
+      "title": "ip-link(8)",
+      "url": "https://man7.org/linux/man-pages/man8/ip-link.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les compteurs de trafic des interfaces",
+      "description": "Affiche chaque interface réseau avec son état, son MTU et ses compteurs de paquets, d'octets, d'erreurs et de pertes.",
+      "notes": "Aucun droit particulier. Des erreurs ou pertes qui augmentent signalent un câble, un duplex mal négocié ou une file pleine.",
+      "examples": {
+        "ip -s link show": "Affiche les compteurs de chaque interface",
+        "ip -s -s link show dev eth0": "Affiche les compteurs d'erreurs détaillés d'une interface",
+        "ip -br link": "Affiche une ligne par interface avec son état",
+        "ip -br addr": "Affiche une ligne par interface avec ses adresses"
+      }
+    }
+  }
+}

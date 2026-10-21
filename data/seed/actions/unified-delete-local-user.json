@@ -20,15 +20,19 @@
     "id": "userdel-cmd",
     "platform": 1,
     "name": "userdel",
-    "commandPattern": "userdel {options} {username}",
+    "commandPattern": "sudo userdel {options} {username}",
     "parameters": [
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "-r",
+          "-f"
+        ],
         "defaultValue": "-r",
         "required": false,
-        "description": "Options (-r also deletes the home directory)"
+        "description": "-r also deletes the home directory and the mail spool, -f forces the deletion even when the user is logged in"
       },
       {
         "name": "username",
@@ -63,22 +67,22 @@
       "platform": 1
     },
     {
-      "command": "userdel jdupont",
+      "command": "sudo userdel jdupont",
       "description": "Delete the user jdupont",
       "platform": 1
     },
     {
-      "command": "userdel -r olduser",
+      "command": "sudo userdel -r olduser",
       "description": "Delete the user and the home directory",
       "platform": 1
     },
     {
-      "command": "userdel -f lockeduser",
+      "command": "sudo userdel -f lockeduser",
       "description": "Force the deletion even when the user is logged on",
       "platform": 1
     },
     {
-      "command": "userdel -r jdupont",
+      "command": "sudo userdel -r jdupont",
       "description": "With deletion of the home directory",
       "platform": 1
     }
@@ -133,7 +137,7 @@
         "linux": {
           "options": {
             "label": "Options",
-            "description": "Options (-r supprime aussi le home)"
+            "description": "-r supprime aussi le répertoire personnel et la boîte mail, -f force la suppression même si l'utilisateur est connecté"
           },
           "username": {
             "label": "Nom d'utilisateur",
@@ -147,10 +151,10 @@
         "Get-LocalUser | Where-Object {$_.Enabled -eq $false} | Remove-LocalUser": "Supprime tous les utilisateurs désactivés",
         "sudo userdel john": "Supprime l'utilisateur john (garde le home)",
         "sudo userdel -r john": "Supprime john et son répertoire home",
-        "userdel jdupont": "Supprimer l'utilisateur jdupont",
-        "userdel -r olduser": "Supprimer l'utilisateur et son home",
-        "userdel -f lockeduser": "Forcer la suppression même si connecté",
-        "userdel -r jdupont": "Avec suppression du home"
+        "sudo userdel jdupont": "Supprimer l'utilisateur jdupont",
+        "sudo userdel -r olduser": "Supprimer l'utilisateur et son home",
+        "sudo userdel -f lockeduser": "Forcer la suppression même si connecté",
+        "sudo userdel -r jdupont": "Avec suppression du home"
       }
     }
   }
