@@ -203,6 +203,7 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
                     ActionId = action.Id,
                     Title = action.Title,
                     Category = CommandPresentationResolver.ResolveCategoryLabel(action.Category, key => _localizer[key]),
+                    CategoryKey = action.Category,
                     HasLinuxTemplate = action.LinuxCommandTemplate is not null,
                     HasWindowsTemplate = action.WindowsCommandTemplate is not null,
                     LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],
@@ -303,7 +304,8 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
 
         if (!string.IsNullOrWhiteSpace(SearchText)
             && action.Title.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0
-            && action.Category.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0)
+            && action.Category.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0
+            && action.CategoryKey.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0)
         {
             return false;
         }

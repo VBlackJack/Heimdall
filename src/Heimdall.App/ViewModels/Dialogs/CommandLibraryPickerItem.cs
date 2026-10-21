@@ -23,7 +23,11 @@ public sealed class CommandLibraryPickerItem
 {
     public required string ActionId { get; init; }
     public required string Title { get; init; }
+    /// <summary>The category label the operator reads.</summary>
     public required string Category { get; init; }
+
+    /// <summary>The category as stored (a key or free text); a search matches it too.</summary>
+    public string CategoryKey { get; init; } = string.Empty;
     public required bool HasLinuxTemplate { get; init; }
     public required bool HasWindowsTemplate { get; init; }
     public required IReadOnlyList<TemplateParameter> LinuxParameters { get; init; }
