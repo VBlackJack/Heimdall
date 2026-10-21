@@ -1,7 +1,7 @@
 {
   "id": "sysinternals-pskill",
-  "title": "Tuer un processus (PsKill)",
-  "description": "Tue des processus par nom ou ID, localement ou à distance. Plus robuste que taskkill.",
+  "title": "Kill a process (PsKill)",
+  "description": "Kill processes by name or ID, locally or remotely. More robust than taskkill.",
   "category": "performance",
   "platform": 0,
   "level": 1,
@@ -19,20 +19,37 @@
     "parameters": [
       {
         "name": "process",
-        "label": "Processus",
+        "label": "Process",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom (ex: chrome) ou PID"
+        "description": "Name (e.g. chrome) or PID"
       }
     ]
   },
   "examples": [
     {
       "command": "pskill.exe -t -AcceptEula chrome",
-      "description": "Tue toutes les instances de Chrome et toute leur arborescence de processus enfants (-t). Radical pour nettoyer un navigateur planté.",
+      "description": "Kill every Chrome instance and its whole tree of child processes (-t). A radical way to clean up a hung browser.",
       "platform": 0
     }
   ],
-  "windowsCommandTemplateId": "ceb1f423-3586-449e-ae43-ff3c0a6f7c54"
+  "windowsCommandTemplateId": "ceb1f423-3586-449e-ae43-ff3c0a6f7c54",
+  "translations": {
+    "fr": {
+      "title": "Tuer un processus (PsKill)",
+      "description": "Tue des processus par nom ou ID, localement ou à distance. Plus robuste que taskkill.",
+      "parameters": {
+        "windows": {
+          "process": {
+            "label": "Processus",
+            "description": "Nom (ex: chrome) ou PID"
+          }
+        }
+      },
+      "examples": {
+        "pskill.exe -t -AcceptEula chrome": "Tue toutes les instances de Chrome et toute leur arborescence de processus enfants (-t). Radical pour nettoyer un navigateur planté."
+      }
+    }
+  }
 }

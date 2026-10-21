@@ -1,7 +1,7 @@
 {
   "id": "show-pending-updates",
-  "title": "Afficher les mises à jour en attente",
-  "description": "Liste toutes les mises à jour disponibles mais non installées",
+  "title": "Show pending updates",
+  "description": "List every available update that is not installed",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -21,30 +21,44 @@
   "examples": [
     {
       "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates.Count\"",
-      "description": "Compte le nombre de mises à jour en attente",
+      "description": "Count the pending updates",
       "platform": 0
     },
     {
       "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf once checked to run it.",
       "platform": 0
     },
     {
       "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the prompts. Useful in automated scripts, but use it with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the modified or created object in the pipeline. By default the Set-/New- cmdlets return nothing. -PassThru enables the return for chained operations or immediate checks.",
       "platform": 0
     },
     {
       "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the command's execution. -Verbose enables debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
       "platform": 0
     }
   ],
-  "notes": "Utilise l'API COM de Windows Update. Peut prendre quelques secondes.",
-  "links": []
+  "notes": "Uses the Windows Update COM API. Can take a few seconds.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Afficher les mises à jour en attente",
+      "description": "Liste toutes les mises à jour disponibles mais non installées",
+      "notes": "Utilise l'API COM de Windows Update. Peut prendre quelques secondes.",
+      "examples": {
+        "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates.Count\"": "Compte le nombre de mises à jour en attente",
+        "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
+      }
+    }
+  }
 }

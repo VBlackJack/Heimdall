@@ -1,7 +1,7 @@
 {
   "id": "strace-trace-syscalls",
-  "title": "Tracer les appels système d'un processus",
-  "description": "Trace tous les appels système effectués par un processus (debugging)",
+  "title": "Trace the system calls of a process",
+  "description": "Trace every system call a process makes (debugging)",
   "category": "performance",
   "platform": 1,
   "level": 1,
@@ -29,66 +29,96 @@
       },
       {
         "name": "command",
-        "label": "Commande",
+        "label": "Command",
         "type": "string",
         "defaultValue": "ls",
         "required": true,
-        "description": "Commande à tracer ou -p PID"
+        "description": "Command to trace, or -p PID"
       }
     ]
   },
   "examples": [
     {
       "command": "strace ls",
-      "description": "Trace tous les syscalls de ls",
+      "description": "Trace every syscall of ls",
       "platform": 1
     },
     {
       "command": "strace -c ls",
-      "description": "Statistiques d'appels système",
+      "description": "System call statistics",
       "platform": 1
     },
     {
       "command": "strace -p 1234",
-      "description": "Attache à un processus existant",
+      "description": "Attach to a running process",
       "platform": 1
     },
     {
       "command": "strace -c Get-Process",
-      "description": "Exemple utilisant le paramètre 'options': Options (-c=stats, -p PID, -e=filter, -o=output). Remplacez -v -f par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'options' parameter: Options (-c=stats, -p PID, -e=filter, -o=output). Replace -v -f with the value that fits your environment.",
       "platform": 0
     },
     {
       "command": "strace -v -f ls",
-      "description": "Exemple utilisant le paramètre 'command': Commande à tracer ou -p PID. Remplacez Get-Process par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'command' parameter: Command to trace, or -p PID. Replace Get-Process with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "strace -e open ls",
-      "description": "Tracer uniquement open()",
+      "description": "Trace open() only",
       "platform": 1
     },
     {
       "command": "strace -o trace.log command",
-      "description": "Sauvegarder dans un fichier",
+      "description": "Save to a file",
       "platform": 1
     },
     {
       "command": "strace ls -la",
-      "description": "Tracer la commande ls",
+      "description": "Trace the ls command",
       "platform": 1
     },
     {
       "command": "strace -o trace.log -f ./script.sh",
-      "description": "Tracer avec enfants",
+      "description": "Trace with the child processes",
       "platform": 1
     }
   ],
-  "notes": "Peut nécessiter sudo. -c pour résumé statistique. Très utile pour le debugging.",
+  "notes": "May require sudo. -c for a statistical summary. Very useful for debugging.",
   "links": [
     {
       "title": "strace documentation",
       "url": "https://man7.org/linux/man-pages/man1/strace.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tracer les appels système d'un processus",
+      "description": "Trace tous les appels système effectués par un processus (debugging)",
+      "notes": "Peut nécessiter sudo. -c pour résumé statistique. Très utile pour le debugging.",
+      "parameters": {
+        "linux": {
+          "options": {
+            "label": "Options",
+            "description": "Options (-c=stats, -p PID, -e=filter, -o=output)"
+          },
+          "command": {
+            "label": "Commande",
+            "description": "Commande à tracer ou -p PID"
+          }
+        }
+      },
+      "examples": {
+        "strace ls": "Trace tous les syscalls de ls",
+        "strace -c ls": "Statistiques d'appels système",
+        "strace -p 1234": "Attache à un processus existant",
+        "strace -c Get-Process": "Exemple utilisant le paramètre 'options': Options (-c=stats, -p PID, -e=filter, -o=output). Remplacez -v -f par la valeur appropriée selon votre environnement.",
+        "strace -v -f ls": "Exemple utilisant le paramètre 'command': Commande à tracer ou -p PID. Remplacez Get-Process par la valeur appropriée selon votre environnement.",
+        "strace -e open ls": "Tracer uniquement open()",
+        "strace -o trace.log command": "Sauvegarder dans un fichier",
+        "strace ls -la": "Tracer la commande ls",
+        "strace -o trace.log -f ./script.sh": "Tracer avec enfants"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "sql-list-databases",
-  "title": "Lister toutes les bases de données SQL Server",
-  "description": "Affiche la liste complète de toutes les bases de données sur une instance SQL Server avec leur taille, état et mode de récupération.",
+  "title": "List every SQL Server database",
+  "description": "Show the full list of databases on a SQL Server instance with their size, state and recovery model.",
   "category": "database",
   "platform": 0,
   "level": 0,
@@ -23,42 +23,63 @@
     "parameters": [
       {
         "name": "serverInstance",
-        "label": "Instance SQL Server",
+        "label": "SQL Server instance",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "localhost",
         "required": true,
-        "description": "Nom de l'instance SQL Server (ex: localhost, SERVER\\INSTANCE)"
+        "description": "SQL Server instance name (e.g. localhost, SERVER\\INSTANCE)"
       }
     ]
   },
   "examples": [
     {
       "command": "Invoke-Sqlcmd -ServerInstance 'localhost' -Query \"SELECT name, state_desc FROM sys.databases\"",
-      "description": "Liste simple des bases et leur état",
+      "description": "Simple list of the databases and their state",
       "platform": 0
     },
     {
       "command": "Invoke-Sqlcmd -ServerInstance 'PROD-SQL\\INSTANCE1' -Query \"SELECT * FROM sys.databases\"",
-      "description": "Liste détaillée sur une instance nommée",
+      "description": "Detailed list on a named instance",
       "platform": 0
     },
     {
       "command": "Invoke-Sqlcmd -ServerInstance 'localhost' -Query \"SELECT name AS DatabaseName, database_id AS ID, state_desc AS State, recovery_model_desc AS RecoveryModel, (SELECT SUM(size)*8/1024 FROM sys.master_files WHERE database_id = d.database_id) AS SizeMB FROM sys.databases d ORDER BY name\" | Format-Table -AutoSize",
-      "description": "Exemple utilisant le paramètre 'serverInstance': Nom de l'instance SQL Server (ex: localhost, SERVER\\INSTANCE). Remplacez localhost\\SQLEXPRESS par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'serverInstance' parameter: SQL Server instance name (e.g. localhost, SERVER\\INSTANCE). Replace localhost\\SQLEXPRESS with the value that fits your environment.",
       "platform": 0
     },
     {
       "command": "Invoke-Sqlcmd -ServerInstance 'localhost\\SQLEXPRESS' -Query \"SELECT name AS DatabaseName, database_id AS ID, state_desc AS State, recovery_model_desc AS RecoveryModel, (SELECT SUM(size)*8/1024 FROM sys.master_files WHERE database_id = d.database_id) AS SizeMB FROM sys.databases d ORDER BY name\" | Format-Table -AutoSize",
-      "description": "Affiche la liste complète de toutes les bases de données sur une instance SQL Server avec leur taille, état et mode de récupération.",
+      "description": "Show the full list of databases on a SQL Server instance with their size, state and recovery model.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite le module SqlServer PowerShell ou sqlcmd.exe. Privilèges de lecture requis sur sys.databases.",
+  "notes": "Requires the SqlServer PowerShell module or sqlcmd.exe. Read permission on sys.databases is required.",
   "links": [
     {
       "title": "Documentation Invoke-Sqlcmd",
       "url": "https://learn.microsoft.com/en-us/powershell/module/sqlserver/invoke-sqlcmd"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister toutes les bases de données SQL Server",
+      "description": "Affiche la liste complète de toutes les bases de données sur une instance SQL Server avec leur taille, état et mode de récupération.",
+      "notes": "Nécessite le module SqlServer PowerShell ou sqlcmd.exe. Privilèges de lecture requis sur sys.databases.",
+      "parameters": {
+        "windows": {
+          "serverInstance": {
+            "label": "Instance SQL Server",
+            "description": "Nom de l'instance SQL Server (ex: localhost, SERVER\\INSTANCE)"
+          }
+        }
+      },
+      "examples": {
+        "Invoke-Sqlcmd -ServerInstance 'localhost' -Query \"SELECT name, state_desc FROM sys.databases\"": "Liste simple des bases et leur état",
+        "Invoke-Sqlcmd -ServerInstance 'PROD-SQL\\INSTANCE1' -Query \"SELECT * FROM sys.databases\"": "Liste détaillée sur une instance nommée",
+        "Invoke-Sqlcmd -ServerInstance 'localhost' -Query \"SELECT name AS DatabaseName, database_id AS ID, state_desc AS State, recovery_model_desc AS RecoveryModel, (SELECT SUM(size)*8/1024 FROM sys.master_files WHERE database_id = d.database_id) AS SizeMB FROM sys.databases d ORDER BY name\" | Format-Table -AutoSize": "Exemple utilisant le paramètre 'serverInstance': Nom de l'instance SQL Server (ex: localhost, SERVER\\INSTANCE). Remplacez localhost\\SQLEXPRESS par la valeur appropriée selon votre environnement.",
+        "Invoke-Sqlcmd -ServerInstance 'localhost\\SQLEXPRESS' -Query \"SELECT name AS DatabaseName, database_id AS ID, state_desc AS State, recovery_model_desc AS RecoveryModel, (SELECT SUM(size)*8/1024 FROM sys.master_files WHERE database_id = d.database_id) AS SizeMB FROM sys.databases d ORDER BY name\" | Format-Table -AutoSize": "Affiche la liste complète de toutes les bases de données sur une instance SQL Server avec leur taille, état et mode de récupération."
+      }
+    }
+  }
 }
