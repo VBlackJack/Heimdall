@@ -172,6 +172,8 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Recherche plein texte avec classement par pertinence sur les titres, les tags, les descriptions et le texte des commandes
 - Filtres par catégorie, tag, plateforme et niveau de risque ; chaque filtre conserve sa sélection après un rechargement de la bibliothèque
 - Favoris, et badge de risque par action (info, run, dangereux)
+- Les actions livrées et leurs catégories s'affichent dans la langue de l'interface, et un changement de langue recharge la bibliothèque en gardant l'action sélectionnée. Le catalogue est rédigé en anglais avec une traduction française à côté ; l'espagnol n'a pas encore de traduction livrée et affiche le texte anglais
+- Les actions livrées suivent la version installée : quand une mise à jour modifie le catalogue, les actions livrées sont remplacées au lancement suivant, tandis que vos propres actions, les favoris et l'historique des actions toujours livrées sont conservés
 
 **Construire la commande**
 - Paramètres typés : texte, entier, booléen, nom d'hôte, adresse IP, chemin, et **choice** (un jeu fixe de valeurs proposé en liste déroulante)
@@ -194,6 +196,8 @@ paramètres et un générateur qui produit la commande finale à votre place.
 **Partager**
 - Import et export en JSON, et synchronisation Git pour une bibliothèque d'équipe ; **Synchroniser au démarrage** s'exécute une fois après le déverrouillage du coffre, et un échec est signalé dans la barre d'état
 - Les actions issues d'un import voient leur niveau de risque et leur plateforme ramenés à des valeurs connues : un niveau non reconnu est traité comme dangereux plutôt qu'anodin
+- Un export conserve le texte anglais de chaque action avec ses traductions ; un export pris avant la localisation des catégories s'importe dans les catégories actuelles
+- **Pack d'allègement pour poste de travail** : 72 actions qui épurent un poste Windows personnel (applications du Store, Edge, OneDrive, télémétrie, réglages de performances) sont livrées à part du catalogue, dans `data/packs/windows-workstation-debloat.json` du dossier d'installation. Importez ce fichier avec le bouton Importer de la bibliothèque si vous les voulez. Elles visent un poste de travail, pas un serveur ; elles arrivent comme vos propres actions, que vous pouvez donc modifier et exporter ; leur texte est pour l'instant en français seulement ; et neuf d'entre elles s'ouvrent sur une erreur de longueur de commande tant que leurs scripts n'ont pas été réécrits
 
 ### Connexion rapide (Ctrl+K)
 - Palette de commandes pour des connexions ponctuelles sans enregistrer de profil de serveur

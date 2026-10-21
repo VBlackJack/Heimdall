@@ -400,7 +400,14 @@ Persistence uses SQLite through `TwinShellDbContext`. The shared database path
 is under the user's local application data in a `TwinShell` directory.
 
 Seed data lives in `data/seed/actions/`. Files whose names start with `_` are
-ignored; the current seed set contains 514 action JSON files.
+ignored; the current seed set contains 442 action JSON files. Their text is an
+English pivot with other languages under `translations`, and their categories
+are ASCII keys that the view resolves to localized labels. At startup the seed
+directory is hashed; when the hash differs from the one recorded in the
+`SeedState` table, the system actions are refreshed in one transaction.
+
+The optional workstation debloat pack lives in `data/packs/`, in the import
+format, and is not seeded.
 
 Key user flows:
 
@@ -448,3 +455,4 @@ non-user-created commands, and import merge skips system actions.
 - `src/Heimdall.App/ViewModels/CommandLibraryViewModel*.cs`: Command Library
   view-model slices.
 - `data/seed/actions/`: command library seed actions.
+- `data/packs/`: optional command library packs, imported by the operator.

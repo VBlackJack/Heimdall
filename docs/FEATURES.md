@@ -172,6 +172,8 @@ generator that produces the final command for you.
 - Full-text search with relevance ranking over titles, tags, descriptions and command text
 - Filter by category, tag, platform and risk level; every filter keeps its selection across a library reload
 - Favorites, and a per-action risk badge (info, run, dangerous)
+- Shipped actions and their categories show in the interface language, and a language switch reloads the library keeping the selected action. The catalogue is written in English with a French translation beside it; Spanish has no shipped translation yet and shows the English text
+- Shipped actions follow the installed version: when an update changes the catalogue, the shipped actions are replaced at the next launch, while your own actions, the favorites and history of actions still shipped are kept
 
 **Building the command**
 - Typed parameters: text, integer, boolean, hostname, IP address, path, and **choice** (a fixed set of values offered as a drop-down)
@@ -194,6 +196,8 @@ generator that produces the final command for you.
 **Sharing**
 - Import and export as JSON, and Git synchronization for a shared team library; **Sync on startup** runs once after the vault is unlocked, and a failure is reported on the status bar
 - Actions that arrive from an import have their risk level and platform clamped to known values, so an unrecognized level is treated as dangerous rather than harmless
+- An export keeps the English text of each action with its translations; an export taken before the categories were localized imports into the current categories
+- **Workstation debloat pack**: 72 actions that strip a personal Windows workstation (store apps, Edge, OneDrive, telemetry, performance tweaks) ship apart from the catalogue, in `data/packs/windows-workstation-debloat.json` in the installation folder. Import that file with the library's Import button if you want them. They are aimed at a workstation, not a server; they arrive as your own actions, so you can edit and export them; their text is French only for now; and nine of them open with a command-length error until their scripts are rewritten
 
 ### Quick Connect (Ctrl+K)
 - Command palette for ad-hoc connections without saving a server profile
