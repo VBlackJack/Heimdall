@@ -91,6 +91,25 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 ? parameterValues[parameter.Name]
                 : parameter.DefaultValue ?? string.Empty;
 
+            // Built by the shared helper rather than spelled out here, so the substitution
+            // and the checks that reason about placeholders cannot drift apart.
+            var placeholder = CommandPatternQuoting.Placeholder(parameter.Name);
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                if (parameter.Required)
+                {
+                    throw new InvalidOperationException(
+                        _localizationService.GetFormattedString(MessageKeys.ValidationParameterRequired, parameter.Label));
+                }
+
+                // An optional value left empty means "leave the argument out": quoting it
+                // would hand the command an empty argument instead (hostname '').
+                var withoutPlaceholder = RemoveEmptyPlaceholder(command.ToString(), placeholder);
+                command.Clear().Append(withoutPlaceholder);
+                continue;
+            }
+
             // Validate the value according to the parameter type
             if (!ValidateParameterValue(template, parameter, value, out var validationError))
             {
@@ -100,14 +119,57 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             // Escape the value for shell safety using the target platform
             var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform, parameter.Quoting);
 
-            // Replace {parameterName} with actual value using StringBuilder
-            // Built by the shared helper rather than spelled out here, so the substitution
-            // and the checks that reason about placeholders cannot drift apart.
-            var placeholder = CommandPatternQuoting.Placeholder(parameter.Name);
             command.Replace(placeholder, escapedValue);
         }
 
         return EnforceCommandLength(command.ToString());
+    }
+
+    /// <summary>
+    /// Removes every occurrence of <paramref name="placeholder"/> from
+    /// <paramref name="command"/> together with the run of spaces each one leaves.
+    /// </summary>
+    /// <remarks>
+    /// Only the spaces next to a removed placeholder are touched: two spaces written into
+    /// the pattern elsewhere, inside a quoted grep expression for instance, are the
+    /// author's and stay. A placeholder that ends the command takes the space before it
+    /// along, so <c>hostname {name}</c> becomes <c>hostname</c>.
+    /// </remarks>
+    internal static string RemoveEmptyPlaceholder(string command, string placeholder)
+    {
+        var result = new StringBuilder(command.Length);
+        var index = 0;
+
+        while (true)
+        {
+            var found = command.IndexOf(placeholder, index, StringComparison.Ordinal);
+            if (found < 0)
+            {
+                result.Append(command, index, command.Length - index);
+                break;
+            }
+
+            result.Append(command, index, found - index);
+            index = found + placeholder.Length;
+
+            if (result.Length == 0 || result[^1] == ' ')
+            {
+                while (index < command.Length && command[index] == ' ')
+                {
+                    index++;
+                }
+            }
+
+            if (index >= command.Length)
+            {
+                while (result.Length > 0 && result[^1] == ' ')
+                {
+                    result.Length--;
+                }
+            }
+        }
+
+        return result.ToString();
     }
 
     public Dictionary<string, string> GetDefaultParameterValues(CommandTemplate template)

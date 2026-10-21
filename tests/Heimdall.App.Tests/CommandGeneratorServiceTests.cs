@@ -711,6 +711,73 @@ public sealed class CommandGeneratorServiceTests
         generate.Should().NotThrow($"{seedTemplate} must generate with its shipped defaults");
     }
 
+    // F-08: an empty optional value used to arrive as '' (hostname '', git pull ''). The
+    // generator now leaves such an argument out, so an empty quoted token left in a command
+    // built from the shipped defaults comes from the pattern: quotes written around a
+    // placeholder whose default is empty (-HostHeader '{hostHeader}').
+    [Theory]
+    [MemberData(nameof(EverySeedTemplate))]
+    public void GenerateCommand_EverySeedTemplate_ShippedDefaultsQuoteNothingEmpty(string seedTemplate)
+    {
+        string[] parts = seedTemplate.Split(" / ", StringSplitOptions.None);
+        CommandTemplate template = LoadSeedTemplate(parts[0], parts[1]);
+        Dictionary<string, string> values = new(StringComparer.Ordinal);
+        foreach (TemplateParameter parameter in template.Parameters)
+        {
+            string value = parameter.DefaultValue ?? string.Empty;
+            if (parameter.Required && string.IsNullOrWhiteSpace(value))
+            {
+                value = parameter.IsChoice ? parameter.AllowedValues![0] : SafeValueForParameter(parameter);
+            }
+
+            values[parameter.Name] = value;
+        }
+
+        string command = CreateService().GenerateCommand(template, values);
+        bool quotesNothing = EmptyQuotedToken.IsMatch(command);
+
+        if (EmptyQuotedSeedTemplates.Contains(seedTemplate))
+        {
+            // Pinned from the other side too: once the seed is fixed this fails and the entry
+            // has to leave the list, so the list cannot outlive the defect.
+            quotesNothing.Should().BeTrue(
+                $"{seedTemplate} is listed as quoting an empty default; remove it from the list once it does not: {command}");
+            return;
+        }
+
+        quotesNothing.Should().BeFalse($"{seedTemplate} must not quote an empty value: {command}");
+    }
+
+    /// <summary>
+    /// A pair of single or double quotes holding nothing and standing as a token of its own,
+    /// alone or after <c>=</c>. Doubled quotes inside a value (<c>'it''s'</c>) and the bash
+    /// close-escape-reopen sequence (<c>'\''</c>) touch other characters and do not match.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex EmptyQuotedToken = new(
+        @"(^|[\s=])(''|"""")(\s|$)",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Shipped templates whose pattern writes quotes around a placeholder whose default is
+    /// empty, so the generator cannot leave the argument out. A seed-side defect, fixed in
+    /// the seed files, not here.
+    /// </summary>
+    private static readonly HashSet<string> EmptyQuotedSeedTemplates = new(StringComparer.Ordinal)
+    {
+        "iis-create-site.json / windowsCommandTemplate",
+    };
+
+    [Fact]
+    public void EmptyQuotedSeedTemplates_NameOnlyTemplatesTheCatalogueShips()
+    {
+        HashSet<string> shipped = EverySeedTemplate()
+            .Select(row => (string)row[0])
+            .ToHashSet(StringComparer.Ordinal);
+
+        EmptyQuotedSeedTemplates.Where(entry => !shipped.Contains(entry))
+            .Should().BeEmpty("a listed template must still have a seed row, or the list outlives the defect");
+    }
+
     /// <summary>
     /// Shipped templates whose pattern alone is longer than
     /// <see cref="ValidationConstants.MaxCommandLength"/>, so they cannot generate whatever
