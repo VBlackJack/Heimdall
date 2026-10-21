@@ -2793,7 +2793,7 @@
                         <Setter Property="Margin" Value="0,0,0,10"/>
                     </Style>
                     <Style x:Key="SettingsApplyBadgeTextStyle" TargetType="{x:Type TextBlock}">
-                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                         <Setter Property="FontSize" Value="{StaticResource FontSizeSmallCaption}"/>
                         <Setter Property="FontWeight" Value="SemiBold"/>
                     </Style>

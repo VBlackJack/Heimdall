@@ -279,7 +279,7 @@ public sealed class ToolsTabPopulationService
             var recentIds = vm.RecentToolIds;
             if (recentIds.Count > 0)
             {
-                AddToolsTabSectionHeader(target, vm.Localize("ToolsRecentHeader"), "AccentBrush");
+                AddToolsTabSectionHeader(target, vm.Localize("ToolsRecentHeader"), "AccentTextBrush");
                 var recentPanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
                 foreach (var rid in recentIds)
                 {

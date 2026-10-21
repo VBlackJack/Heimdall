@@ -100,7 +100,7 @@ public static class HighlightTextBehavior
         }
 
         var matchRun = new Run(match) { FontWeight = FontWeights.Bold };
-        if (Application.Current?.TryFindResource("AccentBrush") is Brush accent)
+        if (Application.Current?.TryFindResource("AccentTextBrush") is Brush accent)
         {
             matchRun.Foreground = accent;
         }
