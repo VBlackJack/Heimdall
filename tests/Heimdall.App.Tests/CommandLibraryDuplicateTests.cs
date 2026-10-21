@@ -89,30 +89,43 @@ public sealed class CommandLibraryDuplicateTests
     /// <summary>
     /// The end the user sees: the library gains a row and the original is untouched.
     /// </summary>
+    /// <remarks>
+    /// Run on one dispatcher thread, and checked on the view model's rows as well as the
+    /// store: off the dispatcher the reload after the save failed on the collection view's
+    /// thread check, silently, and a test reading only the store stayed green.
+    /// </remarks>
     [Fact]
-    public async Task DuplicatingAddsANewActionAndLeavesTheOriginalAlone()
+    public void DuplicatingAddsANewActionAndLeavesTheOriginalAlone()
     {
-        var shipped = SeededAction();
-        var actions = new FakeActionService([shipped]);
-        var viewModel = await CreateViewModelAsync(actions);
-        using var _ = viewModel;
+        StaDispatcherRunner.Run(async () =>
+        {
+            var shipped = SeededAction();
+            var actions = new FakeActionService([shipped]);
+            var viewModel = await CreateViewModelAsync(actions);
+            using var _ = viewModel;
 
-        CommandActionDialogViewModel? shown = null;
-        viewModel.ShowActionDialogAsync = vm => { shown = vm; return Task.FromResult(true); };
-        viewModel.SelectedEntry = viewModel.AllEntries.Single();
+            CommandActionDialogViewModel? shown = null;
+            viewModel.ShowActionDialogAsync = vm => { shown = vm; return Task.FromResult(true); };
+            viewModel.SelectedEntry = viewModel.AllEntries.Single();
 
-        await viewModel.DuplicateSelectedAsync();
+            await viewModel.DuplicateSelectedAsync();
 
-        Assert.NotNull(shown);
-        var stored = (await actions.GetAllActionsAsync()).ToList();
-        Assert.Equal(2, stored.Count);
+            Assert.NotNull(shown);
+            var stored = (await actions.GetAllActionsAsync()).ToList();
+            Assert.Equal(2, stored.Count);
 
-        var original = stored.Single(a => string.Equals(a.Id, shipped.Id, StringComparison.Ordinal));
-        Assert.Equal("Tail a log", original.Title);
-        Assert.False(original.IsUserCreated);
+            var original = stored.Single(a => string.Equals(a.Id, shipped.Id, StringComparison.Ordinal));
+            Assert.Equal("Tail a log", original.Title);
+            Assert.False(original.IsUserCreated);
 
-        var copy = stored.Single(a => !string.Equals(a.Id, shipped.Id, StringComparison.Ordinal));
-        Assert.True(copy.IsUserCreated);
+            var copy = stored.Single(a => !string.Equals(a.Id, shipped.Id, StringComparison.Ordinal));
+            Assert.True(copy.IsUserCreated);
+
+            // The library shows what the store holds: the reload after the save went through.
+            Assert.Equal(
+                stored.Select(a => a.Id).Order(StringComparer.Ordinal),
+                viewModel.AllEntries.Select(entry => entry.Source.Id).Order(StringComparer.Ordinal));
+        });
     }
 
     /// <summary>
