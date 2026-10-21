@@ -1,0 +1,88 @@
+{
+  "id": "print-list-jobs",
+  "title": "List the jobs of a print queue",
+  "description": "Show the jobs waiting in one print queue with their owner, status and size.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "printer",
+    "print-job",
+    "printmanagement",
+    "queue",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "print-list-jobs-cmd",
+  "windowsCommandTemplate": {
+    "id": "print-list-jobs-cmd",
+    "platform": 0,
+    "name": "Get-PrintJob",
+    "commandPattern": "Get-PrintJob -ComputerName {printServer} -PrinterName {printerName} | Select-Object Id,DocumentName,UserName,JobStatus,SubmittedTime,TotalPages | Format-Table -AutoSize",
+    "parameters": [
+      {
+        "name": "printServer",
+        "label": "Print server",
+        "type": "hostname",
+        "defaultValue": "localhost",
+        "required": true,
+        "description": "Print server to query (localhost for this computer)"
+      },
+      {
+        "name": "printerName",
+        "label": "Printer",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the printer whose queue to read"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-PrintJob -ComputerName PRINT01 -PrinterName 'HP-Floor2'",
+      "description": "Show the queue of the HP-Floor2 printer",
+      "platform": 0
+    },
+    {
+      "command": "Get-Printer -ComputerName PRINT01 | ForEach-Object { Get-PrintJob -PrinterObject $_ }",
+      "description": "Show the jobs of every queue on the print server",
+      "platform": 0
+    },
+    {
+      "command": "Get-PrintJob -ComputerName PRINT01 -PrinterName 'HP-Floor2' | Where-Object JobStatus -like '*Error*'",
+      "description": "Find the jobs that block the queue with an error",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the PrintManagement module. No administrator rights needed.",
+  "links": [
+    {
+      "title": "Get-PrintJob documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/printmanagement/get-printjob"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les travaux d'une file d'impression",
+      "description": "Affiche les travaux en attente dans une file d'impression avec leur propriétaire, leur état et leur taille.",
+      "notes": "Nécessite le module PrintManagement. Aucun droit administrateur requis.",
+      "parameters": {
+        "windows": {
+          "printServer": {
+            "label": "Serveur d'impression",
+            "description": "Serveur d'impression à interroger (localhost pour cet ordinateur)"
+          },
+          "printerName": {
+            "label": "Imprimante",
+            "description": "Nom de l'imprimante dont lire la file"
+          }
+        }
+      },
+      "examples": {
+        "Get-PrintJob -ComputerName PRINT01 -PrinterName 'HP-Floor2'": "Affiche la file de l'imprimante HP-Floor2",
+        "Get-Printer -ComputerName PRINT01 | ForEach-Object { Get-PrintJob -PrinterObject $_ }": "Affiche les travaux de toutes les files du serveur d'impression",
+        "Get-PrintJob -ComputerName PRINT01 -PrinterName 'HP-Floor2' | Where-Object JobStatus -like '*Error*'": "Trouve les travaux qui bloquent la file avec une erreur"
+      }
+    }
+  }
+}

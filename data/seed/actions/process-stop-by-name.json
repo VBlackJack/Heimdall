@@ -1,0 +1,82 @@
+{
+  "id": "process-stop-by-name",
+  "title": "Stop processes by name",
+  "description": "Force every process with a given name to stop.",
+  "category": "performance",
+  "platform": 0,
+  "level": 2,
+  "tags": [
+    "process",
+    "stop-process",
+    "kill",
+    "terminate",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "process-stop-by-name-cmd",
+  "windowsCommandTemplate": {
+    "id": "process-stop-by-name-cmd",
+    "platform": 0,
+    "name": "Stop-Process",
+    "commandPattern": "Stop-Process -Name {processName} -Force",
+    "parameters": [
+      {
+        "name": "processName",
+        "label": "Process name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the process, without .exe"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Stop-Process -Name notepad -Force",
+      "description": "Stop every Notepad process",
+      "platform": 0
+    },
+    {
+      "command": "Stop-Process -Name w3wp -Confirm",
+      "description": "Ask before stopping each IIS worker process",
+      "platform": 0
+    },
+    {
+      "command": "Get-Process -Name java -IncludeUserName | Where-Object UserName -eq 'CONTOSO\\svc_app' | Stop-Process -Force",
+      "description": "Stop only the processes of one account (needs elevation)",
+      "platform": 0
+    },
+    {
+      "command": "Get-Process -Name w3wp | Select-Object Id,StartTime,CPU",
+      "description": "Check which processes match the name before stopping them",
+      "platform": 0
+    }
+  ],
+  "notes": "Unsaved work in the stopped processes is lost. Stopping a process of another user requires administrator rights.",
+  "links": [
+    {
+      "title": "Stop-Process documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/stop-process"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Arrêter des processus par leur nom",
+      "description": "Force l'arrêt de tous les processus qui portent un nom donné.",
+      "notes": "Le travail non enregistré dans les processus arrêtés est perdu. Arrêter un processus d'un autre utilisateur nécessite des droits administrateur.",
+      "parameters": {
+        "windows": {
+          "processName": {
+            "label": "Nom du processus",
+            "description": "Nom du processus, sans .exe"
+          }
+        }
+      },
+      "examples": {
+        "Stop-Process -Name notepad -Force": "Arrête tous les processus Notepad",
+        "Stop-Process -Name w3wp -Confirm": "Demande confirmation avant d'arrêter chaque processus de travail IIS",
+        "Get-Process -Name java -IncludeUserName | Where-Object UserName -eq 'CONTOSO\\svc_app' | Stop-Process -Force": "Arrête seulement les processus d'un compte (nécessite une élévation)",
+        "Get-Process -Name w3wp | Select-Object Id,StartTime,CPU": "Vérifie quels processus correspondent au nom avant de les arrêter"
+      }
+    }
+  }
+}
