@@ -41,18 +41,8 @@
       "platform": 1
     },
     {
-      "command": "systemctl enable nginx.service",
-      "description": "Example using the 'service' parameter: Name of the systemd unit to enable. Replace spooler with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "systemctl enable docker",
       "description": "Enable Docker at boot",
-      "platform": 1
-    },
-    {
-      "command": "sudo systemctl enable wuauserv",
-      "description": "Example using the 'serviceName' parameter: Name of the service to enable at boot. Replace wuauserv with the value that fits your environment.",
       "platform": 1
     }
   ],
@@ -79,9 +69,7 @@
       "examples": {
         "sudo systemctl enable nginx": "Active nginx au démarrage",
         "sudo systemctl enable --now nginx": "Active et démarre immédiatement",
-        "systemctl enable nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à activer. Remplacez spooler par la valeur appropriée selon votre environnement.",
-        "systemctl enable docker": "Activer Docker au démarrage",
-        "sudo systemctl enable wuauserv": "Exemple utilisant le paramètre 'serviceName': Nom du service à activer au démarrage. Remplacez wuauserv par la valeur appropriée selon votre environnement."
+        "systemctl enable docker": "Activer Docker au démarrage"
       }
     }
   }

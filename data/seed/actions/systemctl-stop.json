@@ -40,11 +40,6 @@
       "platform": 1
     },
     {
-      "command": "systemctl stop nginx.service",
-      "description": "Example using the 'service' parameter: Name of the systemd unit to stop. Replace spooler with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "systemctl stop mysql",
       "description": "Stop the MySQL service",
       "platform": 1
@@ -73,7 +68,6 @@
       "examples": {
         "sudo systemctl stop nginx": "Arrête le service nginx",
         "sudo systemctl stop mysql.service": "Arrête MySQL/MariaDB",
-        "systemctl stop nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à arrêter. Remplacez spooler par la valeur appropriée selon votre environnement.",
         "systemctl stop mysql": "Arrêter le service MySQL"
       }
     }

@@ -54,16 +54,6 @@
       "platform": 1
     },
     {
-      "command": "vmstat 5 10",
-      "description": "Example using the 'interval' parameter: Interval between samples. Replace 3600 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "vmstat 3600 5",
-      "description": "Example using the 'count' parameter: Number of samples to take. Replace 10 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "vmstat 1 10",
       "description": "System stats every second, 10 times",
       "platform": 1
@@ -112,8 +102,6 @@
         "vmstat 5 5": "Statistiques toutes les 5 secondes, 5 fois",
         "vmstat -s": "Statistiques mémoire détaillées",
         "vmstat -d": "Statistiques disques",
-        "vmstat 5 10": "Exemple utilisant le paramètre 'interval': Intervalle entre les mesures. Remplacez 3600 par la valeur appropriée selon votre environnement.",
-        "vmstat 3600 5": "Exemple utilisant le paramètre 'count': Nombre de mesures à effectuer. Remplacez 10 par la valeur appropriée selon votre environnement.",
         "vmstat 1 10": "Stats système toutes les secondes, 10 fois",
         "vmstat -w": "Format large",
         "vmstat -a": "Mémoire active/inactive",

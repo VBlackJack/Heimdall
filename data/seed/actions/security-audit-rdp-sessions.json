@@ -31,11 +31,6 @@
   },
   "examples": [
     {
-      "command": "Get-WinEvent -FilterHashtable @{LogName='System'; Level=2; StartTime=(Get-Date).AddHours(-24)}",
-      "description": "Efficient way to filter the errors (Level=2) of the last 24 hours. Much faster than Get-EventLog on large volumes.",
-      "platform": 0
-    },
-    {
       "command": "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} | Where-Object {$_.Properties[8].Value -eq 10} | Select-Object TimeCreated,Message",
       "description": "Successful RDP logons (LogonType 10)",
       "platform": 0
@@ -82,7 +77,6 @@
         }
       },
       "examples": {
-        "Get-WinEvent -FilterHashtable @{LogName='System'; Level=2; StartTime=(Get-Date).AddHours(-24)}": "Méthode performante pour filtrer les erreurs (Level=2) des dernières 24h. Beaucoup plus rapide que Get-EventLog sur les gros volumes.",
         "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} | Where-Object {$_.Properties[8].Value -eq 10} | Select-Object TimeCreated,Message": "Connexions RDP réussies (LogonType 10)",
         "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625} | Select-Object -First 20": "20 dernières tentatives de connexion échouées",
         "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get-Date).AddDays(-30)} | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",

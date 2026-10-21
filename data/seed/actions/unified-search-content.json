@@ -59,11 +59,6 @@
       "platform": 0
     },
     {
-      "command": "Select-String -Path \"*.cs\" -Pattern \"TODO\" -Recurse",
-      "description": "Find every TODO in the C# files",
-      "platform": 0
-    },
-    {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Select-Object * -First 1",
       "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
@@ -81,11 +76,6 @@
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Measure-Object",
       "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path \".\" -Filter \"{filePattern}\" -Recurse | Select-String -Pattern \"{searchTerm}\"",
-      "description": "Example using the 'searchPath' parameter: Folder to search. Replace <searchPath> with the value that fits your environment.",
       "platform": 0
     }
   ],
@@ -129,16 +119,6 @@
       "command": "grep -i \"password\" config.txt",
       "description": "Case-insensitive search",
       "platform": 1
-    },
-    {
-      "command": "grep -r \"<searchTerm>\" \"{searchPath}\"",
-      "description": "Example using the 'searchTerm' parameter: Text or regex to search for. Replace <searchTerm> with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "grep -r \"{searchTerm}\" \".\"",
-      "description": "Example using the 'searchPath' parameter: Folder to search. Replace <searchPath> with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "examples": [],
@@ -175,17 +155,13 @@
       },
       "examples": {
         "Get-ChildItem -Path \"C:\\Logs\" -Filter \"*.log\" -Recurse | Select-String -Pattern \"ERROR\"": "Cherche ERROR dans tous les fichiers .log",
-        "Select-String -Path \"*.cs\" -Pattern \"TODO\" -Recurse": "Trouve tous les TODO dans les fichiers C#",
         "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
         "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
         "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "Get-ChildItem -Path \"{searchPath}\" -Filter \"{filePattern}\" -Recurse | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
-        "Get-ChildItem -Path \".\" -Filter \"{filePattern}\" -Recurse | Select-String -Pattern \"{searchTerm}\"": "Exemple utilisant le paramètre 'searchPath': Dossier où chercher. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
         "grep -r \"ERROR\" /var/log": "Cherche ERROR dans tous les fichiers de /var/log",
         "grep -rn \"TODO\" --include=\"*.py\"": "Trouve TODO dans les fichiers Python avec numéros de ligne",
-        "grep -i \"password\" config.txt": "Recherche insensible à la casse",
-        "grep -r \"<searchTerm>\" \"{searchPath}\"": "Exemple utilisant le paramètre 'searchTerm': Texte ou regex à rechercher. Remplacez <searchTerm> par la valeur appropriée selon votre environnement.",
-        "grep -r \"{searchTerm}\" \".\"": "Exemple utilisant le paramètre 'searchPath': Dossier où chercher. Remplacez <searchPath> par la valeur appropriée selon votre environnement."
+        "grep -i \"password\" config.txt": "Recherche insensible à la casse"
       }
     }
   }

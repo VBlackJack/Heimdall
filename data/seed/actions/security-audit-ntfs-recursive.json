@@ -43,21 +43,6 @@
       "command": "Get-ChildItem C:\\Shares -Directory -Recurse | ForEach-Object {Get-Acl $_.FullName}",
       "description": "Full audit of every subfolder of C:\\Shares",
       "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Select-Object * -First 1",
-      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Measure-Object",
-      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
-      "platform": 0
     }
   ],
   "notes": "WARNING: can be slow on large trees. Use -Depth to limit the recursion. Export to CSV for analysis: | Export-Csv report.csv",
@@ -85,10 +70,7 @@
         }
       },
       "examples": {
-        "Get-ChildItem C:\\Shares -Directory -Recurse | ForEach-Object {Get-Acl $_.FullName}": "Audit complet de tous les sous-dossiers de C:\\Shares",
-        "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
-        "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
-        "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+        "Get-ChildItem C:\\Shares -Directory -Recurse | ForEach-Object {Get-Acl $_.FullName}": "Audit complet de tous les sous-dossiers de C:\\Shares"
       }
     }
   }

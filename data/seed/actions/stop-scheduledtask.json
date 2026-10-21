@@ -50,21 +50,6 @@
       "platform": 0
     },
     {
-      "command": "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -PassThru",
-      "description": "Run the action and return the resulting object for an immediate check. -PassThru confirms that the operation succeeded by showing the final status. Useful for scripts with error handling.",
-      "platform": 0
-    },
-    {
-      "command": "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Force",
-      "description": "Force the action despite resistance (dependent services, protected processes, and so on). -Force bypasses some safeguards. Use it with care after checking the dependencies.",
-      "platform": 0
-    },
-    {
-      "command": "Stop-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\",
-      "description": "Example using the 'taskname' parameter: Name of the task to stop. Replace DailyBackup with the value that fits your environment.",
-      "platform": 0
-    },
-    {
       "command": "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\",
       "description": "Example using the 'taskpath' parameter: Task path. Replace \\Microsoft\\Windows\\ with the value that fits your environment.",
       "platform": 0
@@ -97,9 +82,6 @@
       "examples": {
         "Stop-ScheduledTask -TaskName 'LongRunningTask'": "Arrête une tâche en cours d'exécution",
         "Get-ScheduledTask | Where-Object {$_.State -eq 'Running'} | Stop-ScheduledTask": "Arrête toutes les tâches en cours",
-        "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -PassThru": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
-        "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Force": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances.",
-        "Stop-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskname': Nom de la tâche à arrêter. Remplacez DailyBackup par la valeur appropriée selon votre environnement.",
         "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
       }
     }

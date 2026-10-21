@@ -35,11 +35,6 @@
       "platform": 0
     },
     {
-      "command": "Get-Process | Where-Object {$_.Responding -eq $false}",
-      "description": "Find the applications that are 'Not responding' (frozen).",
-      "platform": 0
-    },
-    {
       "command": "Get-NetTCPConnection -State Listen | Select-Object LocalAddress,LocalPort,ProcessName | Format-Table",
       "description": "List the listening ports on Windows",
       "platform": 0
@@ -68,7 +63,6 @@
       "description": "Affiche les ports ouverts et les connexions réseau actives",
       "examples": {
         "Get-NetTCPConnection -State Established | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort | Sort-Object RemoteAddress": "Affiche les connexions TCP actives triées par adresse distante.",
-        "Get-Process | Where-Object {$_.Responding -eq $false}": "Trouve les applications 'Ne répond pas' (Frozen).",
         "Get-NetTCPConnection -State Listen | Select-Object LocalAddress,LocalPort,ProcessName | Format-Table": "Liste les ports en écoute sur Windows",
         "ss -tulpn": "Liste les ports en ecoute avec les processus associes (alternative moderne a netstat).",
         "netstat -i": "Statistiques des interfaces",

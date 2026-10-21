@@ -46,16 +46,6 @@
       "platform": 1
     },
     {
-      "command": "yum install -y nginx --dry-run",
-      "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
-      "platform": 1
-    },
-    {
-      "command": "yum install -y httpd",
-      "description": "Example using the 'package' parameter: Name of the package to install. Replace nginx with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "yum update -y",
       "description": "Update every package",
       "platform": 1
@@ -105,8 +95,6 @@
         "sudo yum install httpd": "Installe le serveur web Apache",
         "sudo yum install vim wget curl": "Installe plusieurs paquets",
         "yum install -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "yum install -y nginx --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
-        "yum install -y httpd": "Exemple utilisant le paramètre 'package': Nom du paquet à installer. Remplacez nginx par la valeur appropriée selon votre environnement.",
         "yum update -y": "Mettre à jour tous les paquets",
         "yum install httpd -y": "Installer Apache",
         "yum remove nginx": "Désinstaller nginx",

@@ -40,11 +40,6 @@
       "command": "tree /A > structure.txt",
       "description": "Save the tree in ASCII to a file",
       "platform": 0
-    },
-    {
-      "command": "tree \".\" /F /A",
-      "description": "Example using the 'path' parameter: Folder to show. Replace <path> with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "search-tree-linux-cmd",
@@ -78,11 +73,6 @@
     {
       "command": "tree -h",
       "description": "Show sizes in a readable format",
-      "platform": 1
-    },
-    {
-      "command": "tree \".\"",
-      "description": "Example using the 'path' parameter: Folder to show. Replace <path> with the value that fits your environment.",
       "platform": 1
     },
     {
@@ -129,11 +119,9 @@
       "examples": {
         "tree C:\\Projects /F": "Affiche l'arborescence avec les fichiers",
         "tree /A > structure.txt": "Sauvegarde l'arborescence en ASCII dans un fichier",
-        "tree \".\" /F /A": "Exemple utilisant le paramètre 'path': Dossier à afficher. Remplacez <path> par la valeur appropriée selon votre environnement.",
         "tree -L 2": "Limite à 2 niveaux de profondeur",
         "tree -d": "Affiche uniquement les dossiers",
         "tree -h": "Affiche les tailles en format lisible",
-        "tree \".\"": "Exemple utilisant le paramètre 'path': Dossier à afficher. Remplacez <path> par la valeur appropriée selon votre environnement.",
         "tree /var/www": "Arborescence du dossier web",
         "tree -L 2 /home": "Limiter à 2 niveaux",
         "tree -d /etc": "Afficher uniquement les dossiers",

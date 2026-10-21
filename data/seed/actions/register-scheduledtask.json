@@ -93,11 +93,6 @@
       "platform": 0
     },
     {
-      "command": "$action = New-ScheduledTaskAction -Execute 'notepad.exe' -Argument '-Force -Verbose'; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'DailyBackup' -Action $action -Trigger $trigger -User 'jdupont' -PassThru",
-      "description": "Make the command return the modified or created object in the pipeline. By default the Set-/New- cmdlets return nothing. -PassThru enables the return for chained operations or immediate checks.",
-      "platform": 0
-    },
-    {
       "command": "$action = New-ScheduledTaskAction -Execute 'notepad.exe' -Argument '-Force -Verbose'; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'DailyBackup' -Action $action -Trigger $trigger -User 'jdupont' -Verbose",
       "description": "Show detailed information about the command's execution. -Verbose enables debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
       "platform": 0
@@ -145,7 +140,6 @@
         "$action = New-ScheduledTaskAction -Execute 'C:\\Scripts\\startup.bat'; $trigger = New-ScheduledTaskTrigger -AtStartup; Register-ScheduledTask -TaskName 'StartupScript' -Action $action -Trigger $trigger -User 'SYSTEM'": "Script au démarrage du système",
         "$action = New-ScheduledTaskAction -Execute 'notepad.exe' -Argument '-Force -Verbose'; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'DailyBackup' -Action $action -Trigger $trigger -User 'jdupont' -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
         "$action = New-ScheduledTaskAction -Execute 'notepad.exe' -Argument '-Force -Verbose'; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'DailyBackup' -Action $action -Trigger $trigger -User 'jdupont' -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
-        "$action = New-ScheduledTaskAction -Execute 'notepad.exe' -Argument '-Force -Verbose'; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'DailyBackup' -Action $action -Trigger $trigger -User 'jdupont' -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
         "$action = New-ScheduledTaskAction -Execute 'notepad.exe' -Argument '-Force -Verbose'; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'DailyBackup' -Action $action -Trigger $trigger -User 'jdupont' -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
       }
     }

@@ -25,7 +25,7 @@
       "platform": 0
     },
     {
-      "command": "psloggedon.exe \\SERVER01",
+      "command": "psloggedon.exe \\\\SERVER01",
       "description": "Check who is logged on to a remote server.",
       "platform": 0
     }
@@ -37,7 +37,7 @@
       "description": "Affiche les utilisateurs connectés localement et via des partages de ressources.",
       "examples": {
         "psloggedon.exe -l -AcceptEula": "Affiche uniquement les connexions locales (-l), pas les connexions via partages réseau.",
-        "psloggedon.exe \\SERVER01": "Vérifie qui est connecté sur un serveur distant."
+        "psloggedon.exe \\\\SERVER01": "Vérifie qui est connecté sur un serveur distant."
       }
     }
   }

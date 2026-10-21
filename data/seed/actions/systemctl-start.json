@@ -40,11 +40,6 @@
       "platform": 1
     },
     {
-      "command": "systemctl start nginx.service",
-      "description": "Example using the 'service' parameter: Name of the systemd unit to start. Replace spooler with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "systemctl start apache2",
       "description": "Start the Apache service",
       "platform": 1
@@ -73,7 +68,6 @@
       "examples": {
         "sudo systemctl start nginx": "Démarre le service nginx",
         "sudo systemctl start apache2.service": "Démarre Apache (l'extension .service est optionnelle)",
-        "systemctl start nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à démarrer. Remplacez spooler par la valeur appropriée selon votre environnement.",
         "systemctl start apache2": "Démarrer le service Apache"
       }
     }

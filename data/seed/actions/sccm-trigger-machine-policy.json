@@ -21,16 +21,6 @@
   },
   "examples": [
     {
-      "command": "ss -tulpn",
-      "description": "🔥 LINUX STANDARD: list every listening TCP/UDP port (-tul) with its process (-p) and without DNS resolution (-n). The reference command to find out 'who listens on this port'.",
-      "platform": 1
-    },
-    {
-      "command": "ss -s",
-      "description": "Quick statistical summary of the sockets (Total, TCP, UDP). Useful to spot socket exhaustion or a DDoS attack.",
-      "platform": 1
-    },
-    {
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000021}'",
       "description": "Trigger the machine policy retrieval",
       "platform": 0
@@ -54,8 +44,6 @@
       "description": "Force le client SCCM à récupérer et appliquer immédiatement les stratégies machine depuis le serveur",
       "notes": "Schedule ID {21} = Machine Policy Retrieval, {22} = Machine Policy Evaluation. Nécessite le client SCCM installé. Vérifier CCM.log pour confirmation.",
       "examples": {
-        "ss -tulpn": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
-        "ss -s": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
         "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000021}'": "Déclenche la récupération de la stratégie machine",
         "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000022}'": "Déclenche l'évaluation de la stratégie machine"
       }

@@ -68,11 +68,6 @@
       "command": "dotnet run -- arg1 arg2",
       "description": "Run with arguments",
       "platform": 0
-    },
-    {
-      "command": "dotnet run --project \".\"",
-      "description": "Example using the 'projectPath' parameter: Path of the .csproj project. Replace C:\\Projects\\MyApp with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "linuxExamples": [
@@ -110,7 +105,6 @@
         "dotnet run": "Lance le projet du dossier courant",
         "dotnet run --configuration Release": "Lance en mode Release",
         "dotnet run -- arg1 arg2": "Lance avec des arguments",
-        "dotnet run --project \".\"": "Exemple utilisant le paramètre 'projectPath': Chemin du projet .csproj. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement.",
         "dotnet run --project \"./MyApp\"": "Lance un projet .NET depuis un chemin relatif",
         "dotnet restore": "Restaurer les dépendances NuGet"
       }

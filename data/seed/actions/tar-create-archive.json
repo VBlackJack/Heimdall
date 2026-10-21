@@ -60,16 +60,6 @@
       "command": "tar -tjf backup.tar.bz2",
       "description": "List the content without extracting",
       "platform": 1
-    },
-    {
-      "command": "tar --v -f backup.tar.gz file1.txt file2.txt -v",
-      "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
-      "platform": 1
-    },
-    {
-      "command": "tar -czf backup.tar.gz file1.txt file2.txt",
-      "description": "Example using the 'options' parameter: Options (c=create, z=gzip, j=bzip2, x=extract, f=file, v=verbose). Replace -v -f with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "notes": "c=create, x=extract, t=list, z=gzip, j=bzip2, f=file. .tar.gz or .tgz for gzip.",
@@ -103,9 +93,7 @@
       "examples": {
         "tar -czf backup.tar.gz /home/user/data": "Crée une archive gzip",
         "tar -xzf backup.tar.gz": "Extrait une archive gzip",
-        "tar -tjf backup.tar.bz2": "Liste le contenu sans extraire",
-        "tar --v -f backup.tar.gz file1.txt file2.txt -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "tar -czf backup.tar.gz file1.txt file2.txt": "Exemple utilisant le paramètre 'options': Options (c=create, z=gzip, j=bzip2, x=extract, f=file, v=verbose). Remplacez -v -f par la valeur appropriée selon votre environnement."
+        "tar -tjf backup.tar.bz2": "Liste le contenu sans extraire"
       }
     }
   }

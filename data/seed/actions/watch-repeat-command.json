@@ -39,11 +39,6 @@
   },
   "examples": [
     {
-      "command": "watch -n 2 Get-Process",
-      "description": "Example using the 'interval' parameter: Interval in seconds between runs. Replace 3600 with the value that fits your environment.",
-      "platform": 0
-    },
-    {
       "command": "watch \"tail -n 10 /var/log/syslog\"",
       "description": "Follow the last lines",
       "platform": 1
@@ -79,7 +74,6 @@
         }
       },
       "examples": {
-        "watch -n 2 Get-Process": "Exemple utilisant le paramètre 'interval': Intervalle en secondes entre chaque exécution. Remplacez 3600 par la valeur appropriée selon votre environnement.",
         "watch \"tail -n 10 /var/log/syslog\"": "Suivre les dernières lignes",
         "watch -c \"ls --color\"": "Garder les couleurs"
       }

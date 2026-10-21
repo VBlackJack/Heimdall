@@ -40,16 +40,6 @@
       "command": "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:sccm.contoso.com SMSSITECODE=ABC /forceinstall",
       "description": "Reinstall the SCCM client with site ABC",
       "platform": 0
-    },
-    {
-      "command": "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:<mp_server> SMSSITECODE={site_code} /forceinstall",
-      "description": "Example using the 'mp_server' parameter: FQDN of the SCCM Management Point server.",
-      "platform": 0
-    },
-    {
-      "command": "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:{mp_server} SMSSITECODE=<site_code> /forceinstall",
-      "description": "Example using the 'site_code' parameter: SCCM site code (3 characters).",
-      "platform": 0
     }
   ],
   "notes": "Requires administrator rights. /forceinstall reinstalls the client even when it is already present.",
@@ -77,9 +67,7 @@
         }
       },
       "examples": {
-        "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:sccm.contoso.com SMSSITECODE=ABC /forceinstall": "Réinstalle le client SCCM avec le site ABC",
-        "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:<mp_server> SMSSITECODE={site_code} /forceinstall": "Exemple utilisant le paramètre 'mp_server': FQDN du serveur Management Point SCCM.",
-        "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:{mp_server} SMSSITECODE=<site_code> /forceinstall": "Exemple utilisant le paramètre 'site_code': Code du site SCCM (3 caractères)."
+        "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:sccm.contoso.com SMSSITECODE=ABC /forceinstall": "Réinstalle le client SCCM avec le site ABC"
       }
     }
   }

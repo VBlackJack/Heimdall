@@ -43,16 +43,6 @@
       "command": "systemctl is-enabled nginx",
       "description": "Check whether it is enabled at boot",
       "platform": 1
-    },
-    {
-      "command": "systemctl status nginx.service",
-      "description": "Example using the 'service' parameter: Name of the systemd unit to check. Replace spooler with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "systemctl disable cups",
-      "description": "Disable the print service at boot",
-      "platform": 1
     }
   ],
   "notes": "Reading does not require sudo. Shows the PID, memory, recent logs and state.",
@@ -78,9 +68,7 @@
       "examples": {
         "systemctl status nginx": "Affiche l'état complet de nginx",
         "systemctl is-active nginx": "Retourne uniquement active/inactive",
-        "systemctl is-enabled nginx": "Vérifie si activé au boot",
-        "systemctl status nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à vérifier. Remplacez spooler par la valeur appropriée selon votre environnement.",
-        "systemctl disable cups": "Désactiver le service d'impression au démarrage"
+        "systemctl is-enabled nginx": "Vérifie si activé au boot"
       }
     }
   }

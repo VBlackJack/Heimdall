@@ -53,16 +53,6 @@
       "platform": 1
     },
     {
-      "command": "setfacl -m u:username:rwx C:\\Logs\\app.log",
-      "description": "Example using the 'acl' parameter: ACL to apply (u:user:perms or g:group:perms). Replace user:jdupont:rwx with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "setfacl -m user:jdupont:rwx /path/to/file",
-      "description": "Example using the 'path' parameter: File or directory to modify. Replace C:\\Logs\\app.log with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "setfacl -m u:jdupont:rwx /shared",
       "description": "Give rwx to jdupont",
       "platform": 1
@@ -116,8 +106,6 @@
         "setfacl -m u:john:rwx /shared/folder": "Donne rwx à l'utilisateur john",
         "setfacl -m g:developers:rw- /project": "Donne rw au groupe developers",
         "setfacl -x u:john /shared/folder": "Supprime l'ACL de john",
-        "setfacl -m u:username:rwx C:\\Logs\\app.log": "Exemple utilisant le paramètre 'acl': ACL à appliquer (u:user:perms ou g:group:perms). Remplacez user:jdupont:rwx par la valeur appropriée selon votre environnement.",
-        "setfacl -m user:jdupont:rwx /path/to/file": "Exemple utilisant le paramètre 'path': Fichier ou répertoire à modifier. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
         "setfacl -m u:jdupont:rwx /shared": "Donner rwx à jdupont",
         "setfacl -m g:devs:rx /app": "Donner rx au groupe devs",
         "setfacl -x u:olduser /shared": "Supprimer les ACL d'un utilisateur",

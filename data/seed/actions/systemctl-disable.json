@@ -40,18 +40,8 @@
       "platform": 1
     },
     {
-      "command": "systemctl disable nginx.service",
-      "description": "Example using the 'service' parameter: Name of the systemd unit to disable. Replace spooler with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "sudo systemctl disable apache2",
       "description": "Disable apache2 at boot",
-      "platform": 1
-    },
-    {
-      "command": "sudo systemctl disable wuauserv",
-      "description": "Example using the 'serviceName' parameter: Name of the service to disable at boot. Replace wuauserv with the value that fits your environment.",
       "platform": 1
     }
   ],
@@ -78,9 +68,7 @@
       "examples": {
         "sudo systemctl disable nginx": "Désactive nginx au démarrage",
         "sudo systemctl disable --now nginx": "Désactive et arrête immédiatement",
-        "systemctl disable nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à désactiver. Remplacez spooler par la valeur appropriée selon votre environnement.",
-        "sudo systemctl disable apache2": "Désactive apache2 au démarrage",
-        "sudo systemctl disable wuauserv": "Exemple utilisant le paramètre 'serviceName': Nom du service à désactiver au démarrage. Remplacez wuauserv par la valeur appropriée selon votre environnement."
+        "sudo systemctl disable apache2": "Désactive apache2 au démarrage"
       }
     }
   }

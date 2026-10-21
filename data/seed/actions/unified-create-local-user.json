@@ -67,16 +67,6 @@
       "platform": 1
     },
     {
-      "command": "useradd -m -s /bin/bash {username}",
-      "description": "Example using the 'shell' parameter: Default shell. Replace <shell> with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "useradd -m -s {shell} newuser",
-      "description": "Example using the 'username' parameter: Name of the new user. Replace <username> with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "useradd -m -s /bin/bash jdupont",
       "description": "Create a user with a home directory and bash",
       "platform": 1
@@ -152,8 +142,6 @@
         "sudo useradd -m -s /bin/bash john": "Crée l'utilisateur john avec répertoire home",
         "sudo useradd -m -G sudo,docker john": "Crée john et l'ajoute aux groupes sudo et docker",
         "sudo passwd john": "Définit le mot de passe après création",
-        "useradd -m -s /bin/bash {username}": "Exemple utilisant le paramètre 'shell': Shell par défaut. Remplacez <shell> par la valeur appropriée selon votre environnement.",
-        "useradd -m -s {shell} newuser": "Exemple utilisant le paramètre 'username': Nom du nouvel utilisateur. Remplacez <username> par la valeur appropriée selon votre environnement.",
         "useradd -m -s /bin/bash jdupont": "Créer un utilisateur avec home et bash",
         "useradd -m -d /opt/app -s /bin/bash appuser": "Utilisateur avec home personnalisé"
       }

@@ -63,16 +63,6 @@
       "platform": 1
     },
     {
-      "command": "userdel -r {username}",
-      "description": "Example using the 'options' parameter: Options (-r also deletes the home directory). Replace <options> with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "userdel {options} john",
-      "description": "Example using the 'username' parameter: User to delete. Replace <username> with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "userdel jdupont",
       "description": "Delete the user jdupont",
       "platform": 1
@@ -157,8 +147,6 @@
         "Get-LocalUser | Where-Object {$_.Enabled -eq $false} | Remove-LocalUser": "Supprime tous les utilisateurs désactivés",
         "sudo userdel john": "Supprime l'utilisateur john (garde le home)",
         "sudo userdel -r john": "Supprime john et son répertoire home",
-        "userdel -r {username}": "Exemple utilisant le paramètre 'options': Options (-r supprime aussi le home). Remplacez <options> par la valeur appropriée selon votre environnement.",
-        "userdel {options} john": "Exemple utilisant le paramètre 'username': Utilisateur à supprimer. Remplacez <username> par la valeur appropriée selon votre environnement.",
         "userdel jdupont": "Supprimer l'utilisateur jdupont",
         "userdel -r olduser": "Supprimer l'utilisateur et son home",
         "userdel -f lockeduser": "Forcer la suppression même si connecté",

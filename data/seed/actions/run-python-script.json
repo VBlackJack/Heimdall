@@ -45,13 +45,7 @@
       }
     ]
   },
-  "examples": [
-    {
-      "command": "python \"C:\\Scripts\\deploy.ps1\"",
-      "description": "Example using the 'scriptPath' parameter: Path of the .py file. Replace C:\\Scripts\\deploy.ps1 with the value that fits your environment.",
-      "platform": 2
-    }
-  ],
+  "examples": [],
   "notes": "python3 on Linux/Mac, python on Windows. -m runs a module.",
   "links": [],
   "windowsExamples": [
@@ -119,8 +113,7 @@
         "python3 -m module_name": "Exécute un module Python",
         "python3 script.py arg1 arg2": "Exécute avec des arguments",
         "python3 -m venv venv && source venv/bin/activate": "Créer et activer un venv",
-        "python3 -c \"print('Hello')\"": "Exécuter une ligne de code",
-        "python \"C:\\Scripts\\deploy.ps1\"": "Exemple utilisant le paramètre 'scriptPath': Chemin du fichier .py. Remplacez C:\\Scripts\\deploy.ps1 par la valeur appropriée selon votre environnement."
+        "python3 -c \"print('Hello')\"": "Exécuter une ligne de code"
       }
     }
   }

@@ -53,16 +53,6 @@
       "platform": 1
     },
     {
-      "command": "usermod -aG sudo jdupont",
-      "description": "Example using the 'options' parameter: Options (-aG=add groups, -s=shell, -L=lock, -U=unlock). Replace -v -f with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "usermod -v -f john",
-      "description": "Example using the 'username' parameter: User to modify. Replace jdupont with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "usermod -L baduser",
       "description": "Lock the user account",
       "platform": 1
@@ -111,8 +101,6 @@
         "sudo usermod -aG sudo john": "Ajoute john au groupe sudo",
         "sudo usermod -s /bin/zsh john": "Change le shell de john",
         "sudo usermod -L john": "Verrouille le compte de john",
-        "usermod -aG sudo jdupont": "Exemple utilisant le paramètre 'options': Options (-aG=add groups, -s=shell, -L=lock, -U=unlock). Remplacez -v -f par la valeur appropriée selon votre environnement.",
-        "usermod -v -f john": "Exemple utilisant le paramètre 'username': Utilisateur à modifier. Remplacez jdupont par la valeur appropriée selon votre environnement.",
         "usermod -L baduser": "Verrouiller le compte utilisateur",
         "usermod -U baduser": "Déverrouiller le compte utilisateur",
         "usermod -s /bin/zsh jdupont": "Changer le shell de l'utilisateur",

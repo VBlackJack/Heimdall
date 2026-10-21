@@ -66,18 +66,8 @@
       "platform": 0
     },
     {
-      "command": "Restore-SqlDatabase -ServerInstance 'localhost' -Database 'ProductionDB' -BackupFile 'D:\\Backups\\daily' -ReplaceDatabase",
-      "description": "Example using the 'serverInstance' parameter: Target SQL Server instance. Replace localhost\\SQLEXPRESS with the value that fits your environment.",
-      "platform": 0
-    },
-    {
       "command": "Restore-SqlDatabase -ServerInstance 'localhost\\SQLEXPRESS' -Database 'ProductionDB' -BackupFile 'D:\\Backups\\daily' -ReplaceDatabase",
       "description": "Example using the 'databaseName' parameter: Name of the database to restore. Replace ProductionDB with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "Restore-SqlDatabase -ServerInstance 'localhost\\SQLEXPRESS' -Database 'ProductionDB' -BackupFile 'C:\\Backups\\backup.bak' -ReplaceDatabase",
-      "description": "Example using the 'backupPath' parameter: Path of the .bak file. Replace D:\\Backups\\daily with the value that fits your environment.",
       "platform": 0
     }
   ],
@@ -113,9 +103,7 @@
         "Restore-SqlDatabase -ServerInstance 'localhost' -Database 'MyDB' -BackupFile 'C:\\Backups\\MyDB.bak' -ReplaceDatabase": "Restaure MyDB en écrasant la base existante",
         "Restore-SqlDatabase -ServerInstance 'localhost' -Database 'MyDB_Test' -BackupFile 'C:\\Backups\\MyDB.bak'": "Restaure sous un nouveau nom",
         "Invoke-Sqlcmd -Query \"RESTORE DATABASE [MyDB] FROM DISK='C:\\Backups\\MyDB.bak' WITH REPLACE\"": "Alternative avec T-SQL",
-        "Restore-SqlDatabase -ServerInstance 'localhost' -Database 'ProductionDB' -BackupFile 'D:\\Backups\\daily' -ReplaceDatabase": "Exemple utilisant le paramètre 'serverInstance': Instance SQL Server cible. Remplacez localhost\\SQLEXPRESS par la valeur appropriée selon votre environnement.",
-        "Restore-SqlDatabase -ServerInstance 'localhost\\SQLEXPRESS' -Database 'ProductionDB' -BackupFile 'D:\\Backups\\daily' -ReplaceDatabase": "Exemple utilisant le paramètre 'databaseName': Nom de la base de données à restaurer. Remplacez ProductionDB par la valeur appropriée selon votre environnement.",
-        "Restore-SqlDatabase -ServerInstance 'localhost\\SQLEXPRESS' -Database 'ProductionDB' -BackupFile 'C:\\Backups\\backup.bak' -ReplaceDatabase": "Exemple utilisant le paramètre 'backupPath': Chemin du fichier .bak. Remplacez D:\\Backups\\daily par la valeur appropriée selon votre environnement."
+        "Restore-SqlDatabase -ServerInstance 'localhost\\SQLEXPRESS' -Database 'ProductionDB' -BackupFile 'D:\\Backups\\daily' -ReplaceDatabase": "Exemple utilisant le paramètre 'databaseName': Nom de la base de données à restaurer. Remplacez ProductionDB par la valeur appropriée selon votre environnement."
       }
     }
   }

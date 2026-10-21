@@ -55,21 +55,6 @@
       "platform": 0
     },
     {
-      "command": "Start-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -PassThru",
-      "description": "Run the action and return the resulting object for an immediate check. -PassThru confirms that the operation succeeded by showing the final status. Useful for scripts with error handling.",
-      "platform": 0
-    },
-    {
-      "command": "Start-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Force",
-      "description": "Force the action despite resistance (dependent services, protected processes, and so on). -Force bypasses some safeguards. Use it with care after checking the dependencies.",
-      "platform": 0
-    },
-    {
-      "command": "Start-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\",
-      "description": "Example using the 'taskname' parameter: Name of the task to start. Replace DailyBackup with the value that fits your environment.",
-      "platform": 0
-    },
-    {
       "command": "Start-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\",
       "description": "Example using the 'taskpath' parameter: Task path (e.g. -TaskPath '\\CustomTasks\\'). Replace \\Microsoft\\Windows\\ with the value that fits your environment.",
       "platform": 0
@@ -103,9 +88,6 @@
         "Start-ScheduledTask -TaskName 'DailyBackup'": "Démarre la tâche immédiatement",
         "Start-ScheduledTask -TaskName 'Cleanup' -TaskPath '\\Maintenance\\'": "Démarre une tâche dans un chemin spécifique",
         "Get-ScheduledTask -TaskPath '\\' | Where-Object {$_.State -eq 'Ready'} | Start-ScheduledTask": "Démarre toutes les tâches prêtes",
-        "Start-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -PassThru": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
-        "Start-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Force": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances.",
-        "Start-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskname': Nom de la tâche à démarrer. Remplacez DailyBackup par la valeur appropriée selon votre environnement.",
         "Start-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche (ex: -TaskPath '\\CustomTasks\\'). Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
       }
     }

@@ -59,21 +59,6 @@
       "command": "icacls \"C:\\Data\" /grant Administrators:F /T",
       "description": "Give full control recursively",
       "platform": 0
-    },
-    {
-      "command": "icacls \"<path>\" /grant {user}:{permissions}",
-      "description": "Example using the 'path' parameter: Path of the file or folder. Replace <path> with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "icacls \"{path}\" /grant <user>:{permissions}",
-      "description": "Example using the 'user' parameter: Name of the user or group. Replace <user> with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "icacls \"{path}\" /grant {user}:F",
-      "description": "Example using the 'permissions' parameter: F=Full, M=Modify, RX=ReadExecute, R=Read, W=Write. Replace <permissions> with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "file-permissions-linux-cmd",
@@ -121,11 +106,6 @@
       "command": "chmod {permissions} \"{path}\" -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
       "platform": 1
-    },
-    {
-      "command": "chmod 755 \"{path}\"",
-      "description": "Example using the 'permissions' parameter: Permissions in octal (e.g. 755, 644) or symbolic form (e.g. u+x). Replace <permissions> with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "examples": [],
@@ -163,14 +143,10 @@
       "examples": {
         "icacls \"C:\\Data\" /grant Users:M": "Donne les droits de modification aux Users",
         "icacls \"C:\\Data\" /grant Administrators:F /T": "Donne le contrôle total récursivement",
-        "icacls \"<path>\" /grant {user}:{permissions}": "Exemple utilisant le paramètre 'path': Chemin du fichier ou dossier. Remplacez <path> par la valeur appropriée selon votre environnement.",
-        "icacls \"{path}\" /grant <user>:{permissions}": "Exemple utilisant le paramètre 'user': Nom de l'utilisateur ou du groupe. Remplacez <user> par la valeur appropriée selon votre environnement.",
-        "icacls \"{path}\" /grant {user}:F": "Exemple utilisant le paramètre 'permissions': F=Full, M=Modify, RX=ReadExecute, R=Read, W=Write. Remplacez <permissions> par la valeur appropriée selon votre environnement.",
         "chmod 755 script.sh": "Rend un script exécutable (rwxr-xr-x)",
         "chmod -R 644 /var/www/html": "Définit les permissions récursivement",
         "chmod u+x file.sh": "Ajoute l'exécution pour le propriétaire",
-        "chmod {permissions} \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "chmod 755 \"{path}\"": "Exemple utilisant le paramètre 'permissions': Permissions en octal (ex: 755, 644) ou symbolique (ex: u+x). Remplacez <permissions> par la valeur appropriée selon votre environnement."
+        "chmod {permissions} \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
       }
     }
   }

@@ -62,16 +62,6 @@
       "platform": 1
     },
     {
-      "command": "sar -u 3600 10",
-      "description": "Example using the 'options' parameter: Statistics type (-u=CPU, -r=RAM, -b=IO, -n DEV=network). Replace -v -f with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "sar -v -f 5 10",
-      "description": "Example using the 'interval' parameter: Interval in seconds. Replace 3600 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "sar -u 1 5",
       "description": "CPU every second, 5 times",
       "platform": 1
@@ -124,8 +114,6 @@
         "sar -u 5 3": "CPU toutes les 5s, 3 fois",
         "sar -r": "Historique d'utilisation mémoire du jour",
         "sar -n DEV 1 5": "Statistiques réseau",
-        "sar -u 3600 10": "Exemple utilisant le paramètre 'options': Type de stats (-u=CPU, -r=RAM, -b=IO, -n DEV=réseau). Remplacez -v -f par la valeur appropriée selon votre environnement.",
-        "sar -v -f 5 10": "Exemple utilisant le paramètre 'interval': Intervalle en secondes. Remplacez 3600 par la valeur appropriée selon votre environnement.",
         "sar -u 1 5": "CPU toutes les secondes, 5 fois",
         "sar -r 1 5": "Mémoire toutes les secondes",
         "sar -b 1 5": "Activité I/O",

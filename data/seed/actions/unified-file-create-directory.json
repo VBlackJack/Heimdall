@@ -48,18 +48,8 @@
       "platform": 0
     },
     {
-      "command": "New-Item -Path \"{path}\" -ItemType Directory -Force -PassThru",
-      "description": "Make the command return the modified or created object in the pipeline. By default the Set-/New- cmdlets return nothing. -PassThru enables the return for chained operations or immediate checks.",
-      "platform": 0
-    },
-    {
       "command": "New-Item -Path \"{path}\" -ItemType Directory -Force -Verbose",
       "description": "Show detailed information about the command's execution. -Verbose enables debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
-      "platform": 0
-    },
-    {
-      "command": "New-Item -Path \"<path>\" -ItemType Directory -Force",
-      "description": "Example using the 'path' parameter: Path of the new folder to create. Replace <path> with the value that fits your environment.",
       "platform": 0
     },
     {
@@ -100,11 +90,6 @@
       "command": "mkdir -p \"{path}\" -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
       "platform": 1
-    },
-    {
-      "command": "mkdir -p \"<path>\"",
-      "description": "Example using the 'path' parameter: Path of the new folder to create. Replace <path> with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "examples": [],
@@ -131,14 +116,11 @@
         "New-Item -Path \"C:\\Projects\\MyApp\\src\" -ItemType Directory -Force": "Crée une arborescence de dossiers",
         "New-Item -Path \"{path}\" -ItemType Directory -Force -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
         "New-Item -Path \"{path}\" -ItemType Directory -Force -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
-        "New-Item -Path \"{path}\" -ItemType Directory -Force -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
         "New-Item -Path \"{path}\" -ItemType Directory -Force -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
-        "New-Item -Path \"<path>\" -ItemType Directory -Force": "Exemple utilisant le paramètre 'path': Chemin du nouveau dossier à créer. Remplacez <path> par la valeur appropriée selon votre environnement.",
         "New-Item -Path \"C:\\Projects\\src\",\"C:\\Projects\\bin\" -ItemType Directory -Force": "Cree plusieurs dossiers en une commande.",
         "mkdir -p /home/user/projects/myapp/src": "Crée une arborescence de dossiers",
         "mkdir -m 755 newfolder": "Crée un dossier avec permissions spécifiques",
-        "mkdir -p \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "mkdir -p \"<path>\"": "Exemple utilisant le paramètre 'path': Chemin du nouveau dossier à créer. Remplacez <path> par la valeur appropriée selon votre environnement."
+        "mkdir -p \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
       }
     }
   }

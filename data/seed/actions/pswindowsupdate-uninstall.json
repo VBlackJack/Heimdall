@@ -38,11 +38,6 @@
       "command": "Uninstall-WindowsUpdate -KBArticleID KB5001234 -IgnoreReboot",
       "description": "Uninstall without restarting automatically",
       "platform": 0
-    },
-    {
-      "command": "Uninstall-WindowsUpdate -KBArticleID KB5001234 -Confirm:$false",
-      "description": "Example using the 'kbNumber' parameter: KB number of the update to uninstall. Replace KB5012345 with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "DANGER: may require a restart. May make the system unstable. Requires administrator rights and PSWindowsUpdate.",
@@ -67,8 +62,7 @@
       },
       "examples": {
         "Uninstall-WindowsUpdate -KBArticleID KB5001234": "Désinstalle la mise à jour KB5001234",
-        "Uninstall-WindowsUpdate -KBArticleID KB5001234 -IgnoreReboot": "Désinstalle sans redémarrer automatiquement",
-        "Uninstall-WindowsUpdate -KBArticleID KB5001234 -Confirm:$false": "Exemple utilisant le paramètre 'kbNumber': Numéro KB de la mise à jour à désinstaller. Remplacez KB5012345 par la valeur appropriée selon votre environnement."
+        "Uninstall-WindowsUpdate -KBArticleID KB5001234 -IgnoreReboot": "Désinstalle sans redémarrer automatiquement"
       }
     }
   }

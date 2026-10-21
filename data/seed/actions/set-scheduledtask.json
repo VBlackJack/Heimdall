@@ -54,26 +54,6 @@
       "command": "Set-ScheduledTask -TaskName 'MyTask' -User 'DOMAIN\\ServiceAccount'",
       "description": "Change the account the task runs as",
       "platform": 0
-    },
-    {
-      "command": "Set-ScheduledTask -TaskName 'DailyBackup' -Name Test -WhatIf",
-      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf once checked to run it.",
-      "platform": 0
-    },
-    {
-      "command": "Set-ScheduledTask -TaskName 'DailyBackup' -Name Test -Confirm:$false",
-      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the prompts. Useful in automated scripts, but use it with care: there is no safety net.",
-      "platform": 0
-    },
-    {
-      "command": "Set-ScheduledTask -TaskName 'DailyBackup' -Name Test -PassThru",
-      "description": "Make the command return the modified or created object in the pipeline. By default the Set-/New- cmdlets return nothing. -PassThru enables the return for chained operations or immediate checks.",
-      "platform": 0
-    },
-    {
-      "command": "Set-ScheduledTask -TaskName 'DailyBackup' -Name Test -Verbose",
-      "description": "Show detailed information about the command's execution. -Verbose enables debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
-      "platform": 0
     }
   ],
   "notes": "Requires administrator rights. Use Get-ScheduledTask to see the current configuration before modifying it.",
@@ -103,11 +83,7 @@
       "examples": {
         "$trigger = New-ScheduledTaskTrigger -Daily -At 3:00AM; Set-ScheduledTask -TaskName 'Backup' -Trigger $trigger": "Change l'heure d'exécution",
         "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-File C:\\Scripts\\new-backup.ps1'; Set-ScheduledTask -TaskName 'Backup' -Action $action": "Change le script exécuté",
-        "Set-ScheduledTask -TaskName 'MyTask' -User 'DOMAIN\\ServiceAccount'": "Change le compte d'exécution",
-        "Set-ScheduledTask -TaskName 'DailyBackup' -Name Test -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
-        "Set-ScheduledTask -TaskName 'DailyBackup' -Name Test -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
-        "Set-ScheduledTask -TaskName 'DailyBackup' -Name Test -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
-        "Set-ScheduledTask -TaskName 'DailyBackup' -Name Test -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
+        "Set-ScheduledTask -TaskName 'MyTask' -User 'DOMAIN\\ServiceAccount'": "Change le compte d'exécution"
       }
     }
   }

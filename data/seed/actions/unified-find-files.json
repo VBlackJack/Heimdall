@@ -74,11 +74,6 @@
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Measure-Object",
       "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path \"C:\\\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime",
-      "description": "Example using the 'searchPath' parameter: Folder where the search starts. Replace <searchPath> with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "linuxCommandTemplateId": "search-find-files-linux-cmd",
@@ -121,16 +116,6 @@
       "command": "find . -type f -mtime -7",
       "description": "Files modified in the last 7 days",
       "platform": 1
-    },
-    {
-      "command": "find \"/\" -name \"{pattern}\"",
-      "description": "Example using the 'searchPath' parameter: Folder where the search starts. Replace <searchPath> with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "find \"{searchPath}\" -name \"*.txt\"",
-      "description": "Example using the 'pattern' parameter: File name pattern (e.g. *.txt, *.log). Replace <pattern> with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "examples": [],
@@ -168,12 +153,9 @@
         "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
         "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
-        "Get-ChildItem -Path \"C:\\\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime": "Exemple utilisant le paramètre 'searchPath': Dossier où commencer la recherche. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
         "find /home -name \"*.pdf\"": "Trouve tous les fichiers PDF dans /home",
         "find / -name \"config.json\" 2>/dev/null": "Cherche config.json en ignorant les erreurs",
-        "find . -type f -mtime -7": "Fichiers modifiés dans les 7 derniers jours",
-        "find \"/\" -name \"{pattern}\"": "Exemple utilisant le paramètre 'searchPath': Dossier où commencer la recherche. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
-        "find \"{searchPath}\" -name \"*.txt\"": "Exemple utilisant le paramètre 'pattern': Motif de nom de fichier (ex: *.txt, *.log). Remplacez <pattern> par la valeur appropriée selon votre environnement."
+        "find . -type f -mtime -7": "Fichiers modifiés dans les 7 derniers jours"
       }
     }
   }

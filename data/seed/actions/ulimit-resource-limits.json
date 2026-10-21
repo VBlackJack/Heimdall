@@ -54,16 +54,6 @@
       "platform": 1
     },
     {
-      "command": "ulimit -a ConfigValue123",
-      "description": "Example using the 'option' parameter: Option (a=all, n=files, u=processes, m=memory). Replace verbose with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "ulimit -verbose ConfigValue123",
-      "description": "Example using the 'value' parameter: New value (empty = show). Replace ConfigValue123 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "ulimit -n",
       "description": "Open files limit",
       "platform": 1
@@ -102,8 +92,6 @@
         "ulimit -a": "Affiche toutes les limites",
         "ulimit -n 65535": "Augmente le nombre de fichiers ouverts",
         "ulimit -u 4096": "Limite le nombre de processus",
-        "ulimit -a ConfigValue123": "Exemple utilisant le paramètre 'option': Option (a=all, n=files, u=processes, m=memory). Remplacez verbose par la valeur appropriée selon votre environnement.",
-        "ulimit -verbose ConfigValue123": "Exemple utilisant le paramètre 'value': Nouvelle valeur (vide = afficher). Remplacez ConfigValue123 par la valeur appropriée selon votre environnement.",
         "ulimit -n": "Limite des fichiers ouverts",
         "ulimit -u": "Limite des processus utilisateur"
       }

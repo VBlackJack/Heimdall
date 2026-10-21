@@ -38,11 +38,6 @@
       "command": "sudo systemctl reload-or-restart nginx",
       "description": "Reload, or restart if reload is not supported",
       "platform": 1
-    },
-    {
-      "command": "systemctl reload nginx.service",
-      "description": "Example using the 'service' parameter: Name of the systemd unit to reload. Replace spooler with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "notes": "Requires sudo. Faster than restart. Not every service supports reload.",
@@ -67,8 +62,7 @@
       },
       "examples": {
         "sudo systemctl reload nginx": "Recharge la config nginx sans interruption",
-        "sudo systemctl reload-or-restart nginx": "Recharge ou redémarre si reload non supporté",
-        "systemctl reload nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à recharger. Remplacez spooler par la valeur appropriée selon votre environnement."
+        "sudo systemctl reload-or-restart nginx": "Recharge ou redémarre si reload non supporté"
       }
     }
   }

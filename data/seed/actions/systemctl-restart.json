@@ -40,11 +40,6 @@
       "platform": 1
     },
     {
-      "command": "systemctl restart nginx.service",
-      "description": "Example using the 'service' parameter: Name of the systemd unit to restart. Replace spooler with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "systemctl restart sshd",
       "description": "Restart the SSH service",
       "platform": 1
@@ -73,7 +68,6 @@
       "examples": {
         "sudo systemctl restart nginx": "Redémarre nginx (utile après modification de config)",
         "sudo systemctl restart sshd": "Redémarre SSH",
-        "systemctl restart nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à redémarrer. Remplacez spooler par la valeur appropriée selon votre environnement.",
         "systemctl restart sshd": "Redémarrer le service SSH"
       }
     }

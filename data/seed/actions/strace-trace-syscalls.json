@@ -54,16 +54,6 @@
       "platform": 1
     },
     {
-      "command": "strace -c Get-Process",
-      "description": "Example using the 'options' parameter: Options (-c=stats, -p PID, -e=filter, -o=output). Replace -v -f with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "strace -v -f ls",
-      "description": "Example using the 'command' parameter: Command to trace, or -p PID. Replace Get-Process with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "strace -e open ls",
       "description": "Trace open() only",
       "platform": 1
@@ -112,8 +102,6 @@
         "strace ls": "Trace tous les syscalls de ls",
         "strace -c ls": "Statistiques d'appels système",
         "strace -p 1234": "Attache à un processus existant",
-        "strace -c Get-Process": "Exemple utilisant le paramètre 'options': Options (-c=stats, -p PID, -e=filter, -o=output). Remplacez -v -f par la valeur appropriée selon votre environnement.",
-        "strace -v -f ls": "Exemple utilisant le paramètre 'command': Commande à tracer ou -p PID. Remplacez Get-Process par la valeur appropriée selon votre environnement.",
         "strace -e open ls": "Tracer uniquement open()",
         "strace -o trace.log command": "Sauvegarder dans un fichier",
         "strace ls -la": "Tracer la commande ls",

@@ -54,21 +54,11 @@
     {
       "command": "scp -r /local/dir user@server:/remote/",
       "description": "Copy a directory recursively",
-      "platform": 0
+      "platform": 1
     },
     {
       "command": "scp user@server:/remote/file.txt .",
       "description": "Download from a remote server",
-      "platform": 1
-    },
-    {
-      "command": "scp -r C:\\Original D:\\Archive",
-      "description": "Example using the 'options' parameter: Options (-r=recursive, -P=port, -i=SSH key). Replace -v -f with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "scp -v -f file.txt D:\\Archive",
-      "description": "Example using the 'source' parameter: Source file (local or user@host:/path). Replace C:\\Original with the value that fits your environment.",
       "platform": 1
     },
     {
@@ -129,8 +119,6 @@
         "scp file.txt user@server:/home/user/": "Copie un fichier vers un serveur distant",
         "scp -r /local/dir user@server:/remote/": "Copie récursive d'un répertoire",
         "scp user@server:/remote/file.txt .": "Télécharge depuis serveur distant",
-        "scp -r C:\\Original D:\\Archive": "Exemple utilisant le paramètre 'options': Options (-r=récursif, -P=port, -i=clé SSH). Remplacez -v -f par la valeur appropriée selon votre environnement.",
-        "scp -v -f file.txt D:\\Archive": "Exemple utilisant le paramètre 'source': Fichier source (local ou user@host:/path). Remplacez C:\\Original par la valeur appropriée selon votre environnement.",
         "scp file.txt user@server:/tmp/": "Copier un fichier vers un serveur",
         "scp user@server:/var/log/app.log .": "Télécharger un fichier depuis un serveur",
         "scp -r /local/folder user@server:/remote/": "Copier un dossier récursivement",

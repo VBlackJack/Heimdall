@@ -62,16 +62,6 @@
       "platform": 1
     },
     {
-      "command": "rsync --v -f C:\\Original D:\\Archive -v",
-      "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
-      "platform": 1
-    },
-    {
-      "command": "rsync --v -f C:\\Original D:\\Archive --dry-run",
-      "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
-      "platform": 1
-    },
-    {
       "command": "rsync -avz /source/ /dest/",
       "description": "Synchronize with compression",
       "platform": 1
@@ -124,8 +114,6 @@
         "rsync -avz /source/ /backup/": "Sauvegarde locale avec compression",
         "rsync -avz /data/ user@server:/backup/": "Sauvegarde distante via SSH",
         "rsync -avz --delete /source/ /backup/": "Synchronisation miroir (supprime fichiers en trop)",
-        "rsync --v -f C:\\Original D:\\Archive -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "rsync --v -f C:\\Original D:\\Archive --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
         "rsync -avz /source/ /dest/": "Synchroniser avec compression",
         "rsync -avz --delete /src/ user@server:/dest/": "Sync vers serveur distant avec suppression",
         "rsync -avzn /src/ /dest/": "Dry-run (simulation)",

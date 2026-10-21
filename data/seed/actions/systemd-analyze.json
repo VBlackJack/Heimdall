@@ -45,11 +45,6 @@
       "platform": 1
     },
     {
-      "command": "systemd-analyze blame | head -n 20",
-      "description": "Example using the 'lines' parameter: Number of slowest services to show. Replace 100 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "systemd-analyze plot > boot.svg",
       "description": "Boot chart",
       "platform": 1
@@ -89,7 +84,6 @@
         "systemd-analyze": "Affiche le temps total de boot",
         "systemd-analyze blame": "Liste les services par temps de démarrage",
         "systemd-analyze critical-chain": "Affiche la chaîne critique du démarrage",
-        "systemd-analyze blame | head -n 20": "Exemple utilisant le paramètre 'lines': Nombre de services les plus lents à afficher. Remplacez 100 par la valeur appropriée selon votre environnement.",
         "systemd-analyze plot > boot.svg": "Graphique du boot",
         "systemd-analyze verify /etc/systemd/system/myapp.service": "Vérifier un service",
         "systemd-analyze time": "Résumé du temps de boot"
