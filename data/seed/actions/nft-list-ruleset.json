@@ -1,0 +1,65 @@
+{
+  "id": "nft-list-ruleset",
+  "title": "Show the nftables ruleset",
+  "description": "Print every nftables table, chain and rule loaded in the kernel.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "nftables",
+    "nft",
+    "linux",
+    "firewall",
+    "rules"
+  ],
+  "linuxCommandTemplateId": "nft-list-ruleset-cmd",
+  "linuxCommandTemplate": {
+    "id": "nft-list-ruleset-cmd",
+    "platform": 1,
+    "name": "nft",
+    "commandPattern": "sudo nft list ruleset",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo nft list ruleset",
+      "description": "Show the complete ruleset",
+      "platform": 1
+    },
+    {
+      "command": "sudo nft list tables",
+      "description": "List the tables only",
+      "platform": 1
+    },
+    {
+      "command": "sudo nft -a list ruleset",
+      "description": "Show the rules with the handles needed to delete one",
+      "platform": 1
+    },
+    {
+      "command": "sudo nft list table inet firewalld",
+      "description": "Show the table firewalld manages",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. On hosts running firewalld, change the rules through firewall-cmd rather than nft.",
+  "links": [
+    {
+      "title": "nft(8)",
+      "url": "https://www.netfilter.org/projects/nftables/manpage.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher le jeu de règles nftables",
+      "description": "Affiche toutes les tables, chaînes et règles nftables chargées dans le noyau.",
+      "notes": "Nécessite sudo. Sur un hôte avec firewalld, modifier les règles via firewall-cmd plutôt que nft.",
+      "examples": {
+        "sudo nft list ruleset": "Affiche le jeu de règles complet",
+        "sudo nft list tables": "Liste seulement les tables",
+        "sudo nft -a list ruleset": "Affiche les règles avec les handles nécessaires pour en supprimer une",
+        "sudo nft list table inet firewalld": "Affiche la table gérée par firewalld"
+      }
+    }
+  }
+}
