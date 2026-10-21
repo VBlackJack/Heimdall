@@ -19,6 +19,7 @@ using System.Windows.Controls;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views.Dialogs;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -72,6 +73,7 @@ public partial class CommandLibraryView : UserControl, IToolView
         _viewModel = services.GetRequiredService<CommandLibraryViewModel>();
 
         _viewModel.SendCommandHandler = context?.SendCommandAction;
+        _viewModel.InsertTextHandler = context?.InsertTextAction;
         _viewModel.CanSendToTerminalProbe = context?.CanSendToTerminal;
         _viewModel.CommandBroadcaster = context?.CommandBroadcaster;
         _viewModel.ShowActionDialogAsync = ShowActionDialogAsync;
@@ -88,8 +90,8 @@ public partial class CommandLibraryView : UserControl, IToolView
         // opening gesture is invisible cannot be opened.
         _viewModel.RefreshBroadcastTargets();
 
-        _viewModel.AutoSelectPlatform(context?.ConnectionType);
-        _ = _viewModel.InitializeAsync(context?.TargetHost, context?.InitialActionId);
+        _viewModel.AutoSelectPlatform(context?.ConnectionType, context?.RemoteOs ?? RemoteOs.Auto);
+        _ = _viewModel.InitializeAsync(context?.TargetHost, context?.InitialActionId, context?.Username);
     }
 
     /// <summary>
@@ -168,6 +170,7 @@ public partial class CommandLibraryView : UserControl, IToolView
     {
         CommandLibraryViewModel.CopyTarget => BtnCopy,
         CommandLibraryViewModel.SendTarget => BtnSend,
+        CommandLibraryViewModel.InsertTarget => BtnInsert,
         CommandLibraryViewModel.CopyExampleTarget => BtnCopy,
         _ => null
     };

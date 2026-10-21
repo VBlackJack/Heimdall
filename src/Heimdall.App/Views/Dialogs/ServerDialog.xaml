@@ -768,6 +768,30 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
+                                        <!-- What the far end runs. Auto keeps the guess from the protocol
+                                             (SSH reads as Linux, RDP, WinRM and Local as Windows), which is
+                                             wrong for SSH into Windows OpenSSH and for a local WSL shell. -->
+                                        <TextBlock x:Name="DlgSrv_RemoteOsLabel"
+                                                   Text="{loc:Translate ToolCmdLibDialogLblRemoteOs}"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,14,0,4"/>
+                                        <ComboBox x:Name="DlgSrv_RemoteOsCombo"
+                                                  AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblRemoteOs}"
+                                                  SelectedValue="{Binding RemoteOs}"
+                                                  SelectedValuePath="Tag"
+                                                  Width="200"
+                                                  HorizontalAlignment="Left"
+                                                  Style="{StaticResource DialogFormComboBoxStyle}">
+                                            <ComboBoxItem Content="{loc:Translate ToolCmdLibRemoteOsAuto}"
+                                                          AutomationProperties.Name="{loc:Translate ToolCmdLibRemoteOsAuto}"
+                                                          Tag="{x:Static config:RemoteOs.Auto}"/>
+                                            <ComboBoxItem Content="{loc:Translate ToolCmdLibPlatformWindows}"
+                                                          AutomationProperties.Name="{loc:Translate ToolCmdLibPlatformWindows}"
+                                                          Tag="{x:Static config:RemoteOs.Windows}"/>
+                                            <ComboBoxItem Content="{loc:Translate ToolCmdLibPlatformLinux}"
+                                                          AutomationProperties.Name="{loc:Translate ToolCmdLibPlatformLinux}"
+                                                          Tag="{x:Static config:RemoteOs.Linux}"/>
+                                        </ComboBox>
                                         <!-- One test, beside the two fields it measures. It used to be two
                                              buttons with two labels, both inside a credentials card, which is
                                              why a first-time user read "Test connection" as validating his

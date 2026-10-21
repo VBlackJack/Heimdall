@@ -2064,7 +2064,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 input => sshSession.Session.Write(input + "\n"),
                 progress,
                 linkedCts.Token,
-                _postConnectStepResolver).ConfigureAwait(false);
+                new RemoteOsBoundStepResolver(_postConnectStepResolver, server.RemoteOs)).ConfigureAwait(false);
             FileLogger.Info(
                 $"Post-connect: {displayName} executed={result.StepsExecuted}, " +
                 $"skipped={result.StepsSkippedDisabled}, failed={result.StepsFailed}, broken={result.StepsBroken}, " +

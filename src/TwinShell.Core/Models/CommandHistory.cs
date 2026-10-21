@@ -85,8 +85,24 @@ public sealed class CommandHistory
     public string ActionTitle { get; set; } = string.Empty;
 
     /// <summary>
-    /// Whether this command was executed (vs just copied)
+    /// Host of the session the command was produced for, or null when the library was not
+    /// opened from a session.
     /// </summary>
+    /// <remarks>
+    /// Stored in clear, like the title and the category: it is a server name the inventory
+    /// already holds, not something the operator typed as a secret, and the history panel
+    /// filters on it while the sealed halves of a row may be unreadable.
+    /// </remarks>
+    public string? TargetHost { get; set; }
+
+    /// <summary>
+    /// True when the command was sent to a terminal, false when it was only copied or typed
+    /// at the prompt without being run.
+    /// </summary>
+    /// <remarks>
+    /// Sent is not the same as succeeded: a terminal has no return channel, so nothing ever
+    /// learns an exit code for a command the library sent.
+    /// </remarks>
     public bool IsExecuted { get; set; }
 
     /// <summary>

@@ -234,6 +234,84 @@ public partial class MessageDialog : Window
         return dialog.ThreeWayResult;
     }
 
+    /// <summary>
+    /// The answer picked in a <see cref="ShowChoice"/> dialog, or null when it was cancelled.
+    /// </summary>
+    public int? ChoiceResult { get; private set; }
+
+    /// <summary>
+    /// Shows a themed question with one button per answer and a cancel button.
+    /// </summary>
+    /// <param name="owner">The window the question belongs to.</param>
+    /// <param name="title">The dialog title.</param>
+    /// <param name="message">The question.</param>
+    /// <param name="choices">One label per answer, laid out left to right.</param>
+    /// <param name="defaultIndex">The answer Enter picks; drawn as the primary button.</param>
+    /// <param name="cancelLabel">The label of the cancel button, which Escape presses.</param>
+    /// <returns>The index of the answer picked, or null when cancelled or closed.</returns>
+    public static int? ShowChoice(
+        Window? owner,
+        string title,
+        string message,
+        IReadOnlyList<string> choices,
+        int defaultIndex,
+        string cancelLabel)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
+
+        var dialog = new MessageDialog { Owner = owner };
+        dialog.TitleText.Text = title;
+        dialog.MessageText.Text = message;
+        dialog.ConfigureChoiceButtons(choices, defaultIndex, cancelLabel);
+        ApplySeverityStyle(dialog, "info");
+
+        dialog.ShowDialog();
+        return dialog.ChoiceResult;
+    }
+
+    /// <summary>
+    /// Replaces the fixed buttons with the cancel button followed by one button per answer.
+    /// </summary>
+    /// <remarks>
+    /// Separated from <see cref="ShowChoice"/>, which ends in a blocking <c>ShowDialog</c>, so
+    /// the layout and the keyboard defaults can be checked without showing anything.
+    /// </remarks>
+    internal void ConfigureChoiceButtons(IReadOnlyList<string> choices, int defaultIndex, string cancelLabel)
+    {
+        BtnPrimary.Visibility = Visibility.Collapsed;
+        BtnPrimary.IsDefault = false;
+        BtnSecondary.Visibility = Visibility.Collapsed;
+        BtnTertiary.Content = cancelLabel;
+        BtnTertiary.Visibility = Visibility.Visible;
+        System.Windows.Automation.AutomationProperties.SetName(BtnTertiary, cancelLabel);
+
+        for (var index = 0; index < choices.Count; index++)
+        {
+            var answer = index;
+            var label = choices[index];
+            var isDefault = index == defaultIndex;
+            var button = new System.Windows.Controls.Button
+            {
+                Content = label,
+                IsDefault = isDefault,
+                MinWidth = BtnSecondary.MinWidth,
+                Padding = BtnSecondary.Padding,
+                FontSize = BtnSecondary.FontSize,
+                Margin = BtnSecondary.Margin
+            };
+            button.SetResourceReference(
+                StyleProperty,
+                isDefault ? "PrimaryButtonStyle" : "SecondaryButtonStyle");
+            System.Windows.Automation.AutomationProperties.SetName(button, label);
+            button.Click += (_, _) =>
+            {
+                ChoiceResult = answer;
+                DialogResult = true;
+            };
+            ButtonPanel.Children.Insert(ButtonPanel.Children.IndexOf(BtnPrimary), button);
+        }
+    }
+
     private void OnPrimaryClick(object sender, RoutedEventArgs e)
     {
         Result = true;

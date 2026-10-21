@@ -22,6 +22,9 @@ namespace TwinShell.Persistence.Configurations;
 
 public sealed class CommandHistoryConfiguration : IEntityTypeConfiguration<CommandHistoryEntity>
 {
+    /// <summary>The longest DNS name, which bounds every host a session can be opened on.</summary>
+    private const int TargetHostMaxLength = 253;
+
     public void Configure(EntityTypeBuilder<CommandHistoryEntity> builder)
     {
         builder.ToTable("CommandHistories");
@@ -61,6 +64,9 @@ public sealed class CommandHistoryConfiguration : IEntityTypeConfiguration<Comma
         builder.Property(e => e.ActionTitle)
             .IsRequired()
             .HasMaxLength(300);
+
+        builder.Property(e => e.TargetHost)
+            .HasMaxLength(TargetHostMaxLength);
 
         // Relationship with Action
         builder.HasOne(e => e.Action)

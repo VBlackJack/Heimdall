@@ -38,7 +38,9 @@ public sealed class CommandHistoryService : ICommandHistoryService
         Dictionary<string, string> parameters,
         Platform platform,
         string actionTitle,
-        string category)
+        string category,
+        string? targetHost,
+        bool isExecuted)
     {
         var history = new CommandHistory
         {
@@ -49,6 +51,8 @@ public sealed class CommandHistoryService : ICommandHistoryService
             Platform = platform,
             ActionTitle = actionTitle,
             Category = category,
+            TargetHost = string.IsNullOrWhiteSpace(targetHost) ? null : targetHost.Trim(),
+            IsExecuted = isExecuted,
             CreatedAt = DateTime.UtcNow
         };
 

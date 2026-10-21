@@ -397,10 +397,7 @@ public partial class MainWindow
     {
         var toolId = ConnectionTypeCatalog.StripToolPrefix(server.ConnectionType);
         vm.TrackRecentTool(toolId.ToUpperInvariant());
-        var context = new Core.Models.ToolContext(
-            TargetHost: server.RemoteServer,
-            TargetPort: server.RemotePort > 0 ? (int?)server.RemotePort : null,
-            Argument: server.RemoteServer);
+        var context = Services.ToolEntryContextFactory.ForTreeEntry(server);
         _ = vm.OpenToolTabAsync(toolId, server.DisplayName, context);
     }
 

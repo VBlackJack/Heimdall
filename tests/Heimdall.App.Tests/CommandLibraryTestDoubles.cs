@@ -285,6 +285,23 @@ internal sealed class SilentDialogService : AppDialogService
     public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message)
         => Task.FromResult<bool?>(false);
 
+    /// <summary>Answer every choice prompt with this index; null cancels.</summary>
+    public int? ChoiceResult { get; init; }
+
+    /// <summary>Every choice prompt raised, as its title.</summary>
+    public List<string> Choices { get; } = [];
+
+    public Task<int?> ShowChoiceAsync(
+        string title,
+        string message,
+        IReadOnlyList<string> choices,
+        int defaultIndex,
+        string cancelLabel)
+    {
+        Choices.Add(title);
+        return Task.FromResult(ChoiceResult);
+    }
+
     public Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null)
         => Task.FromResult<string?>(defaultValue);
 

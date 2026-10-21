@@ -30,7 +30,7 @@ namespace TwinShell.Persistence.Mappers;
 /// The generated command and the parameter values are what the user typed, so they are
 /// sealed on the way in and opened on the way out through
 /// <see cref="HistorySecretEnvelope"/>. Everything else - the action title, the category,
-/// the timestamp - stays in clear, because the panel has to stay readable and sortable
+/// the timestamp, the target host - stays in clear, because the panel has to stay readable and sortable
 /// when the sealed halves cannot be opened.
 /// </remarks>
 public static class CommandHistoryMapper
@@ -65,6 +65,7 @@ public static class CommandHistoryMapper
             CreatedAt = history.CreatedAt,
             Category = history.Category,
             ActionTitle = history.ActionTitle,
+            TargetHost = history.TargetHost,
             IsExecuted = history.IsExecuted,
             ExitCode = history.ExitCode,
             ExecutionDurationTicks = history.ExecutionDuration?.Ticks,
@@ -92,6 +93,7 @@ public static class CommandHistoryMapper
             CreatedAt = entity.CreatedAt,
             Category = entity.Category,
             ActionTitle = entity.ActionTitle,
+            TargetHost = entity.TargetHost,
             IsExecuted = entity.IsExecuted,
             ExitCode = entity.ExitCode,
             ExecutionDuration = entity.ExecutionDurationTicks.HasValue

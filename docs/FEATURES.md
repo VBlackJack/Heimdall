@@ -172,26 +172,33 @@ generator that produces the final command for you.
 - Full-text search with relevance ranking over titles, tags, descriptions and command text
 - Filter by category, tag, platform and risk level; every filter keeps its selection across a library reload
 - Favorites, and a per-action risk badge (info, run, dangerous)
+- Each row shows the command itself under its title, in monospace on one line: the template the row opens on under the current platform filter (Windows unless the filter is Linux, or the only template there is), cut at 96 characters like the command palette's snippet previews
+- Opened from a session, the platform filter starts on the platform of that session. A profile can declare the operating system of its far end (General tab, **Operating system of the far end**): Windows or Linux is then used as given, and Automatic keeps the guess from the protocol (SSH as Linux; RDP, WinRM and Local as Windows). Post-connect steps linked to the library and their picker follow the same declaration, so SSH into a Windows OpenSSH server gets the Windows template
 
 **Building the command**
 - Typed parameters: text, integer, boolean, hostname, IP address, path, and **choice** (a fixed set of values offered as a drop-down)
 - A choice parameter accepts only what it offers, matched without regard to case or surrounding space; whether a value may be absent is left to the parameter's own Required flag
 - The editor warns when the command pattern and the declared parameters disagree - a `{placeholder}` with no parameter, or a parameter the pattern never uses. It warns and never blocks, because braces are ordinary shell punctuation
 - Live preview of the generated command, with shell quoting applied to substituted values
+- Opened from a session, the library prefills a host parameter with the session's host and a user parameter (`user`, `username`, `login`, `account`, `samaccountname`) with the session's user name; a parameter's default is kept when the session has no user
 
 **Running it**
 - Copy to the clipboard, or send to the terminal of the session the library was opened from
+- **Insert** (`Shift+Enter`), between Copy and Send, types the command at that terminal's prompt without running it, so you can read and edit it and press Enter yourself. Nothing runs, so it never asks the dangerous-command confirmation; any line break in the command becomes a space, and the history records it as copied, not sent
 - Commands flagged dangerous require confirmation before they are sent
 - **Send to several open terminals**: tick the terminals from a panel beside the Send button and the same command goes to each. It reaches terminals that are already open and never connects one; every target receives the same text; one confirmation names how many will receive it, whatever the action's declared risk; and a terminal that refuses does not stop the others - the summary names which did not receive it
-- Keyboard: `Enter` copies, `Ctrl+Enter` sends, `Ctrl+D` duplicates the selected action
+- Keyboard: `Enter` copies, `Shift+Enter` inserts, `Ctrl+Enter` sends, `Ctrl+D` duplicates the selected action
 
 **History**
-- Every command you copy or send is recorded with its title, category and timestamp
+- Every command you copy or send is recorded with its title, category and timestamp, the host of the session the library was opened from, and whether it was sent or only copied
+- A **This host only** box at the top of the panel, ticked by default when the library belongs to a session, shows only what went to that host; it keeps its state while the panel reloads
+- Sent means the text reached the terminal, not that it succeeded: a terminal gives nothing back, so no exit code is recorded
 - The command itself and its parameter values are encrypted before they reach the database, under the master-password vault when one is set and DPAPI otherwise
 - Replay a past command back into the generator, with its parameters
 - Nothing is recorded while the vault is locked, and rows are pruned after 90 days
 
 **Sharing**
+- Export first asks what the file should contain: **My actions** (the default: the actions you created or imported), **Current filter** (what the list shows now, search included) or **Everything** (the seeded catalogue too); the warning about secrets in free-text fields follows the choice
 - Import and export as JSON, and Git synchronization for a shared team library; **Sync on startup** runs once after the vault is unlocked, and a failure is reported on the status bar
 - Actions that arrive from an import have their risk level and platform clamped to known values, so an unrecognized level is treated as dangerous rather than harmless
 
@@ -327,7 +334,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,261 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,274 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 

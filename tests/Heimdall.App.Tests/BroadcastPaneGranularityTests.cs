@@ -288,6 +288,8 @@ public sealed class BroadcastPaneGranularityTests
         public List<string> Received { get; } = [];
 
         public void WriteCommand(string command) => Received.Add(command);
+
+        public void WriteText(string text) => throw new NotSupportedException("Insert is not under test here.");
     }
 
     private static SessionPaneModel Leaf(object? hostControl) => new() { HostControl = hostControl };

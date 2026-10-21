@@ -68,6 +68,7 @@ public static class SharedProfileSanitizer
         nameof(ServerProfileDto.PostConnectSteps),
         nameof(ServerProfileDto.Tags),
         nameof(ServerProfileDto.Origin),
+        nameof(ServerProfileDto.RemoteOs),
     };
 
     /// <summary>The <see cref="SshGatewayDto"/> properties a shared gateway keeps.</summary>
@@ -119,6 +120,9 @@ public static class SharedProfileSanitizer
             PostConnectSteps = SanitizeSteps(source.PostConnectSteps),
             Tags = source.Tags,
             Origin = source.Origin,
+            // A description of the host, like its name: it only picks which command templates
+            // the library offers, and runs nothing.
+            RemoteOs = source.RemoteOs,
         };
 
         // Through the setter only when the source declared a port, so an RDP profile does not gain

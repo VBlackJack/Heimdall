@@ -152,7 +152,8 @@ public sealed class CommandHistoryRetentionTests
 
         public Task<string> AddCommandAsync(
             string actionId, string generatedCommand, Dictionary<string, string> parameters,
-            Platform platform, string actionTitle, string category)
+            Platform platform, string actionTitle, string category,
+            string? targetHost, bool isExecuted)
             => Task.FromResult(string.Empty);
 
         public Task UpdateWithExecutionResultsAsync(

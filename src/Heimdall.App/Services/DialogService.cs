@@ -76,6 +76,28 @@ public interface IDialogService
     Task<bool?> ShowSaveDiscardCancelAsync(string title, string message);
 
     /// <summary>
+    /// Asks the user to pick one of several named answers, or to cancel.
+    /// </summary>
+    /// <param name="title">Dialog title.</param>
+    /// <param name="message">The question.</param>
+    /// <param name="choices">One label per answer, in display order.</param>
+    /// <param name="defaultIndex">The answer Enter picks.</param>
+    /// <param name="cancelLabel">Label of the button that picks nothing, and takes Escape.</param>
+    /// <returns>The index of the answer picked, or null when the user cancelled.</returns>
+    /// <remarks>
+    /// The default implementation answers with <paramref name="defaultIndex"/> without asking,
+    /// so a surface with no dialog to show - a test double, a headless host - behaves as if the
+    /// user pressed Enter, and existing implementations need no change.
+    /// </remarks>
+    Task<int?> ShowChoiceAsync(
+        string title,
+        string message,
+        IReadOnlyList<string> choices,
+        int defaultIndex,
+        string cancelLabel)
+        => Task.FromResult<int?>(defaultIndex);
+
+    /// <summary>
     /// Shows a text input dialog and returns the entered value.
     /// </summary>
     /// <param name="title">Dialog title.</param>

@@ -44,6 +44,7 @@ public sealed class CommandLibraryViewModelSendTests
 
         var sent = new List<string>();
         viewModel.SendCommandHandler = sent.Add;
+        viewModel.CanSendToTerminalProbe = () => true;
 
         viewModel.ApplyExample("rm -rf /");
         await viewModel.SendAsync();
@@ -60,6 +61,7 @@ public sealed class CommandLibraryViewModelSendTests
 
         var sent = new List<string>();
         viewModel.SendCommandHandler = sent.Add;
+        viewModel.CanSendToTerminalProbe = () => true;
 
         viewModel.ApplyExample("rm -rf /");
         await viewModel.SendAsync();
@@ -76,6 +78,7 @@ public sealed class CommandLibraryViewModelSendTests
 
         var sent = new List<string>();
         viewModel.SendCommandHandler = sent.Add;
+        viewModel.CanSendToTerminalProbe = () => true;
 
         await viewModel.SendAsync();
 
@@ -338,7 +341,7 @@ public sealed class CommandLibraryViewModelSendTests
     {
         public int ExportCount { get; private set; }
 
-        public Task<int> ExportAsync(IActionService actionService, string path)
+        public Task<int> ExportAsync(IReadOnlyList<TwinShell.Core.Models.Action> actions, string path)
         {
             ExportCount++;
             return Task.FromResult(0);

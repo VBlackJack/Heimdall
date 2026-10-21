@@ -1167,14 +1167,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 try
                 {
                     var toolId = ConnectionTypeCatalog.StripToolPrefix(serverDto.ConnectionType);
-                    var context = new Core.Models.ToolContext(
-                        TargetHost: serverDto.RemoteServer,
-                        TargetPort: serverDto.RemotePort > 0 ? serverDto.RemotePort : null,
-                        Argument: serverDto.RemoteServer,
-                        DisplayName: serverDto.DisplayName,
-                        Username: serverDto.SshUsername ?? serverDto.RdpUsername,
-                        ConnectionType: serverDto.ConnectionType,
-                        ProjectName: server.ProjectName);
+                    var context = Services.ToolEntryContextFactory.ForConnectedEntry(serverDto, server.ProjectName);
                     ToolSessionRequested?.Invoke(toolId, server.DisplayName, context);
                     return true;
                 }

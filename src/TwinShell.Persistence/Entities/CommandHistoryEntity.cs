@@ -39,6 +39,11 @@ public sealed class CommandHistoryEntity
     public string Category { get; set; } = string.Empty;
     public string ActionTitle { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Host of the originating session, in clear. Added by schema step 5.
+    /// </summary>
+    public string? TargetHost { get; set; }
+
     // Sprint 4: Execution tracking fields
     public bool IsExecuted { get; set; }
     public int? ExitCode { get; set; }

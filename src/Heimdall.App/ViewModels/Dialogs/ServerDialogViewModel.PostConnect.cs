@@ -186,7 +186,10 @@ public partial class ServerDialogViewModel
             return;
         }
 
-        var pickerVm = new CommandLibraryPickerDialogViewModel(Localizer, ServiceScopeFactory);
+        var pickerVm = new CommandLibraryPickerDialogViewModel(Localizer, ServiceScopeFactory)
+        {
+            RemoteOs = RemoteOs
+        };
         var result = await DialogService.ShowCommandLibraryPickerAsync(
             pickerVm,
             BuildAutoPrefillContext());
@@ -215,7 +218,10 @@ public partial class ServerDialogViewModel
             return;
         }
 
-        var pickerVm = new CommandLibraryPickerDialogViewModel(Localizer, ServiceScopeFactory);
+        var pickerVm = new CommandLibraryPickerDialogViewModel(Localizer, ServiceScopeFactory)
+        {
+            RemoteOs = RemoteOs
+        };
         var result = await DialogService.ShowCommandLibraryPickerAsync(
             pickerVm,
             BuildAutoPrefillContext(),

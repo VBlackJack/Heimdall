@@ -1387,6 +1387,13 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     private string _environment = "None";
 
+    /// <summary>
+    /// The operating system of the far end, as declared; Auto keeps the guess from the protocol.
+    /// Drives which command templates the library and the post-connect picker offer.
+    /// </summary>
+    [ObservableProperty]
+    private RemoteOs _remoteOs = RemoteOs.Auto;
+
     [ObservableProperty]
     private bool _isFavorite;
 
@@ -2467,6 +2474,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             ProjectId = string.IsNullOrWhiteSpace(SelectedProjectId) ? null : SelectedProjectId,
             Tags = string.IsNullOrWhiteSpace(Tags) ? null : Tags,
             Environment = Environment == "None" ? null : Environment,
+            RemoteOs = RemoteOs,
             MacAddress = string.IsNullOrWhiteSpace(MacAddress) ? null : MacAddress,
             IsFavorite = IsFavorite
         };
@@ -2681,6 +2689,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.Tags = dto.Tags ?? "";
         vm.MacAddress = dto.MacAddress ?? "";
         vm.Environment = dto.Environment ?? "None";
+        vm.RemoteOs = dto.RemoteOs;
         vm.IsFavorite = dto.IsFavorite;
         vm._isInitializing = false;
         vm.CoerceWinRmSslForGateway();

@@ -2180,6 +2180,20 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     }
 
     /// <summary>
+    /// Types <paramref name="text"/> at the prompt without submitting it, for the operator to
+    /// review, edit and run with their own Enter.
+    /// </summary>
+    /// <remarks>
+    /// Goes through <see cref="Services.TerminalCommandFormatter.Insert"/>, which removes every
+    /// line break: a break reaching the session would run the line before it, which is the
+    /// one thing this write promises not to do.
+    /// </remarks>
+    public void WriteText(string text)
+    {
+        WriteToSession(Services.TerminalCommandFormatter.Insert(text));
+    }
+
+    /// <summary>
     /// Sends raw bytes to the active session without triggering broadcast.
     /// Used by the broadcast relay to avoid infinite loops.
     /// </summary>

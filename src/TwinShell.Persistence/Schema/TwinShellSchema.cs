@@ -42,6 +42,10 @@ public static class TwinShellSchema
 
     private const string ActionsTableName = "Actions";
 
+    private const string CommandHistoriesTableName = "CommandHistories";
+
+    private const string TargetHostColumnName = "TargetHost";
+
     private static readonly string[] PublicIdTables =
     [
         ActionsTableName,
@@ -66,6 +70,7 @@ public static class TwinShellSchema
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             [ActionsTableName] = [PublicIdColumnName, "WindowsExamplesJson", "LinuxExamplesJson"],
+            [CommandHistoriesTableName] = [TargetHostColumnName],
             ["CommandBatches"] = [PublicIdColumnName],
             ["CustomCategories"] = [PublicIdColumnName],
             ["CommandTemplates"] = [PublicIdColumnName]
@@ -85,7 +90,11 @@ public static class TwinShellSchema
         new SchemaStep(
             4,
             "Per-platform example columns on Actions",
-            ApplyPlatformExampleColumnsAsync)
+            ApplyPlatformExampleColumnsAsync),
+        new SchemaStep(
+            5,
+            "Target host column on CommandHistories",
+            ApplyHistoryTargetHostColumnAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -141,6 +150,45 @@ public static class TwinShellSchema
                 + " TEXT NOT NULL DEFAULT '[]'",
                 cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Adds the nullable <c>TargetHost</c> column to <c>CommandHistories</c> when it is missing.
+    /// </summary>
+    /// <remarks>
+    /// Nullable with no default: a row written before the column existed does not know where
+    /// its command went, and a made-up value would put it under a host's filter it never
+    /// reached. Idempotent by existence test, like the platform example columns. A database with
+    /// no history table at all is left alone: the table is created from the model, column
+    /// included, and there is nothing to add to.
+    /// </remarks>
+    private static async Task ApplyHistoryTargetHostColumnAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        if (!await TableExistsAsync(connection, transaction, CommandHistoriesTableName, cancellationToken))
+        {
+            return;
+        }
+
+        bool exists = await ColumnExistsAsync(
+            connection,
+            transaction,
+            CommandHistoriesTableName,
+            TargetHostColumnName,
+            cancellationToken);
+
+        if (exists)
+        {
+            return;
+        }
+
+        await ExecuteNonQueryAsync(
+            connection,
+            transaction,
+            "ALTER TABLE " + CommandHistoriesTableName + " ADD COLUMN " + TargetHostColumnName + " TEXT NULL",
+            cancellationToken);
     }
 
     private static async Task ApplyUnwrapDoubleQuotedPlaceholdersAsync(
@@ -590,6 +638,24 @@ public static class TwinShellSchema
         object? result = await command.ExecuteScalarAsync(cancellationToken);
         int existingColumnCount = Convert.ToInt32(result, CultureInfo.InvariantCulture);
         return existingColumnCount > 0;
+    }
+
+    private static async Task<bool> TableExistsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        string tableName,
+        CancellationToken cancellationToken)
+    {
+        await using DbCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $tableName";
+        DbParameter parameter = command.CreateParameter();
+        parameter.ParameterName = "$tableName";
+        parameter.Value = tableName;
+        command.Parameters.Add(parameter);
+
+        object? result = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(result, CultureInfo.InvariantCulture) > 0;
     }
 
     private static void EnsureKnownColumn(string tableName, string columnName)

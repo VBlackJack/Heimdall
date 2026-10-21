@@ -94,6 +94,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private ActionModel? _selectedAction;
     private CommandTemplate? _activeTemplate;
     private string? _targetHost;
+    private string? _username;
     private bool _disposed;
     private bool _loadingSelection;
 
@@ -292,6 +293,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     [NotifyPropertyChangedFor(nameof(SendTooltip))]
     [NotifyPropertyChangedFor(nameof(ShowCopyHint))]
     [NotifyPropertyChangedFor(nameof(CopyTooltip))]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
     private bool _isCommandValid;
 
     /// <summary>Multi-line validation error text (one bullet per error).</summary>
@@ -521,6 +523,25 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     private Action<string>? _sendCommandHandler;
 
     /// <summary>
+    /// The handler invoked by Insert, populated by the view from
+    /// <see cref="Heimdall.Core.Models.ToolContext.InsertTextAction"/>: it types the command at
+    /// the session's prompt without submitting it. When null, the Insert button is hidden.
+    /// </summary>
+    public Action<string>? InsertTextHandler
+    {
+        get => _insertTextHandler;
+        set
+        {
+            _insertTextHandler = value;
+            OnPropertyChanged(nameof(IsInsertVisible));
+        }
+    }
+    private Action<string>? _insertTextHandler;
+
+    /// <summary>True when an <see cref="InsertTextHandler"/> is wired, which shows the Insert button.</summary>
+    public bool IsInsertVisible => _insertTextHandler is not null;
+
+    /// <summary>
     /// Probe installed by the view from
     /// <see cref="Heimdall.Core.Models.ToolContext.CanSendToTerminal"/>. Answers
     /// "does this session tab currently contain an injectable terminal sink?".
@@ -549,6 +570,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     public void RefreshSendState()
     {
         OnPropertyChanged(nameof(IsSendEnabled));
+        SendCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SendTooltip));
         OnPropertyChanged(nameof(ShowCopyHint));
     }
@@ -566,6 +588,9 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     /// <summary>Feedback target for the generator's Send button.</summary>
     public const string SendTarget = "send";
+
+    /// <summary>Feedback target for the generator's Insert button.</summary>
+    public const string InsertTarget = "insert";
 
     /// <summary>Feedback target for copying an example row's command.</summary>
     public const string CopyExampleTarget = "example";
@@ -744,9 +769,15 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// Optional action id to preselect once the library has loaded (used by the
     /// Command Palette "Open in Command Library" bridge). Unknown ids are ignored.
     /// </param>
-    public async Task InitializeAsync(string? targetHost, string? initialActionId = null)
+    /// <param name="username">
+    /// Optional user name the originating session authenticates with; used to prefill
+    /// user-named parameters when a template is selected.
+    /// </param>
+    public async Task InitializeAsync(string? targetHost, string? initialActionId = null, string? username = null)
     {
         _targetHost = string.IsNullOrWhiteSpace(targetHost) ? null : targetHost.Trim();
+        _username = string.IsNullOrWhiteSpace(username) ? null : username.Trim();
+        OnPropertyChanged(nameof(HasTargetHost));
         EmptyStateMessage = LocalizeKey("ToolCmdLibStatusLoading");
         HelpContentText = LocalizeKey("ToolHelpCMDLIB").Replace("\\n", "\n");
 
@@ -928,20 +959,29 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     }
 
     /// <summary>
-    /// Pre-seeds the platform filter index using the originating tool context's
-    /// connection type (SSH → Linux, RDP/LOCAL → Windows, otherwise All).
+    /// Pre-seeds the platform filter from the originating session: the operating system its
+    /// profile declares, or, when it declares none, the guess from the connection type
+    /// (see <see cref="RemoteOsResolver"/>). Undetermined leaves the filter on All.
     /// The view calls this once after <see cref="InitializeAsync"/>.
     /// </summary>
-    public void AutoSelectPlatform(string? connectionType)
+    public void AutoSelectPlatform(string? connectionType, RemoteOs remoteOs = RemoteOs.Auto)
     {
-        PlatformFilterIndex = connectionType?.ToUpperInvariant() switch
+        PlatformFilterIndex = RemoteOsResolver.Resolve(remoteOs, connectionType) switch
         {
-            "SSH" => 2,
-            "LOCAL" => 1,
-            "RDP" => 1,
-            _ => 0
+            RemoteOs.Linux => PlatformFilterLinux,
+            RemoteOs.Windows => PlatformFilterWindows,
+            _ => PlatformFilterAll
         };
     }
+
+    /// <summary>Index of "All" in <see cref="PlatformFilterItems"/>.</summary>
+    internal const int PlatformFilterAll = 0;
+
+    /// <summary>Index of "Windows" in <see cref="PlatformFilterItems"/>.</summary>
+    internal const int PlatformFilterWindows = 1;
+
+    /// <summary>Index of "Linux" in <see cref="PlatformFilterItems"/>.</summary>
+    internal const int PlatformFilterLinux = 2;
 
     /// <summary>
     /// Reloads the entire library (used after CRUD and Git sync). Preserves
@@ -952,7 +992,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         var preservedSearch = SearchText;
         ResetSelection();
         ResetSearchState();
-        await InitializeAsync(_targetHost);
+        await InitializeAsync(_targetHost, initialActionId: null, _username);
         await ApplySearchAsync(preservedSearch);
     }
 
@@ -984,21 +1024,9 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
             var hasLinux = _selectedAction.LinuxCommandTemplate is not null;
             HasMultipleTemplates = hasWin && hasLinux;
 
-            if (hasWin && hasLinux)
-            {
-                var preferWindows = PlatformFilterIndex != 2;
-                UseWindowsTemplate = preferWindows;
-                _activeTemplate = preferWindows
-                    ? _selectedAction.WindowsCommandTemplate
-                    : _selectedAction.LinuxCommandTemplate;
-            }
-            else
-            {
-                UseWindowsTemplate = hasWin;
-                _activeTemplate = hasWin
-                    ? _selectedAction.WindowsCommandTemplate
-                    : _selectedAction.LinuxCommandTemplate;
-            }
+            _activeTemplate = PreferredTemplate(_selectedAction, PlatformFilterIndex);
+            UseWindowsTemplate = hasWin
+                && ReferenceEquals(_activeTemplate, _selectedAction.WindowsCommandTemplate);
 
             if (_activeTemplate is null)
             {
@@ -1016,6 +1044,30 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         }
         return true;
     }
+
+    /// <summary>
+    /// The template an action opens on under a platform filter: Windows unless the filter is
+    /// Linux, and whichever exists when the action carries only one.
+    /// </summary>
+    /// <remarks>
+    /// Shared by <see cref="SelectAction"/> and the row's command preview, so the line a row
+    /// shows is the command a click on it puts in the generator.
+    /// </remarks>
+    internal static CommandTemplate? PreferredTemplate(ActionModel action, int platformFilterIndex)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        return platformFilterIndex != PlatformFilterLinux
+            ? action.WindowsCommandTemplate ?? action.LinuxCommandTemplate
+            : action.LinuxCommandTemplate ?? action.WindowsCommandTemplate;
+    }
+
+    /// <summary>
+    /// One line of the command pattern a row's action would open on under the current platform
+    /// filter, shortened the way the palette shortens its snippets.
+    /// </summary>
+    public string ResolveCommandPreview(ActionModel action)
+        => CommandPreviewText.ToPreview(PreferredTemplate(action, PlatformFilterIndex)?.CommandPattern);
 
     /// <summary>
     /// Preselects the action with the given id (matching <see cref="ActionModel.Id"/>)
@@ -1241,7 +1293,22 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         {
             return _targetHost!;
         }
+        if (!string.IsNullOrWhiteSpace(_username) && IsUserParameter(parameter.Name))
+        {
+            return _username!;
+        }
         return parameter.DefaultValue ?? string.Empty;
+    }
+
+    /// <summary>
+    /// True for a parameter that names the account a command acts as, which the session's own
+    /// user name can fill. Matched on the name alone, like <see cref="IsHostParameter"/>: no
+    /// parameter type says "user".
+    /// </summary>
+    private static bool IsUserParameter(string name)
+    {
+        var n = name.ToLowerInvariant();
+        return n is "user" or "username" or "login" or "account" or "samaccountname";
     }
 
     private static bool CanPrefillTargetHost(TemplateParameter parameter, string targetHost)

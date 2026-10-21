@@ -191,4 +191,18 @@ public interface IEmbeddedSessionManager
     /// stays out of the way rather than reaching a stale list.
     /// </remarks>
     Func<IReadOnlyList<SessionTabViewModel>>? ActiveSessionsProvider { get; set; }
+
+    /// <summary>
+    /// Resolves a profile identifier to the saved profile, so a tool docked in a session tab can
+    /// learn the host, user, protocol and operating system of the session it belongs to.
+    /// </summary>
+    /// <remarks>
+    /// Left unset, a tool opened in a session simply gets no session facts, which is what every
+    /// tool got before this existed.
+    /// </remarks>
+    Func<string, ServerProfileDto?>? ProfileResolver
+    {
+        get => null;
+        set { }
+    }
 }
