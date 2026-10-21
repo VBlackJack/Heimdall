@@ -116,6 +116,60 @@ public sealed class CommandLibraryDuplicateTests
     }
 
     /// <summary>
+    /// The library reloads after a save; the new action has to come back selected, as the
+    /// capture path does, or the operator is left hunting for the row they just wrote.
+    /// </summary>
+    /// <remarks>
+    /// Run on one dispatcher thread, as the view runs it: the reload rebuilds a collection
+    /// view, which refuses changes from a thread other than the one that created it.
+    /// </remarks>
+    [Fact]
+    public void DuplicatingSelectsTheCopy()
+    {
+        StaDispatcherRunner.Run(async () =>
+        {
+            var shipped = SeededAction();
+            var actions = new FakeActionService([shipped]);
+            var viewModel = await CreateViewModelAsync(actions);
+            using var _ = viewModel;
+            viewModel.ShowActionDialogAsync = vm => Task.FromResult(true);
+            viewModel.SelectedEntry = viewModel.AllEntries.Single();
+
+            await viewModel.DuplicateSelectedAsync();
+
+            var copy = (await actions.GetAllActionsAsync()).Single(a => !string.Equals(a.Id, shipped.Id, StringComparison.Ordinal));
+            Assert.NotNull(viewModel.SelectedEntry);
+            Assert.Equal(copy.Id, viewModel.SelectedEntry!.Source.Id);
+        });
+    }
+
+    [Fact]
+    public void AddingSelectsTheNewAction()
+    {
+        StaDispatcherRunner.Run(async () =>
+        {
+            var actions = new FakeActionService([SeededAction()]);
+            var viewModel = await CreateViewModelAsync(actions);
+            using var _ = viewModel;
+            viewModel.ShowActionDialogAsync = vm =>
+            {
+                vm.Title = "Disk usage";
+                vm.Category = "system";
+                vm.Platform = Platform.Linux;
+                vm.LinuxPattern = "df -h";
+                vm.LinuxTemplateName = "df";
+                return Task.FromResult(true);
+            };
+
+            await viewModel.AddActionAsync();
+
+            var added = (await actions.GetAllActionsAsync()).Single(a => a.Title == "Disk usage");
+            Assert.NotNull(viewModel.SelectedEntry);
+            Assert.Equal(added.Id, viewModel.SelectedEntry!.Source.Id);
+        });
+    }
+
+    /// <summary>
     /// Unlike Edit, this is offered for an action the user cannot edit. That is the point.
     /// </summary>
     [Fact]

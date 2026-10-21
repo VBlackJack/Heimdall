@@ -306,14 +306,24 @@ public sealed partial class CommandLibraryViewModel
         if (!saved) return;
 
         await RunActionServiceOperationAsync(
-            async actionService =>
-            {
-                var action = vm.ToAction();
-                await actionService.CreateActionAsync(action);
-                await ReloadAsync();
-            },
+            actionService => CreateAndSelectAsync(actionService, vm.ToAction()),
             "Create action",
             "ToolCmdLibErrorTitle");
+    }
+
+    /// <summary>
+    /// Stores <paramref name="action"/>, reloads the library and selects the new row, the
+    /// way the capture path opens on the action it just created.
+    /// </summary>
+    /// <remarks>
+    /// The reload rebuilds every row, so without the select the operator was left with no
+    /// selection and had to find the action they had just written.
+    /// </remarks>
+    private async Task CreateAndSelectAsync(IActionService actionService, TwinShell.Core.Models.Action action)
+    {
+        var created = await actionService.CreateActionAsync(action);
+        await ReloadAsync();
+        SelectActionById((created ?? action).Id);
     }
 
     /// <summary>
@@ -347,11 +357,7 @@ public sealed partial class CommandLibraryViewModel
         if (!saved) return;
 
         await RunActionServiceOperationAsync(
-            async actionService =>
-            {
-                await actionService.CreateActionAsync(vm.ToAction());
-                await ReloadAsync();
-            },
+            actionService => CreateAndSelectAsync(actionService, vm.ToAction()),
             "Duplicate action",
             "ToolCmdLibErrorTitle");
     }
