@@ -1,7 +1,7 @@
 {
   "id": "unified-service-restart",
-  "title": "Redémarrer un service",
-  "description": "Redémarre un service Windows.",
+  "title": "Restart a service",
+  "description": "Restart a Windows service or a Linux systemd unit.",
   "category": "services-automation",
   "platform": 2,
   "level": 1,
@@ -12,7 +12,7 @@
     "service",
     "systemd"
   ],
-  "notes": "Windows: Nécessite des droits administrateur. -Force arrête les services dépendants.\nLinux: Nécessite les droits sudo. Utile après modification de configuration.",
+  "notes": "Windows: requires administrator rights. -Force also stops the dependent services.\nLinux: requires sudo. Use it after changing a service configuration.",
   "links": [],
   "windowsCommandTemplateId": "win-service-restart-cmd",
   "windowsCommandTemplate": {
@@ -23,28 +23,28 @@
     "parameters": [
       {
         "name": "serviceName",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du service à redémarrer"
+        "description": "Name of the service to restart"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "Restart-Service -Name Spooler -Force",
-      "description": "Redémarre le service Spooler d'impression",
+      "description": "Restart the print spooler",
       "platform": 0
     },
     {
       "command": "Restart-Service -Name {serviceName} -Force -PassThru",
-      "description": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
+      "description": "Restart the service and return it, to confirm its final status",
       "platform": 0
     },
     {
       "command": "Restart-Service -Name W32Time -Force",
-      "description": "Redémarre le service Windows Time pour resynchroniser l'horloge.",
+      "description": "Restart Windows Time to resynchronize the clock",
       "platform": 0
     }
   ],
@@ -57,35 +57,65 @@
     "parameters": [
       {
         "name": "serviceName",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du service à redémarrer"
+        "description": "Name of the service to restart"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "sudo systemctl restart nginx",
-      "description": "Redémarre le service nginx",
+      "description": "Restart nginx",
       "platform": 1
     },
     {
       "command": "sudo systemctl restart mysql",
-      "description": "Redémarre le service de base de données MySQL.",
+      "description": "Restart the MySQL database service",
       "platform": 1
     },
     {
       "command": "sudo systemctl restart sshd",
-      "description": "Redémarre le service SSH pour appliquer une nouvelle configuration.",
+      "description": "Restart SSH to apply a new configuration",
       "platform": 1
     },
     {
       "command": "sudo systemctl restart apache2",
-      "description": "Redémarre le serveur web Apache.",
+      "description": "Restart the Apache web server",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Redémarrer un service",
+      "description": "Redémarre un service Windows ou Linux.",
+      "notes": "Windows: Nécessite des droits administrateur. -Force arrête les services dépendants.\nLinux: Nécessite les droits sudo. Utile après modification de configuration.",
+      "parameters": {
+        "windows": {
+          "serviceName": {
+            "label": "Nom du service",
+            "description": "Nom du service à redémarrer"
+          }
+        },
+        "linux": {
+          "serviceName": {
+            "label": "Nom du service",
+            "description": "Nom du service à redémarrer"
+          }
+        }
+      },
+      "examples": {
+        "Restart-Service -Name Spooler -Force": "Redémarre le service Spooler d'impression",
+        "Restart-Service -Name {serviceName} -Force -PassThru": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
+        "Restart-Service -Name W32Time -Force": "Redémarre le service Windows Time pour resynchroniser l'horloge.",
+        "sudo systemctl restart nginx": "Redémarre le service nginx",
+        "sudo systemctl restart mysql": "Redémarre le service de base de données MySQL.",
+        "sudo systemctl restart sshd": "Redémarre le service SSH pour appliquer une nouvelle configuration.",
+        "sudo systemctl restart apache2": "Redémarre le serveur web Apache."
+      }
+    }
+  }
 }
