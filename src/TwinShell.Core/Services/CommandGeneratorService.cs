@@ -336,6 +336,16 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterDangerousCharacters, parameter.Label));
                         }
                         break;
+
+                    default:
+                        // A type this switch does not know (a choice, or a name typed by
+                        // hand into an imported file) is still quoted like a string, so it
+                        // gets at least the checks no quoting replaces.
+                        if (ContainsRefusedCharacters(template, parameter, value))
+                        {
+                            errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterDangerousCharacters, parameter.Label));
+                        }
+                        break;
                 }
             }
         }
@@ -464,6 +474,15 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                     return false;
                 }
                 else if (ContainsRefusedCharacters(template, parameter, value))
+                {
+                    key = MessageKeys.ValidationParameterDangerousCharacters;
+                }
+                break;
+
+            default:
+                // Same rule as ValidateParameters: an unknown type is quoted like a string,
+                // so it gets at least the checks no quoting replaces.
+                if (ContainsRefusedCharacters(template, parameter, value))
                 {
                     key = MessageKeys.ValidationParameterDangerousCharacters;
                 }

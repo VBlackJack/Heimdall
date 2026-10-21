@@ -161,6 +161,27 @@ public sealed class CommandGeneratorValueShapingTests
         command.Should().Be("grep '8080' file");
     }
 
+    /// <summary>
+    /// "text" is not a type the generator declares ("string" is): it used to fall through
+    /// both switches with no check at all, so a line feed went into the command and
+    /// submitted it on the terminal.
+    /// </summary>
+    [Theory]
+    [InlineData("a\nb")]
+    [InlineData("a\rb")]
+    [InlineData("a\0b")]
+    public void UnknownType_ControlCharacter_IsRefusedOnBothPaths(string value)
+    {
+        var service = CreateService();
+        var template = Template(Platform.Linux, "echo {v}", CommandLibraryTestHelpers.RequiredParameter("v", "Value", "text"));
+
+        service.ValidateParameters(template, Values(("v", value)), out var errors).Should().BeFalse();
+        errors.Should().Equal(MessageKeys.ValidationParameterDangerousCharacters);
+        var generate = () => service.GenerateCommand(template, Values(("v", value)));
+        generate.Should().Throw<InvalidOperationException>()
+            .WithMessage(MessageKeys.ValidationParameterDangerousCharacters);
+    }
+
     internal static CommandGeneratorService CreateService() =>
         new(new FakeTwinShellLocalizationService());
 
