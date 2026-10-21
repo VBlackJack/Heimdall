@@ -426,7 +426,7 @@ de données partagée se trouve dans les données d'application locales de
 l'utilisateur, dans un répertoire `TwinShell`.
 
 Les données de départ se trouvent dans `data/seed/actions/`. Les fichiers dont
-le nom commence par `_` sont ignorés ; le jeu de données actuel contient 442
+le nom commence par `_` sont ignorés ; le jeu de données actuel contient 537
 fichiers JSON d'actions. Leur texte est un pivot anglais avec les autres langues
 sous `translations`, et leurs catégories sont des clés ASCII que la vue traduit
 en libellés localisés. Au démarrage, le répertoire des données de départ est
