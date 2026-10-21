@@ -558,11 +558,23 @@ public static class JsonSchemaValidator
                         "description": {
                             "type": ["string", "null"],
                             "maxLength": 500
+                        },
+                        "parameters": {
+                            "type": ["object", "null"],
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "additionalProperties": false
                 },
                 "maxItems": 100
+            },
+            "variables": {
+                "type": ["object", "null"],
+                "additionalProperties": {
+                    "type": "string"
+                }
             },
             "isUserCreated": {
                 "type": "boolean"

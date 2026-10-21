@@ -58,6 +58,29 @@ public sealed class CommandLibraryImportResult
     /// </summary>
     public int TruncatedExamples { get; init; }
 
+    /// <summary>Number of runbooks created from the file.</summary>
+    public int RunbooksImported { get; init; }
+
+    /// <summary>Number of the operator's runbooks updated from the file, matched by public id.</summary>
+    public int RunbooksUpdated { get; init; }
+
+    /// <summary>Number of runbooks left out: unnamed, or matching one the operator does not own.</summary>
+    public int RunbooksSkipped { get; init; }
+
+    /// <summary>A copy of this result carrying the runbook counts.</summary>
+    public CommandLibraryImportResult WithRunbooks(int imported, int updated, int skipped) =>
+        new()
+        {
+            Outcome = Outcome,
+            Imported = Imported,
+            Updated = Updated,
+            Skipped = Skipped,
+            TruncatedExamples = TruncatedExamples,
+            RunbooksImported = imported,
+            RunbooksUpdated = updated,
+            RunbooksSkipped = skipped
+        };
+
     /// <summary>Creates a file-too-large result.</summary>
     public static CommandLibraryImportResult FileTooLarge() =>
         new() { Outcome = CommandLibraryImportOutcome.FileTooLarge };

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-using System.Text.Json;
-using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
 using TwinShell.Core.Models;
 
@@ -27,10 +25,6 @@ namespace TwinShell.Core.Services;
 public sealed class BatchService : IBatchService
 {
     private readonly IBatchRepository _repository;
-
-    // PERFORMANCE: Use centralized JsonSerializerOptions to avoid recreation
-    private static JsonSerializerOptions ExportJsonOptions => JsonOptionsHelper.CamelCaseForExport;
-    private static JsonSerializerOptions ImportJsonOptions => JsonOptionsHelper.CamelCaseForImport;
 
     public BatchService(IBatchRepository repository)
     {
@@ -45,6 +39,11 @@ public sealed class BatchService : IBatchService
     public async Task<CommandBatch?> GetBatchByIdAsync(string id)
     {
         return await _repository.GetByIdAsync(id).ConfigureAwait(false);
+    }
+
+    public async Task<CommandBatch?> GetBatchByPublicIdAsync(Guid publicId)
+    {
+        return await _repository.GetByPublicIdAsync(publicId).ConfigureAwait(false);
     }
 
     public async Task<CommandBatch> CreateBatchAsync(CommandBatch batch)
@@ -74,13 +73,19 @@ public sealed class BatchService : IBatchService
     {
         batch.UpdatedAt = DateTime.UtcNow;
 
-        // Ensure order is correct
+        // The list position is the order the caller gave the steps; the stored Order is what
+        // a reload sorts by, so it is renumbered here rather than trusted from the caller.
         for (int i = 0; i < batch.Commands.Count; i++)
         {
             batch.Commands[i].Order = i;
         }
 
         await _repository.UpdateAsync(batch).ConfigureAwait(false);
+    }
+
+    public async Task MarkExecutedAsync(string id, DateTime executedAtUtc)
+    {
+        await _repository.MarkExecutedAsync(id, executedAtUtc).ConfigureAwait(false);
     }
 
     public async Task DeleteBatchAsync(string id)
@@ -96,39 +101,5 @@ public sealed class BatchService : IBatchService
         }
 
         return await _repository.SearchAsync(query).ConfigureAwait(false);
-    }
-
-    public string ExportBatchToJson(CommandBatch batch)
-    {
-        return JsonSerializer.Serialize(batch, ExportJsonOptions);
-    }
-
-    public CommandBatch ImportBatchFromJson(string json)
-    {
-        var batch = JsonSerializer.Deserialize<CommandBatch>(json, ImportJsonOptions);
-
-        if (batch == null)
-        {
-            throw new InvalidOperationException("Failed to deserialize batch from JSON");
-        }
-
-        // Generate new IDs to avoid conflicts
-        batch.Id = Guid.NewGuid().ToString();
-        batch.CreatedAt = DateTime.UtcNow;
-        batch.UpdatedAt = DateTime.UtcNow;
-        batch.LastExecutedAt = null;
-
-        // Reset execution status and generate new IDs for commands
-        for (int i = 0; i < batch.Commands.Count; i++)
-        {
-            var command = batch.Commands[i];
-            command.Id = Guid.NewGuid().ToString();
-            command.BatchId = batch.Id;
-            command.Order = i;
-            command.IsExecuted = false;
-            command.ExecutionResult = null;
-        }
-
-        return batch;
     }
 }

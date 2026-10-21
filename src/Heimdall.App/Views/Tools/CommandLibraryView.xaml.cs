@@ -78,6 +78,7 @@ public partial class CommandLibraryView : UserControl, IToolView, ICommandCaptur
         _viewModel.CanSendToTerminalProbe = context?.CanSendToTerminal;
         _viewModel.CommandBroadcaster = context?.CommandBroadcaster;
         _viewModel.ShowActionDialogAsync = ShowActionDialogAsync;
+        _viewModel.ShowRunbookDialogAsync = ShowRunbookDialogAsync;
         _viewModel.ShowSaveFileDialog = ShowSaveFileDialog;
         _viewModel.ShowOpenFileDialog = ShowOpenFileDialog;
         _viewModel.SetClipboardText = SetClipboardSafely;
@@ -246,6 +247,17 @@ public partial class CommandLibraryView : UserControl, IToolView, ICommandCaptur
 
         var result = dialog.ShowDialog() == true;
         return Task.FromResult(result);
+    }
+
+    private Task<bool> ShowRunbookDialogAsync(RunbookDialogViewModel vm)
+    {
+        var dialog = new RunbookDialog
+        {
+            DataContext = vm,
+            Owner = Window.GetWindow(this)
+        };
+
+        return Task.FromResult(dialog.ShowDialog() == true);
     }
 
     private string? ShowSaveFileDialog(string defaultFileName, string filter)

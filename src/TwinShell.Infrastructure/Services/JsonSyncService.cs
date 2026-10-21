@@ -316,7 +316,8 @@ public sealed class JsonSyncService : SyncServiceBase
                     ActionTitle = c.ActionTitle,
                     Command = c.Command,
                     Platform = c.Platform.ToString(),
-                    Description = c.Description
+                    Description = c.Description,
+                    Parameters = c.Parameters.Count > 0 ? c.Parameters : null
                 }).ToList();
 
                 var model = new BatchModel
@@ -326,6 +327,7 @@ public sealed class JsonSyncService : SyncServiceBase
                     Description = batch.Description,
                     ExecutionMode = batch.ExecutionMode.ToString(),
                     Tags = batch.Tags,
+                    Variables = batch.Variables.Count > 0 ? batch.Variables : null,
                     Commands = commands,
                     IsUserCreated = batch.IsUserCreated,
                     UpdatedAt = batch.UpdatedAt
@@ -820,8 +822,14 @@ public sealed class JsonSyncService : SyncServiceBase
                         ActionTitle = c.ActionTitle,
                         Command = c.Command,
                         Platform = Enum.TryParse<Platform>(c.Platform, true, out var p) ? p : Platform.Windows,
-                        Description = c.Description
+                        Description = c.Description,
+                        Parameters = new Dictionary<string, string>(
+                            c.Parameters ?? new Dictionary<string, string>(),
+                            StringComparer.Ordinal)
                     }).ToList();
+                var variables = new Dictionary<string, string>(
+                    model.Variables ?? new Dictionary<string, string>(),
+                    StringComparer.Ordinal);
 
                 var existing = await _batchRepository.GetByPublicIdAsync(model.Id);
 
@@ -852,6 +860,7 @@ public sealed class JsonSyncService : SyncServiceBase
                     existing.Description = model.Description;
                     existing.ExecutionMode = executionMode;
                     existing.Commands = commands;
+                    existing.Variables = variables;
                     existing.Tags = model.Tags ?? new List<string>();
                     existing.IsUserCreated = model.IsUserCreated;
                     existing.UpdatedAt = normalizedUpdatedAt ?? nowUtc;
@@ -870,6 +879,7 @@ public sealed class JsonSyncService : SyncServiceBase
                         Description = model.Description,
                         ExecutionMode = executionMode,
                         Commands = commands,
+                        Variables = variables,
                         Tags = model.Tags ?? new List<string>(),
                         IsUserCreated = model.IsUserCreated,
                         CreatedAt = DateTime.UtcNow,
@@ -1278,6 +1288,8 @@ public sealed class JsonSyncService : SyncServiceBase
         public string ExecutionMode { get; set; } = "StopOnError";
         public List<string>? Tags { get; set; }
         public List<BatchCommandModel>? Commands { get; set; }
+        /// <summary>Runbook variables with their default values</summary>
+        public Dictionary<string, string>? Variables { get; set; }
         public bool IsUserCreated { get; set; }
         /// <summary>Timestamp for conflict detection during sync</summary>
         public DateTime? UpdatedAt { get; set; }
@@ -1292,6 +1304,8 @@ public sealed class JsonSyncService : SyncServiceBase
         public string Command { get; set; } = string.Empty;
         public string? Platform { get; set; }
         public string? Description { get; set; }
+        /// <summary>Parameter values of a step that references an action</summary>
+        public Dictionary<string, string>? Parameters { get; set; }
     }
 
     #endregion

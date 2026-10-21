@@ -445,6 +445,9 @@ Principaux parcours utilisateur :
 - import/export au format JSON compatible TwinShell
 - synchronisation Git via `IGitSyncService`
 - envoi vers le terminal via `ToolContext.SendCommandAction`
+- runbooks : étapes ordonnées de la bibliothèque ou commandes littérales,
+  stockées comme lots de commandes TwinShell et exécutées une étape à la fois
+  dans le terminal de la session
 
 Les actions système issues des données de départ sont protégées : les actions
 d'édition et de suppression sont masquées pour les commandes qui n'ont pas été
@@ -484,7 +487,18 @@ créées par l'utilisateur, et la fusion à l'import ignore les actions système
 - `src/Heimdall.App/Views/Tools/CommandLibraryView.xaml.cs` : vue de l'outil
   Command Library.
 - `src/Heimdall.App/ViewModels/CommandLibraryViewModel*.cs` : tranches de
-  view-model de Command Library.
+  view-model de Command Library ; `.Runbooks.cs` porte le panneau Runbooks et
+  ses opérations de stockage, `.RunbookRun.cs` lance une exécution et la relie
+  au terminal.
+- `src/Heimdall.App/ViewModels/CommandLibrary/RunbookRunViewModel.cs` : une
+  exécution de runbook, étape par étape, avec ses états et ses enregistrements
+  d'historique.
+- `src/Heimdall.App/ViewModels/CommandLibrary/RunbookVariables.cs` : la
+  substitution `{{nom}}` dans les valeurs des étapes d'un runbook.
+- `src/Heimdall.App/ViewModels/Dialogs/RunbookDialogViewModel.cs` et
+  `src/Heimdall.App/Views/Dialogs/RunbookDialog.xaml` : l'éditeur de runbook.
+- `src/TwinShell.Core/Models/CommandBatch.cs` et `BatchCommandItem.cs` : le
+  modèle de runbook, stocké par `BatchService` et `BatchRepository`.
 - `data/seed/actions/` : actions de départ de la bibliothèque de commandes.
 - `data/packs/` : packs facultatifs de la bibliothèque de commandes, importés par
   l'opérateur.

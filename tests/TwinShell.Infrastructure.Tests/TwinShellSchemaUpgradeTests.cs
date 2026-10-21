@@ -35,6 +35,11 @@ namespace TwinShell.Infrastructure.Tests;
 
 public sealed class TwinShellSchemaUpgradeTests
 {
+    // The upgrade runs every declared step, so the terminal version is the last one declared.
+    // Read from the steps rather than written as a number, so adding a step does not rewrite
+    // every assertion here.
+    private static readonly int LastDeclaredVersion = TwinShellSchema.Steps.Max(step => step.Version);
+
     private static readonly string[] PublicIdTables =
     [
         "Actions",
@@ -52,7 +57,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(7);
+        userVersion.Should().Be(LastDeclaredVersion);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -77,7 +82,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(7);
+        userVersion.Should().Be(LastDeclaredVersion);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -107,7 +112,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(7);
+        userVersion.Should().Be(LastDeclaredVersion);
 
         foreach (string tableName in PublicIdTables)
         {
@@ -166,7 +171,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(context);
-        userVersion.Should().Be(7);
+        userVersion.Should().Be(LastDeclaredVersion);
     }
 
     // Producer: TwinShellSchema step 2
@@ -181,7 +186,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(7);
+        userVersion.Should().Be(LastDeclaredVersion);
 
         // Windows system template: single double-quoted placeholder is unwrapped.
         string windowsSystemPattern = await ReadCommandPatternAsync(database.Context, "tpl-system-windows");
@@ -214,7 +219,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(7);
+        userVersion.Should().Be(LastDeclaredVersion);
 
         string windowsAfterSecond = await ReadCommandPatternAsync(database.Context, "tpl-system-windows");
         string linuxAfterSecond = await ReadCommandPatternAsync(database.Context, "tpl-system-linux");
@@ -238,7 +243,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(7);
+        userVersion.Should().Be(LastDeclaredVersion);
 
         Dictionary<string, TemplateRow> afterRows = await ReadCommandTemplateRowsAsync(database.Context);
         int updatedRows = afterRows.Count(row => beforeRows[row.Key] != row.Value);
@@ -294,7 +299,7 @@ public sealed class TwinShellSchemaUpgradeTests
         await SchemaUpgrader.UpgradeAsync(database.Context, TwinShellSchema.Steps);
 
         int userVersion = await ReadUserVersionAsync(database.Context);
-        userVersion.Should().Be(7);
+        userVersion.Should().Be(LastDeclaredVersion);
 
         Dictionary<string, TemplateRow> rowsAfterSecond = await ReadCommandTemplateRowsAsync(database.Context);
         rowsAfterSecond.Should().Equal(rowsAfterFirst);

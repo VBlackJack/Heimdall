@@ -203,8 +203,18 @@ generator that produces the final command for you.
 - Replay a past command back into the generator, with its parameters
 - Nothing is recorded while the vault is locked, and rows are pruned after 90 days
 
+**Runbooks**
+- A runbook chains the steps you would otherwise send one by one on every incident, such as status, logs, restart, status. The **Runbooks** button in the header opens a panel that lists your runbooks with their step count and last run, with New, Edit, Duplicate, Delete and Run
+- A step is either a library action with a value for each of its parameters, or a command typed as is with the platform it is written for. An action step opens on the template that fits the session the library belongs to: Linux over SSH, Windows over RDP, or what the profile declares
+- **Variables**: a runbook declares variables with default values, and a parameter value written `{{name}}` takes the value of that variable. The values are asked once, when the run starts, and a variable named like a host or a user starts on the session's host or user name. A `{{name}}` that matches no variable is left as written and the step says so instead of sending it. Only the values of action steps are substituted; a literal command is sent as typed, and nothing else is interpreted
+- **The run is manual, step by step**: the panel shows each step with its status (pending, sent, inserted, copied, skipped, not sent), the current command in a read-only box, and **Send to Terminal**, **Insert**, **Copy**, **Skip** and **Stop**. A terminal returns no exit code, so Heimdall cannot tell that a step failed: you read the output, then send the next step or press Stop. The failure mode stored with a runbook (stop the run, or carry on) is shown as a reminder of what to do, not enforced
+- Send asks the dangerous-command confirmation for a dangerous action, and always for a literal step, which bypassed the generator's checks; Insert never asks, as in the generator. Send and Insert need a terminal in the tab; without one, Copy carries the run
+- Each step sent from a library action is recorded in the history as sent, against the session's host; an inserted or copied step is recorded as copied. A literal step is not recorded, because a history row belongs to an action
+- Runbooks are your own data: none ships with Heimdall
+
 **Sharing**
-- Export first asks what the file should contain: **My actions** (the default: the actions you created or imported), **Current filter** (what the list shows now, search included) or **Everything** (the seeded catalogue too); the warning about secrets in free-text fields follows the choice
+- Export first asks what the file should contain: **My actions** (the default: the actions you created or imported, and your runbooks), **Current filter** (what the list shows now, search included) or **Everything** (the seeded catalogue too); the warning about secrets in free-text fields follows the choice
+- An import merges the runbooks it carries by their identity, as it does actions: one you already have is updated, a new one is added. Git synchronization carries runbooks too, with their variables and parameter values
 - Import and export as JSON, and Git synchronization for a shared team library; **Sync on startup** runs once after the vault is unlocked, and a failure is reported on the status bar
 - After a sync, the library's title bar says how many of your actions were kept local because your copy was newer than the repository's; their titles are in its tooltip and in the sync summary
 - The Git sync author name and e-mail address start from your `git config --global` identity when Git is installed and the fields still hold their placeholders; nothing is written until you save
@@ -344,7 +354,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,292 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,351 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 

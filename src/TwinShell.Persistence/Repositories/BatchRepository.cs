@@ -76,11 +76,29 @@ public sealed class BatchRepository : IBatchRepository
         existingEntity.Name = batch.Name;
         existingEntity.Description = batch.Description;
         existingEntity.ExecutionMode = batch.ExecutionMode;
-        existingEntity.CommandsJson = System.Text.Json.JsonSerializer.Serialize(batch.Commands);
-        existingEntity.TagsJson = System.Text.Json.JsonSerializer.Serialize(batch.Tags);
+        existingEntity.CommandsJson = CommandBatchMapper.SerializeCommands(batch.Commands);
+        existingEntity.TagsJson = CommandBatchMapper.SerializeTags(batch.Tags);
+        existingEntity.VariablesJson = CommandBatchMapper.SerializeVariables(batch.Variables);
         existingEntity.LastExecutedAt = batch.LastExecutedAt;
-        existingEntity.UpdatedAt = DateTime.UtcNow;
+        // The caller's timestamp, not now: BatchService stamps an edit, and Git sync's import
+        // passes the remote timestamp, which must survive or the next sync sees a local edit.
+        existingEntity.UpdatedAt = batch.UpdatedAt;
 
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task MarkExecutedAsync(string id, DateTime executedAtUtc)
+    {
+        var entity = await _context.CommandBatches
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (entity == null)
+        {
+            return;
+        }
+
+        // Only the run timestamp: UpdatedAt is what Git sync compares, and a run is not an edit.
+        entity.LastExecutedAt = executedAtUtc;
         await _context.SaveChangesAsync();
     }
 

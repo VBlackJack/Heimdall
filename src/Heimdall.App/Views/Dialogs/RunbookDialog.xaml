@@ -1,0 +1,261 @@
+<Window x:Class="Heimdall.App.Views.Dialogs.RunbookDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:Heimdall.App.Converters"
+        xmlns:loc="clr-namespace:Heimdall.App.Localization"
+        xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:RunbookDialogViewModel}"
+        Title="{Binding DialogTitle}"
+        Width="680" Height="720"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BackgroundBrush}"
+        ResizeMode="CanResizeWithGrip"
+        MinWidth="520" MinHeight="420"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Themes/DialogCommonStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <converters:NullToVisibilityConverter x:Key="NullToVis"/>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="{StaticResource SpacingLg}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Name -->
+                <TextBlock Text="{loc:Translate ToolCmdLibRunbookLblName}" Style="{StaticResource DialogLabelStyle}"/>
+                <TextBox x:Name="TxtName"
+                         Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblName}"
+                         Style="{StaticResource DialogFormTextBoxStyle}"
+                         MaxLength="200"/>
+
+                <!-- Description -->
+                <TextBlock Text="{loc:Translate ToolCmdLibDialogLblDescription}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblDescription}"
+                         Style="{StaticResource DialogFormTextBoxStyle}"
+                         TextWrapping="Wrap" AcceptsReturn="True"
+                         Height="48" VerticalContentAlignment="Top"
+                         VerticalScrollBarVisibility="Auto"
+                         MaxLength="1000"/>
+
+                <!-- Failure mode: stored and shown; the run is manual, the tooltip says why. -->
+                <TextBlock Text="{loc:Translate ToolCmdLibRunbookLblMode}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <ComboBox SelectedIndex="{Binding ExecutionModeIndex}"
+                          AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblMode}"
+                          AutomationProperties.HelpText="{loc:Translate ToolCmdLibRunbookModeTooltip}"
+                          ToolTip="{loc:Translate ToolCmdLibRunbookModeTooltip}"
+                          Style="{StaticResource DialogFormComboBoxStyle}">
+                    <ComboBoxItem Content="{loc:Translate ToolCmdLibRunbookModeStopOnError}"/>
+                    <ComboBoxItem Content="{loc:Translate ToolCmdLibRunbookModeContinueOnError}"/>
+                </ComboBox>
+
+                <!-- ── Variables ───────────────────────────── -->
+                <DockPanel Margin="0,16,0,4">
+                    <Button DockPanel.Dock="Right"
+                            Content="{loc:Translate ToolCmdLibRunbookAddVariable}"
+                            Command="{Binding AddVariableCommand}"
+                            AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookAddVariable}"
+                            Style="{DynamicResource SecondaryButtonStyle}"/>
+                    <TextBlock Text="{loc:Translate ToolCmdLibRunbookSectionVariables}"
+                               Style="{StaticResource DialogSectionTitleStyle}"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBlock Text="{loc:Translate ToolCmdLibRunbookVariablesHelp}"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,4"/>
+                <ItemsControl ItemsSource="{Binding Variables}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblVariableName}"
+                                         ToolTip="{loc:Translate ToolCmdLibRunbookLblVariableName}"
+                                         FontFamily="Consolas" Margin="0,0,4,0" Padding="4,3"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextPrimaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblVariableDefault}"
+                                         ToolTip="{loc:Translate ToolCmdLibRunbookLblVariableDefault}"
+                                         Margin="0,0,4,0" Padding="4,3"
+                                         Background="{DynamicResource CardBrush}"
+                                         Foreground="{DynamicResource TextPrimaryBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"/>
+                                <Button Grid.Column="2"
+                                        Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
+                                        FontSize="10" Width="24" Height="24"
+                                        Command="{Binding DataContext.RemoveVariableCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="{loc:Translate ToolCmdLibRunbookRemoveVariable}"
+                                        AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookRemoveVariable}"
+                                        Style="{DynamicResource GhostButtonStyle}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- ── Steps ───────────────────────────────── -->
+                <DockPanel Margin="0,16,0,4">
+                    <Button DockPanel.Dock="Right"
+                            Content="{loc:Translate ToolCmdLibRunbookAddCommand}"
+                            Command="{Binding AddCommandCommand}"
+                            AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookAddCommand}"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Margin="8,0,0,0"/>
+                    <Button DockPanel.Dock="Right"
+                            Content="{loc:Translate ToolCmdLibRunbookAddAction}"
+                            Command="{Binding AddActionCommand}"
+                            AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookAddAction}"
+                            Style="{DynamicResource SecondaryButtonStyle}"/>
+                    <TextBlock Text="{loc:Translate ToolCmdLibRunbookSectionSteps}"
+                               Style="{StaticResource DialogSectionTitleStyle}"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBlock Text="{loc:Translate ToolCmdLibRunbookStepsEmpty}"
+                           Visibility="{Binding HasNoSteps, Converter={StaticResource BoolToVisibilityConverter}}"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"/>
+                <ItemsControl ItemsSource="{Binding Steps}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,4,0,4" Padding="8"
+                                    Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1" CornerRadius="4">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right"
+                                                Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
+                                                FontSize="10" Width="24" Height="24"
+                                                Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="{loc:Translate ToolCmdLibRunbookRemoveStep}"
+                                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookRemoveStep}"
+                                                Style="{DynamicResource GhostButtonStyle}"/>
+                                        <Button DockPanel.Dock="Right"
+                                                Content="&#xE74B;" FontFamily="{StaticResource FontFamilyIcons}"
+                                                FontSize="10" Width="24" Height="24"
+                                                Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="{loc:Translate ToolCmdLibRunbookMoveDown}"
+                                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookMoveDown}"
+                                                Style="{DynamicResource GhostButtonStyle}"/>
+                                        <Button DockPanel.Dock="Right"
+                                                Content="&#xE74A;" FontFamily="{StaticResource FontFamilyIcons}"
+                                                FontSize="10" Width="24" Height="24"
+                                                Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="{loc:Translate ToolCmdLibRunbookMoveUp}"
+                                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookMoveUp}"
+                                                Style="{DynamicResource GhostButtonStyle}"/>
+                                        <TextBlock Text="{Binding ActionTitle}"
+                                                   Visibility="{Binding IsAction, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{loc:Translate ToolCmdLibRunbookStepLiteral}"
+                                                   Visibility="{Binding IsLiteral, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </DockPanel>
+
+                                    <!-- Action step: one value per parameter; {{name}} uses a variable. -->
+                                    <ItemsControl ItemsSource="{Binding Parameters}"
+                                                  Visibility="{Binding IsAction, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                  Margin="0,6,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <DockPanel Margin="0,2,0,2" ToolTip="{Binding DisplayTooltip}">
+                                                    <TextBlock DockPanel.Dock="Left"
+                                                               Text="{Binding DisplayLabel}" Width="150"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                             AutomationProperties.Name="{Binding DisplayLabel}"
+                                                             FontFamily="Consolas" Padding="4,3"
+                                                             Background="{DynamicResource CardBrush}"
+                                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                                             BorderBrush="{DynamicResource BorderBrush}"/>
+                                                </DockPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <!-- Literal step: the command and the platform it is written for. -->
+                                    <StackPanel Visibility="{Binding IsLiteral, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                Margin="0,6,0,0">
+                                        <TextBox Text="{Binding Command, UpdateSourceTrigger=PropertyChanged}"
+                                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblCommand}"
+                                                 ToolTip="{loc:Translate ToolCmdLibRunbookLblCommand}"
+                                                 FontFamily="Consolas" Padding="4,3"
+                                                 Background="{DynamicResource CardBrush}"
+                                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                                 BorderBrush="{DynamicResource BorderBrush}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <RadioButton Content="{loc:Translate ToolCmdLibPlatformWindows}"
+                                                         IsChecked="{Binding IsWindows, Mode=TwoWay}"
+                                                         AutomationProperties.Name="{loc:Translate ToolCmdLibPlatformWindows}"
+                                                         Foreground="{DynamicResource TextPrimaryBrush}"
+                                                         Margin="0,0,12,0"/>
+                                            <RadioButton Content="{loc:Translate ToolCmdLibPlatformLinux}"
+                                                         IsChecked="{Binding IsLinux, Mode=TwoWay}"
+                                                         AutomationProperties.Name="{loc:Translate ToolCmdLibPlatformLinux}"
+                                                         Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <TextBlock Grid.Row="1"
+                   Text="{Binding ValidationError}"
+                   Foreground="{DynamicResource ErrorTextBrush}"
+                   FontSize="{StaticResource FontSizeBody}"
+                   Margin="0,8,0,0" TextWrapping="Wrap"
+                   Visibility="{Binding ValidationError, Converter={StaticResource NullToVis}}"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button IsCancel="True" MinWidth="80"
+                    Content="{loc:Translate BtnCancel}"
+                    AutomationProperties.Name="{loc:Translate BtnCancel}"
+                    Margin="0,0,8,0"
+                    Style="{DynamicResource SecondaryButtonStyle}"/>
+            <Button IsDefault="True" MinWidth="80"
+                    Content="{loc:Translate BtnSave}"
+                    AutomationProperties.Name="{loc:Translate BtnSave}"
+                    Click="OnSaveClick"
+                    Style="{DynamicResource PrimaryButtonStyle}"/>
+        </StackPanel>
+    </Grid>
+</Window>
