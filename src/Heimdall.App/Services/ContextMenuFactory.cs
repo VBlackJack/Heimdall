@@ -455,11 +455,7 @@ public sealed class ContextMenuFactory
         {
             var toolId = ConnectionTypeCatalog.StripToolPrefix(tool.ConnectionType!);
             vm.TrackRecentTool(toolId.ToUpperInvariant());
-            var context = new Core.Models.ToolContext(
-                TargetHost: tool.RemoteServer,
-                TargetPort: tool.RemotePort > 0 ? tool.RemotePort : null,
-                Argument: tool.RemoteServer,
-                RemoteOs: tool.SourceProfile?.RemoteOs ?? Core.Configuration.RemoteOs.Auto);
+            var context = ToolEntryContextFactory.ForTreeEntry(tool);
             _ = vm.OpenToolTabAsync(toolId, tool.DisplayName, context);
         };
         menu.Items.Add(openItem);
