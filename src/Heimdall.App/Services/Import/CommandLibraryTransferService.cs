@@ -23,6 +23,7 @@ using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
 using ActionModel = TwinShell.Core.Models.Action;
+using CommandBatch = TwinShell.Core.Models.CommandBatch;
 using CommandExample = TwinShell.Core.Models.CommandExample;
 using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 
@@ -51,17 +52,29 @@ public sealed class CommandLibraryTransferService(
     };
 
     /// <inheritdoc/>
-    public async Task<int> ExportAsync(IReadOnlyList<ActionModel> actions, string path)
+    public Task<int> ExportAsync(IReadOnlyList<ActionModel> actions, string path)
+        => ExportAsync(actions, [], path);
+
+    /// <inheritdoc/>
+    public async Task<int> ExportAsync(IReadOnlyList<ActionModel> actions, IReadOnlyList<CommandBatch> runbooks, string path)
     {
         ArgumentNullException.ThrowIfNull(actions);
+        ArgumentNullException.ThrowIfNull(runbooks);
 
-        var envelope = new
+        // Keys written as they appear in the file: the naming policy does not reach dictionary keys.
+        var envelope = new Dictionary<string, object>(StringComparer.Ordinal)
         {
-            schemaVersion = "1.0",
-            exportDate = DateTime.UtcNow,
-            totalActions = actions.Count,
-            actions
+            ["schemaVersion"] = "1.0",
+            ["exportDate"] = DateTime.UtcNow,
+            ["totalActions"] = actions.Count,
+            ["actions"] = actions
         };
+
+        // Optional: a file without runbooks reads exactly as it did before they existed.
+        if (runbooks.Count > 0)
+        {
+            envelope["runbooks"] = runbooks.Select(RunbookTransferModel.FromRunbook).ToList();
+        }
 
         var json = JsonSerializer.Serialize(envelope, ExportOptions);
         await File.WriteAllTextAsync(path, json);
@@ -70,7 +83,14 @@ public sealed class CommandLibraryTransferService(
     }
 
     /// <inheritdoc/>
-    public async Task<CommandLibraryImportResult> ImportAsync(IActionService actionService, string path)
+    public Task<CommandLibraryImportResult> ImportAsync(IActionService actionService, string path)
+        => ImportAsync(actionService, null, path);
+
+    /// <inheritdoc/>
+    public async Task<CommandLibraryImportResult> ImportAsync(
+        IActionService actionService,
+        IBatchService? batchService,
+        string path)
     {
         string json;
         try
@@ -94,12 +114,84 @@ public sealed class CommandLibraryTransferService(
             return CommandLibraryImportResult.FileUnreadable();
         }
 
-        var actions = ParseImportJson(json);
-        if (actions is null || actions.Count == 0)
+        var actions = ParseImportJson(json) ?? [];
+        var runbooks = batchService is null ? [] : ParseRunbooks(json);
+        if (actions.Count == 0 && runbooks.Count == 0)
         {
             return CommandLibraryImportResult.InvalidFormat();
         }
 
+        var result = await MergeActionsAsync(actionService, actions);
+        if (runbooks.Count == 0)
+        {
+            return result;
+        }
+
+        var (runbooksImported, runbooksUpdated, runbooksSkipped) = await MergeRunbooksAsync(batchService!, runbooks);
+        return result.WithRunbooks(runbooksImported, runbooksUpdated, runbooksSkipped);
+    }
+
+    /// <summary>
+    /// Merges imported runbooks by public id, the way actions are merged: one the operator owns is
+    /// updated in place, keeping its local identity, creation date and last run; a new one is
+    /// added; one without a name, or matching a runbook the operator does not own, is skipped.
+    /// </summary>
+    private static async Task<(int Imported, int Updated, int Skipped)> MergeRunbooksAsync(
+        IBatchService batchService,
+        IReadOnlyList<RunbookTransferModel> runbooks)
+    {
+        int imported = 0, updated = 0, skipped = 0;
+
+        foreach (var model in runbooks)
+        {
+            if (string.IsNullOrWhiteSpace(model.Name) || model.Name.Length > AppConstants.MaxImportActionTitleLength)
+            {
+                skipped++;
+                continue;
+            }
+
+            var runbook = model.ToRunbook();
+            var existing = model.PublicId == Guid.Empty
+                ? null
+                : await batchService.GetBatchByPublicIdAsync(model.PublicId);
+
+            if (existing is null)
+            {
+                if (runbook.PublicId == Guid.Empty)
+                {
+                    runbook.PublicId = Guid.NewGuid();
+                }
+
+                await batchService.CreateBatchAsync(runbook);
+                imported++;
+            }
+            else if (existing.IsUserCreated)
+            {
+                runbook.Id = existing.Id;
+                runbook.PublicId = existing.PublicId;
+                runbook.CreatedAt = existing.CreatedAt;
+                runbook.LastExecutedAt = existing.LastExecutedAt;
+                foreach (var step in runbook.Commands)
+                {
+                    step.BatchId = existing.Id;
+                }
+
+                await batchService.UpdateBatchAsync(runbook);
+                updated++;
+            }
+            else
+            {
+                skipped++;
+            }
+        }
+
+        return (imported, updated, skipped);
+    }
+
+    private static async Task<CommandLibraryImportResult> MergeActionsAsync(
+        IActionService actionService,
+        List<ActionModel> actions)
+    {
         int imported = 0, updated = 0, skipped = 0, truncatedExamples = 0;
 
         foreach (var action in actions)
@@ -256,6 +348,33 @@ public sealed class CommandLibraryTransferService(
             {
                 parameter.Quoting = QuotingMode.ShellQuote;
             }
+        }
+    }
+
+    /// <summary>
+    /// The runbooks of a bulk envelope's optional <c>runbooks</c> array; empty when the file has
+    /// none or the array cannot be read.
+    /// </summary>
+    internal static List<RunbookTransferModel> ParseRunbooks(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("runbooks", out var runbooksElement)
+                && runbooksElement.ValueKind == JsonValueKind.Array)
+            {
+                return JsonSerializer.Deserialize<List<RunbookTransferModel>>(
+                    runbooksElement.GetRawText(), ImportOptions)?
+                    .Where(model => model is not null)
+                    .ToList() ?? [];
+            }
+
+            return [];
+        }
+        catch (JsonException)
+        {
+            return [];
         }
     }
 

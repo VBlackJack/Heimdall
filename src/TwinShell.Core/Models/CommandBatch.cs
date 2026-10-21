@@ -54,6 +54,12 @@ public sealed class CommandBatch
     public List<BatchCommandItem> Commands { get; set; } = new();
 
     /// <summary>
+    /// Runbook variables with their default values, by name. A step parameter written as
+    /// <c>{{name}}</c> takes the value the operator gives the variable when the run starts.
+    /// </summary>
+    public Dictionary<string, string> Variables { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>
     /// Creation timestamp
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

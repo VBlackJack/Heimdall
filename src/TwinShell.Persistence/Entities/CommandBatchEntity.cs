@@ -44,6 +44,11 @@ public sealed class CommandBatchEntity
     /// </summary>
     public string TagsJson { get; set; } = "[]";
 
+    /// <summary>
+    /// Runbook variables and their default values, stored as a JSON object
+    /// </summary>
+    public string VariablesJson { get; set; } = "{}";
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? LastExecutedAt { get; set; }

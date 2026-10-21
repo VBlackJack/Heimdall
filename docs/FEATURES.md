@@ -68,7 +68,6 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Auto-reconnect overlay on unexpected disconnect (SSH and RDP)
 - A crash or restart of a WebView2 GPU or utility helper process (a graphics driver reset, a display change) leaves open terminals running; only the loss of the browser or renderer process falls back, and the transcript and macro expect steps keep running on the connection behind it
 - **Copy output, secrets masked** (Ctrl+Shift+M, session tab menu, Ctrl+K palette): reads the text of an SSH, Telnet, WinRM or local shell session (last 4 MiB of scrollback), masks private keys, authorization headers, URL credentials, command-line and prompt passwords, key-value secrets and AWS, GitHub, Slack and JWT tokens as `[masked:<rule-id>]`, and shows a preview with the count per rule and an optional stable pseudonym for IPv4 addresses and host names. Copies only on **Copy**; runs offline, writes nothing to disk, refuses to copy if a rule times out; session logs are not masked
-- **Save selection to Command Library** (Ctrl+Shift+L, or Shift+right-click): opens the Command Library editor prefilled with the selected command (see Command Library, **Capturing a command**); a plain right-click still pastes
 
 ### VNC
 - Embedded VNC viewer via noVNC + WebView2
@@ -176,6 +175,9 @@ generator that produces the final command for you.
 - Each row shows the command itself under its title, in monospace on one line: the template the row opens on under the current platform filter (Windows unless the filter is Linux, or the only template there is), cut at 96 characters like the command palette's snippet previews
 - Opened from a session, the platform filter starts on the platform of that session. A profile can declare the operating system of its far end (General tab, **Operating system of the far end**): Windows or Linux is then used as given, and Automatic keeps the guess from the protocol (SSH as Linux; RDP, WinRM and Local as Windows). Post-connect steps linked to the library and their picker follow the same declaration, so SSH into a Windows OpenSSH server gets the Windows template
 
+- Shipped actions and their categories show in the interface language, and a language switch reloads the library keeping the selected action. The catalogue is written in English with a French translation beside it; Spanish has no shipped translation yet and shows the English text
+- Shipped actions follow the installed version: when an update changes the catalogue, the shipped actions are replaced at the next launch, while your own actions, the favorites and history of actions still shipped are kept
+
 **Building the command**
 - Typed parameters: text, integer, boolean, hostname, IP address, path, and **choice** (a fixed set of values offered as a drop-down)
 - A choice parameter accepts only what it offers, matched without regard to case or surrounding space; whether a value may be absent is left to the parameter's own Required flag
@@ -190,12 +192,6 @@ generator that produces the final command for you.
 - **Send to several open terminals**: tick the terminals from a panel beside the Send button and the same command goes to each. It reaches terminals that are already open and never connects one; every target receives the same text; one confirmation names how many will receive it, whatever the action's declared risk; and a terminal that refuses does not stop the others - the summary names which did not receive it
 - Keyboard: `Enter` copies, `Shift+Enter` inserts, `Ctrl+Enter` sends, `Ctrl+D` duplicates the selected action
 
-**Capturing a command**
-- Select a command in a terminal (SSH, Telnet, WinRM or local shell) and press `Ctrl+Shift+L`, or Shift+right-click and choose **Save selection to Command Library**; the entry is greyed out when nothing is selected, and a plain right-click still pastes
-- The editor for a new action opens, in the library tab already open if there is one, prefilled from the selection: the command goes into the pattern of the session's platform (Windows for Local, RDP and WinRM sessions or a far end declared Windows, Linux otherwise), the risk starts at Run, the tag is the protocol, the category is the one of the last action you created in this session, and the title is left for you
-- A selection over several lines becomes one line, its lines joined with ` ; ` for Windows and ` && ` for Linux, for you to read before saving
-- Cancel leaves the library on its list; Save adds the action and selects it. A capture writes nothing to the history
-
 **History**
 - Every command you copy or send is recorded with its title, category and timestamp, the host of the session the library was opened from, and whether it was sent or only copied
 - A **This host only** box at the top of the panel, ticked by default when the library belongs to a session, shows only what went to that host; it keeps its state while the panel reloads
@@ -204,10 +200,22 @@ generator that produces the final command for you.
 - Replay a past command back into the generator, with its parameters
 - Nothing is recorded while the vault is locked, and rows are pruned after 90 days
 
+**Runbooks**
+- A runbook chains the steps you would otherwise send one by one on every incident, such as status, logs, restart, status. The **Runbooks** button in the header opens a panel that lists your runbooks with their step count and last run, with New, Edit, Duplicate, Delete and Run
+- A step is either a library action with a value for each of its parameters, or a command typed as is with the platform it is written for. An action step opens on the template that fits the session the library belongs to: Linux over SSH, Windows over RDP, or what the profile declares
+- **Variables**: a runbook declares variables with default values, and a parameter value written `{{name}}` takes the value of that variable. The values are asked once, when the run starts, and a variable named like a host or a user starts on the session's host or user name. A `{{name}}` that matches no variable is left as written and the step says so instead of sending it. Only the values of action steps are substituted; a literal command is sent as typed, and nothing else is interpreted
+- **The run is manual, step by step**: the panel shows each step with its status (pending, sent, inserted, copied, skipped, not sent), the current command in a read-only box, and **Send to Terminal**, **Insert**, **Copy**, **Skip** and **Stop**. A terminal returns no exit code, so Heimdall cannot tell that a step failed: you read the output, then send the next step or press Stop. The failure mode stored with a runbook (stop the run, or carry on) is shown as a reminder of what to do, not enforced
+- Send asks the dangerous-command confirmation for a dangerous action, and always for a literal step, which bypassed the generator's checks; Insert never asks, as in the generator. Send and Insert need a terminal in the tab; without one, Copy carries the run
+- Each step sent from a library action is recorded in the history as sent, against the session's host; an inserted or copied step is recorded as copied. A literal step is not recorded, because a history row belongs to an action
+- Runbooks are your own data: none ships with Heimdall
+
 **Sharing**
-- Export first asks what the file should contain: **My actions** (the default: the actions you created or imported), **Current filter** (what the list shows now, search included) or **Everything** (the seeded catalogue too); the warning about secrets in free-text fields follows the choice
+- Export first asks what the file should contain: **My actions** (the default: the actions you created or imported, and your runbooks), **Current filter** (what the list shows now, search included) or **Everything** (the seeded catalogue too); the warning about secrets in free-text fields follows the choice
+- An import merges the runbooks it carries by their identity, as it does actions: one you already have is updated, a new one is added. Git synchronization carries runbooks too, with their variables and parameter values
 - Import and export as JSON, and Git synchronization for a shared team library; **Sync on startup** runs once after the vault is unlocked, and a failure is reported on the status bar
 - Actions that arrive from an import have their risk level and platform clamped to known values, so an unrecognized level is treated as dangerous rather than harmless
+- An export keeps the English text of each action with its translations; an export taken before the categories were localized imports into the current categories
+- **Workstation debloat pack**: 72 actions that strip a personal Windows workstation (store apps, Edge, OneDrive, telemetry, performance tweaks) ship apart from the catalogue, in `data/packs/windows-workstation-debloat.json` in the installation folder. Import that file with the library's Import button if you want them. They are aimed at a workstation, not a server; they arrive as your own actions, so you can edit and export them; their text is French only for now; and nine of them open with a command-length error until their scripts are rewritten
 
 ### Quick Connect (Ctrl+K)
 - Command palette for ad-hoc connections without saving a server profile
@@ -341,7 +349,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,288 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,347 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 

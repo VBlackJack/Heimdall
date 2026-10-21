@@ -37,6 +37,13 @@ public interface IBatchService
     Task<CommandBatch?> GetBatchByIdAsync(string id);
 
     /// <summary>
+    /// Gets a batch by its public ID, the identity an export carries across installations
+    /// </summary>
+    /// <param name="publicId">Public ID</param>
+    /// <returns>The batch, or null if not found</returns>
+    Task<CommandBatch?> GetBatchByPublicIdAsync(Guid publicId);
+
+    /// <summary>
     /// Creates a new batch
     /// </summary>
     /// <param name="batch">The batch to create</param>
@@ -50,6 +57,14 @@ public interface IBatchService
     Task UpdateBatchAsync(CommandBatch batch);
 
     /// <summary>
+    /// Records when a batch was last run without counting the run as an edit: only
+    /// LastExecutedAt changes, UpdatedAt is left alone
+    /// </summary>
+    /// <param name="id">Batch ID</param>
+    /// <param name="executedAtUtc">When the run started, in UTC</param>
+    Task MarkExecutedAsync(string id, DateTime executedAtUtc);
+
+    /// <summary>
     /// Deletes a batch
     /// </summary>
     /// <param name="id">Batch ID</param>
@@ -61,18 +76,4 @@ public interface IBatchService
     /// <param name="query">Search query</param>
     /// <returns>Matching batches</returns>
     Task<IEnumerable<CommandBatch>> SearchBatchesAsync(string query);
-
-    /// <summary>
-    /// Exports a batch to JSON
-    /// </summary>
-    /// <param name="batch">The batch to export</param>
-    /// <returns>JSON string representation</returns>
-    string ExportBatchToJson(CommandBatch batch);
-
-    /// <summary>
-    /// Imports a batch from JSON
-    /// </summary>
-    /// <param name="json">JSON string</param>
-    /// <returns>The imported batch</returns>
-    CommandBatch ImportBatchFromJson(string json);
 }

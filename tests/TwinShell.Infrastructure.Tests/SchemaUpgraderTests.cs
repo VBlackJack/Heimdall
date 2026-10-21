@@ -155,6 +155,41 @@ public sealed class SchemaUpgraderTests
         observedOrder.Should().Equal(1, 2);
     }
 
+    // Two steps with one version would both claim the same user_version: the second would never
+    // run on a database the first had reached. The upgrader refuses the list before touching the
+    // database, so neither step runs.
+    [Fact]
+    public async Task UpgradeAsync_WhenTwoStepsShareAVersion_RefusesAndAppliesNothing()
+    {
+        await using TempSchemaDatabase database = new TempSchemaDatabase();
+        List<string> applied = [];
+        IReadOnlyList<SchemaStep> steps =
+        [
+            new SchemaStep(
+                1,
+                "first",
+                (DbConnection _, DbTransaction _, CancellationToken _) =>
+                {
+                    applied.Add("first");
+                    return Task.CompletedTask;
+                }),
+            new SchemaStep(
+                1,
+                "same-version",
+                (DbConnection _, DbTransaction _, CancellationToken _) =>
+                {
+                    applied.Add("same-version");
+                    return Task.CompletedTask;
+                })
+        ];
+
+        Func<Task> upgrade = () => SchemaUpgrader.UpgradeAsync(database.Context, steps);
+
+        await upgrade.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("Schema step versions must be unique.*");
+        applied.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task UpgradeAsync_WhenCancelledBeforeFirstStep_DoesNotApplyAnything()
     {

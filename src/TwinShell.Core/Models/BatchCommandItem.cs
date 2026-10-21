@@ -49,9 +49,17 @@ public sealed class BatchCommandItem
     public string ActionTitle { get; set; } = string.Empty;
 
     /// <summary>
-    /// The actual command to execute
+    /// The actual command to execute: the literal text of a free step, or, for a step that
+    /// references an action, a cache of the text last generated from it.
     /// </summary>
     public string Command { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Parameter values for a step that references an action, by parameter name. A value may
+    /// name a runbook variable as <c>{{name}}</c>; it is substituted when the step runs.
+    /// Empty for a literal step.
+    /// </summary>
+    public Dictionary<string, string> Parameters { get; set; } = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Platform for this command

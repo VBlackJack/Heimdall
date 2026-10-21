@@ -51,6 +51,10 @@ public sealed class CommandBatchConfiguration : IEntityTypeConfiguration<Command
             .IsRequired()
             .HasColumnType("TEXT");
 
+        builder.Property(e => e.VariablesJson)
+            .IsRequired()
+            .HasColumnType("TEXT");
+
         builder.Property(e => e.CreatedAt)
             .IsRequired();
 

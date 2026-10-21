@@ -49,6 +49,10 @@ public static class TwinShellSchema
 
     private const string TargetHostColumnName = "TargetHost";
 
+    private const string CommandBatchesTableName = "CommandBatches";
+
+    private const string VariablesColumnName = "VariablesJson";
+
     // The translated parameter labels and example descriptions, added when the shipped
     // catalogue started carrying its French beside an English pivot. Default '{}' matches the
     // entity initializers, so a translation row that predates them still materialises.
@@ -84,7 +88,7 @@ public static class TwinShellSchema
             [ActionsTableName] = [PublicIdColumnName, "WindowsExamplesJson", "LinuxExamplesJson"],
             [ActionTranslationsTableName] = ["ParametersJson", "ExamplesJson"],
             [CommandHistoriesTableName] = [TargetHostColumnName],
-            ["CommandBatches"] = [PublicIdColumnName],
+            [CommandBatchesTableName] = [PublicIdColumnName, VariablesColumnName],
             ["CustomCategories"] = [PublicIdColumnName],
             ["CommandTemplates"] = [PublicIdColumnName]
         };
@@ -115,7 +119,11 @@ public static class TwinShellSchema
         new SchemaStep(
             7,
             "SeedState table recording the seed last applied",
-            ApplySeedStateTableAsync)
+            ApplySeedStateTableAsync),
+        new SchemaStep(
+            8,
+            "Runbook variables column on CommandBatches",
+            ApplyBatchVariablesColumnAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -265,6 +273,46 @@ public static class TwinShellSchema
     /// written from today's model, the table is already there. No row is written: a missing
     /// hash on a populated database is what tells the refresh to run once.
     /// </remarks>
+    /// <summary>
+    /// Adds the runbook <c>VariablesJson</c> column to <c>CommandBatches</c> when it is missing.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent by existence test, like the other column steps. The DEFAULT '{}' says what a
+    /// batch written before runbooks had: no variables. A step's parameter values need no
+    /// column of their own: steps live in <c>CommandsJson</c>, and a step stored before it had
+    /// parameters reads back with none. A database without the table is left alone:
+    /// <c>EnsureCreated</c> writes it whole, column included.
+    /// </remarks>
+    private static async Task ApplyBatchVariablesColumnAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        if (!await TableExistsAsync(connection, transaction, CommandBatchesTableName, cancellationToken))
+        {
+            return;
+        }
+
+        bool exists = await ColumnExistsAsync(
+            connection,
+            transaction,
+            CommandBatchesTableName,
+            VariablesColumnName,
+            cancellationToken);
+
+        if (exists)
+        {
+            return;
+        }
+
+        await ExecuteNonQueryAsync(
+            connection,
+            transaction,
+            "ALTER TABLE " + CommandBatchesTableName + " ADD COLUMN " + VariablesColumnName
+            + " TEXT NOT NULL DEFAULT '{}'",
+            cancellationToken);
+    }
+
     private static Task ApplySeedStateTableAsync(
         DbConnection connection,
         DbTransaction transaction,
