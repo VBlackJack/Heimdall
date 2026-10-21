@@ -20,7 +20,7 @@
     "id": "iis-create-site-cmd",
     "platform": 0,
     "name": "New-IISSite",
-    "commandPattern": "Import-Module WebAdministration; New-Website -Name '{siteName}' -PhysicalPath '{physicalPath}' -Port {port} -HostHeader '{hostHeader}'",
+    "commandPattern": "Import-Module WebAdministration; New-Website -Name '{siteName}' -PhysicalPath '{physicalPath}' -Port {port}",
     "parameters": [
       {
         "name": "siteName",
@@ -47,15 +47,6 @@
         "defaultValue": "80",
         "required": true,
         "description": "HTTP listening port"
-      },
-      {
-        "name": "hostHeader",
-        "label": "Host Header",
-        "type": "string",
-        "quoting": "InlineInQuotes",
-        "defaultValue": "",
-        "required": false,
-        "description": "Host header (e.g. www.example.com)"
       }
     ]
   },
@@ -121,10 +112,6 @@
           "port": {
             "label": "Port",
             "description": "Port d'écoute HTTP"
-          },
-          "hostHeader": {
-            "label": "En-tête d'hôte",
-            "description": "En-tête d'hôte (ex: www.example.com)"
           }
         }
       },

@@ -781,10 +781,12 @@ public sealed class CommandGeneratorServiceTests
     /// empty, so the generator cannot leave the argument out. A seed-side defect, fixed in
     /// the seed files, not here.
     /// </summary>
-    private static readonly HashSet<string> EmptyQuotedSeedTemplates = new(StringComparer.Ordinal)
-    {
-        "iis-create-site.json / windowsCommandTemplate",
-    };
+    /// <remarks>
+    /// Empty since iis-create-site moved its optional -HostHeader clause into an example.
+    /// Kept, with the theory pinning every entry from both sides, so a defect that returns is
+    /// listed knowingly and leaves the list once fixed.
+    /// </remarks>
+    private static readonly HashSet<string> EmptyQuotedSeedTemplates = new(StringComparer.Ordinal);
 
     [Fact]
     public void EmptyQuotedSeedTemplates_NameOnlyTemplatesTheCatalogueShips()
