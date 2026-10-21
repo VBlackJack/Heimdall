@@ -15,12 +15,12 @@
     "id": "clean-sccm-cache-cmd",
     "platform": 0,
     "name": "Invoke-WmiMethod",
-    "commandPattern": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }\"",
+    "commandPattern": "$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }",
     "parameters": []
   },
   "examples": [
     {
-      "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }\"",
+      "command": "$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }",
       "description": "Delete every element of the client cache (the action's own command)",
       "platform": 0
     },
@@ -38,7 +38,7 @@
       "description": "Supprime tous les fichiers du cache du client Configuration Manager",
       "notes": "Droits administrateur requis. Libère de l'espace disque en supprimant les packages téléchargés.",
       "examples": {
-        "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }\"": "Supprime tous les éléments du cache client (la commande de l'action elle-même)",
+        "$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }": "Supprime tous les éléments du cache client (la commande de l'action elle-même)",
         "(Get-WmiObject -Namespace root\\ccm\\SoftMgmtAgent -Class CacheInfoEx | Measure-Object -Property ContentSize -Sum).Sum": "Affiche uniquement la taille totale du contenu en cache (somme de ContentSize), sans rien supprimer"
       }
     }
