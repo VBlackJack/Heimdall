@@ -68,6 +68,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - Auto-reconnect overlay on unexpected disconnect (SSH and RDP)
 - A crash or restart of a WebView2 GPU or utility helper process (a graphics driver reset, a display change) leaves open terminals running; only the loss of the browser or renderer process falls back, and the transcript and macro expect steps keep running on the connection behind it
 - **Copy output, secrets masked** (Ctrl+Shift+M, session tab menu, Ctrl+K palette): reads the text of an SSH, Telnet, WinRM or local shell session (last 4 MiB of scrollback), masks private keys, authorization headers, URL credentials, command-line and prompt passwords, key-value secrets and AWS, GitHub, Slack and JWT tokens as `[masked:<rule-id>]`, and shows a preview with the count per rule and an optional stable pseudonym for IPv4 addresses and host names. Copies only on **Copy**; runs offline, writes nothing to disk, refuses to copy if a rule times out; session logs are not masked
+- **Save selection to Command Library** (Ctrl+Shift+L, or Shift+right-click): opens the Command Library editor prefilled with the selected command (see Command Library, **Capturing a command**); a plain right-click still pastes
 
 ### VNC
 - Embedded VNC viewer via noVNC + WebView2
@@ -191,6 +192,12 @@ generator that produces the final command for you.
 - Commands flagged dangerous require confirmation before they are sent
 - **Send to several open terminals**: tick the terminals from a panel beside the Send button and the same command goes to each. It reaches terminals that are already open and never connects one; every target receives the same text; one confirmation names how many will receive it, whatever the action's declared risk; and a terminal that refuses does not stop the others - the summary names which did not receive it
 - Keyboard: `Enter` copies, `Shift+Enter` inserts, `Ctrl+Enter` sends, `Ctrl+D` duplicates the selected action
+
+**Capturing a command**
+- Select a command in a terminal (SSH, Telnet, WinRM or local shell) and press `Ctrl+Shift+L`, or Shift+right-click and choose **Save selection to Command Library**; the entry is greyed out when nothing is selected, and a plain right-click still pastes
+- The editor for a new action opens, in the library tab already open if there is one, prefilled from the selection: the command goes into the pattern of the session's platform (Windows for Local, RDP and WinRM sessions or a far end declared Windows, Linux otherwise), the risk starts at Run, the tag is the protocol, the category is the one of the last action you created in this session, and the title is left for you
+- A selection over several lines becomes one line, its lines joined with ` ; ` for Windows and ` && ` for Linux, for you to read before saving
+- Cancel leaves the library on its list; Save adds the action and selects it. A capture writes nothing to the history
 
 **History**
 - Every command you copy or send is recorded with its title, category and timestamp, the host of the session the library was opened from, and whether it was sent or only copied
