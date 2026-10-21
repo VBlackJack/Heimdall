@@ -1,7 +1,7 @@
 {
   "id": "dns-show-cache",
-  "title": "Afficher le cache DNS",
-  "description": "Affiche le contenu actuel du cache DNS local.",
+  "title": "Show the DNS cache",
+  "description": "Show the current content of the local DNS cache.",
   "category": "network-dns",
   "platform": 0,
   "level": 0,
@@ -21,10 +21,20 @@
   "examples": [
     {
       "command": "ipconfig /displaydns",
-      "description": "Affiche tous les enregistrements en cache DNS",
+      "description": "Show every record in the DNS cache",
       "platform": 0
     }
   ],
-  "notes": "Commande Windows uniquement. Sortie volumineuse, pensez à filtrer avec | findstr.",
-  "links": []
+  "notes": "Windows only. Large output, consider filtering with | findstr.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Afficher le cache DNS",
+      "description": "Affiche le contenu actuel du cache DNS local.",
+      "notes": "Commande Windows uniquement. Sortie volumineuse, pensez à filtrer avec | findstr.",
+      "examples": {
+        "ipconfig /displaydns": "Affiche tous les enregistrements en cache DNS"
+      }
+    }
+  }
 }

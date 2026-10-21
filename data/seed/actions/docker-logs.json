@@ -1,7 +1,7 @@
 {
   "id": "docker-logs",
-  "title": "Consulter les logs d'un conteneur",
-  "description": "Affiche les logs stdout/stderr d'un conteneur Docker",
+  "title": "Read the logs of a container",
+  "description": "Show the stdout/stderr logs of a Docker container",
   "category": "containers-vms",
   "platform": 2,
   "level": 0,
@@ -21,15 +21,15 @@
     "parameters": [
       {
         "name": "container",
-        "label": "Conteneur",
+        "label": "Container",
         "type": "string",
         "defaultValue": "container_name",
         "required": true,
-        "description": "Nom ou ID du conteneur"
+        "description": "Name or ID of the container"
       }
     ]
   },
-  "notes": "Windows & Linux: Ctrl+C pour arrêter le suivi. --tail limite le nombre de lignes.",
+  "notes": "Windows & Linux: Ctrl+C stops following. --tail limits the number of lines.",
   "links": [
     {
       "title": "Docker logs",
@@ -44,11 +44,11 @@
     "parameters": [
       {
         "name": "container",
-        "label": "Conteneur",
+        "label": "Container",
         "type": "string",
         "defaultValue": "container_name",
         "required": true,
-        "description": "Nom ou ID du conteneur"
+        "description": "Name or ID of the container"
       }
     ]
   },
@@ -56,51 +56,79 @@
   "windowsExamples": [
     {
       "command": "docker logs -f mycontainer",
-      "description": "Suit les logs en temps réel",
+      "description": "Follow the logs in real time",
       "platform": 0
     },
     {
       "command": "docker logs --tail 100 mycontainer",
-      "description": "Affiche les 100 dernières lignes",
+      "description": "Show the last 100 lines",
       "platform": 0
     },
     {
       "command": "docker logs --since 1h mycontainer",
-      "description": "Logs de la dernière heure",
+      "description": "Logs of the last hour",
       "platform": 0
     },
     {
       "command": "docker logs -f {container}",
-      "description": "Exemple utilisant le paramètre 'options': Options (-f=follow, --tail=n, --since, -t=timestamps). Remplacez <options> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'container' parameter: name or ID of the container. Replace it with the value that fits your environment.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "docker logs -f mycontainer",
-      "description": "Suit les logs en temps réel",
+      "description": "Follow the logs in real time",
       "platform": 1
     },
     {
       "command": "docker logs --tail 100 mycontainer",
-      "description": "Affiche les 100 dernières lignes",
+      "description": "Show the last 100 lines",
       "platform": 1
     },
     {
       "command": "docker logs --since 1h mycontainer",
-      "description": "Logs de la dernière heure",
+      "description": "Logs of the last hour",
       "platform": 1
     },
     {
       "command": "docker logs -f {container}",
-      "description": "Exemple utilisant le paramètre 'options': Options (-f=follow, --tail=n, --since, -t=timestamps). Remplacez <options> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'container' parameter: name or ID of the container. Replace it with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "docker logs -f webapp",
-      "description": "Suivre les logs du conteneur webapp",
+      "description": "Follow the logs of the webapp container",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Consulter les logs d'un conteneur",
+      "description": "Affiche les logs stdout/stderr d'un conteneur Docker",
+      "notes": "Windows & Linux: Ctrl+C pour arrêter le suivi. --tail limite le nombre de lignes.",
+      "parameters": {
+        "windows": {
+          "container": {
+            "label": "Conteneur",
+            "description": "Nom ou ID du conteneur"
+          }
+        },
+        "linux": {
+          "container": {
+            "label": "Conteneur",
+            "description": "Nom ou ID du conteneur"
+          }
+        }
+      },
+      "examples": {
+        "docker logs -f mycontainer": "Suit les logs en temps réel",
+        "docker logs --tail 100 mycontainer": "Affiche les 100 dernières lignes",
+        "docker logs --since 1h mycontainer": "Logs de la dernière heure",
+        "docker logs -f {container}": "Exemple utilisant le paramètre 'container': nom ou ID du conteneur. Remplacez-le par la valeur appropriée selon votre environnement.",
+        "docker logs -f webapp": "Suivre les logs du conteneur webapp"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "du-directory-size",
-  "title": "Calculer la taille d'un répertoire",
-  "description": "Calcule l'espace disque utilisé par un répertoire et ses sous-répertoires",
+  "title": "Compute the size of a directory",
+  "description": "Compute the disk space used by a directory and its subdirectories",
   "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
@@ -21,74 +21,104 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": ".",
         "required": true,
-        "description": "Répertoire à analyser"
+        "description": "Directory to analyze"
       },
       {
         "name": "lines",
-        "label": "Nombre de résultats",
+        "label": "Number of results",
         "type": "number",
         "defaultValue": "20",
         "required": true,
-        "description": "Nombre de plus gros répertoires à afficher"
+        "description": "Number of largest directories to show"
       }
     ]
   },
   "examples": [
     {
       "command": "du -sh /var/log",
-      "description": "Taille totale du répertoire /var/log",
+      "description": "Total size of the /var/log directory",
       "platform": 1
     },
     {
       "command": "du -h --max-depth=1 /home | sort -hr",
-      "description": "Taille des sous-répertoires de /home triée",
+      "description": "Sorted size of the subdirectories of /home",
       "platform": 1
     },
     {
       "command": "du -sh . | sort -hr | head -n 100",
-      "description": "Exemple utilisant le paramètre 'path': Répertoire à analyser. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'path' parameter: directory to analyze. Replace C:\\Logs\\app.log with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "du -sh C:\\Logs\\app.log | sort -hr | head -n 20",
-      "description": "Exemple utilisant le paramètre 'lines': Nombre de plus gros répertoires à afficher. Remplacez 100 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'lines' parameter: number of largest directories to show. Replace 100 with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "du -h --max-depth=1 /home",
-      "description": "Taille de chaque sous-dossier de /home",
+      "description": "Size of each subfolder of /home",
       "platform": 1
     },
     {
       "command": "du -sh /var/log/* | sort -hr | head -10",
-      "description": "Top 10 des plus gros fichiers de logs",
+      "description": "Top 10 largest log files",
       "platform": 1
     },
     {
       "command": "du -ah /tmp | sort -rh | head -20",
-      "description": "Les 20 plus gros fichiers dans /tmp",
+      "description": "The 20 largest files in /tmp",
       "platform": 1
     },
     {
       "command": "du -sm /var/* | sort -rn",
-      "description": "Taille en Mo de chaque dossier dans /var",
+      "description": "Size in MB of each folder in /var",
       "platform": 1
     },
     {
       "command": "du -sh /var/log/* | sort -hr | head",
-      "description": "Top fichiers",
+      "description": "Top files",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo (sauf répertoires protégés). -s=summary, -h=human-readable.",
+  "notes": "Does not require sudo (except for protected directories). -s=summary, -h=human-readable.",
   "links": [
     {
       "title": "du command",
       "url": "https://man7.org/linux/man-pages/man1/du.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Calculer la taille d'un répertoire",
+      "description": "Calcule l'espace disque utilisé par un répertoire et ses sous-répertoires",
+      "notes": "Ne nécessite pas sudo (sauf répertoires protégés). -s=summary, -h=human-readable.",
+      "parameters": {
+        "linux": {
+          "path": {
+            "label": "Chemin",
+            "description": "Répertoire à analyser"
+          },
+          "lines": {
+            "label": "Nombre de résultats",
+            "description": "Nombre de plus gros répertoires à afficher"
+          }
+        }
+      },
+      "examples": {
+        "du -sh /var/log": "Taille totale du répertoire /var/log",
+        "du -h --max-depth=1 /home | sort -hr": "Taille des sous-répertoires de /home triée",
+        "du -sh . | sort -hr | head -n 100": "Exemple utilisant le paramètre 'path': Répertoire à analyser. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
+        "du -sh C:\\Logs\\app.log | sort -hr | head -n 20": "Exemple utilisant le paramètre 'lines': Nombre de plus gros répertoires à afficher. Remplacez 100 par la valeur appropriée selon votre environnement.",
+        "du -h --max-depth=1 /home": "Taille de chaque sous-dossier de /home",
+        "du -sh /var/log/* | sort -hr | head -10": "Top 10 des plus gros fichiers de logs",
+        "du -ah /tmp | sort -rh | head -20": "Les 20 plus gros fichiers dans /tmp",
+        "du -sm /var/* | sort -rn": "Taille en Mo de chaque dossier dans /var",
+        "du -sh /var/log/* | sort -hr | head": "Top fichiers"
+      }
+    }
+  }
 }

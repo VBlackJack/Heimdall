@@ -1,7 +1,7 @@
 {
   "id": "docker-ps",
-  "title": "Lister les conteneurs Docker",
-  "description": "Affiche la liste des conteneurs Docker en cours d'exécution",
+  "title": "List the Docker containers",
+  "description": "Show the list of running Docker containers",
   "category": "containers-vms",
   "platform": 2,
   "level": 0,
@@ -20,7 +20,7 @@
     "commandPattern": "docker ps",
     "parameters": []
   },
-  "notes": "Windows & Linux: Nécessite accès au daemon Docker. -a pour voir aussi les conteneurs arrêtés.",
+  "notes": "Windows & Linux: requires access to the Docker daemon. -a to also see the stopped containers.",
   "links": [
     {
       "title": "Docker ps documentation",
@@ -38,51 +38,66 @@
   "windowsExamples": [
     {
       "command": "docker ps",
-      "description": "Liste les conteneurs en cours",
+      "description": "List the running containers",
       "platform": 0
     },
     {
       "command": "docker ps -a",
-      "description": "Liste tous les conteneurs (même arrêtés)",
+      "description": "List all containers (stopped ones included)",
       "platform": 0
     },
     {
       "command": "docker ps -q",
-      "description": "Affiche uniquement les IDs",
+      "description": "Show the IDs only",
       "platform": 0
     },
     {
       "command": "docker ps --filter status=exited",
-      "description": "Filtre pour afficher uniquement les conteneurs arrêtés.",
+      "description": "Filter to show only the stopped containers.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "docker ps",
-      "description": "Liste les conteneurs en cours",
+      "description": "List the running containers",
       "platform": 1
     },
     {
       "command": "docker ps -a",
-      "description": "Liste tous les conteneurs (même arrêtés)",
+      "description": "List all containers (stopped ones included)",
       "platform": 1
     },
     {
       "command": "docker ps -q",
-      "description": "Affiche uniquement les IDs",
+      "description": "Show the IDs only",
       "platform": 1
     },
     {
       "command": "docker ps --format \"table {{.Names}}\\t{{.Status}}\"",
-      "description": "Affiche les conteneurs avec un format personnalisé (nom et statut).",
+      "description": "Show the containers with a custom format (name and status).",
       "platform": 1
     },
     {
       "command": "docker images",
-      "description": "Lister les images locales",
+      "description": "List the local images",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Lister les conteneurs Docker",
+      "description": "Affiche la liste des conteneurs Docker en cours d'exécution",
+      "notes": "Windows & Linux: Nécessite accès au daemon Docker. -a pour voir aussi les conteneurs arrêtés.",
+      "examples": {
+        "docker ps": "Liste les conteneurs en cours",
+        "docker ps -a": "Liste tous les conteneurs (même arrêtés)",
+        "docker ps -q": "Affiche uniquement les IDs",
+        "docker ps --filter status=exited": "Filtre pour afficher uniquement les conteneurs arrêtés.",
+        "docker ps --format \"table {{.Names}}\\t{{.Status}}\"": "Affiche les conteneurs avec un format personnalisé (nom et statut).",
+        "docker images": "Lister les images locales"
+      }
+    }
+  }
 }

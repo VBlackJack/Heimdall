@@ -1,7 +1,7 @@
 {
   "id": "docker-compose-up",
-  "title": "Démarrer une stack Docker Compose",
-  "description": "Lance tous les services définis dans un fichier docker-compose.yml",
+  "title": "Start a Docker Compose stack",
+  "description": "Start every service defined in a docker-compose.yml file",
   "category": "containers-vms",
   "platform": 2,
   "level": 1,
@@ -20,7 +20,7 @@
     "commandPattern": "docker-compose up -d",
     "parameters": []
   },
-  "notes": "Windows & Linux: Doit être exécuté dans le répertoire contenant docker-compose.yml. -d pour detached mode.",
+  "notes": "Windows & Linux: must run in the directory that holds docker-compose.yml. -d for detached mode.",
   "links": [
     {
       "title": "Docker Compose documentation",
@@ -38,46 +38,60 @@
   "windowsExamples": [
     {
       "command": "docker-compose up -d",
-      "description": "Démarre en arrière-plan",
+      "description": "Start in the background",
       "platform": 0
     },
     {
       "command": "docker-compose up --build",
-      "description": "Rebuild les images avant de démarrer",
+      "description": "Rebuild the images before starting",
       "platform": 0
     },
     {
       "command": "docker-compose down",
-      "description": "Arrête et supprime les conteneurs",
+      "description": "Stop and remove the containers",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "docker-compose up -d",
-      "description": "Démarre en arrière-plan",
+      "description": "Start in the background",
       "platform": 1
     },
     {
       "command": "docker-compose up --build",
-      "description": "Rebuild les images avant de démarrer",
+      "description": "Rebuild the images before starting",
       "platform": 1
     },
     {
       "command": "docker-compose down",
-      "description": "Arrête et supprime les conteneurs",
+      "description": "Stop and remove the containers",
       "platform": 1
     },
     {
       "command": "docker-compose logs -f",
-      "description": "Suivre les logs de tous les services",
+      "description": "Follow the logs of every service",
       "platform": 1
     },
     {
       "command": "docker-compose ps",
-      "description": "État des services",
+      "description": "Status of the services",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Démarrer une stack Docker Compose",
+      "description": "Lance tous les services définis dans un fichier docker-compose.yml",
+      "notes": "Windows & Linux: Doit être exécuté dans le répertoire contenant docker-compose.yml. -d pour detached mode.",
+      "examples": {
+        "docker-compose up -d": "Démarre en arrière-plan",
+        "docker-compose up --build": "Rebuild les images avant de démarrer",
+        "docker-compose down": "Arrête et supprime les conteneurs",
+        "docker-compose logs -f": "Suivre les logs de tous les services",
+        "docker-compose ps": "État des services"
+      }
+    }
+  }
 }
