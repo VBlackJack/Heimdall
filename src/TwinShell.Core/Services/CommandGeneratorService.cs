@@ -121,8 +121,14 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 throw new InvalidOperationException(validationError);
             }
 
-            // Escape the value for shell safety using the target platform
-            var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform, parameter.Quoting);
+            // Escape the value for shell safety using the target platform. A value goes in
+            // bare only where every occurrence stands outside quotes and after no dollar sign:
+            // after $ the shell would read it as a variable name, and inside a quoted span the
+            // pattern's own quoting decides.
+            var everyOccurrenceBare = CommandPatternQuoting
+                .GetPlaceholderQuoteContexts(template.CommandPattern, parameter.Name, template.Platform == Platform.Windows)
+                .All(context => context == CommandPatternQuoting.QuoteContext.Bare);
+            var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform, parameter.Quoting, everyOccurrenceBare);
 
             command.Replace(placeholder, escapedValue);
         }
@@ -501,7 +507,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     /// <summary>
     /// Escapes a parameter value based on its type
     /// </summary>
-    private string EscapeParameterValue(string value, string parameterType, Platform platform, QuotingMode? quotingMode)
+    private string EscapeParameterValue(string value, string parameterType, Platform platform, QuotingMode? quotingMode, bool everyOccurrenceBare)
     {
         switch (parameterType.ToLower())
         {
@@ -523,7 +529,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                     return EscapeInlineInSingleQuotes(value, platform);
                 }
 
-                return IsSafeBareValue(value, platform) ? value : QuoteForShell(value, platform);
+                return everyOccurrenceBare && IsSafeBareValue(value, platform) ? value : QuoteForShell(value, platform);
         }
     }
 

@@ -149,6 +149,24 @@ public sealed class CommandGeneratorValueShapingTests
         service.GenerateCommand(linux, Values(("v", value))).Should().Be("run " + value);
     }
 
+    /// <summary>
+    /// A safe value goes in bare only where the shell reads the occurrence as plain text:
+    /// after a dollar sign, <c>abc</c> bare would become the variable <c>$abc</c>.
+    /// </summary>
+    [Theory]
+    [InlineData(Platform.Linux, "echo ${x}", "echo $'abc'")]
+    [InlineData(Platform.Windows, "echo ${x}", "echo $'abc'")]
+    [InlineData(Platform.Linux, "echo \"{x}\"", "echo \"'abc'\"")]
+    [InlineData(Platform.Linux, "echo {x} ${x}", "echo 'abc' $'abc'")]
+    public void GenerateCommand_SafeValueWhereTheShellExpands_KeepsItsQuotes(Platform platform, string pattern, string expected)
+    {
+        var template = Template(platform, pattern, CommandLibraryTestHelpers.RequiredParameter("x", "X"));
+
+        var command = CreateService().GenerateCommand(template, Values(("x", "abc")));
+
+        command.Should().Be(expected);
+    }
+
     [Fact]
     public void GenerateCommand_InlineInQuotesSafeValue_KeepsThePatternsQuotesOnly()
     {
