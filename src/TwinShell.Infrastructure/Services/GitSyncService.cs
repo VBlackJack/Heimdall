@@ -134,9 +134,9 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         {
             _logger.LogWarning("Sync operation '{Operation}' blocked - another operation is in progress", operationName);
             return GitOperationResult.Fail(
-                "A sync operation is already in progress. Please wait for it to complete.",
+                L(MessageKeys.GitSyncResultBusy),
                 GitSyncErrorCode.Unknown,
-                "Concurrent sync operations are not allowed.");
+                L(MessageKeys.GitSyncResultBusyDetails));
         }
 
         // Create new cancellation token source for this operation
@@ -157,11 +157,11 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         catch (OperationCanceledException)
         {
             _logger.LogInformation("Sync operation '{Operation}' was cancelled", operationName);
-            RaiseStatusChanged("Operation cancelled", SyncPhase.Idle);
+            RaiseStatusChanged(L(MessageKeys.GitSyncResultCancelled), SyncPhase.Idle);
             return GitOperationResult.Fail(
-                "Operation was cancelled.",
+                L(MessageKeys.GitSyncResultCancelled),
                 GitSyncErrorCode.Cancelled,
-                "The sync operation was cancelled by user request.");
+                L(MessageKeys.GitSyncResultCancelledDetails));
         }
         finally
         {
@@ -403,7 +403,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         if (!IsConfigured)
         {
             var failResult = GitOperationResult.Fail(
-                L(MessageKeys.GitSyncNotConfigured),
+                L(MessageKeys.GitSyncResultNotConfigured),
                 GitSyncErrorCode.InvalidConfiguration);
             await LogSyncOperationAsync(failResult, SyncOperationType.Initialize, startedAt);
             return failResult;
@@ -418,9 +418,9 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         if (!IsValidRepositoryPath(localPath))
         {
             var failResult = GitOperationResult.Fail(
-                "Invalid repository path",
+                L(MessageKeys.GitSyncResultInvalidPath),
                 GitSyncErrorCode.InvalidConfiguration,
-                "Repository path contains invalid characters or path traversal attempts.");
+                L(MessageKeys.GitSyncResultInvalidPathDetails));
             await LogSyncOperationAsync(failResult, SyncOperationType.Initialize, startedAt);
             return failResult;
         }
@@ -428,7 +428,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         if (!GitUrlValidator.IsAllowed(remoteUrl, hasToken, out string remoteUrlReason))
         {
             GitOperationResult failResult = GitOperationResult.Fail(
-                "Invalid remote URL",
+                L(MessageKeys.GitSyncResultInvalidRemoteUrl),
                 GitSyncErrorCode.InvalidConfiguration,
                 remoteUrlReason);
             await LogSyncOperationAsync(failResult, SyncOperationType.Initialize, startedAt);
@@ -446,7 +446,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 if (Repository.IsValid(localPath))
                 {
                     RaiseStatusChanged(L(MessageKeys.GitSyncRepositoryInitialized), SyncPhase.Completed, 100);
-                    return GitOperationResult.Ok("Repository already exists and is valid.");
+                    return GitOperationResult.Ok(L(MessageKeys.GitSyncResultRepositoryReady));
                 }
                 else
                 {
@@ -455,9 +455,9 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                     {
                         RaiseStatusChanged(L(MessageKeys.GitSyncInvalidDirectory), SyncPhase.Failed);
                         return GitOperationResult.Fail(
-                            "Directory exists but is not a Git repository and is not empty.",
+                            L(MessageKeys.GitSyncResultDirectoryNotEmpty),
                             GitSyncErrorCode.InvalidConfiguration,
-                            "Please choose an empty directory or an existing Git repository.");
+                            L(MessageKeys.GitSyncResultDirectoryNotEmptyDetails));
                     }
                 }
             }
@@ -492,7 +492,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 "Repository cloned successfully from {RemoteUrl} to {LocalPath}",
                 GitUrlSanitizer.SanitizeForLogging(remoteUrl),
                 localPath);
-            var successResult = GitOperationResult.Ok(L(MessageKeys.GitSyncCloneSuccess));
+            var successResult = GitOperationResult.Ok(L(MessageKeys.GitSyncResultCloned));
             await LogSyncOperationAsync(successResult, SyncOperationType.Initialize, startedAt);
             return successResult;
         }
@@ -512,7 +512,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 ex,
                 "Failed to clone repository from {RemoteUrl}",
                 GitUrlSanitizer.SanitizeForLogging(remoteUrl));
-            var failResult = GitOperationResult.Fail("Failed to clone repository", errorCode, ex.Message);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultCloneFailed), errorCode, ex.Message);
             await LogSyncOperationAsync(failResult, SyncOperationType.Initialize, startedAt);
             return failResult;
         }
@@ -521,7 +521,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             var errorCode = MapExceptionToErrorCode(ex);
             RaiseStatusChanged(L(MessageKeys.GitSyncInitFailed), SyncPhase.Failed);
             _logger.LogError(ex, "Failed to initialize repository at {LocalPath}", localPath);
-            var failResult = GitOperationResult.Fail("Failed to initialize repository", errorCode, ex.Message);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultInitializeFailed), errorCode, ex.Message);
             await LogSyncOperationAsync(failResult, SyncOperationType.Initialize, startedAt);
             return failResult;
         }
@@ -539,7 +539,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
 
         if (!IsConfigured)
         {
-            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncNotConfigured), GitSyncErrorCode.InvalidConfiguration);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultNotConfigured), GitSyncErrorCode.InvalidConfiguration);
             await LogSyncOperationAsync(failResult, SyncOperationType.Pull, startedAt);
             return failResult;
         }
@@ -550,9 +550,9 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         if (!IsValidRepositoryPath(localPath))
         {
             var failResult = GitOperationResult.Fail(
-                "Invalid repository path",
+                L(MessageKeys.GitSyncResultInvalidPath),
                 GitSyncErrorCode.InvalidConfiguration,
-                "Repository path contains invalid characters or path traversal attempts.");
+                L(MessageKeys.GitSyncResultInvalidPathDetails));
             await LogSyncOperationAsync(failResult, SyncOperationType.Pull, startedAt);
             return failResult;
         }
@@ -660,7 +660,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                     SyncPhase.DetectingConflicts);
 
                 var conflictResult = GitOperationResult.WithMergeConflicts(
-                    $"Merge conflicts detected in {conflictedFiles.Count} file(s). Please resolve conflicts manually.",
+                    LF(MessageKeys.GitSyncResultMergeConflicts, conflictedFiles.Count),
                     conflictedFiles);
                 await LogSyncOperationAsync(conflictResult, SyncOperationType.Pull, startedAt);
                 return conflictResult;
@@ -700,7 +700,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 var successResult = new GitOperationResult
                 {
                     Success = true,
-                    Message = $"Pull completed. {commitsMerged} commits merged.",
+                    Message = LF(MessageKeys.GitSyncResultPullCompleted, commitsMerged),
                     ItemsImported = totalImported,
                     ItemsUpdated = importResult.TotalUpdated,
                     CommitsMerged = commitsMerged,
@@ -715,7 +715,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 RaiseStatusChanged(L(MessageKeys.GitSyncImportFailed), SyncPhase.Failed);
                 _logger.LogWarning("Pull succeeded but import failed: {Errors}", string.Join(", ", importResult.Errors));
                 var failResult = GitOperationResult.Fail(
-                    "Pull succeeded but import failed",
+                    L(MessageKeys.GitSyncResultImportFailed),
                     GitSyncErrorCode.ValidationError,
                     string.Join(", ", importResult.Errors));
                 await LogSyncOperationAsync(failResult, SyncOperationType.Pull, startedAt);
@@ -735,7 +735,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             var errorCode = MapExceptionToErrorCode(ex);
             RaiseStatusChanged(L(MessageKeys.GitSyncPullFailed), SyncPhase.Failed);
             _logger.LogError(ex, "Failed to pull changes from remote");
-            var failResult = GitOperationResult.Fail("Failed to pull changes", errorCode, ex.Message);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultPullFailed), errorCode, ex.Message);
             await LogSyncOperationAsync(failResult, SyncOperationType.Pull, startedAt);
             return failResult;
         }
@@ -744,7 +744,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             var errorCode = MapExceptionToErrorCode(ex);
             RaiseStatusChanged(L(MessageKeys.GitSyncSyncFailed), SyncPhase.Failed);
             _logger.LogError(ex, "Failed to sync repository");
-            var failResult = GitOperationResult.Fail("Failed to sync", errorCode, ex.Message);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultSyncFailed), errorCode, ex.Message);
             await LogSyncOperationAsync(failResult, SyncOperationType.Pull, startedAt);
             return failResult;
         }
@@ -762,7 +762,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
 
         if (!IsConfigured)
         {
-            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncNotConfigured), GitSyncErrorCode.InvalidConfiguration);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultNotConfigured), GitSyncErrorCode.InvalidConfiguration);
             await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
             return failResult;
         }
@@ -773,9 +773,9 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         if (!IsValidRepositoryPath(localPath))
         {
             var failResult = GitOperationResult.Fail(
-                "Invalid repository path",
+                L(MessageKeys.GitSyncResultInvalidPath),
                 GitSyncErrorCode.InvalidConfiguration,
-                "Repository path contains invalid characters or path traversal attempts.");
+                L(MessageKeys.GitSyncResultInvalidPathDetails));
             await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
             return failResult;
         }
@@ -783,7 +783,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         if (!Repository.IsValid(localPath))
         {
             var failResult = GitOperationResult.Fail(
-                L(MessageKeys.GitSyncRepositoryNotInitialized),
+                L(MessageKeys.GitSyncResultRepositoryNotInitialized),
                 GitSyncErrorCode.RepositoryNotInitialized);
             await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
             return failResult;
@@ -801,7 +801,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 RaiseStatusChanged(L(MessageKeys.GitSyncExportFailed), SyncPhase.Failed);
                 _logger.LogWarning("Failed to export data: {Errors}", string.Join(", ", exportResult.Errors));
                 var failResult = GitOperationResult.Fail(
-                    "Failed to export data",
+                    L(MessageKeys.GitSyncResultExportFailed),
                     GitSyncErrorCode.FileSystemError,
                     string.Join(", ", exportResult.Errors));
                 await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
@@ -833,7 +833,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 var noChangesResult = new GitOperationResult
                 {
                     Success = true,
-                    Message = "No changes to push. Everything is up to date.",
+                    Message = L(MessageKeys.GitSyncResultNothingToPush),
                     ItemsExported = exportResult.TotalExported
                 };
                 await LogSyncOperationAsync(noChangesResult, SyncOperationType.Push, startedAt);
@@ -882,7 +882,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             var successResult = new GitOperationResult
             {
                 Success = true,
-                Message = "Changes pushed successfully.",
+                Message = L(MessageKeys.GitSyncResultPushed),
                 ItemsExported = exportResult.TotalExported
             };
             await LogSyncOperationAsync(successResult, SyncOperationType.Push, startedAt);
@@ -901,9 +901,9 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             RaiseStatusChanged(L(MessageKeys.GitSyncPushRejected), SyncPhase.Failed);
             _logger.LogWarning(ex, "Push rejected - remote has changes that need to be pulled first");
             var failResult = GitOperationResult.Fail(
-                "Push rejected. Remote has changes that need to be pulled first.",
+                L(MessageKeys.GitSyncResultPushRejected),
                 GitSyncErrorCode.PushRejected,
-                "Please pull changes before pushing.");
+                L(MessageKeys.GitSyncResultPushRejectedDetails));
             await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
             return failResult;
         }
@@ -913,7 +913,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             RaiseStatusChanged(L(MessageKeys.GitSyncPushFailed), SyncPhase.Failed);
             _logger.LogError(ex, "Export succeeded but push failed");
             var failResult = GitOperationResult.Fail(
-                "Export succeeded but push failed. You can push manually with git push.",
+                L(MessageKeys.GitSyncResultPushFailed),
                 errorCode,
                 ex.Message);
             await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
@@ -924,7 +924,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             var errorCode = MapExceptionToErrorCode(ex);
             RaiseStatusChanged(L(MessageKeys.GitSyncPushFailed), SyncPhase.Failed);
             _logger.LogError(ex, "Failed to export and push");
-            var failResult = GitOperationResult.Fail($"Failed to export and push: {ex.GetType().Name}", errorCode, ex.Message);
+            var failResult = GitOperationResult.Fail(LF(MessageKeys.GitSyncResultExportAndPushFailed, ex.GetType().Name), errorCode, ex.Message);
             await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
             return failResult;
         }
@@ -959,8 +959,8 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             // Consider sync successful if pull succeeded, even if push had issues
             // (push failures are usually credential issues, not data issues)
             var message = pushResult.Success
-                ? $"Sync complete. {pullResult.ItemsImported} imported, {pushResult.ItemsExported} exported."
-                : $"Sync complete. {pullResult.ItemsImported} imported, {pushResult.ItemsExported} exported. Push failed: {pushResult.ErrorDetails}";
+                ? LF(MessageKeys.GitSyncResultSyncComplete, pullResult.ItemsImported, pushResult.ItemsExported)
+                : LF(MessageKeys.GitSyncResultSyncCompletePushFailed, pullResult.ItemsImported, pushResult.ItemsExported, pushResult.ErrorDetails ?? string.Empty);
 
             _logger.LogInformation(
                 "Full sync completed: {Imported} imported, {Exported} exported, {Merged} commits merged, push success: {PushSuccess}",
@@ -1012,7 +1012,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
 
         if (string.IsNullOrWhiteSpace(candidateUrl))
         {
-            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncNotConfigured), GitSyncErrorCode.InvalidConfiguration);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultNotConfigured), GitSyncErrorCode.InvalidConfiguration);
             await LogSyncOperationAsync(failResult, SyncOperationType.TestConnection, startedAt);
             return failResult;
         }
@@ -1022,7 +1022,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         if (!GitUrlValidator.IsAllowed(remoteUrl, hasToken, out string remoteUrlReason))
         {
             GitOperationResult failResult = GitOperationResult.Fail(
-                "Invalid remote URL",
+                L(MessageKeys.GitSyncResultInvalidRemoteUrl),
                 GitSyncErrorCode.InvalidConfiguration,
                 remoteUrlReason);
             await LogSyncOperationAsync(failResult, SyncOperationType.TestConnection, startedAt);
@@ -1054,7 +1054,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 && !referenceNames.Contains(BranchReferencePrefix + branch.Trim(), StringComparer.Ordinal))
             {
                 GitOperationResult branchResult = GitOperationResult.Fail(
-                    "Branch not found on the remote repository",
+                    L(MessageKeys.GitSyncResultBranchNotFound),
                     GitSyncErrorCode.BranchNotFound,
                     branch.Trim());
                 await LogSyncOperationAsync(branchResult, SyncOperationType.TestConnection, startedAt);
@@ -1065,7 +1065,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             _logger.LogInformation(
                 "Connection test successful for {RemoteUrl}",
                 GitUrlSanitizer.SanitizeForLogging(remoteUrl));
-            var successResult = GitOperationResult.Ok("Connection to remote repository successful.");
+            var successResult = GitOperationResult.Ok(L(MessageKeys.GitSyncResultConnected));
             await LogSyncOperationAsync(successResult, SyncOperationType.TestConnection, startedAt);
             return successResult;
         }
@@ -1081,7 +1081,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 ex,
                 "Failed to connect to remote repository {RemoteUrl}",
                 GitUrlSanitizer.SanitizeForLogging(remoteUrl));
-            var failResult = GitOperationResult.Fail("Failed to connect to remote repository", errorCode, ex.Message);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultConnectFailed), errorCode, ex.Message);
             await LogSyncOperationAsync(failResult, SyncOperationType.TestConnection, startedAt);
             return failResult;
         }
@@ -1093,7 +1093,7 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 ex,
                 "Connection test failed for {RemoteUrl}",
                 GitUrlSanitizer.SanitizeForLogging(remoteUrl));
-            var failResult = GitOperationResult.Fail("Connection test failed", errorCode, ex.Message);
+            var failResult = GitOperationResult.Fail(L(MessageKeys.GitSyncResultConnectionTestFailed), errorCode, ex.Message);
             await LogSyncOperationAsync(failResult, SyncOperationType.TestConnection, startedAt);
             return failResult;
         }
