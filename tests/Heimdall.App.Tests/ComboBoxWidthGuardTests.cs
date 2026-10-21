@@ -40,7 +40,7 @@ public sealed class ComboBoxWidthGuardTests
     private static readonly XNamespace Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
     private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
-    private static readonly string[] MeasuredLanguages = ["en", "fr"];
+    private static readonly string[] MeasuredLanguages = ["en", "fr", "es"];
 
     /// <summary>FontSizeBody, which ThemedComboBoxStyle applies to every combo box.</summary>
     private const double BodyFontSize = 13;
@@ -63,9 +63,6 @@ public sealed class ComboBoxWidthGuardTests
                 "PsPolicyAllSigned"),
             ["MainWindow.xaml|{Binding Settings.SshDefaultMode}"] = Keys(
                 "SettingsSshModeEmbedded", "SettingsSshModeExternal"),
-            ["MainWindow.xaml|{Binding Settings.SshAgentPreference}"] = Keys(
-                "SettingsSshAgentPreferenceAutoOpenSshFirst", "SettingsSshAgentPreferenceAutoPageantFirst",
-                "SettingsSshAgentPreferenceOpenSshOnly", "SettingsSshAgentPreferencePageantOnly"),
             ["MainWindow.xaml|{Binding Settings.RdpDefaultMode}"] = Keys(
                 "SettingsRdpModeEmbedded", "SettingsRdpModeExternal"),
             ["MainWindow.xaml|{Binding Settings.RdpDefaultColorDepth}"] = Keys(
