@@ -1,0 +1,60 @@
+{
+  "id": "smb-list-open-files",
+  "title": "List the files open over SMB",
+  "description": "Show the files that clients hold open on the file server, with the user and the client.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "smb",
+    "open-file",
+    "smbshare",
+    "file-server",
+    "lock",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "smb-list-open-files-cmd",
+  "windowsCommandTemplate": {
+    "id": "smb-list-open-files-cmd",
+    "platform": 0,
+    "name": "Get-SmbOpenFile",
+    "commandPattern": "Get-SmbOpenFile | Select-Object ClientComputerName,ClientUserName,Path,ShareRelativePath | Format-Table -AutoSize",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-SmbOpenFile -ClientUserName 'CONTOSO\\jdupont'",
+      "description": "Show the files one user holds open",
+      "platform": 0
+    },
+    {
+      "command": "Get-SmbOpenFile | Where-Object Path -like 'D:\\Shares\\Finance\\*'",
+      "description": "Find who holds a file open in one folder",
+      "platform": 0
+    },
+    {
+      "command": "Get-SmbOpenFile -CimSession FS01 | Measure-Object",
+      "description": "Count the open files of a remote file server",
+      "platform": 0
+    }
+  ],
+  "notes": "Run it on the file server, or add -CimSession to query one remotely. Requires administrator rights.",
+  "links": [
+    {
+      "title": "Get-SmbOpenFile documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/smbshare/get-smbopenfile"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les fichiers ouverts en SMB",
+      "description": "Affiche les fichiers que des clients gardent ouverts sur le serveur de fichiers, avec l'utilisateur et le client.",
+      "notes": "À lancer sur le serveur de fichiers, ou ajoutez -CimSession pour en interroger un à distance. Nécessite des droits administrateur.",
+      "examples": {
+        "Get-SmbOpenFile -ClientUserName 'CONTOSO\\jdupont'": "Affiche les fichiers qu'un utilisateur garde ouverts",
+        "Get-SmbOpenFile | Where-Object Path -like 'D:\\Shares\\Finance\\*'": "Trouve qui garde un fichier ouvert dans un dossier",
+        "Get-SmbOpenFile -CimSession FS01 | Measure-Object": "Compte les fichiers ouverts d'un serveur de fichiers distant"
+      }
+    }
+  }
+}

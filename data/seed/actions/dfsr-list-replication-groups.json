@@ -1,0 +1,65 @@
+{
+  "id": "dfsr-list-replication-groups",
+  "title": "List the DFS replication groups",
+  "description": "Show the DFS Replication groups of the domain with their state.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "dfs",
+    "dfsr",
+    "replication",
+    "group",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "dfsr-list-replication-groups-cmd",
+  "windowsCommandTemplate": {
+    "id": "dfsr-list-replication-groups-cmd",
+    "platform": 0,
+    "name": "Get-DfsReplicationGroup",
+    "commandPattern": "Get-DfsReplicationGroup | Select-Object GroupName,State,Description | Format-Table -AutoSize",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-DfsReplicationGroup -DomainName contoso.com",
+      "description": "Show the groups of another domain",
+      "platform": 0
+    },
+    {
+      "command": "Get-DfsReplicatedFolder -GroupName BranchData",
+      "description": "List the folders one group replicates",
+      "platform": 0
+    },
+    {
+      "command": "Get-DfsrMember -GroupName BranchData",
+      "description": "List the servers that belong to one group",
+      "platform": 0
+    },
+    {
+      "command": "Get-DfsrConnection -GroupName BranchData",
+      "description": "Show the replication connections of one group",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the DFSR module (RSAT DFS Management tools). Without -DomainName the current domain is read.",
+  "links": [
+    {
+      "title": "Get-DfsReplicationGroup documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/dfsr/get-dfsreplicationgroup"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les groupes de réplication DFS",
+      "description": "Affiche les groupes de réplication DFS du domaine avec leur état.",
+      "notes": "Nécessite le module DFSR (outils RSAT de gestion DFS). Sans -DomainName, le domaine courant est lu.",
+      "examples": {
+        "Get-DfsReplicationGroup -DomainName contoso.com": "Affiche les groupes d'un autre domaine",
+        "Get-DfsReplicatedFolder -GroupName BranchData": "Liste les dossiers qu'un groupe réplique",
+        "Get-DfsrMember -GroupName BranchData": "Liste les serveurs membres d'un groupe",
+        "Get-DfsrConnection -GroupName BranchData": "Affiche les connexions de réplication d'un groupe"
+      }
+    }
+  }
+}
