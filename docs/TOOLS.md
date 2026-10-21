@@ -417,6 +417,8 @@ Key user flows:
 - import/export in TwinShell-compatible JSON
 - Git sync through `IGitSyncService`
 - Send to Terminal through `ToolContext.SendCommandAction`
+- runbooks: ordered library steps or literal commands, stored as TwinShell
+  command batches and run one step at a time into the session's terminal
 
 System seed actions are protected: edit/delete actions are hidden for
 non-user-created commands, and import merge skips system actions.
@@ -453,6 +455,15 @@ non-user-created commands, and import merge skips system actions.
 - `src/Heimdall.App/Views/Tools/CommandLibraryView.xaml.cs`: Command Library
   tool view.
 - `src/Heimdall.App/ViewModels/CommandLibraryViewModel*.cs`: Command Library
-  view-model slices.
+  view-model slices; `.Runbooks.cs` holds the Runbooks panel and its store
+  operations, `.RunbookRun.cs` starts a run and wires it to the terminal.
+- `src/Heimdall.App/ViewModels/CommandLibrary/RunbookRunViewModel.cs`: one
+  runbook run, step by step, with its statuses and history records.
+- `src/Heimdall.App/ViewModels/CommandLibrary/RunbookVariables.cs`: the
+  `{{name}}` substitution in runbook step values.
+- `src/Heimdall.App/ViewModels/Dialogs/RunbookDialogViewModel.cs` and
+  `src/Heimdall.App/Views/Dialogs/RunbookDialog.xaml`: the runbook editor.
+- `src/TwinShell.Core/Models/CommandBatch.cs` and `BatchCommandItem.cs`: the
+  runbook model, stored by `BatchService` and `BatchRepository`.
 - `data/seed/actions/`: command library seed actions.
 - `data/packs/`: optional command library packs, imported by the operator.
