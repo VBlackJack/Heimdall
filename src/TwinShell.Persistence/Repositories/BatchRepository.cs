@@ -76,8 +76,9 @@ public sealed class BatchRepository : IBatchRepository
         existingEntity.Name = batch.Name;
         existingEntity.Description = batch.Description;
         existingEntity.ExecutionMode = batch.ExecutionMode;
-        existingEntity.CommandsJson = System.Text.Json.JsonSerializer.Serialize(batch.Commands);
-        existingEntity.TagsJson = System.Text.Json.JsonSerializer.Serialize(batch.Tags);
+        existingEntity.CommandsJson = CommandBatchMapper.SerializeCommands(batch.Commands);
+        existingEntity.TagsJson = CommandBatchMapper.SerializeTags(batch.Tags);
+        existingEntity.VariablesJson = CommandBatchMapper.SerializeVariables(batch.Variables);
         existingEntity.LastExecutedAt = batch.LastExecutedAt;
         existingEntity.UpdatedAt = DateTime.UtcNow;
 

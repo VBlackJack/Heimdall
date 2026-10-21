@@ -102,6 +102,7 @@ internal static class TwinShellBootstrapper
         services.AddScoped<ICommandGeneratorService, CommandGeneratorService>();
         services.AddScoped<ICommandHistoryService, CommandHistoryService>();
         services.AddScoped<IFavoritesService, FavoritesService>();
+        services.AddScoped<IBatchService, BatchService>();
 
         // Git Sync services (from TwinShell.Infrastructure)
         services.AddScoped<ISyncService, JsonSyncService>();

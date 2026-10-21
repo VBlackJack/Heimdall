@@ -47,6 +47,11 @@ public sealed class BatchService : IBatchService
         return await _repository.GetByIdAsync(id).ConfigureAwait(false);
     }
 
+    public async Task<CommandBatch?> GetBatchByPublicIdAsync(Guid publicId)
+    {
+        return await _repository.GetByPublicIdAsync(publicId).ConfigureAwait(false);
+    }
+
     public async Task<CommandBatch> CreateBatchAsync(CommandBatch batch)
     {
         batch.Id = Guid.NewGuid().ToString();
@@ -74,7 +79,8 @@ public sealed class BatchService : IBatchService
     {
         batch.UpdatedAt = DateTime.UtcNow;
 
-        // Ensure order is correct
+        // The list position is the order the caller gave the steps; the stored Order is what
+        // a reload sorts by, so it is renumbered here rather than trusted from the caller.
         for (int i = 0; i < batch.Commands.Count; i++)
         {
             batch.Commands[i].Order = i;

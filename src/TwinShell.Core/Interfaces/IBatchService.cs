@@ -37,6 +37,13 @@ public interface IBatchService
     Task<CommandBatch?> GetBatchByIdAsync(string id);
 
     /// <summary>
+    /// Gets a batch by its public ID, the identity an export carries across installations
+    /// </summary>
+    /// <param name="publicId">Public ID</param>
+    /// <returns>The batch, or null if not found</returns>
+    Task<CommandBatch?> GetBatchByPublicIdAsync(Guid publicId);
+
+    /// <summary>
     /// Creates a new batch
     /// </summary>
     /// <param name="batch">The batch to create</param>
