@@ -574,7 +574,7 @@
                                                         ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                         FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
-                                                        Padding="2" VerticalAlignment="Top"
+                                                        Padding="{StaticResource SpacingXxs}" VerticalAlignment="Top"
                                                         Focusable="False"/>
                                             </Grid>
                                         </Border>
@@ -883,7 +883,7 @@
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryReplay}"
                                         Style="{DynamicResource GhostButtonStyle}"
                                         FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
-                                        Padding="2" VerticalAlignment="Center"
+                                        Padding="{StaticResource SpacingXxs}" VerticalAlignment="Center"
                                         Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <Button DockPanel.Dock="Right"
                                         Content="&#xE8C8;" FontFamily="{StaticResource FontFamilyIcons}"
@@ -894,7 +894,7 @@
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopy}"
                                         Style="{DynamicResource GhostButtonStyle}"
                                         FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
-                                        Padding="2" VerticalAlignment="Center"
+                                        Padding="{StaticResource SpacingXxs}" VerticalAlignment="Center"
                                         Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <TextBlock DockPanel.Dock="Right"
                                            Text="{Binding Timestamp}"

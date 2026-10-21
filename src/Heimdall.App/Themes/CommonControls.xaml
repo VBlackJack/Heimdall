@@ -23,9 +23,12 @@
     <sys:Double x:Key="FontSizeHero">64</sys:Double>
 
     <!-- Design Tokens: Spacing                                    -->
+    <!-- The scale is 2 4 8 12 16 20 24. -->
+    <Thickness x:Key="SpacingXxs">2</Thickness>
     <Thickness x:Key="SpacingXs">4</Thickness>
     <Thickness x:Key="SpacingSm">8</Thickness>
     <Thickness x:Key="SpacingMd">12</Thickness>
+    <Thickness x:Key="SpacingMl">16</Thickness>
     <Thickness x:Key="SpacingLg">20</Thickness>
     <Thickness x:Key="SpacingXl">24</Thickness>
 
@@ -241,7 +244,7 @@
         <Setter Property="Control.Template">
             <Setter.Value>
                 <ControlTemplate>
-                    <Rectangle Margin="2"
+                    <Rectangle Margin="{StaticResource SpacingXxs}"
                                StrokeThickness="2"
                                Stroke="{DynamicResource AccentBrush}"
                                SnapsToDevicePixels="True"
@@ -796,7 +799,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Thumb}">
                     <Border x:Name="ThumbBorder"
-                            Margin="2"
+                            Margin="{StaticResource SpacingXxs}"
                             Background="{TemplateBinding Background}"
                             CornerRadius="{StaticResource CornerRadiusSm}"
                             SnapsToDevicePixels="True"/>
@@ -1282,7 +1285,7 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="{StaticResource CornerRadiusMd}"
-                                Padding="2"
+                                Padding="{StaticResource SpacingXxs}"
                                 ClipToBounds="True"
                                 SnapsToDevicePixels="True">
                             <TabPanel x:Name="HeaderPanel"
@@ -1871,7 +1874,7 @@
                                     VerticalAlignment="Center">
                                 <Grid>
                                     <Path x:Name="CheckGlyph"
-                                          Margin="2"
+                                          Margin="{StaticResource SpacingXxs}"
                                           Data="M 2 8 L 6 12 L 14 3"
                                           Stroke="{DynamicResource TextOnAccentBrush}"
                                           StrokeThickness="2"
