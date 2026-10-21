@@ -18,6 +18,7 @@ using System.Globalization;
 using FluentAssertions;
 using TwinShell.Core.Constants;
 using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
 using TwinShell.Core.Models;
 using TwinShell.Core.Services;
 
@@ -180,6 +181,31 @@ public sealed class CommandGeneratorValueShapingTests
         var generate = () => service.GenerateCommand(template, Values(("v", value)));
         generate.Should().Throw<InvalidOperationException>()
             .WithMessage(MessageKeys.ValidationParameterDangerousCharacters);
+    }
+
+    /// <summary>
+    /// <c>${msg}</c> is a variable in bash and in PowerShell, so a value substituted there
+    /// is read by the shell, not taken literally: the lexer used to class it Bare and the
+    /// generator then dropped the metacharacter blacklist.
+    /// </summary>
+    [Theory]
+    [InlineData(Platform.Linux)]
+    [InlineData(Platform.Windows)]
+    public void DollarBracePlaceholder_KeepsTheBlacklist(Platform platform)
+    {
+        var template = Template(platform, "echo ${msg}", CommandLibraryTestHelpers.RequiredParameter("msg", "Message"));
+
+        CommandPatternQuoting.GetPlaceholderQuoteContexts(template.CommandPattern, "msg", platform == Platform.Windows)
+            .Should().Equal(CommandPatternQuoting.QuoteContext.Expanding);
+        CreateService().ValidateParameters(template, Values(("msg", "a;b")), out var errors).Should().BeFalse();
+        errors.Should().Equal(MessageKeys.ValidationParameterDangerousCharacters);
+    }
+
+    [Fact]
+    public void EscapedDollarBeforePlaceholder_StaysBare()
+    {
+        CommandPatternQuoting.GetPlaceholderQuoteContexts("echo \\${msg}", "msg", powerShell: false)
+            .Should().Equal(CommandPatternQuoting.QuoteContext.Bare);
     }
 
     internal static CommandGeneratorService CreateService() =>

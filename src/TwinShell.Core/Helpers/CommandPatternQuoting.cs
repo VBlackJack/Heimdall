@@ -227,12 +227,18 @@ public static class CommandPatternQuoting
         var state = LexerState.Bare;
         int index = 0;
 
+        // Where the last unescaped dollar sign outside quotes stood: a placeholder right
+        // after it is ${name}, which both bash and PowerShell read as a variable, so the
+        // value is not literal there whatever quoting it gets.
+        int bareDollarIndex = -1;
+
         while (index < commandPattern.Length)
         {
             if (string.CompareOrdinal(commandPattern, index, placeholder, 0, placeholder.Length) == 0)
             {
                 contexts.Add(state switch
                 {
+                    LexerState.Bare when bareDollarIndex == index - 1 => QuoteContext.Expanding,
                     LexerState.Bare => QuoteContext.Bare,
                     LexerState.Single => QuoteContext.SingleQuoted,
                     _ => QuoteContext.Expanding,
@@ -249,6 +255,11 @@ public static class CommandPatternQuoting
                     {
                         index += 2;
                         continue;
+                    }
+
+                    if (c == '$')
+                    {
+                        bareDollarIndex = index;
                     }
 
                     if (!powerShell && c == '$' && index + 1 < commandPattern.Length && commandPattern[index + 1] == '\'')
