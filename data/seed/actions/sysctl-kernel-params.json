@@ -22,10 +22,18 @@
       {
         "name": "parameter",
         "label": "Parameter",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "-a",
+          "vm.swappiness",
+          "net.ipv4.ip_forward",
+          "fs.file-max",
+          "net.core.somaxconn",
+          "kernel.hostname"
+        ],
         "defaultValue": "-a",
         "required": true,
-        "description": "Parameter to show (-a for all, or a name such as vm.swappiness)"
+        "description": "Parameter to show: -a for all, or one of the common names (any other name is in the examples)"
       }
     ]
   },
@@ -82,7 +90,7 @@
         "linux": {
           "parameter": {
             "label": "Paramètre",
-            "description": "Paramètre à afficher (-a pour tous, ou un nom comme vm.swappiness)"
+            "description": "Paramètre à afficher : -a pour tous, ou l'un des noms courants (les autres noms figurent dans les exemples)"
           }
         }
       },

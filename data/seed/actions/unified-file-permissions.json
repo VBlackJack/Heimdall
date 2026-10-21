@@ -99,8 +99,8 @@
       "platform": 1
     },
     {
-      "command": "chmod -R 644 /var/www/html",
-      "description": "Set the permissions recursively",
+      "command": "sudo find /var/www/html -type f -exec chmod 644 {} +",
+      "description": "Set 644 on the files only, recursively, so the directories keep their execute bit",
       "platform": 1
     },
     {
@@ -170,7 +170,7 @@
         "icacls \"C:\\Data\" /grant Users:M": "Donne les droits de modification aux Users",
         "icacls \"C:\\Data\" /grant Administrators:F /T": "Donne le contrôle total récursivement",
         "chmod 755 script.sh": "Rend un script exécutable (rwxr-xr-x)",
-        "chmod -R 644 /var/www/html": "Définit les permissions récursivement",
+        "sudo find /var/www/html -type f -exec chmod 644 {} +": "Applique 644 aux seuls fichiers, récursivement, pour que les répertoires gardent leur droit d'exécution",
         "chmod u+x file.sh": "Ajoute l'exécution pour le propriétaire",
         "chmod +x script.sh": "Rend un script exécutable",
         "chmod -R 755 /var/www/html": "Applique les droits web standards (755) récursivement (-R)",

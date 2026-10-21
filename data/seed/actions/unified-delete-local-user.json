@@ -25,10 +25,14 @@
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "-r",
+          "-f"
+        ],
         "defaultValue": "-r",
         "required": false,
-        "description": "Options (-r also deletes the home directory)"
+        "description": "-r also deletes the home directory and the mail spool, -f forces the deletion even when the user is logged in"
       },
       {
         "name": "username",
@@ -133,7 +137,7 @@
         "linux": {
           "options": {
             "label": "Options",
-            "description": "Options (-r supprime aussi le home)"
+            "description": "-r supprime aussi le répertoire personnel et la boîte mail, -f force la suppression même si l'utilisateur est connecté"
           },
           "username": {
             "label": "Nom d'utilisateur",

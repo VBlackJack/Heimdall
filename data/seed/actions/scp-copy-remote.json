@@ -22,10 +22,16 @@
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "-r",
+          "-p",
+          "-rp",
+          "-C"
+        ],
         "defaultValue": "-r",
         "required": false,
-        "description": "Options (-r=recursive, -P=port, -i=SSH key)"
+        "description": "-r = recursive, -p = keep times and modes, -rp = both, -C = compress (port and key options are in the examples)"
       },
       {
         "name": "source",
@@ -103,7 +109,7 @@
         "linux": {
           "options": {
             "label": "Options",
-            "description": "Options (-r=récursif, -P=port, -i=clé SSH)"
+            "description": "-r = récursif, -p = conserve dates et droits, -rp = les deux, -C = compression (les options de port et de clé figurent dans les exemples)"
           },
           "source": {
             "label": "Source",

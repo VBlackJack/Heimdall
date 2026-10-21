@@ -22,10 +22,17 @@
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "-u",
+          "-r",
+          "-b",
+          "-q",
+          "-d"
+        ],
         "defaultValue": "-u",
         "required": true,
-        "description": "Statistics type (-u=CPU, -r=RAM, -b=IO, -n DEV=network)"
+        "description": "Statistics type: -u = CPU, -r = memory, -b = I/O, -q = load average, -d = block devices (network with -n DEV is in the examples)"
       },
       {
         "name": "interval",
@@ -98,7 +105,7 @@
         "linux": {
           "options": {
             "label": "Options",
-            "description": "Type de stats (-u=CPU, -r=RAM, -b=IO, -n DEV=réseau)"
+            "description": "Type de statistiques : -u = CPU, -r = mémoire, -b = E/S, -q = charge moyenne, -d = périphériques bloc (le réseau avec -n DEV figure dans les exemples)"
           },
           "interval": {
             "label": "Intervalle",
