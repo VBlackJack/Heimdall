@@ -135,7 +135,7 @@
                                Text="{loc:Translate ToolTunnelRouteVia}"
                                VerticalAlignment="Center" />
                     <ComboBox x:Name="CmbRouteVia"
-                              Width="240"
+                              MinWidth="240"
                               Background="{DynamicResource CardBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
