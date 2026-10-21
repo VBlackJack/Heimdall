@@ -1,0 +1,65 @@
+{
+  "id": "dfsn-list-roots",
+  "title": "List the DFS namespaces",
+  "description": "Show the DFS namespace roots with their type and state.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "dfs",
+    "dfsn",
+    "namespace",
+    "share",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "dfsn-list-roots-cmd",
+  "windowsCommandTemplate": {
+    "id": "dfsn-list-roots-cmd",
+    "platform": 0,
+    "name": "Get-DfsnRoot",
+    "commandPattern": "Get-DfsnRoot | Select-Object Path,Type,State,Description | Format-Table -AutoSize",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-DfsnRoot -Domain contoso.com",
+      "description": "Show the namespaces of the contoso.com domain",
+      "platform": 0
+    },
+    {
+      "command": "Get-DfsnRoot -ComputerName FS01",
+      "description": "Show the namespaces hosted by the server FS01",
+      "platform": 0
+    },
+    {
+      "command": "Get-DfsnRootTarget -Path '\\\\contoso.com\\Public'",
+      "description": "Show the servers that host one namespace",
+      "platform": 0
+    },
+    {
+      "command": "Get-DfsnFolder -Path '\\\\contoso.com\\Public\\*'",
+      "description": "List the folders of one namespace",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the DFSN module (RSAT DFS Management tools).",
+  "links": [
+    {
+      "title": "Get-DfsnRoot documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/dfsn/get-dfsnroot"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les espaces de noms DFS",
+      "description": "Affiche les racines d'espaces de noms DFS avec leur type et leur état.",
+      "notes": "Nécessite le module DFSN (outils RSAT de gestion DFS).",
+      "examples": {
+        "Get-DfsnRoot -Domain contoso.com": "Affiche les espaces de noms du domaine contoso.com",
+        "Get-DfsnRoot -ComputerName FS01": "Affiche les espaces de noms hébergés par le serveur FS01",
+        "Get-DfsnRootTarget -Path '\\\\contoso.com\\Public'": "Affiche les serveurs qui hébergent un espace de noms",
+        "Get-DfsnFolder -Path '\\\\contoso.com\\Public\\*'": "Liste les dossiers d'un espace de noms"
+      }
+    }
+  }
+}

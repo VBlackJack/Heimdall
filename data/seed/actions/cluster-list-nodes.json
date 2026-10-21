@@ -1,0 +1,76 @@
+{
+  "id": "cluster-list-nodes",
+  "title": "List the cluster nodes",
+  "description": "Show the nodes of a failover cluster with their state and quorum vote.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "cluster",
+    "node",
+    "failoverclusters",
+    "high-availability",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "cluster-list-nodes-cmd",
+  "windowsCommandTemplate": {
+    "id": "cluster-list-nodes-cmd",
+    "platform": 0,
+    "name": "Get-ClusterNode",
+    "commandPattern": "Get-ClusterNode -Cluster {clusterName} | Select-Object Name,State,NodeWeight,DynamicWeight | Format-Table -AutoSize",
+    "parameters": [
+      {
+        "name": "clusterName",
+        "label": "Cluster",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the failover cluster"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-ClusterNode -Cluster CLU01",
+      "description": "Show the nodes of CLU01",
+      "platform": 0
+    },
+    {
+      "command": "Get-ClusterNode -Cluster CLU01 | Where-Object State -ne 'Up'",
+      "description": "Find the nodes that are down or paused",
+      "platform": 0
+    },
+    {
+      "command": "Get-ClusterNode -Cluster CLU01 -Name NODE02 | Format-List *",
+      "description": "Show every property of one node",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the FailoverClusters module (RSAT Failover Clustering tools) and administrator rights on the cluster.",
+  "links": [
+    {
+      "title": "Get-ClusterNode documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/failoverclusters/get-clusternode"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les noeuds du cluster",
+      "description": "Affiche les noeuds d'un cluster de basculement avec leur état et leur vote de quorum.",
+      "notes": "Nécessite le module FailoverClusters (outils RSAT Clustering de basculement) et des droits administrateur sur le cluster.",
+      "parameters": {
+        "windows": {
+          "clusterName": {
+            "label": "Cluster",
+            "description": "Nom du cluster de basculement"
+          }
+        }
+      },
+      "examples": {
+        "Get-ClusterNode -Cluster CLU01": "Affiche les noeuds de CLU01",
+        "Get-ClusterNode -Cluster CLU01 | Where-Object State -ne 'Up'": "Trouve les noeuds arrêtés ou suspendus",
+        "Get-ClusterNode -Cluster CLU01 -Name NODE02 | Format-List *": "Affiche toutes les propriétés d'un noeud"
+      }
+    }
+  }
+}

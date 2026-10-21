@@ -1,0 +1,82 @@
+{
+  "id": "winrm-test-wsman",
+  "title": "Test WinRM on a computer",
+  "description": "Check that the WinRM service of a computer answers WS-Management requests.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "winrm",
+    "wsman",
+    "remoting",
+    "powershell",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "winrm-test-wsman-cmd",
+  "windowsCommandTemplate": {
+    "id": "winrm-test-wsman-cmd",
+    "platform": 0,
+    "name": "Test-WSMan",
+    "commandPattern": "Test-WSMan -ComputerName {computerName}",
+    "parameters": [
+      {
+        "name": "computerName",
+        "label": "Computer name",
+        "type": "hostname",
+        "defaultValue": "localhost",
+        "required": true,
+        "description": "Computer to query (localhost for this one)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Test-WSMan -ComputerName SRV-APP01",
+      "description": "Check that WinRM answers on SRV-APP01",
+      "platform": 0
+    },
+    {
+      "command": "Test-WSMan -ComputerName SRV-APP01 -Authentication Default",
+      "description": "Authenticate with the current credentials, which also returns the remote OS version",
+      "platform": 0
+    },
+    {
+      "command": "Test-WSMan -ComputerName SRV-APP01 -UseSSL",
+      "description": "Check the HTTPS listener (port 5986)",
+      "platform": 0
+    },
+    {
+      "command": "Test-WSMan",
+      "description": "Check the WinRM service of this computer",
+      "platform": 0
+    }
+  ],
+  "notes": "Needs no administrator rights. Without -Authentication the request is anonymous and only proves that the service answers.",
+  "links": [
+    {
+      "title": "Test-WSMan documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.wsman.management/test-wsman"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester WinRM sur un ordinateur",
+      "description": "Vérifie que le service WinRM d'un ordinateur répond aux requêtes WS-Management.",
+      "notes": "Ne nécessite pas de droits administrateur. Sans -Authentication, la requête est anonyme et prouve seulement que le service répond.",
+      "parameters": {
+        "windows": {
+          "computerName": {
+            "label": "Nom de l'ordinateur",
+            "description": "Ordinateur à interroger (localhost pour celui-ci)"
+          }
+        }
+      },
+      "examples": {
+        "Test-WSMan -ComputerName SRV-APP01": "Vérifie que WinRM répond sur SRV-APP01",
+        "Test-WSMan -ComputerName SRV-APP01 -Authentication Default": "S'authentifie avec les identifiants courants, ce qui renvoie aussi la version du système distant",
+        "Test-WSMan -ComputerName SRV-APP01 -UseSSL": "Vérifie l'écouteur HTTPS (port 5986)",
+        "Test-WSMan": "Vérifie le service WinRM de cet ordinateur"
+      }
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "id": "virsh-start-vm",
+  "title": "Start a KVM virtual machine",
+  "description": "Start a libvirt virtual machine that is shut off.",
+  "category": "containers-vms",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "virsh",
+    "libvirt",
+    "kvm",
+    "linux",
+    "vm",
+    "start"
+  ],
+  "linuxCommandTemplateId": "virsh-start-vm-cmd",
+  "linuxCommandTemplate": {
+    "id": "virsh-start-vm-cmd",
+    "platform": 1,
+    "name": "virsh",
+    "commandPattern": "sudo virsh start {domain}",
+    "parameters": [
+      {
+        "name": "domain",
+        "label": "Virtual machine",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name or UUID of the libvirt domain"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo virsh start web01",
+      "description": "Start web01",
+      "platform": 1
+    },
+    {
+      "command": "sudo virsh autostart web01",
+      "description": "Start web01 with the host from now on",
+      "platform": 1
+    },
+    {
+      "command": "sudo virsh resume web01",
+      "description": "Resume a paused machine",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo or membership of the libvirt group.",
+  "links": [
+    {
+      "title": "virsh manual",
+      "url": "https://www.libvirt.org/manpages/virsh.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Démarrer une machine virtuelle KVM",
+      "description": "Démarre une machine virtuelle libvirt arrêtée.",
+      "notes": "Nécessite sudo ou l'appartenance au groupe libvirt.",
+      "parameters": {
+        "linux": {
+          "domain": {
+            "label": "Machine virtuelle",
+            "description": "Nom ou UUID du domaine libvirt"
+          }
+        }
+      },
+      "examples": {
+        "sudo virsh start web01": "Démarre web01",
+        "sudo virsh autostart web01": "Démarre désormais web01 avec l'hôte",
+        "sudo virsh resume web01": "Reprend une machine en pause"
+      }
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "id": "nmcli-show-devices",
+  "title": "Show the network devices of NetworkManager",
+  "description": "Show each network device NetworkManager knows, with its type, state and active connection.",
+  "category": "network-dns",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "nmcli",
+    "networkmanager",
+    "linux",
+    "network",
+    "interface"
+  ],
+  "linuxCommandTemplateId": "nmcli-show-devices-cmd",
+  "linuxCommandTemplate": {
+    "id": "nmcli-show-devices-cmd",
+    "platform": 1,
+    "name": "nmcli",
+    "commandPattern": "nmcli device status",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "nmcli device status",
+      "description": "Show the state of every device",
+      "platform": 1
+    },
+    {
+      "command": "nmcli device show eth0",
+      "description": "Show the addresses, gateway and DNS of one device",
+      "platform": 1
+    },
+    {
+      "command": "nmcli general status",
+      "description": "Show the overall NetworkManager state",
+      "platform": 1
+    },
+    {
+      "command": "sudo nmcli device reapply eth0",
+      "description": "Apply a changed connection to a device without taking it down",
+      "platform": 1
+    }
+  ],
+  "notes": "Reading needs no special rights. Hosts without NetworkManager (systemd-networkd, ifupdown) need ip instead.",
+  "links": [
+    {
+      "title": "nmcli(1)",
+      "url": "https://networkmanager.dev/docs/api/latest/nmcli.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les périphériques réseau de NetworkManager",
+      "description": "Affiche chaque périphérique réseau connu de NetworkManager, avec son type, son état et sa connexion active.",
+      "notes": "La lecture ne demande aucun droit particulier. Les hôtes sans NetworkManager (systemd-networkd, ifupdown) utilisent ip.",
+      "examples": {
+        "nmcli device status": "Affiche l'état de chaque périphérique",
+        "nmcli device show eth0": "Affiche les adresses, la passerelle et le DNS d'un périphérique",
+        "nmcli general status": "Affiche l'état général de NetworkManager",
+        "sudo nmcli device reapply eth0": "Applique une connexion modifiée à un périphérique sans le désactiver"
+      }
+    }
+  }
+}

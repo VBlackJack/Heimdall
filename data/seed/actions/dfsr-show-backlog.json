@@ -1,0 +1,112 @@
+{
+  "id": "dfsr-show-backlog",
+  "title": "Show the DFS Replication backlog",
+  "description": "Show the files waiting to replicate from one member to another for a replicated folder.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "dfs",
+    "dfsr",
+    "replication",
+    "backlog",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "dfsr-show-backlog-cmd",
+  "windowsCommandTemplate": {
+    "id": "dfsr-show-backlog-cmd",
+    "platform": 0,
+    "name": "Get-DfsrBacklog",
+    "commandPattern": "Get-DfsrBacklog -GroupName {groupName} -FolderName {folderName} -SourceComputerName {sourceComputer} -DestinationComputerName {destinationComputer} -Verbose",
+    "parameters": [
+      {
+        "name": "groupName",
+        "label": "Replication group",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the replication group"
+      },
+      {
+        "name": "folderName",
+        "label": "Replicated folder",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the replicated folder"
+      },
+      {
+        "name": "sourceComputer",
+        "label": "Sending member",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Member that sends the changes"
+      },
+      {
+        "name": "destinationComputer",
+        "label": "Receiving member",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Member that receives the changes"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-DfsrBacklog -GroupName BranchData -FolderName Projects -SourceComputerName FS01 -DestinationComputerName FS02 -Verbose",
+      "description": "Show what FS02 still has to receive from FS01",
+      "platform": 0
+    },
+    {
+      "command": "Get-DfsrBacklog -GroupName BranchData -FolderName Projects -SourceComputerName FS02 -DestinationComputerName FS01 -Verbose",
+      "description": "Check the other direction",
+      "platform": 0
+    },
+    {
+      "command": "dfsrdiag backlog /rgname:BranchData /rfname:Projects /smem:FS01 /rmem:FS02",
+      "description": "Get the backlog count with the classic tool",
+      "platform": 0
+    }
+  ],
+  "notes": "The cmdlet lists at most 100 files; the full count appears in the verbose stream. Requires the DFSR module (RSAT DFS Management tools).",
+  "links": [
+    {
+      "title": "Get-DfsrBacklog documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/dfsr/get-dfsrbacklog"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher le retard de réplication DFS",
+      "description": "Affiche les fichiers en attente de réplication d'un membre vers un autre pour un dossier répliqué.",
+      "notes": "La cmdlet liste au plus 100 fichiers ; le nombre total apparaît dans le flux verbose. Nécessite le module DFSR (outils RSAT de gestion DFS).",
+      "parameters": {
+        "windows": {
+          "groupName": {
+            "label": "Groupe de réplication",
+            "description": "Nom du groupe de réplication"
+          },
+          "folderName": {
+            "label": "Dossier répliqué",
+            "description": "Nom du dossier répliqué"
+          },
+          "sourceComputer": {
+            "label": "Membre émetteur",
+            "description": "Membre qui envoie les modifications"
+          },
+          "destinationComputer": {
+            "label": "Membre récepteur",
+            "description": "Membre qui reçoit les modifications"
+          }
+        }
+      },
+      "examples": {
+        "Get-DfsrBacklog -GroupName BranchData -FolderName Projects -SourceComputerName FS01 -DestinationComputerName FS02 -Verbose": "Montre ce que FS02 doit encore recevoir de FS01",
+        "Get-DfsrBacklog -GroupName BranchData -FolderName Projects -SourceComputerName FS02 -DestinationComputerName FS01 -Verbose": "Vérifie l'autre sens",
+        "dfsrdiag backlog /rgname:BranchData /rfname:Projects /smem:FS01 /rmem:FS02": "Obtient le nombre de fichiers en retard avec l'outil classique"
+      }
+    }
+  }
+}

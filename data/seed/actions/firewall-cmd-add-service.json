@@ -1,0 +1,94 @@
+{
+  "id": "firewall-cmd-add-service",
+  "title": "Allow a service in firewalld",
+  "description": "Open a predefined firewalld service, such as http or ssh, permanently in a zone.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "firewalld",
+    "firewall-cmd",
+    "linux",
+    "firewall",
+    "service"
+  ],
+  "linuxCommandTemplateId": "firewall-cmd-add-service-cmd",
+  "linuxCommandTemplate": {
+    "id": "firewall-cmd-add-service-cmd",
+    "platform": 1,
+    "name": "firewall-cmd",
+    "commandPattern": "sudo firewall-cmd --permanent --zone={zone} --add-service={service}",
+    "parameters": [
+      {
+        "name": "zone",
+        "label": "Zone",
+        "type": "string",
+        "defaultValue": "public",
+        "required": true,
+        "description": "firewalld zone the rule belongs to"
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "string",
+        "defaultValue": "http",
+        "required": true,
+        "description": "Name of a predefined firewalld service"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo firewall-cmd --permanent --zone=public --add-service=https",
+      "description": "Allow HTTPS in the public zone",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --get-services",
+      "description": "List the predefined service names",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --permanent --zone=public --remove-service=dhcpv6-client",
+      "description": "Remove a service from the zone",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --zone=public --add-service=http --timeout=1h",
+      "description": "Allow HTTP for one hour only, without saving it",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. A --permanent change applies after firewall-cmd --reload.",
+  "links": [
+    {
+      "title": "firewall-cmd(1)",
+      "url": "https://firewalld.org/documentation/man-pages/firewall-cmd.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Autoriser un service dans firewalld",
+      "description": "Ouvre de façon permanente un service firewalld prédéfini, comme http ou ssh, dans une zone.",
+      "notes": "Nécessite sudo. Une modification --permanent s'applique après firewall-cmd --reload.",
+      "parameters": {
+        "linux": {
+          "zone": {
+            "label": "Zone",
+            "description": "Zone firewalld à laquelle appartient la règle"
+          },
+          "service": {
+            "label": "Service",
+            "description": "Nom d'un service firewalld prédéfini"
+          }
+        }
+      },
+      "examples": {
+        "sudo firewall-cmd --permanent --zone=public --add-service=https": "Autorise HTTPS dans la zone public",
+        "sudo firewall-cmd --get-services": "Liste les noms de services prédéfinis",
+        "sudo firewall-cmd --permanent --zone=public --remove-service=dhcpv6-client": "Retire un service de la zone",
+        "sudo firewall-cmd --zone=public --add-service=http --timeout=1h": "Autorise HTTP pendant une heure seulement, sans l'enregistrer"
+      }
+    }
+  }
+}

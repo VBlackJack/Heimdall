@@ -1,0 +1,65 @@
+{
+  "id": "lsmod-list-modules",
+  "title": "List the loaded kernel modules",
+  "description": "List the kernel modules currently loaded, with their size and the modules that use them.",
+  "category": "performance",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "lsmod",
+    "kernel",
+    "linux",
+    "module",
+    "driver"
+  ],
+  "linuxCommandTemplateId": "lsmod-list-modules-cmd",
+  "linuxCommandTemplate": {
+    "id": "lsmod-list-modules-cmd",
+    "platform": 1,
+    "name": "lsmod",
+    "commandPattern": "lsmod",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "lsmod",
+      "description": "List every loaded module",
+      "platform": 1
+    },
+    {
+      "command": "lsmod | grep -i nf_",
+      "description": "Check which netfilter modules are loaded",
+      "platform": 1
+    },
+    {
+      "command": "modinfo br_netfilter",
+      "description": "Show the description, version and parameters of a module",
+      "platform": 1
+    },
+    {
+      "command": "ls /etc/modules-load.d/",
+      "description": "Show the modules loaded at every boot",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs no special rights. Modules built into the kernel do not appear in the list.",
+  "links": [
+    {
+      "title": "lsmod(8)",
+      "url": "https://man7.org/linux/man-pages/man8/lsmod.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les modules noyau chargés",
+      "description": "Liste les modules noyau actuellement chargés, avec leur taille et les modules qui les utilisent.",
+      "notes": "Aucun droit particulier. Les modules intégrés au noyau n'apparaissent pas dans la liste.",
+      "examples": {
+        "lsmod": "Liste tous les modules chargés",
+        "lsmod | grep -i nf_": "Vérifie quels modules netfilter sont chargés",
+        "modinfo br_netfilter": "Affiche la description, la version et les paramètres d'un module",
+        "ls /etc/modules-load.d/": "Affiche les modules chargés à chaque démarrage"
+      }
+    }
+  }
+}

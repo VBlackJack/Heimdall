@@ -1,0 +1,75 @@
+{
+  "id": "hostnamectl-set-hostname",
+  "title": "Change the host name",
+  "description": "Set the static host name of the system, persistently.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "hostnamectl",
+    "systemd",
+    "linux",
+    "hostname"
+  ],
+  "linuxCommandTemplateId": "hostnamectl-set-hostname-cmd",
+  "linuxCommandTemplate": {
+    "id": "hostnamectl-set-hostname-cmd",
+    "platform": 1,
+    "name": "hostnamectl",
+    "commandPattern": "sudo hostnamectl set-hostname {hostname}",
+    "parameters": [
+      {
+        "name": "hostname",
+        "label": "Host name",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "New host name, short or fully qualified"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo hostnamectl set-hostname web01.example.com",
+      "description": "Give the host a fully qualified name",
+      "platform": 1
+    },
+    {
+      "command": "sudo hostnamectl set-hostname web01",
+      "description": "Give the host a short name",
+      "platform": 1
+    },
+    {
+      "command": "grep -n web01 /etc/hosts",
+      "description": "Check that /etc/hosts still matches the new name",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. Update /etc/hosts, the DNS record and any domain join or certificate that uses the old name.",
+  "links": [
+    {
+      "title": "hostnamectl(1)",
+      "url": "https://man7.org/linux/man-pages/man1/hostnamectl.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Changer le nom d'hôte",
+      "description": "Définit de façon permanente le nom d'hôte statique du système.",
+      "notes": "Nécessite sudo. Mettre à jour /etc/hosts, l'enregistrement DNS et toute jonction de domaine ou certificat qui utilise l'ancien nom.",
+      "parameters": {
+        "linux": {
+          "hostname": {
+            "label": "Nom d'hôte",
+            "description": "Nouveau nom d'hôte, court ou complet"
+          }
+        }
+      },
+      "examples": {
+        "sudo hostnamectl set-hostname web01.example.com": "Donne à l'hôte un nom complet",
+        "sudo hostnamectl set-hostname web01": "Donne à l'hôte un nom court",
+        "grep -n web01 /etc/hosts": "Vérifie que /etc/hosts correspond toujours au nouveau nom"
+      }
+    }
+  }
+}

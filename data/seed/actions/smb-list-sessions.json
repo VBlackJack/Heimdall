@@ -1,0 +1,59 @@
+{
+  "id": "smb-list-sessions",
+  "title": "List the SMB sessions",
+  "description": "Show the clients connected to the file server with their user, dialect and open files.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "smb",
+    "session",
+    "smbshare",
+    "file-server",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "smb-list-sessions-cmd",
+  "windowsCommandTemplate": {
+    "id": "smb-list-sessions-cmd",
+    "platform": 0,
+    "name": "Get-SmbSession",
+    "commandPattern": "Get-SmbSession | Select-Object ClientComputerName,ClientUserName,NumOpens,Dialect,SecondsExists,SecondsIdle | Format-Table -AutoSize",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-SmbSession -ClientUserName 'CONTOSO\\jdupont'",
+      "description": "Show the sessions of one user",
+      "platform": 0
+    },
+    {
+      "command": "Get-SmbSession | Where-Object Dialect -like '2*'",
+      "description": "Find the clients still on SMB 2",
+      "platform": 0
+    },
+    {
+      "command": "Get-SmbSession -CimSession FS01",
+      "description": "List the sessions of a remote file server",
+      "platform": 0
+    }
+  ],
+  "notes": "Run it on the file server, or add -CimSession to query one remotely. Requires administrator rights.",
+  "links": [
+    {
+      "title": "Get-SmbSession documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/smbshare/get-smbsession"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les sessions SMB",
+      "description": "Affiche les clients connectés au serveur de fichiers avec leur utilisateur, leur dialecte et leurs fichiers ouverts.",
+      "notes": "À lancer sur le serveur de fichiers, ou ajoutez -CimSession pour en interroger un à distance. Nécessite des droits administrateur.",
+      "examples": {
+        "Get-SmbSession -ClientUserName 'CONTOSO\\jdupont'": "Affiche les sessions d'un utilisateur",
+        "Get-SmbSession | Where-Object Dialect -like '2*'": "Trouve les clients encore en SMB 2",
+        "Get-SmbSession -CimSession FS01": "Liste les sessions d'un serveur de fichiers distant"
+      }
+    }
+  }
+}

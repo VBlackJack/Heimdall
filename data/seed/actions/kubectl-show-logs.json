@@ -1,0 +1,106 @@
+{
+  "id": "kubectl-show-logs",
+  "title": "Show the last log lines of a pod",
+  "description": "Show the last lines a pod wrote to its standard output and error.",
+  "category": "containers-vms",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "kubectl",
+    "kubernetes",
+    "k8s",
+    "linux",
+    "logs"
+  ],
+  "linuxCommandTemplateId": "kubectl-show-logs-cmd",
+  "linuxCommandTemplate": {
+    "id": "kubectl-show-logs-cmd",
+    "platform": 1,
+    "name": "kubectl",
+    "commandPattern": "kubectl logs {pod} -n {namespace} --tail={lines}",
+    "parameters": [
+      {
+        "name": "pod",
+        "label": "Pod",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the pod"
+      },
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "string",
+        "defaultValue": "default",
+        "required": true,
+        "description": "Kubernetes namespace"
+      },
+      {
+        "name": "lines",
+        "label": "Lines",
+        "type": "int",
+        "defaultValue": "100",
+        "required": true,
+        "description": "Number of lines to show"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "kubectl logs web-7d9c6b5f4-x2k8p -n web --tail=200",
+      "description": "Show the last 200 lines of a pod",
+      "platform": 1
+    },
+    {
+      "command": "kubectl logs web-7d9c6b5f4-x2k8p -n web --previous",
+      "description": "Show the logs of the previous container, after a crash",
+      "platform": 1
+    },
+    {
+      "command": "kubectl logs deployment/web -n web -c nginx -f",
+      "description": "Follow one container of a deployment",
+      "platform": 1
+    },
+    {
+      "command": "kubectl logs -l app=web -n web --since=1h",
+      "description": "Show the last hour of every pod with a label",
+      "platform": 1
+    }
+  ],
+  "notes": "Uses the current kubeconfig context. A pod with several containers needs -c to name one.",
+  "links": [
+    {
+      "title": "kubectl logs",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les dernières lignes de journal d'un pod",
+      "description": "Affiche les dernières lignes écrites par un pod sur sa sortie standard et d'erreur.",
+      "notes": "Utilise le contexte kubeconfig courant. Un pod à plusieurs conteneurs demande -c pour en nommer un.",
+      "parameters": {
+        "linux": {
+          "pod": {
+            "label": "Pod",
+            "description": "Nom du pod"
+          },
+          "namespace": {
+            "label": "Espace de noms",
+            "description": "Espace de noms Kubernetes"
+          },
+          "lines": {
+            "label": "Lignes",
+            "description": "Nombre de lignes à afficher"
+          }
+        }
+      },
+      "examples": {
+        "kubectl logs web-7d9c6b5f4-x2k8p -n web --tail=200": "Affiche les 200 dernières lignes d'un pod",
+        "kubectl logs web-7d9c6b5f4-x2k8p -n web --previous": "Affiche les journaux du conteneur précédent, après un plantage",
+        "kubectl logs deployment/web -n web -c nginx -f": "Suit un conteneur d'un déploiement",
+        "kubectl logs -l app=web -n web --since=1h": "Affiche la dernière heure de chaque pod portant un label"
+      }
+    }
+  }
+}

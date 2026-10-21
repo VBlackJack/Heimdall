@@ -1,0 +1,118 @@
+{
+  "id": "smb-create-share",
+  "title": "Create an SMB share",
+  "description": "Share an existing folder over SMB with full and read access granted to two accounts.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 1,
+  "tags": [
+    "smb",
+    "share",
+    "smbshare",
+    "file-server",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "smb-create-share-cmd",
+  "windowsCommandTemplate": {
+    "id": "smb-create-share-cmd",
+    "platform": 0,
+    "name": "New-SmbShare",
+    "commandPattern": "New-SmbShare -Name {shareName} -Path {folderPath} -FullAccess {fullAccess} -ReadAccess {readAccess}",
+    "parameters": [
+      {
+        "name": "shareName",
+        "label": "Share name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name clients use (end it with $ to hide it)"
+      },
+      {
+        "name": "folderPath",
+        "label": "Folder",
+        "type": "path",
+        "defaultValue": "",
+        "required": true,
+        "description": "Existing folder to share"
+      },
+      {
+        "name": "fullAccess",
+        "label": "Full access",
+        "type": "string",
+        "defaultValue": "BUILTIN\\Administrators",
+        "required": true,
+        "description": "Account or group granted full access"
+      },
+      {
+        "name": "readAccess",
+        "label": "Read access",
+        "type": "string",
+        "defaultValue": "NT AUTHORITY\\Authenticated Users",
+        "required": true,
+        "description": "Account or group granted read access"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "New-SmbShare -Name 'Data' -Path 'D:\\Shares\\Data' -FullAccess 'CONTOSO\\File Admins' -ReadAccess 'CONTOSO\\Domain Users'",
+      "description": "Share D:\\Shares\\Data, read-only for the domain users",
+      "platform": 0
+    },
+    {
+      "command": "New-SmbShare -Name 'Data$' -Path 'D:\\Shares\\Data' -FullAccess 'CONTOSO\\File Admins'",
+      "description": "Create a hidden share for the administrators",
+      "platform": 0
+    },
+    {
+      "command": "New-SmbShare -Name 'Projects' -Path 'D:\\Shares\\Projects' -ChangeAccess 'CONTOSO\\Project Team' -FolderEnumerationMode AccessBased",
+      "description": "Create a share that hides the folders a user may not open",
+      "platform": 0
+    },
+    {
+      "command": "New-SmbShare -Name 'Scans' -Path 'D:\\Shares\\Scans' -ChangeAccess 'CONTOSO\\Domain Users' -EncryptData $true",
+      "description": "Create a share that requires SMB encryption",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires administrator rights. Share permissions combine with the NTFS permissions and the stricter one wins; on a non-English system use the localized names of the built-in groups.",
+  "links": [
+    {
+      "title": "New-SmbShare documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/smbshare/new-smbshare"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer un partage SMB",
+      "description": "Partage un dossier existant en SMB en accordant un accès total et un accès en lecture à deux comptes.",
+      "notes": "Nécessite des droits administrateur. Les autorisations de partage se combinent aux autorisations NTFS et la plus restrictive l'emporte ; sur un système non anglais, utilisez les noms localisés des groupes intégrés.",
+      "parameters": {
+        "windows": {
+          "shareName": {
+            "label": "Nom du partage",
+            "description": "Nom utilisé par les clients (terminez-le par $ pour le masquer)"
+          },
+          "folderPath": {
+            "label": "Dossier",
+            "description": "Dossier existant à partager"
+          },
+          "fullAccess": {
+            "label": "Accès total",
+            "description": "Compte ou groupe qui reçoit l'accès total"
+          },
+          "readAccess": {
+            "label": "Accès en lecture",
+            "description": "Compte ou groupe qui reçoit l'accès en lecture"
+          }
+        }
+      },
+      "examples": {
+        "New-SmbShare -Name 'Data' -Path 'D:\\Shares\\Data' -FullAccess 'CONTOSO\\File Admins' -ReadAccess 'CONTOSO\\Domain Users'": "Partage D:\\Shares\\Data en lecture seule pour les utilisateurs du domaine",
+        "New-SmbShare -Name 'Data$' -Path 'D:\\Shares\\Data' -FullAccess 'CONTOSO\\File Admins'": "Crée un partage masqué pour les administrateurs",
+        "New-SmbShare -Name 'Projects' -Path 'D:\\Shares\\Projects' -ChangeAccess 'CONTOSO\\Project Team' -FolderEnumerationMode AccessBased": "Crée un partage qui masque les dossiers qu'un utilisateur ne peut pas ouvrir",
+        "New-SmbShare -Name 'Scans' -Path 'D:\\Shares\\Scans' -ChangeAccess 'CONTOSO\\Domain Users' -EncryptData $true": "Crée un partage qui exige le chiffrement SMB"
+      }
+    }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "id": "sysctl-set-parameter",
+  "title": "Change a kernel parameter",
+  "description": "Set a kernel parameter at run time, such as IP forwarding or the swappiness.",
+  "category": "performance",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "sysctl",
+    "kernel",
+    "linux",
+    "tuning",
+    "parameter"
+  ],
+  "linuxCommandTemplateId": "sysctl-set-parameter-cmd",
+  "linuxCommandTemplate": {
+    "id": "sysctl-set-parameter-cmd",
+    "platform": 1,
+    "name": "sysctl",
+    "commandPattern": "sudo sysctl -w {parameter}={value}",
+    "parameters": [
+      {
+        "name": "parameter",
+        "label": "Parameter",
+        "type": "string",
+        "defaultValue": "vm.swappiness",
+        "required": true,
+        "description": "Dotted name of the kernel parameter"
+      },
+      {
+        "name": "value",
+        "label": "Value",
+        "type": "string",
+        "defaultValue": "10",
+        "required": true,
+        "description": "New value of the parameter"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo sysctl -w net.ipv4.ip_forward=1",
+      "description": "Turn on IPv4 forwarding",
+      "platform": 1
+    },
+    {
+      "command": "sudo sysctl -w vm.swappiness=10",
+      "description": "Make the kernel swap less eagerly",
+      "platform": 1
+    },
+    {
+      "command": "echo 'vm.swappiness = 10' | sudo tee /etc/sysctl.d/90-swappiness.conf",
+      "description": "Keep the value across reboots",
+      "platform": 1
+    },
+    {
+      "command": "sudo sysctl --system",
+      "description": "Reload every file under /etc/sysctl.d",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. A value set with -w is lost at reboot unless a file in /etc/sysctl.d sets it too.",
+  "links": [
+    {
+      "title": "sysctl(8)",
+      "url": "https://man7.org/linux/man-pages/man8/sysctl.8.html"
+    },
+    {
+      "title": "Documentation for /proc/sys",
+      "url": "https://www.kernel.org/doc/html/latest/admin-guide/sysctl/index.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Modifier un paramètre noyau",
+      "description": "Définit un paramètre noyau à chaud, comme le routage IP ou la swappiness.",
+      "notes": "Nécessite sudo. Une valeur définie avec -w est perdue au redémarrage, sauf si un fichier de /etc/sysctl.d la définit aussi.",
+      "parameters": {
+        "linux": {
+          "parameter": {
+            "label": "Paramètre",
+            "description": "Nom pointé du paramètre noyau"
+          },
+          "value": {
+            "label": "Valeur",
+            "description": "Nouvelle valeur du paramètre"
+          }
+        }
+      },
+      "examples": {
+        "sudo sysctl -w net.ipv4.ip_forward=1": "Active le routage IPv4",
+        "sudo sysctl -w vm.swappiness=10": "Rend le noyau moins prompt à utiliser le swap",
+        "echo 'vm.swappiness = 10' | sudo tee /etc/sysctl.d/90-swappiness.conf": "Conserve la valeur après redémarrage",
+        "sudo sysctl --system": "Recharge tous les fichiers de /etc/sysctl.d"
+      }
+    }
+  }
+}

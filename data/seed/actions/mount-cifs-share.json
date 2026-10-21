@@ -1,0 +1,135 @@
+{
+  "id": "mount-cifs-share",
+  "title": "Mount an SMB share",
+  "description": "Mount a Windows or Samba share on a local mount point with the CIFS client.",
+  "category": "files-storage",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "mount",
+    "cifs",
+    "smb",
+    "linux",
+    "share"
+  ],
+  "linuxCommandTemplateId": "mount-cifs-share-cmd",
+  "linuxCommandTemplate": {
+    "id": "mount-cifs-share-cmd",
+    "platform": 1,
+    "name": "mount",
+    "commandPattern": "sudo mount -t cifs //{server}/{share} {mountPoint} -o username={username},vers={smbVersion}",
+    "parameters": [
+      {
+        "name": "server",
+        "label": "Server",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name or address of the file server"
+      },
+      {
+        "name": "share",
+        "label": "Share",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the share on the server"
+      },
+      {
+        "name": "mountPoint",
+        "label": "Mount point",
+        "type": "path",
+        "defaultValue": "/mnt/share",
+        "required": true,
+        "description": "Existing local directory to mount on"
+      },
+      {
+        "name": "username",
+        "label": "User name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Account used to authenticate"
+      },
+      {
+        "name": "smbVersion",
+        "label": "SMB version",
+        "type": "choice",
+        "allowedValues": [
+          "3.1.1",
+          "3.0",
+          "2.1"
+        ],
+        "defaultValue": "3.0",
+        "required": true,
+        "description": "Protocol dialect to negotiate"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo mount -t cifs //fs01/data /mnt/share -o username=alice,vers=3.0",
+      "description": "Mount the data share as alice",
+      "platform": 1
+    },
+    {
+      "command": "sudo mount -t cifs //fs01/data /mnt/share -o credentials=/root/.smbcred,uid=1000,gid=1000",
+      "description": "Mount with a credentials file and give the files to a local user",
+      "platform": 1
+    },
+    {
+      "command": "sudo mount -t cifs //fs01/data /mnt/share -o username=alice,domain=EXAMPLE,sec=ntlmssp",
+      "description": "Mount with a domain account and NTLMSSP",
+      "platform": 1
+    },
+    {
+      "command": "sudo umount /mnt/share",
+      "description": "Unmount the share",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo and the cifs-utils package. Asks for the password; use a credentials file readable by root only for unattended mounts.",
+  "links": [
+    {
+      "title": "mount.cifs(8)",
+      "url": "https://manpages.debian.org/bookworm/cifs-utils/mount.cifs.8.en.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Monter un partage SMB",
+      "description": "Monte un partage Windows ou Samba sur un point de montage local avec le client CIFS.",
+      "notes": "Nécessite sudo et le paquet cifs-utils. Demande le mot de passe ; pour un montage sans intervention, utiliser un fichier d'identifiants lisible par root seul.",
+      "parameters": {
+        "linux": {
+          "server": {
+            "label": "Serveur",
+            "description": "Nom ou adresse du serveur de fichiers"
+          },
+          "share": {
+            "label": "Partage",
+            "description": "Nom du partage sur le serveur"
+          },
+          "mountPoint": {
+            "label": "Point de montage",
+            "description": "Répertoire local existant sur lequel monter"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Compte utilisé pour s'authentifier"
+          },
+          "smbVersion": {
+            "label": "Version SMB",
+            "description": "Dialecte du protocole à négocier"
+          }
+        }
+      },
+      "examples": {
+        "sudo mount -t cifs //fs01/data /mnt/share -o username=alice,vers=3.0": "Monte le partage data sous alice",
+        "sudo mount -t cifs //fs01/data /mnt/share -o credentials=/root/.smbcred,uid=1000,gid=1000": "Monte avec un fichier d'identifiants et attribue les fichiers à un utilisateur local",
+        "sudo mount -t cifs //fs01/data /mnt/share -o username=alice,domain=EXAMPLE,sec=ntlmssp": "Monte avec un compte de domaine et NTLMSSP",
+        "sudo umount /mnt/share": "Démonte le partage"
+      }
+    }
+  }
+}

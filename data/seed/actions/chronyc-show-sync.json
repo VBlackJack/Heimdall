@@ -1,0 +1,88 @@
+{
+  "id": "chronyc-show-sync",
+  "title": "Show the chrony synchronization state",
+  "description": "Show how chrony keeps the clock in time: the current offset, or the NTP sources and their quality.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "chrony",
+    "chronyc",
+    "linux",
+    "ntp",
+    "time"
+  ],
+  "linuxCommandTemplateId": "chronyc-show-sync-cmd",
+  "linuxCommandTemplate": {
+    "id": "chronyc-show-sync-cmd",
+    "platform": 1,
+    "name": "chronyc",
+    "commandPattern": "chronyc {report}",
+    "parameters": [
+      {
+        "name": "report",
+        "label": "Report",
+        "type": "choice",
+        "allowedValues": [
+          "tracking",
+          "sources",
+          "sourcestats",
+          "activity"
+        ],
+        "defaultValue": "tracking",
+        "required": true,
+        "description": "tracking for the clock offset, sources and sourcestats for the servers"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "chronyc tracking",
+      "description": "Show the offset and the reference server",
+      "platform": 1
+    },
+    {
+      "command": "chronyc sources -v",
+      "description": "List the NTP sources with a legend of the columns",
+      "platform": 1
+    },
+    {
+      "command": "chronyc sourcestats",
+      "description": "Show the drift and the jitter of each source",
+      "platform": 1
+    },
+    {
+      "command": "sudo chronyc makestep",
+      "description": "Step the clock at once instead of slewing it",
+      "platform": 1
+    }
+  ],
+  "notes": "Reading needs no special rights. Requires the chronyd service, the default time service on RHEL.",
+  "links": [
+    {
+      "title": "chronyc manual",
+      "url": "https://chrony-project.org/doc/4.5/chronyc.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'état de synchronisation chrony",
+      "description": "Montre comment chrony garde l'horloge à l'heure : le décalage actuel, ou les sources NTP et leur qualité.",
+      "notes": "La lecture ne demande aucun droit. Nécessite le service chronyd, service de temps par défaut sur RHEL.",
+      "parameters": {
+        "linux": {
+          "report": {
+            "label": "Rapport",
+            "description": "tracking pour le décalage de l'horloge, sources et sourcestats pour les serveurs"
+          }
+        }
+      },
+      "examples": {
+        "chronyc tracking": "Affiche le décalage et le serveur de référence",
+        "chronyc sources -v": "Liste les sources NTP avec une légende des colonnes",
+        "chronyc sourcestats": "Affiche la dérive et la gigue de chaque source",
+        "sudo chronyc makestep": "Corrige l'horloge d'un coup au lieu de la ralentir progressivement"
+      }
+    }
+  }
+}

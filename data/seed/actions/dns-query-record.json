@@ -29,7 +29,18 @@
       {
         "name": "recordType",
         "label": "Record type",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "A",
+          "AAAA",
+          "CNAME",
+          "MX",
+          "NS",
+          "PTR",
+          "SOA",
+          "SRV",
+          "TXT"
+        ],
         "defaultValue": "A",
         "required": false,
         "description": "DNS record type (A, AAAA, MX, TXT and so on)"

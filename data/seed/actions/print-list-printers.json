@@ -1,0 +1,82 @@
+{
+  "id": "print-list-printers",
+  "title": "List the printers",
+  "description": "Show the printers of a computer or print server with their driver, port, share and status.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "printer",
+    "print-server",
+    "printmanagement",
+    "spooler",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "print-list-printers-cmd",
+  "windowsCommandTemplate": {
+    "id": "print-list-printers-cmd",
+    "platform": 0,
+    "name": "Get-Printer",
+    "commandPattern": "Get-Printer -ComputerName {printServer} | Select-Object Name,DriverName,PortName,Shared,ShareName,PrinterStatus | Format-Table -AutoSize",
+    "parameters": [
+      {
+        "name": "printServer",
+        "label": "Print server",
+        "type": "hostname",
+        "defaultValue": "localhost",
+        "required": true,
+        "description": "Print server to query (localhost for this computer)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-Printer -ComputerName PRINT01 | Where-Object PrinterStatus -ne 'Normal'",
+      "description": "Find the printers in error or offline",
+      "platform": 0
+    },
+    {
+      "command": "Get-Printer -ComputerName PRINT01 -Name 'HP-Floor2' | Format-List *",
+      "description": "Show every setting of one printer",
+      "platform": 0
+    },
+    {
+      "command": "Get-PrinterDriver -ComputerName PRINT01",
+      "description": "List the drivers installed on the print server",
+      "platform": 0
+    },
+    {
+      "command": "Get-PrinterPort -ComputerName PRINT01",
+      "description": "List the printer ports of the print server",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the PrintManagement module, present on Windows Server and on Windows clients.",
+  "links": [
+    {
+      "title": "Get-Printer documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/printmanagement/get-printer"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les imprimantes",
+      "description": "Affiche les imprimantes d'un ordinateur ou d'un serveur d'impression avec leur pilote, leur port, leur partage et leur état.",
+      "notes": "Nécessite le module PrintManagement, présent sur Windows Server et sur les postes Windows.",
+      "parameters": {
+        "windows": {
+          "printServer": {
+            "label": "Serveur d'impression",
+            "description": "Serveur d'impression à interroger (localhost pour cet ordinateur)"
+          }
+        }
+      },
+      "examples": {
+        "Get-Printer -ComputerName PRINT01 | Where-Object PrinterStatus -ne 'Normal'": "Trouve les imprimantes en erreur ou hors ligne",
+        "Get-Printer -ComputerName PRINT01 -Name 'HP-Floor2' | Format-List *": "Affiche tous les réglages d'une imprimante",
+        "Get-PrinterDriver -ComputerName PRINT01": "Liste les pilotes installés sur le serveur d'impression",
+        "Get-PrinterPort -ComputerName PRINT01": "Liste les ports d'imprimante du serveur d'impression"
+      }
+    }
+  }
+}

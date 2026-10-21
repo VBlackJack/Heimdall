@@ -1,0 +1,110 @@
+{
+  "id": "firewall-cmd-add-port",
+  "title": "Open a port in firewalld",
+  "description": "Open a TCP or UDP port, or a port range, permanently in a firewalld zone.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "firewalld",
+    "firewall-cmd",
+    "linux",
+    "firewall",
+    "port"
+  ],
+  "linuxCommandTemplateId": "firewall-cmd-add-port-cmd",
+  "linuxCommandTemplate": {
+    "id": "firewall-cmd-add-port-cmd",
+    "platform": 1,
+    "name": "firewall-cmd",
+    "commandPattern": "sudo firewall-cmd --permanent --zone={zone} --add-port={port}/{protocol}",
+    "parameters": [
+      {
+        "name": "zone",
+        "label": "Zone",
+        "type": "string",
+        "defaultValue": "public",
+        "required": true,
+        "description": "firewalld zone the rule belongs to"
+      },
+      {
+        "name": "port",
+        "label": "Port or range",
+        "type": "string",
+        "defaultValue": "8080",
+        "required": true,
+        "description": "Port number, or a range such as 8000-8100"
+      },
+      {
+        "name": "protocol",
+        "label": "Protocol",
+        "type": "choice",
+        "allowedValues": [
+          "tcp",
+          "udp"
+        ],
+        "defaultValue": "tcp",
+        "required": true,
+        "description": "Transport protocol of the port"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo firewall-cmd --permanent --zone=public --add-port=8443/tcp",
+      "description": "Open TCP port 8443",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --permanent --zone=public --add-port=60000-61000/udp",
+      "description": "Open a UDP range for mosh",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --permanent --zone=public --remove-port=8080/tcp",
+      "description": "Close a port opened earlier",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --zone=public --list-ports",
+      "description": "List the ports the zone opens",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. A --permanent change applies after firewall-cmd --reload.",
+  "links": [
+    {
+      "title": "firewall-cmd(1)",
+      "url": "https://firewalld.org/documentation/man-pages/firewall-cmd.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Ouvrir un port dans firewalld",
+      "description": "Ouvre de façon permanente un port TCP ou UDP, ou une plage de ports, dans une zone firewalld.",
+      "notes": "Nécessite sudo. Une modification --permanent s'applique après firewall-cmd --reload.",
+      "parameters": {
+        "linux": {
+          "zone": {
+            "label": "Zone",
+            "description": "Zone firewalld à laquelle appartient la règle"
+          },
+          "port": {
+            "label": "Port ou plage",
+            "description": "Numéro de port, ou une plage comme 8000-8100"
+          },
+          "protocol": {
+            "label": "Protocole",
+            "description": "Protocole de transport du port"
+          }
+        }
+      },
+      "examples": {
+        "sudo firewall-cmd --permanent --zone=public --add-port=8443/tcp": "Ouvre le port TCP 8443",
+        "sudo firewall-cmd --permanent --zone=public --add-port=60000-61000/udp": "Ouvre une plage UDP pour mosh",
+        "sudo firewall-cmd --permanent --zone=public --remove-port=8080/tcp": "Ferme un port ouvert précédemment",
+        "sudo firewall-cmd --zone=public --list-ports": "Liste les ports ouverts par la zone"
+      }
+    }
+  }
+}

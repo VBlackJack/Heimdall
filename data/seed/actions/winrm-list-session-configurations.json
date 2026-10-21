@@ -1,0 +1,59 @@
+{
+  "id": "winrm-list-session-configurations",
+  "title": "List the PowerShell remoting endpoints",
+  "description": "Show the session configurations registered on the computer and who may connect to them.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "winrm",
+    "psremoting",
+    "endpoint",
+    "powershell",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "winrm-list-session-configurations-cmd",
+  "windowsCommandTemplate": {
+    "id": "winrm-list-session-configurations-cmd",
+    "platform": 0,
+    "name": "Get-PSSessionConfiguration",
+    "commandPattern": "Get-PSSessionConfiguration | Select-Object Name,PSVersion,Permission | Format-List",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-PSSessionConfiguration",
+      "description": "Show every registered session configuration",
+      "platform": 0
+    },
+    {
+      "command": "Get-PSSessionConfiguration -Name Microsoft.PowerShell | Format-List *",
+      "description": "Show every property of the default endpoint",
+      "platform": 0
+    },
+    {
+      "command": "Get-PSSessionConfiguration | Select-Object Name,Permission",
+      "description": "Show who may connect to each endpoint",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires an elevated session.",
+  "links": [
+    {
+      "title": "Get-PSSessionConfiguration documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/get-pssessionconfiguration"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les points de terminaison PowerShell distants",
+      "description": "Affiche les configurations de session enregistrées sur l'ordinateur et qui peut s'y connecter.",
+      "notes": "Nécessite une session élevée.",
+      "examples": {
+        "Get-PSSessionConfiguration": "Affiche toutes les configurations de session enregistrées",
+        "Get-PSSessionConfiguration -Name Microsoft.PowerShell | Format-List *": "Affiche toutes les propriétés du point de terminaison par défaut",
+        "Get-PSSessionConfiguration | Select-Object Name,Permission": "Montre qui peut se connecter à chaque point de terminaison"
+      }
+    }
+  }
+}

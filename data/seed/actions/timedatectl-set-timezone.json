@@ -1,0 +1,76 @@
+{
+  "id": "timedatectl-set-timezone",
+  "title": "Set the time zone",
+  "description": "Change the system time zone; the clock itself stays the same.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "timedatectl",
+    "systemd",
+    "linux",
+    "time",
+    "timezone"
+  ],
+  "linuxCommandTemplateId": "timedatectl-set-timezone-cmd",
+  "linuxCommandTemplate": {
+    "id": "timedatectl-set-timezone-cmd",
+    "platform": 1,
+    "name": "timedatectl",
+    "commandPattern": "sudo timedatectl set-timezone {timezone}",
+    "parameters": [
+      {
+        "name": "timezone",
+        "label": "Time zone",
+        "type": "string",
+        "defaultValue": "UTC",
+        "required": true,
+        "description": "IANA time zone name, such as Europe/Paris or UTC"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo timedatectl set-timezone Europe/Paris",
+      "description": "Set the time zone to Paris",
+      "platform": 1
+    },
+    {
+      "command": "sudo timedatectl set-timezone UTC",
+      "description": "Set the time zone to UTC, common on servers",
+      "platform": 1
+    },
+    {
+      "command": "timedatectl list-timezones | grep America",
+      "description": "Find the exact name of a time zone",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. Running services keep their old zone until they restart.",
+  "links": [
+    {
+      "title": "timedatectl(1)",
+      "url": "https://man7.org/linux/man-pages/man1/timedatectl.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Définir le fuseau horaire",
+      "description": "Change le fuseau horaire du système ; l'horloge elle-même ne change pas.",
+      "notes": "Nécessite sudo. Les services en cours gardent l'ancien fuseau jusqu'à leur redémarrage.",
+      "parameters": {
+        "linux": {
+          "timezone": {
+            "label": "Fuseau horaire",
+            "description": "Nom de fuseau IANA, comme Europe/Paris ou UTC"
+          }
+        }
+      },
+      "examples": {
+        "sudo timedatectl set-timezone Europe/Paris": "Règle le fuseau horaire sur Paris",
+        "sudo timedatectl set-timezone UTC": "Règle le fuseau horaire sur UTC, courant sur les serveurs",
+        "timedatectl list-timezones | grep America": "Trouve le nom exact d'un fuseau horaire"
+      }
+    }
+  }
+}

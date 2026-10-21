@@ -1,0 +1,101 @@
+{
+  "id": "getent-lookup-entry",
+  "title": "Look up an entry in a system database",
+  "description": "Look up a user, a group or a host through the Name Service Switch, the way the system itself resolves it.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "getent",
+    "linux",
+    "nss",
+    "user",
+    "group"
+  ],
+  "linuxCommandTemplateId": "getent-lookup-entry-cmd",
+  "linuxCommandTemplate": {
+    "id": "getent-lookup-entry-cmd",
+    "platform": 1,
+    "name": "getent",
+    "commandPattern": "getent {database} {key}",
+    "parameters": [
+      {
+        "name": "database",
+        "label": "Database",
+        "type": "choice",
+        "allowedValues": [
+          "passwd",
+          "group",
+          "hosts",
+          "services",
+          "shadow"
+        ],
+        "defaultValue": "passwd",
+        "required": true,
+        "description": "Name Service Switch database to query"
+      },
+      {
+        "name": "key",
+        "label": "Key",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name or number to look up in the database"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "getent passwd alice",
+      "description": "Show the account entry of alice",
+      "platform": 1
+    },
+    {
+      "command": "getent group wheel",
+      "description": "Show the members of the wheel group",
+      "platform": 1
+    },
+    {
+      "command": "getent hosts db01",
+      "description": "Resolve a host the way applications do, hosts file included",
+      "platform": 1
+    },
+    {
+      "command": "getent services 5432",
+      "description": "Show which service name owns a port number",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs no special rights, except the shadow database, which requires sudo.",
+  "links": [
+    {
+      "title": "getent(1)",
+      "url": "https://man7.org/linux/man-pages/man1/getent.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher une entrée dans une base système",
+      "description": "Recherche un utilisateur, un groupe ou un hôte via le Name Service Switch, comme le système le résout lui-même.",
+      "notes": "Aucun droit particulier, sauf pour la base shadow qui nécessite sudo.",
+      "parameters": {
+        "linux": {
+          "database": {
+            "label": "Base",
+            "description": "Base du Name Service Switch à interroger"
+          },
+          "key": {
+            "label": "Clé",
+            "description": "Nom ou numéro à rechercher dans la base"
+          }
+        }
+      },
+      "examples": {
+        "getent passwd alice": "Affiche l'entrée de compte de alice",
+        "getent group wheel": "Affiche les membres du groupe wheel",
+        "getent hosts db01": "Résout un hôte comme le font les applications, fichier hosts compris",
+        "getent services 5432": "Indique quel nom de service correspond à un numéro de port"
+      }
+    }
+  }
+}

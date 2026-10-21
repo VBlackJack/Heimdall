@@ -1,0 +1,82 @@
+{
+  "id": "ssh-show-authorized-keys",
+  "title": "Show the authorized SSH keys of a user",
+  "description": "Print the public keys allowed to log in as a given local user.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "ssh",
+    "linux",
+    "authorized_keys",
+    "audit",
+    "key"
+  ],
+  "linuxCommandTemplateId": "ssh-show-authorized-keys-cmd",
+  "linuxCommandTemplate": {
+    "id": "ssh-show-authorized-keys-cmd",
+    "platform": 1,
+    "name": "cat",
+    "commandPattern": "sudo cat /home/{username}/.ssh/authorized_keys",
+    "parameters": [
+      {
+        "name": "username",
+        "label": "User name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Login name of the local account"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo cat /home/deploy/.ssh/authorized_keys",
+      "description": "Show the keys that can log in as deploy",
+      "platform": 1
+    },
+    {
+      "command": "sudo ssh-keygen -lf /home/deploy/.ssh/authorized_keys",
+      "description": "Show the fingerprint and comment of each authorized key",
+      "platform": 1
+    },
+    {
+      "command": "sudo cat /root/.ssh/authorized_keys",
+      "description": "Show the keys that can log in as root",
+      "platform": 1
+    },
+    {
+      "command": "sudo sshd -T | grep -i authorizedkeysfile",
+      "description": "Show where sshd looks for authorized keys",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo to read another user's home. The path assumes the default AuthorizedKeysFile and a home under /home.",
+  "links": [
+    {
+      "title": "sshd(8) - AUTHORIZED_KEYS FILE FORMAT",
+      "url": "https://man7.org/linux/man-pages/man8/sshd.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les clés SSH autorisées d'un utilisateur",
+      "description": "Affiche les clés publiques autorisées à se connecter sous un utilisateur local donné.",
+      "notes": "Nécessite sudo pour lire le répertoire d'un autre utilisateur. Le chemin suppose le AuthorizedKeysFile par défaut et un répertoire sous /home.",
+      "parameters": {
+        "linux": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Identifiant du compte local"
+          }
+        }
+      },
+      "examples": {
+        "sudo cat /home/deploy/.ssh/authorized_keys": "Affiche les clés qui peuvent se connecter sous deploy",
+        "sudo ssh-keygen -lf /home/deploy/.ssh/authorized_keys": "Affiche l'empreinte et le commentaire de chaque clé autorisée",
+        "sudo cat /root/.ssh/authorized_keys": "Affiche les clés qui peuvent se connecter sous root",
+        "sudo sshd -T | grep -i authorizedkeysfile": "Affiche où sshd cherche les clés autorisées"
+      }
+    }
+  }
+}
