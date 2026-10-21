@@ -96,11 +96,6 @@
       "platform": 1
     },
     {
-      "command": "ansible all -m pester -a \"-NoProfile -ExecutionPolicy Bypass\"",
-      "description": "Example using the 'hostPattern' parameter: pattern that targets the hosts (all, webservers and so on). Replace *.contoso.com with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "ansible *.contoso.com -m pester -a \"-NoProfile -ExecutionPolicy Bypass\"",
       "description": "Example using the 'args' parameter: arguments for the module. Replace -NoProfile -ExecutionPolicy Bypass with the value that fits your environment.",
       "platform": 1
@@ -144,7 +139,6 @@
       "examples": {
         "ansible all -m ping": "Teste la connectivité sur tous les hôtes",
         "ansible webservers -m shell -a 'uptime'": "Exécute la commande uptime sur les serveurs web",
-        "ansible all -m pester -a \"-NoProfile -ExecutionPolicy Bypass\"": "Exemple utilisant le paramètre 'hostPattern': Pattern pour cibler les hôtes (all, webservers, etc.). Remplacez *.contoso.com par la valeur appropriée selon votre environnement.",
         "ansible *.contoso.com -m pester -a \"-NoProfile -ExecutionPolicy Bypass\"": "Exemple utilisant le paramètre 'args': Arguments pour le module. Remplacez -NoProfile -ExecutionPolicy Bypass par la valeur appropriée selon votre environnement."
       }
     }

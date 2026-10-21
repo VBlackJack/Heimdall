@@ -55,16 +55,6 @@
       "command": "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'On'} | ForEach-Object { Suspend-BitLocker -MountPoint $_.MountPoint -RebootCount 1 }",
       "description": "Suspend BitLocker on every protected volume for 1 restart",
       "platform": 0
-    },
-    {
-      "command": "Suspend-BitLocker -MountPoint \"C:\" -RebootCount 5",
-      "description": "Example using the 'driveLetter' parameter: volume letter (e.g. C). Replace D with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "Suspend-BitLocker -MountPoint \"D:\" -RebootCount 1",
-      "description": "Example using the 'rebootCount' parameter: number of restarts before protection resumes automatically. Replace 5 with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "⚠️ While suspended, the disk stays ENCRYPTED but is ACCESSIBLE without authentication! Use it only for maintenance (BIOS, firmware, drivers). RebootCount=0: suspended until Resume-BitLocker. RebootCount=1+: resumes automatically after N restarts.",
@@ -95,9 +85,7 @@
         "Suspend-BitLocker -MountPoint C: -RebootCount 1": "Suspend BitLocker pour 1 redémarrage (réactivation auto après)",
         "Suspend-BitLocker -MountPoint C: -RebootCount 2": "Suspend BitLocker pour 2 redémarrages (mise à jour BIOS multi-étapes)",
         "Suspend-BitLocker -MountPoint C: -RebootCount 0": "Suspend BitLocker indéfiniment jusqu'à réactivation manuelle",
-        "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'On'} | ForEach-Object { Suspend-BitLocker -MountPoint $_.MountPoint -RebootCount 1 }": "Suspend BitLocker sur tous les volumes protégés pour 1 redémarrage",
-        "Suspend-BitLocker -MountPoint \"C:\" -RebootCount 5": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume (ex: C). Remplacez D par la valeur appropriée selon votre environnement.",
-        "Suspend-BitLocker -MountPoint \"D:\" -RebootCount 1": "Exemple utilisant le paramètre 'rebootCount': Nombre de redémarrages avant réactivation automatique. Remplacez 5 par la valeur appropriée selon votre environnement."
+        "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'On'} | ForEach-Object { Suspend-BitLocker -MountPoint $_.MountPoint -RebootCount 1 }": "Suspend BitLocker sur tous les volumes protégés pour 1 redémarrage"
       }
     }
   }

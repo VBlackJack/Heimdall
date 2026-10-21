@@ -107,21 +107,6 @@
       "command": "ansible-playbook site.yml --skip-tags \"backup\"",
       "description": "Run every task except the ones tagged backup.",
       "platform": 1
-    },
-    {
-      "command": "ansible-playbook site.yml -i /etc/ansible/hosts --tags \"deploy,config\"",
-      "description": "Example using the 'playbookPath' parameter: path to the YAML playbook file. Replace /etc/ansible/playbooks/deploy.yml with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook /etc/ansible/playbooks/deploy.yml -i inventory.ini --tags \"deploy,config\"",
-      "description": "Example using the 'inventory' parameter: host inventory file. Replace /etc/ansible/hosts with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook /etc/ansible/playbooks/deploy.yml -i /etc/ansible/hosts --tags \"deploy\"",
-      "description": "Example using the 'tags' parameter: tags of the tasks to run (comma-separated). Replace deploy,config with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "translations": {
@@ -161,10 +146,7 @@
       },
       "examples": {
         "ansible-playbook site.yml --tags \"deploy,configure\"": "Exécute uniquement les tâches avec les tags deploy et configure.",
-        "ansible-playbook site.yml --skip-tags \"backup\"": "Exécute toutes les tâches sauf celles avec le tag backup.",
-        "ansible-playbook site.yml -i /etc/ansible/hosts --tags \"deploy,config\"": "Exemple utilisant le paramètre 'playbookPath': Chemin vers le fichier playbook YAML. Remplacez /etc/ansible/playbooks/deploy.yml par la valeur appropriée selon votre environnement.",
-        "ansible-playbook /etc/ansible/playbooks/deploy.yml -i inventory.ini --tags \"deploy,config\"": "Exemple utilisant le paramètre 'inventory': Fichier d'inventaire des hôtes. Remplacez /etc/ansible/hosts par la valeur appropriée selon votre environnement.",
-        "ansible-playbook /etc/ansible/playbooks/deploy.yml -i /etc/ansible/hosts --tags \"deploy\"": "Exemple utilisant le paramètre 'tags': Tags des tâches à exécuter (séparés par des virgules). Remplacez deploy,config par la valeur appropriée selon votre environnement."
+        "ansible-playbook site.yml --skip-tags \"backup\"": "Exécute toutes les tâches sauf celles avec le tag backup."
       }
     }
   }

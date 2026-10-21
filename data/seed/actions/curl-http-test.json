@@ -46,11 +46,6 @@
       "platform": 1
     },
     {
-      "command": "curl -v -f http://localhost",
-      "description": "Example using the 'url' parameter: URL to test. Replace https://www.contoso.com with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "curl https://api.example.com",
       "description": "Simple GET request",
       "platform": 1
@@ -95,7 +90,6 @@
         "curl -I http://google.com": "Affiche uniquement les headers HTTP",
         "curl -X GET https://api.example.com/users": "Requête GET sur une API",
         "curl -o file.html http://example.com": "Télécharge dans un fichier",
-        "curl -v -f http://localhost": "Exemple utilisant le paramètre 'url': URL à tester. Remplacez https://www.contoso.com par la valeur appropriée selon votre environnement.",
         "curl https://api.example.com": "Requête GET simple",
         "curl -X POST -d '{\"key\":\"value\"}' -H \"Content-Type: application/json\" https://api.example.com": "Requête POST JSON",
         "curl -I https://example.com": "Afficher les headers uniquement",

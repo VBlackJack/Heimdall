@@ -24,22 +24,22 @@
     {
       "command": "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; foreach($k in $keys) { $report += [PSCustomObject]@{Computer=$_.Name; Password=$k.'msFVE-RecoveryPassword'} } }; $report | Export-Csv C:\\BitLocker-Keys-Full.csv -NoTypeInformation",
       "description": "Export ALL the BitLocker keys of the domain to a CSV",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -SearchBase 'OU=Laptops,DC=contoso,DC=com' | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; if($keys) { Write-Host \"$($_.Name): $($keys[0].'msFVE-RecoveryPassword')\" } }",
       "description": "Export the BitLocker keys of one OU only (e.g. Laptops)",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword,whenCreated -ErrorAction SilentlyContinue; $report += [PSCustomObject]@{Computer=$_.Name; KeyCount=$keys.Count; LatestKey=($keys | Sort-Object whenCreated -Descending | Select-Object -First 1).'msFVE-RecoveryPassword'} }; $report | Where-Object {$_.KeyCount -gt 0}",
       "description": "Report with the number of keys and the latest recovery key per computer",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "$date = Get-Date -Format 'yyyyMMdd'; Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties msFVE-RecoveryPassword -ErrorAction SilentlyContinue; foreach($k in $keys) { \"$($_.Name): $($k.'msFVE-RecoveryPassword')\" | Out-File \"C:\\BitLocker-Backup-$date.txt\" -Append } }",
       "description": "Save every key to a dated text file",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * | Select-Object * -First 1",

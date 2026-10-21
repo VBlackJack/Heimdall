@@ -47,11 +47,6 @@
       "command": "(Get-Tpm).TpmReady",
       "description": "Check that the TPM is ready and working before adding the protector",
       "platform": 0
-    },
-    {
-      "command": "Add-BitLockerKeyProtector -MountPoint \"C:\" -TpmProtector",
-      "description": "Example using the 'driveLetter' parameter: volume letter. Replace D with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "TPM: transparent unlock at boot (convenient but less secure). TPM+PIN: a code to type at startup (balance between security and convenience). TPM+StartupKey: requires a USB key at startup (high security). The PC must have a TPM 1.2+ enabled in the BIOS.",
@@ -78,8 +73,7 @@
         "Add-BitLockerKeyProtector -MountPoint C: -TpmProtector": "Ajoute la protection TPM seule (déverrouillage automatique au boot)",
         "Add-BitLockerKeyProtector -MountPoint C: -TpmAndPinProtector": "Ajoute TPM + PIN (saisie PIN au démarrage, sécurité renforcée)",
         "Add-BitLockerKeyProtector -MountPoint C: -TpmAndStartupKeyProtector -StartupKeyPath 'E:\\'": "Ajoute TPM + clé USB de démarrage (nécessite la clé USB au boot)",
-        "(Get-Tpm).TpmReady": "Vérifie si le TPM est prêt et fonctionnel avant d'ajouter le protecteur",
-        "Add-BitLockerKeyProtector -MountPoint \"C:\" -TpmProtector": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume. Remplacez D par la valeur appropriée selon votre environnement."
+        "(Get-Tpm).TpmReady": "Vérifie si le TPM est prêt et fonctionnel avant d'ajouter le protecteur"
       }
     }
   }

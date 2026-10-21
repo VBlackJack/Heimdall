@@ -82,11 +82,6 @@
       "platform": 0
     },
     {
-      "command": "dotnet build \".\" --configuration Release",
-      "description": "Example using the 'projectPath' parameter: path of the .csproj, the .sln or the folder. Replace C:\\Projects\\MyApp with the value that fits your environment.",
-      "platform": 0
-    },
-    {
       "command": "dotnet build \"C:\\Projects\\MyApp\" --configuration Release",
       "description": "Example using the 'configuration' parameter: Debug or Release. Replace Release with the value that fits your environment.",
       "platform": 0
@@ -134,7 +129,6 @@
       "examples": {
         "dotnet build MyApp.csproj --configuration Release": "Compile en mode Release",
         "dotnet build --no-restore": "Compile sans restaurer les packages",
-        "dotnet build \".\" --configuration Release": "Exemple utilisant le paramètre 'projectPath': Chemin du .csproj, .sln ou dossier. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement.",
         "dotnet build \"C:\\Projects\\MyApp\" --configuration Release": "Exemple utilisant le paramètre 'configuration': Debug ou Release. Remplacez Release par la valeur appropriée selon votre environnement.",
         "dotnet build": "Compiler le projet",
         "dotnet test": "Exécuter les tests"

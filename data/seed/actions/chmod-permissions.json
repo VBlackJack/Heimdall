@@ -58,11 +58,6 @@
       "platform": 1
     },
     {
-      "command": "chmod 755 /var/log/app.log",
-      "description": "Example using the 'mode' parameter: permissions (755, 644, +x, u+w and so on). Replace Full with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "chmod 755 /var/www/html/index.php",
       "description": "rwxr-xr-x permissions for a web file",
       "platform": 1
@@ -117,7 +112,6 @@
         "chmod -R 644 /var/www/html": "644 récursif sur un répertoire",
         "chmod +x file.sh": "Ajoute le droit d'exécution",
         "chmod Full /var/log/app.log -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "chmod 755 /var/log/app.log": "Exemple utilisant le paramètre 'mode': Permissions (755, 644, +x, u+w, etc.). Remplacez Full par la valeur appropriée selon votre environnement.",
         "chmod 755 /var/www/html/index.php": "Permissions rwxr-xr-x pour un fichier web",
         "chmod 600 ~/.ssh/id_rsa": "Sécuriser la clé SSH privée (lecture/écriture propriétaire seulement)",
         "chmod -R 644 /var/log/*.log": "Permissions rw-r--r-- pour les fichiers de logs",

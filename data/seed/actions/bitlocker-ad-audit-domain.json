@@ -24,27 +24,27 @@
     {
       "command": "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; $report += [PSCustomObject]@{Computer=$_.Name; BitLocker=$hasKeys} }; $report | Format-Table",
       "description": "List every computer with its BitLocker status (True/False)",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "$all = (Get-ADComputer -Filter *).Count; $encrypted = (Get-ADComputer -Filter * | Where-Object { (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -ne $null }).Count; Write-Host \"BitLocker: $encrypted / $all ordinateurs ($(($encrypted/$all*100).ToString('N1'))%)\" -ForegroundColor Cyan",
       "description": "Compute the BitLocker compliance percentage of the domain",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * | Where-Object { (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -eq $null } | Select-Object Name",
       "description": "⚠️ List the computers WITHOUT BitLocker (non-compliant!)",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * | ForEach-Object { $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -Properties whenCreated -ErrorAction SilentlyContinue; $report += [PSCustomObject]@{Computer=$_.Name; HasBitLocker=($keys -ne $null); KeyCount=$keys.Count; LastKeyDate=($keys | Sort-Object whenCreated -Descending | Select-Object -First 1).whenCreated} }; $report | Export-Csv C:\\BitLocker-Domain-Audit-$(Get-Date -Format 'yyyyMMdd').csv -NoTypeInformation",
       "description": "Build a full CSV report with the number of keys and the date of the latest key",
-      "platform": 1
+      "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -SearchBase 'OU=Laptops,DC=contoso,DC=com' | ForEach-Object { $hasKeys = (Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $_.DistinguishedName -ErrorAction SilentlyContinue) -ne $null; [PSCustomObject]@{Laptop=$_.Name; Protected=$hasKeys} }",
       "description": "BitLocker audit for one OU only (e.g. Laptops)",
-      "platform": 1
+      "platform": 0
     }
   ],
   "notes": "⚠️ CRITICAL COMPLIANCE: this command audits the WHOLE AD domain. On large domains (1000+ PCs) it can take several minutes. Use -SearchBase to limit it to one OU. Computers without BitLocker keys = NON-COMPLIANT (security risk!). Run it regularly (weekly or monthly) to monitor compliance.",

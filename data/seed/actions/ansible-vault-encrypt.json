@@ -72,11 +72,6 @@
       "platform": 1
     },
     {
-      "command": "ansible-vault encrypt secrets.yml",
-      "description": "Example using the 'filePath' parameter: path of the file to encrypt. Replace C:\\Data\\report.xlsx with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "ansible-vault encrypt --vault-id prod@prompt secrets.yml",
       "description": "With a vault ID",
       "platform": 1
@@ -110,7 +105,6 @@
         "ansible-vault encrypt C:\\Data\\report.xlsx": "Exemple Windows utilisant ansible-vault. Remplacez les paramètres entre <> par vos valeurs.",
         "ansible-vault encrypt vars/secrets.yml": "Chiffre le fichier de secrets",
         "ansible-vault decrypt vars/secrets.yml": "Déchiffre le fichier de secrets",
-        "ansible-vault encrypt secrets.yml": "Exemple utilisant le paramètre 'filePath': Chemin du fichier à chiffrer. Remplacez C:\\Data\\report.xlsx par la valeur appropriée selon votre environnement.",
         "ansible-vault encrypt --vault-id prod@prompt secrets.yml": "Avec vault ID",
         "ansible-vault encrypt_string 'secret' --name 'password'": "Chiffrer une string"
       }

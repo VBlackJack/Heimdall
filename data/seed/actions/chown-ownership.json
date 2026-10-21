@@ -67,11 +67,6 @@
       "platform": 1
     },
     {
-      "command": "chown www-data:IT-Admins /var/log/app.log",
-      "description": "Example using the 'owner' parameter: new owner. Replace admin with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "chown www-data:www-data /var/www/html -R",
       "description": "Change the owner of the Apache web folder",
       "platform": 1
@@ -130,7 +125,6 @@
         "sudo chown -R john /home/john": "Change récursivement le propriétaire",
         "sudo chown :developers file.txt": "Change uniquement le groupe",
         "chown admin:IT-Admins /var/log/app.log -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "chown www-data:IT-Admins /var/log/app.log": "Exemple utilisant le paramètre 'owner': Nouveau propriétaire. Remplacez admin par la valeur appropriée selon votre environnement.",
         "chown www-data:www-data /var/www/html -R": "Changer le propriétaire du dossier web Apache",
         "chown root:admin /etc/config.conf": "Définir root comme propriétaire avec groupe admin",
         "chown -R jdupont:users /home/jdupont/documents": "Changer récursivement le propriétaire d'un dossier",

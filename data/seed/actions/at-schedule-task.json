@@ -54,11 +54,6 @@
       "platform": 1
     },
     {
-      "command": "echo \"echo 'Task executed'\" | at 14:30:00",
-      "description": "Example using the 'command' parameter: command to run. Replace Get-Process with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "echo \"backup.sh\" | at now + 1 hour",
       "description": "Schedule in 1 hour",
       "platform": 1
@@ -112,7 +107,6 @@
         "at 14:30": "Mode interactif pour définir les commandes",
         "atq": "Liste les tâches en attente",
         "atrm 3": "Supprime la tâche numéro 3",
-        "echo \"echo 'Task executed'\" | at 14:30:00": "Exemple utilisant le paramètre 'command': Commande à exécuter. Remplacez Get-Process par la valeur appropriée selon votre environnement.",
         "echo \"backup.sh\" | at now + 1 hour": "Planifier dans 1 heure",
         "echo \"reboot\" | at 03:00": "Planifier un reboot à 3h",
         "at -f script.sh now + 2 hours": "Exécuter un script dans 2h",

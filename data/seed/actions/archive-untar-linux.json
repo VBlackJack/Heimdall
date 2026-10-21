@@ -51,11 +51,6 @@
       "command": "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\" -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
-    },
-    {
-      "command": "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\"",
-      "description": "Example using the 'archivePath' parameter: path of the tar.gz file. Replace C:\\Backup\\data.tar.gz with the value that fits your environment.",
-      "platform": 1
     }
   ],
   "notes": "-x extract, -z gzip, -f file, -C destination, -t list. -v for verbose.",
@@ -80,8 +75,7 @@
       "examples": {
         "tar -xzf archive.tar.gz -C /tmp": "Extrait dans /tmp",
         "tar -tzf archive.tar.gz": "Liste le contenu sans extraire",
-        "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\"": "Exemple utilisant le paramètre 'archivePath': Chemin du fichier tar.gz. Remplacez C:\\Backup\\data.tar.gz par la valeur appropriée selon votre environnement."
+        "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
       }
     }
   }

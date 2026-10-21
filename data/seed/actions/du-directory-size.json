@@ -49,16 +49,6 @@
       "platform": 1
     },
     {
-      "command": "du -sh . | sort -hr | head -n 100",
-      "description": "Example using the 'path' parameter: directory to analyze. Replace C:\\Logs\\app.log with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "du -sh C:\\Logs\\app.log | sort -hr | head -n 20",
-      "description": "Example using the 'lines' parameter: number of largest directories to show. Replace 100 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "du -h --max-depth=1 /home",
       "description": "Size of each subfolder of /home",
       "platform": 1
@@ -111,8 +101,6 @@
       "examples": {
         "du -sh /var/log": "Taille totale du répertoire /var/log",
         "du -h --max-depth=1 /home | sort -hr": "Taille des sous-répertoires de /home triée",
-        "du -sh . | sort -hr | head -n 100": "Exemple utilisant le paramètre 'path': Répertoire à analyser. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
-        "du -sh C:\\Logs\\app.log | sort -hr | head -n 20": "Exemple utilisant le paramètre 'lines': Nombre de plus gros répertoires à afficher. Remplacez 100 par la valeur appropriée selon votre environnement.",
         "du -h --max-depth=1 /home": "Taille de chaque sous-dossier de /home",
         "du -sh /var/log/* | sort -hr | head -10": "Top 10 des plus gros fichiers de logs",
         "du -ah /tmp | sort -rh | head -20": "Les 20 plus gros fichiers dans /tmp",

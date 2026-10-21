@@ -57,11 +57,6 @@
       "command": "Set-MpPreference -MAPSReporting 2 -SubmitSamplesConsent 1",
       "description": "Configure optimal cloud protection (advanced reporting + safe sample submission)",
       "platform": 0
-    },
-    {
-      "command": "Set-MpPreference -MAPSReporting $2",
-      "description": "Example using the 'level' parameter: 0=Off, 1=Basic, 2=Advanced (recommended). Replace Error with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "MAPSReporting (Microsoft Active Protection Service): 0=Off, 1=Basic, 2=Advanced. Advanced is recommended: better detection of zero-day threats thanks to cloud analysis. SubmitSamplesConsent: 0=Always ask, 1=Send safe samples automatically, 2=Never send, 3=Send everything automatically.",
@@ -90,8 +85,7 @@
         "Set-MpPreference -MAPSReporting 0": "Désactive la protection cloud (réduit la sécurité!)",
         "Set-MpPreference -SubmitSamplesConsent 2": "Configure l'envoi automatique des échantillons suspects (0=Demander, 1=Envoyer sûrs, 2=Jamais, 3=Toujours)",
         "Get-MpComputerStatus | Select-Object MAPSReporting,SubmitSamplesConsent": "Vérifie les paramètres actuels de protection cloud",
-        "Set-MpPreference -MAPSReporting 2 -SubmitSamplesConsent 1": "Configure protection cloud optimale (reporting avancé + envoi échantillons sûrs)",
-        "Set-MpPreference -MAPSReporting $2": "Exemple utilisant le paramètre 'level': 0=Désactivé, 1=Basique, 2=Avancé (recommandé). Remplacez Error par la valeur appropriée selon votre environnement."
+        "Set-MpPreference -MAPSReporting 2 -SubmitSamplesConsent 1": "Configure protection cloud optimale (reporting avancé + envoi échantillons sûrs)"
       }
     }
   }

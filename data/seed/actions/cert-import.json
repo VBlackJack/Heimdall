@@ -58,11 +58,6 @@
       "platform": 0
     },
     {
-      "command": "Import-Certificate -FilePath 'C:\\Certs\\certificate.cer' -CertStoreLocation Cert:\\LocalMachine\\My",
-      "description": "Example using the 'certPath' parameter: path of the certificate file (.cer, .crt). Replace C:\\Certs\\server.pfx with the value that fits your environment.",
-      "platform": 0
-    },
-    {
       "command": "Import-Certificate -FilePath 'C:\\Certs\\server.pfx' -CertStoreLocation Cert:\\LocalMachine\\My",
       "description": "Example using the 'storeName' parameter: name of the store (My, Root, CA, TrustedPublisher). Replace My with the value that fits your environment.",
       "platform": 0
@@ -96,7 +91,6 @@
         "Import-Certificate -FilePath 'C:\\Certs\\cert.cer' -CertStoreLocation Cert:\\LocalMachine\\My": "Importe dans le magasin personnel de la machine",
         "Import-PfxCertificate -FilePath 'C:\\Certs\\cert.pfx' -CertStoreLocation Cert:\\LocalMachine\\My -Password (ConvertTo-SecureString -String 'MyPassword' -AsPlainText -Force)": "Importe un certificat PFX avec clé privée",
         "certutil -addstore Root 'C:\\Certs\\rootCA.cer'": "Alternative avec certutil pour certificat racine",
-        "Import-Certificate -FilePath 'C:\\Certs\\certificate.cer' -CertStoreLocation Cert:\\LocalMachine\\My": "Exemple utilisant le paramètre 'certPath': Chemin du fichier certificat (.cer, .crt). Remplacez C:\\Certs\\server.pfx par la valeur appropriée selon votre environnement.",
         "Import-Certificate -FilePath 'C:\\Certs\\server.pfx' -CertStoreLocation Cert:\\LocalMachine\\My": "Exemple utilisant le paramètre 'storeName': Nom du magasin (My, Root, CA, TrustedPublisher). Remplacez My par la valeur appropriée selon votre environnement."
       }
     }

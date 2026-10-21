@@ -60,16 +60,6 @@
       "command": "Set-MpPreference -ScanScheduleDay 8",
       "description": "Disable scheduled scans (8=Never)",
       "platform": 0
-    },
-    {
-      "command": "Set-MpPreference -ScanScheduleDay $0 -ScanScheduleTime $14:30:00",
-      "description": "Example using the 'day' parameter: 0=Every day, 1=Sunday, 2=Monday... 7=Saturday, 8=Never. Replace Monday with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "Set-MpPreference -ScanScheduleDay $Monday -ScanScheduleTime $02:00:00",
-      "description": "Example using the 'time' parameter: time in HH:mm:ss format (e.g. 02:00:00 for 2 a.m.). Replace 14:30:00 with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "ScanScheduleDay: 0=Every day, 1=Sunday, 2=Monday, 3=Tuesday, 4=Wednesday, 5=Thursday, 6=Friday, 7=Saturday, 8=Never. ScanParameters: 1=QuickScan (recommended), 2=FullScan. Pick a time when the PC is on but little used.",
@@ -101,9 +91,7 @@
         "Set-MpPreference -ScanScheduleDay 7 -ScanScheduleTime 20:00:00": "Planifie une analyse tous les samedis à 20h",
         "Set-MpPreference -ScanScheduleDay 1 -ScanScheduleTime 12:00:00 -ScanParameters 1": "Analyse rapide tous les dimanches à midi (ScanParameters: 1=Quick, 2=Full)",
         "Get-MpPreference | Select-Object ScanScheduleDay,ScanScheduleTime,ScanParameters": "Affiche la planification actuelle des analyses",
-        "Set-MpPreference -ScanScheduleDay 8": "Désactive les analyses planifiées (8=Jamais)",
-        "Set-MpPreference -ScanScheduleDay $0 -ScanScheduleTime $14:30:00": "Exemple utilisant le paramètre 'day': 0=Tous les jours, 1=Dimanche, 2=Lundi... 7=Samedi, 8=Jamais. Remplacez Monday par la valeur appropriée selon votre environnement.",
-        "Set-MpPreference -ScanScheduleDay $Monday -ScanScheduleTime $02:00:00": "Exemple utilisant le paramètre 'time': Heure au format HH:mm:ss (ex: 02:00:00 pour 2h du matin). Remplacez 14:30:00 par la valeur appropriée selon votre environnement."
+        "Set-MpPreference -ScanScheduleDay 8": "Désactive les analyses planifiées (8=Jamais)"
       }
     }
   }

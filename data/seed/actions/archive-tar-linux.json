@@ -55,16 +55,6 @@
       "platform": 1
     },
     {
-      "command": "tar -czf \"backup.tar.gz\" \"/home/admin/data\"",
-      "description": "Example using the 'archiveName' parameter: name of the archive file (without extension). Replace data-backup.zip with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "tar -czf \"data-backup.zip.tar.gz\" \"/home/admin/data\"",
-      "description": "Example using the 'sourcePath' parameter: files or folders to archive. Replace C:\\Source\\data.csv with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "tar -czvf backup.tar.gz /etc /home",
       "description": "Create a compressed archive of /etc and /home",
       "platform": 1
@@ -113,8 +103,6 @@
         "tar -czf backup.tar.gz /home/user/documents": "Crée une archive compressée du dossier documents",
         "tar -czf logs_$(date +%Y%m%d).tar.gz /var/log": "Archive avec date dans le nom",
         "tar -czf \"data-backup.zip.tar.gz\" \"/home/admin/data\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "tar -czf \"backup.tar.gz\" \"/home/admin/data\"": "Exemple utilisant le paramètre 'archiveName': Nom du fichier archive (sans extension). Remplacez data-backup.zip par la valeur appropriée selon votre environnement.",
-        "tar -czf \"data-backup.zip.tar.gz\" \"/home/admin/data\"": "Exemple utilisant le paramètre 'sourcePath': Fichiers ou dossiers à archiver. Remplacez C:\\Source\\data.csv par la valeur appropriée selon votre environnement.",
         "tar -czvf backup.tar.gz /etc /home": "Créer une archive compressée de /etc et /home",
         "tar -xzvf archive.tar.gz -C /tmp": "Extraire une archive dans /tmp",
         "tar -tzvf backup.tar.gz": "Lister le contenu d'une archive",

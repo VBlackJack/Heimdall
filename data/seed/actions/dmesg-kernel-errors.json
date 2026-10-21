@@ -48,16 +48,6 @@
       "platform": 1
     },
     {
-      "command": "dmesg --level=err,warn --human --color=always | tail -n 100",
-      "description": "Example using the 'level' parameter: severity level (emerg, alert, crit, err, warn, notice, info, debug). Replace Error with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "dmesg --level=Error --human --color=always | tail -n 100",
-      "description": "Example using the 'lines' parameter: number of lines to show. Replace 100 with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "dmesg",
       "description": "Show the kernel messages",
       "platform": 1
@@ -110,8 +100,6 @@
       "examples": {
         "dmesg --level=err,warn --human": "Affiche les erreurs et avertissements du noyau",
         "dmesg | grep -i usb": "Recherche les messages concernant l'USB",
-        "dmesg --level=err,warn --human --color=always | tail -n 100": "Exemple utilisant le paramètre 'level': Niveau de sévérité (emerg, alert, crit, err, warn, notice, info, debug). Remplacez Error par la valeur appropriée selon votre environnement.",
-        "dmesg --level=Error --human --color=always | tail -n 100": "Exemple utilisant le paramètre 'lines': Nombre de lignes à afficher. Remplacez 100 par la valeur appropriée selon votre environnement.",
         "dmesg": "Afficher les messages du noyau",
         "dmesg -T": "Avec timestamps lisibles",
         "dmesg -w": "Suivre en temps réel",

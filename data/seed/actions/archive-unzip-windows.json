@@ -41,11 +41,6 @@
       "command": "Expand-Archive -Path \"backup.zip\" -DestinationPath \"C:\\Restored\"",
       "description": "Extract a ZIP archive",
       "platform": 0
-    },
-    {
-      "command": "Expand-Archive -Path \"C:\\Backup\\archive.zip\" -DestinationPath \".\" -Force",
-      "description": "Example using the 'destinationPath' parameter: destination folder. Replace D:\\Backup\\data.csv with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "notes": "-Force overwrites the existing files.",
@@ -73,8 +68,7 @@
         }
       },
       "examples": {
-        "Expand-Archive -Path \"backup.zip\" -DestinationPath \"C:\\Restored\"": "Extrait une archive ZIP",
-        "Expand-Archive -Path \"C:\\Backup\\archive.zip\" -DestinationPath \".\" -Force": "Exemple utilisant le paramètre 'destinationPath': Dossier de destination. Remplacez D:\\Backup\\data.csv par la valeur appropriée selon votre environnement."
+        "Expand-Archive -Path \"backup.zip\" -DestinationPath \"C:\\Restored\"": "Extrait une archive ZIP"
       }
     }
   }

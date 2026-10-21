@@ -41,11 +41,6 @@
       "command": "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=IT,DC=contoso,DC=com\"",
       "description": "Move Jean Dupont to the IT OU",
       "platform": 0
-    },
-    {
-      "command": "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=Archive,DC=contoso,DC=com\"",
-      "description": "Standard run of the None command. See the official documentation with Get-Help Move-ADObject -Full for the available parameters and advanced use cases.",
-      "platform": 0
     }
   ],
   "notes": "Requires the full DN of the object. Use Get-ADUser/Get-ADComputer -Identity xxx to get the DN.",
@@ -73,8 +68,7 @@
         }
       },
       "examples": {
-        "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=IT,DC=contoso,DC=com\"": "Déplace Jean Dupont vers l'OU IT",
-        "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=Archive,DC=contoso,DC=com\"": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Move-ADObject -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=IT,DC=contoso,DC=com\"": "Déplace Jean Dupont vers l'OU IT"
       }
     }
   }

@@ -80,16 +80,6 @@
       "command": "dotnet publish --self-contained --runtime win-x64",
       "description": "Publish with the runtime included for Windows x64",
       "platform": 0
-    },
-    {
-      "command": "dotnet publish \".\" --configuration Release --output \"C:\\Reports\\output.txt\"",
-      "description": "Example using the 'projectPath' parameter: path of the project. Replace C:\\Projects\\MyApp with the value that fits your environment.",
-      "platform": 0
-    },
-    {
-      "command": "dotnet publish \"C:\\Projects\\MyApp\" --configuration Release --output \"./publish\"",
-      "description": "Example using the 'outputPath' parameter: folder to publish to. Replace C:\\Reports\\output.txt with the value that fits your environment.",
-      "platform": 0
     }
   ],
   "linuxExamples": [
@@ -134,8 +124,6 @@
       "examples": {
         "dotnet publish -c Release -o ./publish": "Publie en mode Release",
         "dotnet publish --self-contained --runtime win-x64": "Publie avec runtime inclus pour Windows x64",
-        "dotnet publish \".\" --configuration Release --output \"C:\\Reports\\output.txt\"": "Exemple utilisant le paramètre 'projectPath': Chemin du projet. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement.",
-        "dotnet publish \"C:\\Projects\\MyApp\" --configuration Release --output \"./publish\"": "Exemple utilisant le paramètre 'outputPath': Dossier où publier. Remplacez C:\\Reports\\output.txt par la valeur appropriée selon votre environnement.",
         "dotnet publish \"./MyApp\" --configuration Release --output \"./publish\"": "Publie un projet .NET en mode Release",
         "dotnet publish -c Release": "Publier en mode Release"
       }

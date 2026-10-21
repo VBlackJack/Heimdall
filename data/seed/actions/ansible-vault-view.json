@@ -67,11 +67,6 @@
       "platform": 1
     },
     {
-      "command": "ansible-vault view secrets.yml",
-      "description": "Example using the 'filePath' parameter: path of the encrypted file to show. Replace C:\\Data\\report.xlsx with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "ansible-vault view group_vars/prod/vault.yml",
       "description": "In group_vars",
       "platform": 1
@@ -99,7 +94,6 @@
       "examples": {
         "ansible-vault view C:\\Data\\report.xlsx": "Exemple Windows utilisant ansible-vault. Remplacez les paramètres entre <> par vos valeurs.",
         "ansible-vault view vars/secrets.yml": "Affiche le contenu déchiffré",
-        "ansible-vault view secrets.yml": "Exemple utilisant le paramètre 'filePath': Chemin du fichier chiffré à afficher. Remplacez C:\\Data\\report.xlsx par la valeur appropriée selon votre environnement.",
         "ansible-vault view group_vars/prod/vault.yml": "Dans group_vars"
       }
     }

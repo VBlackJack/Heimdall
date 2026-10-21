@@ -24,16 +24,6 @@
       "command": "netdom query fsmo",
       "description": "Show all FSMO role holders",
       "platform": 0
-    },
-    {
-      "command": "netdom query fsmo -WhatIf",
-      "description": "Simulate the action with -WhatIf (dry run). Shows what would be done without running it. Essential to test commands that change things before running them. Remove -WhatIf after checking to run it.",
-      "platform": 0
-    },
-    {
-      "command": "netdom query fsmo -Confirm:$false",
-      "description": "Run the action without an interactive confirmation. The -Confirm:$false parameter suppresses the confirmation prompts. Useful in automated scripts, but use with care.",
-      "platform": 0
     }
   ],
   "notes": "The 5 FSMO roles: Schema Master, Domain Naming Master, RID Master, PDC Emulator, Infrastructure Master.",
@@ -49,9 +39,7 @@
       "description": "Affiche les contrôleurs de domaine détenant les rôles FSMO (Flexible Single Master Operations).",
       "notes": "Les 5 rôles FSMO: Schema Master, Domain Naming Master, RID Master, PDC Emulator, Infrastructure Master.",
       "examples": {
-        "netdom query fsmo": "Affiche tous les détenteurs de rôles FSMO",
-        "netdom query fsmo -WhatIf": "Simulation de l'action avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter réellement. Indispensable pour tester les commandes de modification avant exécution. Retirez -WhatIf après validation pour exécuter.",
-        "netdom query fsmo -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution."
+        "netdom query fsmo": "Affiche tous les détenteurs de rôles FSMO"
       }
     }
   }

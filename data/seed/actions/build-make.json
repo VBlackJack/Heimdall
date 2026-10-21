@@ -46,11 +46,6 @@
       "platform": 1
     },
     {
-      "command": "make all",
-      "description": "Example using the 'target' parameter: target to build (all, clean, install and so on). Replace srv-web-01.contoso.com with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "make clean",
       "description": "Clean the generated files",
       "platform": 1
@@ -95,7 +90,6 @@
         "make": "Compile la cible par défaut",
         "make clean && make": "Nettoie puis recompile",
         "make -j4": "Compile en parallèle (4 jobs)",
-        "make all": "Exemple utilisant le paramètre 'target': Cible à compiler (all, clean, install, etc.). Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
         "make clean": "Nettoyer les fichiers générés",
         "make install": "Installer le programme",
         "make test": "Exécuter les tests",

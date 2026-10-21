@@ -94,16 +94,6 @@
       "platform": 1
     },
     {
-      "command": "ansible-playbook site.yml -i /etc/ansible/hosts --check --diff",
-      "description": "Example using the 'playbookPath' parameter: path to the YAML playbook file. Replace /etc/ansible/playbooks/deploy.yml with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook /etc/ansible/playbooks/deploy.yml -i inventory.ini --check --diff",
-      "description": "Example using the 'inventory' parameter: host inventory file. Replace /etc/ansible/hosts with the value that fits your environment.",
-      "platform": 1
-    },
-    {
       "command": "ansible-playbook --check deploy.yml",
       "description": "Check mode",
       "platform": 1
@@ -141,8 +131,6 @@
         "ansible-playbook deploy.yml --check -v": "Mode dry-run avec sortie verbose.",
         "ansible-playbook deploy.yml -i production --check --diff": "Simule le déploiement et affiche les modifications",
         "ansible-playbook update.yml --check -v": "Test avec sortie verbeux",
-        "ansible-playbook site.yml -i /etc/ansible/hosts --check --diff": "Exemple utilisant le paramètre 'playbookPath': Chemin vers le fichier playbook YAML. Remplacez /etc/ansible/playbooks/deploy.yml par la valeur appropriée selon votre environnement.",
-        "ansible-playbook /etc/ansible/playbooks/deploy.yml -i inventory.ini --check --diff": "Exemple utilisant le paramètre 'inventory': Fichier d'inventaire des hôtes. Remplacez /etc/ansible/hosts par la valeur appropriée selon votre environnement.",
         "ansible-playbook --check deploy.yml": "Mode check"
       }
     }
