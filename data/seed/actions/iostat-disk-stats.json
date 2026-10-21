@@ -1,8 +1,8 @@
 {
   "id": "iostat-disk-stats",
-  "title": "Statistiques d'I/O disque",
-  "description": "Affiche les statistiques d'entrées/sorties des disques et partitions",
-  "category": "📊 Monitoring & Logs",
+  "title": "Disk I/O statistics",
+  "description": "Show the input/output statistics of disks and partitions.",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -21,34 +21,56 @@
     "parameters": [
       {
         "name": "interval",
-        "label": "Intervalle (secondes)",
+        "label": "Interval (seconds)",
         "type": "number",
         "defaultValue": "5",
         "required": true,
-        "description": "Intervalle entre les mesures"
+        "description": "Interval between samples"
       },
       {
         "name": "count",
-        "label": "Nombre de mesures",
+        "label": "Number of samples",
         "type": "number",
         "defaultValue": "3",
         "required": true,
-        "description": "Nombre de mesures à effectuer"
+        "description": "Number of samples to take"
       }
     ]
   },
   "examples": [
     {
       "command": "iostat",
-      "description": "Statistiques CPU et disque",
+      "description": "CPU and disk statistics",
       "platform": 1
     }
   ],
-  "notes": "Fait partie du package sysstat. -x pour statistiques étendues. Utile pour détecter les goulots d'étranglement.",
+  "notes": "Part of the sysstat package. -x for extended statistics. Useful to find bottlenecks.",
   "links": [
     {
       "title": "iostat command",
       "url": "https://man7.org/linux/man-pages/man1/iostat.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Statistiques d'I/O disque",
+      "description": "Affiche les statistiques d'entrées/sorties des disques et partitions",
+      "notes": "Fait partie du package sysstat. -x pour statistiques étendues. Utile pour détecter les goulots d'étranglement.",
+      "parameters": {
+        "linux": {
+          "interval": {
+            "label": "Intervalle (secondes)",
+            "description": "Intervalle entre les mesures"
+          },
+          "count": {
+            "label": "Nombre de mesures",
+            "description": "Nombre de mesures à effectuer"
+          }
+        }
+      },
+      "examples": {
+        "iostat": "Statistiques CPU et disque"
+      }
+    }
+  }
 }

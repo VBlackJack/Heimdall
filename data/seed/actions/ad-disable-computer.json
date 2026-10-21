@@ -1,8 +1,8 @@
 {
   "id": "ad-disable-computer",
-  "title": "Désactiver un compte ordinateur AD",
-  "description": "Désactive un compte ordinateur Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Disable an AD computer account",
+  "description": "Disable an Active Directory computer account.",
+  "category": "active-directory",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -15,60 +15,61 @@
     "id": "ad-disable-computer-cmd",
     "platform": 0,
     "name": "Disable-ADAccount",
-    "commandPattern": "Disable-ADAccount -Identity {computerName}$",
+    "commandPattern": "Disable-ADAccount -Identity '{computerName}$'",
     "parameters": [
       {
         "name": "computerName",
-        "label": "Nom de l'ordinateur",
+        "label": "Computer name",
         "type": "string",
         "defaultValue": "",
+        "quoting": "InlineInQuotes",
         "required": true,
-        "description": "Nom de l'ordinateur AD (sans le $)"
+        "description": "Name of the AD computer (without the $)"
       }
     ]
   },
   "examples": [
     {
-      "command": "Disable-ADAccount -Identity jdupont",
-      "description": "Désactive immédiatement le compte de jdupont. L'utilisateur ne pourra plus se connecter mais le compte et toutes ses données restent dans AD. La désactivation est réversible avec Enable-ADAccount. Méthode recommandée pour les départs temporaires (congés longs, suspensions).",
+      "command": "Disable-ADAccount -Identity 'PC-SALES-01$'",
+      "description": "Disable the computer account PC-SALES-01 (the sAMAccountName of a computer ends with $)",
       "platform": 0
     },
     {
-      "command": "Disable-ADAccount -Identity jdupont -Confirm:$false",
-      "description": "Désactive le compte sans demander de confirmation. Le paramètre -Confirm:$false supprime l'invite (utile pour les scripts automatisés). Utilisez avec précaution : la désactivation est immédiate et peut déconnecter l'utilisateur de toutes ses sessions actives.",
+      "command": "Get-ADComputer -Filter {Enabled -eq $true} -Properties LastLogonDate | Where-Object {$_.LastLogonDate -lt (Get-Date).AddDays(-90)} | Disable-ADAccount -WhatIf",
+      "description": "Simulate disabling every enabled computer that has not logged on for 90 days; remove -WhatIf to run it",
       "platform": 0
     },
     {
-      "command": "Get-ADUser -Filter {Enabled -eq $true -and LastLogonDate -lt (Get-Date).AddDays(-180)} -Properties LastLogonDate | Disable-ADAccount -WhatIf",
-      "description": "Simulation de désactivation des comptes inactifs depuis 180 jours. Le switch -WhatIf affiche ce qui serait fait SANS exécuter l'action (mode dry-run). Indispensable avant toute action de masse pour éviter les erreurs. Retirez -WhatIf après vérification pour exécuter réellement.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ADUser jdupont -Properties Enabled | Select-Object Name,Enabled,SamAccountName",
-      "description": "Vérifie si un compte est actif ou désactivé. La propriété Enabled vaut $true (actif) ou $false (désactivé). Toujours vérifier l'état avant de désactiver ou réactiver. Utile aussi pour les scripts de reporting et les tableaux de bord.",
-      "platform": 0
-    },
-    {
-      "command": "Disable-ADAccount -Identity jdupont -PassThru | Set-ADUser -Description \"Account disabled on $(Get-Date -Format 'dd/MM/yyyy') - Employee departure\"",
-      "description": "Désactive le compte et ajoute automatiquement une note avec la date et la raison. Le switch -PassThru permet de passer l'objet au pipeline. Set-ADUser -Description documente l'action pour la traçabilité. Excellente pratique pour les audits : toujours documenter les raisons de désactivation.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ADUser -Filter {Department -eq 'Finance' -and Enabled -eq $true} | Select-Object Name,SamAccountName | Export-Csv C:\\Temp\\FinanceUsersBeforeDisable.csv -NoTypeInformation; Get-ADUser -Filter {Department -eq 'Finance'} | Disable-ADAccount",
-      "description": "Désactivation massive avec sauvegarde préalable : exporte d'abord la liste des utilisateurs Finance actifs, puis les désactive tous. La sauvegarde CSV permet une restauration en cas d'erreur. Les deux commandes sont séparées par un point-virgule pour exécution séquentielle. Toujours faire une sauvegarde avant une opération de masse.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ADUser -Filter * -Properties Enabled,LastLogonDate | Where-Object {$_.Enabled -eq $false} | Select-Object Name,SamAccountName,Enabled,LastLogonDate | Export-Csv C:\\Temp\\DisabledAccounts.csv -NoTypeInformation",
-      "description": "Exporte un rapport complet de tous les comptes désactivés avec leur dernière connexion. Utile pour les audits de sécurité, l'analyse des comptes dormants et la préparation au nettoyage de l'AD. Effectuez ce rapport trimestriellement pour maintenir un AD propre.",
+      "command": "Disable-ADAccount -Identity 'PC-SALES-01$' -PassThru | Select-Object Name,Enabled",
+      "description": "Disable the computer account and show its state to confirm it",
       "platform": 0
     }
   ],
-  "notes": "L'ordinateur ne pourra plus communiquer avec le domaine. Utile pour les machines retirées du service.",
+  "notes": "The computer can no longer communicate with the domain. Useful for decommissioned machines.",
   "links": [
     {
       "title": "Documentation Disable-ADAccount",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/disable-adaccount"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Désactiver un compte ordinateur AD",
+      "description": "Désactive un compte ordinateur Active Directory.",
+      "notes": "L'ordinateur ne pourra plus communiquer avec le domaine. Utile pour les machines retirées du service.",
+      "parameters": {
+        "windows": {
+          "computerName": {
+            "label": "Nom de l'ordinateur",
+            "description": "Nom de l'ordinateur AD (sans le $)"
+          }
+        }
+      },
+      "examples": {
+        "Disable-ADAccount -Identity 'PC-SALES-01$'": "Désactive le compte ordinateur PC-SALES-01 (le sAMAccountName d'un ordinateur se termine par $)",
+        "Get-ADComputer -Filter {Enabled -eq $true} -Properties LastLogonDate | Where-Object {$_.LastLogonDate -lt (Get-Date).AddDays(-90)} | Disable-ADAccount -WhatIf": "Simule la désactivation de tous les ordinateurs actifs sans connexion depuis 90 jours ; retirez -WhatIf pour l'exécuter",
+        "Disable-ADAccount -Identity 'PC-SALES-01$' -PassThru | Select-Object Name,Enabled": "Désactive le compte ordinateur et affiche son état pour le confirmer"
+      }
+    }
+  }
 }

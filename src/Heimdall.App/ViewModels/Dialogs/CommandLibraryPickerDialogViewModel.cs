@@ -26,6 +26,7 @@ using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
+using TwinShell.Core.Services;
 using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 using TemplateParameter = TwinShell.Core.Models.TemplateParameter;
 
@@ -211,12 +212,17 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
             // it, so the continuation has to resume on the thread that created them.
             // ActionService already applies ConfigureAwait(false) internally, which means
             // the caller's await is the only thing that can bring the flow back.
-            var items = (await actionService.GetAllActionsAsync())
+            var stored = await actionService.GetAllActionsAsync();
+
+            // The picker shows the operator's language. What it hands back is the action id
+            // and the template, whose command pattern no translation touches.
+            var items = ActionLocalizer.LocalizeAll(stored, _localizer.CurrentLocale)
                 .Select(action => new CommandLibraryPickerItem
                 {
                     ActionId = action.Id,
                     Title = action.Title,
-                    Category = action.Category,
+                    Category = CommandPresentationResolver.ResolveCategoryLabel(action.Category, key => _localizer[key]),
+                    CategoryKey = action.Category,
                     HasLinuxTemplate = action.LinuxCommandTemplate is not null,
                     HasWindowsTemplate = action.WindowsCommandTemplate is not null,
                     LinuxParameters = action.LinuxCommandTemplate?.Parameters?.ToList() ?? [],
@@ -319,7 +325,8 @@ public partial class CommandLibraryPickerDialogViewModel : ObservableObject
 
         if (!string.IsNullOrWhiteSpace(SearchText)
             && action.Title.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0
-            && action.Category.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0)
+            && action.Category.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0
+            && action.CategoryKey.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0)
         {
             return false;
         }

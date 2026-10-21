@@ -1,8 +1,8 @@
 {
   "id": "linux-rsyslog-check-config",
-  "title": "Vérifier configuration Rsyslog",
-  "description": "Vérifie la syntaxe du fichier de configuration rsyslog.conf sans démarrer le démon. À lancer impérativement après chaque modification.",
-  "category": "📊 Monitoring & Logs",
+  "title": "Check the rsyslog configuration",
+  "description": "Check the syntax of the rsyslog.conf configuration file without starting the daemon. Always run it after every change.",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -22,14 +22,24 @@
   "examples": [
     {
       "command": "rsyslogd -N1",
-      "description": "Vérifie le fichier /etc/rsyslog.conf par défaut. Retourne les erreurs de syntaxe éventuelles.",
+      "description": "Check the default /etc/rsyslog.conf file. Returns any syntax errors.",
       "platform": 1
     },
     {
       "command": "rsyslogd -N1 -f /etc/rsyslog.d/my-app.conf",
-      "description": "Vérifie un fichier de configuration spécifique.",
+      "description": "Check a given configuration file.",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "024aaaaa-e143-4ca7-a1d0-8fd1d4674999"
+  "linuxCommandTemplateId": "024aaaaa-e143-4ca7-a1d0-8fd1d4674999",
+  "translations": {
+    "fr": {
+      "title": "Vérifier configuration Rsyslog",
+      "description": "Vérifie la syntaxe du fichier de configuration rsyslog.conf sans démarrer le démon. À lancer impérativement après chaque modification.",
+      "examples": {
+        "rsyslogd -N1": "Vérifie le fichier /etc/rsyslog.conf par défaut. Retourne les erreurs de syntaxe éventuelles.",
+        "rsyslogd -N1 -f /etc/rsyslog.d/my-app.conf": "Vérifie un fichier de configuration spécifique."
+      }
+    }
+  }
 }

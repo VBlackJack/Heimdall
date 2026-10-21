@@ -1,8 +1,8 @@
 {
   "id": "ad-get-group-members",
-  "title": "Lister les membres d'un groupe AD",
-  "description": "Affiche tous les membres d'un groupe Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "List the members of an AD group",
+  "description": "Show every member of an Active Directory group.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -20,51 +20,74 @@
     "parameters": [
       {
         "name": "groupName",
-        "label": "Nom du groupe",
+        "label": "Group name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du groupe AD"
+        "description": "Name of the AD group"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-ADGroup -Filter *",
-      "description": "Liste tous les groupes Active Directory du domaine. Retourne le nom, le GroupCategory (Distribution/Security), le GroupScope (DomainLocal/Global/Universal) et le DistinguishedName. Peut être lent sur de gros domaines avec des milliers de groupes.",
+      "description": "List every Active Directory group of the domain. Returns the name, GroupCategory (Distribution/Security), GroupScope (DomainLocal/Global/Universal) and DistinguishedName. Can be slow on large domains with thousands of groups.",
       "platform": 0
     },
     {
       "command": "Get-ADGroup -Filter {Name -like '*Admin*'} -Properties Description,Members",
-      "description": "Recherche tous les groupes contenant 'Admin' dans le nom. Utile pour identifier les groupes à privilèges élevés. La propriété Description aide à comprendre l'usage du groupe. Members liste les membres (mais utilisez plutôt Get-ADGroupMember pour une liste détaillée).",
+      "description": "Search every group with 'Admin' in its name. Useful to find highly privileged groups. The Description property helps understand what the group is for. Members lists the members (prefer Get-ADGroupMember for a detailed list).",
       "platform": 0
     },
     {
       "command": "Get-ADGroup -Identity 'Domain Admins' -Properties Members,MemberOf,Description",
-      "description": "Affiche les détails d'un groupe spécifique. Members liste les membres directs. MemberOf liste les groupes dont ce groupe est membre (imbrication). Description documente le rôle du groupe. Essentiel pour l'audit des groupes sensibles.",
+      "description": "Show the details of one group. Members lists the direct members. MemberOf lists the groups this group belongs to (nesting). Description documents the group's role. Essential to audit sensitive groups.",
       "platform": 0
     },
     {
       "command": "Get-ADGroup -Filter * -Properties ManagedBy | Where-Object {$_.ManagedBy -ne $null} | Select-Object Name,ManagedBy",
-      "description": "Liste tous les groupes qui ont un gestionnaire défini. La propriété ManagedBy contient le DN de l'utilisateur responsable du groupe. Utile pour identifier les groupes gérés et contacter les responsables lors de revues d'accès.",
+      "description": "List every group that has a manager. The ManagedBy property holds the DN of the user responsible for the group. Useful to find managed groups and contact their owners during access reviews.",
       "platform": 0
     },
     {
       "command": "Get-ADGroup -Filter {GroupCategory -eq 'Distribution'} | Measure-Object",
-      "description": "Compte le nombre de groupes de distribution (listes de diffusion Exchange). Measure-Object retourne le count total. Utile pour les statistiques, la documentation et les audits Exchange.",
+      "description": "Count the distribution groups (Exchange mailing lists). Measure-Object returns the total count. Useful for statistics, documentation and Exchange audits.",
       "platform": 0
     },
     {
       "command": "Get-ADGroup -Filter * -Properties Created | Sort-Object Created -Descending | Select-Object Name,Created -First 20",
-      "description": "Affiche les 20 groupes les plus récemment créés. Sort-Object -Descending trie du plus récent au plus ancien. Utile pour surveiller les créations de groupes, détecter les créations suspectes et suivre les changements organisationnels.",
+      "description": "Show the 20 most recently created groups. Sort-Object -Descending sorts from newest to oldest. Useful to monitor group creation, detect suspicious creations and follow organizational changes.",
       "platform": 0
     }
   ],
-  "notes": "Affiche les membres directs uniquement. Pour inclure les membres des groupes imbriqués, utiliser -Recursive.",
+  "notes": "Shows direct members only. To include the members of nested groups, use -Recursive.",
   "links": [
     {
       "title": "Documentation Get-ADGroupMember",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adgroupmember"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les membres d'un groupe AD",
+      "description": "Affiche tous les membres d'un groupe Active Directory.",
+      "notes": "Affiche les membres directs uniquement. Pour inclure les membres des groupes imbriqués, utiliser -Recursive.",
+      "parameters": {
+        "windows": {
+          "groupName": {
+            "label": "Nom du groupe",
+            "description": "Nom du groupe AD"
+          }
+        }
+      },
+      "examples": {
+        "Get-ADGroup -Filter *": "Liste tous les groupes Active Directory du domaine. Retourne le nom, le GroupCategory (Distribution/Security), le GroupScope (DomainLocal/Global/Universal) et le DistinguishedName. Peut être lent sur de gros domaines avec des milliers de groupes.",
+        "Get-ADGroup -Filter {Name -like '*Admin*'} -Properties Description,Members": "Recherche tous les groupes contenant 'Admin' dans le nom. Utile pour identifier les groupes à privilèges élevés. La propriété Description aide à comprendre l'usage du groupe. Members liste les membres (mais utilisez plutôt Get-ADGroupMember pour une liste détaillée).",
+        "Get-ADGroup -Identity 'Domain Admins' -Properties Members,MemberOf,Description": "Affiche les détails d'un groupe spécifique. Members liste les membres directs. MemberOf liste les groupes dont ce groupe est membre (imbrication). Description documente le rôle du groupe. Essentiel pour l'audit des groupes sensibles.",
+        "Get-ADGroup -Filter * -Properties ManagedBy | Where-Object {$_.ManagedBy -ne $null} | Select-Object Name,ManagedBy": "Liste tous les groupes qui ont un gestionnaire défini. La propriété ManagedBy contient le DN de l'utilisateur responsable du groupe. Utile pour identifier les groupes gérés et contacter les responsables lors de revues d'accès.",
+        "Get-ADGroup -Filter {GroupCategory -eq 'Distribution'} | Measure-Object": "Compte le nombre de groupes de distribution (listes de diffusion Exchange). Measure-Object retourne le count total. Utile pour les statistiques, la documentation et les audits Exchange.",
+        "Get-ADGroup -Filter * -Properties Created | Sort-Object Created -Descending | Select-Object Name,Created -First 20": "Affiche les 20 groupes les plus récemment créés. Sort-Object -Descending trie du plus récent au plus ancien. Utile pour surveiller les créations de groupes, détecter les créations suspectes et suivre les changements organisationnels."
+      }
+    }
+  }
 }

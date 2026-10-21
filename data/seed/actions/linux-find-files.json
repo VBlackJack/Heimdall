@@ -1,8 +1,8 @@
 {
   "id": "linux-find-files",
-  "title": "Recherche avancée (find)",
-  "description": "Cherche des fichiers selon critères (nom, taille, date, permissions).",
-  "category": "📁 Files & Storage",
+  "title": "Advanced search (find)",
+  "description": "Find files by criteria (name, size, date, permissions).",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -19,43 +19,67 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": ".",
         "required": true,
-        "description": "Où chercher"
+        "description": "Where to search"
       },
       {
         "name": "pattern",
-        "label": "Mot-clé",
+        "label": "Keyword",
         "type": "string",
         "defaultValue": "*.log",
         "required": true,
-        "description": "Nom ou wildcard"
+        "description": "Name or wildcard"
       }
     ]
   },
   "examples": [
     {
       "command": "find /var/log -name \"*.err\"",
-      "description": "Trouve tous les fichiers .err dans /var/log.",
+      "description": "Find every .err file in /var/log.",
       "platform": 1
     },
     {
       "command": "find . -type f -mmin -10",
-      "description": "🔥 FORENSIC : Trouve tous les fichiers modifiés il y a moins de 10 minutes. Très utile pour voir ce qui vient de changer.",
+      "description": "🔥 FORENSIC: find every file modified less than 10 minutes ago. Very useful to see what just changed.",
       "platform": 1
     },
     {
       "command": "find / -size +100M",
-      "description": "Trouve tous les fichiers de plus de 100 Mo sur tout le système.",
+      "description": "Find every file larger than 100 MB on the whole system.",
       "platform": 1
     },
     {
       "command": "find . -type f -exec grep -l \"error\" {} +",
-      "description": "Trouve les fichiers contenant le mot 'error' (combine find et grep).",
+      "description": "Find the files that contain the word 'error' (combines find and grep).",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "d5086d24-2152-4fbc-aad6-d9548b122f8f"
+  "linuxCommandTemplateId": "d5086d24-2152-4fbc-aad6-d9548b122f8f",
+  "translations": {
+    "fr": {
+      "title": "Recherche avancée (find)",
+      "description": "Cherche des fichiers selon critères (nom, taille, date, permissions).",
+      "parameters": {
+        "linux": {
+          "path": {
+            "label": "Chemin",
+            "description": "Où chercher"
+          },
+          "pattern": {
+            "label": "Mot-clé",
+            "description": "Nom ou wildcard"
+          }
+        }
+      },
+      "examples": {
+        "find /var/log -name \"*.err\"": "Trouve tous les fichiers .err dans /var/log.",
+        "find . -type f -mmin -10": "🔥 FORENSIC : Trouve tous les fichiers modifiés il y a moins de 10 minutes. Très utile pour voir ce qui vient de changer.",
+        "find / -size +100M": "Trouve tous les fichiers de plus de 100 Mo sur tout le système.",
+        "find . -type f -exec grep -l \"error\" {} +": "Trouve les fichiers contenant le mot 'error' (combine find et grep)."
+      }
+    }
+  }
 }

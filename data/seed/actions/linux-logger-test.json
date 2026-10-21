@@ -1,8 +1,8 @@
 {
   "id": "linux-logger-test",
-  "title": "Tester l'envoi de logs (Logger)",
-  "description": "Envoie manuellement un message au démon syslog local ou distant. Utile pour vérifier que le routage des logs fonctionne (ex: vers un SIEM).",
-  "category": "📊 Monitoring & Logs",
+  "title": "Test log sending (logger)",
+  "description": "Send a message by hand to the local or remote syslog daemon. Useful to check that log routing works (e.g. to a SIEM).",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "priority",
-        "label": "Priorité",
+        "label": "Priority",
         "type": "string",
         "defaultValue": "local0.info",
         "required": true,
-        "description": "Facilité.Niveau (ex: local0.info, auth.err)"
+        "description": "Facility.Level (e.g. local0.info, auth.err)"
       },
       {
         "name": "message",
@@ -32,21 +32,43 @@
         "type": "string",
         "defaultValue": "Test TwinShell Syslog",
         "required": true,
-        "description": "Contenu du log"
+        "description": "Log content"
       }
     ]
   },
   "examples": [
     {
       "command": "logger -p local0.info \"Test message de TwinShell\"",
-      "description": "Envoie un log simple avec la facilité local0.",
+      "description": "Send a plain log with the local0 facility.",
       "platform": 1
     },
     {
       "command": "logger -n 192.168.1.50 -P 514 -t TEST \"Message direct UDP\"",
-      "description": "🔥 TEST RESEAU : Envoie un log directement à un serveur distant (-n) en UDP, en contournant le démon local. Idéal pour tester le pare-feu/réseau.",
+      "description": "🔥 NETWORK TEST: send a log straight to a remote server (-n) over UDP, bypassing the local daemon. Ideal to test the firewall and the network.",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "1e605fe9-b556-4145-a7ca-5a2556903843"
+  "linuxCommandTemplateId": "1e605fe9-b556-4145-a7ca-5a2556903843",
+  "translations": {
+    "fr": {
+      "title": "Tester l'envoi de logs (Logger)",
+      "description": "Envoie manuellement un message au démon syslog local ou distant. Utile pour vérifier que le routage des logs fonctionne (ex: vers un SIEM).",
+      "parameters": {
+        "linux": {
+          "priority": {
+            "label": "Priorité",
+            "description": "Facilité.Niveau (ex: local0.info, auth.err)"
+          },
+          "message": {
+            "label": "Message",
+            "description": "Contenu du log"
+          }
+        }
+      },
+      "examples": {
+        "logger -p local0.info \"Test message de TwinShell\"": "Envoie un log simple avec la facilité local0.",
+        "logger -n 192.168.1.50 -P 514 -t TEST \"Message direct UDP\"": "🔥 TEST RESEAU : Envoie un log directement à un serveur distant (-n) en UDP, en contournant le démon local. Idéal pour tester le pare-feu/réseau."
+      }
+    }
+  }
 }

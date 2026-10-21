@@ -1,8 +1,8 @@
 {
   "id": "rsync-sync-files",
-  "title": "Synchroniser des fichiers avec rsync",
-  "description": "Synchronise et copie des fichiers localement ou à distance de manière incrémentale",
-  "category": "📁 Files & Storage",
+  "title": "Synchronize files with rsync",
+  "description": "Synchronize and copy files incrementally, locally or to a remote host",
+  "category": "files-storage",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -21,11 +21,11 @@
     "parameters": [
       {
         "name": "options",
-        "label": "Options",
+        "label": "Short options",
         "type": "string",
         "defaultValue": "avz",
         "required": true,
-        "description": "Options (a=archive, v=verbose, z=compress, --delete, etc.)"
+        "description": "Short options after the dash (a=archive, v=verbose, z=compress, n=dry run); long options such as --delete are in the examples"
       },
       {
         "name": "source",
@@ -33,7 +33,7 @@
         "type": "string",
         "defaultValue": "/source/path/",
         "required": true,
-        "description": "Répertoire source"
+        "description": "Source directory"
       },
       {
         "name": "destination",
@@ -41,62 +41,84 @@
         "type": "string",
         "defaultValue": "/dest/path/",
         "required": true,
-        "description": "Répertoire destination (local ou distant)"
+        "description": "Destination directory (local or remote)"
       }
     ]
   },
   "examples": [
     {
       "command": "rsync -avz /source/ /backup/",
-      "description": "Sauvegarde locale avec compression",
+      "description": "Local backup with compression",
       "platform": 1
     },
     {
       "command": "rsync -avz /data/ user@server:/backup/",
-      "description": "Sauvegarde distante via SSH",
+      "description": "Remote backup over SSH",
       "platform": 1
     },
     {
       "command": "rsync -avz --delete /source/ /backup/",
-      "description": "Synchronisation miroir (supprime fichiers en trop)",
-      "platform": 1
-    },
-    {
-      "command": "rsync --v -f C:\\Original D:\\Archive -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "rsync --v -f C:\\Original D:\\Archive --dry-run",
-      "description": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+      "description": "Mirror synchronization (deletes extra files)",
       "platform": 1
     },
     {
       "command": "rsync -avz /source/ /dest/",
-      "description": "Synchroniser avec compression",
+      "description": "Synchronize with compression",
       "platform": 1
     },
     {
       "command": "rsync -avz --delete /src/ user@server:/dest/",
-      "description": "Sync vers serveur distant avec suppression",
+      "description": "Sync to a remote server with deletion",
       "platform": 1
     },
     {
       "command": "rsync -avzn /src/ /dest/",
-      "description": "Dry-run (simulation)",
+      "description": "Dry run (simulation)",
       "platform": 1
     },
     {
       "command": "rsync -avz --exclude=\"*.log\" /app/ /backup/",
-      "description": "Exclure les fichiers .log",
+      "description": "Exclude .log files",
       "platform": 1
     }
   ],
-  "notes": "Le / final sur source change le comportement. --delete supprime les fichiers manquants. Très efficace.",
+  "notes": "A trailing / on the source changes the behavior. --delete removes the files missing from the source. Very efficient.",
   "links": [
     {
       "title": "rsync documentation",
       "url": "https://man7.org/linux/man-pages/man1/rsync.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Synchroniser des fichiers avec rsync",
+      "description": "Synchronise et copie des fichiers localement ou à distance de manière incrémentale",
+      "notes": "Le / final sur source change le comportement. --delete supprime les fichiers manquants. Très efficace.",
+      "parameters": {
+        "linux": {
+          "options": {
+            "label": "Options courtes",
+            "description": "Options courtes après le tiret (a=archive, v=verbose, z=compression, n=simulation) ; les options longues comme --delete figurent dans les exemples"
+          },
+          "source": {
+            "label": "Source",
+            "description": "Répertoire source"
+          },
+          "destination": {
+            "label": "Destination",
+            "description": "Répertoire destination (local ou distant)"
+          }
+        }
+      },
+      "examples": {
+        "rsync -avz /source/ /backup/": "Sauvegarde locale avec compression",
+        "rsync -avz /data/ user@server:/backup/": "Sauvegarde distante via SSH",
+        "rsync -avz --delete /source/ /backup/": "Synchronisation miroir (supprime fichiers en trop)",
+        "rsync -avz /source/ /dest/": "Synchroniser avec compression",
+        "rsync -avz --delete /src/ user@server:/dest/": "Sync vers serveur distant avec suppression",
+        "rsync -avzn /src/ /dest/": "Dry-run (simulation)",
+        "rsync -avz --exclude=\"*.log\" /app/ /backup/": "Exclure les fichiers .log"
+      }
+    }
+  }
 }

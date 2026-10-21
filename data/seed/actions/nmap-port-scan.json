@@ -1,8 +1,8 @@
 {
   "id": "nmap-port-scan",
-  "title": "Scanner les ports ouverts",
-  "description": "Scanne les ports ouverts sur un hôte ou réseau avec nmap",
-  "category": "🌐 Network & DNS",
+  "title": "Scan open ports",
+  "description": "Scan the open ports of a host or network with nmap.",
+  "category": "network-dns",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -22,78 +22,102 @@
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "-sT",
+          "-sU",
+          "-A"
+        ],
         "defaultValue": "-sT",
         "required": true,
-        "description": "Options de scan (-sT=TCP, -sU=UDP, -p=ports, -A=aggressive)"
+        "description": "Scan options (-sT=TCP, -sU=UDP, -p=ports, -A=aggressive)"
       },
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "localhost",
         "required": true,
-        "description": "IP ou réseau à scanner"
+        "description": "IP or network to scan"
       }
     ]
   },
   "examples": [
     {
       "command": "nmap -sT localhost",
-      "description": "Scan TCP des ports communs sur localhost",
+      "description": "TCP scan of the common ports on localhost",
       "platform": 1
     },
     {
       "command": "nmap -p 1-65535 192.168.1.1",
-      "description": "Scan complet de tous les ports",
+      "description": "Full scan of every port",
       "platform": 1
     },
     {
       "command": "nmap -sV -O 192.168.1.0/24",
-      "description": "Détection de version et OS sur un réseau",
-      "platform": 1
-    },
-    {
-      "command": "nmap -sT srv-web-01.contoso.com",
-      "description": "Exemple utilisant le paramètre 'options': Options de scan (-sT=TCP, -sU=UDP, -p=ports, -A=aggressive). Remplacez -v -f par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "nmap -v -f localhost",
-      "description": "Exemple utilisant le paramètre 'target': IP ou réseau à scanner. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
+      "description": "Version and OS detection on a network",
       "platform": 1
     },
     {
       "command": "nmap -sP 192.168.1.0/24",
-      "description": "Scanner les hôtes actifs",
+      "description": "Scan the live hosts",
       "platform": 1
     },
     {
       "command": "nmap -p 22,80,443 server.com",
-      "description": "Scanner des ports spécifiques",
+      "description": "Scan given ports",
       "platform": 1
     },
     {
       "command": "nmap -sV server.com",
-      "description": "Détecter les versions de services",
+      "description": "Detect service versions",
       "platform": 1
     },
     {
       "command": "nmap -O 192.168.1.1",
-      "description": "Détecter l'OS",
+      "description": "Detect the OS",
       "platform": 1
     },
     {
       "command": "nmap -A server.com",
-      "description": "Scan complet (OS, version, scripts)",
+      "description": "Full scan (OS, version, scripts)",
       "platform": 1
     }
   ],
-  "notes": "Certaines options nécessitent sudo. À utiliser uniquement sur vos propres systèmes. -sV détecte les versions.",
+  "notes": "Some options require sudo. Use it only on your own systems. -sV detects versions.",
   "links": [
     {
       "title": "nmap documentation",
       "url": "https://nmap.org/book/man.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Scanner les ports ouverts",
+      "description": "Scanne les ports ouverts sur un hôte ou réseau avec nmap",
+      "notes": "Certaines options nécessitent sudo. À utiliser uniquement sur vos propres systèmes. -sV détecte les versions.",
+      "parameters": {
+        "linux": {
+          "options": {
+            "label": "Options",
+            "description": "Options de scan (-sT=TCP, -sU=UDP, -p=ports, -A=aggressive)"
+          },
+          "target": {
+            "label": "Cible",
+            "description": "IP ou réseau à scanner"
+          }
+        }
+      },
+      "examples": {
+        "nmap -sT localhost": "Scan TCP des ports communs sur localhost",
+        "nmap -p 1-65535 192.168.1.1": "Scan complet de tous les ports",
+        "nmap -sV -O 192.168.1.0/24": "Détection de version et OS sur un réseau",
+        "nmap -sP 192.168.1.0/24": "Scanner les hôtes actifs",
+        "nmap -p 22,80,443 server.com": "Scanner des ports spécifiques",
+        "nmap -sV server.com": "Détecter les versions de services",
+        "nmap -O 192.168.1.1": "Détecter l'OS",
+        "nmap -A server.com": "Scan complet (OS, version, scripts)"
+      }
+    }
+  }
 }

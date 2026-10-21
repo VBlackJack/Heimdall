@@ -1,8 +1,8 @@
 {
   "id": "stop-scheduledtask",
-  "title": "Arrêter une tâche planifiée",
-  "description": "Arrête l'exécution en cours d'une tâche planifiée",
-  "category": "⚙️ Services & Automation",
+  "title": "Stop a scheduled task",
+  "description": "Stop the running instance of a scheduled task",
+  "category": "services-automation",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -21,60 +21,69 @@
     "parameters": [
       {
         "name": "taskname",
-        "label": "Nom de la tâche",
+        "label": "Task name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "MyTask",
         "required": true,
-        "description": "Nom de la tâche à arrêter"
+        "description": "Name of the task to stop"
       },
       {
         "name": "taskpath",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Chemin de la tâche"
+        "description": "Task path (e.g. \\CustomTasks\\), passed positionally after the task name"
       }
     ]
   },
   "examples": [
     {
       "command": "Stop-ScheduledTask -TaskName 'LongRunningTask'",
-      "description": "Arrête une tâche en cours d'exécution",
+      "description": "Stop a running task",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask | Where-Object {$_.State -eq 'Running'} | Stop-ScheduledTask",
-      "description": "Arrête toutes les tâches en cours",
-      "platform": 0
-    },
-    {
-      "command": "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -PassThru",
-      "description": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
-      "platform": 0
-    },
-    {
-      "command": "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Force",
-      "description": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances.",
-      "platform": 0
-    },
-    {
-      "command": "Stop-ScheduledTask -TaskName 'MyTask' \\Microsoft\\Windows\\",
-      "description": "Exemple utilisant le paramètre 'taskname': Nom de la tâche à arrêter. Remplacez DailyBackup par la valeur appropriée selon votre environnement.",
+      "description": "Stop every running task",
       "platform": 0
     },
     {
       "command": "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\",
-      "description": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'taskpath' parameter: Task path. Replace \\Microsoft\\Windows\\ with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Termine immédiatement l'exécution. Utilisez avec prudence sur les tâches critiques.",
+  "notes": "Ends the run immediately. Use it with care on critical tasks.",
   "links": [
     {
       "title": "Stop-ScheduledTask Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/stop-scheduledtask"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Arrêter une tâche planifiée",
+      "description": "Arrête l'exécution en cours d'une tâche planifiée",
+      "notes": "Termine immédiatement l'exécution. Utilisez avec prudence sur les tâches critiques.",
+      "parameters": {
+        "windows": {
+          "taskname": {
+            "label": "Nom de la tâche",
+            "description": "Nom de la tâche à arrêter"
+          },
+          "taskpath": {
+            "label": "Chemin",
+            "description": "Chemin de la tâche (ex: \\CustomTasks\\), passé en position après le nom de la tâche"
+          }
+        }
+      },
+      "examples": {
+        "Stop-ScheduledTask -TaskName 'LongRunningTask'": "Arrête une tâche en cours d'exécution",
+        "Get-ScheduledTask | Where-Object {$_.State -eq 'Running'} | Stop-ScheduledTask": "Arrête toutes les tâches en cours",
+        "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

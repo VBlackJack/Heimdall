@@ -1,8 +1,8 @@
 {
   "id": "grep-logs-pattern",
-  "title": "Rechercher un pattern dans les logs",
-  "description": "Recherche un pattern spécifique dans les fichiers de logs système",
-  "category": "📊 Monitoring & Logs",
+  "title": "Search the logs for a pattern",
+  "description": "Search the system log files for a given pattern.",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -20,82 +20,110 @@
     "parameters": [
       {
         "name": "pattern",
-        "label": "Pattern de recherche",
+        "label": "Search pattern",
         "type": "string",
         "defaultValue": "error",
         "required": true,
-        "description": "Texte ou regex à rechercher"
+        "description": "Text or regex to search for"
       },
       {
         "name": "logfile",
-        "label": "Fichier de log",
+        "label": "Log file",
         "type": "string",
         "defaultValue": "/var/log/syslog",
         "required": true,
-        "description": "Chemin vers le fichier de log"
+        "description": "Path to the log file"
       },
       {
         "name": "lines",
-        "label": "Nombre de lignes",
+        "label": "Number of lines",
         "type": "number",
         "defaultValue": "50",
         "required": true,
-        "description": "Nombre de résultats à afficher"
+        "description": "Number of results to show"
       }
     ]
   },
   "examples": [
     {
       "command": "grep -i \"error\" /var/log/syslog | tail -n 50",
-      "description": "Recherche 'error' dans syslog (insensible à la casse)",
+      "description": "Search syslog for 'error' (case-insensitive)",
       "platform": 1
     },
     {
       "command": "grep \"failed\" /var/log/auth.log",
-      "description": "Recherche les échecs d'authentification",
-      "platform": 1
-    },
-    {
-      "command": "grep -i \"error\" /var/log/syslog | tail -n 100",
-      "description": "Exemple utilisant le paramètre 'pattern': Texte ou regex à rechercher. Remplacez *.txt par la valeur appropriée selon votre environnement.",
+      "description": "Search for authentication failures",
       "platform": 1
     },
     {
       "command": "grep -i \"error|warning\" /var/log/syslog | tail -n 100",
-      "description": "Exemple utilisant le paramètre 'logfile': Chemin vers le fichier de log. Remplacez /var/log/syslog par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'logfile' parameter: path to the log file. Replace /var/log/syslog with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "grep -i \"failed|denied\" /var/log/auth.log | tail -n 50",
-      "description": "Recherche les tentatives d'authentification échouées dans le journal d'authentification. Remplacez le fichier et le pattern selon votre environnement.",
+      "description": "Search the authentication log for failed authentication attempts. Adjust the file and the pattern to your environment.",
       "platform": 1
     },
     {
       "command": "grep -r \"error\" /var/log",
-      "description": "Rechercher \"error\" récursivement dans les logs",
+      "description": "Search the logs for \"error\" recursively",
       "platform": 1
     },
     {
       "command": "grep -i \"warning\" app.log",
-      "description": "Recherche insensible à la casse",
+      "description": "Case-insensitive search",
       "platform": 1
     },
     {
       "command": "grep -v \"debug\" app.log",
-      "description": "Exclure les lignes contenant \"debug\"",
+      "description": "Exclude the lines that contain \"debug\"",
       "platform": 1
     },
     {
       "command": "grep -n \"TODO\" *.py",
-      "description": "Afficher les numéros de ligne",
+      "description": "Show line numbers",
       "platform": 1
     }
   ],
-  "notes": "Option -i pour ignorer la casse. Peut nécessiter sudo selon les permissions du fichier.",
+  "notes": "Option -i ignores case. May require sudo depending on the file permissions.",
   "links": [
     {
       "title": "grep command guide",
       "url": "https://www.gnu.org/software/grep/manual/grep.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher un pattern dans les logs",
+      "description": "Recherche un pattern spécifique dans les fichiers de logs système",
+      "notes": "Option -i pour ignorer la casse. Peut nécessiter sudo selon les permissions du fichier.",
+      "parameters": {
+        "linux": {
+          "pattern": {
+            "label": "Pattern de recherche",
+            "description": "Texte ou regex à rechercher"
+          },
+          "logfile": {
+            "label": "Fichier de log",
+            "description": "Chemin vers le fichier de log"
+          },
+          "lines": {
+            "label": "Nombre de lignes",
+            "description": "Nombre de résultats à afficher"
+          }
+        }
+      },
+      "examples": {
+        "grep -i \"error\" /var/log/syslog | tail -n 50": "Recherche 'error' dans syslog (insensible à la casse)",
+        "grep \"failed\" /var/log/auth.log": "Recherche les échecs d'authentification",
+        "grep -i \"error|warning\" /var/log/syslog | tail -n 100": "Exemple utilisant le paramètre 'logfile': Chemin vers le fichier de log. Remplacez /var/log/syslog par la valeur appropriée selon votre environnement.",
+        "grep -i \"failed|denied\" /var/log/auth.log | tail -n 50": "Recherche les tentatives d'authentification échouées dans le journal d'authentification. Remplacez le fichier et le pattern selon votre environnement.",
+        "grep -r \"error\" /var/log": "Rechercher \"error\" récursivement dans les logs",
+        "grep -i \"warning\" app.log": "Recherche insensible à la casse",
+        "grep -v \"debug\" app.log": "Exclure les lignes contenant \"debug\"",
+        "grep -n \"TODO\" *.py": "Afficher les numéros de ligne"
+      }
+    }
+  }
 }

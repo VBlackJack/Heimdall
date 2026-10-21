@@ -1,8 +1,8 @@
 {
   "id": "laps-export-report",
-  "title": "Générer un rapport complet LAPS",
-  "description": "Génère un rapport CSV de tous les ordinateurs LAPS avec mots de passe et dates d'expiration.",
-  "category": "🔒 Security & Encryption",
+  "title": "Generate a full LAPS report",
+  "description": "Generate a CSV report of every LAPS computer with its password and expiration date.",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "$report = Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null} | Select-Object Name,@{N='Password';E={$_.'ms-Mcs-AdmPwd'}},@{N='Expiration';E={[DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime')}}; $report | Export-Csv C:\\LAPS-Full-Report.csv -NoTypeInformation",
-      "description": "Génère un rapport CSV complet avec tous les mots de passe LAPS",
+      "description": "Generate a full CSV report with every LAPS password",
       "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null -and [DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime') -lt (Get-Date).AddDays(7)} | Select-Object Name,@{N='ExpiresIn';E={([DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime') - (Get-Date)).Days}} | Export-Csv C:\\LAPS-Expiring-Soon.csv -NoTypeInformation",
-      "description": "Rapport des ordinateurs dont le mot de passe LAPS expire dans 7 jours",
+      "description": "Report of the computers whose LAPS password expires within 7 days",
       "platform": 0
     },
     {
       "command": "$stats = Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd | Group-Object -Property {if($_.'ms-Mcs-AdmPwd'){'LAPS OK'}else{'NO LAPS'}} | Select-Object Name,Count; $stats",
-      "description": "Statistiques de couverture LAPS (combien avec/sans LAPS)",
+      "description": "LAPS coverage statistics (how many with and without LAPS)",
       "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "⚠️ SÉCURITÉ MAXIMALE: Ce rapport contient TOUS les mots de passe admin locaux! Stockez-le dans un coffre-fort chiffré (gestionnaire de mots de passe, Azure Key Vault, coffre physique). NE JAMAIS envoyer par email non chiffré. Supprimez après consultation. Auditez qui génère ces rapports.",
+  "notes": "⚠️ MAXIMUM SECURITY: this report holds ALL the local admin passwords! Store it in an encrypted vault (password manager, Azure Key Vault, physical safe). NEVER send it by unencrypted email. Delete it after use. Audit who generates these reports.",
   "links": [
     {
       "title": "LAPS Reporting",
       "url": "https://learn.microsoft.com/en-us/windows-server/identity/laps/laps-management-policy-settings"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Générer un rapport complet LAPS",
+      "description": "Génère un rapport CSV de tous les ordinateurs LAPS avec mots de passe et dates d'expiration.",
+      "notes": "⚠️ SÉCURITÉ MAXIMALE: Ce rapport contient TOUS les mots de passe admin locaux! Stockez-le dans un coffre-fort chiffré (gestionnaire de mots de passe, Azure Key Vault, coffre physique). NE JAMAIS envoyer par email non chiffré. Supprimez après consultation. Auditez qui génère ces rapports.",
+      "examples": {
+        "$report = Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null} | Select-Object Name,@{N='Password';E={$_.'ms-Mcs-AdmPwd'}},@{N='Expiration';E={[DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime')}}; $report | Export-Csv C:\\LAPS-Full-Report.csv -NoTypeInformation": "Génère un rapport CSV complet avec tous les mots de passe LAPS",
+        "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Where-Object {$_.'ms-Mcs-AdmPwd' -ne $null -and [DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime') -lt (Get-Date).AddDays(7)} | Select-Object Name,@{N='ExpiresIn';E={([DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime') - (Get-Date)).Days}} | Export-Csv C:\\LAPS-Expiring-Soon.csv -NoTypeInformation": "Rapport des ordinateurs dont le mot de passe LAPS expire dans 7 jours",
+        "$stats = Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd | Group-Object -Property {if($_.'ms-Mcs-AdmPwd'){'LAPS OK'}else{'NO LAPS'}} | Select-Object Name,Count; $stats": "Statistiques de couverture LAPS (combien avec/sans LAPS)",
+        "$report = @(); Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "$report = @(); Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd,ms-Mcs-AdmPwdExpirationTime | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

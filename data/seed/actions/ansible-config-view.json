@@ -1,8 +1,8 @@
 {
   "id": "ansible-config-view",
-  "title": "Afficher la configuration Ansible",
-  "description": "Affiche la configuration actuelle d'Ansible avec toutes les sources",
-  "category": "⚙️ Services & Automation",
+  "title": "Show the Ansible configuration",
+  "description": "Show the current Ansible configuration with all its sources",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -28,7 +28,7 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "Utilisez cette commande pour diagnostiquer les problèmes de configuration et vérifier les paramètres appliqués.",
+  "notes": "Use this command to diagnose configuration problems and check the settings in effect.",
   "links": [
     {
       "title": "Ansible Configuration",
@@ -38,28 +38,42 @@
   "linuxExamples": [
     {
       "command": "ansible-config dump --only-changed",
-      "description": "Affiche uniquement les paramètres modifiés",
+      "description": "Show only the changed settings",
       "platform": 1
     },
     {
       "command": "ansible-config list",
-      "description": "Liste tous les paramètres de configuration disponibles",
+      "description": "List every available configuration setting",
       "platform": 1
     },
     {
       "command": "ansible-config view",
-      "description": "Affiche le fichier de configuration actuel",
+      "description": "Show the current configuration file",
       "platform": 1
     },
     {
       "command": "ansible-config dump",
-      "description": "Configuration actuelle",
+      "description": "Current configuration",
       "platform": 1
     },
     {
       "command": "ansible --version",
-      "description": "Version et config",
+      "description": "Version and configuration",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher la configuration Ansible",
+      "description": "Affiche la configuration actuelle d'Ansible avec toutes les sources",
+      "notes": "Utilisez cette commande pour diagnostiquer les problèmes de configuration et vérifier les paramètres appliqués.",
+      "examples": {
+        "ansible-config dump --only-changed": "Affiche uniquement les paramètres modifiés",
+        "ansible-config list": "Liste tous les paramètres de configuration disponibles",
+        "ansible-config view": "Affiche le fichier de configuration actuel",
+        "ansible-config dump": "Configuration actuelle",
+        "ansible --version": "Version et config"
+      }
+    }
+  }
 }

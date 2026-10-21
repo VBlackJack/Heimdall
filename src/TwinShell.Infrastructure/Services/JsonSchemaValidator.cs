@@ -17,6 +17,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
+using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
+using TwinShell.Core.Models;
 
 namespace TwinShell.Infrastructure.Services;
 
@@ -34,8 +37,8 @@ public static class JsonSchemaValidator
     static JsonSchemaValidator()
     {
         CategorySchema = JsonSchema.FromText(CategorySchemaJson);
-        TemplateSchema = JsonSchema.FromText(TemplateSchemaJson);
-        ActionSchema = JsonSchema.FromText(ActionSchemaJson);
+        TemplateSchema = JsonSchema.FromText(BuildTemplateSchemaJson());
+        ActionSchema = JsonSchema.FromText(BuildActionSchemaJson());
         BatchSchema = JsonSchema.FromText(BatchSchemaJson);
     }
 
@@ -226,7 +229,19 @@ public static class JsonSchemaValidator
                         },
                         "type": {
                             "type": "string",
-                            "enum": ["string", "integer", "boolean", "path", "hostname", "ipaddress"]
+                            "enum": ["__PARAMETER_TYPES__"]
+                        },
+                        "allowedValues": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "string",
+                                "maxLength": 200
+                            },
+                            "maxItems": 50
+                        },
+                        "quoting": {
+                            "type": ["string", "null"],
+                            "enum": ["__QUOTING_MODES__"]
                         },
                         "defaultValue": {
                             "type": ["string", "null"]
@@ -246,6 +261,37 @@ public static class JsonSchemaValidator
         "additionalProperties": false
     }
     """;
+
+    private const string ParameterTypesPlaceholder = "[\"__PARAMETER_TYPES__\"]";
+    private const string QuotingModesPlaceholder = "[\"__QUOTING_MODES__\"]";
+
+    /// <summary>
+    /// The template schema with its parameter types taken from
+    /// <see cref="TemplateParameterTypes.Accepted"/>, the list the generator understands, and
+    /// its quoting modes from <see cref="QuotingMode"/>.
+    /// </summary>
+    internal static string BuildTemplateSchemaJson()
+        => TemplateSchemaJson
+            .Replace(
+                ParameterTypesPlaceholder,
+                JsonSerializer.Serialize(TemplateParameterTypes.Accepted),
+                StringComparison.Ordinal)
+            .Replace(
+                QuotingModesPlaceholder,
+                JsonSerializer.Serialize(Enum.GetNames<QuotingMode>().Cast<string?>().Append(null)),
+                StringComparison.Ordinal);
+
+    private const string LevelNamesPlaceholder = "[\"__LEVEL_NAMES__\"]";
+
+    /// <summary>
+    /// The action schema with its level list taken from <see cref="CriticalityLevelNames"/>,
+    /// the one source shared with the import that reads the level.
+    /// </summary>
+    internal static string BuildActionSchemaJson()
+        => ActionSchemaJson.Replace(
+            LevelNamesPlaceholder,
+            JsonSerializer.Serialize(CriticalityLevelNames.AcceptedNames),
+            StringComparison.Ordinal);
 
     private const string ActionSchemaJson = """
     {
@@ -277,7 +323,7 @@ public static class JsonSchemaValidator
             },
             "level": {
                 "type": "string",
-                "enum": ["Info", "Warning", "Danger"]
+                "enum": ["__LEVEL_NAMES__"]
             },
             "tags": {
                 "type": ["array", "null"],
@@ -346,10 +392,76 @@ public static class JsonSchemaValidator
             "updatedAt": {
                 "type": ["string", "null"],
                 "format": "date-time"
+            },
+            "translations": {
+                "type": ["object", "null"],
+                "maxProperties": 20,
+                "propertyNames": {
+                    "pattern": "^[a-z]{2}$"
+                },
+                "additionalProperties": {
+                    "$ref": "#/$defs/translation"
+                }
             }
         },
         "additionalProperties": false,
         "$defs": {
+            "translation": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "description": {
+                        "type": "string",
+                        "maxLength": 2000
+                    },
+                    "notes": {
+                        "type": "string",
+                        "maxLength": 5000
+                    },
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "windows": {
+                                "$ref": "#/$defs/parameterTranslations"
+                            },
+                            "linux": {
+                                "$ref": "#/$defs/parameterTranslations"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "examples": {
+                        "type": "object",
+                        "maxProperties": 50,
+                        "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 500
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "parameterTranslations": {
+                "type": "object",
+                "maxProperties": 50,
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                            "maxLength": 200
+                        },
+                        "description": {
+                            "type": "string",
+                            "maxLength": 500
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
             "example": {
                 "type": "object",
                 "required": ["command"],

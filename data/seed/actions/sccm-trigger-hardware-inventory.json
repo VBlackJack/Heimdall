@@ -1,8 +1,8 @@
 {
   "id": "sccm-trigger-hardware-inventory",
-  "title": "Forcer l'inventaire matériel SCCM",
-  "description": "Déclenche immédiatement la collecte de l'inventaire matériel et l'envoie au serveur SCCM",
-  "category": "🔄 Windows Updates",
+  "title": "Force the SCCM hardware inventory",
+  "description": "Collect the hardware inventory now and send it to the SCCM server",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,26 +21,26 @@
   },
   "examples": [
     {
-      "command": "ss -tulpn",
-      "description": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
-      "platform": 1
-    },
-    {
-      "command": "ss -s",
-      "description": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
-      "platform": 1
-    },
-    {
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000001}'",
-      "description": "Déclenche l'inventaire matériel",
+      "description": "Trigger the hardware inventory",
       "platform": 0
     }
   ],
-  "notes": "Schedule ID {01} = Hardware Inventory Cycle. Utile après modification matérielle ou pour forcer la mise à jour de l'inventaire dans SCCM.",
+  "notes": "Schedule ID {01} = Hardware Inventory Cycle. Useful after a hardware change or to force an inventory update in SCCM.",
   "links": [
     {
       "title": "SCCM Trigger Schedule IDs",
       "url": "https://www.systemcenterdudes.com/configuration-manager-2012-client-command-list/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Forcer l'inventaire matériel SCCM",
+      "description": "Déclenche immédiatement la collecte de l'inventaire matériel et l'envoie au serveur SCCM",
+      "notes": "Schedule ID {01} = Hardware Inventory Cycle. Utile après modification matérielle ou pour forcer la mise à jour de l'inventaire dans SCCM.",
+      "examples": {
+        "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000001}'": "Déclenche l'inventaire matériel"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "ad-delete-user",
-  "title": "Supprimer un compte utilisateur AD",
-  "description": "Supprime définitivement un compte utilisateur Active Directory. Opération irréversible : le SID, les appartenances aux groupes et les données associées sont perdus.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Delete an AD user account",
+  "description": "Permanently delete an Active Directory user account. Irreversible: the SID, the group memberships and the associated data are lost.",
+  "category": "active-directory",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -21,46 +21,68 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName ou DistinguishedName de l'utilisateur à supprimer"
+        "description": "SamAccountName or DistinguishedName of the user to delete"
       }
     ]
   },
   "examples": [
     {
       "command": "Remove-ADUser -Identity jdupont -Confirm:$false",
-      "description": "Supprime définitivement le compte jdupont sans demander de confirmation. Le SID est détruit et ne pourra pas être recréé à l'identique. Toujours désactiver le compte en premier (Disable-ADAccount) et attendre une période de rétention avant de supprimer.",
+      "description": "Permanently delete the jdupont account without asking for confirmation. The SID is destroyed and can never be recreated identically. Always disable the account first (Disable-ADAccount) and wait for a retention period before deleting.",
       "platform": 0
     },
     {
       "command": "Remove-ADUser -Identity jdupont -WhatIf",
-      "description": "Simulation de suppression : affiche ce qui serait fait SANS exécuter l'action. Le switch -WhatIf est indispensable avant toute suppression pour vérifier que la cible est correcte. Retirez -WhatIf après vérification pour exécuter réellement.",
+      "description": "Simulate the deletion: show what would be done WITHOUT running the action. The -WhatIf switch is essential before any deletion to check that the target is right. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "Get-ADUser jdupont -Properties MemberOf | Select-Object Name,SamAccountName,@{N='Groups';E={($_.MemberOf | ForEach-Object {(Get-ADGroup $_).Name}) -join ', '}} | Export-Csv C:\\Temp\\UserBackup.csv -NoTypeInformation; Remove-ADUser -Identity jdupont -Confirm:$false",
-      "description": "Sauvegarde les appartenances aux groupes de l'utilisateur avant suppression. Le CSV permet de recréer les permissions si nécessaire. Toujours effectuer cette sauvegarde avant une suppression définitive pour faciliter la restauration en cas d'erreur.",
+      "description": "Back up the user's group memberships before deleting. The CSV lets you recreate the permissions if needed. Always take this backup before a permanent deletion, to make a restore easier in case of error.",
       "platform": 0
     },
     {
       "command": "Remove-ADUser -Identity 'CN=Jean Dupont,OU=Utilisateurs,DC=contoso,DC=com' -Confirm:$false",
-      "description": "Suppression par DistinguishedName (DN) complet. Utile lorsque plusieurs comptes partagent un nom similaire ou lorsque le SamAccountName n'est pas connu. Le DN identifie de manière unique un objet dans l'arborescence AD.",
+      "description": "Delete by full DistinguishedName (DN). Useful when several accounts share a similar name or when the SamAccountName is unknown. The DN uniquely identifies an object in the AD tree.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter {Enabled -eq $false -and LastLogonDate -lt (Get-Date).AddDays(-365)} -Properties LastLogonDate | Select-Object Name,SamAccountName,LastLogonDate | Export-Csv C:\\Temp\\ToDelete.csv -NoTypeInformation",
-      "description": "Identifie les comptes désactivés et inactifs depuis plus d'un an, candidats à la suppression. Exporte la liste pour validation managériale avant suppression. Ne supprime rien automatiquement : vérifiez la liste manuellement avant de procéder avec Remove-ADUser.",
+      "description": "Find the accounts disabled and inactive for more than a year, candidates for deletion. Export the list for management approval before deleting. Deletes nothing automatically: review the list by hand before going on with Remove-ADUser.",
       "platform": 0
     }
   ],
-  "notes": "⚠️ ATTENTION : Opération irréversible. Le SID, les appartenances aux groupes et les autorisations NTFS associées sont définitivement perdus. Recommandation : désactiver le compte (Disable-ADAccount) pendant 90 jours minimum avant de supprimer. Sauvegarder les appartenances aux groupes avant suppression.",
+  "notes": "⚠️ WARNING: irreversible operation. The SID, the group memberships and the associated NTFS permissions are permanently lost. Recommendation: disable the account (Disable-ADAccount) for at least 90 days before deleting it. Back up the group memberships before deleting.",
   "links": [
     {
       "title": "Documentation Remove-ADUser",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/remove-aduser"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Supprimer un compte utilisateur AD",
+      "description": "Supprime définitivement un compte utilisateur Active Directory. Opération irréversible : le SID, les appartenances aux groupes et les données associées sont perdus.",
+      "notes": "⚠️ ATTENTION : Opération irréversible. Le SID, les appartenances aux groupes et les autorisations NTFS associées sont définitivement perdus. Recommandation : désactiver le compte (Disable-ADAccount) pendant 90 jours minimum avant de supprimer. Sauvegarder les appartenances aux groupes avant suppression.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName ou DistinguishedName de l'utilisateur à supprimer"
+          }
+        }
+      },
+      "examples": {
+        "Remove-ADUser -Identity jdupont -Confirm:$false": "Supprime définitivement le compte jdupont sans demander de confirmation. Le SID est détruit et ne pourra pas être recréé à l'identique. Toujours désactiver le compte en premier (Disable-ADAccount) et attendre une période de rétention avant de supprimer.",
+        "Remove-ADUser -Identity jdupont -WhatIf": "Simulation de suppression : affiche ce qui serait fait SANS exécuter l'action. Le switch -WhatIf est indispensable avant toute suppression pour vérifier que la cible est correcte. Retirez -WhatIf après vérification pour exécuter réellement.",
+        "Get-ADUser jdupont -Properties MemberOf | Select-Object Name,SamAccountName,@{N='Groups';E={($_.MemberOf | ForEach-Object {(Get-ADGroup $_).Name}) -join ', '}} | Export-Csv C:\\Temp\\UserBackup.csv -NoTypeInformation; Remove-ADUser -Identity jdupont -Confirm:$false": "Sauvegarde les appartenances aux groupes de l'utilisateur avant suppression. Le CSV permet de recréer les permissions si nécessaire. Toujours effectuer cette sauvegarde avant une suppression définitive pour faciliter la restauration en cas d'erreur.",
+        "Remove-ADUser -Identity 'CN=Jean Dupont,OU=Utilisateurs,DC=contoso,DC=com' -Confirm:$false": "Suppression par DistinguishedName (DN) complet. Utile lorsque plusieurs comptes partagent un nom similaire ou lorsque le SamAccountName n'est pas connu. Le DN identifie de manière unique un objet dans l'arborescence AD.",
+        "Get-ADUser -Filter {Enabled -eq $false -and LastLogonDate -lt (Get-Date).AddDays(-365)} -Properties LastLogonDate | Select-Object Name,SamAccountName,LastLogonDate | Export-Csv C:\\Temp\\ToDelete.csv -NoTypeInformation": "Identifie les comptes désactivés et inactifs depuis plus d'un an, candidats à la suppression. Exporte la liste pour validation managériale avant suppression. Ne supprime rien automatiquement : vérifiez la liste manuellement avant de procéder avec Remove-ADUser."
+      }
+    }
+  }
 }

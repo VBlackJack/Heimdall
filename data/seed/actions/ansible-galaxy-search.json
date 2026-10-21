@@ -1,8 +1,8 @@
 {
   "id": "ansible-galaxy-search",
-  "title": "Rechercher des rôles Ansible Galaxy",
-  "description": "Recherche des rôles disponibles sur Ansible Galaxy",
-  "category": "⚙️ Services & Automation",
+  "title": "Search Ansible Galaxy roles",
+  "description": "Search the roles available on Ansible Galaxy",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "keyword",
-        "label": "Mot-clé de recherche",
+        "label": "Search keyword",
         "type": "string",
         "defaultValue": "nginx",
         "required": true,
-        "description": "Mot-clé pour rechercher des rôles"
+        "description": "Keyword to search roles for"
       }
     ]
   },
@@ -37,16 +37,16 @@
     "parameters": [
       {
         "name": "keyword",
-        "label": "Mot-clé",
+        "label": "Keyword",
         "type": "string",
         "defaultValue": "nginx",
         "required": true,
-        "description": "Mot-clé de recherche"
+        "description": "Search keyword"
       }
     ]
   },
   "examples": [],
-  "notes": "Galaxy héberge des milliers de rôles réutilisables créés par la communauté.",
+  "notes": "Galaxy hosts thousands of reusable roles created by the community.",
   "links": [
     {
       "title": "Ansible Galaxy",
@@ -56,15 +56,40 @@
   "windowsExamples": [
     {
       "command": "ansible-galaxy search warning",
-      "description": "Exemple Windows utilisant ansible-galaxy. Remplacez les paramètres entre <> par vos valeurs.",
+      "description": "Windows example using ansible-galaxy. Replace the parameters between <> with your values.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-galaxy search --platforms ubuntu",
-      "description": "Pour Ubuntu",
+      "description": "For Ubuntu",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher des rôles Ansible Galaxy",
+      "description": "Recherche des rôles disponibles sur Ansible Galaxy",
+      "notes": "Galaxy héberge des milliers de rôles réutilisables créés par la communauté.",
+      "parameters": {
+        "windows": {
+          "keyword": {
+            "label": "Mot-clé de recherche",
+            "description": "Mot-clé pour rechercher des rôles"
+          }
+        },
+        "linux": {
+          "keyword": {
+            "label": "Mot-clé",
+            "description": "Mot-clé de recherche"
+          }
+        }
+      },
+      "examples": {
+        "ansible-galaxy search warning": "Exemple Windows utilisant ansible-galaxy. Remplacez les paramètres entre <> par vos valeurs.",
+        "ansible-galaxy search --platforms ubuntu": "Pour Ubuntu"
+      }
+    }
+  }
 }

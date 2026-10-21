@@ -1,8 +1,8 @@
 {
   "id": "laps-set-expiration-time",
-  "title": "Modifier la durée d'expiration du mot de passe LAPS",
-  "description": "Configure la durée de validité du mot de passe administrateur local géré par LAPS.",
-  "category": "🔒 Security & Encryption",
+  "title": "Change the LAPS password expiration time",
+  "description": "Set how long the local administrator password managed by LAPS stays valid.",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -19,59 +19,86 @@
     "parameters": [
       {
         "name": "computerName",
-        "label": "Nom de l'ordinateur",
+        "label": "Computer name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom NetBIOS de l'ordinateur"
+        "description": "NetBIOS name of the computer"
       },
       {
         "name": "days",
-        "label": "Jours avant expiration",
+        "label": "Days before expiration",
         "type": "string",
         "defaultValue": "30",
         "required": true,
-        "description": "Nombre de jours avant expiration (ex: 30, 60, 90)"
+        "description": "Number of days before expiration (e.g. 30, 60, 90)"
       }
     ]
   },
   "examples": [
     {
       "command": "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate}",
-      "description": "Configure l'expiration du mot de passe dans 30 jours",
+      "description": "Set the password to expire in 30 days",
       "platform": 0
     },
     {
       "command": "$expDate = (Get-Date).AddDays(1).ToFileTime(); Set-ADComputer -Identity PC-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate}",
-      "description": "Force la rotation du mot de passe dans 24h",
+      "description": "Force the password rotation within 24 hours",
       "platform": 0
     },
     {
       "command": "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "⚠️ Cette commande force une date d'expiration spécifique. Pour forcer rotation immédiate: utilisez Reset-AdmPwdPassword. La durée par défaut LAPS (GPO) est généralement 30 jours. Durées recommandées: Serveurs critiques: 14-30j, Postes de travail: 30-60j, Laptops: 30-45j.",
+  "notes": "⚠️ This command forces a given expiration date. To force an immediate rotation, use Reset-AdmPwdPassword. The default LAPS duration (GPO) is usually 30 days. Recommended durations: critical servers: 14-30 days, workstations: 30-60 days, laptops: 30-45 days.",
   "links": [
     {
       "title": "LAPS Configuration",
       "url": "https://learn.microsoft.com/en-us/windows-server/identity/laps/laps-management-policy-settings"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Modifier la durée d'expiration du mot de passe LAPS",
+      "description": "Configure la durée de validité du mot de passe administrateur local géré par LAPS.",
+      "notes": "⚠️ Cette commande force une date d'expiration spécifique. Pour forcer rotation immédiate: utilisez Reset-AdmPwdPassword. La durée par défaut LAPS (GPO) est généralement 30 jours. Durées recommandées: Serveurs critiques: 14-30j, Postes de travail: 30-60j, Laptops: 30-45j.",
+      "parameters": {
+        "windows": {
+          "computerName": {
+            "label": "Nom de l'ordinateur",
+            "description": "Nom NetBIOS de l'ordinateur"
+          },
+          "days": {
+            "label": "Jours avant expiration",
+            "description": "Nombre de jours avant expiration (ex: 30, 60, 90)"
+          }
+        }
+      },
+      "examples": {
+        "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate}": "Configure l'expiration du mot de passe dans 30 jours",
+        "$expDate = (Get-Date).AddDays(1).ToFileTime(); Set-ADComputer -Identity PC-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate}": "Force la rotation du mot de passe dans 24h",
+        "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

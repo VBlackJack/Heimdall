@@ -1,8 +1,8 @@
 {
   "id": "systemctl-enable",
-  "title": "Activer un service au démarrage",
-  "description": "Configure un service pour démarrer automatiquement au boot",
-  "category": "⚙️ Services & Automation",
+  "title": "Enable a service at boot",
+  "description": "Configure a service to start automatically at boot",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -21,46 +21,56 @@
     "parameters": [
       {
         "name": "service",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "nginx.service",
         "required": true,
-        "description": "Nom de l'unité systemd à activer"
+        "description": "Name of the systemd unit to enable"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo systemctl enable nginx",
-      "description": "Active nginx au démarrage",
+      "description": "Enable nginx at boot",
       "platform": 1
     },
     {
       "command": "sudo systemctl enable --now nginx",
-      "description": "Active et démarre immédiatement",
-      "platform": 1
-    },
-    {
-      "command": "systemctl enable nginx.service",
-      "description": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à activer. Remplacez spooler par la valeur appropriée selon votre environnement.",
+      "description": "Enable and start immediately",
       "platform": 1
     },
     {
       "command": "systemctl enable docker",
-      "description": "Activer Docker au démarrage",
-      "platform": 1
-    },
-    {
-      "command": "sudo systemctl enable wuauserv",
-      "description": "Exemple utilisant le paramètre 'serviceName': Nom du service à activer au démarrage. Remplacez wuauserv par la valeur appropriée selon votre environnement.",
+      "description": "Enable Docker at boot",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. --now démarre aussi le service immédiatement. Crée un lien symbolique.",
+  "notes": "Requires sudo. --now also starts the service immediately. Creates a symbolic link.",
   "links": [
     {
       "title": "systemctl enable",
       "url": "https://www.freedesktop.org/software/systemd/man/systemctl.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Activer un service au démarrage",
+      "description": "Configure un service pour démarrer automatiquement au boot",
+      "notes": "Nécessite sudo. --now démarre aussi le service immédiatement. Crée un lien symbolique.",
+      "parameters": {
+        "linux": {
+          "service": {
+            "label": "Nom du service",
+            "description": "Nom de l'unité systemd à activer"
+          }
+        }
+      },
+      "examples": {
+        "sudo systemctl enable nginx": "Active nginx au démarrage",
+        "sudo systemctl enable --now nginx": "Active et démarre immédiatement",
+        "systemctl enable docker": "Activer Docker au démarrage"
+      }
+    }
+  }
 }

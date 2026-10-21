@@ -1,8 +1,8 @@
 {
   "id": "sccm-repair-client",
-  "title": "Réparer le client SCCM",
-  "description": "Exécute la réparation automatique du client SCCM pour résoudre les problèmes de communication",
-  "category": "🔄 Windows Updates",
+  "title": "Repair the SCCM client",
+  "description": "Run the automatic repair of the SCCM client to fix communication problems",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -22,15 +22,25 @@
   "examples": [
     {
       "command": "& 'C:\\Windows\\CCM\\ccmrepair.exe'",
-      "description": "Alternative: lance l'outil de réparation via l'exécutable",
+      "description": "Alternative: start the repair tool through its executable",
       "platform": 0
     }
   ],
-  "notes": "ATTENTION: La réparation peut prendre plusieurs minutes. Le client SCCM réinstallera les composants endommagés. Vérifier les logs dans C:\\Windows\\CCM\\Logs\\ccmrepair.log",
+  "notes": "WARNING: the repair can take several minutes. The SCCM client reinstalls the damaged components. Check the logs in C:\\Windows\\CCM\\Logs\\ccmrepair.log",
   "links": [
     {
       "title": "SCCM Client Repair",
       "url": "https://learn.microsoft.com/en-us/mem/configmgr/core/clients/manage/client-notification"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Réparer le client SCCM",
+      "description": "Exécute la réparation automatique du client SCCM pour résoudre les problèmes de communication",
+      "notes": "ATTENTION: La réparation peut prendre plusieurs minutes. Le client SCCM réinstallera les composants endommagés. Vérifier les logs dans C:\\Windows\\CCM\\Logs\\ccmrepair.log",
+      "examples": {
+        "& 'C:\\Windows\\CCM\\ccmrepair.exe'": "Alternative: lance l'outil de réparation via l'exécutable"
+      }
+    }
+  }
 }

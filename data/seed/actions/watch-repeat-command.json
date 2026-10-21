@@ -1,8 +1,8 @@
 {
   "id": "watch-repeat-command",
-  "title": "Répéter une commande périodiquement",
-  "description": "Exécute une commande à intervalle régulier et affiche le résultat",
-  "category": "⚙️ Services & Automation",
+  "title": "Repeat a command periodically",
+  "description": "Run a command at a regular interval and show the result",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -21,44 +21,62 @@
     "parameters": [
       {
         "name": "interval",
-        "label": "Intervalle (secondes)",
+        "label": "Interval (seconds)",
         "type": "number",
         "defaultValue": "2",
         "required": true,
-        "description": "Intervalle en secondes entre chaque exécution"
+        "description": "Interval in seconds between runs"
       },
       {
         "name": "command",
-        "label": "Commande",
+        "label": "Command",
         "type": "string",
         "defaultValue": "df -h",
         "required": true,
-        "description": "Commande à répéter"
+        "description": "Command to repeat"
       }
     ]
   },
   "examples": [
     {
-      "command": "watch -n 2 Get-Process",
-      "description": "Exemple utilisant le paramètre 'interval': Intervalle en secondes entre chaque exécution. Remplacez 3600 par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
       "command": "watch \"tail -n 10 /var/log/syslog\"",
-      "description": "Suivre les dernières lignes",
+      "description": "Follow the last lines",
       "platform": 1
     },
     {
       "command": "watch -c \"ls --color\"",
-      "description": "Garder les couleurs",
+      "description": "Keep the colors",
       "platform": 1
     }
   ],
-  "notes": "Ctrl+C pour arrêter. -d surligne les changements. -n définit l'intervalle.",
+  "notes": "Ctrl+C to stop. -d highlights the changes. -n sets the interval.",
   "links": [
     {
       "title": "watch command",
       "url": "https://man7.org/linux/man-pages/man1/watch.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Répéter une commande périodiquement",
+      "description": "Exécute une commande à intervalle régulier et affiche le résultat",
+      "notes": "Ctrl+C pour arrêter. -d surligne les changements. -n définit l'intervalle.",
+      "parameters": {
+        "linux": {
+          "interval": {
+            "label": "Intervalle (secondes)",
+            "description": "Intervalle en secondes entre chaque exécution"
+          },
+          "command": {
+            "label": "Commande",
+            "description": "Commande à répéter"
+          }
+        }
+      },
+      "examples": {
+        "watch \"tail -n 10 /var/log/syslog\"": "Suivre les dernières lignes",
+        "watch -c \"ls --color\"": "Garder les couleurs"
+      }
+    }
+  }
 }

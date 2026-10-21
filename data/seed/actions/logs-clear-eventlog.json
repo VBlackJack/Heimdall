@@ -1,8 +1,8 @@
 {
   "id": "logs-clear-eventlog",
-  "title": "Vider un journal d'événements",
-  "description": "Efface tous les événements d'un journal Windows spécifique.",
-  "category": "📊 Monitoring & Logs",
+  "title": "Clear an event log",
+  "description": "Delete every event of a given Windows log.",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -20,21 +20,39 @@
     "parameters": [
       {
         "name": "logName",
-        "label": "Journal",
+        "label": "Log",
         "type": "string",
         "defaultValue": "Application",
         "required": true,
-        "description": "Nom du journal à vider (System, Application, Security)"
+        "description": "Name of the log to clear (System, Application, Security)"
       }
     ]
   },
   "examples": [
     {
       "command": "Clear-EventLog -LogName Application",
-      "description": "Vide le journal Application",
+      "description": "Clear the Application log",
       "platform": 0
     }
   ],
-  "notes": "⚠️ ATTENTION : Cette action est irréversible ! Envisager d'exporter le journal avant de le vider.",
-  "links": []
+  "notes": "⚠️ WARNING: this action cannot be undone! Consider exporting the log before clearing it.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Vider un journal d'événements",
+      "description": "Efface tous les événements d'un journal Windows spécifique.",
+      "notes": "⚠️ ATTENTION : Cette action est irréversible ! Envisager d'exporter le journal avant de le vider.",
+      "parameters": {
+        "windows": {
+          "logName": {
+            "label": "Journal",
+            "description": "Nom du journal à vider (System, Application, Security)"
+          }
+        }
+      },
+      "examples": {
+        "Clear-EventLog -LogName Application": "Vide le journal Application"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "hyperv-create-snapshot",
-  "title": "Créer un snapshot (point de contrôle) d'une VM",
-  "description": "Crée un point de contrôle (snapshot) d'une machine virtuelle Hyper-V, capturant son état actuel pour une restauration ultérieure.",
-  "category": "🐳 Containers & VMs",
+  "title": "Create a VM snapshot (checkpoint)",
+  "description": "Create a checkpoint (snapshot) of a Hyper-V virtual machine, capturing its current state for a later restore.",
+  "category": "containers-vms",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -23,51 +23,76 @@
     "parameters": [
       {
         "name": "vmName",
-        "label": "Nom de la VM",
+        "label": "VM name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la machine virtuelle"
+        "description": "Name of the virtual machine"
       },
       {
         "name": "snapshotName",
-        "label": "Nom du snapshot",
+        "label": "Snapshot name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "Checkpoint-before-change",
         "required": true,
-        "description": "Nom du point de contrôle"
+        "description": "Name of the checkpoint"
       }
     ]
   },
   "examples": [
     {
       "command": "Checkpoint-VM -Name 'Windows11-Dev' -SnapshotName 'Before-Updates'",
-      "description": "Snapshot avant mise à jour",
+      "description": "Snapshot before an update",
       "platform": 0
     },
     {
       "command": "Checkpoint-VM -Name 'Windows11-Dev' -SnapshotName \"Checkpoint-$(Get-Date -Format 'yyyy-MM-dd_HH-mm')\"",
-      "description": "Snapshot nommé avec la date et l'heure (chaîne entre guillemets doubles, évaluée par PowerShell)",
+      "description": "Snapshot named with the date and time (double-quoted string, evaluated by PowerShell)",
       "platform": 0
     },
     {
       "command": "Get-VM 'Production-*' | Checkpoint-VM -SnapshotName 'Weekly-Backup'",
-      "description": "Snapshot de toutes les VMs de production",
+      "description": "Snapshot of every production VM",
       "platform": 0
     },
     {
       "command": "Restore-VMSnapshot -VMName 'TestVM' -Name 'Before-Updates' -Confirm:$false",
-      "description": "Restaure un snapshot",
+      "description": "Restore a snapshot",
       "platform": 0
     }
   ],
-  "notes": "Les snapshots consomment de l'espace disque. Supprimez les anciens snapshots régulièrement. Évitez trop de snapshots en chaîne (impact performance).",
+  "notes": "Snapshots use disk space. Delete old snapshots regularly. Avoid long snapshot chains (performance impact).",
   "links": [
     {
       "title": "Documentation Checkpoint-VM",
       "url": "https://learn.microsoft.com/en-us/powershell/module/hyper-v/checkpoint-vm"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer un snapshot (point de contrôle) d'une VM",
+      "description": "Crée un point de contrôle (snapshot) d'une machine virtuelle Hyper-V, capturant son état actuel pour une restauration ultérieure.",
+      "notes": "Les snapshots consomment de l'espace disque. Supprimez les anciens snapshots régulièrement. Évitez trop de snapshots en chaîne (impact performance).",
+      "parameters": {
+        "windows": {
+          "vmName": {
+            "label": "Nom de la VM",
+            "description": "Nom de la machine virtuelle"
+          },
+          "snapshotName": {
+            "label": "Nom du snapshot",
+            "description": "Nom du point de contrôle"
+          }
+        }
+      },
+      "examples": {
+        "Checkpoint-VM -Name 'Windows11-Dev' -SnapshotName 'Before-Updates'": "Snapshot avant mise à jour",
+        "Checkpoint-VM -Name 'Windows11-Dev' -SnapshotName \"Checkpoint-$(Get-Date -Format 'yyyy-MM-dd_HH-mm')\"": "Snapshot nommé avec la date et l'heure (chaîne entre guillemets doubles, évaluée par PowerShell)",
+        "Get-VM 'Production-*' | Checkpoint-VM -SnapshotName 'Weekly-Backup'": "Snapshot de toutes les VMs de production",
+        "Restore-VMSnapshot -VMName 'TestVM' -Name 'Before-Updates' -Confirm:$false": "Restaure un snapshot"
+      }
+    }
+  }
 }

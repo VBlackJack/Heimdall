@@ -89,7 +89,9 @@ public sealed class CommandHistoryTargetHostTests
         }
 
         (await database.HistoryHasTargetHostColumnAsync()).Should().BeTrue();
-        (await database.ReadUserVersionAsync()).Should().Be(5);
+        (await database.ReadUserVersionAsync()).Should().Be(
+            TwinShellSchema.Steps.Max(step => step.Version),
+            "the upgrade runs every later step too, so the terminal version is the last one declared");
     }
 
     private static CommandHistoryRepository NewRepository(TwinShellDbContext context)

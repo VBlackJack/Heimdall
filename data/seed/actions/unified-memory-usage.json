@@ -1,8 +1,8 @@
 {
   "id": "unified-memory-usage",
-  "title": "Afficher l'utilisation de la mémoire",
-  "description": "Affiche l'utilisation de la mémoire RAM du système",
-  "category": "📊 Monitoring & Logs",
+  "title": "Show memory usage",
+  "description": "Show the RAM usage of the system",
+  "category": "monitoring-logs",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -31,8 +31,17 @@
   "windowsExamples": [
     {
       "command": "Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory",
-      "description": "Affiche l'utilisation mémoire sur Windows",
+      "description": "Show memory usage on Windows",
       "platform": 0
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'utilisation de la mémoire",
+      "description": "Affiche l'utilisation de la mémoire RAM du système",
+      "examples": {
+        "Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory": "Affiche l'utilisation mémoire sur Windows"
+      }
+    }
+  }
 }

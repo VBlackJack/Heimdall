@@ -1,8 +1,8 @@
 {
   "id": "apt-install",
-  "title": "Installer un paquet avec APT",
-  "description": "Installe un ou plusieurs paquets avec leurs dépendances (Debian/Ubuntu)",
-  "category": "📦 Package Management",
+  "title": "Install a package with APT",
+  "description": "Install one or more packages with their dependencies (Debian/Ubuntu)",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -21,51 +21,74 @@
     "parameters": [
       {
         "name": "package",
-        "label": "Nom du paquet",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "nginx",
         "required": true,
-        "description": "Nom du paquet à installer (ou liste séparée par espaces)"
+        "description": "Name of the package to install (or a space-separated list)"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo apt install nginx",
-      "description": "Installe le serveur web nginx",
+      "description": "Install the nginx web server",
       "platform": 1
     },
     {
       "command": "sudo apt install htop vim curl",
-      "description": "Installe plusieurs paquets à la fois",
+      "description": "Install several packages at once",
       "platform": 1
     },
     {
       "command": "apt install -y nginx -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
       "command": "apt install -y nginx --dry-run",
-      "description": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+      "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     },
     {
       "command": "apt install -y nginx",
-      "description": "Exemple utilisant le paramètre 'package': Nom du paquet à installer (ou liste séparée par espaces). Remplacez nginx par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'package' parameter: name of the package to install (or a space-separated list). Replace nginx with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "apt install nginx -y",
-      "description": "Installer nginx",
+      "description": "Install nginx",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. -y pour confirmer automatiquement. Installer les dépendances automatiquement.",
+  "notes": "Requires sudo. -y confirms automatically. Dependencies are installed automatically.",
   "links": [
     {
       "title": "APT package management",
       "url": "https://ubuntu.com/server/docs/package-management"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Installer un paquet avec APT",
+      "description": "Installe un ou plusieurs paquets avec leurs dépendances (Debian/Ubuntu)",
+      "notes": "Nécessite sudo. -y pour confirmer automatiquement. Installer les dépendances automatiquement.",
+      "parameters": {
+        "linux": {
+          "package": {
+            "label": "Nom du paquet",
+            "description": "Nom du paquet à installer (ou liste séparée par espaces)"
+          }
+        }
+      },
+      "examples": {
+        "sudo apt install nginx": "Installe le serveur web nginx",
+        "sudo apt install htop vim curl": "Installe plusieurs paquets à la fois",
+        "apt install -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "apt install -y nginx --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+        "apt install -y nginx": "Exemple utilisant le paramètre 'package': Nom du paquet à installer (ou liste séparée par espaces). Remplacez nginx par la valeur appropriée selon votre environnement.",
+        "apt install nginx -y": "Installer nginx"
+      }
+    }
+  }
 }

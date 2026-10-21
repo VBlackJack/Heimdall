@@ -1,8 +1,8 @@
 {
   "id": "performance-top-memory-processes",
-  "title": "Lister les processus consommant le plus de mémoire",
-  "description": "Affiche les processus classés par utilisation mémoire (RAM) décroissante",
-  "category": "⚡ Performance",
+  "title": "List the processes that use the most memory",
+  "description": "Show the processes sorted by memory (RAM) usage, highest first.",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,66 +21,74 @@
     "parameters": [
       {
         "name": "topCount",
-        "label": "Nombre de processus",
+        "label": "Number of processes",
         "type": "number",
         "defaultValue": "10",
         "required": true,
-        "description": "Nombre de processus à afficher"
+        "description": "Number of processes to show"
       }
     ]
   },
   "examples": [
     {
-      "command": "Get-Process | Sort-Object CPU -Descending | Select-Object -First 5",
-      "description": "🔥 PERFORMANCE : Identifie les 5 processus qui consomment le plus de CPU actuellement.",
-      "platform": 0
-    },
-    {
-      "command": "Get-Process | Where-Object {$_.Responding -eq $false}",
-      "description": "Trouve les applications 'Ne répond pas' (Frozen).",
-      "platform": 0
-    },
-    {
-      "command": "Get-Process -Name chrome | Stop-Process -Force",
-      "description": "Kill Switch : Ferme de force toutes les instances d'un processus spécifique. Utile pour nettoyer des processus zombies.",
-      "platform": 1
-    },
-    {
       "command": "Get-Process | Sort-Object WS -Descending | Select-Object -First 10 ProcessName,@{n='Memory(MB)';e={[int]($_.WS/1MB)}}",
-      "description": "Top 10 des processus par mémoire (simplifié)",
+      "description": "Top 10 processes by memory (simplified)",
       "platform": 0
     },
     {
       "command": "Get-Process | Where-Object {$_.WorkingSet -gt 100MB} | Sort-Object WS -Descending",
-      "description": "Processus utilisant plus de 100 MB",
+      "description": "Processes using more than 100 MB",
       "platform": 0
     },
     {
       "command": "Get-Process | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-Process | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-Process | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     },
     {
       "command": "Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 10 | Select-Object ProcessName,Id,@{Name='Memory_MB';Expression={[math]::Round($_.WorkingSet/1MB,2)}},@{Name='Virtual_MB';Expression={[math]::Round($_.VirtualMemorySize/1MB,2)}},Handles | Format-Table -AutoSize",
-      "description": "Exemple utilisant le paramètre 'topCount': Nombre de processus à afficher.",
+      "description": "Example using the 'topCount' parameter: number of processes to show.",
       "platform": 0
     }
   ],
-  "notes": "WorkingSet = RAM physique utilisée. VirtualMemorySize = mémoire virtuelle. Handles = nombre de handles système ouverts.",
+  "notes": "WorkingSet = physical RAM used. VirtualMemorySize = virtual memory. Handles = number of open system handles.",
   "links": [
     {
       "title": "Process Memory Metrics",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-process"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les processus consommant le plus de mémoire",
+      "description": "Affiche les processus classés par utilisation mémoire (RAM) décroissante",
+      "notes": "WorkingSet = RAM physique utilisée. VirtualMemorySize = mémoire virtuelle. Handles = nombre de handles système ouverts.",
+      "parameters": {
+        "windows": {
+          "topCount": {
+            "label": "Nombre de processus",
+            "description": "Nombre de processus à afficher"
+          }
+        }
+      },
+      "examples": {
+        "Get-Process | Sort-Object WS -Descending | Select-Object -First 10 ProcessName,@{n='Memory(MB)';e={[int]($_.WS/1MB)}}": "Top 10 des processus par mémoire (simplifié)",
+        "Get-Process | Where-Object {$_.WorkingSet -gt 100MB} | Sort-Object WS -Descending": "Processus utilisant plus de 100 MB",
+        "Get-Process | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-Process | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-Process | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 10 | Select-Object ProcessName,Id,@{Name='Memory_MB';Expression={[math]::Round($_.WorkingSet/1MB,2)}},@{Name='Virtual_MB';Expression={[math]::Round($_.VirtualMemorySize/1MB,2)}},Handles | Format-Table -AutoSize": "Exemple utilisant le paramètre 'topCount': Nombre de processus à afficher."
+      }
+    }
+  }
 }

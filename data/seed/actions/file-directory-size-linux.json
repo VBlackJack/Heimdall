@@ -1,13 +1,13 @@
 {
   "id": "file-directory-size-linux",
-  "title": "Taille d'un répertoire",
-  "description": "Calcule la taille totale d'un répertoire et de son contenu.",
-  "category": "📁 Files & Storage",
+  "title": "Directory size",
+  "description": "Compute the total size of a directory and its content.",
+  "category": "files-storage",
   "platform": 1,
   "level": 0,
   "tags": [
-    "taille",
-    "dossier",
+    "size",
+    "folder",
     "du",
     "linux"
   ],
@@ -20,31 +20,45 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": ".",
         "required": false,
-        "description": "Chemin du dossier à analyser"
+        "description": "Path of the folder to analyze"
       }
     ]
   },
   "examples": [
     {
       "command": "du -h --max-depth=1 /home | sort -h",
-      "description": "Liste les dossiers par taille",
-      "platform": 1
-    },
-    {
-      "command": "du -sh \".\"",
-      "description": "Exemple utilisant le paramètre 'path': Chemin du dossier à analyser. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
+      "description": "List folders by size",
       "platform": 1
     },
     {
       "command": "du -sh /home/*",
-      "description": "Taille de chaque home",
+      "description": "Size of each home directory",
       "platform": 1
     }
   ],
-  "notes": "-s pour somme, -h pour format lisible. --max-depth limite la profondeur.",
-  "links": []
+  "notes": "-s for a sum, -h for a human-readable format. --max-depth limits the depth.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Taille d'un répertoire",
+      "description": "Calcule la taille totale d'un répertoire et de son contenu.",
+      "notes": "-s pour somme, -h pour format lisible. --max-depth limite la profondeur.",
+      "parameters": {
+        "linux": {
+          "path": {
+            "label": "Chemin",
+            "description": "Chemin du dossier à analyser"
+          }
+        }
+      },
+      "examples": {
+        "du -h --max-depth=1 /home | sort -h": "Liste les dossiers par taille",
+        "du -sh /home/*": "Taille de chaque home"
+      }
+    }
+  }
 }

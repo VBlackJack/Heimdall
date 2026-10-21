@@ -113,6 +113,9 @@ public sealed class CommandLibraryTransferService(
                 continue;
             }
 
+            // An export taken before the categories became keys carries the old shipped
+            // strings; they land in the group the shipped actions now use.
+            action.Category = CategoryMigration.Normalize(action.Category);
             NormalizeEnumDomains(action);
             NormalizeParameterQuoting(action);
             var truncatedHere = TruncateExampleLists(action);
@@ -256,7 +259,7 @@ public sealed class CommandLibraryTransferService(
         }
     }
 
-    private static List<ActionModel>? ParseImportJson(string json)
+    internal static List<ActionModel>? ParseImportJson(string json)
     {
         try
         {

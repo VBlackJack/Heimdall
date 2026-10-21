@@ -1,8 +1,8 @@
 {
   "id": "db-mysqladmin-ping",
-  "title": "Vérifier statut MySQL (MySQLAdmin)",
-  "description": "Vérifie si le serveur MySQL est en vie et répond.",
-  "category": "💽 Database",
+  "title": "Check MySQL status (mysqladmin)",
+  "description": "Check whether the MySQL server is alive and responding.",
+  "category": "database",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -20,19 +20,19 @@
     "parameters": [
       {
         "name": "host",
-        "label": "Hôte",
+        "label": "Host",
         "type": "string",
         "defaultValue": "localhost",
         "required": true,
-        "description": "Serveur MySQL"
+        "description": "MySQL server"
       },
       {
         "name": "user",
-        "label": "Utilisateur",
+        "label": "User",
         "type": "string",
         "defaultValue": "root",
         "required": true,
-        "description": "User MySQL"
+        "description": "MySQL user"
       }
     ]
   },
@@ -44,19 +44,19 @@
     "parameters": [
       {
         "name": "host",
-        "label": "Hôte",
+        "label": "Host",
         "type": "string",
         "defaultValue": "localhost",
         "required": true,
-        "description": "Serveur MySQL"
+        "description": "MySQL server"
       },
       {
         "name": "user",
-        "label": "Utilisateur",
+        "label": "User",
         "type": "string",
         "defaultValue": "root",
         "required": true,
-        "description": "User MySQL"
+        "description": "MySQL user"
       }
     ]
   },
@@ -64,15 +64,47 @@
   "linuxExamples": [
     {
       "command": "mysqladmin -u root -p processlist",
-      "description": "Affiche la liste des requêtes en cours d'exécution (équivalent de SHOW PROCESSLIST). Utile pour détecter les blocages.",
+      "description": "Show the list of running queries (the equivalent of SHOW PROCESSLIST). Useful to spot blocking.",
       "platform": 1
     },
     {
       "command": "mysqladmin -u root -p status",
-      "description": "Affiche les statistiques vitales (Uptime, Threads, Slow queries).",
+      "description": "Show the vital statistics (Uptime, Threads, Slow queries).",
       "platform": 1
     }
   ],
   "linuxCommandTemplateId": "fbe94b36-6f8b-42bc-85f7-d7714c5d61a4",
-  "windowsCommandTemplateId": "193d03b3-ce1c-486a-82bc-cd26282ca996"
+  "windowsCommandTemplateId": "193d03b3-ce1c-486a-82bc-cd26282ca996",
+  "translations": {
+    "fr": {
+      "title": "Vérifier statut MySQL (MySQLAdmin)",
+      "description": "Vérifie si le serveur MySQL est en vie et répond.",
+      "parameters": {
+        "windows": {
+          "host": {
+            "label": "Hôte",
+            "description": "Serveur MySQL"
+          },
+          "user": {
+            "label": "Utilisateur",
+            "description": "User MySQL"
+          }
+        },
+        "linux": {
+          "host": {
+            "label": "Hôte",
+            "description": "Serveur MySQL"
+          },
+          "user": {
+            "label": "Utilisateur",
+            "description": "User MySQL"
+          }
+        }
+      },
+      "examples": {
+        "mysqladmin -u root -p processlist": "Affiche la liste des requêtes en cours d'exécution (équivalent de SHOW PROCESSLIST). Utile pour détecter les blocages.",
+        "mysqladmin -u root -p status": "Affiche les statistiques vitales (Uptime, Threads, Slow queries)."
+      }
+    }
+  }
 }

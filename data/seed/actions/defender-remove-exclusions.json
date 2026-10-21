@@ -1,8 +1,8 @@
 {
   "id": "defender-remove-exclusions",
-  "title": "Supprimer une exclusion Defender",
-  "description": "Retire un dossier, fichier ou processus de la liste des exclusions Windows Defender.",
-  "category": "🔒 Security & Encryption",
+  "title": "Remove a Defender exclusion",
+  "description": "Remove a folder, file or process from the Windows Defender exclusion list.",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,46 +20,68 @@
     "parameters": [
       {
         "name": "folderPath",
-        "label": "Chemin à retirer",
+        "label": "Path to remove",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du dossier à retirer des exclusions"
+        "description": "Path of the folder to remove from the exclusions"
       }
     ]
   },
   "examples": [
     {
       "command": "Remove-MpPreference -ExclusionPath 'C:\\Temp'",
-      "description": "Retire C:\\Temp des exclusions (Defender va maintenant le scanner)",
+      "description": "Remove C:\\Temp from the exclusions (Defender will scan it again)",
       "platform": 0
     },
     {
       "command": "Remove-MpPreference -ExclusionExtension '.exe'",
-      "description": "Retire l'exclusion des fichiers .exe",
+      "description": "Remove the exclusion of .exe files",
       "platform": 0
     },
     {
       "command": "Get-MpPreference | Select-Object -ExpandProperty ExclusionPath | ForEach-Object { Remove-MpPreference -ExclusionPath $_ }",
-      "description": "⚠️ Supprime TOUTES les exclusions de dossiers (réinitialisation complète)",
+      "description": "⚠️ Remove ALL the folder exclusions (full reset)",
       "platform": 0
     },
     {
       "command": "$exclusions = Get-MpPreference | Select-Object -ExpandProperty ExclusionPath; $exclusions",
-      "description": "Liste les exclusions actuelles avant suppression",
+      "description": "List the current exclusions before removing any",
       "platform": 0
     },
     {
       "command": "Remove-MpPreference -ExclusionPath \"C:\\Projects\\MyApp\"",
-      "description": "Exemple utilisant le paramètre 'folderPath': Chemin du dossier à retirer des exclusions. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'folderPath' parameter: path of the folder to remove from the exclusions. Replace C:\\Projects\\MyApp with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "ExclusionPath: chemin de dossier/fichier. ExclusionExtension: extension (.exe, .dll, etc.). ExclusionProcess: nom de processus (chrome.exe, etc.). Retirer les exclusions améliore la sécurité mais peut réduire les performances.",
+  "notes": "ExclusionPath: folder or file path. ExclusionExtension: extension (.exe, .dll and so on). ExclusionProcess: process name (chrome.exe and so on). Removing exclusions improves security but can lower performance.",
   "links": [
     {
       "title": "Remove-MpPreference Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/defender/remove-mppreference"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Supprimer une exclusion Defender",
+      "description": "Retire un dossier, fichier ou processus de la liste des exclusions Windows Defender.",
+      "notes": "ExclusionPath: chemin de dossier/fichier. ExclusionExtension: extension (.exe, .dll, etc.). ExclusionProcess: nom de processus (chrome.exe, etc.). Retirer les exclusions améliore la sécurité mais peut réduire les performances.",
+      "parameters": {
+        "windows": {
+          "folderPath": {
+            "label": "Chemin à retirer",
+            "description": "Chemin du dossier à retirer des exclusions"
+          }
+        }
+      },
+      "examples": {
+        "Remove-MpPreference -ExclusionPath 'C:\\Temp'": "Retire C:\\Temp des exclusions (Defender va maintenant le scanner)",
+        "Remove-MpPreference -ExclusionExtension '.exe'": "Retire l'exclusion des fichiers .exe",
+        "Get-MpPreference | Select-Object -ExpandProperty ExclusionPath | ForEach-Object { Remove-MpPreference -ExclusionPath $_ }": "⚠️ Supprime TOUTES les exclusions de dossiers (réinitialisation complète)",
+        "$exclusions = Get-MpPreference | Select-Object -ExpandProperty ExclusionPath; $exclusions": "Liste les exclusions actuelles avant suppression",
+        "Remove-MpPreference -ExclusionPath \"C:\\Projects\\MyApp\"": "Exemple utilisant le paramètre 'folderPath': Chemin du dossier à retirer des exclusions. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

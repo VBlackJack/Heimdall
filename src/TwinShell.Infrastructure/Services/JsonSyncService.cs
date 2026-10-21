@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
@@ -171,7 +172,9 @@ public sealed class JsonSyncService : SyncServiceBase
                     Type = p.Type,
                     DefaultValue = p.DefaultValue,
                     Required = p.Required,
-                    Description = p.Description
+                    Description = p.Description,
+                    AllowedValues = p.AllowedValues is { Count: > 0 } ? p.AllowedValues.ToList() : null,
+                    Quoting = p.Quoting?.ToString()
                 }).ToList();
 
                 var model = new TemplateModel
@@ -265,7 +268,8 @@ public sealed class JsonSyncService : SyncServiceBase
                         Url = l.Url
                     }).ToList(),
                     IsUserCreated = action.IsUserCreated,
-                    UpdatedAt = action.UpdatedAt
+                    UpdatedAt = action.UpdatedAt,
+                    Translations = action.Translations is { Count: > 0 } ? action.Translations : null
                 };
 
                 var fileName = BuildEntityFileName(action.Title, action.PublicId);
@@ -543,10 +547,12 @@ public sealed class JsonSyncService : SyncServiceBase
                     {
                         Name = p.Name,
                         Label = p.Label,
-                        Type = p.Type ?? "string",
+                        Type = p.Type ?? TemplateParameterTypes.Text,
                         DefaultValue = p.DefaultValue,
                         Required = p.Required,
-                        Description = p.Description
+                        Description = p.Description,
+                        AllowedValues = p.AllowedValues is { Count: > 0 } ? p.AllowedValues.ToList() : null,
+                        Quoting = Enum.TryParse<QuotingMode>(p.Quoting, ignoreCase: true, out var quoting) ? quoting : null
                     }).ToList();
 
                 var existing = await _templateRepository.GetByPublicIdAsync(model.Id);
@@ -645,7 +651,8 @@ public sealed class JsonSyncService : SyncServiceBase
                     platform = Platform.Windows;
                 }
 
-                if (!Enum.TryParse<CriticalityLevel>(model.Level, true, out var level))
+                // Accepts the legacy "Warning" and "Danger" an older schema declared.
+                if (!CriticalityLevelNames.TryParse(model.Level, out var level))
                 {
                     level = CriticalityLevel.Info;
                 }
@@ -691,7 +698,7 @@ public sealed class JsonSyncService : SyncServiceBase
                     // Update existing (remote is newer or same)
                     existing.Title = model.Title;
                     existing.Description = model.Description;
-                    existing.Category = model.Category;
+                    existing.Category = CategoryMigration.Normalize(model.Category);
                     existing.Platform = platform;
                     existing.Level = level;
                     existing.Tags = model.Tags ?? new List<string>();
@@ -704,6 +711,7 @@ public sealed class JsonSyncService : SyncServiceBase
                     existing.Links = ParseLinks(model.Links);
                     existing.IsUserCreated = model.IsUserCreated;
                     existing.UpdatedAt = normalizedUpdatedAt ?? nowUtc;
+                    existing.Translations = model.Translations ?? new List<ActionTranslation>();
 
                     await _actionRepository.UpdateAsync(existing);
                     result.ActionsUpdated++;
@@ -717,7 +725,7 @@ public sealed class JsonSyncService : SyncServiceBase
                         PublicId = model.Id,
                         Title = model.Title,
                         Description = model.Description,
-                        Category = model.Category,
+                        Category = CategoryMigration.Normalize(model.Category),
                         Platform = platform,
                         Level = level,
                         Tags = model.Tags ?? new List<string>(),
@@ -730,7 +738,8 @@ public sealed class JsonSyncService : SyncServiceBase
                         Links = ParseLinks(model.Links),
                         IsUserCreated = model.IsUserCreated,
                         CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = normalizedUpdatedAt ?? nowUtc
+                        UpdatedAt = normalizedUpdatedAt ?? nowUtc,
+                        Translations = model.Translations ?? new List<ActionTranslation>()
                     };
                     await _actionRepository.AddAsync(action);
                     result.ActionsCreated++;
@@ -1211,6 +1220,12 @@ public sealed class JsonSyncService : SyncServiceBase
         public string? DefaultValue { get; set; }
         public bool Required { get; set; }
         public string? Description { get; set; }
+
+        /// <summary>The values a choice parameter offers; null for any other type.</summary>
+        public List<string>? AllowedValues { get; set; }
+
+        /// <summary>The quoting override, by <see cref="QuotingMode"/> name; null for the default.</summary>
+        public string? Quoting { get; set; }
     }
 
     private sealed class ActionModel
@@ -1232,6 +1247,14 @@ public sealed class JsonSyncService : SyncServiceBase
         public bool IsUserCreated { get; set; }
         /// <summary>Timestamp for conflict detection during sync</summary>
         public DateTime? UpdatedAt { get; set; }
+
+        /// <summary>
+        /// Other languages of the text above, in the same shape as the shipped seeds and the
+        /// library export: an object keyed by culture. Null, and so absent from the file,
+        /// when the action has none.
+        /// </summary>
+        [JsonConverter(typeof(ActionTranslationsJsonConverter))]
+        public List<ActionTranslation>? Translations { get; set; }
     }
 
     private sealed class ExampleModel

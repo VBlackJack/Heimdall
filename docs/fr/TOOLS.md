@@ -426,8 +426,15 @@ de données partagée se trouve dans les données d'application locales de
 l'utilisateur, dans un répertoire `TwinShell`.
 
 Les données de départ se trouvent dans `data/seed/actions/`. Les fichiers dont
-le nom commence par `_` sont ignorés ; le jeu de données actuel contient 514
-fichiers JSON d'actions.
+le nom commence par `_` sont ignorés ; le jeu de données actuel contient 442
+fichiers JSON d'actions. Leur texte est un pivot anglais avec les autres langues
+sous `translations`, et leurs catégories sont des clés ASCII que la vue traduit
+en libellés localisés. Au démarrage, le répertoire des données de départ est
+haché ; quand l'empreinte diffère de celle enregistrée dans la table
+`SeedState`, les actions système sont rafraîchies en une seule transaction.
+
+Le pack facultatif d'allègement pour poste de travail se trouve dans
+`data/packs/`, au format d'import, et n'est pas chargé au démarrage.
 
 Principaux parcours utilisateur :
 
@@ -479,3 +486,5 @@ créées par l'utilisateur, et la fusion à l'import ignore les actions système
 - `src/Heimdall.App/ViewModels/CommandLibraryViewModel*.cs` : tranches de
   view-model de Command Library.
 - `data/seed/actions/` : actions de départ de la bibliothèque de commandes.
+- `data/packs/` : packs facultatifs de la bibliothèque de commandes, importés par
+  l'opérateur.

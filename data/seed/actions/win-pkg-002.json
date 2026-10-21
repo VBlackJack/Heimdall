@@ -1,8 +1,8 @@
 {
   "id": "win-pkg-002",
-  "title": "Lister les applications installées via Winget",
-  "description": "Affiche la liste de toutes les applications installées et gérées par Winget.",
-  "category": "📦 Package Management",
+  "title": "List the applications installed with Winget",
+  "description": "Show the list of every application installed and managed by Winget.",
+  "category": "package-management",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -23,20 +23,31 @@
   "examples": [
     {
       "command": "winget list",
-      "description": "Liste toutes les applications installées",
+      "description": "List every installed application",
       "platform": 0
     },
     {
       "command": "winget list --source winget",
-      "description": "Liste uniquement les applications du store Winget",
+      "description": "List only the applications from the Winget store",
       "platform": 0
     }
   ],
-  "notes": "Affiche toutes les applications, même celles non installées via Winget.",
+  "notes": "Shows every application, even those not installed with Winget.",
   "links": [
     {
       "title": "Winget list documentation",
       "url": "https://learn.microsoft.com/en-us/windows/package-manager/winget/list"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les applications installées via Winget",
+      "description": "Affiche la liste de toutes les applications installées et gérées par Winget.",
+      "notes": "Affiche toutes les applications, même celles non installées via Winget.",
+      "examples": {
+        "winget list": "Liste toutes les applications installées",
+        "winget list --source winget": "Liste uniquement les applications du store Winget"
+      }
+    }
+  }
 }

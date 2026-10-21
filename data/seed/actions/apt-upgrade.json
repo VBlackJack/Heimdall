@@ -1,8 +1,8 @@
 {
   "id": "apt-upgrade",
-  "title": "Mettre à niveau les paquets installés",
-  "description": "Met à jour tous les paquets installés vers leurs dernières versions disponibles",
-  "category": "📦 Package Management",
+  "title": "Upgrade the installed packages",
+  "description": "Update every installed package to its latest available version",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -23,35 +23,49 @@
   "examples": [
     {
       "command": "sudo apt upgrade",
-      "description": "Met à niveau tous les paquets (avec confirmation)",
+      "description": "Upgrade every package (with confirmation)",
       "platform": 1
     },
     {
       "command": "sudo apt full-upgrade",
-      "description": "Met à niveau en gérant les dépendances changées",
+      "description": "Upgrade and handle changed dependencies",
       "platform": 1
     },
     {
       "command": "apt upgrade -y -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
       "command": "apt upgrade -y --dry-run",
-      "description": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+      "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     },
     {
       "command": "apt upgrade -y",
-      "description": "Mettre à jour tous les paquets installés",
+      "description": "Update every installed package",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. Exécuter apt update d'abord. full-upgrade peut supprimer des paquets obsolètes.",
+  "notes": "Requires sudo. Run apt update first. full-upgrade can remove obsolete packages.",
   "links": [
     {
       "title": "APT upgrade guide",
       "url": "https://help.ubuntu.com/community/AptGet/Howto"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Mettre à niveau les paquets installés",
+      "description": "Met à jour tous les paquets installés vers leurs dernières versions disponibles",
+      "notes": "Nécessite sudo. Exécuter apt update d'abord. full-upgrade peut supprimer des paquets obsolètes.",
+      "examples": {
+        "sudo apt upgrade": "Met à niveau tous les paquets (avec confirmation)",
+        "sudo apt full-upgrade": "Met à niveau en gérant les dépendances changées",
+        "apt upgrade -y -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "apt upgrade -y --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+        "apt upgrade -y": "Mettre à jour tous les paquets installés"
+      }
+    }
+  }
 }

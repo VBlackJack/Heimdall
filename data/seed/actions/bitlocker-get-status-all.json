@@ -1,8 +1,8 @@
 {
   "id": "bitlocker-get-status-all",
-  "title": "Obtenir le statut BitLocker de tous les disques",
-  "description": "Affiche l'état de chiffrement BitLocker pour tous les volumes du système.",
-  "category": "🔒 Security & Encryption",
+  "title": "Get the BitLocker status of every disk",
+  "description": "Show the BitLocker encryption state of every volume of the system.",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Get-BitLockerVolume",
-      "description": "Affiche le statut BitLocker de tous les volumes avec tous les détails",
+      "description": "Show the BitLocker status of every volume with all the details",
       "platform": 0
     },
     {
       "command": "Get-BitLockerVolume | Select-Object MountPoint,VolumeStatus,ProtectionStatus",
-      "description": "Affiche uniquement le point de montage et les statuts de chiffrement",
+      "description": "Show only the mount point and the encryption statuses",
       "platform": 0
     },
     {
       "command": "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'On'}",
-      "description": "Liste uniquement les volumes avec BitLocker activé",
+      "description": "List only the volumes with BitLocker enabled",
       "platform": 0
     },
     {
       "command": "Get-BitLockerVolume | Where-Object {$_.VolumeStatus -eq 'FullyDecrypted'}",
-      "description": "Liste les volumes non chiffrés (vulnérables)",
+      "description": "List the unencrypted (vulnerable) volumes",
       "platform": 0
     },
     {
       "command": "Get-BitLockerVolume C: | Select-Object *",
-      "description": "Affiche toutes les propriétés détaillées du volume C:",
+      "description": "Show every detailed property of volume C:",
       "platform": 0
     }
   ],
-  "notes": "ProtectionStatus: On (protégé), Off (non protégé). VolumeStatus: FullyEncrypted, FullyDecrypted, EncryptionInProgress, DecryptionInProgress. EncryptionMethod: None, Aes128, Aes256, XtsAes128, XtsAes256.",
+  "notes": "ProtectionStatus: On (protected), Off (not protected). VolumeStatus: FullyEncrypted, FullyDecrypted, EncryptionInProgress, DecryptionInProgress. EncryptionMethod: None, Aes128, Aes256, XtsAes128, XtsAes256.",
   "links": [
     {
       "title": "Get-BitLockerVolume Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/bitlocker/get-bitlockervolume"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Obtenir le statut BitLocker de tous les disques",
+      "description": "Affiche l'état de chiffrement BitLocker pour tous les volumes du système.",
+      "notes": "ProtectionStatus: On (protégé), Off (non protégé). VolumeStatus: FullyEncrypted, FullyDecrypted, EncryptionInProgress, DecryptionInProgress. EncryptionMethod: None, Aes128, Aes256, XtsAes128, XtsAes256.",
+      "examples": {
+        "Get-BitLockerVolume": "Affiche le statut BitLocker de tous les volumes avec tous les détails",
+        "Get-BitLockerVolume | Select-Object MountPoint,VolumeStatus,ProtectionStatus": "Affiche uniquement le point de montage et les statuts de chiffrement",
+        "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'On'}": "Liste uniquement les volumes avec BitLocker activé",
+        "Get-BitLockerVolume | Where-Object {$_.VolumeStatus -eq 'FullyDecrypted'}": "Liste les volumes non chiffrés (vulnérables)",
+        "Get-BitLockerVolume C: | Select-Object *": "Affiche toutes les propriétés détaillées du volume C:"
+      }
+    }
+  }
 }

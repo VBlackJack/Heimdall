@@ -1,8 +1,8 @@
 {
   "id": "win-pkg-105",
-  "title": "Désinstaller un package Chocolatey",
-  "description": "Désinstalle un package précédemment installé via Chocolatey.",
-  "category": "📦 Package Management",
+  "title": "Uninstall a Chocolatey package",
+  "description": "Uninstall a package previously installed with Chocolatey.",
+  "category": "package-management",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -21,31 +21,44 @@
     "parameters": [
       {
         "name": "packageName",
-        "label": "Nom du package",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du package à désinstaller"
+        "description": "Name of the package to uninstall"
       }
     ]
   },
   "examples": [
     {
       "command": "choco uninstall googlechrome -y",
-      "description": "Désinstalle Google Chrome",
-      "platform": 0
-    },
-    {
-      "command": "choco uninstall Microsoft.VisualStudioCode -y",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help choco -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Uninstall Google Chrome",
       "platform": 0
     }
   ],
-  "notes": "⚠️ ATTENTION : Cette action supprime le package du système. Assurez-vous de sauvegarder vos données.",
+  "notes": "⚠️ WARNING: this action removes the package from the system. Make sure to back up your data.",
   "links": [
     {
       "title": "Chocolatey uninstall documentation",
       "url": "https://docs.chocolatey.org/en-us/choco/commands/uninstall"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Désinstaller un package Chocolatey",
+      "description": "Désinstalle un package précédemment installé via Chocolatey.",
+      "notes": "⚠️ ATTENTION : Cette action supprime le package du système. Assurez-vous de sauvegarder vos données.",
+      "parameters": {
+        "windows": {
+          "packageName": {
+            "label": "Nom du package",
+            "description": "Nom du package à désinstaller"
+          }
+        }
+      },
+      "examples": {
+        "choco uninstall googlechrome -y": "Désinstalle Google Chrome"
+      }
+    }
+  }
 }

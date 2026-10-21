@@ -1,8 +1,8 @@
 {
   "id": "linux-list-services",
-  "title": "Lister tous les services",
-  "description": "Affiche la liste de tous les services systemd avec leur état.",
-  "category": "⚙️ Services & Automation",
+  "title": "List all services",
+  "description": "Show every systemd service with its state.",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -22,10 +22,20 @@
   "examples": [
     {
       "command": "systemctl list-units --type=service --all",
-      "description": "Liste tous les services",
+      "description": "List all services",
       "platform": 1
     }
   ],
-  "notes": "Utiliser --state=failed pour voir les services en échec.",
-  "links": []
+  "notes": "Use --state=failed to see the failed services.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Lister tous les services",
+      "description": "Affiche la liste de tous les services systemd avec leur état.",
+      "notes": "Utiliser --state=failed pour voir les services en échec.",
+      "examples": {
+        "systemctl list-units --type=service --all": "Liste tous les services"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "pkill-pattern",
-  "title": "Terminer des processus par pattern",
-  "description": "Envoie un signal aux processus correspondant à un pattern de nom",
-  "category": "📊 Monitoring & Logs",
+  "title": "Terminate processes by pattern",
+  "description": "Send a signal to the processes whose name matches a pattern.",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -17,58 +17,66 @@
     "id": "pkill-cmd",
     "platform": 1,
     "name": "pkill",
-    "commandPattern": "pkill {options} {pattern}",
+    "commandPattern": "pkill {pattern}",
     "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "",
-        "required": false,
-        "description": "Options (-9=SIGKILL, -u user, -f=full command)"
-      },
       {
         "name": "pattern",
         "label": "Pattern",
         "type": "string",
         "defaultValue": "nginx",
         "required": true,
-        "description": "Pattern à rechercher dans le nom du processus"
+        "description": "Pattern to look for in the process name"
       }
     ]
   },
   "examples": [
     {
       "command": "pgrep -a firefox",
-      "description": "Liste les processus firefox (sans les tuer)",
+      "description": "List the firefox processes (without killing them)",
       "platform": 1
     },
     {
       "command": "pkill -u username",
-      "description": "Termine tous les processus d'un utilisateur",
-      "platform": 1
-    },
-    {
-      "command": "pkill -v -f *.txt",
-      "description": "Exemple utilisant le paramètre 'options': Options (-9=SIGKILL, -u user, -f=full command). Remplacez -v -f par la valeur appropriée selon votre environnement.",
+      "description": "Terminate every process of a user",
       "platform": 1
     },
     {
       "command": "pkill -9 java",
-      "description": "Forcer l'arrêt des processus Java",
+      "description": "Force the Java processes to stop",
       "platform": 1
     },
     {
       "command": "pkill -u www-data",
-      "description": "Terminer les processus d'un utilisateur",
+      "description": "Terminate the processes of a user",
       "platform": 1
     }
   ],
-  "notes": "Peut nécessiter sudo. pgrep pour lister sans tuer. -9 force la terminaison.",
+  "notes": "May require sudo. pgrep lists without killing. -9 forces the termination.",
   "links": [
     {
       "title": "pkill documentation",
       "url": "https://man7.org/linux/man-pages/man1/pkill.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Terminer des processus par pattern",
+      "description": "Envoie un signal aux processus correspondant à un pattern de nom",
+      "notes": "Peut nécessiter sudo. pgrep pour lister sans tuer. -9 force la terminaison.",
+      "parameters": {
+        "linux": {
+          "pattern": {
+            "label": "Motif",
+            "description": "Pattern à rechercher dans le nom du processus"
+          }
+        }
+      },
+      "examples": {
+        "pgrep -a firefox": "Liste les processus firefox (sans les tuer)",
+        "pkill -u username": "Termine tous les processus d'un utilisateur",
+        "pkill -9 java": "Forcer l'arrêt des processus Java",
+        "pkill -u www-data": "Terminer les processus d'un utilisateur"
+      }
+    }
+  }
 }

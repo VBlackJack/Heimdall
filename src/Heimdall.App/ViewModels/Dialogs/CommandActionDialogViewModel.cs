@@ -20,6 +20,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Localization;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
@@ -53,6 +54,35 @@ public partial class CommandActionDialogViewModel : ObservableValidator
 
     public List<string> AvailableCategories { get; set; } = [];
 
+    // Set by UseCategoryLabels: maps a chosen label back to its key on save.
+    private Func<string, string>? _categoryLocalize;
+
+    /// <summary>
+    /// Offers <paramref name="categories"/> by their labels and shows the current category
+    /// by its label; on save, a label of a shipped category goes back to its key.
+    /// </summary>
+    /// <param name="categories">The categories in use, as stored (keys or free text).</param>
+    /// <param name="localize">Resolves a locale key in the operator's language.</param>
+    /// <remarks>
+    /// The combo is editable, so what comes back is text: the label of a shipped category,
+    /// or a category the operator typed, which is stored as typed.
+    /// </remarks>
+    public void UseCategoryLabels(IEnumerable<string> categories, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(categories);
+        ArgumentNullException.ThrowIfNull(localize);
+
+        _categoryLocalize = localize;
+        AvailableCategories = categories
+            .Select(category => CommandPresentationResolver.ResolveCategoryLabel(category, localize))
+            .ToList();
+
+        var wasInitializing = _isInitializing;
+        _isInitializing = true;
+        Category = CommandPresentationResolver.ResolveCategoryLabel(Category, localize);
+        _isInitializing = wasInitializing;
+    }
+
     // ── Dialog state ──────────────────────────────────────────────
 
     [ObservableProperty]
@@ -73,6 +103,10 @@ public partial class CommandActionDialogViewModel : ObservableValidator
     private Guid? _editWinTemplatePublicId;
     private string? _editLinuxTemplateId;
     private Guid? _editLinuxTemplatePublicId;
+
+    // Carried through an edit untouched: the dialog edits the pivot text only, and a save
+    // that dropped the other languages would lose them without the operator ever seeing them.
+    private List<ActionTranslation>? _editTranslations;
 
     // ── Action fields ─────────────────────────────────────────────
 
@@ -408,7 +442,9 @@ public partial class CommandActionDialogViewModel : ObservableValidator
             PublicId = _editPublicId ?? Guid.NewGuid(),
             Title = Title.Trim(),
             Description = Description.Trim(),
-            Category = Category.Trim(),
+            Category = _categoryLocalize is null
+                ? Category.Trim()
+                : CommandPresentationResolver.ResolveCategoryKey(Category, _categoryLocalize),
             Platform = Platform,
             Level = Level,
             Tags = string.IsNullOrWhiteSpace(Tags)
@@ -422,7 +458,8 @@ public partial class CommandActionDialogViewModel : ObservableValidator
                 .Select(e => e.ToModel()).ToList(),
             Links = Links.Select(l => l.ToModel()).ToList(),
             IsUserCreated = true,
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.UtcNow,
+            Translations = _editTranslations?.ToList() ?? []
         };
 
         if (!string.IsNullOrWhiteSpace(WindowsPattern))
@@ -497,6 +534,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         vm._editWinTemplatePublicId = null;
         vm._editLinuxTemplateId = null;
         vm._editLinuxTemplatePublicId = null;
+        vm._editTranslations = null;
         vm._isInitializing = false;
 
         // A copy is unsaved work from the moment it exists, unlike an edit of something
@@ -557,6 +595,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
         vm._editActionId = action.Id;
         vm._editPublicId = action.PublicId;
         vm._editCreatedAt = action.CreatedAt;
+        vm._editTranslations = action.Translations?.ToList();
         vm.Title = action.Title;
         vm.Description = action.Description ?? "";
         vm.Category = action.Category;
@@ -642,8 +681,7 @@ public partial class CommandActionDialogViewModel : ObservableValidator
 /// </summary>
 public partial class ParameterEntryVm : ObservableObject
 {
-    public static readonly string[] AvailableTypes =
-        ["string", "int", "bool", "hostname", "ipaddress", "path", TemplateParameter.ChoiceTypeName];
+    public static readonly string[] AvailableTypes = [.. TemplateParameterTypes.Offered];
 
     [ObservableProperty] private string _name = "";
     [ObservableProperty] private string _label = "";

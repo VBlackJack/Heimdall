@@ -88,7 +88,8 @@ public sealed partial class CommandLibraryViewModel
         try
         {
             var sources = _allEntries.Select(static e => e.Source).ToList();
-            var ranked = (await _searchService.SearchAsync(sources, trimmed)).ToList();
+            // The category is matched by its stored key and by the label the operator sees.
+            var ranked = (await _searchService.SearchAsync(sources, trimmed, ResolveCategoryLabel)).ToList();
 
             // The debounce above cancels the delay, not the query: once a search is in
             // flight nothing stops it, so two can overlap and finish out of order. A
@@ -162,7 +163,7 @@ public sealed partial class CommandLibraryViewModel
         {
             _actionsView.SortDescriptions.Clear();
             _actionsView.GroupDescriptions.Add(
-                new PropertyGroupDescription(nameof(CommandLibraryActionEntry.Category)));
+                new PropertyGroupDescription(nameof(CommandLibraryActionEntry.CategoryLabel)));
         }
     }
 
@@ -265,6 +266,9 @@ public sealed partial class CommandLibraryViewModel
         || PlatformFilterIndex > 0
         || RiskFilterIndex > 0
         || !string.IsNullOrEmpty(_lastSearchTerm);
+
+    private string ResolveCategoryLabel(string category)
+        => CommandPresentationResolver.ResolveCategoryLabel(category, LocalizeKey);
 
     private void ResetSearchState()
     {

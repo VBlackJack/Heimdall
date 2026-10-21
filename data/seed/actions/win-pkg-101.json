@@ -1,8 +1,8 @@
 {
   "id": "win-pkg-101",
-  "title": "Installer un package Chocolatey",
-  "description": "Installe un package Windows à l'aide du gestionnaire Chocolatey.",
-  "category": "📦 Package Management",
+  "title": "Install a Chocolatey package",
+  "description": "Install a Windows package with the Chocolatey manager.",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -21,31 +21,50 @@
     "parameters": [
       {
         "name": "packageName",
-        "label": "Nom du package",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du package à installer (ex: googlechrome, vscode)"
+        "description": "Name of the package to install (e.g. googlechrome, vscode)"
       }
     ]
   },
   "examples": [
     {
       "command": "choco install googlechrome -y",
-      "description": "Installe Google Chrome",
+      "description": "Install Google Chrome",
       "platform": 0
     },
     {
       "command": "choco install vscode -y",
-      "description": "Installe Visual Studio Code",
+      "description": "Install Visual Studio Code",
       "platform": 0
     }
   ],
-  "notes": "Nécessite Chocolatey installé. L'option -y accepte automatiquement les prompts.",
+  "notes": "Requires Chocolatey to be installed. The -y option accepts the prompts automatically.",
   "links": [
     {
       "title": "Documentation officielle Chocolatey",
       "url": "https://docs.chocolatey.org/en-us/choco/commands/install"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Installer un package Chocolatey",
+      "description": "Installe un package Windows à l'aide du gestionnaire Chocolatey.",
+      "notes": "Nécessite Chocolatey installé. L'option -y accepte automatiquement les prompts.",
+      "parameters": {
+        "windows": {
+          "packageName": {
+            "label": "Nom du package",
+            "description": "Nom du package à installer (ex: googlechrome, vscode)"
+          }
+        }
+      },
+      "examples": {
+        "choco install googlechrome -y": "Installe Google Chrome",
+        "choco install vscode -y": "Installe Visual Studio Code"
+      }
+    }
+  }
 }

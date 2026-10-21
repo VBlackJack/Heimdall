@@ -1,8 +1,8 @@
 {
   "id": "gpo-get-applied-to-user",
-  "title": "Lister les GPO appliquées à un utilisateur",
-  "description": "Affiche toutes les GPO appliquées à un utilisateur spécifique.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "List the GPOs applied to a user",
+  "description": "Show every GPO applied to a given user.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -20,26 +20,39 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "User name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom d'utilisateur (format DOMAIN\\username)"
+        "description": "User name (DOMAIN\\username format)"
       }
     ]
   },
   "examples": [
     {
       "command": "gpresult /R /USER CONTOSO\\jdupont",
-      "description": "Affiche les GPO appliquées à l'utilisateur jdupont",
-      "platform": 0
-    },
-    {
-      "command": "gpresult /R /USER jdupont",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help gpresult -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Show the GPOs applied to the user jdupont",
       "platform": 0
     }
   ],
-  "notes": "Pour un rapport HTML détaillé, utiliser /H au lieu de /R. Nécessite des droits administrateur.",
-  "links": []
+  "notes": "For a detailed HTML report, use /H instead of /R. Requires administrator rights.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Lister les GPO appliquées à un utilisateur",
+      "description": "Affiche toutes les GPO appliquées à un utilisateur spécifique.",
+      "notes": "Pour un rapport HTML détaillé, utiliser /H au lieu de /R. Nécessite des droits administrateur.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Nom d'utilisateur (format DOMAIN\\username)"
+          }
+        }
+      },
+      "examples": {
+        "gpresult /R /USER CONTOSO\\jdupont": "Affiche les GPO appliquées à l'utilisateur jdupont"
+      }
+    }
+  }
 }

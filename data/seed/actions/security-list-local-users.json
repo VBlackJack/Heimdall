@@ -1,8 +1,8 @@
 {
   "id": "security-list-local-users",
-  "title": "Lister tous les utilisateurs locaux",
-  "description": "Affiche tous les comptes utilisateurs locaux avec leur statut (activé/désactivé) et dernière connexion",
-  "category": "🔒 Security & Encryption",
+  "title": "List every local user",
+  "description": "Show every local user account with its status (enabled or disabled) and last logon",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Get-LocalUser | Where-Object {$_.Enabled -eq $true}",
-      "description": "Liste uniquement les utilisateurs activés",
+      "description": "List only the enabled users",
       "platform": 0
     },
     {
       "command": "Get-LocalUser | Where-Object {$_.PasswordExpires -lt (Get-Date).AddDays(30)}",
-      "description": "Utilisateurs dont le mot de passe expire dans 30 jours",
+      "description": "Users whose password expires within 30 days",
       "platform": 0
     },
     {
       "command": "Get-LocalUser | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-LocalUser | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-LocalUser | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "Enabled=$false = compte désactivé. PasswordExpires=Never ou date future. Vérifiez les comptes inactifs pour la sécurité.",
+  "notes": "Enabled=$false = disabled account. PasswordExpires=Never or a future date. Review inactive accounts for security.",
   "links": [
     {
       "title": "Get-LocalUser Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/get-localuser"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister tous les utilisateurs locaux",
+      "description": "Affiche tous les comptes utilisateurs locaux avec leur statut (activé/désactivé) et dernière connexion",
+      "notes": "Enabled=$false = compte désactivé. PasswordExpires=Never ou date future. Vérifiez les comptes inactifs pour la sécurité.",
+      "examples": {
+        "Get-LocalUser | Where-Object {$_.Enabled -eq $true}": "Liste uniquement les utilisateurs activés",
+        "Get-LocalUser | Where-Object {$_.PasswordExpires -lt (Get-Date).AddDays(30)}": "Utilisateurs dont le mot de passe expire dans 30 jours",
+        "Get-LocalUser | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-LocalUser | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-LocalUser | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

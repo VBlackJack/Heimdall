@@ -1,8 +1,8 @@
 {
   "id": "selinux-status",
-  "title": "Vérifier l'état de SELinux",
-  "description": "Affiche l'état et le mode de SELinux (Security-Enhanced Linux)",
-  "category": "🔒 Security & Encryption",
+  "title": "Check the SELinux status",
+  "description": "Show the status and mode of SELinux (Security-Enhanced Linux)",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -23,35 +23,49 @@
   "examples": [
     {
       "command": "getenforce",
-      "description": "Affiche le mode SELinux (Enforcing/Permissive/Disabled)",
+      "description": "Show the SELinux mode (Enforcing/Permissive/Disabled)",
       "platform": 1
     },
     {
       "command": "sestatus",
-      "description": "État détaillé de SELinux",
+      "description": "Detailed SELinux status",
       "platform": 1
     },
     {
       "command": "sudo setenforce 0",
-      "description": "Passe en mode Permissive (temporaire)",
+      "description": "Switch to Permissive mode (temporary)",
       "platform": 1
     },
     {
       "command": "setenforce Permissive",
-      "description": "Passer en mode permissif",
+      "description": "Switch to permissive mode",
       "platform": 1
     },
     {
       "command": "ausearch -m avc -ts recent",
-      "description": "Derniers refus",
+      "description": "Latest denials",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo pour lecture. Principalement sur RHEL/CentOS/Fedora.",
+  "notes": "Reading does not require sudo. Mostly on RHEL/CentOS/Fedora.",
   "links": [
     {
       "title": "SELinux documentation",
       "url": "https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/using_selinux/index"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier l'état de SELinux",
+      "description": "Affiche l'état et le mode de SELinux (Security-Enhanced Linux)",
+      "notes": "Ne nécessite pas sudo pour lecture. Principalement sur RHEL/CentOS/Fedora.",
+      "examples": {
+        "getenforce": "Affiche le mode SELinux (Enforcing/Permissive/Disabled)",
+        "sestatus": "État détaillé de SELinux",
+        "sudo setenforce 0": "Passe en mode Permissive (temporaire)",
+        "setenforce Permissive": "Passer en mode permissif",
+        "ausearch -m avc -ts recent": "Derniers refus"
+      }
+    }
+  }
 }

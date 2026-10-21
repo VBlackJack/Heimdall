@@ -1,8 +1,8 @@
 {
   "id": "ad-create-group",
-  "title": "Créer un nouveau groupe AD",
-  "description": "Crée un nouveau groupe de sécurité ou de distribution dans Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Create an AD group",
+  "description": "Create a security or distribution group in Active Directory.",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,43 +20,43 @@
     "parameters": [
       {
         "name": "groupName",
-        "label": "Nom du groupe",
+        "label": "Group name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du groupe AD"
+        "description": "Name of the AD group"
       },
       {
         "name": "groupCategory",
-        "label": "Catégorie",
+        "label": "Category",
         "type": "string",
         "defaultValue": "Security",
         "required": true,
-        "description": "Security ou Distribution"
+        "description": "Security or Distribution"
       },
       {
         "name": "groupScope",
-        "label": "Portée",
+        "label": "Scope",
         "type": "string",
         "defaultValue": "Global",
         "required": true,
-        "description": "DomainLocal, Global, ou Universal"
+        "description": "DomainLocal, Global or Universal"
       },
       {
         "name": "displayName",
-        "label": "Nom d'affichage",
+        "label": "Display name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom d'affichage du groupe"
+        "description": "Display name of the group"
       },
       {
         "name": "ouPath",
-        "label": "Chemin OU",
+        "label": "OU path",
         "type": "string",
         "defaultValue": "OU=Groups,DC=contoso,DC=com",
         "required": true,
-        "description": "Distinguished Name de l'OU de destination"
+        "description": "Distinguished Name of the target OU"
       },
       {
         "name": "description",
@@ -64,47 +64,90 @@
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Description du groupe"
+        "description": "Description of the group"
       }
     ]
   },
   "examples": [
     {
       "command": "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Administrateurs IT\" -Path \"OU=Groups,DC=contoso,DC=com\" -Description \"Groupe des administrateurs IT\"",
-      "description": "Crée un groupe de sécurité IT-Admins",
+      "description": "Create the IT-Admins security group",
       "platform": 0
     },
     {
       "command": "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the confirmation prompts. Useful in automated scripts, but use with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the modified or created object to the pipeline. By default the Set- and New- cmdlets return nothing. -PassThru turns the output on, for chained operations or an immediate check.",
       "platform": 0
     },
     {
       "command": "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the command's execution. -Verbose turns on the diagnostic messages that show exactly what happens. Essential for troubleshooting and to understand the internal operations.",
       "platform": 0
     },
     {
       "command": "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\"",
-      "description": "Exemple utilisant le paramètre 'groupName': Nom du groupe AD. Remplacez IT-Admins par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'groupName' parameter: name of the AD group. Replace IT-Admins with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits d'administration AD. GroupCategory: Security pour permissions, Distribution pour emails.",
+  "notes": "Requires AD administration rights. GroupCategory: Security for permissions, Distribution for email.",
   "links": [
     {
       "title": "Documentation New-ADGroup",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/new-adgroup"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer un nouveau groupe AD",
+      "description": "Crée un nouveau groupe de sécurité ou de distribution dans Active Directory.",
+      "notes": "Nécessite des droits d'administration AD. GroupCategory: Security pour permissions, Distribution pour emails.",
+      "parameters": {
+        "windows": {
+          "groupName": {
+            "label": "Nom du groupe",
+            "description": "Nom du groupe AD"
+          },
+          "groupCategory": {
+            "label": "Catégorie",
+            "description": "Security ou Distribution"
+          },
+          "groupScope": {
+            "label": "Portée",
+            "description": "DomainLocal, Global, ou Universal"
+          },
+          "displayName": {
+            "label": "Nom d'affichage",
+            "description": "Nom d'affichage du groupe"
+          },
+          "ouPath": {
+            "label": "Chemin OU",
+            "description": "Distinguished Name de l'OU de destination"
+          },
+          "description": {
+            "label": "Description",
+            "description": "Description du groupe"
+          }
+        }
+      },
+      "examples": {
+        "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Administrateurs IT\" -Path \"OU=Groups,DC=contoso,DC=com\" -Description \"Groupe des administrateurs IT\"": "Crée un groupe de sécurité IT-Admins",
+        "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+        "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\"": "Exemple utilisant le paramètre 'groupName': Nom du groupe AD. Remplacez IT-Admins par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

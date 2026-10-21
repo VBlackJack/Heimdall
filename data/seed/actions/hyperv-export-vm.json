@@ -1,8 +1,8 @@
 {
   "id": "hyperv-export-vm",
-  "title": "Exporter une machine virtuelle",
-  "description": "Exporte une VM Hyper-V complète (configuration, disques virtuels, snapshots) vers un dossier pour sauvegarde ou migration.",
-  "category": "🐳 Containers & VMs",
+  "title": "Export a virtual machine",
+  "description": "Export a whole Hyper-V VM (configuration, virtual disks, snapshots) to a folder for backup or migration.",
+  "category": "containers-vms",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -23,56 +23,70 @@
     "parameters": [
       {
         "name": "vmName",
-        "label": "Nom de la VM",
+        "label": "VM name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la VM à exporter"
+        "description": "Name of the VM to export"
       },
       {
         "name": "exportPath",
-        "label": "Chemin d'export",
+        "label": "Export path",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "D:\\VM-Exports",
         "required": true,
-        "description": "Dossier de destination de l'export"
+        "description": "Destination folder of the export"
       }
     ]
   },
   "examples": [
     {
       "command": "Export-VM -Name 'Windows11-Dev' -Path 'D:\\Backups\\VMs'",
-      "description": "Exporte une VM vers D:\\Backups\\VMs",
+      "description": "Export a VM to D:\\Backups\\VMs",
       "platform": 0
     },
     {
       "command": "Export-VM -Name 'Production-DB' -Path '\\\\NAS\\VM-Backups' -CaptureLiveState CaptureSavedState",
-      "description": "Exporte avec capture de l'état actuel",
+      "description": "Export and capture the current state",
       "platform": 0
     },
     {
       "command": "Import-VM -Path 'D:\\Backups\\VMs\\Windows11-Dev' -Copy -GenerateNewId",
-      "description": "Importe une VM exportée (avec nouvel ID)",
-      "platform": 0
-    },
-    {
-      "command": "Export-VM -Name 'VM-WEB-01' -Path 'C:\\Export\\users.csv'",
-      "description": "Exemple utilisant le paramètre 'vmName': Nom de la VM à exporter. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "Export-VM -Name 'VM-WEB-01' -Path 'D:\\VM-Exports'",
-      "description": "Exemple utilisant le paramètre 'exportPath': Dossier de destination de l'export. Remplacez C:\\Export\\users.csv par la valeur appropriée selon votre environnement.",
+      "description": "Import an exported VM (with a new ID)",
       "platform": 0
     }
   ],
-  "notes": "L'export peut être long selon la taille de la VM. Vérifiez l'espace disque disponible. Utilisez Import-VM pour restaurer.",
+  "notes": "The export can take a while depending on the VM size. Check the free disk space. Use Import-VM to restore.",
   "links": [
     {
       "title": "Documentation Export-VM",
       "url": "https://learn.microsoft.com/en-us/powershell/module/hyper-v/export-vm"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exporter une machine virtuelle",
+      "description": "Exporte une VM Hyper-V complète (configuration, disques virtuels, snapshots) vers un dossier pour sauvegarde ou migration.",
+      "notes": "L'export peut être long selon la taille de la VM. Vérifiez l'espace disque disponible. Utilisez Import-VM pour restaurer.",
+      "parameters": {
+        "windows": {
+          "vmName": {
+            "label": "Nom de la VM",
+            "description": "Nom de la VM à exporter"
+          },
+          "exportPath": {
+            "label": "Chemin d'export",
+            "description": "Dossier de destination de l'export"
+          }
+        }
+      },
+      "examples": {
+        "Export-VM -Name 'Windows11-Dev' -Path 'D:\\Backups\\VMs'": "Exporte une VM vers D:\\Backups\\VMs",
+        "Export-VM -Name 'Production-DB' -Path '\\\\NAS\\VM-Backups' -CaptureLiveState CaptureSavedState": "Exporte avec capture de l'état actuel",
+        "Import-VM -Path 'D:\\Backups\\VMs\\Windows11-Dev' -Copy -GenerateNewId": "Importe une VM exportée (avec nouvel ID)"
+      }
+    }
+  }
 }

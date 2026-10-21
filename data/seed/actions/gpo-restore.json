@@ -1,8 +1,8 @@
 {
   "id": "gpo-restore",
-  "title": "Restaurer une GPO",
-  "description": "Restaure une stratégie de groupe à partir d'une sauvegarde.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Restore a GPO",
+  "description": "Restore a Group Policy from a backup.",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,39 +20,56 @@
     "parameters": [
       {
         "name": "gpoName",
-        "label": "Nom de la GPO",
+        "label": "GPO name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la GPO à restaurer"
+        "description": "Name of the GPO to restore"
       },
       {
         "name": "backupPath",
-        "label": "Chemin de sauvegarde",
+        "label": "Backup path",
         "type": "string",
         "defaultValue": "C:\\GPOBackups",
         "required": true,
-        "description": "Chemin du dossier de sauvegarde"
+        "description": "Path of the backup folder"
       }
     ]
   },
   "examples": [
     {
       "command": "Restore-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"",
-      "description": "Restaure la Default Domain Policy depuis la sauvegarde",
-      "platform": 0
-    },
-    {
-      "command": "Restore-GPO -Name \"Security-Baseline\" -Path \"C:\\GPOBackups\"",
-      "description": "Exemple utilisant le paramètre 'backupPath': Chemin du dossier de sauvegarde. Remplacez D:\\Backups\\daily par la valeur appropriée selon votre environnement.",
+      "description": "Restore the Default Domain Policy from the backup",
       "platform": 0
     }
   ],
-  "notes": "Écrase la GPO actuelle avec les paramètres de la sauvegarde. Utiliser avec précaution.",
+  "notes": "Overwrites the current GPO with the settings of the backup. Use with care.",
   "links": [
     {
       "title": "Documentation Restore-GPO",
       "url": "https://learn.microsoft.com/en-us/powershell/module/grouppolicy/restore-gpo"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Restaurer une GPO",
+      "description": "Restaure une stratégie de groupe à partir d'une sauvegarde.",
+      "notes": "Écrase la GPO actuelle avec les paramètres de la sauvegarde. Utiliser avec précaution.",
+      "parameters": {
+        "windows": {
+          "gpoName": {
+            "label": "Nom de la GPO",
+            "description": "Nom de la GPO à restaurer"
+          },
+          "backupPath": {
+            "label": "Chemin de sauvegarde",
+            "description": "Chemin du dossier de sauvegarde"
+          }
+        }
+      },
+      "examples": {
+        "Restore-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"": "Restaure la Default Domain Policy depuis la sauvegarde"
+      }
+    }
+  }
 }

@@ -72,4 +72,9 @@ public sealed class ActionEntity
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public bool IsUserCreated { get; set; }
+
+    /// <summary>
+    /// Other languages of the text above, one row per culture.
+    /// </summary>
+    public List<ActionTranslationEntity> Translations { get; set; } = new();
 }

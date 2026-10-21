@@ -39,6 +39,30 @@ public sealed class InstallerScriptGuardTests
         Assert.Contains("WizardSilent()", script, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// An upgrade does not keep a seed file the new version no longer ships.
+    /// </summary>
+    /// <remarks>
+    /// Inno Setup's [Files] only adds and overwrites, so the script deletes the shipped seed
+    /// and packs before copying. The MSI needs no entry: its MajorUpgrade removes the
+    /// previous product's files before the new ones are installed.
+    /// </remarks>
+    [Fact]
+    public void Installers_DoNotKeepASeedFileAnUpgradeNoLongerShips()
+    {
+        string inno = File.ReadAllText(Path.Combine(RepositoryRoot(), "installer", "innosetup.iss"));
+        string wix = File.ReadAllText(Path.Combine(RepositoryRoot(), "installer", "Product.wxs"));
+
+        int installDelete = inno.IndexOf("[InstallDelete]", StringComparison.Ordinal);
+        Assert.True(installDelete >= 0, "innosetup.iss needs an [InstallDelete] section");
+        int nextSection = inno.IndexOf("\n[", installDelete + 1, StringComparison.Ordinal);
+        string section = nextSection < 0 ? inno[installDelete..] : inno[installDelete..nextSection];
+
+        Assert.Contains("Type: filesandordirs; Name: \"{app}\\data\\seed\\actions\"", section, StringComparison.Ordinal);
+        Assert.Contains("Type: filesandordirs; Name: \"{app}\\data\\packs\"", section, StringComparison.Ordinal);
+        Assert.Contains("<MajorUpgrade", wix, StringComparison.Ordinal);
+    }
+
     /// <remarks>
     /// An Inno Setup failure or a missing compiler was a yellow warning while a WiX failure
     /// was fatal, so a publish could ship a release without the one asset the in-app

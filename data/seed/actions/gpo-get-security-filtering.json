@@ -1,8 +1,8 @@
 {
   "id": "gpo-get-security-filtering",
-  "title": "Obtenir le filtrage de sécurité d'une GPO",
-  "description": "Affiche les groupes ou utilisateurs auxquels la GPO est filtrée (qui peuvent l'appliquer).",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Get the security filtering of a GPO",
+  "description": "Show the groups or users the GPO is filtered to (those who can apply it).",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -20,41 +20,63 @@
     "parameters": [
       {
         "name": "gpoName",
-        "label": "Nom de la GPO",
+        "label": "GPO name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la GPO"
+        "description": "GPO name"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-GPPermission -Name \"Security-Policy\" -All | Where-Object {$_.Permission -eq 'GpoApply'} | Select-Object Trustee",
-      "description": "Liste qui peut appliquer la GPO Security-Policy",
+      "description": "List who can apply the Security-Policy GPO",
       "platform": 0
     },
     {
       "command": "Get-GPPermission -Name \"Security-Baseline\" -All | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-GPPermission -Name \"Security-Baseline\" -All | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "Get-GPPermission -Name \"Security-Baseline\" -All | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-GPPermission -Name \"Security-Baseline\" -All | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Affiche uniquement les principaux de sécurité ayant le droit 'Apply Group Policy'. Utile pour le ciblage GPO.",
-  "links": []
+  "notes": "Shows only the security principals that hold the 'Apply Group Policy' right. Useful for GPO targeting.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Obtenir le filtrage de sécurité d'une GPO",
+      "description": "Affiche les groupes ou utilisateurs auxquels la GPO est filtrée (qui peuvent l'appliquer).",
+      "notes": "Affiche uniquement les principaux de sécurité ayant le droit 'Apply Group Policy'. Utile pour le ciblage GPO.",
+      "parameters": {
+        "windows": {
+          "gpoName": {
+            "label": "Nom de la GPO",
+            "description": "Nom de la GPO"
+          }
+        }
+      },
+      "examples": {
+        "Get-GPPermission -Name \"Security-Policy\" -All | Where-Object {$_.Permission -eq 'GpoApply'} | Select-Object Trustee": "Liste qui peut appliquer la GPO Security-Policy",
+        "Get-GPPermission -Name \"Security-Baseline\" -All | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-GPPermission -Name \"Security-Baseline\" -All | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-GPPermission -Name \"Security-Baseline\" -All | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-GPPermission -Name \"Security-Baseline\" -All | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

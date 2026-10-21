@@ -54,9 +54,16 @@ public sealed class SearchService : ISearchService
     /// <param name="actions">Actions to search</param>
     /// <param name="searchTerm">Search query (can be multi-word)</param>
     /// <returns>Matching actions sorted by relevance</returns>
-    public async Task<IEnumerable<ActionModel>> SearchAsync(
+    public Task<IEnumerable<ActionModel>> SearchAsync(
         IEnumerable<ActionModel> actions,
         string searchTerm)
+        => SearchAsync(actions, searchTerm, categoryLabel: null);
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<ActionModel>> SearchAsync(
+        IEnumerable<ActionModel> actions,
+        string searchTerm,
+        Func<string, string>? categoryLabel)
     {
         if (string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -64,7 +71,7 @@ public sealed class SearchService : ISearchService
         }
 
         // Use scoring search and extract just the actions
-        var searchResults = await SearchWithScoringAsync(actions, searchTerm).ConfigureAwait(false);
+        var searchResults = await SearchWithScoringAsync(actions, searchTerm, categoryLabel: categoryLabel).ConfigureAwait(false);
         return searchResults.Select(r => r.Action);
     }
 
@@ -76,11 +83,16 @@ public sealed class SearchService : ISearchService
     /// <param name="actions">Actions to search</param>
     /// <param name="searchTerm">Search query (can be multi-word)</param>
     /// <param name="enableFuzzySearch">Enable fuzzy matching for typo tolerance (default: true)</param>
+    /// <param name="categoryLabel">
+    /// Resolves a stored category to the label the operator sees; the category matches by
+    /// either. Null matches the stored value only.
+    /// </param>
     /// <returns>Search results with scoring, sorted by relevance</returns>
     public async Task<IEnumerable<SearchResult>> SearchWithScoringAsync(
         IEnumerable<ActionModel> actions,
         string searchTerm,
-        bool enableFuzzySearch = true)
+        bool enableFuzzySearch = true,
+        Func<string, string>? categoryLabel = null)
     {
         if (string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -115,7 +127,7 @@ public sealed class SearchService : ISearchService
 
         foreach (var action in actions)
         {
-            var scoreBreakdown = CalculateRelevanceScore(action, normalizedSearchTerm, searchTokens, enableFuzzySearch);
+            var scoreBreakdown = CalculateRelevanceScore(action, normalizedSearchTerm, searchTokens, enableFuzzySearch, categoryLabel);
 
             // Only include actions with score > 0 (i.e., they match the search)
             if (scoreBreakdown.TotalScore > 0)
@@ -151,14 +163,15 @@ public sealed class SearchService : ISearchService
         ActionModel action,
         string normalizedSearchTerm,
         string[] searchTokens,
-        bool enableFuzzySearch)
+        bool enableFuzzySearch,
+        Func<string, string>? categoryLabel)
     {
         var breakdown = new SearchScoreBreakdown();
 
         // Normalize all fields
         var normalizedTitle = TextNormalizer.NormalizeForSearch(action.Title);
         var normalizedDescription = TextNormalizer.NormalizeForSearch(action.Description);
-        var normalizedCategory = TextNormalizer.NormalizeForSearch(action.Category);
+        var normalizedCategory = NormalizeCategory(action.Category, categoryLabel);
         var normalizedNotes = TextNormalizer.NormalizeForSearch(action.Notes);
 
         // Check for exact token matches in each field
@@ -206,7 +219,7 @@ public sealed class SearchService : ISearchService
         // If no exact matches and fuzzy search is enabled, try fuzzy matching
         if (breakdown.TotalScore == 0 && enableFuzzySearch)
         {
-            double fuzzyScore = CalculateFuzzyMatchScore(action, searchTokens);
+            double fuzzyScore = CalculateFuzzyMatchScore(action, searchTokens, normalizedCategory);
             breakdown.FuzzyMatchBonus = fuzzyScore;
         }
 
@@ -214,15 +227,31 @@ public sealed class SearchService : ISearchService
     }
 
     /// <summary>
+    /// The category text a query is matched against: the stored value, and the label the
+    /// operator sees when one is resolved, so either one finds the action.
+    /// </summary>
+    private static string NormalizeCategory(string category, Func<string, string>? categoryLabel)
+    {
+        var stored = TextNormalizer.NormalizeForSearch(category);
+        if (categoryLabel is null || string.IsNullOrEmpty(category))
+        {
+            return stored;
+        }
+
+        var label = TextNormalizer.NormalizeForSearch(categoryLabel(category));
+        return string.Equals(label, stored, StringComparison.Ordinal) ? stored : stored + " " + label;
+    }
+
+    /// <summary>
     /// Calculates fuzzy match score for an action when no exact matches are found.
     /// Uses Levenshtein distance to tolerate typos (up to 30% character difference).
     /// </summary>
-    private double CalculateFuzzyMatchScore(ActionModel action, string[] searchTokens)
+    private double CalculateFuzzyMatchScore(ActionModel action, string[] searchTokens, string normalizedCategory)
     {
         double totalFuzzyScore = 0;
 
         // Build searchable text from all fields
-        var searchableText = BuildNormalizedSearchableText(action);
+        var searchableText = BuildNormalizedSearchableText(action, normalizedCategory);
 
         // Check fuzzy match for each search token
         foreach (var token in searchTokens)
@@ -247,13 +276,13 @@ public sealed class SearchService : ISearchService
     /// Builds a single normalized searchable string from all action fields.
     /// Includes: Title, Description, Category, Tags, Notes, Template Names, Template Patterns.
     /// </summary>
-    private string BuildNormalizedSearchableText(ActionModel action)
+    private string BuildNormalizedSearchableText(ActionModel action, string normalizedCategory)
     {
         var parts = new List<string>
         {
             TextNormalizer.NormalizeForSearch(action.Title),
             TextNormalizer.NormalizeForSearch(action.Description),
-            TextNormalizer.NormalizeForSearch(action.Category)
+            normalizedCategory
         };
 
         // Add all tags

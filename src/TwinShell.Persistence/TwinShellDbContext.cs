@@ -40,6 +40,7 @@ public sealed class TwinShellDbContext : DbContext
     public DbSet<CommandBatchEntity> CommandBatches => Set<CommandBatchEntity>();
     public DbSet<SearchHistoryEntity> SearchHistories => Set<SearchHistoryEntity>();
     public DbSet<SyncHistoryEntity> SyncHistories => Set<SyncHistoryEntity>();
+    public DbSet<SeedStateEntity> SeedStates => Set<SeedStateEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,5 +56,6 @@ public sealed class TwinShellDbContext : DbContext
         modelBuilder.ApplyConfiguration(new CommandBatchConfiguration());
         modelBuilder.ApplyConfiguration(new SearchHistoryConfiguration());
         modelBuilder.ApplyConfiguration(new SyncHistoryConfiguration());
+        modelBuilder.ApplyConfiguration(new SeedStateConfiguration());
     }
 }

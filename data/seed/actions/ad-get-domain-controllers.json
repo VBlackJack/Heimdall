@@ -1,8 +1,8 @@
 {
   "id": "ad-get-domain-controllers",
-  "title": "Lister tous les contrôleurs de domaine",
-  "description": "Affiche la liste de tous les contrôleurs de domaine Active Directory.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "List all domain controllers",
+  "description": "Show the list of every Active Directory domain controller.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,25 +22,37 @@
   "examples": [
     {
       "command": "Get-ADDomainController -Filter * | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-ADDomainController -Filter * | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ADDomainController -Filter * | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Affiche tous les DCs du domaine avec leur OS et adresse IP.",
+  "notes": "Shows every DC of the domain with its OS and IP address.",
   "links": [
     {
       "title": "Documentation Get-ADDomainController",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-addomaincontroller"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister tous les contrôleurs de domaine",
+      "description": "Affiche la liste de tous les contrôleurs de domaine Active Directory.",
+      "notes": "Affiche tous les DCs du domaine avec leur OS et adresse IP.",
+      "examples": {
+        "Get-ADDomainController -Filter * | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-ADDomainController -Filter * | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ADDomainController -Filter * | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

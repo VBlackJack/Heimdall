@@ -1,8 +1,8 @@
 {
   "id": "get-eventlog-latest",
-  "title": "Consulter les événements Windows récents",
-  "description": "Affiche les derniers événements du journal Windows (System, Application, Security)",
-  "category": "📊 Monitoring & Logs",
+  "title": "View recent Windows events",
+  "description": "Show the latest events of a Windows log (System, Application, Security).",
+  "category": "monitoring-logs",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,19 +21,19 @@
     "parameters": [
       {
         "name": "logname",
-        "label": "Journal",
+        "label": "Log",
         "type": "string",
         "defaultValue": "System",
         "required": true,
-        "description": "Nom du journal (System, Application, Security)"
+        "description": "Log name (System, Application, Security)"
       },
       {
         "name": "count",
-        "label": "Nombre d'événements",
+        "label": "Number of events",
         "type": "number",
         "defaultValue": "20",
         "required": false,
-        "description": "Nombre d'événements à afficher"
+        "description": "Number of events to show"
       },
       {
         "name": "entrytype",
@@ -41,62 +41,78 @@
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Filtre par type (ex: -EntryType Error,Warning)"
+        "description": "Filter by type (e.g. -EntryType Error,Warning)"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-EventLog -LogName System -EntryType Error -After (Get-Date).AddHours(-1)",
-      "description": "🔥 CRITIQUE : Affiche uniquement les ERREURS système de la DERNIÈRE HEURE. C'est la première commande à lancer en cas de plantage serveur.",
+      "description": "🔥 CRITICAL: show only the system ERRORS of the LAST HOUR. The first command to run when a server crashes.",
       "platform": 0
     },
     {
       "command": "Get-EventLog -LogName Security -InstanceId 4625 -Newest 20",
-      "description": "Sécurité : Affiche les 20 dernières tentatives de connexion échouées (Event ID 4625). Indique une potentielle attaque brute-force ou un compte de service verrouillé.",
+      "description": "Security: show the last 20 failed logon attempts (Event ID 4625). Points to a possible brute-force attack or a locked service account.",
       "platform": 0
     },
     {
       "command": "Get-EventLog -LogName System -Newest 20",
-      "description": "20 derniers événements système",
+      "description": "Last 20 system events",
       "platform": 0
     },
     {
       "command": "Get-EventLog -LogName Application -EntryType Error -Newest 10",
-      "description": "10 dernières erreurs applicatives",
+      "description": "Last 10 application errors",
       "platform": 0
     },
     {
       "command": "Get-EventLog -LogName System -EntryType Error,Warning -Newest 50 | Out-GridView",
-      "description": "Erreurs et avertissements en grille interactive",
+      "description": "Errors and warnings in an interactive grid",
       "platform": 0
     },
     {
       "command": "Get-EventLog -LogName System -After (Get-Date).AddHours(-1)",
-      "description": "Événements de la dernière heure",
-      "platform": 0
-    },
-    {
-      "command": "Get-EventLog -LogName Application -Newest 10 Error | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
-      "platform": 0
-    },
-    {
-      "command": "Get-EventLog -LogName Application -Newest 10 Error | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
-      "platform": 0
-    },
-    {
-      "command": "Get-EventLog -LogName Application -Newest 10 Error | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Events of the last hour",
       "platform": 0
     }
   ],
-  "notes": "Essentiel pour diagnostic. Utilisez Get-WinEvent pour logs plus récents (plus performant). EntryType: Error, Warning, Information.",
+  "notes": "Essential for diagnostics. Use Get-WinEvent for newer logs (faster). EntryType: Error, Warning, Information.",
   "links": [
     {
       "title": "Get-EventLog Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-eventlog"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Consulter les événements Windows récents",
+      "description": "Affiche les derniers événements du journal Windows (System, Application, Security)",
+      "notes": "Essentiel pour diagnostic. Utilisez Get-WinEvent pour logs plus récents (plus performant). EntryType: Error, Warning, Information.",
+      "parameters": {
+        "windows": {
+          "logname": {
+            "label": "Journal",
+            "description": "Nom du journal (System, Application, Security)"
+          },
+          "count": {
+            "label": "Nombre d'événements",
+            "description": "Nombre d'événements à afficher"
+          },
+          "entrytype": {
+            "label": "Type",
+            "description": "Filtre par type (ex: -EntryType Error,Warning)"
+          }
+        }
+      },
+      "examples": {
+        "Get-EventLog -LogName System -EntryType Error -After (Get-Date).AddHours(-1)": "🔥 CRITIQUE : Affiche uniquement les ERREURS système de la DERNIÈRE HEURE. C'est la première commande à lancer en cas de plantage serveur.",
+        "Get-EventLog -LogName Security -InstanceId 4625 -Newest 20": "Sécurité : Affiche les 20 dernières tentatives de connexion échouées (Event ID 4625). Indique une potentielle attaque brute-force ou un compte de service verrouillé.",
+        "Get-EventLog -LogName System -Newest 20": "20 derniers événements système",
+        "Get-EventLog -LogName Application -EntryType Error -Newest 10": "10 dernières erreurs applicatives",
+        "Get-EventLog -LogName System -EntryType Error,Warning -Newest 50 | Out-GridView": "Erreurs et avertissements en grille interactive",
+        "Get-EventLog -LogName System -After (Get-Date).AddHours(-1)": "Événements de la dernière heure"
+      }
+    }
+  }
 }

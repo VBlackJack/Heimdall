@@ -1,20 +1,19 @@
 {
   "id": "unified-file-disk-usage",
-  "title": "Vérifier l'espace disque",
-  "description": "Affiche l'utilisation de l'espace disque pour les volumes.",
-  "category": "📁 Files & Storage",
+  "title": "Check the disk space",
+  "description": "Show the disk space usage of the volumes.",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [
-    "espace",
+    "space",
     "windows",
     "linux",
-    "disque",
+    "disk",
     "usage",
-    "df",
-    "disk"
+    "df"
   ],
-  "notes": "Windows: Affiche l'espace utilisé et libre pour chaque volume.\nLinux: -h pour format lisible (GB, MB). -i pour voir les inodes.",
+  "notes": "Windows: shows the used and free space of each volume.\nLinux: -h for a readable format (GB, MB). -i to see the inodes.",
   "links": [],
   "windowsCommandTemplateId": "file-disk-usage-windows-cmd",
   "windowsCommandTemplate": {
@@ -27,22 +26,22 @@
   "windowsExamples": [
     {
       "command": "Get-PSDrive -PSProvider FileSystem | Select-Object Name,Used,Free,@{Name='Size';Expression={$_.Used+$_.Free}} | Format-Table -AutoSize",
-      "description": "Affiche l'espace disque pour tous les lecteurs",
+      "description": "Show the disk space of every drive",
       "platform": 0
     },
     {
       "command": "Get-PSDrive -PSProvider FileSystem | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-PSDrive -PSProvider FileSystem | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-PSDrive -PSProvider FileSystem | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
@@ -57,24 +56,41 @@
   "linuxExamples": [
     {
       "command": "df -h",
-      "description": "Affiche l'espace disque en format lisible",
+      "description": "Show the disk space in a readable format",
       "platform": 1
     },
     {
       "command": "df -h /home",
-      "description": "Affiche l'espace pour un point de montage spécifique",
+      "description": "Show the space of a specific mount point",
       "platform": 1
     },
     {
       "command": "df -T",
-      "description": "Afficher le type de filesystem",
+      "description": "Show the filesystem type",
       "platform": 1
     },
     {
       "command": "df -h --total",
-      "description": "Avec le total global",
+      "description": "With the grand total",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Vérifier l'espace disque",
+      "description": "Affiche l'utilisation de l'espace disque pour les volumes.",
+      "notes": "Windows: Affiche l'espace utilisé et libre pour chaque volume.\nLinux: -h pour format lisible (GB, MB). -i pour voir les inodes.",
+      "examples": {
+        "Get-PSDrive -PSProvider FileSystem | Select-Object Name,Used,Free,@{Name='Size';Expression={$_.Used+$_.Free}} | Format-Table -AutoSize": "Affiche l'espace disque pour tous les lecteurs",
+        "Get-PSDrive -PSProvider FileSystem | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-PSDrive -PSProvider FileSystem | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-PSDrive -PSProvider FileSystem | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "df -h": "Affiche l'espace disque en format lisible",
+        "df -h /home": "Affiche l'espace pour un point de montage spécifique",
+        "df -T": "Afficher le type de filesystem",
+        "df -h --total": "Avec le total global"
+      }
+    }
+  }
 }

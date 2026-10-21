@@ -1,8 +1,8 @@
 {
   "id": "iis-list-sites",
-  "title": "Lister tous les sites IIS",
-  "description": "Affiche la liste complète de tous les sites web configurés dans Internet Information Services avec leur état, bindings et pool d'application associé.",
-  "category": "🌐 Network & DNS",
+  "title": "List all IIS sites",
+  "description": "Show every website configured in Internet Information Services with its state, bindings and application pool.",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -25,35 +25,49 @@
   "examples": [
     {
       "command": "Get-IISSite | Select-Object Name, State, Bindings",
-      "description": "Liste simple de tous les sites avec leur état",
+      "description": "Plain list of every site with its state",
       "platform": 0
     },
     {
       "command": "Get-Website | Select-Object Name, PhysicalPath, State",
-      "description": "Liste les sites avec leur chemin physique",
+      "description": "List the sites with their physical path",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Get-IISSite | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Get-IISSite | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Get-IISSite | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite le module WebAdministration. Doit être exécuté avec des privilèges administrateur.",
+  "notes": "Requires the WebAdministration module. Must run with administrator privileges.",
   "links": [
     {
       "title": "Documentation Get-IISSite",
       "url": "https://learn.microsoft.com/en-us/powershell/module/iisadministration/get-iissite"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister tous les sites IIS",
+      "description": "Affiche la liste complète de tous les sites web configurés dans Internet Information Services avec leur état, bindings et pool d'application associé.",
+      "notes": "Nécessite le module WebAdministration. Doit être exécuté avec des privilèges administrateur.",
+      "examples": {
+        "Get-IISSite | Select-Object Name, State, Bindings": "Liste simple de tous les sites avec leur état",
+        "Get-Website | Select-Object Name, PhysicalPath, State": "Liste les sites avec leur chemin physique",
+        "Import-Module WebAdministration; Get-IISSite | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Import-Module WebAdministration; Get-IISSite | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Import-Module WebAdministration; Get-IISSite | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

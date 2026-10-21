@@ -1,8 +1,8 @@
 {
   "id": "linux-service-start",
-  "title": "Démarrer un service",
-  "description": "Démarre un service systemd arrêté.",
-  "category": "⚙️ Services & Automation",
+  "title": "Start a service",
+  "description": "Start a stopped systemd service.",
+  "category": "services-automation",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -20,21 +20,39 @@
     "parameters": [
       {
         "name": "serviceName",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du service à démarrer"
+        "description": "Name of the service to start"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo systemctl start nginx",
-      "description": "Exemple utilisant le paramètre 'serviceName': Nom du service à démarrer. Remplacez nginx par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'serviceName' parameter: name of the service to start. Replace nginx with the value that fits your environment.",
       "platform": 1
     }
   ],
-  "notes": "Nécessite les droits sudo. Vérifier le statut après démarrage.",
-  "links": []
+  "notes": "Requires sudo. Check the status after the start.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Démarrer un service",
+      "description": "Démarre un service systemd arrêté.",
+      "notes": "Nécessite les droits sudo. Vérifier le statut après démarrage.",
+      "parameters": {
+        "linux": {
+          "serviceName": {
+            "label": "Nom du service",
+            "description": "Nom du service à démarrer"
+          }
+        }
+      },
+      "examples": {
+        "sudo systemctl start nginx": "Exemple utilisant le paramètre 'serviceName': Nom du service à démarrer. Remplacez nginx par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

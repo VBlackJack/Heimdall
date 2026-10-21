@@ -27,4 +27,19 @@ public interface ISearchService
     Task<IEnumerable<ActionModel>> SearchAsync(
         IEnumerable<ActionModel> actions,
         string searchTerm);
+
+    /// <summary>
+    /// Searches actions, matching a category by its stored value and by the label
+    /// <paramref name="categoryLabel"/> gives it.
+    /// </summary>
+    /// <remarks>
+    /// A shipped category is stored as a key ("security") and shown as a localized label;
+    /// the operator types what they see. An implementation that has no use for the label
+    /// searches as <see cref="SearchAsync(IEnumerable{ActionModel}, string)"/> does.
+    /// </remarks>
+    Task<IEnumerable<ActionModel>> SearchAsync(
+        IEnumerable<ActionModel> actions,
+        string searchTerm,
+        Func<string, string>? categoryLabel)
+        => SearchAsync(actions, searchTerm);
 }

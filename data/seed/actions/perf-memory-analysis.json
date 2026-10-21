@@ -1,8 +1,8 @@
 {
   "id": "perf-memory-analysis",
-  "title": "Analyser l'utilisation mémoire détaillée",
-  "description": "Analyse détaillée de l'utilisation de la mémoire système: RAM totale, disponible, utilisée, et répartition par processus.",
-  "category": "⚡ Performance",
+  "title": "Analyze memory usage in detail",
+  "description": "Detailed analysis of the system memory usage: total, available and used RAM, and the split by process.",
+  "category": "performance",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -31,7 +31,7 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "WorkingSet = mémoire physique (RAM). PrivateMemorySize = mémoire virtuelle privée. Sur Linux, buff/cache est de la mémoire disponible.",
+  "notes": "WorkingSet = physical memory (RAM). PrivateMemorySize = private virtual memory. On Linux, buff/cache is available memory.",
   "links": [
     {
       "title": "Documentation Win32_OperatingSystem",
@@ -41,35 +41,50 @@
   "windowsExamples": [
     {
       "command": "systeminfo | findstr /C:\"Total Physical Memory\" /C:\"Available Physical Memory\"",
-      "description": "Mémoire système Windows (cmd.exe)",
+      "description": "Windows system memory (cmd.exe)",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "free -h",
-      "description": "Affichage mémoire Linux (human-readable)",
+      "description": "Linux memory output (human-readable)",
       "platform": 1
     },
     {
       "command": "free -m",
-      "description": "Utilisation mémoire en Mo",
+      "description": "Memory usage in MB",
       "platform": 1
     },
     {
       "command": "free -s 5",
-      "description": "Rafraîchir toutes les 5 secondes",
+      "description": "Refresh every 5 seconds",
       "platform": 1
     },
     {
       "command": "free -t",
-      "description": "Avec le total RAM + swap",
+      "description": "With the RAM + swap total",
       "platform": 1
     },
     {
       "command": "free -w",
-      "description": "Afficher buffers et cache séparément",
+      "description": "Show buffers and cache separately",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Analyser l'utilisation mémoire détaillée",
+      "description": "Analyse détaillée de l'utilisation de la mémoire système: RAM totale, disponible, utilisée, et répartition par processus.",
+      "notes": "WorkingSet = mémoire physique (RAM). PrivateMemorySize = mémoire virtuelle privée. Sur Linux, buff/cache est de la mémoire disponible.",
+      "examples": {
+        "systeminfo | findstr /C:\"Total Physical Memory\" /C:\"Available Physical Memory\"": "Mémoire système Windows (cmd.exe)",
+        "free -h": "Affichage mémoire Linux (human-readable)",
+        "free -m": "Utilisation mémoire en Mo",
+        "free -s 5": "Rafraîchir toutes les 5 secondes",
+        "free -t": "Avec le total RAM + swap",
+        "free -w": "Afficher buffers et cache séparément"
+      }
+    }
+  }
 }

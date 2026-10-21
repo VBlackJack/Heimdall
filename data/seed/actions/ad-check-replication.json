@@ -1,8 +1,8 @@
 {
   "id": "ad-check-replication",
-  "title": "Vérifier la réplication Active Directory",
-  "description": "Vérifie l'état de la réplication entre les contrôleurs de domaine.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Check Active Directory replication",
+  "description": "Check the replication status between domain controllers.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,25 +22,25 @@
   "examples": [
     {
       "command": "repadmin /showrepl",
-      "description": "Affiche l'état de réplication du DC local",
-      "platform": 0
-    },
-    {
-      "command": "repadmin /showrepl -WhatIf",
-      "description": "Simulation de l'action avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter réellement. Indispensable pour tester les commandes de modification avant exécution. Retirez -WhatIf après validation pour exécuter.",
-      "platform": 0
-    },
-    {
-      "command": "repadmin /showrepl -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution.",
+      "description": "Show the replication status of the local DC",
       "platform": 0
     }
   ],
-  "notes": "À exécuter sur un contrôleur de domaine. Pour vérifier tous les DCs: repadmin /replsummary.",
+  "notes": "Run it on a domain controller. To check every DC: repadmin /replsummary.",
   "links": [
     {
       "title": "Documentation repadmin",
       "url": "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/replication/repadmin-showrepl"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier la réplication Active Directory",
+      "description": "Vérifie l'état de la réplication entre les contrôleurs de domaine.",
+      "notes": "À exécuter sur un contrôleur de domaine. Pour vérifier tous les DCs: repadmin /replsummary.",
+      "examples": {
+        "repadmin /showrepl": "Affiche l'état de réplication du DC local"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "yum-install",
-  "title": "Installer un paquet avec YUM",
-  "description": "Installe un paquet avec YUM sur RHEL/CentOS (anciennes versions)",
-  "category": "📦 Package Management",
+  "title": "Install a package with YUM",
+  "description": "Install a package with YUM on RHEL/CentOS (older versions)",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -21,71 +21,86 @@
     "parameters": [
       {
         "name": "package",
-        "label": "Nom du paquet",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "httpd",
         "required": true,
-        "description": "Nom du paquet à installer"
+        "description": "Name of the package to install"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo yum install httpd",
-      "description": "Installe le serveur web Apache",
+      "description": "Install the Apache web server",
       "platform": 1
     },
     {
       "command": "sudo yum install vim wget curl",
-      "description": "Installe plusieurs paquets",
+      "description": "Install several packages",
       "platform": 1
     },
     {
       "command": "yum install -y nginx -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "yum install -y nginx --dry-run",
-      "description": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
-      "platform": 1
-    },
-    {
-      "command": "yum install -y httpd",
-      "description": "Exemple utilisant le paramètre 'package': Nom du paquet à installer. Remplacez nginx par la valeur appropriée selon votre environnement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
       "platform": 1
     },
     {
       "command": "yum update -y",
-      "description": "Mettre à jour tous les paquets",
+      "description": "Update every package",
       "platform": 1
     },
     {
       "command": "yum install httpd -y",
-      "description": "Installer Apache",
+      "description": "Install Apache",
       "platform": 1
     },
     {
       "command": "yum remove nginx",
-      "description": "Désinstaller nginx",
+      "description": "Remove nginx",
       "platform": 1
     },
     {
       "command": "yum search php",
-      "description": "Rechercher des paquets PHP",
+      "description": "Search for PHP packages",
       "platform": 1
     },
     {
       "command": "yum list installed | grep mysql",
-      "description": "Lister les paquets MySQL installés",
+      "description": "List the installed MySQL packages",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. Sur RHEL 8+/CentOS 8+, utiliser dnf au lieu de yum.",
+  "notes": "Requires sudo. On RHEL 8+/CentOS 8+, use dnf instead of yum.",
   "links": [
     {
       "title": "YUM documentation",
       "url": "https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/system_administrators_guide/ch-yum"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Installer un paquet avec YUM",
+      "description": "Installe un paquet avec YUM sur RHEL/CentOS (anciennes versions)",
+      "notes": "Nécessite sudo. Sur RHEL 8+/CentOS 8+, utiliser dnf au lieu de yum.",
+      "parameters": {
+        "linux": {
+          "package": {
+            "label": "Nom du paquet",
+            "description": "Nom du paquet à installer"
+          }
+        }
+      },
+      "examples": {
+        "sudo yum install httpd": "Installe le serveur web Apache",
+        "sudo yum install vim wget curl": "Installe plusieurs paquets",
+        "yum install -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "yum update -y": "Mettre à jour tous les paquets",
+        "yum install httpd -y": "Installer Apache",
+        "yum remove nginx": "Désinstaller nginx",
+        "yum search php": "Rechercher des paquets PHP",
+        "yum list installed | grep mysql": "Lister les paquets MySQL installés"
+      }
+    }
+  }
 }

@@ -49,6 +49,13 @@ french.UpgradePrompt=Heimdall v%1 est déjà installé.%nVoulez-vous mettre à j
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+[InstallDelete]
+; The shipped command library seed and its packs are replaced whole on every install.
+; [Files] only adds and overwrites, so without this a seed file a later version removed
+; would survive the upgrade and be loaded again as a shipped action.
+Type: filesandordirs; Name: "{app}\data\seed\actions"
+Type: filesandordirs; Name: "{app}\data\packs"
+
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 

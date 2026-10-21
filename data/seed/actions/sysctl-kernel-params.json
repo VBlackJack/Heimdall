@@ -1,8 +1,8 @@
 {
   "id": "sysctl-kernel-params",
-  "title": "Afficher/modifier les paramètres kernel",
-  "description": "Affiche ou modifie les paramètres du noyau Linux en temps réel",
-  "category": "⚡ Performance",
+  "title": "Show or change kernel parameters",
+  "description": "Show or change Linux kernel parameters at runtime",
+  "category": "performance",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -21,56 +21,80 @@
     "parameters": [
       {
         "name": "parameter",
-        "label": "Paramètre",
+        "label": "Parameter",
         "type": "string",
         "defaultValue": "-a",
         "required": true,
-        "description": "Paramètre kernel (-a=all, param.name, param=value)"
+        "description": "Kernel parameter (-a=all, param.name, param=value)"
       }
     ]
   },
   "examples": [
     {
       "command": "sysctl -a",
-      "description": "Liste tous les paramètres kernel",
+      "description": "List every kernel parameter",
       "platform": 1
     },
     {
       "command": "sysctl net.ipv4.ip_forward",
-      "description": "Affiche un paramètre spécifique",
+      "description": "Show a specific parameter",
       "platform": 1
     },
     {
       "command": "sudo sysctl -w net.ipv4.ip_forward=1",
-      "description": "Modifie un paramètre (temporaire)",
+      "description": "Change a parameter (temporary)",
       "platform": 1
     },
     {
       "command": "sysctl vm.swappiness",
-      "description": "Valeur de swappiness",
+      "description": "Swappiness value",
       "platform": 1
     },
     {
       "command": "sysctl -w vm.swappiness=10",
-      "description": "Modifier swappiness",
+      "description": "Change swappiness",
       "platform": 1
     },
     {
       "command": "sysctl -p",
-      "description": "Recharger /etc/sysctl.conf",
+      "description": "Reload /etc/sysctl.conf",
       "platform": 1
     },
     {
       "command": "sysctl -a | head -50",
-      "description": "Tous les paramètres",
+      "description": "Every parameter",
       "platform": 1
     }
   ],
-  "notes": "Modifications temporaires. Éditer /etc/sysctl.conf pour permanence. sysctl -p recharge le fichier.",
+  "notes": "Changes are temporary. Edit /etc/sysctl.conf to make them permanent. sysctl -p reloads the file.",
   "links": [
     {
       "title": "sysctl documentation",
       "url": "https://man7.org/linux/man-pages/man8/sysctl.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher/modifier les paramètres kernel",
+      "description": "Affiche ou modifie les paramètres du noyau Linux en temps réel",
+      "notes": "Modifications temporaires. Éditer /etc/sysctl.conf pour permanence. sysctl -p recharge le fichier.",
+      "parameters": {
+        "linux": {
+          "parameter": {
+            "label": "Paramètre",
+            "description": "Paramètre kernel (-a=all, param.name, param=value)"
+          }
+        }
+      },
+      "examples": {
+        "sysctl -a": "Liste tous les paramètres kernel",
+        "sysctl net.ipv4.ip_forward": "Affiche un paramètre spécifique",
+        "sudo sysctl -w net.ipv4.ip_forward=1": "Modifie un paramètre (temporaire)",
+        "sysctl vm.swappiness": "Valeur de swappiness",
+        "sysctl -w vm.swappiness=10": "Modifier swappiness",
+        "sysctl -p": "Recharger /etc/sysctl.conf",
+        "sysctl -a | head -50": "Tous les paramètres"
+      }
+    }
+  }
 }

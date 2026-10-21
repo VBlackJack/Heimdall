@@ -27,6 +27,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
+using TwinShell.Core.Services;
 using ActionModel = TwinShell.Core.Models.Action;
 using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 // File-local aliases resolve two name clashes between Heimdall.App.Services
@@ -158,11 +159,45 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     {
         if (_uiDispatcher is null || _uiDispatcher.CheckAccess())
         {
-            RefreshLocalizedText();
+            _ = ApplyLocaleChangeAsync();
             return;
         }
 
-        _ = _uiDispatcher.InvokeAsync(RefreshLocalizedText);
+        _ = _uiDispatcher.InvokeAsync(ApplyLocaleChangeAsync);
+    }
+
+    /// <summary>
+    /// Rewords the library's own text, then reloads its actions so each one shows in the new
+    /// language, keeping the filters and the selected action.
+    /// </summary>
+    /// <remarks>
+    /// The actions are reloaded rather than reworded in place because the text of a shipped
+    /// action is data, not a locale key: each row holds a copy made for one culture when the
+    /// library loaded. The reload keeps the filters the way <see cref="ReloadAsync"/> does after
+    /// an edit, and the selection by action id; a parameter value typed into the panel is not
+    /// kept, as after any reload.
+    /// </remarks>
+    internal async Task ApplyLocaleChangeAsync()
+    {
+        RefreshLocalizedText();
+
+        if (_disposed || !IsReady)
+        {
+            return;
+        }
+
+        var selectedId = SelectedEntry?.Source.Id;
+
+        try
+        {
+            await ReloadAsync();
+            SelectActionById(selectedId);
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[CommandLibrary] Reload after a language switch failed: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -807,12 +842,17 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
                 favorites.Select(f => f.ActionId), StringComparer.Ordinal);
 
             var actions = (await actionService.GetAllActionsAsync()).ToList();
+            var culture = _localizer?.CurrentLocale;
 
             ResetParameterSubscriptions();
             _allEntries.Clear();
             foreach (var action in actions)
             {
-                _allEntries.Add(new CommandLibraryActionEntry(action, this));
+                // The row shows the operator's language; edits start from the stored pivot.
+                _allEntries.Add(new CommandLibraryActionEntry(
+                    ActionLocalizer.Localize(action, culture),
+                    this,
+                    action));
             }
 
             _categoryList = actions
@@ -933,9 +973,11 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         var previous = CategoryFilterIndex;
         CategoryFilterItems.Clear();
         CategoryFilterItems.Add(LocalizeKey("ToolCmdLibFilterCategoryAll"));
+
+        // Shown by label, filtered by key: the index maps back into _categoryList.
         foreach (var cat in _categoryList)
         {
-            CategoryFilterItems.Add(cat);
+            CategoryFilterItems.Add(CommandPresentationResolver.ResolveCategoryLabel(cat, LocalizeKey));
         }
         CategoryFilterIndex = ClampFilterIndex(previous, CategoryFilterItems.Count);
     }
@@ -971,7 +1013,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         _actionsView.SortDescriptions.Clear();
         _actionsView.GroupDescriptions.Clear();
         _actionsView.GroupDescriptions.Add(
-            new PropertyGroupDescription(nameof(CommandLibraryActionEntry.Category)));
+            new PropertyGroupDescription(nameof(CommandLibraryActionEntry.CategoryLabel)));
     }
 
     /// <summary>

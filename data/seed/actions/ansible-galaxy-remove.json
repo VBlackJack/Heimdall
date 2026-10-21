@@ -1,8 +1,8 @@
 {
   "id": "ansible-galaxy-remove",
-  "title": "Supprimer un rôle installé",
-  "description": "Supprime un rôle Ansible Galaxy installé localement",
-  "category": "⚙️ Services & Automation",
+  "title": "Remove an installed role",
+  "description": "Remove an Ansible Galaxy role installed locally",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -21,11 +21,11 @@
     "parameters": [
       {
         "name": "roleName",
-        "label": "Nom du rôle",
+        "label": "Role name",
         "type": "string",
         "defaultValue": "geerlingguy.apache",
         "required": true,
-        "description": "Nom du rôle à supprimer"
+        "description": "Name of the role to remove"
       }
     ]
   },
@@ -38,16 +38,16 @@
     "parameters": [
       {
         "name": "roleName",
-        "label": "Nom du rôle",
+        "label": "Role name",
         "type": "string",
         "defaultValue": "geerlingguy.apache",
         "required": true,
-        "description": "Nom du rôle à supprimer"
+        "description": "Name of the role to remove"
       }
     ]
   },
   "examples": [],
-  "notes": "Cette commande supprime définitivement le rôle du système de fichiers local.",
+  "notes": "This command permanently deletes the role from the local file system.",
   "links": [
     {
       "title": "Ansible Galaxy",
@@ -57,20 +57,46 @@
   "windowsExamples": [
     {
       "command": "ansible-galaxy remove webserver",
-      "description": "Exemple Windows utilisant ansible-galaxy. Remplacez les paramètres entre <> par vos valeurs.",
+      "description": "Windows example using ansible-galaxy. Replace the parameters between <> with your values.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-galaxy remove ansible.posix",
-      "description": "Supprime la collection posix",
+      "description": "Remove the posix collection",
       "platform": 1
     },
     {
       "command": "ansible-galaxy remove -p ./roles custom_role",
-      "description": "Dans un chemin",
+      "description": "In a given path",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Supprimer un rôle installé",
+      "description": "Supprime un rôle Ansible Galaxy installé localement",
+      "notes": "Cette commande supprime définitivement le rôle du système de fichiers local.",
+      "parameters": {
+        "windows": {
+          "roleName": {
+            "label": "Nom du rôle",
+            "description": "Nom du rôle à supprimer"
+          }
+        },
+        "linux": {
+          "roleName": {
+            "label": "Nom du rôle",
+            "description": "Nom du rôle à supprimer"
+          }
+        }
+      },
+      "examples": {
+        "ansible-galaxy remove webserver": "Exemple Windows utilisant ansible-galaxy. Remplacez les paramètres entre <> par vos valeurs.",
+        "ansible-galaxy remove ansible.posix": "Supprime la collection posix",
+        "ansible-galaxy remove -p ./roles custom_role": "Dans un chemin"
+      }
+    }
+  }
 }

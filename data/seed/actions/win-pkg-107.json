@@ -1,8 +1,8 @@
 {
   "id": "win-pkg-107",
-  "title": "Ajouter une source Chocolatey",
-  "description": "Ajoute une nouvelle source de packages Chocolatey personnalisée.",
-  "category": "📦 Package Management",
+  "title": "Add a Chocolatey source",
+  "description": "Add a new custom Chocolatey package source.",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -21,39 +21,56 @@
     "parameters": [
       {
         "name": "name",
-        "label": "Nom de la source",
+        "label": "Source name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom à donner à la source"
+        "description": "Name to give the source"
       },
       {
         "name": "url",
-        "label": "URL de la source",
+        "label": "Source URL",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "URL du dépôt de packages"
+        "description": "URL of the package repository"
       }
     ]
   },
   "examples": [
     {
       "command": "choco source add --name=MyRepo --source=https://packages.example.com/chocolatey",
-      "description": "Ajoute une source personnalisée",
-      "platform": 0
-    },
-    {
-      "command": "choco source add --name=MyResource --source=https://www.contoso.com",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help choco -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Add a custom source",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits administrateur. Vérifier la fiabilité de la source avant de l'ajouter.",
+  "notes": "Requires administrator rights. Check that the source is trustworthy before adding it.",
   "links": [
     {
       "title": "Chocolatey source documentation",
       "url": "https://docs.chocolatey.org/en-us/choco/commands/source"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Ajouter une source Chocolatey",
+      "description": "Ajoute une nouvelle source de packages Chocolatey personnalisée.",
+      "notes": "Nécessite des droits administrateur. Vérifier la fiabilité de la source avant de l'ajouter.",
+      "parameters": {
+        "windows": {
+          "name": {
+            "label": "Nom de la source",
+            "description": "Nom à donner à la source"
+          },
+          "url": {
+            "label": "URL de la source",
+            "description": "URL du dépôt de packages"
+          }
+        }
+      },
+      "examples": {
+        "choco source add --name=MyRepo --source=https://packages.example.com/chocolatey": "Ajoute une source personnalisée"
+      }
+    }
+  }
 }

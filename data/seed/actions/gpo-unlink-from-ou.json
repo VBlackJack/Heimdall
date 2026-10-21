@@ -1,8 +1,8 @@
 {
   "id": "gpo-unlink-from-ou",
-  "title": "Délier une GPO d'une OU",
-  "description": "Supprime le lien entre une GPO et une unité d'organisation.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Unlink a GPO from an OU",
+  "description": "Remove the link between a GPO and an organizational unit.",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,54 +20,80 @@
     "parameters": [
       {
         "name": "gpoName",
-        "label": "Nom de la GPO",
+        "label": "GPO name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la GPO à délier"
+        "description": "Name of the GPO to unlink"
       },
       {
         "name": "ouDN",
-        "label": "DN de l'OU",
+        "label": "OU DN",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Distinguished Name de l'OU"
+        "description": "Distinguished name of the OU"
       }
     ]
   },
   "examples": [
     {
       "command": "Remove-GPLink -Name \"Security-Policy-IT\" -Target \"OU=IT,DC=contoso,DC=com\"",
-      "description": "Délie la GPO de l'OU IT",
+      "description": "Unlink the GPO from the IT OU",
       "platform": 0
     },
     {
       "command": "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying anything. ESSENTIAL before any bulk action or critical change. Remove -WhatIf once checked to run it.",
       "platform": 0
     },
     {
       "command": "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false removes the prompts. Useful in automated scripts but use it with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the run of the command. -Verbose turns on debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
       "platform": 0
     },
     {
       "command": "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\"",
-      "description": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO à délier. Remplacez Security-Baseline par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'gpoName' parameter: name of the GPO to unlink. Replace Security-Baseline with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Supprime uniquement le lien, pas la GPO elle-même. La GPO reste disponible pour d'autres liens.",
+  "notes": "Removes only the link, not the GPO itself. The GPO stays available for other links.",
   "links": [
     {
       "title": "Documentation Remove-GPLink",
       "url": "https://learn.microsoft.com/en-us/powershell/module/grouppolicy/remove-gplink"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Délier une GPO d'une OU",
+      "description": "Supprime le lien entre une GPO et une unité d'organisation.",
+      "notes": "Supprime uniquement le lien, pas la GPO elle-même. La GPO reste disponible pour d'autres liens.",
+      "parameters": {
+        "windows": {
+          "gpoName": {
+            "label": "Nom de la GPO",
+            "description": "Nom de la GPO à délier"
+          },
+          "ouDN": {
+            "label": "DN de l'OU",
+            "description": "Distinguished Name de l'OU"
+          }
+        }
+      },
+      "examples": {
+        "Remove-GPLink -Name \"Security-Policy-IT\" -Target \"OU=IT,DC=contoso,DC=com\"": "Délie la GPO de l'OU IT",
+        "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+        "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\"": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO à délier. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

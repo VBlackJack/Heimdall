@@ -1,8 +1,8 @@
 {
   "id": "ss-established-connections",
-  "title": "Lister les connexions établies",
-  "description": "Affiche toutes les connexions réseau actuellement établies",
-  "category": "🔒 Security & Encryption",
+  "title": "List established connections",
+  "description": "Show every network connection currently established",
+  "category": "security",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -23,30 +23,43 @@
   "examples": [
     {
       "command": "ss -tn state established",
-      "description": "Connexions TCP établies",
+      "description": "Established TCP connections",
       "platform": 1
     },
     {
       "command": "ss -tnp state established",
-      "description": "Avec les processus (nécessite sudo)",
+      "description": "With the processes (requires sudo)",
       "platform": 1
     },
     {
       "command": "ss -t state established",
-      "description": "Connexions TCP établies",
+      "description": "Established TCP connections",
       "platform": 1
     },
     {
       "command": "ss -o state established",
-      "description": "Connexions avec timers",
+      "description": "Connections with timers",
       "platform": 1
     }
   ],
-  "notes": "Utile pour détecter des connexions suspectes. -p nécessite sudo.",
+  "notes": "Useful to spot suspicious connections. -p requires sudo.",
   "links": [
     {
       "title": "ss command",
       "url": "https://man7.org/linux/man-pages/man8/ss.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les connexions établies",
+      "description": "Affiche toutes les connexions réseau actuellement établies",
+      "notes": "Utile pour détecter des connexions suspectes. -p nécessite sudo.",
+      "examples": {
+        "ss -tn state established": "Connexions TCP établies",
+        "ss -tnp state established": "Avec les processus (nécessite sudo)",
+        "ss -t state established": "Connexions TCP établies",
+        "ss -o state established": "Connexions avec timers"
+      }
+    }
+  }
 }

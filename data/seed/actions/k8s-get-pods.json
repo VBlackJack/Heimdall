@@ -1,8 +1,8 @@
 {
   "id": "k8s-get-pods",
-  "title": "Lister les Pods (Kubectl)",
-  "description": "Affiche la liste des pods Kubernetes avec leur statut, IP et nœud.",
-  "category": "🐳 Containers & VMs",
+  "title": "List pods (kubectl)",
+  "description": "Show the Kubernetes pods with their status, IP and node.",
+  "category": "containers-vms",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -30,15 +30,25 @@
   "linuxExamples": [
     {
       "command": "kubectl get pods -A -o wide",
-      "description": "🔥 VUE D'ENSEMBLE : Liste tous les pods de tous les namespaces (-A) avec détails IP/Node (-o wide). Permet de repérer les pods en erreur.",
+      "description": "🔥 OVERVIEW: list every pod of every namespace (-A) with IP and node details (-o wide). Spots the pods in error.",
       "platform": 1
     },
     {
       "command": "kubectl get pods --field-selector status.phase!=Running -A",
-      "description": "Affiche uniquement les pods qui ne sont PAS en statut 'Running' (CrashLoop, Pending, Error).",
+      "description": "Show only the pods that are NOT in the 'Running' state (CrashLoop, Pending, Error).",
       "platform": 1
     }
   ],
   "linuxCommandTemplateId": "51b77f21-af64-4c31-b554-e3a5c5d4656a",
-  "windowsCommandTemplateId": "55a34bb4-f487-45e5-aefb-9bf850b0c905"
+  "windowsCommandTemplateId": "55a34bb4-f487-45e5-aefb-9bf850b0c905",
+  "translations": {
+    "fr": {
+      "title": "Lister les Pods (Kubectl)",
+      "description": "Affiche la liste des pods Kubernetes avec leur statut, IP et noeud.",
+      "examples": {
+        "kubectl get pods -A -o wide": "🔥 VUE D'ENSEMBLE : Liste tous les pods de tous les namespaces (-A) avec détails IP/Node (-o wide). Permet de repérer les pods en erreur.",
+        "kubectl get pods --field-selector status.phase!=Running -A": "Affiche uniquement les pods qui ne sont PAS en statut 'Running' (CrashLoop, Pending, Error)."
+      }
+    }
+  }
 }

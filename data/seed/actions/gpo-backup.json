@@ -1,8 +1,8 @@
 {
   "id": "gpo-backup",
-  "title": "Sauvegarder une GPO",
-  "description": "Crée une sauvegarde d'une stratégie de groupe spécifique.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Back up a GPO",
+  "description": "Create a backup of a given Group Policy.",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,39 +20,56 @@
     "parameters": [
       {
         "name": "gpoName",
-        "label": "Nom de la GPO",
+        "label": "GPO name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la GPO à sauvegarder"
+        "description": "Name of the GPO to back up"
       },
       {
         "name": "backupPath",
-        "label": "Chemin de sauvegarde",
+        "label": "Backup path",
         "type": "string",
         "defaultValue": "C:\\GPOBackups",
         "required": true,
-        "description": "Chemin du dossier de sauvegarde"
+        "description": "Path of the backup folder"
       }
     ]
   },
   "examples": [
     {
       "command": "Backup-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"",
-      "description": "Sauvegarde la Default Domain Policy dans C:\\GPOBackups",
-      "platform": 0
-    },
-    {
-      "command": "Backup-GPO -Name \"Security-Baseline\" -Path \"C:\\GPOBackups\"",
-      "description": "Exemple utilisant le paramètre 'backupPath': Chemin du dossier de sauvegarde. Remplacez D:\\Backups\\daily par la valeur appropriée selon votre environnement.",
+      "description": "Back up the Default Domain Policy to C:\\GPOBackups",
       "platform": 0
     }
   ],
-  "notes": "Le dossier de destination doit exister. La sauvegarde inclut tous les paramètres de la GPO.",
+  "notes": "The destination folder must exist. The backup includes every setting of the GPO.",
   "links": [
     {
       "title": "Documentation Backup-GPO",
       "url": "https://learn.microsoft.com/en-us/powershell/module/grouppolicy/backup-gpo"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Sauvegarder une GPO",
+      "description": "Crée une sauvegarde d'une stratégie de groupe spécifique.",
+      "notes": "Le dossier de destination doit exister. La sauvegarde inclut tous les paramètres de la GPO.",
+      "parameters": {
+        "windows": {
+          "gpoName": {
+            "label": "Nom de la GPO",
+            "description": "Nom de la GPO à sauvegarder"
+          },
+          "backupPath": {
+            "label": "Chemin de sauvegarde",
+            "description": "Chemin du dossier de sauvegarde"
+          }
+        }
+      },
+      "examples": {
+        "Backup-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"": "Sauvegarde la Default Domain Policy dans C:\\GPOBackups"
+      }
+    }
+  }
 }

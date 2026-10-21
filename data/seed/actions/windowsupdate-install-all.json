@@ -1,8 +1,8 @@
 {
   "id": "windowsupdate-install-all",
-  "title": "Installer toutes les mises à jour Windows disponibles",
-  "description": "Télécharge et installe automatiquement toutes les mises à jour Windows disponibles",
-  "category": "🔄 Windows Updates",
+  "title": "Install every available Windows update",
+  "description": "Download and install every available Windows update automatically",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -22,20 +22,31 @@
   "examples": [
     {
       "command": "Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -AutoReboot",
-      "description": "Installe toutes les mises à jour et redémarre automatiquement si nécessaire",
+      "description": "Install every update and restart automatically when needed",
       "platform": 0
     },
     {
       "command": "Install-WindowsUpdate -Category 'Critical Updates','Security Updates' -AcceptAll -IgnoreReboot",
-      "description": "Installe uniquement les mises à jour critiques et de sécurité sans redémarrer",
+      "description": "Install only the critical and security updates, without restarting",
       "platform": 0
     }
   ],
-  "notes": "ATTENTION: Cette commande peut nécessiter un redémarrage. Utilisez -IgnoreReboot pour empêcher le redémarrage automatique. Nécessite PSWindowsUpdate.",
+  "notes": "WARNING: this command may require a restart. Use -IgnoreReboot to prevent the automatic restart. Requires PSWindowsUpdate.",
   "links": [
     {
       "title": "Install Windows Updates with PowerShell",
       "url": "https://www.alitajran.com/install-windows-updates-powershell/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Installer toutes les mises à jour Windows disponibles",
+      "description": "Télécharge et installe automatiquement toutes les mises à jour Windows disponibles",
+      "notes": "ATTENTION: Cette commande peut nécessiter un redémarrage. Utilisez -IgnoreReboot pour empêcher le redémarrage automatique. Nécessite PSWindowsUpdate.",
+      "examples": {
+        "Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -AutoReboot": "Installe toutes les mises à jour et redémarre automatiquement si nécessaire",
+        "Install-WindowsUpdate -Category 'Critical Updates','Security Updates' -AcceptAll -IgnoreReboot": "Installe uniquement les mises à jour critiques et de sécurité sans redémarrer"
+      }
+    }
+  }
 }
