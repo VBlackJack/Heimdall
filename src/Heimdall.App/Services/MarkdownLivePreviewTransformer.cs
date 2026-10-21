@@ -40,18 +40,16 @@ public sealed partial class MarkdownLivePreviewTransformer : DocumentColorizingT
     [GeneratedRegex(@"\[\[(.+?)\]\]")]
     private static partial Regex NoteLinkPattern();
 
-    private readonly System.Windows.Media.Brush _dimBrush;
+    // The syntax characters are the secondary text colour, dimmed, so they follow the theme.
+    private const string DimSourceBrushKey = "TextSecondaryBrush";
 
-    public MarkdownLivePreviewTransformer()
-    {
-        var dimColor = System.Windows.Media.Color.FromArgb(
-            (byte)(255 * SyntaxCharOpacity), 180, 180, 180);
-        _dimBrush = new System.Windows.Media.SolidColorBrush(dimColor);
-        _dimBrush.Freeze();
-    }
+    private System.Windows.Media.Brush _dimBrush = System.Windows.Media.Brushes.Transparent;
+    private System.Windows.Media.Color? _dimSourceColor;
 
     protected override void ColorizeLine(DocumentLine line)
     {
+        RefreshDimBrush();
+
         if (line.Length == 0)
         {
             return;
@@ -67,6 +65,25 @@ public sealed partial class MarkdownLivePreviewTransformer : DocumentColorizingT
 
         ColorizeStrikethrough(lineText, offset);
         ColorizeNoteLinkUnderline(lineText, offset);
+    }
+
+    /// <summary>
+    /// Rebuilds the dim brush when the theme colour it derives from has changed, so a theme switch
+    /// reaches the next redraw.
+    /// </summary>
+    private void RefreshDimBrush()
+    {
+        var source = Application.Current?.TryFindResource(DimSourceBrushKey) as System.Windows.Media.SolidColorBrush;
+        var color = source?.Color ?? System.Windows.SystemColors.GrayTextColor;
+        if (_dimSourceColor == color)
+        {
+            return;
+        }
+
+        var brush = new System.Windows.Media.SolidColorBrush(color) { Opacity = SyntaxCharOpacity };
+        brush.Freeze();
+        _dimBrush = brush;
+        _dimSourceColor = color;
     }
 
     private bool TryColorizeHeading(string lineText, int lineOffset, int lineEndOffset)

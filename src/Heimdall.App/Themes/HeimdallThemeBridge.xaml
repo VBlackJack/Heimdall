@@ -54,7 +54,8 @@
     <SolidColorBrush x:Key="TreeRowSelectedBrush" Color="{DynamicResource AccentColor}" Opacity="0.18" />
     <SolidColorBrush x:Key="TreeRowDropTargetBrush" Color="{DynamicResource InfoColor}" Opacity="0.30" />
     <SolidColorBrush x:Key="DragDropOverlayBackground" Color="{DynamicResource BackgroundColor}" Opacity="0.40" />
-    <SolidColorBrush x:Key="OverlayBackground" Color="#B3000000" />
+    <!-- Modal scrim: the window background at 70% (alpha B3), so a light theme dims to a light veil. -->
+    <SolidColorBrush x:Key="OverlayBackground" Color="{DynamicResource BackgroundColor}" Opacity="0.70" />
 
     <!-- Protocol accent brushes -->
     <SolidColorBrush x:Key="ProtocolRdpBrush" Color="{DynamicResource BlueColor}" />

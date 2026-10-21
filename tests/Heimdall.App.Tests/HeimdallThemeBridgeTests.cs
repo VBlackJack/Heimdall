@@ -127,6 +127,46 @@ public sealed class HeimdallThemeBridgeTests
         Assert.Empty(colorKeys);
     }
 
+    /// <summary>
+    /// The modal scrim dims the window with the window's own background colour: black at 70% left
+    /// a light theme under a dark veil with dark text on it. A literal colour here fails.
+    /// </summary>
+    [Fact]
+    public void OverlayBackground_IsTheBackgroundColourAtSeventyPercent()
+    {
+        XElement overlay = KeyedBrush("OverlayBackground");
+
+        Assert.Equal("{DynamicResource BackgroundColor}", overlay.Attribute("Color")?.Value);
+        Assert.Equal("0.70", overlay.Attribute("Opacity")?.Value);
+    }
+
+    /// <summary>Every brush of the bridge derives from a theme colour; none spells one.</summary>
+    [Fact]
+    public void HeimdallThemeBridge_DeclaresNoLiteralColour()
+    {
+        XDocument document = XDocument.Load(GetBridgePath());
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        List<string> literal = document.Root!
+            .Elements()
+            .Where(element => element.Attribute("Color") is { } color
+                && !color.Value.StartsWith("{DynamicResource ", StringComparison.Ordinal))
+            .Select(element => $"{element.Attribute(xaml + "Key")?.Value} = {element.Attribute("Color")!.Value}")
+            .ToList();
+
+        Assert.Empty(literal);
+    }
+
+    private static XElement KeyedBrush(string key)
+    {
+        XDocument document = XDocument.Load(GetBridgePath());
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        return Assert.Single(
+            document.Root!.Elements(),
+            element => element.Attribute(xaml + "Key")?.Value == key);
+    }
+
     private static string GetBridgePath()
     {
         DirectoryInfo? directory = new DirectoryInfo(AppContext.BaseDirectory);
