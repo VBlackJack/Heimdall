@@ -80,6 +80,8 @@ public sealed class BatchRepository : IBatchRepository
         existingEntity.TagsJson = CommandBatchMapper.SerializeTags(batch.Tags);
         existingEntity.VariablesJson = CommandBatchMapper.SerializeVariables(batch.Variables);
         existingEntity.LastExecutedAt = batch.LastExecutedAt;
+        // Git sync's import sets the flag from the shared copy; leaving the column alone lost it.
+        existingEntity.IsUserCreated = batch.IsUserCreated;
         // The caller's timestamp, not now: BatchService stamps an edit, and Git sync's import
         // passes the remote timestamp, which must survive or the next sync sees a local edit.
         existingEntity.UpdatedAt = batch.UpdatedAt;
