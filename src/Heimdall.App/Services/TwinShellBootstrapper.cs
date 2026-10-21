@@ -156,36 +156,7 @@ internal static class TwinShellBootstrapper
             return;
         }
 
-        var options = JsonOptionsHelper.CaseInsensitive;
-        var validActions = new List<ActionModel>(jsonFiles.Length);
-
-        // Parse/validate/normalize pass: per-file try/catch so one malformed or oversized
-        // file is logged and skipped without aborting the rest of the batch.
-        foreach (var file in jsonFiles)
-        {
-            try
-            {
-                var json = await File.ReadAllTextAsync(file);
-                if (json.Length > Heimdall.Core.Configuration.AppConstants.MaxSeedFileSizeBytes) continue;
-
-                var action = JsonSerializer.Deserialize<ActionModel>(json, options);
-                if (action is null
-                    || string.IsNullOrWhiteSpace(action.Title)
-                    || string.IsNullOrWhiteSpace(action.Category))
-                    continue;
-
-                action.IsUserCreated = false;
-                action.CreatedAt = DateTime.UtcNow;
-                action.UpdatedAt = DateTime.UtcNow;
-
-                validActions.Add(action);
-            }
-            catch (Exception ex)
-            {
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    $"[TwinShell] Seed error ({Path.GetFileName(file)}): {ex.Message}");
-            }
-        }
+        var validActions = await ReadSeedActionsAsync(jsonFiles);
 
         // An empty parse is a broken install, not an empty catalogue: applying it would delete
         // every shipped action.
@@ -211,6 +182,61 @@ internal static class TwinShellBootstrapper
             Heimdall.Core.Logging.FileLogger.Error(
                 "[TwinShell] Seed refresh failed and was rolled back; the previous catalogue is kept", ex);
         }
+    }
+
+    /// <summary>
+    /// Parses the seed files into system actions, skipping any file that is malformed,
+    /// oversized, untitled, uncategorized, or in the workstation debloat category.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Per-file try/catch, so one bad file is logged and skipped without aborting the rest.
+    /// </para>
+    /// <para>
+    /// The debloat category belongs to the optional pack under <c>data/packs</c>. The
+    /// installer copies over an existing installation without deleting what the new build no
+    /// longer ships, so the 72 files that moved to the pack stay in the seed directory of
+    /// every upgraded copy; read as seeds, they would come back as shipped actions on the
+    /// next launch. Their category is matched after <see cref="CategoryMigration"/>, because
+    /// a file left by an older build still carries the old string.
+    /// </para>
+    /// </remarks>
+    internal static async Task<List<ActionModel>> ReadSeedActionsAsync(IReadOnlyCollection<string> files)
+    {
+        var options = JsonOptionsHelper.CaseInsensitive;
+        var validActions = new List<ActionModel>(files.Count);
+
+        foreach (var file in files)
+        {
+            try
+            {
+                var json = await File.ReadAllTextAsync(file);
+                if (json.Length > Heimdall.Core.Configuration.AppConstants.MaxSeedFileSizeBytes) continue;
+
+                var action = JsonSerializer.Deserialize<ActionModel>(json, options);
+                if (action is null
+                    || string.IsNullOrWhiteSpace(action.Title)
+                    || string.IsNullOrWhiteSpace(action.Category))
+                    continue;
+
+                action.Category = CategoryMigration.Normalize(action.Category);
+                if (string.Equals(action.Category, CommandCategories.WindowsDebloat, StringComparison.Ordinal))
+                    continue;
+
+                action.IsUserCreated = false;
+                action.CreatedAt = DateTime.UtcNow;
+                action.UpdatedAt = DateTime.UtcNow;
+
+                validActions.Add(action);
+            }
+            catch (Exception ex)
+            {
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"[TwinShell] Seed error ({Path.GetFileName(file)}): {ex.Message}");
+            }
+        }
+
+        return validActions;
     }
 
     /// <summary>

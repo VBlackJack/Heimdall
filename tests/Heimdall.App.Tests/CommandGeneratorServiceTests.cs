@@ -714,22 +714,31 @@ public sealed class CommandGeneratorServiceTests
     /// <summary>
     /// Shipped templates whose pattern alone is longer than
     /// <see cref="ValidationConstants.MaxCommandLength"/>, so they cannot generate whatever
-    /// the values. Found by the theory above; they open on a generation error today.
+    /// the values. Found by the theory above; they would open on a generation error.
     /// Whether the bound or the scripts should change is an open decision, not this test's
     /// to make, so the list records the defect instead of hiding it.
     /// </summary>
-    private static readonly HashSet<string> OverlongShippedTemplates = new(StringComparer.Ordinal)
+    /// <remarks>
+    /// Empty since the nine it held left the default catalogue with the workstation debloat
+    /// pack (data/packs), which keeps them as they are.
+    /// </remarks>
+    private static readonly HashSet<string> OverlongShippedTemplates = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// An entry of <see cref="OverlongShippedTemplates"/> whose seed row is gone is never
+    /// reached by the theory above, so it would stay listed and green forever. Every entry
+    /// has to name a template the catalogue still ships.
+    /// </summary>
+    [Fact]
+    public void OverlongShippedTemplates_NameOnlyTemplatesTheCatalogueShips()
     {
-        "win-perf-201.json / windowsCommandTemplate",
-        "win-perf-403.json / windowsCommandTemplate",
-        "win-perf-404.json / windowsCommandTemplate",
-        "win-privacy-101.json / windowsCommandTemplate",
-        "win-privacy-203.json / windowsCommandTemplate",
-        "win-privacy-205.json / windowsCommandTemplate",
-        "win-privacy-206.json / windowsCommandTemplate",
-        "win-privacy-303.json / windowsCommandTemplate",
-        "win-privacy-304.json / windowsCommandTemplate",
-    };
+        HashSet<string> shipped = EverySeedTemplate()
+            .Select(row => (string)row[0])
+            .ToHashSet(StringComparer.Ordinal);
+
+        OverlongShippedTemplates.Where(entry => !shipped.Contains(entry))
+            .Should().BeEmpty("a listed template must still have a seed row, or the list outlives the defect");
+    }
 
     public static IEnumerable<object[]> EverySeedTemplate()
     {
