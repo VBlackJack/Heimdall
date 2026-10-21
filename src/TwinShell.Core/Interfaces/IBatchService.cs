@@ -76,18 +76,4 @@ public interface IBatchService
     /// <param name="query">Search query</param>
     /// <returns>Matching batches</returns>
     Task<IEnumerable<CommandBatch>> SearchBatchesAsync(string query);
-
-    /// <summary>
-    /// Exports a batch to JSON
-    /// </summary>
-    /// <param name="batch">The batch to export</param>
-    /// <returns>JSON string representation</returns>
-    string ExportBatchToJson(CommandBatch batch);
-
-    /// <summary>
-    /// Imports a batch from JSON
-    /// </summary>
-    /// <param name="json">JSON string</param>
-    /// <returns>The imported batch</returns>
-    CommandBatch ImportBatchFromJson(string json);
 }

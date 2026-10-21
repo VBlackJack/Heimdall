@@ -97,10 +97,6 @@ internal sealed class FakeBatchService : IBatchService
 
     public Task<IEnumerable<CommandBatch>> SearchBatchesAsync(string query) => GetAllBatchesAsync();
 
-    public string ExportBatchToJson(CommandBatch batch) => throw new NotSupportedException();
-
-    public CommandBatch ImportBatchFromJson(string json) => throw new NotSupportedException();
-
     public void Seed(CommandBatch batch) => _store.Add(Copy(batch));
 
     private static CommandBatch Copy(CommandBatch batch) => new()

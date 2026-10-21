@@ -146,9 +146,5 @@ public sealed class CommandLibraryRunbooksPanelTests
         public Task DeleteBatchAsync(string id) => Task.CompletedTask;
 
         public Task<IEnumerable<CommandBatch>> SearchBatchesAsync(string query) => GetAllBatchesAsync();
-
-        public string ExportBatchToJson(CommandBatch batch) => string.Empty;
-
-        public CommandBatch ImportBatchFromJson(string json) => new();
     }
 }
