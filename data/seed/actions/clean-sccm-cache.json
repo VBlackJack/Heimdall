@@ -1,7 +1,7 @@
 {
   "id": "clean-sccm-cache",
-  "title": "Vider le cache SCCM",
-  "description": "Supprime tous les fichiers du cache du client Configuration Manager",
+  "title": "Clear the SCCM cache",
+  "description": "Delete every file from the Configuration Manager client cache",
   "category": "windows-updates",
   "platform": 0,
   "level": 2,
@@ -21,25 +21,38 @@
   "examples": [
     {
       "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the confirmation prompts. Useful in automated scripts, but use with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the modified or created object to the pipeline. By default the Set- and New- cmdlets return nothing. -PassThru turns the output on, for chained operations or an immediate check.",
       "platform": 0
     },
     {
       "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the command's execution. -Verbose turns on the diagnostic messages that show exactly what happens. Essential for troubleshooting and to understand the internal operations.",
       "platform": 0
     }
   ],
-  "notes": "Droits administrateur requis. Libère de l'espace disque en supprimant les packages téléchargés.",
-  "links": []
+  "notes": "Requires administrator rights. Frees disk space by deleting the downloaded packages.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Vider le cache SCCM",
+      "description": "Supprime tous les fichiers du cache du client Configuration Manager",
+      "notes": "Droits administrateur requis. Libère de l'espace disque en supprimant les packages téléchargés.",
+      "examples": {
+        "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
+      }
+    }
+  }
 }

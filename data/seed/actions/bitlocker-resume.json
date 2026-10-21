@@ -1,7 +1,7 @@
 {
   "id": "bitlocker-resume",
-  "title": "Réactiver la protection BitLocker",
-  "description": "Réactive la protection BitLocker après une suspension temporaire.",
+  "title": "Resume BitLocker protection",
+  "description": "Resume BitLocker protection after a temporary suspension.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -19,46 +19,68 @@
     "parameters": [
       {
         "name": "driveLetter",
-        "label": "Lettre du disque",
+        "label": "Drive letter",
         "type": "driveletter",
         "defaultValue": "C",
         "required": true,
-        "description": "Lettre du volume (ex: C)"
+        "description": "Volume letter (e.g. C)"
       }
     ]
   },
   "examples": [
     {
       "command": "Resume-BitLocker -MountPoint C:",
-      "description": "Réactive immédiatement la protection BitLocker sur C:",
+      "description": "Resume BitLocker protection on C: at once",
       "platform": 0
     },
     {
       "command": "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'Off'} | ForEach-Object { Resume-BitLocker -MountPoint $_.MountPoint }",
-      "description": "Réactive BitLocker sur tous les volumes dont la protection est désactivée",
+      "description": "Resume BitLocker on every volume whose protection is off",
       "platform": 0
     },
     {
       "command": "Resume-BitLocker -MountPoint C:; Get-BitLockerVolume C: | Select-Object MountPoint,ProtectionStatus",
-      "description": "Réactive BitLocker puis vérifie que la protection est bien active",
+      "description": "Resume BitLocker, then check that protection is active",
       "platform": 0
     },
     {
       "command": "Resume-BitLocker -MountPoint \"C:\"",
-      "description": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume (ex: C). Remplacez D par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'driveLetter' parameter: volume letter (e.g. C). Replace D with the value that fits your environment.",
       "platform": 0
     },
     {
       "command": "Resume-BitLocker -MountPoint \"D:\"",
-      "description": "Réactive la protection BitLocker après une suspension temporaire.",
+      "description": "Resume BitLocker protection after a temporary suspension.",
       "platform": 0
     }
   ],
-  "notes": "Utilisez après Suspend-BitLocker ou si la protection a été suspendue automatiquement. La réactivation est immédiate (pas besoin de redémarrage). Vérifiez que tous les protecteurs de clés sont toujours en place.",
+  "notes": "Use it after Suspend-BitLocker or when protection was suspended automatically. Resuming is immediate (no restart needed). Check that every key protector is still in place.",
   "links": [
     {
       "title": "Resume-BitLocker Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/bitlocker/resume-bitlocker"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Réactiver la protection BitLocker",
+      "description": "Réactive la protection BitLocker après une suspension temporaire.",
+      "notes": "Utilisez après Suspend-BitLocker ou si la protection a été suspendue automatiquement. La réactivation est immédiate (pas besoin de redémarrage). Vérifiez que tous les protecteurs de clés sont toujours en place.",
+      "parameters": {
+        "windows": {
+          "driveLetter": {
+            "label": "Lettre du disque",
+            "description": "Lettre du volume (ex: C)"
+          }
+        }
+      },
+      "examples": {
+        "Resume-BitLocker -MountPoint C:": "Réactive immédiatement la protection BitLocker sur C:",
+        "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'Off'} | ForEach-Object { Resume-BitLocker -MountPoint $_.MountPoint }": "Réactive BitLocker sur tous les volumes dont la protection est désactivée",
+        "Resume-BitLocker -MountPoint C:; Get-BitLockerVolume C: | Select-Object MountPoint,ProtectionStatus": "Réactive BitLocker puis vérifie que la protection est bien active",
+        "Resume-BitLocker -MountPoint \"C:\"": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume (ex: C). Remplacez D par la valeur appropriée selon votre environnement.",
+        "Resume-BitLocker -MountPoint \"D:\"": "Réactive la protection BitLocker après une suspension temporaire."
+      }
+    }
+  }
 }

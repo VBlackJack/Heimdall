@@ -1,7 +1,7 @@
 {
   "id": "build-gradle",
-  "title": "Construire un projet Gradle",
-  "description": "Compile et package un projet avec Gradle.",
+  "title": "Build a Gradle project",
+  "description": "Build and package a project with Gradle.",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -30,42 +30,58 @@
   "examples": [
     {
       "command": "gradle build",
-      "description": "Compile et teste le projet",
+      "description": "Build and test the project",
       "platform": 2
     },
     {
       "command": "gradle clean build",
-      "description": "Nettoie puis compile",
+      "description": "Clean, then build",
       "platform": 2
     }
   ],
-  "notes": "Préférer ./gradlew (wrapper) pour la portabilité. --no-daemon pour CI/CD.",
+  "notes": "Prefer ./gradlew (the wrapper) for portability. --no-daemon for CI/CD.",
   "links": [],
   "linuxExamples": [
     {
       "command": "./gradlew build",
-      "description": "Utilise le wrapper Gradle",
+      "description": "Use the Gradle wrapper",
       "platform": 1
     },
     {
       "command": "./gradlew test",
-      "description": "Exécuter les tests",
+      "description": "Run the tests",
       "platform": 1
     },
     {
       "command": "./gradlew clean build",
-      "description": "Nettoyer et construire",
+      "description": "Clean and build",
       "platform": 1
     },
     {
       "command": "./gradlew bootRun",
-      "description": "Démarrer une application Spring Boot",
+      "description": "Start a Spring Boot application",
       "platform": 1
     },
     {
       "command": "./gradlew dependencies",
-      "description": "Afficher les dépendances",
+      "description": "Show the dependencies",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Construire un projet Gradle",
+      "description": "Compile et package un projet avec Gradle.",
+      "notes": "Préférer ./gradlew (wrapper) pour la portabilité. --no-daemon pour CI/CD.",
+      "examples": {
+        "./gradlew build": "Utilise le wrapper Gradle",
+        "./gradlew test": "Exécuter les tests",
+        "./gradlew clean build": "Nettoyer et construire",
+        "./gradlew bootRun": "Démarrer une application Spring Boot",
+        "./gradlew dependencies": "Afficher les dépendances",
+        "gradle build": "Compile et teste le projet",
+        "gradle clean build": "Nettoie puis compile"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "cert-export",
-  "title": "Exporter un certificat",
-  "description": "Exporte un certificat du magasin Windows vers un fichier .cer ou .pfx.",
+  "title": "Export a certificate",
+  "description": "Export a certificate from the Windows store to a .cer or .pfx file.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -24,65 +24,93 @@
     "parameters": [
       {
         "name": "thumbprint",
-        "label": "Empreinte du certificat",
+        "label": "Certificate thumbprint",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Thumbprint (empreinte SHA-1) du certificat"
+        "description": "Thumbprint (SHA-1 fingerprint) of the certificate"
       },
       {
         "name": "exportPath",
-        "label": "Chemin d'export",
+        "label": "Export path",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Export\\certificate.cer",
         "required": true,
-        "description": "Chemin du fichier de destination"
+        "description": "Path of the destination file"
       }
     ]
   },
   "examples": [
     {
       "command": "Export-Certificate -Cert (Get-ChildItem Cert:\\LocalMachine\\My\\1234567890ABCDEF) -FilePath 'C:\\cert.cer'",
-      "description": "Exporte un certificat public (.cer)",
+      "description": "Export a public certificate (.cer)",
       "platform": 0
     },
     {
       "command": "Export-PfxCertificate -Cert (Get-ChildItem Cert:\\LocalMachine\\My\\1234567890ABCDEF) -FilePath 'C:\\cert.pfx' -Password (ConvertTo-SecureString -String 'MyPassword' -AsPlainText -Force)",
-      "description": "Exporte avec clé privée (.pfx)",
+      "description": "Export with the private key (.pfx)",
       "platform": 0
     },
     {
       "command": "certutil -exportPFX My 1234567890ABCDEF C:\\cert.pfx",
-      "description": "Alternative avec certutil",
+      "description": "Alternative with certutil",
       "platform": 0
     },
     {
       "command": "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Export-Certificate exporte uniquement la clé publique. Utilisez Export-PfxCertificate pour inclure la clé privée (nécessite mot de passe).",
+  "notes": "Export-Certificate exports the public key only. Use Export-PfxCertificate to include the private key (a password is required).",
   "links": [
     {
       "title": "Documentation Export-Certificate",
       "url": "https://learn.microsoft.com/en-us/powershell/module/pki/export-certificate"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exporter un certificat",
+      "description": "Exporte un certificat du magasin Windows vers un fichier .cer ou .pfx.",
+      "notes": "Export-Certificate exporte uniquement la clé publique. Utilisez Export-PfxCertificate pour inclure la clé privée (nécessite mot de passe).",
+      "parameters": {
+        "windows": {
+          "thumbprint": {
+            "label": "Empreinte du certificat",
+            "description": "Thumbprint (empreinte SHA-1) du certificat"
+          },
+          "exportPath": {
+            "label": "Chemin d'export",
+            "description": "Chemin du fichier de destination"
+          }
+        }
+      },
+      "examples": {
+        "Export-Certificate -Cert (Get-ChildItem Cert:\\LocalMachine\\My\\1234567890ABCDEF) -FilePath 'C:\\cert.cer'": "Exporte un certificat public (.cer)",
+        "Export-PfxCertificate -Cert (Get-ChildItem Cert:\\LocalMachine\\My\\1234567890ABCDEF) -FilePath 'C:\\cert.pfx' -Password (ConvertTo-SecureString -String 'MyPassword' -AsPlainText -Force)": "Exporte avec clé privée (.pfx)",
+        "certutil -exportPFX My 1234567890ABCDEF C:\\cert.pfx": "Alternative avec certutil",
+        "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

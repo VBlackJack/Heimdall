@@ -1,7 +1,7 @@
 {
   "id": "cert-check-expiration",
-  "title": "Vérifier l'expiration des certificats",
-  "description": "Analyse tous les certificats installés et identifie ceux qui sont expirés ou proches de l'expiration (< 30 jours).",
+  "title": "Check certificate expiration",
+  "description": "Scan every installed certificate and find the ones that are expired or about to expire (< 30 days).",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -24,51 +24,74 @@
     "parameters": [
       {
         "name": "daysThreshold",
-        "label": "Seuil en jours",
+        "label": "Threshold in days",
         "type": "number",
         "defaultValue": "30",
         "required": true,
-        "description": "Nombre de jours avant expiration pour alerter"
+        "description": "Number of days before expiration that triggers an alert"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-ChildItem Cert:\\LocalMachine\\My | Where-Object {$_.NotAfter -lt (Get-Date).AddDays(30)} | Format-Table Subject, NotAfter",
-      "description": "Certificats expirant dans 30 jours",
+      "description": "Certificates expiring within 30 days",
       "platform": 0
     },
     {
       "command": "Get-ChildItem Cert:\\ -Recurse | Where-Object {$_.NotAfter -lt (Get-Date)} | Select-Object PSPath, Subject, NotAfter",
-      "description": "Tous les certificats déjà expirés",
+      "description": "Every certificate that has already expired",
       "platform": 0
     },
     {
       "command": "Get-ChildItem Cert:\\LocalMachine -Recurse | Where-Object {$_.NotAfter -lt (Get-Date).AddDays(90)} | Export-Csv C:\\cert-expiration-report.csv",
-      "description": "Export CSV des certificats à renouveler",
+      "description": "CSV export of the certificates to renew",
       "platform": 0
     },
     {
       "command": "$daysThreshold = 90; Get-ChildItem -Path Cert:\\LocalMachine\\My | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "$daysThreshold = 90; Get-ChildItem -Path Cert:\\LocalMachine\\My | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "$daysThreshold = 90; Get-ChildItem -Path Cert:\\LocalMachine\\My | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Automatisez cette vérification dans une tâche planifiée pour une surveillance proactive. Les certificats expirés causent des erreurs SSL/TLS.",
+  "notes": "Automate this check in a scheduled task for proactive monitoring. Expired certificates cause SSL/TLS errors.",
   "links": [
     {
       "title": "Documentation Certificate Management",
       "url": "https://learn.microsoft.com/en-us/powershell/module/pki/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier l'expiration des certificats",
+      "description": "Analyse tous les certificats installés et identifie ceux qui sont expirés ou proches de l'expiration (< 30 jours).",
+      "notes": "Automatisez cette vérification dans une tâche planifiée pour une surveillance proactive. Les certificats expirés causent des erreurs SSL/TLS.",
+      "parameters": {
+        "windows": {
+          "daysThreshold": {
+            "label": "Seuil en jours",
+            "description": "Nombre de jours avant expiration pour alerter"
+          }
+        }
+      },
+      "examples": {
+        "Get-ChildItem Cert:\\LocalMachine\\My | Where-Object {$_.NotAfter -lt (Get-Date).AddDays(30)} | Format-Table Subject, NotAfter": "Certificats expirant dans 30 jours",
+        "Get-ChildItem Cert:\\ -Recurse | Where-Object {$_.NotAfter -lt (Get-Date)} | Select-Object PSPath, Subject, NotAfter": "Tous les certificats déjà expirés",
+        "Get-ChildItem Cert:\\LocalMachine -Recurse | Where-Object {$_.NotAfter -lt (Get-Date).AddDays(90)} | Export-Csv C:\\cert-expiration-report.csv": "Export CSV des certificats à renouveler",
+        "$daysThreshold = 90; Get-ChildItem -Path Cert:\\LocalMachine\\My | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$daysThreshold = 90; Get-ChildItem -Path Cert:\\LocalMachine\\My | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "$daysThreshold = 90; Get-ChildItem -Path Cert:\\LocalMachine\\My | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

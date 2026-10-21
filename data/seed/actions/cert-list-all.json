@@ -1,7 +1,7 @@
 {
   "id": "cert-list-all",
-  "title": "Lister tous les certificats installés",
-  "description": "Affiche tous les certificats installés dans les magasins Windows Certificate Store (LocalMachine et CurrentUser) avec leur expiration et usage.",
+  "title": "List every installed certificate",
+  "description": "Show every certificate installed in the Windows Certificate Store (LocalMachine and CurrentUser) with its expiration and usage.",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -26,40 +26,55 @@
   "examples": [
     {
       "command": "Get-ChildItem -Path Cert:\\LocalMachine\\My | Format-List",
-      "description": "Liste détaillée des certificats personnels de la machine",
+      "description": "Detailed list of the machine's personal certificates",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path Cert:\\LocalMachine\\Root",
-      "description": "Certificats racine de confiance",
+      "description": "Trusted root certificates",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path Cert:\\ -Recurse | Where-Object {$_.NotAfter -lt (Get-Date).AddDays(30)}",
-      "description": "Certificats expirant dans 30 jours",
+      "description": "Certificates expiring within 30 days",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path Cert:\\LocalMachine\\My | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path Cert:\\LocalMachine\\My | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path Cert:\\LocalMachine\\My | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Principaux magasins: My (personnels), Root (racine), CA (intermédiaires), TrustedPublisher, AuthRoot.",
+  "notes": "Main stores: My (personal), Root (root), CA (intermediate), TrustedPublisher, AuthRoot.",
   "links": [
     {
       "title": "Documentation Certificate Store",
       "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/install/certificate-stores"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister tous les certificats installés",
+      "description": "Affiche tous les certificats installés dans les magasins Windows Certificate Store (LocalMachine et CurrentUser) avec leur expiration et usage.",
+      "notes": "Principaux magasins: My (personnels), Root (racine), CA (intermédiaires), TrustedPublisher, AuthRoot.",
+      "examples": {
+        "Get-ChildItem -Path Cert:\\LocalMachine\\My | Format-List": "Liste détaillée des certificats personnels de la machine",
+        "Get-ChildItem -Path Cert:\\LocalMachine\\Root": "Certificats racine de confiance",
+        "Get-ChildItem -Path Cert:\\ -Recurse | Where-Object {$_.NotAfter -lt (Get-Date).AddDays(30)}": "Certificats expirant dans 30 jours",
+        "Get-ChildItem -Path Cert:\\LocalMachine\\My | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-ChildItem -Path Cert:\\LocalMachine\\My | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ChildItem -Path Cert:\\LocalMachine\\My | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }
