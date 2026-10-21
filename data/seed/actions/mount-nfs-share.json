@@ -1,0 +1,110 @@
+{
+  "id": "mount-nfs-share",
+  "title": "Mount an NFS share",
+  "description": "Mount a directory exported by an NFS server on a local mount point.",
+  "category": "files-storage",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "mount",
+    "nfs",
+    "linux",
+    "share",
+    "storage"
+  ],
+  "linuxCommandTemplateId": "mount-nfs-share-cmd",
+  "linuxCommandTemplate": {
+    "id": "mount-nfs-share-cmd",
+    "platform": 1,
+    "name": "mount",
+    "commandPattern": "sudo mount -t nfs {server}:{exportPath} {mountPoint}",
+    "parameters": [
+      {
+        "name": "server",
+        "label": "Server",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name or address of the file server"
+      },
+      {
+        "name": "exportPath",
+        "label": "Export path",
+        "type": "path",
+        "defaultValue": "",
+        "required": true,
+        "description": "Directory exported by the server"
+      },
+      {
+        "name": "mountPoint",
+        "label": "Mount point",
+        "type": "path",
+        "defaultValue": "/mnt/nfs",
+        "required": true,
+        "description": "Existing local directory to mount on"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo mount -t nfs nas01:/export/data /mnt/nfs",
+      "description": "Mount the data export of nas01",
+      "platform": 1
+    },
+    {
+      "command": "sudo mount -t nfs -o vers=4.2,ro nas01:/export/iso /mnt/iso",
+      "description": "Mount read-only with NFS 4.2",
+      "platform": 1
+    },
+    {
+      "command": "echo 'nas01:/export/data /mnt/nfs nfs defaults,_netdev 0 0' | sudo tee -a /etc/fstab",
+      "description": "Mount the share at every boot",
+      "platform": 1
+    },
+    {
+      "command": "sudo umount /mnt/nfs",
+      "description": "Unmount the share",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo and nfs-utils (RHEL) or nfs-common (Debian). The mount point must exist.",
+  "links": [
+    {
+      "title": "nfs(5)",
+      "url": "https://man7.org/linux/man-pages/man5/nfs.5.html"
+    },
+    {
+      "title": "mount(8)",
+      "url": "https://man7.org/linux/man-pages/man8/mount.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Monter un partage NFS",
+      "description": "Monte un répertoire exporté par un serveur NFS sur un point de montage local.",
+      "notes": "Nécessite sudo et nfs-utils (RHEL) ou nfs-common (Debian). Le point de montage doit exister.",
+      "parameters": {
+        "linux": {
+          "server": {
+            "label": "Serveur",
+            "description": "Nom ou adresse du serveur de fichiers"
+          },
+          "exportPath": {
+            "label": "Chemin exporté",
+            "description": "Répertoire exporté par le serveur"
+          },
+          "mountPoint": {
+            "label": "Point de montage",
+            "description": "Répertoire local existant sur lequel monter"
+          }
+        }
+      },
+      "examples": {
+        "sudo mount -t nfs nas01:/export/data /mnt/nfs": "Monte l'export data de nas01",
+        "sudo mount -t nfs -o vers=4.2,ro nas01:/export/iso /mnt/iso": "Monte en lecture seule avec NFS 4.2",
+        "echo 'nas01:/export/data /mnt/nfs nfs defaults,_netdev 0 0' | sudo tee -a /etc/fstab": "Monte le partage à chaque démarrage",
+        "sudo umount /mnt/nfs": "Démonte le partage"
+      }
+    }
+  }
+}

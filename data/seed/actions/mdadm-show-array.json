@@ -1,0 +1,82 @@
+{
+  "id": "mdadm-show-array",
+  "title": "Show the state of a software RAID array",
+  "description": "Show the level, the state, the members and the rebuild progress of a Linux software RAID array.",
+  "category": "files-storage",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "mdadm",
+    "raid",
+    "linux",
+    "disk",
+    "storage"
+  ],
+  "linuxCommandTemplateId": "mdadm-show-array-cmd",
+  "linuxCommandTemplate": {
+    "id": "mdadm-show-array-cmd",
+    "platform": 1,
+    "name": "mdadm",
+    "commandPattern": "sudo mdadm --detail {device}",
+    "parameters": [
+      {
+        "name": "device",
+        "label": "Array",
+        "type": "path",
+        "defaultValue": "/dev/md0",
+        "required": true,
+        "description": "RAID device, such as /dev/md0"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo mdadm --detail /dev/md0",
+      "description": "Show the state and the members of md0",
+      "platform": 1
+    },
+    {
+      "command": "cat /proc/mdstat",
+      "description": "Show every array and its rebuild progress at a glance",
+      "platform": 1
+    },
+    {
+      "command": "sudo mdadm --examine /dev/sdb1",
+      "description": "Read the RAID superblock of one member disk",
+      "platform": 1
+    },
+    {
+      "command": "sudo mdadm --detail --scan",
+      "description": "Print the ARRAY lines for mdadm.conf",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. A degraded state means a member is missing: replace it before a second disk fails.",
+  "links": [
+    {
+      "title": "mdadm(8)",
+      "url": "https://man7.org/linux/man-pages/man8/mdadm.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'état d'une grappe RAID logicielle",
+      "description": "Affiche le niveau, l'état, les membres et l'avancement de reconstruction d'une grappe RAID logicielle Linux.",
+      "notes": "Nécessite sudo. L'état degraded signifie qu'un membre manque : le remplacer avant qu'un second disque tombe.",
+      "parameters": {
+        "linux": {
+          "device": {
+            "label": "Grappe",
+            "description": "Périphérique RAID, comme /dev/md0"
+          }
+        }
+      },
+      "examples": {
+        "sudo mdadm --detail /dev/md0": "Affiche l'état et les membres de md0",
+        "cat /proc/mdstat": "Affiche d'un coup d'oeil chaque grappe et sa reconstruction",
+        "sudo mdadm --examine /dev/sdb1": "Lit le superbloc RAID d'un disque membre",
+        "sudo mdadm --detail --scan": "Affiche les lignes ARRAY pour mdadm.conf"
+      }
+    }
+  }
+}

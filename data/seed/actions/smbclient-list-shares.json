@@ -1,0 +1,89 @@
+{
+  "id": "smbclient-list-shares",
+  "title": "List the shares of an SMB server",
+  "description": "List the shares a Windows or Samba server offers to a given user.",
+  "category": "files-storage",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "smbclient",
+    "samba",
+    "smb",
+    "cifs",
+    "linux",
+    "share"
+  ],
+  "linuxCommandTemplateId": "smbclient-list-shares-cmd",
+  "linuxCommandTemplate": {
+    "id": "smbclient-list-shares-cmd",
+    "platform": 1,
+    "name": "smbclient",
+    "commandPattern": "smbclient -L //{server} -U {username}",
+    "parameters": [
+      {
+        "name": "server",
+        "label": "Server",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name or address of the file server"
+      },
+      {
+        "name": "username",
+        "label": "User name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Account used to authenticate, as DOMAIN\\user or user"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "smbclient -L //fs01 -U 'EXAMPLE\\alice'",
+      "description": "List the shares fs01 offers to a domain user",
+      "platform": 1
+    },
+    {
+      "command": "smbclient -L //fs01 -N",
+      "description": "List the shares anonymously",
+      "platform": 1
+    },
+    {
+      "command": "smbclient //fs01/public -U alice -c 'ls'",
+      "description": "List the files at the root of a share",
+      "platform": 1
+    }
+  ],
+  "notes": "Asks for the password. Ships with the samba-client (RHEL) or smbclient (Debian) package.",
+  "links": [
+    {
+      "title": "smbclient(1)",
+      "url": "https://www.samba.org/samba/docs/current/man-html/smbclient.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les partages d'un serveur SMB",
+      "description": "Liste les partages qu'un serveur Windows ou Samba propose à un utilisateur donné.",
+      "notes": "Demande le mot de passe. Fourni par le paquet samba-client (RHEL) ou smbclient (Debian).",
+      "parameters": {
+        "linux": {
+          "server": {
+            "label": "Serveur",
+            "description": "Nom ou adresse du serveur de fichiers"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Compte utilisé pour s'authentifier, sous la forme DOMAINE\\utilisateur ou utilisateur"
+          }
+        }
+      },
+      "examples": {
+        "smbclient -L //fs01 -U 'EXAMPLE\\alice'": "Liste les partages que fs01 propose à un utilisateur du domaine",
+        "smbclient -L //fs01 -N": "Liste les partages de façon anonyme",
+        "smbclient //fs01/public -U alice -c 'ls'": "Liste les fichiers à la racine d'un partage"
+      }
+    }
+  }
+}
