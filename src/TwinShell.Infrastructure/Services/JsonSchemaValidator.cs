@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
+using TwinShell.Core.Constants;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Models;
@@ -210,7 +212,7 @@ public static class JsonSchemaValidator
             "commandPattern": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 1000
+                "maxLength": __COMMAND_PATTERN_MAX_LENGTH__
             },
             "parameters": {
                 "type": ["array", "null"],
@@ -265,13 +267,21 @@ public static class JsonSchemaValidator
     private const string ParameterTypesPlaceholder = "[\"__PARAMETER_TYPES__\"]";
     private const string QuotingModesPlaceholder = "[\"__QUOTING_MODES__\"]";
 
+    private const string CommandPatternMaxLengthPlaceholder = "__COMMAND_PATTERN_MAX_LENGTH__";
+
     /// <summary>
     /// The template schema with its parameter types taken from
-    /// <see cref="TemplateParameterTypes.Accepted"/>, the list the generator understands, and
-    /// its quoting modes from <see cref="QuotingMode"/>.
+    /// <see cref="TemplateParameterTypes.Accepted"/>, the list the generator understands, its
+    /// quoting modes from <see cref="QuotingMode"/>, and its pattern bound from
+    /// <see cref="ValidationConstants.MaxTemplateCommandPatternLength"/>, so a pattern the
+    /// library stores is not refused by the sync.
     /// </summary>
     internal static string BuildTemplateSchemaJson()
         => TemplateSchemaJson
+            .Replace(
+                CommandPatternMaxLengthPlaceholder,
+                ValidationConstants.MaxTemplateCommandPatternLength.ToString(CultureInfo.InvariantCulture),
+                StringComparison.Ordinal)
             .Replace(
                 ParameterTypesPlaceholder,
                 JsonSerializer.Serialize(TemplateParameterTypes.Accepted),

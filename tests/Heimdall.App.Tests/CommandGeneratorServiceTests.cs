@@ -104,7 +104,7 @@ public sealed class CommandGeneratorServiceTests
     public void GenerateCommand_NoParameters_PatternExceedsMaxLength_Throws()
     {
         CommandGeneratorService service = CreateService();
-        CommandTemplate template = CreateTemplate("long-pattern", "Long pattern", new string('a', 1100));
+        CommandTemplate template = CreateTemplate("long-pattern", "Long pattern", new string('a', ValidationConstants.MaxCommandLength + 1));
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
 
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
@@ -117,7 +117,9 @@ public sealed class CommandGeneratorServiceTests
     {
         CommandGeneratorService service = CreateService();
         TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("val", "Value");
-        string pattern = new string('a', 800) + "{val}" + new string('b', 100);
+        // Pattern and value each fit; together they pass the command bound.
+        string pattern = new string('a', ValidationConstants.MaxCommandLength - ValidationConstants.MaxParameterLength)
+            + "{val}" + new string('b', 100);
         CommandTemplate template = CreateTemplate("expanded-command", "Expanded command", pattern, parameter);
         Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal)
         {

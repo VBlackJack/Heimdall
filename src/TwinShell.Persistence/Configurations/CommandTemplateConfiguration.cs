@@ -39,7 +39,7 @@ public sealed class CommandTemplateConfiguration : IEntityTypeConfiguration<Comm
 
         builder.Property(e => e.CommandPattern)
             .IsRequired()
-            .HasMaxLength(ValidationConstants.MaxTemplateCommandPatternLength); // 1000
+            .HasMaxLength(ValidationConstants.MaxTemplateCommandPatternLength);
 
         builder.Property(e => e.Platform)
             .IsRequired()
