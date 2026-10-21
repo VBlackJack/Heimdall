@@ -22,10 +22,17 @@
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "tulpn",
+          "tlpn",
+          "ulpn",
+          "tunap",
+          "s"
+        ],
         "defaultValue": "tulpn",
         "required": true,
-        "description": "Options (t=TCP, u=UDP, l=listening, p=process, n=numeric)"
+        "description": "tulpn = TCP and UDP listening sockets with their process, tlpn = TCP only, ulpn = UDP only, tunap = every TCP and UDP socket, s = summary"
       }
     ]
   },
@@ -67,7 +74,7 @@
         "linux": {
           "options": {
             "label": "Options",
-            "description": "Options (t=TCP, u=UDP, l=listening, p=process, n=numeric)"
+            "description": "tulpn = sockets TCP et UDP en écoute avec leur processus, tlpn = TCP seulement, ulpn = UDP seulement, tunap = tous les sockets TCP et UDP, s = résumé"
           }
         }
       },

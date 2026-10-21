@@ -1,10 +1,10 @@
 {
   "id": "sysctl-kernel-params",
-  "title": "Show or change kernel parameters",
-  "description": "Show or change Linux kernel parameters at runtime",
+  "title": "Show kernel parameters",
+  "description": "Show the Linux kernel parameters at runtime. Warning: the sysctl -w and sysctl -p examples change the running kernel and need root.",
   "category": "performance",
   "platform": 1,
-  "level": 1,
+  "level": 0,
   "tags": [
     "sysctl",
     "kernel",
@@ -25,7 +25,7 @@
         "type": "string",
         "defaultValue": "-a",
         "required": true,
-        "description": "Kernel parameter (-a=all, param.name, param=value)"
+        "description": "Parameter to show (-a for all, or a name such as vm.swappiness)"
       }
     ]
   },
@@ -75,14 +75,14 @@
   ],
   "translations": {
     "fr": {
-      "title": "Afficher/modifier les paramètres kernel",
-      "description": "Affiche ou modifie les paramètres du noyau Linux en temps réel",
+      "title": "Afficher les paramètres du noyau",
+      "description": "Affiche les paramètres du noyau Linux en temps réel. Attention : les exemples sysctl -w et sysctl -p modifient le noyau en cours d'exécution et nécessitent les droits root.",
       "notes": "Modifications temporaires. Éditer /etc/sysctl.conf pour permanence. sysctl -p recharge le fichier. Écrire une valeur (-w, -p) nécessite les droits root (sudo).",
       "parameters": {
         "linux": {
           "parameter": {
             "label": "Paramètre",
-            "description": "Paramètre kernel (-a=all, param.name, param=value)"
+            "description": "Paramètre à afficher (-a pour tous, ou un nom comme vm.swappiness)"
           }
         }
       },

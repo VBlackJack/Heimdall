@@ -22,10 +22,16 @@
       {
         "name": "options",
         "label": "Short options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "avz",
+          "av",
+          "avzn",
+          "avzP"
+        ],
         "defaultValue": "avz",
         "required": true,
-        "description": "Short options after the dash (a=archive, v=verbose, z=compress, n=dry run); long options such as --delete are in the examples"
+        "description": "avz = archive, verbose, compress; av = without compression (local copy); avzn = dry run; avzP = with progress and resumable partial files. Long options such as --delete are in the examples"
       },
       {
         "name": "source",
@@ -98,7 +104,7 @@
         "linux": {
           "options": {
             "label": "Options courtes",
-            "description": "Options courtes après le tiret (a=archive, v=verbose, z=compression, n=simulation) ; les options longues comme --delete figurent dans les exemples"
+            "description": "avz = archive, détaillé, compression ; av = sans compression (copie locale) ; avzn = simulation ; avzP = avec progression et reprise des fichiers partiels. Les options longues comme --delete figurent dans les exemples"
           },
           "source": {
             "label": "Source",
