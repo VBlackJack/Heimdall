@@ -74,8 +74,8 @@ public sealed class RunbookRunTests
     }
 
     [Theory]
-    [InlineData("SSH", "systemctl restart 'nginx'")]
-    [InlineData("RDP", "Restart-Service -Name 'nginx'")]
+    [InlineData("SSH", "systemctl restart nginx")]
+    [InlineData("RDP", "Restart-Service -Name nginx")]
     public async Task AnActionStep_OpensOnTheTemplateOfTheSessionsPlatform(string connectionType, string expected)
     {
         var restart = RunbookTestHelpers.CreateDualAction(
@@ -120,7 +120,7 @@ public sealed class RunbookRunTests
 
         await run.Run.SendAsync();
 
-        Assert.Equal(["systemctl status 'nginx'"], run.Sent);
+        Assert.Equal(["systemctl status nginx"], run.Sent);
         Assert.Equal(RunbookStepStatus.Sent, run.Run.Steps[0].Status);
     }
 
@@ -178,7 +178,7 @@ public sealed class RunbookRunTests
             Assert.Equal("status", row.ActionId);
         });
         Assert.Equal(
-            ["systemctl status 'nginx'", "systemctl status 'sshd'"],
+            ["systemctl status nginx", "systemctl status sshd"],
             run.History.Rows.Select(row => row.Command).Order(StringComparer.Ordinal));
     }
 
@@ -194,7 +194,7 @@ public sealed class RunbookRunTests
         run.Run.Insert();
         await run.History.WaitForAsync(1, RecordWait);
 
-        Assert.Equal(["systemctl status 'nginx'"], run.Inserted);
+        Assert.Equal(["systemctl status nginx"], run.Inserted);
         Assert.Empty(run.Sent);
         Assert.False(Assert.Single(run.History.Rows).IsExecuted);
         Assert.Equal(RunbookStepStatus.Inserted, run.Run.Steps[0].Status);
