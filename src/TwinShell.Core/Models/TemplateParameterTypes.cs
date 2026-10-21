@@ -40,9 +40,13 @@ public static class TemplateParameterTypes
     public const string Path = "path";
     public const string Choice = TemplateParameter.ChoiceTypeName;
 
-    /// <summary>The types the action editor offers, in the order it lists them.</summary>
+    /// <summary>
+    /// The types the action editor offers, in the order it lists them: every accepted type
+    /// except the legacy spellings "integer" and "boolean", which the editor writes as "int"
+    /// and "bool".
+    /// </summary>
     public static IReadOnlyList<string> Offered { get; } =
-        [Text, Int, Bool, Hostname, IpAddress, Path, Choice];
+        [Text, Int, Number, DriveLetter, Bool, Hostname, IpAddress, Path, Choice];
 
     /// <summary>
     /// Every type the generator understands, the legacy spellings "integer" and "boolean"
