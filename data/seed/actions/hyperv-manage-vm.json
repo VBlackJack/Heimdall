@@ -1,7 +1,7 @@
 {
   "id": "hyperv-manage-vm",
-  "title": "Démarrer, arrêter ou suspendre une VM",
-  "description": "Permet de contrôler l'état d'une machine virtuelle Hyper-V: démarrage, arrêt propre, arrêt forcé, suspension ou reprise.",
+  "title": "Start, stop or suspend a VM",
+  "description": "Control the state of a Hyper-V virtual machine: start, clean shutdown, forced shutdown, suspend or resume.",
   "category": "containers-vms",
   "platform": 0,
   "level": 1,
@@ -20,21 +20,29 @@
     "id": "hyperv-manage-vm-cmd",
     "platform": 0,
     "name": "VM Control",
-    "commandPattern": "{action}-VM -Name '{vmName}'",
+    "commandPattern": "& '{action}-VM' -Name '{vmName}'",
     "parameters": [
       {
         "name": "vmName",
-        "label": "Nom de la VM",
+        "label": "VM name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la machine virtuelle"
+        "description": "Name of the virtual machine"
       },
       {
         "name": "action",
         "label": "Action",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "Start",
+          "Stop",
+          "Save",
+          "Suspend",
+          "Resume"
+        ],
+        "quoting": "InlineInQuotes",
         "defaultValue": "Start",
         "required": true,
         "description": "Action: Start, Stop, Save, Suspend, Resume"
@@ -44,35 +52,61 @@
   "examples": [
     {
       "command": "Start-VM -Name 'Windows11-Dev'",
-      "description": "Démarre la VM Windows11-Dev",
+      "description": "Start the Windows11-Dev VM",
       "platform": 0
     },
     {
       "command": "Save-VM -Name 'Production-DB'",
-      "description": "Sauvegarde l'état et suspend la VM",
+      "description": "Save the state and suspend the VM",
       "platform": 0
     },
     {
       "command": "Suspend-VM -Name 'TestVM'; Resume-VM -Name 'TestVM'",
-      "description": "Pause puis reprend une VM",
+      "description": "Pause a VM, then resume it",
       "platform": 0
     },
     {
       "command": "Restart-VM -Name 'VM-WEB-01'",
-      "description": "Exemple utilisant le paramètre 'vmName': Nom de la machine virtuelle. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'vmName' parameter: name of the virtual machine. Replace VM-WEB-01 with the value that fits your environment.",
       "platform": 0
     },
     {
       "command": "Start-VM -Name 'VM-WEB-01'",
-      "description": "Exemple utilisant le paramètre 'action': Action: Start, Stop, Save, Suspend, Resume. Remplacez Restart par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'action' parameter: action: Start, Stop, Save, Suspend, Resume. Replace Restart with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Stop-VM sans -Force tente un arrêt propre via Integration Services. Save-VM libère la RAM mais conserve l'état. -TurnOff équivaut à -Force.",
+  "notes": "Stop-VM without -Force attempts a clean shutdown through Integration Services. Save-VM frees the RAM but keeps the state. -TurnOff is the same as -Force.",
   "links": [
     {
       "title": "Documentation Hyper-V VM Management",
       "url": "https://learn.microsoft.com/en-us/powershell/module/hyper-v/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Démarrer, arrêter ou suspendre une VM",
+      "description": "Permet de contrôler l'état d'une machine virtuelle Hyper-V: démarrage, arrêt propre, arrêt forcé, suspension ou reprise.",
+      "notes": "Stop-VM sans -Force tente un arrêt propre via Integration Services. Save-VM libère la RAM mais conserve l'état. -TurnOff équivaut à -Force.",
+      "parameters": {
+        "windows": {
+          "vmName": {
+            "label": "Nom de la VM",
+            "description": "Nom de la machine virtuelle"
+          },
+          "action": {
+            "label": "Action",
+            "description": "Action : Start, Stop, Save, Suspend, Resume"
+          }
+        }
+      },
+      "examples": {
+        "Start-VM -Name 'Windows11-Dev'": "Démarre la VM Windows11-Dev",
+        "Save-VM -Name 'Production-DB'": "Sauvegarde l'état et suspend la VM",
+        "Suspend-VM -Name 'TestVM'; Resume-VM -Name 'TestVM'": "Pause puis reprend une VM",
+        "Restart-VM -Name 'VM-WEB-01'": "Exemple utilisant le paramètre 'vmName': Nom de la machine virtuelle. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement.",
+        "Start-VM -Name 'VM-WEB-01'": "Exemple utilisant le paramètre 'action': Action: Start, Stop, Save, Suspend, Resume. Remplacez Restart par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

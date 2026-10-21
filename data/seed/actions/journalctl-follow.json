@@ -1,7 +1,7 @@
 {
   "id": "journalctl-follow",
-  "title": "Suivre les logs système en temps réel",
-  "description": "Affiche en continu les nouveaux messages du journal systemd (équivalent tail -f)",
+  "title": "Follow the system logs in real time",
+  "description": "Show the new messages of the systemd journal as they arrive (the equivalent of tail -f).",
   "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
@@ -20,51 +20,74 @@
     "parameters": [
       {
         "name": "lines",
-        "label": "Lignes initiales",
+        "label": "Initial lines",
         "type": "number",
         "defaultValue": "50",
         "required": true,
-        "description": "Nombre de lignes à afficher avant de suivre"
+        "description": "Number of lines to show before following"
       }
     ]
   },
   "examples": [
     {
       "command": "tail -f /var/log/syslog",
-      "description": "Suit le syslog en temps réel",
+      "description": "Follow syslog in real time",
       "platform": 1
     },
     {
       "command": "tail -n 100 /var/log/syslog",
-      "description": "Affiche les 100 dernières lignes du syslog",
+      "description": "Show the last 100 lines of syslog",
       "platform": 1
     },
     {
       "command": "tail -n 100 /var/log/auth.log",
-      "description": "Afficher les 100 dernières lignes",
+      "description": "Show the last 100 lines",
       "platform": 1
     },
     {
       "command": "tail -F /var/log/app.log",
-      "description": "Suivre même si le fichier est recréé",
+      "description": "Keep following even when the file is recreated",
       "platform": 1
     },
     {
       "command": "multitail /var/log/syslog /var/log/auth.log",
-      "description": "Suivre plusieurs fichiers",
+      "description": "Follow several files",
       "platform": 1
     },
     {
       "command": "tail -f /var/log/auth.log",
-      "description": "Logs d'authentification",
+      "description": "Authentication logs",
       "platform": 1
     }
   ],
-  "notes": "Ctrl+C pour arrêter. Très utile pour le débogage en direct.",
+  "notes": "Ctrl+C to stop. Very useful for live debugging.",
   "links": [
     {
       "title": "journalctl guide",
       "url": "https://www.digitalocean.com/community/tutorials/how-to-use-journalctl-to-view-and-manipulate-systemd-logs"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Suivre les logs système en temps réel",
+      "description": "Affiche en continu les nouveaux messages du journal systemd (équivalent tail -f)",
+      "notes": "Ctrl+C pour arrêter. Très utile pour le débogage en direct.",
+      "parameters": {
+        "linux": {
+          "lines": {
+            "label": "Lignes initiales",
+            "description": "Nombre de lignes à afficher avant de suivre"
+          }
+        }
+      },
+      "examples": {
+        "tail -f /var/log/syslog": "Suit le syslog en temps réel",
+        "tail -n 100 /var/log/syslog": "Affiche les 100 dernières lignes du syslog",
+        "tail -n 100 /var/log/auth.log": "Afficher les 100 dernières lignes",
+        "tail -F /var/log/app.log": "Suivre même si le fichier est recréé",
+        "multitail /var/log/syslog /var/log/auth.log": "Suivre plusieurs fichiers",
+        "tail -f /var/log/auth.log": "Logs d'authentification"
+      }
+    }
+  }
 }
