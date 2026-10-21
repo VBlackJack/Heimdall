@@ -18,17 +18,8 @@
     "id": "docker-stats-cmd",
     "platform": 1,
     "name": "docker",
-    "commandPattern": "docker stats {options}",
-    "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "",
-        "required": false,
-        "description": "Options (--no-stream, --format, container_name)"
-      }
-    ]
+    "commandPattern": "docker stats",
+    "parameters": []
   },
   "notes": "Windows & Linux: Ctrl+C pour quitter. --no-stream pour affichage unique.",
   "links": [
@@ -41,17 +32,8 @@
     "id": "docker-stats-win-cmd",
     "platform": 0,
     "name": "docker",
-    "commandPattern": "docker stats {options}",
-    "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "",
-        "required": false,
-        "description": "Options (--no-stream, --format, container_name)"
-      }
-    ]
+    "commandPattern": "docker stats",
+    "parameters": []
   },
   "windowsCommandTemplateId": "docker-stats-win-cmd",
   "windowsExamples": [

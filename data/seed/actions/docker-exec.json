@@ -18,16 +18,8 @@
     "id": "docker-exec-cmd",
     "platform": 1,
     "name": "docker",
-    "commandPattern": "docker exec {options} {container} {command}",
+    "commandPattern": "docker exec -it {container} {command}",
     "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-it",
-        "required": false,
-        "description": "Options (-it=interactive+tty, -u=user, -w=workdir)"
-      },
       {
         "name": "container",
         "label": "Conteneur",
@@ -57,16 +49,8 @@
     "id": "docker-exec-win-cmd",
     "platform": 0,
     "name": "docker",
-    "commandPattern": "docker exec {options} {container} {command}",
+    "commandPattern": "docker exec -it {container} {command}",
     "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-it",
-        "required": false,
-        "description": "Options (-it=interactive+tty, -u=user, -w=workdir)"
-      },
       {
         "name": "container",
         "label": "Conteneur",
@@ -106,11 +90,6 @@
       "command": "docker exec -it {container} {command}",
       "description": "Exemple utilisant le paramètre 'options': Options (-it=interactive+tty, -u=user, -w=workdir). Remplacez <options> par la valeur appropriée selon votre environnement.",
       "platform": 0
-    },
-    {
-      "command": "docker exec {options} mycontainer {command}",
-      "description": "Exemple utilisant le paramètre 'container': Nom ou ID du conteneur. Remplacez <container> par la valeur appropriée selon votre environnement.",
-      "platform": 0
     }
   ],
   "linuxExamples": [
@@ -132,11 +111,6 @@
     {
       "command": "docker exec -it {container} {command}",
       "description": "Exemple utilisant le paramètre 'options': Options (-it=interactive+tty, -u=user, -w=workdir). Remplacez <options> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "docker exec {options} mycontainer {command}",
-      "description": "Exemple utilisant le paramètre 'container': Nom ou ID du conteneur. Remplacez <container> par la valeur appropriée selon votre environnement.",
       "platform": 1
     }
   ],

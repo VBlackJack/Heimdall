@@ -20,7 +20,11 @@
       {
         "name": "enableDisable",
         "label": "Activer ou désactiver",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "false",
+          "true"
+        ],
         "defaultValue": "false",
         "quoting": "InlineInQuotes",
         "required": true,

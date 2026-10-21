@@ -17,17 +17,8 @@
     "id": "docker-compose-up-cmd",
     "platform": 1,
     "name": "docker-compose",
-    "commandPattern": "docker-compose up {options}",
-    "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-d",
-        "required": false,
-        "description": "Options (-d=detached, --build, --scale, etc.)"
-      }
-    ]
+    "commandPattern": "docker-compose up -d",
+    "parameters": []
   },
   "notes": "Windows & Linux: Doit être exécuté dans le répertoire contenant docker-compose.yml. -d pour detached mode.",
   "links": [
@@ -40,17 +31,8 @@
     "id": "docker-compose-up-win-cmd",
     "platform": 0,
     "name": "docker-compose",
-    "commandPattern": "docker-compose up {options}",
-    "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-d",
-        "required": false,
-        "description": "Options (-d=detached, --build, --scale, etc.)"
-      }
-    ]
+    "commandPattern": "docker-compose up -d",
+    "parameters": []
   },
   "windowsCommandTemplateId": "docker-compose-up-win-cmd",
   "windowsExamples": [

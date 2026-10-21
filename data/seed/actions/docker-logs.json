@@ -17,16 +17,8 @@
     "id": "docker-logs-cmd",
     "platform": 1,
     "name": "docker",
-    "commandPattern": "docker logs {options} {container}",
+    "commandPattern": "docker logs -f {container}",
     "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-f",
-        "required": false,
-        "description": "Options (-f=follow, --tail=n, --since, -t=timestamps)"
-      },
       {
         "name": "container",
         "label": "Conteneur",
@@ -48,16 +40,8 @@
     "id": "docker-logs-win-cmd",
     "platform": 0,
     "name": "docker",
-    "commandPattern": "docker logs {options} {container}",
+    "commandPattern": "docker logs -f {container}",
     "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-f",
-        "required": false,
-        "description": "Options (-f=follow, --tail=n, --since, -t=timestamps)"
-      },
       {
         "name": "container",
         "label": "Conteneur",
@@ -89,11 +73,6 @@
       "command": "docker logs -f {container}",
       "description": "Exemple utilisant le paramètre 'options': Options (-f=follow, --tail=n, --since, -t=timestamps). Remplacez <options> par la valeur appropriée selon votre environnement.",
       "platform": 0
-    },
-    {
-      "command": "docker logs {options} container_name",
-      "description": "Exemple utilisant le paramètre 'container': Nom ou ID du conteneur. Remplacez <container> par la valeur appropriée selon votre environnement.",
-      "platform": 0
     }
   ],
   "linuxExamples": [
@@ -115,11 +94,6 @@
     {
       "command": "docker logs -f {container}",
       "description": "Exemple utilisant le paramètre 'options': Options (-f=follow, --tail=n, --since, -t=timestamps). Remplacez <options> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "docker logs {options} container_name",
-      "description": "Exemple utilisant le paramètre 'container': Nom ou ID du conteneur. Remplacez <container> par la valeur appropriée selon votre environnement.",
       "platform": 1
     },
     {

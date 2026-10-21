@@ -17,16 +17,8 @@
     "id": "curl-cmd",
     "platform": 1,
     "name": "curl",
-    "commandPattern": "curl {options} {url}",
+    "commandPattern": "curl -I {url}",
     "parameters": [
-      {
-        "name": "options",
-        "label": "Options",
-        "type": "string",
-        "defaultValue": "-I",
-        "required": false,
-        "description": "Options curl (-I=headers, -v=verbose, -L=follow redirects)"
-      },
       {
         "name": "url",
         "label": "URL",
@@ -54,11 +46,6 @@
       "platform": 1
     },
     {
-      "command": "curl -I https://www.contoso.com",
-      "description": "Exemple utilisant le paramètre 'options': Options curl (-I=headers, -v=verbose, -L=follow redirects). Remplacez -v -f par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
       "command": "curl -v -f http://localhost",
       "description": "Exemple utilisant le paramètre 'url': URL à tester. Remplacez https://www.contoso.com par la valeur appropriée selon votre environnement.",
       "platform": 1
@@ -76,6 +63,11 @@
     {
       "command": "curl -I https://example.com",
       "description": "Afficher les headers uniquement",
+      "platform": 1
+    },
+    {
+      "command": "curl -IL http://localhost",
+      "description": "Affiche les headers en suivant les redirections",
       "platform": 1
     }
   ],
