@@ -51,7 +51,7 @@ public sealed class CommandLibraryTranslationTransferTests
         var path = Path.GetTempFileName();
         try
         {
-            await service.ExportAsync(new FakeActionService([source]), path);
+            await service.ExportAsync([source], path);
 
             using (var document = JsonDocument.Parse(await File.ReadAllTextAsync(path)))
             {
