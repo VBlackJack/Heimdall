@@ -40,7 +40,7 @@
         <!-- Header -->
         <Border Grid.Row="0" Padding="{StaticResource ToolHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.RowDefinitions>
@@ -190,7 +190,7 @@
         <!-- Summary -->
         <Border Grid.Row="4" Padding="{StaticResource ToolFooterPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="TxtSummary"
                        Text="{Binding SummaryText}"
@@ -202,7 +202,7 @@
         <!-- Footer -->
         <Border Grid.Row="5" Padding="{StaticResource ToolFooterPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,1,0,0">
             <DockPanel>
                 <Button x:Name="BtnCopy" DockPanel.Dock="Right"

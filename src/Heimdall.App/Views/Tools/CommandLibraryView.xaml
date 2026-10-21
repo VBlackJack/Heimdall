@@ -37,7 +37,7 @@
         <Border Grid.Row="0"
                 Padding="{StaticResource ToolHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,0,0,1">
             <DockPanel>
                 <Button DockPanel.Dock="Right"
@@ -172,7 +172,7 @@
         <Border Grid.Row="2"
                 Padding="{StaticResource ToolHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.RowDefinitions>

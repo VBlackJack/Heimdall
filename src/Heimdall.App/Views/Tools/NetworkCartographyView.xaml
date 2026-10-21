@@ -32,7 +32,7 @@
         <!-- Row 0: Header -->
         <Border Grid.Row="0" Padding="{StaticResource ToolHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,0,0,1">
             <DockPanel>
                 <Button x:Name="BtnHelp" DockPanel.Dock="Right" Content="?"
@@ -69,7 +69,7 @@
         <!-- Row 2: Scan parameters -->
         <Border Grid.Row="2" Padding="{StaticResource ToolFooterPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.RowDefinitions>
@@ -256,7 +256,7 @@
         <!-- Row 5: Stats + Export -->
         <Border Grid.Row="5" Padding="{StaticResource ToolFooterPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,1,0,0">
             <Grid>
                 <Grid.RowDefinitions>
@@ -315,7 +315,7 @@
         <Border Grid.Row="6" x:Name="DiffPanel" Visibility="Collapsed"
                 Padding="{StaticResource ToolFooterPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="TxtDiff" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                        Foreground="{DynamicResource AccentTextBrush}"

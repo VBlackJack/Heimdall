@@ -31,7 +31,7 @@
         <!-- Header -->
         <Border Grid.Row="0" Padding="{StaticResource ToolHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,0,0,1">
             <DockPanel>
                 <Button x:Name="BtnHelp" DockPanel.Dock="Right" Content="?"
@@ -68,7 +68,7 @@
         <!-- File path + Browse + Tail -->
         <Border Grid.Row="2" Padding="{StaticResource ToolHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -105,7 +105,7 @@
         <!-- Filter bar -->
         <Border Grid.Row="3" Padding="{StaticResource ToolFooterPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.RowDefinitions>
@@ -204,7 +204,7 @@
         <!-- Stats bar -->
         <Border Grid.Row="6" Padding="{StaticResource ToolFooterPadding}"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,1,0,0">
             <DockPanel>
                 <Button x:Name="BtnCopyLog" DockPanel.Dock="Right" Click="OnCopyLogClick"
