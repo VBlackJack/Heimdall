@@ -1,0 +1,98 @@
+{
+  "id": "passwd-lock-account",
+  "title": "Lock or unlock the password of an account",
+  "description": "Lock the password of a local account so it can no longer log in with it, or unlock it again.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "passwd",
+    "linux",
+    "account",
+    "lock",
+    "password"
+  ],
+  "linuxCommandTemplateId": "passwd-lock-account-cmd",
+  "linuxCommandTemplate": {
+    "id": "passwd-lock-account-cmd",
+    "platform": 1,
+    "name": "passwd",
+    "commandPattern": "sudo passwd {operation} {username}",
+    "parameters": [
+      {
+        "name": "operation",
+        "label": "Operation",
+        "type": "choice",
+        "allowedValues": [
+          "-l",
+          "-u"
+        ],
+        "defaultValue": "-l",
+        "required": true,
+        "description": "-l locks the password, -u unlocks it"
+      },
+      {
+        "name": "username",
+        "label": "User name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Login name of the local account"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo passwd -l alice",
+      "description": "Lock the password of alice",
+      "platform": 1
+    },
+    {
+      "command": "sudo passwd -u alice",
+      "description": "Unlock the password of alice",
+      "platform": 1
+    },
+    {
+      "command": "sudo passwd -S alice",
+      "description": "Show whether the password of alice is locked",
+      "platform": 1
+    },
+    {
+      "command": "sudo usermod -L -e 1 alice",
+      "description": "Lock the password and expire the account, which also blocks SSH keys",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. A locked password does not stop a login with an SSH key: expire the account to block it completely.",
+  "links": [
+    {
+      "title": "passwd(1)",
+      "url": "https://man7.org/linux/man-pages/man1/passwd.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Verrouiller ou déverrouiller le mot de passe d'un compte",
+      "description": "Verrouille le mot de passe d'un compte local pour qu'il ne puisse plus s'en servir, ou le déverrouille.",
+      "notes": "Nécessite sudo. Un mot de passe verrouillé n'empêche pas une connexion par clé SSH : faire expirer le compte pour le bloquer complètement.",
+      "parameters": {
+        "linux": {
+          "operation": {
+            "label": "Opération",
+            "description": "-l verrouille le mot de passe, -u le déverrouille"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Identifiant du compte local"
+          }
+        }
+      },
+      "examples": {
+        "sudo passwd -l alice": "Verrouille le mot de passe de alice",
+        "sudo passwd -u alice": "Déverrouille le mot de passe de alice",
+        "sudo passwd -S alice": "Indique si le mot de passe de alice est verrouillé",
+        "sudo usermod -L -e 1 alice": "Verrouille le mot de passe et fait expirer le compte, ce qui bloque aussi les clés SSH"
+      }
+    }
+  }
+}

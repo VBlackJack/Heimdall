@@ -1,0 +1,81 @@
+{
+  "id": "apachectl-reload-config",
+  "title": "Reload Apache after a configuration test",
+  "description": "Test the Apache configuration and reload the service only when the test passes.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "apache",
+    "httpd",
+    "apachectl",
+    "linux",
+    "web",
+    "reload"
+  ],
+  "linuxCommandTemplateId": "apachectl-reload-config-cmd",
+  "linuxCommandTemplate": {
+    "id": "apachectl-reload-config-cmd",
+    "platform": 1,
+    "name": "apachectl",
+    "commandPattern": "sudo apachectl configtest && sudo systemctl reload {service}",
+    "parameters": [
+      {
+        "name": "service",
+        "label": "Service unit",
+        "type": "choice",
+        "allowedValues": [
+          "httpd",
+          "apache2"
+        ],
+        "defaultValue": "httpd",
+        "required": true,
+        "description": "Apache unit name: httpd on RHEL and derivatives, apache2 on Debian and Ubuntu"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo apachectl configtest && sudo systemctl reload httpd",
+      "description": "Reload Apache on RHEL when the configuration is valid",
+      "platform": 1
+    },
+    {
+      "command": "sudo apachectl configtest && sudo systemctl reload apache2",
+      "description": "Reload Apache on Debian or Ubuntu when the configuration is valid",
+      "platform": 1
+    },
+    {
+      "command": "sudo apachectl graceful",
+      "description": "Restart gracefully through apachectl, which tests the configuration first",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. A reload lets the children finish their current requests.",
+  "links": [
+    {
+      "title": "apachectl - Apache HTTP Server Control Interface",
+      "url": "https://httpd.apache.org/docs/2.4/programs/apachectl.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Recharger Apache après un test de configuration",
+      "description": "Teste la configuration Apache et ne recharge le service que si le test réussit.",
+      "notes": "Nécessite sudo. Un rechargement laisse les processus enfants terminer leurs requêtes en cours.",
+      "parameters": {
+        "linux": {
+          "service": {
+            "label": "Unité de service",
+            "description": "Nom de l'unité Apache : httpd sur RHEL et dérivées, apache2 sur Debian et Ubuntu"
+          }
+        }
+      },
+      "examples": {
+        "sudo apachectl configtest && sudo systemctl reload httpd": "Recharge Apache sur RHEL si la configuration est valide",
+        "sudo apachectl configtest && sudo systemctl reload apache2": "Recharge Apache sur Debian ou Ubuntu si la configuration est valide",
+        "sudo apachectl graceful": "Redémarre en douceur via apachectl, qui teste d'abord la configuration"
+      }
+    }
+  }
+}

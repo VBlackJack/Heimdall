@@ -1,0 +1,82 @@
+{
+  "id": "id-show-identity",
+  "title": "Show the identity and groups of a user",
+  "description": "Show the UID, the primary GID and every group of a user, local or from a directory.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "id",
+    "linux",
+    "user",
+    "group",
+    "account"
+  ],
+  "linuxCommandTemplateId": "id-show-identity-cmd",
+  "linuxCommandTemplate": {
+    "id": "id-show-identity-cmd",
+    "platform": 1,
+    "name": "id",
+    "commandPattern": "id {username}",
+    "parameters": [
+      {
+        "name": "username",
+        "label": "User name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Login name of the local account"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "id alice",
+      "description": "Show the UID and groups of alice",
+      "platform": 1
+    },
+    {
+      "command": "id",
+      "description": "Show the identity of the current session",
+      "platform": 1
+    },
+    {
+      "command": "id -nG alice",
+      "description": "Show only the group names of alice",
+      "platform": 1
+    },
+    {
+      "command": "id jdoe@example.com",
+      "description": "Check that a domain user resolves through SSSD",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs no special rights. Directory users resolve only when SSSD or winbind is running.",
+  "links": [
+    {
+      "title": "id(1)",
+      "url": "https://man7.org/linux/man-pages/man1/id.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'identité et les groupes d'un utilisateur",
+      "description": "Affiche l'UID, le GID principal et tous les groupes d'un utilisateur, local ou issu d'un annuaire.",
+      "notes": "Aucun droit particulier. Les utilisateurs d'annuaire ne sont résolus que si SSSD ou winbind fonctionne.",
+      "parameters": {
+        "linux": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Identifiant du compte local"
+          }
+        }
+      },
+      "examples": {
+        "id alice": "Affiche l'UID et les groupes de alice",
+        "id": "Affiche l'identité de la session courante",
+        "id -nG alice": "Affiche seulement les noms des groupes de alice",
+        "id jdoe@example.com": "Vérifie qu'un utilisateur du domaine est résolu par SSSD"
+      }
+    }
+  }
+}

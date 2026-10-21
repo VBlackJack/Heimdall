@@ -1,0 +1,59 @@
+{
+  "id": "nginx-reload-config",
+  "title": "Reload nginx after a configuration test",
+  "description": "Test the nginx configuration and reload the service only when the test passes, without dropping open connections.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "nginx",
+    "linux",
+    "web",
+    "reload",
+    "systemd"
+  ],
+  "linuxCommandTemplateId": "nginx-reload-config-cmd",
+  "linuxCommandTemplate": {
+    "id": "nginx-reload-config-cmd",
+    "platform": 1,
+    "name": "nginx",
+    "commandPattern": "sudo nginx -t && sudo systemctl reload nginx",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo nginx -t && sudo systemctl reload nginx",
+      "description": "Reload nginx only when its configuration is valid",
+      "platform": 1
+    },
+    {
+      "command": "sudo nginx -s reload",
+      "description": "Send the reload signal directly to the nginx master process",
+      "platform": 1
+    },
+    {
+      "command": "sudo systemctl status nginx --no-pager",
+      "description": "Check the service state after the reload",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. A reload keeps the workers serving open connections; a restart drops them.",
+  "links": [
+    {
+      "title": "nginx command-line parameters",
+      "url": "https://nginx.org/en/docs/switches.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Recharger nginx après un test de configuration",
+      "description": "Teste la configuration nginx et ne recharge le service que si le test réussit, sans couper les connexions ouvertes.",
+      "notes": "Nécessite sudo. Un rechargement laisse les workers servir les connexions ouvertes ; un redémarrage les coupe.",
+      "examples": {
+        "sudo nginx -t && sudo systemctl reload nginx": "Recharge nginx seulement si sa configuration est valide",
+        "sudo nginx -s reload": "Envoie le signal de rechargement directement au processus maître nginx",
+        "sudo systemctl status nginx --no-pager": "Vérifie l'état du service après le rechargement"
+      }
+    }
+  }
+}
