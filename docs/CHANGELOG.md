@@ -12,7 +12,115 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## 2026-10-20: shared MobaXterm sessions a team can use on day one, and a masked copy of terminal output (v2026.102001)
+## 2026-10-21: shared MobaXterm sessions a team can use on day one, a command library in your language with runbooks, and a masked copy of terminal output (v2026.102101)
+
+### Command Library (#656-#663, #665)
+
+- **A sound catalogue** (#656). Every shipped template generates with its shipped defaults
+  (theory `GenerateCommand_EverySeedTemplate_AcceptsItsShippedDefaults`, one row per template);
+  four seeds did not and are fixed. The dangerous-character blacklist applies only where quoting
+  does not protect: `CommandPatternQuoting.GetPlaceholderQuoteContexts` lexes each placeholder as
+  Bare, SingleQuoted or Expanding (PowerShell and bash rules), and `RequiresCharacterBlacklist` is
+  one predicate read by both validation paths; control characters stay refused everywhere.
+  `IsValidPath` judges a path by shape (not blank, no control character, at most
+  `MaxPathLength`); the AppData rule and the `~` / `%` refusals are gone. Two validation messages
+  localized. 65 seeds lose 159 filler examples (man / help pages, repeats, more than 10 per list),
+  guarded by `SeedExampleListGuardTests`; the import door truncates to `MaxActionExamplesCount`.
+  Dead seed fields removed, guarded by `SeedSchemaGuardTests`.
+- **The library knows its session** (#657). `CommandHistory.TargetHost` and `IsExecuted` (schema
+  step 5), shown in the history panel with a Sent / Copied badge and a "This host only" filter.
+  `ServerProfileDto.RemoteOs` (Auto, Windows, Linux) edited in the server dialog and resolved by
+  `RemoteOsResolver` for the platform filter, the post-connect step resolver and the picker; a
+  library docked beside a terminal reads host, user, protocol and OS from that terminal's profile.
+  User parameters (`user`, `username`, `login`, `account`, `samaccountname`) prefilled from the
+  session. Command preview under each row (`CommandLibraryActionEntry.CommandPreview`, 96
+  characters). **Insert** (`Shift+Enter`, `ITerminalCommandSink.WriteText`) types without
+  submitting and records history as not executed. Export asks its scope first
+  (`CommandLibraryExportScope`: Mine, CurrentFilter, Everything) through the new
+  `IDialogService.ShowChoiceAsync`.
+- **The catalogue in English with its French beside it** (#658). `ActionTranslation` carries the
+  translated parameter text and example descriptions, read and written as a `translations` object
+  keyed by culture (`ActionTranslationsJsonConverter`, columns `ParametersJson` / `ExamplesJson`,
+  schema step 5), carried by seeding, the library import and the Git sync DTO. `ActionLocalizer`
+  applies the culture at presentation only (library, palette snippets, post-connect picker); a
+  row keeps the stored pivot and an edit starts from it; a language switch reloads the library
+  keeping filters and selection. Categories are thirteen ASCII keys (`CommandCategories`) resolved
+  to glyph and localized label by `CommandPresentationResolver`; `CategoryMigration.Normalize`
+  maps the old emoji strings at the import doors; the search matches key and label. Installed
+  databases pick up a changed seed: a SHA-256 of the seed directory is compared with the
+  `SeedState` table (schema step 6) and `SystemSeedRefresher` rewrites surviving ids in place
+  (public id and creation date kept, so favorites and history survive), deletes retired ids and
+  leaves user actions alone, in one transaction. The 72 Windows debloat actions move to
+  `data/packs/windows-workstation-debloat.json` (import envelope, not seeded; the installer purges
+  the old seed files). Sync risk levels accept Info, Run, Dangerous plus the two legacy spellings
+  (`CriticalityLevelNames`); sync parameters carry `allowedValues` and `quoting`, and the type list
+  is `TemplateParameterTypes`. The 441 seed files are converted to the English pivot with
+  `translations.fr`, fragment parameters folded or turned into choices, and the examples that did
+  not fit their action dropped (three slices, each checked by a script with a positive control).
+- **Capture a command from the terminal** (#659). `terminal.html` posts `library-save:` on
+  `Ctrl+Shift+L` and `library-menu:` on Shift+right-click, each with the selection in base64;
+  `TerminalLibraryCapture` reads them and builds the one-item menu
+  (`TerminalSaveSelectionToLibrary`); `EmbeddedSessionManager` opens `CMDLIB` with a context built
+  from the pane's profile plus `ToolContext.InitialCommandText`. `CommandCapture` picks the
+  platform (`RemoteOsResolver`, narrowed) and joins the lines with ` ; ` or ` && `.
+  `CommandActionDialogViewModel.ForCapturedCommand` prefills the editor; an open library tab gets
+  `PrefillNewAction` (`ICommandCaptureTarget`) instead of a second tab; the created category is
+  remembered in `CommandLibrarySessionMemory`.
+- **95 new actions** (#660): 59 Linux and 36 Windows seed files, English pivot with
+  `translations.fr`, typed parameters, three to six examples and official documentation links
+  (every URL answered 200). Three existing actions tidied (`dns-query-record` record type as a
+  choice, documentation links on `system-uptime` and `process-kill`).
+- **Catalogue finishing** (#661). Seven near-duplicate clusters merged into one action each (ten
+  ids deleted; the seed refresh removes them, a favorite on one is lost). `sudo` prefixed on 36
+  patterns and 116 examples where root is required, with a note in nine files. `sysctl-kernel-params`
+  and `hostname-show` become Info; `run-dotnet` moves to `development`; the last flag parameters
+  (`ss`, `lvm`, `rsync`, `tar`, `sar`, `scp`, `strace`, `systemd-timer-list`, `ulimit`,
+  `unified-delete-local-user`) become choices whose values are one token each. Seed count 527.
+- **Runbooks** (#662). A runbook is the TwinShell `CommandBatch`: steps keep their parameter
+  values (`BatchCommandItem.Parameters`), the batch keeps variables with defaults (`VariablesJson`,
+  schema step 8), steps read back by `Order`. Panel and editor (`RunbookDialog`,
+  `RunbookDialogViewModel`): name, failure mode, variables, ordered steps (library action with a
+  value per parameter, or literal command with a platform). `RunbookRunViewModel` runs step by
+  step: `{{name}}` substituted in action-step values only (`RunbookVariables`), template of the
+  session platform, Send under `IsSendEnabled` with the dangerous confirmation (always for a
+  literal step), Insert, Copy, Skip, Stop; no automatic advance. History: a sent action step is
+  executed, Insert and Copy are not, literal steps write nothing. Export envelope gains `runbooks`
+  (Mine and Everything), import merges by `PublicId`, Git sync carries variables and step
+  parameters. `MarkExecutedAsync` writes `LastExecutedAt` only, and `BatchRepository.UpdateAsync`
+  stores the `UpdatedAt` it is given, so a sync import keeps the remote timestamp. 59 new locale
+  keys; documented key count 7,347.
+- **Catalogue finishing** (#661). Seven clusters of near-duplicate Linux actions merged into one
+  each (ten ids removed; a favorite on one of them is lost at the seed refresh). `sudo` prefixed
+  on 36 patterns and 116 examples that need root, with the notes saying so. `sysctl-kernel-params`
+  and `hostname-show` are Info, `run-dotnet` is in `development`, and the last flag parameters
+  (`ss`, `lvm`, `rsync`, `tar`, `sar`, `scp`, `strace`, `systemd-timer-list`, `ulimit`,
+  `unified-delete-local-user`) are choices; the sysctl name stays free text. 527 shipped actions.
+- **Generator, import and editor finishing** (#663). An empty optional value is left out of the
+  command and the spaces it leaves are collapsed (guard
+  `GenerateCommand_EverySeedTemplate_ShippedDefaultsQuoteNothingEmpty`, 37 templates generated
+  `''` before). A `ShellQuote` value matching `^[A-Za-z0-9._/:=@+,%-]+$` goes in bare where the
+  lexer classes every occurrence Bare, except on Windows a leading `-` or `@` or a comma (a
+  parameter name, a splat, an array). `ValidateParameterValue` uses the same `MessageKeys` as the
+  validation path, the two template bounds included; unknown parameter types get the
+  control-character check; `${x}` is classed Expanding; the import door and the schema migration
+  read the lexer (`IsPlaceholderOnlyInSingleQuotedSpans`) and `IsPlaceholderInsideSingleQuotedSpan`
+  is gone; the double-wrap theory accepts a choice inside quotes. Add and Duplicate go through
+  `CreateAndSelectAsync` and `ReloadAsync(selectActionId)` re-resolves the selection among the
+  fresh entries. Post-connect step titles go through `ActionLocalizer`, and
+  `InitializePostConnectLinksAsync` no longer sets bound properties after `ConfigureAwait(false)`.
+  `TemplateParameterTypes.Offered` gains `number` and `driveletter`.
+  `MaxTemplateCommandPatternLength` 4000, `MaxCommandLength` 4096, `MaxParameterLength` 1024,
+  the sync schema reading the constant. `GitSyncService` carries the import's kept-local
+  conflicts; the library's status line and the sync summary show them. `IGitIdentityReader` /
+  `GitConfigIdentityReader` prefill the Git author in Settings from `git config --global` while
+  the fields hold the placeholder, as part of the loaded baseline (the panel opens clean).
+- **Last touches** (#665). `BatchRepository.UpdateAsync` writes `IsUserCreated`. The picker's
+  results list disables horizontal scrolling with one star column, shared-size Auto columns, and
+  rows named on their container (`CommandLibraryPickerItem : IAccessibleItemViewModel`). The run
+  header is a grid giving the status the star column, the mode line under it and Stop in the
+  Auto column. Every `GitOperationResult` message goes through `MessageKeys.GitSyncResult*` (33
+  keys in three locales); three results that passed TwinShell keys Heimdall never had are fixed.
+  Documented key count 7,384.
 
 ### Shared MobaXterm sessions (#646, #648-#652)
 
@@ -90,6 +198,14 @@ All notable changes to Heimdall are documented in this file.
 - **HTTP requests are served concurrently** (#645). Each context runs on its own task, bounded by
   `MaxConcurrentHttpRequests = 8`; while the slots are taken HTTP.sys queues the rest, so nothing is
   rejected. On exit the loop waits for in-flight handlers, still capped by `ShutdownTimeoutMs`.
+
+### Firewall tester (#655)
+
+- A `Progress<FwProbeProgress>` report posted after `TestAsync` had written its final counters
+  overwrote them (1 of 2 shown after a finished run; the same race failed
+  `TestAsync_ProgressUpdates_UpdateCounters` during the first v2026.102001 release build, which
+  aborted before any tag). Each run is numbered, a report of a finished or superseded run is
+  dropped, and reports and final state are written under one lock.
 
 ### Tests (#653)
 
