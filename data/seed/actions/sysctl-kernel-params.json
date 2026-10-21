@@ -1,10 +1,10 @@
 {
   "id": "sysctl-kernel-params",
-  "title": "Show or change kernel parameters",
-  "description": "Show or change Linux kernel parameters at runtime",
+  "title": "Show kernel parameters",
+  "description": "Show the Linux kernel parameters at runtime. Warning: the sysctl -w and sysctl -p examples change the running kernel and need root.",
   "category": "performance",
   "platform": 1,
-  "level": 1,
+  "level": 0,
   "tags": [
     "sysctl",
     "kernel",
@@ -17,22 +17,22 @@
     "id": "sysctl-cmd",
     "platform": 1,
     "name": "sysctl",
-    "commandPattern": "sysctl {parameter}",
+    "commandPattern": "sysctl {name}",
     "parameters": [
       {
-        "name": "parameter",
+        "name": "name",
         "label": "Parameter",
         "type": "string",
-        "defaultValue": "-a",
+        "defaultValue": "kernel.hostname",
         "required": true,
-        "description": "Kernel parameter (-a=all, param.name, param=value)"
+        "description": "Name of the kernel parameter to show, such as vm.swappiness (sysctl -a in the examples shows them all)"
       }
     ]
   },
   "examples": [
     {
       "command": "sysctl -a",
-      "description": "List every kernel parameter",
+      "description": "Show every parameter",
       "platform": 1
     },
     {
@@ -51,12 +51,12 @@
       "platform": 1
     },
     {
-      "command": "sysctl -w vm.swappiness=10",
+      "command": "sudo sysctl -w vm.swappiness=10",
       "description": "Change swappiness",
       "platform": 1
     },
     {
-      "command": "sysctl -p",
+      "command": "sudo sysctl -p",
       "description": "Reload /etc/sysctl.conf",
       "platform": 1
     },
@@ -66,7 +66,7 @@
       "platform": 1
     }
   ],
-  "notes": "Changes are temporary. Edit /etc/sysctl.conf to make them permanent. sysctl -p reloads the file.",
+  "notes": "Changes are temporary. Edit /etc/sysctl.conf to make them permanent. sysctl -p reloads the file. Writing a value (-w, -p) requires root (sudo).",
   "links": [
     {
       "title": "sysctl documentation",
@@ -75,24 +75,24 @@
   ],
   "translations": {
     "fr": {
-      "title": "Afficher/modifier les paramètres kernel",
-      "description": "Affiche ou modifie les paramètres du noyau Linux en temps réel",
-      "notes": "Modifications temporaires. Éditer /etc/sysctl.conf pour permanence. sysctl -p recharge le fichier.",
+      "title": "Afficher les paramètres du noyau",
+      "description": "Affiche les paramètres du noyau Linux en temps réel. Attention : les exemples sysctl -w et sysctl -p modifient le noyau en cours d'exécution et nécessitent les droits root.",
+      "notes": "Modifications temporaires. Éditer /etc/sysctl.conf pour permanence. sysctl -p recharge le fichier. Écrire une valeur (-w, -p) nécessite les droits root (sudo).",
       "parameters": {
         "linux": {
-          "parameter": {
+          "name": {
             "label": "Paramètre",
-            "description": "Paramètre kernel (-a=all, param.name, param=value)"
+            "description": "Nom du paramètre du noyau à afficher, comme vm.swappiness (sysctl -a dans les exemples les affiche tous)"
           }
         }
       },
       "examples": {
-        "sysctl -a": "Liste tous les paramètres kernel",
+        "sysctl -a": "Affiche tous les paramètres",
         "sysctl net.ipv4.ip_forward": "Affiche un paramètre spécifique",
         "sudo sysctl -w net.ipv4.ip_forward=1": "Modifie un paramètre (temporaire)",
         "sysctl vm.swappiness": "Valeur de swappiness",
-        "sysctl -w vm.swappiness=10": "Modifier swappiness",
-        "sysctl -p": "Recharger /etc/sysctl.conf",
+        "sudo sysctl -w vm.swappiness=10": "Modifier swappiness",
+        "sudo sysctl -p": "Recharger /etc/sysctl.conf",
         "sysctl -a | head -50": "Tous les paramètres"
       }
     }

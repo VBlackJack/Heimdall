@@ -17,7 +17,7 @@
     "id": "lvm-list-cmd",
     "platform": 1,
     "name": "lvs",
-    "commandPattern": "{command}",
+    "commandPattern": "sudo {command}",
     "parameters": [
       {
         "name": "command",
@@ -26,11 +26,14 @@
         "allowedValues": [
           "lvs",
           "vgs",
-          "pvs"
+          "pvs",
+          "lvdisplay",
+          "vgdisplay",
+          "pvdisplay"
         ],
         "defaultValue": "lvs",
         "required": true,
-        "description": "LVM command (lvs, vgs, pvs)"
+        "description": "LVM report command (lvs, vgs and pvs summarize; lvdisplay, vgdisplay and pvdisplay detail)"
       }
     ]
   },
@@ -51,22 +54,12 @@
       "platform": 1
     },
     {
-      "command": "pvs",
-      "description": "List physical volumes",
-      "platform": 1
-    },
-    {
-      "command": "vgs",
-      "description": "List volume groups",
-      "platform": 1
-    },
-    {
-      "command": "lvdisplay",
+      "command": "sudo lvdisplay",
       "description": "Details of the logical volumes",
       "platform": 1
     },
     {
-      "command": "lvcreate -L 10G -n newvol vg0",
+      "command": "sudo lvcreate -L 10G -n newvol vg0",
       "description": "Create a 10 GB volume",
       "platform": 1
     }
@@ -87,7 +80,7 @@
         "linux": {
           "command": {
             "label": "Commande",
-            "description": "Commande LVM (lvs, vgs, pvs)"
+            "description": "Commande de rapport LVM (lvs, vgs et pvs résument ; lvdisplay, vgdisplay et pvdisplay détaillent)"
           }
         }
       },
@@ -95,10 +88,8 @@
         "sudo lvs": "Liste les volumes logiques",
         "sudo vgs": "Liste les groupes de volumes",
         "sudo pvs": "Liste les volumes physiques",
-        "pvs": "Lister les volumes physiques",
-        "vgs": "Lister les groupes de volumes",
-        "lvdisplay": "Détails des volumes logiques",
-        "lvcreate -L 10G -n newvol vg0": "Créer un volume de 10 Go"
+        "sudo lvdisplay": "Détails des volumes logiques",
+        "sudo lvcreate -L 10G -n newvol vg0": "Créer un volume de 10 Go"
       }
     }
   }

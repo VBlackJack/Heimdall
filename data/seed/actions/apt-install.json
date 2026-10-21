@@ -17,7 +17,7 @@
     "id": "apt-install-cmd",
     "platform": 1,
     "name": "apt",
-    "commandPattern": "apt install -y {package}",
+    "commandPattern": "sudo apt install -y {package}",
     "parameters": [
       {
         "name": "package",
@@ -41,22 +41,22 @@
       "platform": 1
     },
     {
-      "command": "apt install -y nginx -v",
+      "command": "sudo apt install -y nginx -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
-      "command": "apt install -y nginx --dry-run",
+      "command": "sudo apt install -y nginx --dry-run",
       "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     },
     {
-      "command": "apt install -y nginx",
+      "command": "sudo apt install -y nginx",
       "description": "Example using the 'package' parameter: name of the package to install (or a space-separated list). Replace nginx with the value that fits your environment.",
       "platform": 1
     },
     {
-      "command": "apt install nginx -y",
+      "command": "sudo apt install nginx -y",
       "description": "Install nginx",
       "platform": 1
     }
@@ -84,10 +84,10 @@
       "examples": {
         "sudo apt install nginx": "Installe le serveur web nginx",
         "sudo apt install htop vim curl": "Installe plusieurs paquets à la fois",
-        "apt install -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "apt install -y nginx --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
-        "apt install -y nginx": "Exemple utilisant le paramètre 'package': Nom du paquet à installer (ou liste séparée par espaces). Remplacez nginx par la valeur appropriée selon votre environnement.",
-        "apt install nginx -y": "Installer nginx"
+        "sudo apt install -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "sudo apt install -y nginx --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+        "sudo apt install -y nginx": "Exemple utilisant le paramètre 'package': Nom du paquet à installer (ou liste séparée par espaces). Remplacez nginx par la valeur appropriée selon votre environnement.",
+        "sudo apt install nginx -y": "Installer nginx"
       }
     }
   }

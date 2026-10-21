@@ -24,7 +24,7 @@
   "linuxCommandTemplate": {
     "id": "unified-firewall-rules-linux-cmd",
     "platform": 1,
-    "commandPattern": "iptables -L -n -v --line-numbers",
+    "commandPattern": "sudo iptables -L -n -v --line-numbers",
     "parameters": []
   },
   "examples": [],
@@ -37,42 +37,44 @@
   ],
   "linuxExamples": [
     {
-      "command": "iptables -L -n -v --line-numbers",
+      "command": "sudo iptables -L -n -v --line-numbers",
       "description": "List the iptables rules on Linux",
       "platform": 1
     },
     {
-      "command": "iptables -L -n -v",
+      "command": "sudo iptables -L -n -v",
       "description": "List the rules with statistics",
       "platform": 1
     },
     {
-      "command": "iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
+      "command": "sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
       "description": "Allow SSH",
       "platform": 1
     },
     {
-      "command": "iptables -A INPUT -s 192.168.1.0/24 -j ACCEPT",
+      "command": "sudo iptables -A INPUT -s 192.168.1.0/24 -j ACCEPT",
       "description": "Allow a subnet",
       "platform": 1
     },
     {
-      "command": "iptables -D INPUT 3",
+      "command": "sudo iptables -D INPUT 3",
       "description": "Delete rule number 3",
       "platform": 1
     }
   ],
+  "notes": "Linux: iptables requires root (sudo).",
   "translations": {
     "fr": {
       "title": "Lister les règles de pare-feu actives",
       "description": "Affiche toutes les règles de pare-feu actives sur le système",
+      "notes": "Linux : iptables nécessite les droits root (sudo).",
       "examples": {
         "Get-NetFirewallRule | Where-Object {$_.Enabled -eq 'True'} | Format-Table": "Liste les règles de pare-feu actives sur Windows",
-        "iptables -L -n -v --line-numbers": "Liste les règles iptables sur Linux",
-        "iptables -L -n -v": "Lister les règles avec statistiques",
-        "iptables -A INPUT -p tcp --dport 22 -j ACCEPT": "Autoriser SSH",
-        "iptables -A INPUT -s 192.168.1.0/24 -j ACCEPT": "Autoriser un sous-réseau",
-        "iptables -D INPUT 3": "Supprimer la règle n°3"
+        "sudo iptables -L -n -v --line-numbers": "Liste les règles iptables sur Linux",
+        "sudo iptables -L -n -v": "Lister les règles avec statistiques",
+        "sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT": "Autoriser SSH",
+        "sudo iptables -A INPUT -s 192.168.1.0/24 -j ACCEPT": "Autoriser un sous-réseau",
+        "sudo iptables -D INPUT 3": "Supprimer la règle n°3"
       }
     }
   }

@@ -10,14 +10,15 @@
     "owner",
     "permissions",
     "user",
-    "group"
+    "group",
+    "linux"
   ],
   "linuxCommandTemplateId": "chown-cmd",
   "linuxCommandTemplate": {
     "id": "chown-cmd",
     "platform": 1,
     "name": "chown",
-    "commandPattern": "chown {owner}:{group} {path}",
+    "commandPattern": "sudo chown {owner}:{group} {path}",
     "parameters": [
       {
         "name": "owner",
@@ -62,33 +63,38 @@
       "platform": 1
     },
     {
-      "command": "chown admin:IT-Admins /var/log/app.log -v",
+      "command": "sudo chown admin:IT-Admins /var/log/app.log -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
-      "command": "chown www-data:www-data /var/www/html -R",
+      "command": "sudo chown www-data:www-data /var/www/html -R",
       "description": "Change the owner of the Apache web folder",
       "platform": 1
     },
     {
-      "command": "chown root:admin /etc/config.conf",
+      "command": "sudo chown root:admin /etc/config.conf",
       "description": "Make root the owner with the admin group",
       "platform": 1
     },
     {
-      "command": "chown -R jdupont:users /home/jdupont/documents",
+      "command": "sudo chown -R jdupont:users /home/jdupont/documents",
       "description": "Change the owner of a folder recursively",
       "platform": 1
     },
     {
-      "command": "chown --reference=/etc/passwd /etc/shadow",
+      "command": "sudo chown --reference=/etc/passwd /etc/shadow",
       "description": "Copy the owner of a reference file",
       "platform": 1
     },
     {
-      "command": "chown -h jdupont:users /tmp/mylink",
+      "command": "sudo chown -h jdupont:users /tmp/mylink",
       "description": "Change the owner of a symbolic link",
+      "platform": 1
+    },
+    {
+      "command": "sudo chown root:root /etc/cron.d/mycron",
+      "description": "Give a system file back to root",
       "platform": 1
     }
   ],
@@ -124,12 +130,13 @@
         "sudo chown www-data:www-data /var/www/html": "Change owner et group",
         "sudo chown -R john /home/john": "Change récursivement le propriétaire",
         "sudo chown :developers file.txt": "Change uniquement le groupe",
-        "chown admin:IT-Admins /var/log/app.log -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "chown www-data:www-data /var/www/html -R": "Changer le propriétaire du dossier web Apache",
-        "chown root:admin /etc/config.conf": "Définir root comme propriétaire avec groupe admin",
-        "chown -R jdupont:users /home/jdupont/documents": "Changer récursivement le propriétaire d'un dossier",
-        "chown --reference=/etc/passwd /etc/shadow": "Copier le propriétaire d'un fichier de référence",
-        "chown -h jdupont:users /tmp/mylink": "Changer le propriétaire d'un lien symbolique"
+        "sudo chown admin:IT-Admins /var/log/app.log -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "sudo chown www-data:www-data /var/www/html -R": "Changer le propriétaire du dossier web Apache",
+        "sudo chown root:admin /etc/config.conf": "Définir root comme propriétaire avec groupe admin",
+        "sudo chown -R jdupont:users /home/jdupont/documents": "Changer récursivement le propriétaire d'un dossier",
+        "sudo chown --reference=/etc/passwd /etc/shadow": "Copier le propriétaire d'un fichier de référence",
+        "sudo chown -h jdupont:users /tmp/mylink": "Changer le propriétaire d'un lien symbolique",
+        "sudo chown root:root /etc/cron.d/mycron": "Rend un fichier système à root"
       }
     }
   }

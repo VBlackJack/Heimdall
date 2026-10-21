@@ -22,10 +22,16 @@
       {
         "name": "options",
         "label": "Options",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "-c",
+          "-f",
+          "-tt",
+          "-etrace=network"
+        ],
         "defaultValue": "-c",
         "required": false,
-        "description": "Options (-c=stats, -p PID, -e=filter, -o=output)"
+        "description": "-c = summary statistics, -f = follow child processes, -tt = timestamps with microseconds, -etrace=network = network calls only"
       },
       {
         "name": "command",
@@ -90,7 +96,7 @@
         "linux": {
           "options": {
             "label": "Options",
-            "description": "Options (-c=stats, -p PID, -e=filter, -o=output)"
+            "description": "-c = statistiques résumées, -f = suit les processus enfants, -tt = horodatage à la microseconde, -etrace=network = appels réseau seulement"
           },
           "command": {
             "label": "Commande",

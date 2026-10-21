@@ -817,7 +817,15 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// Optional user name the originating session authenticates with; used to prefill
     /// user-named parameters when a template is selected.
     /// </param>
-    public async Task InitializeAsync(string? targetHost, string? initialActionId = null, string? username = null)
+    /// <param name="capturedCommand">
+    /// Optional command captured from a terminal: once the library has loaded, the editor for a
+    /// new action opens prefilled with it (see <see cref="PrefillNewActionAsync"/>).
+    /// </param>
+    public async Task InitializeAsync(
+        string? targetHost,
+        string? initialActionId = null,
+        string? username = null,
+        CapturedCommand? capturedCommand = null)
     {
         _targetHost = string.IsNullOrWhiteSpace(targetHost) ? null : targetHost.Trim();
         _username = string.IsNullOrWhiteSpace(username) ? null : username.Trim();
@@ -907,6 +915,14 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
                 : ex.Message;
             Heimdall.Core.Logging.FileLogger.Warn(
                 $"[CommandLibrary] Failed to load actions: {ex.Message}");
+            return;
+        }
+
+        // Outside the load's try: a failure while saving the capture is reported by the save
+        // itself, and must not be mistaken for a library that failed to load.
+        if (capturedCommand is not null)
+        {
+            await PrefillNewActionAsync(capturedCommand);
         }
     }
 

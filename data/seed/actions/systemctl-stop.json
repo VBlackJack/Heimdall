@@ -16,7 +16,7 @@
     "id": "systemctl-stop-cmd",
     "platform": 1,
     "name": "systemctl",
-    "commandPattern": "systemctl stop {service}",
+    "commandPattern": "sudo systemctl stop {service}",
     "parameters": [
       {
         "name": "service",
@@ -40,7 +40,7 @@
       "platform": 1
     },
     {
-      "command": "systemctl stop mysql",
+      "command": "sudo systemctl stop mysql",
       "description": "Stop the MySQL service",
       "platform": 1
     }
@@ -68,7 +68,7 @@
       "examples": {
         "sudo systemctl stop nginx": "Arrête le service nginx",
         "sudo systemctl stop mysql.service": "Arrête MySQL/MariaDB",
-        "systemctl stop mysql": "Arrêter le service MySQL"
+        "sudo systemctl stop mysql": "Arrêter le service MySQL"
       }
     }
   }

@@ -10,7 +10,8 @@
     "http",
     "https",
     "api",
-    "web"
+    "web",
+    "linux"
   ],
   "linuxCommandTemplateId": "curl-cmd",
   "linuxCommandTemplate": {
@@ -56,13 +57,18 @@
       "platform": 1
     },
     {
-      "command": "curl -I https://example.com",
-      "description": "Show the headers only",
+      "command": "curl -IL http://localhost",
+      "description": "Show the headers while following redirects",
       "platform": 1
     },
     {
-      "command": "curl -IL http://localhost",
-      "description": "Show the headers while following redirects",
+      "command": "curl -k https://dev-interne.local",
+      "description": "Ignore SSL certificate errors (-k)",
+      "platform": 1
+    },
+    {
+      "command": "curl -L -v https://google.com",
+      "description": "Follow redirects (-L) and show the details of the SSL connection (-v)",
       "platform": 1
     }
   ],
@@ -92,8 +98,9 @@
         "curl -o file.html http://example.com": "Télécharge dans un fichier",
         "curl https://api.example.com": "Requête GET simple",
         "curl -X POST -d '{\"key\":\"value\"}' -H \"Content-Type: application/json\" https://api.example.com": "Requête POST JSON",
-        "curl -I https://example.com": "Afficher les headers uniquement",
-        "curl -IL http://localhost": "Affiche les headers en suivant les redirections"
+        "curl -IL http://localhost": "Affiche les headers en suivant les redirections",
+        "curl -k https://dev-interne.local": "Ignore les erreurs de certificat SSL (-k)",
+        "curl -L -v https://google.com": "Suit les redirections (-L) et affiche le détail de la connexion SSL (-v)"
       }
     }
   }

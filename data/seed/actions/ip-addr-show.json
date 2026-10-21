@@ -52,12 +52,12 @@
       "platform": 1
     },
     {
-      "command": "ip link set eth0 up",
+      "command": "sudo ip link set eth0 up",
       "description": "Bring the eth0 interface up",
       "platform": 1
     },
     {
-      "command": "ip addr add 192.168.1.100/24 dev eth0",
+      "command": "sudo ip addr add 192.168.1.100/24 dev eth0",
       "description": "Add an IP address",
       "platform": 1
     },
@@ -72,7 +72,7 @@
       "platform": 1
     }
   ],
-  "notes": "Reading does not require sudo. Replaces ifconfig. -br for a condensed format.",
+  "notes": "Reading does not require sudo. Replaces ifconfig. -br for a condensed format. Changing a link or an address requires root (sudo).",
   "links": [
     {
       "title": "ip command",
@@ -83,7 +83,7 @@
     "fr": {
       "title": "Afficher les adresses IP",
       "description": "Affiche toutes les interfaces réseau et leurs adresses IP",
-      "notes": "Ne nécessite pas sudo pour la lecture. Remplace ifconfig. -br pour format condensé.",
+      "notes": "Ne nécessite pas sudo pour la lecture. Remplace ifconfig. -br pour format condensé. Modifier une interface ou une adresse nécessite les droits root (sudo).",
       "parameters": {
         "linux": {
           "interface": {
@@ -97,8 +97,8 @@
         "ip addr show eth0": "Affiche uniquement eth0",
         "ip -br addr": "Format court (brief)",
         "ip route show": "Afficher la table de routage",
-        "ip link set eth0 up": "Activer l'interface eth0",
-        "ip addr add 192.168.1.100/24 dev eth0": "Ajouter une adresse IP",
+        "sudo ip link set eth0 up": "Activer l'interface eth0",
+        "sudo ip addr add 192.168.1.100/24 dev eth0": "Ajouter une adresse IP",
         "ip neigh show": "Afficher la table ARP",
         "ip -4 addr": "IPv4 uniquement"
       }

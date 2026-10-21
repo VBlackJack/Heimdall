@@ -183,6 +183,8 @@
             var base64ChunkBytes = 32 * 1024;
             // keyCode of the M key, the key of the host's masked-copy chord (Ctrl+Shift+M).
             var maskedCopyKeyCode = 77;
+            // keyCode of the L key, the key of the save-to-library chord (Ctrl+Shift+L).
+            var libraryCaptureKeyCode = 76;
             var utf8ContinuationMask = 0xC0;
             var utf8ContinuationBits = 0x80;
             var searchContextRows = 5;
@@ -685,6 +687,15 @@
                         return false;
                     }
 
+                    // Ctrl+Shift+L: hand the selection to the host, which opens the Command Library
+                    // editor prefilled with it. keyCode (not code) so that every layout matches.
+                    if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.keyCode === libraryCaptureKeyCode) {
+                        event.preventDefault();
+                        var librarySelection = term.getSelection();
+                        if (librarySelection) postMessage('library-save:' + stringToBase64(librarySelection));
+                        return false;
+                    }
+
                     // Ctrl+Shift+F: search
                     if (event.ctrlKey && event.shiftKey && event.code === 'KeyF') {
                         toggleSearch();
@@ -721,8 +732,14 @@
                 }, { passive: false });
 
                 // ── Right-click paste (via C# host clipboard) ─────
+                // Shift+right-click asks the host for its menu instead, carrying the selection
+                // so the menu can tell whether there is anything to save.
                 terminalElement.addEventListener('contextmenu', function (event) {
                     event.preventDefault();
+                    if (event.shiftKey) {
+                        postMessage('library-menu:' + stringToBase64(term.getSelection()));
+                        return;
+                    }
                     postMessage('clipboard-read:');
                 });
 

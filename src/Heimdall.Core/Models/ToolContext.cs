@@ -26,6 +26,8 @@ namespace Heimdall.Core.Models;
 /// end; <see cref="Configuration.RemoteOs.Auto"/> when it declares none or there is no profile.
 /// <see cref="InsertTextAction"/> types text at the session's prompt without submitting it,
 /// beside <see cref="SendCommandAction"/>, which runs it.
+/// <see cref="InitialCommandText"/> is a command captured from a terminal: the Command Library
+/// opens its editor for a new action prefilled with it.
 /// </summary>
 public sealed record ToolContext(
     string? TargetHost = null,
@@ -49,4 +51,5 @@ public sealed record ToolContext(
     IGatewayInventory? GatewayInventory = null,
     string? DocumentContent = null,
     Configuration.RemoteOs RemoteOs = Configuration.RemoteOs.Auto,
-    Action<string>? InsertTextAction = null);
+    Action<string>? InsertTextAction = null,
+    string? InitialCommandText = null);

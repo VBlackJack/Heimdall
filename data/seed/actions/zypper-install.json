@@ -17,7 +17,7 @@
     "id": "zypper-install-cmd",
     "platform": 1,
     "name": "zypper",
-    "commandPattern": "zypper install -y {package}",
+    "commandPattern": "sudo zypper install -y {package}",
     "parameters": [
       {
         "name": "package",
@@ -36,7 +36,7 @@
       "platform": 1
     },
     {
-      "command": "zypper update",
+      "command": "sudo zypper update",
       "description": "Update the packages",
       "platform": 1
     },
@@ -68,7 +68,7 @@
       },
       "examples": {
         "sudo zypper in vim": "Forme courte de install",
-        "zypper update": "Mettre à jour les paquets",
+        "sudo zypper update": "Mettre à jour les paquets",
         "zypper repos": "Lister les dépôts"
       }
     }

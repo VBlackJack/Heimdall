@@ -17,7 +17,7 @@
     "id": "dd-cmd",
     "platform": 1,
     "name": "dd",
-    "commandPattern": "dd if={input} of={output} bs={blocksize} status=progress",
+    "commandPattern": "sudo dd if={input} of={output} bs={blocksize} status=progress",
     "parameters": [
       {
         "name": "input",
@@ -52,22 +52,17 @@
       "platform": 1
     },
     {
-      "command": "dd if=/dev/zero of=/swapfile bs=1M count=4096",
+      "command": "sudo dd if=/dev/zero of=/swapfile bs=1M count=4096",
       "description": "Create a 4 GB swap file",
       "platform": 1
     },
     {
-      "command": "dd if=/dev/sda of=/backup/sda.img bs=4M status=progress",
-      "description": "Full image of a disk",
-      "platform": 1
-    },
-    {
-      "command": "dd if=/dev/zero of=/dev/sdb bs=1M count=100",
+      "command": "sudo dd if=/dev/zero of=/dev/sdb bs=1M count=100",
       "description": "Write 100 MB of zeros",
       "platform": 1
     },
     {
-      "command": "dd if=ubuntu.iso of=/dev/sdc bs=4M status=progress",
+      "command": "sudo dd if=ubuntu.iso of=/dev/sdc bs=4M status=progress",
       "description": "Create a bootable USB key",
       "platform": 1
     },
@@ -77,7 +72,7 @@
       "platform": 1
     },
     {
-      "command": "dd if=/backup/sda.img of=/dev/sda bs=4M",
+      "command": "sudo dd if=/backup/sda.img of=/dev/sda bs=4M",
       "description": "Restore an image",
       "platform": 1
     }
@@ -112,12 +107,11 @@
       },
       "examples": {
         "sudo dd if=/dev/sda of=/backup/sda.img bs=4M status=progress": "Clone un disque complet",
-        "dd if=/dev/zero of=/swapfile bs=1M count=4096": "Crée un fichier de swap de 4GB",
-        "dd if=/dev/sda of=/backup/sda.img bs=4M status=progress": "Image complète d'un disque",
-        "dd if=/dev/zero of=/dev/sdb bs=1M count=100": "Écrire 100 Mo de zéros",
-        "dd if=ubuntu.iso of=/dev/sdc bs=4M status=progress": "Créer une clé USB bootable",
+        "sudo dd if=/dev/zero of=/swapfile bs=1M count=4096": "Crée un fichier de swap de 4GB",
+        "sudo dd if=/dev/zero of=/dev/sdb bs=1M count=100": "Écrire 100 Mo de zéros",
+        "sudo dd if=ubuntu.iso of=/dev/sdc bs=4M status=progress": "Créer une clé USB bootable",
         "dd if=/dev/urandom of=random.bin bs=1M count=10": "Fichier aléatoire de 10 Mo",
-        "dd if=/backup/sda.img of=/dev/sda bs=4M": "Restaurer une image"
+        "sudo dd if=/backup/sda.img of=/dev/sda bs=4M": "Restaurer une image"
       }
     }
   }
