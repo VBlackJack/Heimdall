@@ -5910,7 +5910,7 @@
                         VerticalAlignment="Center">
                 <TextBlock Text="&#xE8B7;"
                            FontFamily="{StaticResource FontFamilyIcons}"
-                           FontSize="40"
+                           FontSize="{StaticResource IconSizeXLarge}"
                            Foreground="{DynamicResource AccentTextBrush}"
                            HorizontalAlignment="Center"/>
                 <TextBlock Margin="0,12,0,0"
@@ -6569,7 +6569,7 @@
                                                             Style="{DynamicResource GhostButtonStyle}"
                                                             ToolTip="{loc:Translate PaletteSnippetBtnSendExample}"
                                                             AutomationProperties.Name="{loc:Translate PaletteSnippetBtnSendExample}"
-                                                            FontSize="11" Width="24" Height="24"
+                                                            FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                                             Padding="2"
                                                             Focusable="False"/>
                                                     <Button Content="&#xE8C8;"
@@ -6579,7 +6579,7 @@
                                                             Style="{DynamicResource GhostButtonStyle}"
                                                             ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                             AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
-                                                            FontSize="11" Width="24" Height="24"
+                                                            FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                                             Padding="2"
                                                             Focusable="False"/>
                                                 </StackPanel>

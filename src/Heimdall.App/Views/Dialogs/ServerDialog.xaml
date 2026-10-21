@@ -581,7 +581,7 @@
                                         VerticalAlignment="Center"
                                         Visibility="{Binding HasGeneralTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <TextBlock Text="{Binding GeneralTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
+                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="{StaticResource FontSizeBadge}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </StackPanel>
@@ -1439,7 +1439,7 @@
                                         VerticalAlignment="Center"
                                         Visibility="{Binding HasOptionsTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <TextBlock Text="{Binding OptionsTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
+                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="{StaticResource FontSizeBadge}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </StackPanel>
@@ -2527,7 +2527,7 @@
                                         VerticalAlignment="Center"
                                         Visibility="{Binding HasNetworkTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <TextBlock Text="{Binding NetworkTabErrorCount}"
-                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="10"
+                                               Foreground="{DynamicResource TextOnAccentBrush}" FontSize="{StaticResource FontSizeBadge}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </StackPanel>

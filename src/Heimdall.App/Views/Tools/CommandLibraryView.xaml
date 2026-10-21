@@ -57,7 +57,7 @@
                         ToolTip="{loc:Translate ToolCmdLibBtnHistory}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnHistory}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="14" MinWidth="28" Height="28"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="14"/>
@@ -68,7 +68,7 @@
                         ToolTip="{loc:Translate ToolCmdLibBtnRunbooks}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnRunbooks}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="14" MinWidth="28" Height="28"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="14"/>
@@ -79,7 +79,7 @@
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnSync}"
                         IsEnabled="{Binding IsSyncing, Converter={StaticResource InvertBoolConverter}}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="14" MinWidth="28" Height="28"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="13"/>
@@ -90,7 +90,7 @@
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCancelSync}"
                         Visibility="{Binding IsSyncing, Converter={StaticResource BoolToVisibilityConverter}}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="14" MinWidth="28" Height="28"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="13"/>
@@ -100,7 +100,7 @@
                         ToolTip="{loc:Translate ToolCmdLibBtnImport}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnImport}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="14" MinWidth="28" Height="28"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="12"/>
@@ -110,7 +110,7 @@
                         ToolTip="{loc:Translate ToolCmdLibBtnExport}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnExport}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="14" MinWidth="28" Height="28"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="11"/>
@@ -120,7 +120,7 @@
                         ToolTip="{loc:Translate ToolCmdLibBtnAdd}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnAdd}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="14" MinWidth="28" Height="28"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="10"/>
@@ -215,7 +215,7 @@
                             ToolTip="{loc:Translate ToolCmdLibFilterFavorites}"
                             AutomationProperties.Name="{loc:Translate ToolCmdLibFilterFavorites}"
                             Style="{DynamicResource GhostButtonStyle}"
-                            FontSize="14" MinWidth="28" Height="28" Padding="4"
+                            FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"
                             Margin="0,2,8,2"
                             Foreground="{Binding FavoritesFilterBrushKey, Converter={StaticResource ResourceKeyToBrushConverter}}"/>
                     <ComboBox MinWidth="180" Margin="0,2,8,2"
@@ -332,7 +332,7 @@
                                 ToolTip="{Binding FavoriteTooltip}"
                                 AutomationProperties.Name="{Binding FavoriteTooltip}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" Width="24" Height="24"
+                                FontSize="{StaticResource FontSizeBodyLarge}" Width="24" Height="24"
                                 VerticalAlignment="Center" Margin="{StaticResource MarginInlineStart}"
                                 Foreground="{DynamicResource WarningTextBrush}"/>
                         <!-- Risk badge -->
@@ -573,7 +573,7 @@
                                                         Style="{DynamicResource GhostButtonStyle}"
                                                         ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
-                                                        FontSize="11" Width="24" Height="24"
+                                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                                         Padding="2" VerticalAlignment="Top"
                                                         Focusable="False"/>
                                             </Grid>
@@ -607,7 +607,7 @@
                                 ToolTip="{loc:Translate ToolCmdLibBtnEdit}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibBtnEdit}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" MinWidth="28" Height="28"
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                                 Padding="4"
                                 Margin="{StaticResource MarginInlineXs}" TabIndex="7"/>
                         <!-- Unlike Edit and Delete this has no visibility gate: copying a
@@ -618,7 +618,7 @@
                                 ToolTip="{loc:Translate ToolCmdLibDuplicate}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibDuplicate}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" MinWidth="28" Height="28"
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                                 Padding="4"
                                 Margin="{StaticResource MarginInlineXs}" TabIndex="9"/>
                         <Button Command="{Binding DeleteSelectedCommand}"
@@ -627,7 +627,7 @@
                                 ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" MinWidth="28" Height="28"
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                                 Padding="4"
                                 TabIndex="8"/>
                     </StackPanel>
@@ -684,7 +684,7 @@
                                       ToolTip="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"
                                       AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"
                                       Style="{DynamicResource ToolbarToggleButtonStyle}"
-                                      FontSize="14" MinWidth="28" Height="28"
+                                      FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                                       Padding="4"
                                       Margin="{StaticResource MarginInlineSm}" TabIndex="7"/>
                     </StackPanel>
@@ -802,7 +802,7 @@
                             ToolTip="{loc:Translate ToolCmdLibHistoryClear}"
                             AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryClear}"
                             Style="{DynamicResource GhostButtonStyle}"
-                            FontSize="14" MinWidth="28" Height="28"
+                            FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                             Padding="4"/>
                     <!-- Only offered when the library was opened for a host: without one there is
                          nothing to compare a row against. -->
@@ -882,7 +882,7 @@
                                         ToolTip="{loc:Translate ToolCmdLibHistoryReplay}"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryReplay}"
                                         Style="{DynamicResource GhostButtonStyle}"
-                                        FontSize="11" Width="24" Height="24"
+                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                         Padding="2" VerticalAlignment="Center"
                                         Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <Button DockPanel.Dock="Right"
@@ -893,7 +893,7 @@
                                         ToolTip="{loc:Translate ToolCmdLibBtnCopy}"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopy}"
                                         Style="{DynamicResource GhostButtonStyle}"
-                                        FontSize="11" Width="24" Height="24"
+                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                         Padding="2" VerticalAlignment="Center"
                                         Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <TextBlock DockPanel.Dock="Right"
@@ -982,35 +982,35 @@
                                 ToolTip="{loc:Translate ToolCmdLibRunbookRun}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookRun}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding DeleteRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookDelete}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookDelete}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE8C8;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding DuplicateRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookDuplicate}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookDuplicate}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE70F;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding EditRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookEdit}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookEdit}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE710;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding NewRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookNew}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookNew}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
                         <TextBlock Text="{loc:Translate ToolCmdLibRunbooksTitle}"
                                    FontSize="{StaticResource FontSizeBody}"
                                    FontWeight="SemiBold"

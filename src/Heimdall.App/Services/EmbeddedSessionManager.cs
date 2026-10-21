@@ -340,7 +340,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 var infoPanel = new System.Windows.Controls.TextBlock
                 {
                     Text = _localizer?["LocalShellExternalElevated"] ?? "Elevated shell launched in external window.",
-                    FontSize = 14,
+                    FontSize = (double)Application.Current.FindResource("FontSizeBodyLarge"),
                     HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                     VerticalAlignment = System.Windows.VerticalAlignment.Center,
                     Foreground = GetBrush("TextSecondaryBrush", System.Windows.Media.Brushes.Gray),
@@ -1585,7 +1585,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             stack.Children.Add(new TextBlock
             {
                 Text = displayName,
-                FontSize = 20,
+                FontSize = (double)Application.Current.FindResource("FontSizeTitle"),
                 FontWeight = FontWeights.SemiBold,
                 Foreground = GetBrush("TextPrimaryBrush", Brushes.White)
             });
@@ -1623,7 +1623,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             return new TextBlock
             {
                 Text = $"Tool: {toolId}",
-                FontSize = 18,
+                FontSize = (double)Application.Current.FindResource("FontSizeLarge"),
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                 VerticalAlignment = System.Windows.VerticalAlignment.Center,
                 Foreground = GetBrush("TextPrimaryBrush", Brushes.White)

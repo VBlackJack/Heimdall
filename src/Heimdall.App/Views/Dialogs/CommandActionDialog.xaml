@@ -163,7 +163,7 @@
                                               SelectedValue="{Binding Type}" Margin="0,0,4,0"
                                               FontSize="{StaticResource FontSizeCaption}"/>
                                     <Button Grid.Column="3" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
-                                            FontSize="10" Width="24" Height="24"
+                                            FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                         Command="{Binding DataContext.RemoveWindowsParameterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
@@ -284,7 +284,7 @@
                                               SelectedValue="{Binding Type}" Margin="0,0,4,0"
                                               FontSize="{StaticResource FontSizeCaption}"/>
                                     <Button Grid.Column="3" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
-                                            FontSize="10" Width="24" Height="24"
+                                            FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                         Command="{Binding DataContext.RemoveLinuxParameterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
@@ -400,7 +400,7 @@
                                                       Content="{Binding DataContext.PlatformOptions[2], RelativeSource={RelativeSource AncestorType=Window}}"/>
                                     </ComboBox>
                                     <Button Grid.Column="2" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
-                                            FontSize="10" Width="24" Height="24"
+                                            FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                             AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                             Command="{Binding DataContext.RemoveExampleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
@@ -455,7 +455,7 @@
                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                          BorderBrush="{DynamicResource BorderBrush}"/>
                                 <Button Grid.Column="2" Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
-                                        FontSize="10" Width="24" Height="24"
+                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                         Command="{Binding DataContext.RemoveLinkCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
