@@ -31,6 +31,7 @@ public static class MarkdownPreviewBuilder
         var textSecondary = ResolveBrush("TextSecondaryBrush", "#aeb7c4");
         var border = ResolveBrush("BorderBrush", "#2b3442");
         var accent = ResolveBrush("AccentBrush", "#4aa3ff");
+        var accentText = ResolveBrush("AccentTextBrush", "#4aa3ff");
         var highlight = ResolveBrush("HighlightBrush", "#182131");
         var surface = ResolveBrush("SurfaceBrush", "#0f141c");
 
@@ -49,6 +50,7 @@ public static class MarkdownPreviewBuilder
         --text-secondary: {textSecondary};
         --border: {border};
         --accent: {accent};
+        --accent-text: {accentText};
         --highlight: {highlight};
     }}
 
@@ -87,11 +89,11 @@ public static class MarkdownPreviewBuilder
     }}
 
     a {{
-        color: var(--accent);
+        color: var(--accent-text);
     }}
 
     .note-link {{
-        color: var(--accent);
+        color: var(--accent-text);
         font-style: italic;
     }}
 

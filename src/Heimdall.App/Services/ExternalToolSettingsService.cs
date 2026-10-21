@@ -71,7 +71,7 @@ public sealed class ExternalToolSettingsService
                 FontSize = captionFontSize,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            variableLabel.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+            variableLabel.SetResourceReference(TextBlock.ForegroundProperty, "AccentTextBrush");
             panel.Children.Add(variableLabel);
 
             var descLabel = new TextBlock

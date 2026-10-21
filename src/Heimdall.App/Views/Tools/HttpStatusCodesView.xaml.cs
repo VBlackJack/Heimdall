@@ -229,7 +229,7 @@ public partial class HttpStatusCodesView : UserControl, IToolView
         {
             < 200 => TryGetBrush("TextSecondaryBrush", Brushes.Gray),
             < 300 => TryGetBrush("SuccessBrush", Brushes.Green),
-            < 400 => TryGetBrush("AccentBrush", Brushes.DodgerBlue),
+            < 400 => TryGetBrush("AccentTextBrush", Brushes.DodgerBlue),
             < 500 => TryGetBrush("WarningBrush", Brushes.Orange),
             _ => TryGetBrush("ErrorBrush", Brushes.Red)
         };

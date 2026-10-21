@@ -230,8 +230,8 @@
     <!-- Traceroute: connected dots path -->
     <Geometry x:Key="Geo.Tool.Traceroute">M2,8 A1.5,1.5 0 1,1 5,8 L7,8 A1.5,1.5 0 1,1 10,8 L12,8 A1.5,1.5 0 1,1 15,8</Geometry>
 
-    <!-- SNMP Walker: tree structure -->
-    <Geometry x:Key="Geo.Tool.SnmpWalker">M8,2 L8,5 M8,5 L4,7 M8,5 L12,7 M4,7 L4,9 M4,9 L2,11 M4,9 L6,11 M12,7 L12,9 M12,9 L10,11 M12,9 L14,11</Geometry>
+    <!-- SNMP Walker: tree structure, a root node over three leaf nodes joined by filled bars -->
+    <Geometry x:Key="Geo.Tool.SnmpWalker">F1 M8,1 A2,2 0 1 1 8,5 A2,2 0 1 1 8,1 Z M7.5,4.5 L8.5,4.5 L8.5,8 L7.5,8 Z M2.5,7.5 L13.5,7.5 L13.5,8.5 L2.5,8.5 Z M2.5,8 L3.5,8 L3.5,11 L2.5,11 Z M7.5,8 L8.5,8 L8.5,11 L7.5,11 Z M12.5,8 L13.5,8 L13.5,11 L12.5,11 Z M3,10.5 A2,2 0 1 1 3,14.5 A2,2 0 1 1 3,10.5 Z M8,10.5 A2,2 0 1 1 8,14.5 A2,2 0 1 1 8,10.5 Z M13,10.5 A2,2 0 1 1 13,14.5 A2,2 0 1 1 13,10.5 Z</Geometry>
 
     <!-- ARP Monitor: radar sweep -->
     <Geometry x:Key="Geo.Tool.ArpMonitor">M8,8 L8,2 A6,6 0 1,1 2,8 A6,6 0 1,1 14,8 M8,8 A4,4 0 0,1 12,8 M8,8 A2,2 0 0,1 10,8</Geometry>

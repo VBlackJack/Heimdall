@@ -1259,7 +1259,7 @@
                             <Border x:Name="PropertiesPanel"
                                     Grid.Row="2"
                                     Background="{DynamicResource SurfaceBrush}"
-                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderBrush="{DynamicResource BorderStrongBrush}"
                                     BorderThickness="0,1,0,0"
                                     Visibility="Collapsed">
                                 <DockPanel>
@@ -2793,7 +2793,7 @@
                         <Setter Property="Margin" Value="0,0,0,10"/>
                     </Style>
                     <Style x:Key="SettingsApplyBadgeTextStyle" TargetType="{x:Type TextBlock}">
-                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                         <Setter Property="FontSize" Value="{StaticResource FontSizeSmallCaption}"/>
                         <Setter Property="FontWeight" Value="SemiBold"/>
                     </Style>
@@ -3750,7 +3750,7 @@
                                         </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshAgentPreferenceLabel" Text="{loc:Translate SettingsSshAgentPreferenceLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
-                                            <ComboBox SelectedValue="{Binding Settings.SshAgentPreference}" SelectedValuePath="Tag" Width="260" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshAgentPreferenceLabel}"
+                                            <ComboBox SelectedValue="{Binding Settings.SshAgentPreference}" SelectedValuePath="Tag" MinWidth="260" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshAgentPreferenceLabel}"
                                                       AutomationProperties.HelpText="{loc:Translate SettingsSshAgentPreferenceHint}">
                                                 <ComboBoxItem Content="{loc:Translate SettingsSshAgentPreferenceAutoOpenSshFirst}" Tag="AutoOpenSshFirst" AutomationProperties.Name="{loc:Translate SettingsSshAgentPreferenceAutoOpenSshFirst}"/>
                                                 <ComboBoxItem Content="{loc:Translate SettingsSshAgentPreferenceAutoPageantFirst}" Tag="AutoPageantFirst" AutomationProperties.Name="{loc:Translate SettingsSshAgentPreferenceAutoPageantFirst}"/>
