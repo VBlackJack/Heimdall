@@ -1,0 +1,108 @@
+{
+  "id": "cim-list-services",
+  "title": "List services by start mode and state",
+  "description": "Show the services in one start mode and one state, with their account, process and binary path.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "cim",
+    "wmi",
+    "service",
+    "startmode",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "cim-list-services-cmd",
+  "windowsCommandTemplate": {
+    "id": "cim-list-services-cmd",
+    "platform": 0,
+    "name": "Get-CimInstance",
+    "commandPattern": "Get-CimInstance -ClassName Win32_Service | Where-Object {$_.StartMode -eq {startMode} -and $_.State -eq {state}} | Select-Object Name,DisplayName,StartName,ProcessId,PathName | Format-Table -AutoSize",
+    "parameters": [
+      {
+        "name": "startMode",
+        "label": "Start mode",
+        "type": "choice",
+        "allowedValues": [
+          "Auto",
+          "Manual",
+          "Disabled"
+        ],
+        "defaultValue": "Auto",
+        "required": true,
+        "description": "Start mode of the services"
+      },
+      {
+        "name": "state",
+        "label": "State",
+        "type": "choice",
+        "allowedValues": [
+          "Running",
+          "Stopped",
+          "Paused"
+        ],
+        "defaultValue": "Stopped",
+        "required": true,
+        "description": "Current state of the services"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-CimInstance -ClassName Win32_Service -Filter \"StartMode='Auto' AND State<>'Running'\"",
+      "description": "Find the automatic services that are not running, filtered on the server side",
+      "platform": 0
+    },
+    {
+      "command": "Get-CimInstance -ClassName Win32_Service | Where-Object StartName -like 'CONTOSO\\*' | Select-Object Name,StartName",
+      "description": "Find the services that run under a domain account",
+      "platform": 0
+    },
+    {
+      "command": "Get-CimInstance -ClassName Win32_Service -Filter \"Name='Spooler'\" | Select-Object Name,ProcessId,PathName",
+      "description": "Show the process and the binary of one service",
+      "platform": 0
+    },
+    {
+      "command": "Get-CimInstance -ClassName Win32_Service -ComputerName SRV-APP01 -Filter \"StartMode='Auto' AND State='Stopped'\"",
+      "description": "Check the stopped automatic services of a remote server",
+      "platform": 0
+    }
+  ],
+  "notes": "No administrator rights needed. Unlike Get-Service, Win32_Service shows the service account and the binary path.",
+  "links": [
+    {
+      "title": "Get-CimInstance documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/cimcmdlets/get-ciminstance"
+    },
+    {
+      "title": "Win32_Service class",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-service"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les services par mode de démarrage et par état",
+      "description": "Affiche les services dans un mode de démarrage et un état donnés, avec leur compte, leur processus et le chemin du binaire.",
+      "notes": "Aucun droit administrateur requis. Contrairement à Get-Service, Win32_Service montre le compte de service et le chemin du binaire.",
+      "parameters": {
+        "windows": {
+          "startMode": {
+            "label": "Mode de démarrage",
+            "description": "Mode de démarrage des services"
+          },
+          "state": {
+            "label": "État",
+            "description": "État actuel des services"
+          }
+        }
+      },
+      "examples": {
+        "Get-CimInstance -ClassName Win32_Service -Filter \"StartMode='Auto' AND State<>'Running'\"": "Trouve les services automatiques qui ne tournent pas, filtrés côté serveur",
+        "Get-CimInstance -ClassName Win32_Service | Where-Object StartName -like 'CONTOSO\\*' | Select-Object Name,StartName": "Trouve les services qui tournent sous un compte du domaine",
+        "Get-CimInstance -ClassName Win32_Service -Filter \"Name='Spooler'\" | Select-Object Name,ProcessId,PathName": "Affiche le processus et le binaire d'un service",
+        "Get-CimInstance -ClassName Win32_Service -ComputerName SRV-APP01 -Filter \"StartMode='Auto' AND State='Stopped'\"": "Vérifie les services automatiques arrêtés d'un serveur distant"
+      }
+    }
+  }
+}

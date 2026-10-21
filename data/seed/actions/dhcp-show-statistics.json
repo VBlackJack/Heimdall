@@ -1,0 +1,80 @@
+{
+  "id": "dhcp-show-statistics",
+  "title": "Show the DHCP server statistics",
+  "description": "Show the address usage and the request counters of a DHCP server.",
+  "category": "network-dns",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "dhcp",
+    "statistics",
+    "dhcpserver",
+    "capacity",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "dhcp-show-statistics-cmd",
+  "windowsCommandTemplate": {
+    "id": "dhcp-show-statistics-cmd",
+    "platform": 0,
+    "name": "Get-DhcpServerv4Statistics",
+    "commandPattern": "Get-DhcpServerv4Statistics -ComputerName {dhcpServer}",
+    "parameters": [
+      {
+        "name": "dhcpServer",
+        "label": "DHCP server",
+        "type": "hostname",
+        "defaultValue": "localhost",
+        "required": true,
+        "description": "DHCP server to query (localhost when run on the server)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-DhcpServerv4Statistics -ComputerName DHCP01",
+      "description": "Show the counters of DHCP01",
+      "platform": 0
+    },
+    {
+      "command": "Get-DhcpServerv4ScopeStatistics -ComputerName DHCP01 | Sort-Object PercentageInUse -Descending",
+      "description": "Show the usage of each scope, fullest first",
+      "platform": 0
+    },
+    {
+      "command": "Get-DhcpServerv4ScopeStatistics -ComputerName DHCP01 | Where-Object PercentageInUse -gt 80",
+      "description": "Find the scopes more than 80 percent full",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the DhcpServer module (RSAT DHCP tools) and membership of DHCP Users or DHCP Administrators.",
+  "links": [
+    {
+      "title": "Get-DhcpServerv4Statistics documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/dhcpserver/get-dhcpserverv4statistics"
+    },
+    {
+      "title": "Get-DhcpServerv4ScopeStatistics documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/dhcpserver/get-dhcpserverv4scopestatistics"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les statistiques du serveur DHCP",
+      "description": "Affiche l'utilisation des adresses et les compteurs de requêtes d'un serveur DHCP.",
+      "notes": "Nécessite le module DhcpServer (outils RSAT DHCP) et l'appartenance à DHCP Users ou DHCP Administrators.",
+      "parameters": {
+        "windows": {
+          "dhcpServer": {
+            "label": "Serveur DHCP",
+            "description": "Serveur DHCP à interroger (localhost si la commande tourne sur le serveur)"
+          }
+        }
+      },
+      "examples": {
+        "Get-DhcpServerv4Statistics -ComputerName DHCP01": "Affiche les compteurs de DHCP01",
+        "Get-DhcpServerv4ScopeStatistics -ComputerName DHCP01 | Sort-Object PercentageInUse -Descending": "Affiche l'utilisation de chaque étendue, la plus pleine en premier",
+        "Get-DhcpServerv4ScopeStatistics -ComputerName DHCP01 | Where-Object PercentageInUse -gt 80": "Trouve les étendues remplies à plus de 80 pour cent"
+      }
+    }
+  }
+}

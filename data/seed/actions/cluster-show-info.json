@@ -1,0 +1,82 @@
+{
+  "id": "cluster-show-info",
+  "title": "Show a failover cluster",
+  "description": "Show the main properties of a failover cluster.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "cluster",
+    "failover",
+    "failoverclusters",
+    "high-availability",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "cluster-show-info-cmd",
+  "windowsCommandTemplate": {
+    "id": "cluster-show-info-cmd",
+    "platform": 0,
+    "name": "Get-Cluster",
+    "commandPattern": "Get-Cluster -Name {clusterName} | Format-List Name,Domain,Id",
+    "parameters": [
+      {
+        "name": "clusterName",
+        "label": "Cluster",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the failover cluster"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-Cluster -Name CLU01 | Format-List *",
+      "description": "Show every property of the cluster CLU01",
+      "platform": 0
+    },
+    {
+      "command": "Get-Cluster -Domain contoso.com",
+      "description": "List the clusters of the contoso.com domain",
+      "platform": 0
+    },
+    {
+      "command": "Get-ClusterQuorum -Cluster CLU01",
+      "description": "Show the quorum configuration",
+      "platform": 0
+    },
+    {
+      "command": "Get-ClusterSharedVolume -Cluster CLU01",
+      "description": "Show the Cluster Shared Volumes and their owner node",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the FailoverClusters module (RSAT Failover Clustering tools) and administrator rights on the cluster.",
+  "links": [
+    {
+      "title": "Get-Cluster documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/failoverclusters/get-cluster"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher un cluster de basculement",
+      "description": "Affiche les propriétés principales d'un cluster de basculement.",
+      "notes": "Nécessite le module FailoverClusters (outils RSAT Clustering de basculement) et des droits administrateur sur le cluster.",
+      "parameters": {
+        "windows": {
+          "clusterName": {
+            "label": "Cluster",
+            "description": "Nom du cluster de basculement"
+          }
+        }
+      },
+      "examples": {
+        "Get-Cluster -Name CLU01 | Format-List *": "Affiche toutes les propriétés du cluster CLU01",
+        "Get-Cluster -Domain contoso.com": "Liste les clusters du domaine contoso.com",
+        "Get-ClusterQuorum -Cluster CLU01": "Affiche la configuration du quorum",
+        "Get-ClusterSharedVolume -Cluster CLU01": "Affiche les volumes partagés de cluster et leur noeud propriétaire"
+      }
+    }
+  }
+}

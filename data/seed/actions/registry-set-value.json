@@ -1,0 +1,124 @@
+{
+  "id": "registry-set-value",
+  "title": "Set a registry value",
+  "description": "Create or change a value under an existing registry key.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 1,
+  "tags": [
+    "registry",
+    "itemproperty",
+    "regedit",
+    "configuration",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "registry-set-value-cmd",
+  "windowsCommandTemplate": {
+    "id": "registry-set-value-cmd",
+    "platform": 0,
+    "name": "Set-ItemProperty",
+    "commandPattern": "Set-ItemProperty -Path {keyPath} -Name {valueName} -Value {value} -Type {valueType}",
+    "parameters": [
+      {
+        "name": "keyPath",
+        "label": "Registry key",
+        "type": "path",
+        "defaultValue": "",
+        "required": true,
+        "description": "Key path in a registry drive (HKLM: or HKCU:)"
+      },
+      {
+        "name": "valueName",
+        "label": "Value name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the value to set"
+      },
+      {
+        "name": "value",
+        "label": "Data",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Data to write (a number for DWord and QWord)"
+      },
+      {
+        "name": "valueType",
+        "label": "Value type",
+        "type": "choice",
+        "allowedValues": [
+          "String",
+          "ExpandString",
+          "DWord",
+          "QWord"
+        ],
+        "defaultValue": "DWord",
+        "required": true,
+        "description": "Registry type of the value"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0 -Type DWord",
+      "description": "Allow Remote Desktop connections",
+      "platform": 0
+    },
+    {
+      "command": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters' -Name 'SMB1' -Value 0 -Type DWord",
+      "description": "Turn off the SMB 1 server (takes effect after a restart)",
+      "platform": 0
+    },
+    {
+      "command": "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Contoso\\Agent' -Name 'LogLevel' -Value 'Verbose' -Type String -WhatIf",
+      "description": "Show the change without writing it",
+      "platform": 0
+    },
+    {
+      "command": "reg export 'HKLM\\SOFTWARE\\Contoso' C:\\Temp\\contoso.reg",
+      "description": "Back up the key to a .reg file before changing it",
+      "platform": 0
+    }
+  ],
+  "notes": "Writing under HKLM requires administrator rights. A wrong value can stop a service or Windows itself from starting: export the key first.",
+  "links": [
+    {
+      "title": "Set-ItemProperty documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/set-itemproperty"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Définir une valeur de registre",
+      "description": "Crée ou modifie une valeur sous une clé de registre existante.",
+      "notes": "L'écriture sous HKLM nécessite des droits administrateur. Une valeur erronée peut empêcher un service ou Windows de démarrer : exportez la clé d'abord.",
+      "parameters": {
+        "windows": {
+          "keyPath": {
+            "label": "Clé de registre",
+            "description": "Chemin de la clé dans un lecteur de registre (HKLM: ou HKCU:)"
+          },
+          "valueName": {
+            "label": "Nom de la valeur",
+            "description": "Nom de la valeur à définir"
+          },
+          "value": {
+            "label": "Donnée",
+            "description": "Donnée à écrire (un nombre pour DWord et QWord)"
+          },
+          "valueType": {
+            "label": "Type de valeur",
+            "description": "Type de registre de la valeur"
+          }
+        }
+      },
+      "examples": {
+        "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0 -Type DWord": "Autorise les connexions Bureau à distance",
+        "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters' -Name 'SMB1' -Value 0 -Type DWord": "Désactive le serveur SMB 1 (effectif après un redémarrage)",
+        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Contoso\\Agent' -Name 'LogLevel' -Value 'Verbose' -Type String -WhatIf": "Montre la modification sans l'écrire",
+        "reg export 'HKLM\\SOFTWARE\\Contoso' C:\\Temp\\contoso.reg": "Sauvegarde la clé dans un fichier .reg avant de la modifier"
+      }
+    }
+  }
+}

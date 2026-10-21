@@ -1,0 +1,94 @@
+{
+  "id": "dhcp-list-leases",
+  "title": "List the leases of a DHCP scope",
+  "description": "Show the leased addresses of an IPv4 scope with the client name and expiry time.",
+  "category": "network-dns",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "dhcp",
+    "lease",
+    "dhcpserver",
+    "network",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "dhcp-list-leases-cmd",
+  "windowsCommandTemplate": {
+    "id": "dhcp-list-leases-cmd",
+    "platform": 0,
+    "name": "Get-DhcpServerv4Lease",
+    "commandPattern": "Get-DhcpServerv4Lease -ComputerName {dhcpServer} -ScopeId {scopeId} | Select-Object IPAddress,ClientId,HostName,AddressState,LeaseExpiryTime | Format-Table -AutoSize",
+    "parameters": [
+      {
+        "name": "dhcpServer",
+        "label": "DHCP server",
+        "type": "hostname",
+        "defaultValue": "localhost",
+        "required": true,
+        "description": "DHCP server to query (localhost when run on the server)"
+      },
+      {
+        "name": "scopeId",
+        "label": "Scope",
+        "type": "ipaddress",
+        "defaultValue": "",
+        "required": true,
+        "description": "Network address of the scope (e.g. 10.0.10.0)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-DhcpServerv4Lease -ComputerName DHCP01 -ScopeId 10.0.10.0",
+      "description": "Show the leases of the 10.0.10.0 scope",
+      "platform": 0
+    },
+    {
+      "command": "Get-DhcpServerv4Lease -ComputerName DHCP01 -IPAddress 10.0.10.57",
+      "description": "Find which client holds one address",
+      "platform": 0
+    },
+    {
+      "command": "Get-DhcpServerv4Lease -ComputerName DHCP01 -ScopeId 10.0.10.0 | Where-Object HostName -like 'PC-*'",
+      "description": "Show the leases of the workstations named PC-*",
+      "platform": 0
+    },
+    {
+      "command": "Get-DhcpServerv4Lease -ComputerName DHCP01 -ScopeId 10.0.10.0 -BadLeases",
+      "description": "Show the addresses declined because of a conflict",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires the DhcpServer module (RSAT DHCP tools) and membership of DHCP Users or DHCP Administrators.",
+  "links": [
+    {
+      "title": "Get-DhcpServerv4Lease documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/dhcpserver/get-dhcpserverv4lease"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les baux d'une étendue DHCP",
+      "description": "Affiche les adresses louées d'une étendue IPv4 avec le nom du client et l'heure d'expiration.",
+      "notes": "Nécessite le module DhcpServer (outils RSAT DHCP) et l'appartenance à DHCP Users ou DHCP Administrators.",
+      "parameters": {
+        "windows": {
+          "dhcpServer": {
+            "label": "Serveur DHCP",
+            "description": "Serveur DHCP à interroger (localhost si la commande tourne sur le serveur)"
+          },
+          "scopeId": {
+            "label": "Étendue",
+            "description": "Adresse réseau de l'étendue (ex : 10.0.10.0)"
+          }
+        }
+      },
+      "examples": {
+        "Get-DhcpServerv4Lease -ComputerName DHCP01 -ScopeId 10.0.10.0": "Affiche les baux de l'étendue 10.0.10.0",
+        "Get-DhcpServerv4Lease -ComputerName DHCP01 -IPAddress 10.0.10.57": "Trouve quel client détient une adresse",
+        "Get-DhcpServerv4Lease -ComputerName DHCP01 -ScopeId 10.0.10.0 | Where-Object HostName -like 'PC-*'": "Affiche les baux des postes nommés PC-*",
+        "Get-DhcpServerv4Lease -ComputerName DHCP01 -ScopeId 10.0.10.0 -BadLeases": "Affiche les adresses refusées pour cause de conflit"
+      }
+    }
+  }
+}

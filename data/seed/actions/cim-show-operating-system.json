@@ -1,0 +1,64 @@
+{
+  "id": "cim-show-operating-system",
+  "title": "Show the operating system and uptime",
+  "description": "Show the Windows edition, version, build, install date, last boot and uptime through CIM.",
+  "category": "monitoring-logs",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "cim",
+    "wmi",
+    "operating-system",
+    "uptime",
+    "boot",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "cim-show-operating-system-cmd",
+  "windowsCommandTemplate": {
+    "id": "cim-show-operating-system-cmd",
+    "platform": 0,
+    "name": "Get-CimInstance",
+    "commandPattern": "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object CSName,Caption,Version,BuildNumber,OSArchitecture,InstallDate,LastBootUpTime,@{Name='Uptime';Expression={(Get-Date) - $_.LastBootUpTime}}",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName SRV-APP01, SRV-APP02 | Select-Object CSName,LastBootUpTime",
+      "description": "Compare the last boot time of two servers",
+      "platform": 0
+    },
+    {
+      "command": "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime",
+      "description": "Show the uptime of this computer as a duration",
+      "platform": 0
+    },
+    {
+      "command": "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object CSName,@{Name='FreeMemoryGB';Expression={[math]::Round($_.FreePhysicalMemory/1MB,1)}}",
+      "description": "Show the free physical memory in gigabytes",
+      "platform": 0
+    }
+  ],
+  "notes": "No administrator rights needed locally. -ComputerName goes through WinRM, so the remote computer must accept remoting.",
+  "links": [
+    {
+      "title": "Get-CimInstance documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/cimcmdlets/get-ciminstance"
+    },
+    {
+      "title": "Win32_OperatingSystem class",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-operatingsystem"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher le système d'exploitation et la durée de fonctionnement",
+      "description": "Affiche l'édition, la version, la build, la date d'installation, le dernier démarrage et la durée de fonctionnement de Windows via CIM.",
+      "notes": "Aucun droit administrateur requis en local. -ComputerName passe par WinRM : l'ordinateur distant doit accepter la communication à distance.",
+      "examples": {
+        "Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName SRV-APP01, SRV-APP02 | Select-Object CSName,LastBootUpTime": "Compare l'heure du dernier démarrage de deux serveurs",
+        "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime": "Affiche la durée de fonctionnement de cet ordinateur sous forme de durée",
+        "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object CSName,@{Name='FreeMemoryGB';Expression={[math]::Round($_.FreePhysicalMemory/1MB,1)}}": "Affiche la mémoire physique libre en gigaoctets"
+      }
+    }
+  }
+}

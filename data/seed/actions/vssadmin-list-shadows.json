@@ -1,0 +1,77 @@
+{
+  "id": "vssadmin-list-shadows",
+  "title": "List the shadow copies of a volume",
+  "description": "Show the Volume Shadow Copy Service snapshots that exist for one volume.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "vssadmin",
+    "vss",
+    "shadow-copy",
+    "snapshot",
+    "backup",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "vssadmin-list-shadows-cmd",
+  "windowsCommandTemplate": {
+    "id": "vssadmin-list-shadows-cmd",
+    "platform": 0,
+    "name": "vssadmin",
+    "commandPattern": "vssadmin list shadows /for={driveLetter}:",
+    "parameters": [
+      {
+        "name": "driveLetter",
+        "label": "Drive letter",
+        "type": "driveletter",
+        "defaultValue": "C",
+        "required": true,
+        "description": "Letter of the volume (without the colon)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "vssadmin list shadows",
+      "description": "List the shadow copies of every volume",
+      "platform": 0
+    },
+    {
+      "command": "vssadmin list shadowstorage",
+      "description": "Show the space reserved and used for shadow copies",
+      "platform": 0
+    },
+    {
+      "command": "vssadmin list writers",
+      "description": "Show the state of the VSS writers when a backup fails",
+      "platform": 0
+    }
+  ],
+  "notes": "Run it from an elevated prompt.",
+  "links": [
+    {
+      "title": "vssadmin list shadows documentation",
+      "url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/vssadmin-list-shadows"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les clichés instantanés d'un volume",
+      "description": "Affiche les clichés du service de cliché instantané des volumes qui existent pour un volume.",
+      "notes": "À lancer depuis une invite élevée.",
+      "parameters": {
+        "windows": {
+          "driveLetter": {
+            "label": "Lettre de lecteur",
+            "description": "Lettre du volume (sans les deux-points)"
+          }
+        }
+      },
+      "examples": {
+        "vssadmin list shadows": "Liste les clichés instantanés de tous les volumes",
+        "vssadmin list shadowstorage": "Affiche l'espace réservé et utilisé par les clichés instantanés",
+        "vssadmin list writers": "Affiche l'état des enregistreurs VSS quand une sauvegarde échoue"
+      }
+    }
+  }
+}

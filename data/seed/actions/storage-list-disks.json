@@ -1,0 +1,65 @@
+{
+  "id": "storage-list-disks",
+  "title": "List the disks",
+  "description": "Show the disks of the computer with their health, partition style, size and online state.",
+  "category": "files-storage",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "disk",
+    "storage",
+    "health",
+    "partition",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "storage-list-disks-cmd",
+  "windowsCommandTemplate": {
+    "id": "storage-list-disks-cmd",
+    "platform": 0,
+    "name": "Get-Disk",
+    "commandPattern": "Get-Disk | Select-Object Number,FriendlyName,SerialNumber,HealthStatus,OperationalStatus,PartitionStyle,@{Name='SizeGB';Expression={[math]::Round($_.Size/1GB,2)}},IsOffline,IsReadOnly | Format-Table -AutoSize",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-Disk | Where-Object IsOffline -eq $true",
+      "description": "Find the disks that are offline",
+      "platform": 0
+    },
+    {
+      "command": "Get-Disk | Where-Object PartitionStyle -eq 'RAW'",
+      "description": "Find the new disks that are not initialized",
+      "platform": 0
+    },
+    {
+      "command": "Get-Disk -Number 1 | Get-Partition",
+      "description": "Show the partitions of disk 1",
+      "platform": 0
+    },
+    {
+      "command": "Get-PhysicalDisk | Select-Object FriendlyName,MediaType,HealthStatus",
+      "description": "Show the media type and health of the physical disks",
+      "platform": 0
+    }
+  ],
+  "notes": "Requires administrator rights.",
+  "links": [
+    {
+      "title": "Get-Disk documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/storage/get-disk"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les disques",
+      "description": "Affiche les disques de l'ordinateur avec leur santé, leur style de partition, leur taille et leur état en ligne.",
+      "notes": "Nécessite des droits administrateur.",
+      "examples": {
+        "Get-Disk | Where-Object IsOffline -eq $true": "Trouve les disques hors ligne",
+        "Get-Disk | Where-Object PartitionStyle -eq 'RAW'": "Trouve les nouveaux disques non initialisés",
+        "Get-Disk -Number 1 | Get-Partition": "Affiche les partitions du disque 1",
+        "Get-PhysicalDisk | Select-Object FriendlyName,MediaType,HealthStatus": "Affiche le type de support et la santé des disques physiques"
+      }
+    }
+  }
+}

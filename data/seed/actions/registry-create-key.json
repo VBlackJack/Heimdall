@@ -1,0 +1,76 @@
+{
+  "id": "registry-create-key",
+  "title": "Create a registry key",
+  "description": "Create a new registry key under an existing parent key.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 1,
+  "tags": [
+    "registry",
+    "key",
+    "regedit",
+    "configuration",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "registry-create-key-cmd",
+  "windowsCommandTemplate": {
+    "id": "registry-create-key-cmd",
+    "platform": 0,
+    "name": "New-Item",
+    "commandPattern": "New-Item -Path {keyPath}",
+    "parameters": [
+      {
+        "name": "keyPath",
+        "label": "Registry key",
+        "type": "path",
+        "defaultValue": "",
+        "required": true,
+        "description": "Path of the key to create (e.g. HKLM:\\SOFTWARE\\Contoso)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "New-Item -Path 'HKLM:\\SOFTWARE\\Contoso'",
+      "description": "Create the Contoso key under HKLM\\SOFTWARE",
+      "platform": 0
+    },
+    {
+      "command": "Test-Path -Path 'HKLM:\\SOFTWARE\\Contoso\\Agent'",
+      "description": "Check whether the key already exists",
+      "platform": 0
+    },
+    {
+      "command": "New-Item -Path 'HKCU:\\Software\\Contoso\\Agent'",
+      "description": "Create a key for the current user only",
+      "platform": 0
+    }
+  ],
+  "notes": "Writing under HKLM requires administrator rights. Do not add -Force on a key that exists: it replaces the key with an empty one and its values are lost.",
+  "links": [
+    {
+      "title": "New-Item documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-item"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer une clé de registre",
+      "description": "Crée une nouvelle clé de registre sous une clé parente existante.",
+      "notes": "L'écriture sous HKLM nécessite des droits administrateur. N'ajoutez pas -Force sur une clé existante : elle est remplacée par une clé vide et ses valeurs sont perdues.",
+      "parameters": {
+        "windows": {
+          "keyPath": {
+            "label": "Clé de registre",
+            "description": "Chemin de la clé à créer (ex : HKLM:\\SOFTWARE\\Contoso)"
+          }
+        }
+      },
+      "examples": {
+        "New-Item -Path 'HKLM:\\SOFTWARE\\Contoso'": "Crée la clé Contoso sous HKLM\\SOFTWARE",
+        "Test-Path -Path 'HKLM:\\SOFTWARE\\Contoso\\Agent'": "Vérifie si la clé existe déjà",
+        "New-Item -Path 'HKCU:\\Software\\Contoso\\Agent'": "Crée une clé pour l'utilisateur courant uniquement"
+      }
+    }
+  }
+}

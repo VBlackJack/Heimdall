@@ -1,0 +1,100 @@
+{
+  "id": "cluster-move-group",
+  "title": "Move a cluster role to another node",
+  "description": "Move a clustered role (a resource group) to another node of the failover cluster.",
+  "category": "services-automation",
+  "platform": 0,
+  "level": 2,
+  "tags": [
+    "cluster",
+    "failover",
+    "move",
+    "maintenance",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "cluster-move-group-cmd",
+  "windowsCommandTemplate": {
+    "id": "cluster-move-group-cmd",
+    "platform": 0,
+    "name": "Move-ClusterGroup",
+    "commandPattern": "Move-ClusterGroup -Name {groupName} -Node {nodeName} -Cluster {clusterName}",
+    "parameters": [
+      {
+        "name": "groupName",
+        "label": "Role",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the clustered role to move"
+      },
+      {
+        "name": "nodeName",
+        "label": "Target node",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Node that takes over the role"
+      },
+      {
+        "name": "clusterName",
+        "label": "Cluster",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the failover cluster"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Move-ClusterGroup -Name 'SQL Server (MSSQLSERVER)' -Node NODE02 -Cluster CLU01",
+      "description": "Move the SQL Server role to NODE02",
+      "platform": 0
+    },
+    {
+      "command": "Move-ClusterGroup -Name FileServer01 -Cluster CLU01",
+      "description": "Move the role to the best available node",
+      "platform": 0
+    },
+    {
+      "command": "Move-ClusterVirtualMachineRole -Name VM01 -Node NODE02 -MigrationType Live -Cluster CLU01",
+      "description": "Live-migrate a clustered virtual machine",
+      "platform": 0
+    }
+  ],
+  "notes": "The role goes offline on its current node and comes back online on the target: its clients lose it for that time. Requires the FailoverClusters module and administrator rights on the cluster.",
+  "links": [
+    {
+      "title": "Move-ClusterGroup documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/failoverclusters/move-clustergroup"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Déplacer un rôle de cluster vers un autre noeud",
+      "description": "Déplace un rôle en cluster (un groupe de ressources) vers un autre noeud du cluster de basculement.",
+      "notes": "Le rôle passe hors ligne sur son noeud actuel puis revient en ligne sur la cible : ses clients le perdent pendant ce temps. Nécessite le module FailoverClusters et des droits administrateur sur le cluster.",
+      "parameters": {
+        "windows": {
+          "groupName": {
+            "label": "Rôle",
+            "description": "Nom du rôle en cluster à déplacer"
+          },
+          "nodeName": {
+            "label": "Noeud cible",
+            "description": "Noeud qui reprend le rôle"
+          },
+          "clusterName": {
+            "label": "Cluster",
+            "description": "Nom du cluster de basculement"
+          }
+        }
+      },
+      "examples": {
+        "Move-ClusterGroup -Name 'SQL Server (MSSQLSERVER)' -Node NODE02 -Cluster CLU01": "Déplace le rôle SQL Server vers NODE02",
+        "Move-ClusterGroup -Name FileServer01 -Cluster CLU01": "Déplace le rôle vers le meilleur noeud disponible",
+        "Move-ClusterVirtualMachineRole -Name VM01 -Node NODE02 -MigrationType Live -Cluster CLU01": "Migre à chaud une machine virtuelle en cluster"
+      }
+    }
+  }
+}

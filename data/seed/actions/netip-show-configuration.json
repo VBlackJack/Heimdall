@@ -1,0 +1,66 @@
+{
+  "id": "netip-show-configuration",
+  "title": "Show the IP configuration",
+  "description": "Show the address, gateway and DNS servers of each connected interface.",
+  "category": "network-dns",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "ipconfig",
+    "ip",
+    "gateway",
+    "dns",
+    "network",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "netip-show-configuration-cmd",
+  "windowsCommandTemplate": {
+    "id": "netip-show-configuration-cmd",
+    "platform": 0,
+    "name": "Get-NetIPConfiguration",
+    "commandPattern": "Get-NetIPConfiguration -Detailed",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "Get-NetIPConfiguration",
+      "description": "Show the short view of each connected interface",
+      "platform": 0
+    },
+    {
+      "command": "Get-NetIPConfiguration -InterfaceAlias Ethernet",
+      "description": "Show one interface by its alias",
+      "platform": 0
+    },
+    {
+      "command": "Get-NetIPConfiguration -All",
+      "description": "Include the disconnected interfaces",
+      "platform": 0
+    },
+    {
+      "command": "Get-NetIPConfiguration -CimSession SRV-APP01",
+      "description": "Show the configuration of a remote server",
+      "platform": 0
+    }
+  ],
+  "notes": "No administrator rights needed. -Detailed adds the MAC address, the link speed and the DHCP state.",
+  "links": [
+    {
+      "title": "Get-NetIPConfiguration documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netipconfiguration"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher la configuration IP",
+      "description": "Affiche l'adresse, la passerelle et les serveurs DNS de chaque interface connectée.",
+      "notes": "Aucun droit administrateur requis. -Detailed ajoute l'adresse MAC, la vitesse du lien et l'état DHCP.",
+      "examples": {
+        "Get-NetIPConfiguration": "Affiche la vue courte de chaque interface connectée",
+        "Get-NetIPConfiguration -InterfaceAlias Ethernet": "Affiche une interface d'après son alias",
+        "Get-NetIPConfiguration -All": "Inclut les interfaces déconnectées",
+        "Get-NetIPConfiguration -CimSession SRV-APP01": "Affiche la configuration d'un serveur distant"
+      }
+    }
+  }
+}

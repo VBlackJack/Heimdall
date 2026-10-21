@@ -1,0 +1,94 @@
+{
+  "id": "hotfix-find-update",
+  "title": "Check whether an update is installed",
+  "description": "Look for one update by its KB number on a computer.",
+  "category": "windows-updates",
+  "platform": 0,
+  "level": 0,
+  "tags": [
+    "hotfix",
+    "kb",
+    "update",
+    "patch",
+    "windows"
+  ],
+  "windowsCommandTemplateId": "hotfix-find-update-cmd",
+  "windowsCommandTemplate": {
+    "id": "hotfix-find-update-cmd",
+    "platform": 0,
+    "name": "Get-HotFix",
+    "commandPattern": "Get-HotFix -Id {hotfixId} -ComputerName {computerName}",
+    "parameters": [
+      {
+        "name": "hotfixId",
+        "label": "KB number",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Identifier of the update (e.g. KB5034441)"
+      },
+      {
+        "name": "computerName",
+        "label": "Computer name",
+        "type": "hostname",
+        "defaultValue": "localhost",
+        "required": true,
+        "description": "Computer to query (localhost for this one)"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "Get-HotFix -Id KB5034441",
+      "description": "Check whether KB5034441 is installed on this computer",
+      "platform": 0
+    },
+    {
+      "command": "Get-HotFix -Id KB5034441 -ComputerName SRV-APP01, SRV-APP02",
+      "description": "Check the same update on two servers",
+      "platform": 0
+    },
+    {
+      "command": "Get-HotFix | Where-Object InstalledOn -gt (Get-Date).AddDays(-30)",
+      "description": "Show the updates installed during the last 30 days",
+      "platform": 0
+    },
+    {
+      "command": "Get-HotFix -Description Security*",
+      "description": "Show the security updates only",
+      "platform": 0
+    }
+  ],
+  "notes": "An update that is not installed raises an error. Querying another computer needs administrator rights on it.",
+  "links": [
+    {
+      "title": "Get-HotFix documentation",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-hotfix"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier si une mise à jour est installée",
+      "description": "Recherche une mise à jour par son numéro KB sur un ordinateur.",
+      "notes": "Une mise à jour absente provoque une erreur. Interroger un autre ordinateur nécessite des droits administrateur sur celui-ci.",
+      "parameters": {
+        "windows": {
+          "hotfixId": {
+            "label": "Numéro KB",
+            "description": "Identifiant de la mise à jour (ex : KB5034441)"
+          },
+          "computerName": {
+            "label": "Nom de l'ordinateur",
+            "description": "Ordinateur à interroger (localhost pour celui-ci)"
+          }
+        }
+      },
+      "examples": {
+        "Get-HotFix -Id KB5034441": "Vérifie si KB5034441 est installée sur cet ordinateur",
+        "Get-HotFix -Id KB5034441 -ComputerName SRV-APP01, SRV-APP02": "Vérifie la même mise à jour sur deux serveurs",
+        "Get-HotFix | Where-Object InstalledOn -gt (Get-Date).AddDays(-30)": "Affiche les mises à jour installées au cours des 30 derniers jours",
+        "Get-HotFix -Description Security*": "Affiche uniquement les mises à jour de sécurité"
+      }
+    }
+  }
+}
