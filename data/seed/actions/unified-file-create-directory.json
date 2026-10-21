@@ -1,7 +1,7 @@
 {
   "id": "unified-file-create-directory",
-  "title": "Créer un répertoire",
-  "description": "Crée un nouveau dossier, y compris les dossiers parents si nécessaire.",
+  "title": "Create a directory",
+  "description": "Create a new folder, including the parent folders when needed.",
   "category": "files-storage",
   "platform": 2,
   "level": 0,
@@ -9,10 +9,10 @@
     "linux",
     "windows",
     "mkdir",
-    "dossier",
-    "créer"
+    "folder",
+    "create"
   ],
-  "notes": "Windows: -Force crée les dossiers parents si nécessaire.\nLinux: -p crée les dossiers parents si nécessaire. -m définit les permissions.",
+  "notes": "Windows: -Force creates the parent folders when needed.\nLinux: -p creates the parent folders when needed. -m sets the permissions.",
   "links": [],
   "windowsCommandTemplateId": "file-create-directory-windows-cmd",
   "windowsCommandTemplate": {
@@ -23,48 +23,48 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin du dossier",
+        "label": "Folder path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du nouveau dossier à créer"
+        "description": "Path of the new folder to create"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "New-Item -Path \"C:\\Projects\\MyApp\\src\" -ItemType Directory -Force",
-      "description": "Crée une arborescence de dossiers",
+      "description": "Create a tree of folders",
       "platform": 0
     },
     {
       "command": "New-Item -Path \"{path}\" -ItemType Directory -Force -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf once checked to run it.",
       "platform": 0
     },
     {
       "command": "New-Item -Path \"{path}\" -ItemType Directory -Force -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the prompts. Useful in automated scripts, but use it with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "New-Item -Path \"{path}\" -ItemType Directory -Force -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the modified or created object in the pipeline. By default the Set-/New- cmdlets return nothing. -PassThru enables the return for chained operations or immediate checks.",
       "platform": 0
     },
     {
       "command": "New-Item -Path \"{path}\" -ItemType Directory -Force -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the command's execution. -Verbose enables debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
       "platform": 0
     },
     {
       "command": "New-Item -Path \"<path>\" -ItemType Directory -Force",
-      "description": "Exemple utilisant le paramètre 'path': Chemin du nouveau dossier à créer. Remplacez <path> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'path' parameter: Path of the new folder to create. Replace <path> with the value that fits your environment.",
       "platform": 0
     },
     {
       "command": "New-Item -Path \"C:\\Projects\\src\",\"C:\\Projects\\bin\" -ItemType Directory -Force",
-      "description": "Cree plusieurs dossiers en une commande.",
+      "description": "Create several folders in one command.",
       "platform": 0
     }
   ],
@@ -77,35 +77,69 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin du dossier",
+        "label": "Folder path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du nouveau dossier à créer"
+        "description": "Path of the new folder to create"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "mkdir -p /home/user/projects/myapp/src",
-      "description": "Crée une arborescence de dossiers",
+      "description": "Create a tree of folders",
       "platform": 1
     },
     {
       "command": "mkdir -m 755 newfolder",
-      "description": "Crée un dossier avec permissions spécifiques",
+      "description": "Create a folder with specific permissions",
       "platform": 1
     },
     {
       "command": "mkdir -p \"{path}\" -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
       "platform": 1
     },
     {
       "command": "mkdir -p \"<path>\"",
-      "description": "Exemple utilisant le paramètre 'path': Chemin du nouveau dossier à créer. Remplacez <path> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'path' parameter: Path of the new folder to create. Replace <path> with the value that fits your environment.",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Créer un répertoire",
+      "description": "Crée un nouveau dossier, y compris les dossiers parents si nécessaire.",
+      "notes": "Windows: -Force crée les dossiers parents si nécessaire.\nLinux: -p crée les dossiers parents si nécessaire. -m définit les permissions.",
+      "parameters": {
+        "windows": {
+          "path": {
+            "label": "Chemin du dossier",
+            "description": "Chemin du nouveau dossier à créer"
+          }
+        },
+        "linux": {
+          "path": {
+            "label": "Chemin du dossier",
+            "description": "Chemin du nouveau dossier à créer"
+          }
+        }
+      },
+      "examples": {
+        "New-Item -Path \"C:\\Projects\\MyApp\\src\" -ItemType Directory -Force": "Crée une arborescence de dossiers",
+        "New-Item -Path \"{path}\" -ItemType Directory -Force -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "New-Item -Path \"{path}\" -ItemType Directory -Force -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "New-Item -Path \"{path}\" -ItemType Directory -Force -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "New-Item -Path \"{path}\" -ItemType Directory -Force -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+        "New-Item -Path \"<path>\" -ItemType Directory -Force": "Exemple utilisant le paramètre 'path': Chemin du nouveau dossier à créer. Remplacez <path> par la valeur appropriée selon votre environnement.",
+        "New-Item -Path \"C:\\Projects\\src\",\"C:\\Projects\\bin\" -ItemType Directory -Force": "Cree plusieurs dossiers en une commande.",
+        "mkdir -p /home/user/projects/myapp/src": "Crée une arborescence de dossiers",
+        "mkdir -m 755 newfolder": "Crée un dossier avec permissions spécifiques",
+        "mkdir -p \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "mkdir -p \"<path>\"": "Exemple utilisant le paramètre 'path': Chemin du nouveau dossier à créer. Remplacez <path> par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

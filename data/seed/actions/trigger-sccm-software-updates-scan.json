@@ -1,7 +1,7 @@
 {
   "id": "trigger-sccm-software-updates-scan",
-  "title": "Déclencher scan des mises à jour SCCM",
-  "description": "Force la recherche immédiate des mises à jour disponibles",
+  "title": "Trigger the SCCM update scan",
+  "description": "Force an immediate search for available updates",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -21,20 +21,32 @@
   "examples": [
     {
       "command": "ss -tulpn",
-      "description": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+      "description": "🔥 LINUX STANDARD: list every listening TCP/UDP port (-tul) with its process (-p) and without DNS resolution (-n). The reference command to find out 'who listens on this port'.",
       "platform": 1
     },
     {
       "command": "ss -s",
-      "description": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+      "description": "Quick statistical summary of the sockets (Total, TCP, UDP). Useful to spot socket exhaustion or a DDoS attack.",
       "platform": 1
     },
     {
       "command": "powershell -Command \"Invoke-WmiMethod -Namespace root\\ccm -Class SMS_Client -Name TriggerSchedule -ArgumentList '{00000000-0000-0000-0000-000000000113}'\"",
-      "description": "Force le scan des mises à jour SCCM",
+      "description": "Force the SCCM update scan",
       "platform": 0
     }
   ],
-  "notes": "Droits administrateur requis. GUID {00000000-0000-0000-0000-000000000113} = Software Updates Scan.",
-  "links": []
+  "notes": "Requires administrator rights. GUID {00000000-0000-0000-0000-000000000113} = Software Updates Scan.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Déclencher scan des mises à jour SCCM",
+      "description": "Force la recherche immédiate des mises à jour disponibles",
+      "notes": "Droits administrateur requis. GUID {00000000-0000-0000-0000-000000000113} = Software Updates Scan.",
+      "examples": {
+        "ss -tulpn": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
+        "ss -s": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
+        "powershell -Command \"Invoke-WmiMethod -Namespace root\\ccm -Class SMS_Client -Name TriggerSchedule -ArgumentList '{00000000-0000-0000-0000-000000000113}'\"": "Force le scan des mises à jour SCCM"
+      }
+    }
+  }
 }

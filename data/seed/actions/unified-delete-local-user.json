@@ -1,7 +1,7 @@
 {
   "id": "unified-delete-local-user",
-  "title": "Supprimer un utilisateur local",
-  "description": "Supprime un compte utilisateur local du système.",
+  "title": "Delete a local user",
+  "description": "Delete a local user account from the system.",
   "category": "security",
   "platform": 2,
   "level": 2,
@@ -28,19 +28,19 @@
         "type": "string",
         "defaultValue": "-r",
         "required": false,
-        "description": "Options (-r supprime aussi le home)"
+        "description": "Options (-r also deletes the home directory)"
       },
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "User name",
         "type": "string",
         "defaultValue": "john",
         "required": true,
-        "description": "Utilisateur à supprimer"
+        "description": "User to delete"
       }
     ]
   },
-  "notes": "Windows: Remove-LocalUser supprime l'utilisateur local (pas AD). Le profil utilisateur n'est pas supprimé automatiquement.\nLinux: userdel nécessite sudo. DANGER: -r supprime définitivement le home. Vérifier les processus actifs d'abord.",
+  "notes": "Windows: Remove-LocalUser deletes the local user (not AD). The user profile is not deleted automatically.\nLinux: userdel requires sudo. DANGER: -r deletes the home directory for good. Check the running processes first.",
   "links": [
     {
       "title": "userdel documentation",
@@ -54,42 +54,42 @@
   "linuxExamples": [
     {
       "command": "sudo userdel john",
-      "description": "Supprime l'utilisateur john (garde le home)",
+      "description": "Delete the user john (keeps the home directory)",
       "platform": 1
     },
     {
       "command": "sudo userdel -r john",
-      "description": "Supprime john et son répertoire home",
+      "description": "Delete john and his home directory",
       "platform": 1
     },
     {
       "command": "userdel -r {username}",
-      "description": "Exemple utilisant le paramètre 'options': Options (-r supprime aussi le home). Remplacez <options> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'options' parameter: Options (-r also deletes the home directory). Replace <options> with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "userdel {options} john",
-      "description": "Exemple utilisant le paramètre 'username': Utilisateur à supprimer. Remplacez <username> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'username' parameter: User to delete. Replace <username> with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "userdel jdupont",
-      "description": "Supprimer l'utilisateur jdupont",
+      "description": "Delete the user jdupont",
       "platform": 1
     },
     {
       "command": "userdel -r olduser",
-      "description": "Supprimer l'utilisateur et son home",
+      "description": "Delete the user and the home directory",
       "platform": 1
     },
     {
       "command": "userdel -f lockeduser",
-      "description": "Forcer la suppression même si connecté",
+      "description": "Force the deletion even when the user is logged on",
       "platform": 1
     },
     {
       "command": "userdel -r jdupont",
-      "description": "Avec suppression du home",
+      "description": "With deletion of the home directory",
       "platform": 1
     }
   ],
@@ -102,30 +102,68 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "User name",
         "type": "string",
         "defaultValue": "john",
         "required": true,
-        "description": "Utilisateur à supprimer"
+        "description": "User to delete"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "Remove-LocalUser -Name \"john\"",
-      "description": "Supprime l'utilisateur john",
+      "description": "Delete the user john",
       "platform": 0
     },
     {
       "command": "Remove-LocalUser -Name \"john\" -Confirm:$false",
-      "description": "Supprime sans confirmation",
+      "description": "Delete without confirmation",
       "platform": 0
     },
     {
       "command": "Get-LocalUser | Where-Object {$_.Enabled -eq $false} | Remove-LocalUser",
-      "description": "Supprime tous les utilisateurs désactivés",
+      "description": "Delete every disabled user",
       "platform": 0
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Supprimer un utilisateur local",
+      "description": "Supprime un compte utilisateur local du système.",
+      "notes": "Windows: Remove-LocalUser supprime l'utilisateur local (pas AD). Le profil utilisateur n'est pas supprimé automatiquement.\nLinux: userdel nécessite sudo. DANGER: -r supprime définitivement le home. Vérifier les processus actifs d'abord.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Utilisateur à supprimer"
+          }
+        },
+        "linux": {
+          "options": {
+            "label": "Options",
+            "description": "Options (-r supprime aussi le home)"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Utilisateur à supprimer"
+          }
+        }
+      },
+      "examples": {
+        "Remove-LocalUser -Name \"john\"": "Supprime l'utilisateur john",
+        "Remove-LocalUser -Name \"john\" -Confirm:$false": "Supprime sans confirmation",
+        "Get-LocalUser | Where-Object {$_.Enabled -eq $false} | Remove-LocalUser": "Supprime tous les utilisateurs désactivés",
+        "sudo userdel john": "Supprime l'utilisateur john (garde le home)",
+        "sudo userdel -r john": "Supprime john et son répertoire home",
+        "userdel -r {username}": "Exemple utilisant le paramètre 'options': Options (-r supprime aussi le home). Remplacez <options> par la valeur appropriée selon votre environnement.",
+        "userdel {options} john": "Exemple utilisant le paramètre 'username': Utilisateur à supprimer. Remplacez <username> par la valeur appropriée selon votre environnement.",
+        "userdel jdupont": "Supprimer l'utilisateur jdupont",
+        "userdel -r olduser": "Supprimer l'utilisateur et son home",
+        "userdel -f lockeduser": "Forcer la suppression même si connecté",
+        "userdel -r jdupont": "Avec suppression du home"
+      }
+    }
+  }
 }

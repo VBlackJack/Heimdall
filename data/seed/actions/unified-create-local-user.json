@@ -1,7 +1,7 @@
 {
   "id": "unified-create-local-user",
-  "title": "Créer un utilisateur local",
-  "description": "Crée un nouveau compte utilisateur local sur le système.",
+  "title": "Create a local user",
+  "description": "Create a new local user account on the system.",
   "category": "security",
   "platform": 2,
   "level": 1,
@@ -27,19 +27,19 @@
         "type": "string",
         "defaultValue": "/bin/bash",
         "required": true,
-        "description": "Shell par défaut"
+        "description": "Default shell"
       },
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "User name",
         "type": "string",
         "defaultValue": "newuser",
         "required": true,
-        "description": "Nom du nouvel utilisateur"
+        "description": "Name of the new user"
       }
     ]
   },
-  "notes": "Windows: New-LocalUser crée un utilisateur local (pas AD). -NoPassword pour compte sans mot de passe.\nLinux: useradd nécessite sudo. -m crée le répertoire home. Utiliser passwd ensuite pour définir le mot de passe.",
+  "notes": "Windows: New-LocalUser creates a local user (not AD). -NoPassword for an account without a password.\nLinux: useradd requires sudo. -m creates the home directory. Run passwd afterwards to set the password.",
   "links": [
     {
       "title": "useradd documentation",
@@ -53,37 +53,37 @@
   "linuxExamples": [
     {
       "command": "sudo useradd -m -s /bin/bash john",
-      "description": "Crée l'utilisateur john avec répertoire home",
+      "description": "Create the user john with a home directory",
       "platform": 1
     },
     {
       "command": "sudo useradd -m -G sudo,docker john",
-      "description": "Crée john et l'ajoute aux groupes sudo et docker",
+      "description": "Create john and add him to the sudo and docker groups",
       "platform": 1
     },
     {
       "command": "sudo passwd john",
-      "description": "Définit le mot de passe après création",
+      "description": "Set the password after creation",
       "platform": 1
     },
     {
       "command": "useradd -m -s /bin/bash {username}",
-      "description": "Exemple utilisant le paramètre 'shell': Shell par défaut. Remplacez <shell> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'shell' parameter: Default shell. Replace <shell> with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "useradd -m -s {shell} newuser",
-      "description": "Exemple utilisant le paramètre 'username': Nom du nouvel utilisateur. Remplacez <username> par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'username' parameter: Name of the new user. Replace <username> with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "useradd -m -s /bin/bash jdupont",
-      "description": "Créer un utilisateur avec home et bash",
+      "description": "Create a user with a home directory and bash",
       "platform": 1
     },
     {
       "command": "useradd -m -d /opt/app -s /bin/bash appuser",
-      "description": "Utilisateur avec home personnalisé",
+      "description": "User with a custom home directory",
       "platform": 1
     }
   ],
@@ -96,30 +96,67 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "User name",
         "type": "string",
         "defaultValue": "newuser",
         "required": true,
-        "description": "Nom du nouvel utilisateur"
+        "description": "Name of the new user"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "New-LocalUser -Name \"john\" -NoPassword",
-      "description": "Crée l'utilisateur john sans mot de passe",
+      "description": "Create the user john without a password",
       "platform": 0
     },
     {
       "command": "New-LocalUser -Name \"john\" -Password (Read-Host -AsSecureString)",
-      "description": "Crée john avec mot de passe interactif",
+      "description": "Create john with an interactive password",
       "platform": 0
     },
     {
       "command": "New-LocalUser -Name \"john\" -FullName \"John Doe\" -Description \"Developer\"",
-      "description": "Crée john avec nom complet et description",
+      "description": "Create john with a full name and a description",
       "platform": 0
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Créer un utilisateur local",
+      "description": "Crée un nouveau compte utilisateur local sur le système.",
+      "notes": "Windows: New-LocalUser crée un utilisateur local (pas AD). -NoPassword pour compte sans mot de passe.\nLinux: useradd nécessite sudo. -m crée le répertoire home. Utiliser passwd ensuite pour définir le mot de passe.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Nom du nouvel utilisateur"
+          }
+        },
+        "linux": {
+          "shell": {
+            "label": "Shell",
+            "description": "Shell par défaut"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Nom du nouvel utilisateur"
+          }
+        }
+      },
+      "examples": {
+        "New-LocalUser -Name \"john\" -NoPassword": "Crée l'utilisateur john sans mot de passe",
+        "New-LocalUser -Name \"john\" -Password (Read-Host -AsSecureString)": "Crée john avec mot de passe interactif",
+        "New-LocalUser -Name \"john\" -FullName \"John Doe\" -Description \"Developer\"": "Crée john avec nom complet et description",
+        "sudo useradd -m -s /bin/bash john": "Crée l'utilisateur john avec répertoire home",
+        "sudo useradd -m -G sudo,docker john": "Crée john et l'ajoute aux groupes sudo et docker",
+        "sudo passwd john": "Définit le mot de passe après création",
+        "useradd -m -s /bin/bash {username}": "Exemple utilisant le paramètre 'shell': Shell par défaut. Remplacez <shell> par la valeur appropriée selon votre environnement.",
+        "useradd -m -s {shell} newuser": "Exemple utilisant le paramètre 'username': Nom du nouvel utilisateur. Remplacez <username> par la valeur appropriée selon votre environnement.",
+        "useradd -m -s /bin/bash jdupont": "Créer un utilisateur avec home et bash",
+        "useradd -m -d /opt/app -s /bin/bash appuser": "Utilisateur avec home personnalisé"
+      }
+    }
+  }
 }

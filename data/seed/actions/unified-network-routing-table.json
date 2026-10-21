@@ -1,7 +1,7 @@
 {
   "id": "unified-network-routing-table",
-  "title": "Afficher la table de routage",
-  "description": "Affiche la table de routage IP complète avec les routes par défaut et statiques",
+  "title": "Show the routing table",
+  "description": "Show the full IP routing table with the default and static routes",
   "category": "network-dns",
   "platform": 2,
   "level": 0,
@@ -31,13 +31,23 @@
   "windowsExamples": [
     {
       "command": "route print -4",
-      "description": "🔥 ROUTAGE WINDOWS : Affiche la table de routage IPv4 standard. Plus lisible que Get-NetRoute pour les anciens admins.",
+      "description": "🔥 WINDOWS ROUTING: show the standard IPv4 routing table. More readable than Get-NetRoute for long-time administrators.",
       "platform": 0
     },
     {
       "command": "Get-NetRoute -AddressFamily IPv4 | Where-Object {$_.NextHop -ne '0.0.0.0'} | Select-Object DestinationPrefix,NextHop,RouteMetric,InterfaceAlias | Sort-Object RouteMetric | Format-Table -AutoSize",
-      "description": "Affiche la table de routage IPv4 sur Windows",
+      "description": "Show the IPv4 routing table on Windows",
       "platform": 0
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher la table de routage",
+      "description": "Affiche la table de routage IP complète avec les routes par défaut et statiques",
+      "examples": {
+        "route print -4": "🔥 ROUTAGE WINDOWS : Affiche la table de routage IPv4 standard. Plus lisible que Get-NetRoute pour les anciens admins.",
+        "Get-NetRoute -AddressFamily IPv4 | Where-Object {$_.NextHop -ne '0.0.0.0'} | Select-Object DestinationPrefix,NextHop,RouteMetric,InterfaceAlias | Sort-Object RouteMetric | Format-Table -AutoSize": "Affiche la table de routage IPv4 sur Windows"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "ulimit-resource-limits",
-  "title": "Afficher/définir les limites de ressources",
-  "description": "Affiche ou modifie les limites de ressources des processus (fichiers, mémoire, CPU)",
+  "title": "Show or set resource limits",
+  "description": "Show or change the resource limits of processes (files, memory, CPU)",
   "category": "performance",
   "platform": 1,
   "level": 1,
@@ -29,56 +29,84 @@
       },
       {
         "name": "value",
-        "label": "Valeur",
+        "label": "Value",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nouvelle valeur (vide = afficher)"
+        "description": "New value (empty = show)"
       }
     ]
   },
   "examples": [
     {
       "command": "ulimit -a",
-      "description": "Affiche toutes les limites",
+      "description": "Show every limit",
       "platform": 1
     },
     {
       "command": "ulimit -n 65535",
-      "description": "Augmente le nombre de fichiers ouverts",
+      "description": "Raise the number of open files",
       "platform": 1
     },
     {
       "command": "ulimit -u 4096",
-      "description": "Limite le nombre de processus",
+      "description": "Limit the number of processes",
       "platform": 1
     },
     {
       "command": "ulimit -a ConfigValue123",
-      "description": "Exemple utilisant le paramètre 'option': Option (a=all, n=files, u=processes, m=memory). Remplacez verbose par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'option' parameter: Option (a=all, n=files, u=processes, m=memory). Replace verbose with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "ulimit -verbose ConfigValue123",
-      "description": "Exemple utilisant le paramètre 'value': Nouvelle valeur (vide = afficher). Remplacez ConfigValue123 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'value' parameter: New value (empty = show). Replace ConfigValue123 with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "ulimit -n",
-      "description": "Limite des fichiers ouverts",
+      "description": "Open files limit",
       "platform": 1
     },
     {
       "command": "ulimit -u",
-      "description": "Limite des processus utilisateur",
+      "description": "User processes limit",
       "platform": 1
     }
   ],
-  "notes": "Modifications temporaires pour la session. Éditer /etc/security/limits.conf pour permanence.",
+  "notes": "Changes are temporary, for the session only. Edit /etc/security/limits.conf to make them permanent.",
   "links": [
     {
       "title": "ulimit guide",
       "url": "https://man7.org/linux/man-pages/man1/bash.1.html#SHELL_BUILTIN_COMMANDS"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher/définir les limites de ressources",
+      "description": "Affiche ou modifie les limites de ressources des processus (fichiers, mémoire, CPU)",
+      "notes": "Modifications temporaires pour la session. Éditer /etc/security/limits.conf pour permanence.",
+      "parameters": {
+        "linux": {
+          "option": {
+            "label": "Option",
+            "description": "Option (a=all, n=files, u=processes, m=memory)"
+          },
+          "value": {
+            "label": "Valeur",
+            "description": "Nouvelle valeur (vide = afficher)"
+          }
+        }
+      },
+      "examples": {
+        "ulimit -a": "Affiche toutes les limites",
+        "ulimit -n 65535": "Augmente le nombre de fichiers ouverts",
+        "ulimit -u 4096": "Limite le nombre de processus",
+        "ulimit -a ConfigValue123": "Exemple utilisant le paramètre 'option': Option (a=all, n=files, u=processes, m=memory). Remplacez verbose par la valeur appropriée selon votre environnement.",
+        "ulimit -verbose ConfigValue123": "Exemple utilisant le paramètre 'value': Nouvelle valeur (vide = afficher). Remplacez ConfigValue123 par la valeur appropriée selon votre environnement.",
+        "ulimit -n": "Limite des fichiers ouverts",
+        "ulimit -u": "Limite des processus utilisateur"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "unified-network-connections",
-  "title": "Afficher les connexions réseau actives",
-  "description": "Affiche les ports ouverts et les connexions réseau actives",
+  "title": "Show active network connections",
+  "description": "Show the open ports and active network connections",
   "category": "network-dns",
   "platform": 2,
   "level": 0,
@@ -31,35 +31,49 @@
   "windowsExamples": [
     {
       "command": "Get-NetTCPConnection -State Established | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort | Sort-Object RemoteAddress",
-      "description": "Affiche les connexions TCP actives triées par adresse distante.",
+      "description": "Show the active TCP connections sorted by remote address.",
       "platform": 0
     },
     {
       "command": "Get-Process | Where-Object {$_.Responding -eq $false}",
-      "description": "Trouve les applications 'Ne répond pas' (Frozen).",
+      "description": "Find the applications that are 'Not responding' (frozen).",
       "platform": 0
     },
     {
       "command": "Get-NetTCPConnection -State Listen | Select-Object LocalAddress,LocalPort,ProcessName | Format-Table",
-      "description": "Liste les ports en écoute sur Windows",
+      "description": "List the listening ports on Windows",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ss -tulpn",
-      "description": "Liste les ports en ecoute avec les processus associes (alternative moderne a netstat).",
+      "description": "List the listening ports with their processes (modern alternative to netstat).",
       "platform": 1
     },
     {
       "command": "netstat -i",
-      "description": "Statistiques des interfaces",
+      "description": "Interface statistics",
       "platform": 1
     },
     {
       "command": "netstat -s",
-      "description": "Statistiques des protocoles",
+      "description": "Protocol statistics",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les connexions réseau actives",
+      "description": "Affiche les ports ouverts et les connexions réseau actives",
+      "examples": {
+        "Get-NetTCPConnection -State Established | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort | Sort-Object RemoteAddress": "Affiche les connexions TCP actives triées par adresse distante.",
+        "Get-Process | Where-Object {$_.Responding -eq $false}": "Trouve les applications 'Ne répond pas' (Frozen).",
+        "Get-NetTCPConnection -State Listen | Select-Object LocalAddress,LocalPort,ProcessName | Format-Table": "Liste les ports en écoute sur Windows",
+        "ss -tulpn": "Liste les ports en ecoute avec les processus associes (alternative moderne a netstat).",
+        "netstat -i": "Statistiques des interfaces",
+        "netstat -s": "Statistiques des protocoles"
+      }
+    }
+  }
 }
