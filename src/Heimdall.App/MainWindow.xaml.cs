@@ -237,7 +237,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             else if (string.Equals(e.PropertyName, nameof(SettingsViewModel.ValidationSummary), StringComparison.Ordinal)
                 || (e.PropertyName?.EndsWith(SettingsTabErrorCountSuffix, StringComparison.Ordinal) ?? false))
             {
-                // The tab badges recount on every change in error; the sections recount with them.
+                // The view model recounts its group totals on every change in error; the rail
+                // sections recount with them.
                 Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => RefreshSettingsRailErrorCounts(viewModel.Settings)));
             }
         };
@@ -782,11 +783,27 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     {
         TabSettings.IsChecked = true;
         SwitchToTab(ShellTab.Settings);
-        Mw_SettingsSubTabControl.SelectedItem = Mw_SettingsTabSsh;
 
-        // The SSH tab alone opened on whichever sub-tab was last shown, usually Connection, and
-        // left the user to find the gateways.
-        Mw_SettingsSshSubTabControl.SelectedItem = Mw_SettingsSshSubTabGateways;
+        // The rail holds every section, so the gateways are selected directly. Opening the SSH
+        // group alone once landed on whichever SSH section was last shown and left the user to
+        // find the gateways.
+        Mw_SettingsSubTabControl.SelectedItem = Mw_SettingsSshSubTabGateways;
+    }
+
+    /// <summary>
+    /// Keeps the open section in sight on the rail: a search jump or a "Go to setting" can open a
+    /// section scrolled out of a short rail.
+    /// </summary>
+    private void OnSettingsRailSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // A combo box inside a section raises the same routed event through the rail.
+        if (!ReferenceEquals(e.OriginalSource, Mw_SettingsSubTabControl)
+            || Mw_SettingsSubTabControl.SelectedItem is not TabItem section)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => section.BringIntoView()));
     }
 
     /// <summary>
@@ -1227,51 +1244,39 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private const string SettingsTabErrorCountSuffix = "TabErrorCount";
 
     /// <summary>
-    /// Puts on every section of the settings rails the count of its fields in error, so the badge
-    /// on a top tab leads to a section and not to a tab that has to be searched.
+    /// Puts on every section of the settings rail the count of its fields in error, so the badge
+    /// leads to the section that holds the red box.
     /// </summary>
     private void RefreshSettingsRailErrorCounts(SettingsViewModel settings)
     {
-        foreach (System.Windows.Controls.TabControl rail in SettingsRails(Mw_SettingsSubTabControl))
+        foreach (TabItem section in SettingsRailSections(Mw_SettingsSubTabControl))
         {
-            foreach (object item in rail.Items)
-            {
-                if (item is TabItem section && section.Content is DependencyObject content)
-                {
-                    Controls.SettingsRail.SetErrorCount(
-                        section,
-                        Controls.SettingsRail.CountFieldErrors(
-                            content,
-                            settings.FieldHasError,
-                            Converters.SettingsFieldErrorConverter.SettingsPathPrefix));
-                }
-            }
+            Controls.SettingsRail.SetErrorCount(
+                section,
+                Controls.SettingsRail.CountFieldErrors(
+                    (DependencyObject)section.Content,
+                    settings.FieldHasError,
+                    Converters.SettingsFieldErrorConverter.SettingsPathPrefix));
         }
     }
 
-    /// <summary>The rail tab controls under <paramref name="root"/>, in the logical tree.</summary>
-    internal static IEnumerable<System.Windows.Controls.TabControl> SettingsRails(DependencyObject root)
+    /// <summary>
+    /// The sections of the settings rail, in rail order: every item that holds content. A group
+    /// heading holds none and is left out.
+    /// </summary>
+    internal static IEnumerable<TabItem> SettingsRailSections(ItemsControl rail)
     {
-        foreach (object child in LogicalTreeHelper.GetChildren(root))
+        ArgumentNullException.ThrowIfNull(rail);
+        foreach (object item in rail.Items)
         {
-            if (child is not DependencyObject node)
+            if (item is TabItem { Content: DependencyObject } section)
             {
-                continue;
-            }
-
-            if (node is System.Windows.Controls.TabControl { TabStripPlacement: Dock.Left } rail)
-            {
-                yield return rail;
-            }
-
-            foreach (System.Windows.Controls.TabControl nested in SettingsRails(node))
-            {
-                yield return nested;
+                yield return section;
             }
         }
     }
 
-    internal sealed record SettingsSearchEntry(FrameworkElement Target, TabItem TopTab, TabItem? SubTab);
+    internal sealed record SettingsSearchEntry(FrameworkElement Target, TabItem Section);
 
     private List<SettingsSearchEntry>? _settingsSearchIndex;
 
@@ -1421,7 +1426,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         // Selecting the tabs is not enough: a match inside a collapsed expander was jumped to with
         // nothing on screen and nothing highlighted. Every tab and expander on the way is opened.
-        Mw_SettingsSubTabControl.SelectedItem = entry.TopTab;
+        Mw_SettingsSubTabControl.SelectedItem = entry.Section;
         RevealSettingsElement(jumpTarget);
         if (DataContext is MainViewModel searchVm)
         {
@@ -1436,8 +1441,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             DispatcherPriority.Loaded,
             new Action(() =>
             {
-                entry.TopTab.UpdateLayout();
-                entry.SubTab?.UpdateLayout();
+                entry.Section.UpdateLayout();
                 jumpTarget.UpdateLayout();
                 Rect targetArea = new(
                     0,
@@ -1459,22 +1463,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
 
         List<SettingsSearchEntry> entries = [];
-        TabItem[] topTabs =
-        [
-            Mw_SettingsTabGeneral,
-            Mw_SettingsTabTerminal,
-            Mw_SettingsTabSsh,
-            Mw_SettingsTabRdp,
-            Mw_SettingsTabSecurity,
-            Mw_SettingsTabAdvanced,
-        ];
-
-        foreach (TabItem topTab in topTabs)
+        foreach (TabItem section in SettingsRailSections(Mw_SettingsSubTabControl))
         {
-            if (topTab.Content is DependencyObject content)
-            {
-                AddSettingsSearchEntries(content, topTab, null, entries);
-            }
+            AddSettingsSearchEntries((DependencyObject)section.Content, section, entries);
         }
 
         _settingsSearchIndex = entries;
@@ -1483,17 +1474,18 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     internal static void AddSettingsSearchEntries(
         DependencyObject node,
-        TabItem topTab,
-        TabItem? subTab,
+        TabItem section,
         List<SettingsSearchEntry> entries)
     {
+        // A tab control inside a section: its pages belong to the same rail section, and the
+        // jump opens the inner page on the way, as it opens an expander.
         if (node is System.Windows.Controls.TabControl tabControl)
         {
             foreach (object item in tabControl.Items)
             {
                 if (item is TabItem tabItem && tabItem.Content is DependencyObject tabContent)
                 {
-                    AddSettingsSearchEntries(tabContent, topTab, tabItem, entries);
+                    AddSettingsSearchEntries(tabContent, section, entries);
                 }
             }
 
@@ -1502,14 +1494,14 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         if (node is TextBlock or System.Windows.Controls.CheckBox)
         {
-            entries.Add(new SettingsSearchEntry((FrameworkElement)node, topTab, subTab));
+            entries.Add(new SettingsSearchEntry((FrameworkElement)node, section));
             return;
         }
 
         // An expander's header is the only label of what it folds away.
         if (node is Expander { Header: string })
         {
-            entries.Add(new SettingsSearchEntry((FrameworkElement)node, topTab, subTab));
+            entries.Add(new SettingsSearchEntry((FrameworkElement)node, section));
         }
 
         // A hint that exists only as a tooltip - most of the RDP check boxes, the host pool
@@ -1517,7 +1509,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         if (node is FrameworkElement { ToolTip: string } withTooltip
             && node is not ContentControl { Content: string })
         {
-            entries.Add(new SettingsSearchEntry(withTooltip, topTab, subTab));
+            entries.Add(new SettingsSearchEntry(withTooltip, section));
         }
 
         // A control whose Content is a plain string puts no TextBlock in the logical tree,
@@ -1530,7 +1522,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 or System.Windows.Controls.RadioButton
                 or ComboBoxItem)
         {
-            entries.Add(new SettingsSearchEntry(contentControl, topTab, subTab));
+            entries.Add(new SettingsSearchEntry(contentControl, section));
             return;
         }
 
@@ -1538,7 +1530,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             if (child is DependencyObject dependencyObject)
             {
-                AddSettingsSearchEntries(dependencyObject, topTab, subTab, entries);
+                AddSettingsSearchEntries(dependencyObject, section, entries);
             }
         }
     }

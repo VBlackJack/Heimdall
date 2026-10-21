@@ -124,7 +124,7 @@ public sealed class MainWindowSettingsSearchReachTests
     private static List<MainWindow.SettingsSearchEntry> Index(DependencyObject root)
     {
         List<MainWindow.SettingsSearchEntry> entries = [];
-        MainWindow.AddSettingsSearchEntries(root, new TabItem(), null, entries);
+        MainWindow.AddSettingsSearchEntries(root, new TabItem(), entries);
         return entries;
     }
 

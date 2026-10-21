@@ -21,15 +21,66 @@ using TextBox = System.Windows.Controls.TextBox;
 namespace Heimdall.App.Controls;
 
 /// <summary>
-/// What a section of the settings rail reports about the fields it holds.
+/// What a section of the settings rail reports about the fields it holds, and where it sits.
 /// </summary>
 /// <remarks>
-/// The top tabs carry an error badge, but a tab now holds several sections, so the badge said
-/// which tab to open and not which section. The rail item shows the count of its own fields in
-/// error, read with the same predicate the field tooltips use.
+/// <para>The settings had six top tabs with an error badge each, and a rail of sections inside each
+/// tab, so the badge said which tab to open and not which section. There is one rail now: every
+/// section is listed under the name of its group, and the rail item shows the count of its own
+/// fields in error, read with the same predicate the field tooltips use.</para>
+/// <para>A section names its group, and so does the group heading above it; a markup guard checks
+/// that the two agree, and the content footer of a group is shown from the open section's group.</para>
 /// </remarks>
 public static class SettingsRail
 {
+    /// <summary>The settings group a rail section or group heading belongs to.</summary>
+    public static readonly DependencyProperty GroupProperty = DependencyProperty.RegisterAttached(
+        "Group",
+        typeof(string),
+        typeof(SettingsRail),
+        new FrameworkPropertyMetadata(null));
+
+    /// <summary>What the rail shows under the open section, such as the reset of a group's defaults.</summary>
+    public static readonly DependencyProperty ContentFooterProperty = DependencyProperty.RegisterAttached(
+        "ContentFooter",
+        typeof(object),
+        typeof(SettingsRail),
+        new FrameworkPropertyMetadata(null));
+
+    /// <summary>Reads the group of a rail item.</summary>
+    /// <param name="element">The section's or the group heading's tab item.</param>
+    public static string? GetGroup(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return (string?)element.GetValue(GroupProperty);
+    }
+
+    /// <summary>Sets the group of a rail item.</summary>
+    /// <param name="element">The section's or the group heading's tab item.</param>
+    /// <param name="value">The group name, the suffix of the heading's name.</param>
+    public static void SetGroup(DependencyObject element, string? value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(GroupProperty, value);
+    }
+
+    /// <summary>Reads what the rail shows under the open section.</summary>
+    /// <param name="element">The rail.</param>
+    public static object? GetContentFooter(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return element.GetValue(ContentFooterProperty);
+    }
+
+    /// <summary>Sets what the rail shows under the open section.</summary>
+    /// <param name="element">The rail.</param>
+    /// <param name="value">The footer content.</param>
+    public static void SetContentFooter(DependencyObject element, object? value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(ContentFooterProperty, value);
+    }
+
     /// <summary>How many fields of the section are in error; the rail item shows it as a badge.</summary>
     public static readonly DependencyProperty ErrorCountProperty = DependencyProperty.RegisterAttached(
         "ErrorCount",

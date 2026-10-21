@@ -34,6 +34,8 @@ public sealed class SettingsLayoutOrderGuardTests
 {
     private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
+    private static readonly XNamespace Rail = "clr-namespace:Heimdall.App.Controls";
+
     [Fact]
     public void SettingsFieldsComeBeforeTheirButtonsAndLabelsAreNotClipped()
     {
@@ -67,13 +69,16 @@ public sealed class SettingsLayoutOrderGuardTests
             Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
         XElement Named(string name) => markup.Descendants().Single(element => element.Attribute(Xaml + "Name")?.Value == name);
 
-        List<XElement> general = Named("Mw_SettingsTabGeneral").Descendants().ToList();
+        List<XElement> settings = Named("Mw_SettingsSubTabControl").Descendants().ToList();
         Assert.True(
-            general.IndexOf(Named("Mw_SettingsAppearanceTitle")) < general.IndexOf(Named("Mw_SettingsOnboardingTitle")),
+            settings.IndexOf(Named("Mw_SettingsAppearanceTitle")) < settings.IndexOf(Named("Mw_SettingsOnboardingTitle")),
             "Appearance comes before the welcome tour on General");
-        // General opens on its first rail section, so Appearance leads the rail and the tour closes it.
-        List<XElement> sections = Named("Mw_SettingsGeneralSubTabControl").Elements()
-            .Where(element => element.Name.LocalName == "TabItem")
+        // The rail opens on the first General section, so Appearance leads the group and the tour
+        // closes it.
+        List<XElement> sections = Named("Mw_SettingsSubTabControl").Elements()
+            .Where(element => element.Name.LocalName == "TabItem"
+                && element.Attribute(Rail + "SettingsRail.Group")?.Value == "General"
+                && element.Attribute("Style")?.Value == "{StaticResource SettingsRailTabItemStyle}")
             .ToList();
         Assert.Contains(sections[0].Descendants(), element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsAppearanceTitle");
         Assert.Contains(sections[^1].Descendants(), element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsOnboardingTitle");

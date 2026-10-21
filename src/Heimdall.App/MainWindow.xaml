@@ -2766,22 +2766,12 @@
             </Grid>
 
             <!-- ============================================================ -->
-            <!-- SETTINGS TAB: top sub-tabs with search                        -->
+            <!-- SETTINGS TAB: one grouped section rail with search          -->
             <!-- ============================================================ -->
             <Grid x:Name="Mw_SettingsRoot"
                   Visibility="{Binding IsSettingsTabSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.Resources>
                     <converters:SettingsFieldErrorConverter x:Key="SettingsFieldErrorConverter"/>
-                    <!-- The error-count badge of a settings tab, once for all six tabs. -->
-                    <Style x:Key="SettingsTabErrorBadgeStyle" TargetType="{x:Type Border}">
-                        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMd}"/>
-                        <Setter Property="Background" Value="{DynamicResource ErrorTextBrush}"/>
-                        <Setter Property="MinWidth" Value="{StaticResource BadgeHeight}"/>
-                        <Setter Property="Height" Value="{StaticResource BadgeHeight}"/>
-                        <Setter Property="Padding" Value="5,0"/>
-                        <Setter Property="Margin" Value="6,0,0,0"/>
-                        <Setter Property="VerticalAlignment" Value="Center"/>
-                    </Style>
                     <!-- When a card's settings take effect, where it is not simply "on Save". -->
                     <Style x:Key="SettingsApplyBadgeStyle" TargetType="{x:Type Border}">
                         <Setter Property="HorizontalAlignment" Value="Left"/>
@@ -2796,12 +2786,6 @@
                         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                         <Setter Property="FontSize" Value="{StaticResource FontSizeSmallCaption}"/>
                         <Setter Property="FontWeight" Value="SemiBold"/>
-                    </Style>
-                    <Style x:Key="SettingsTabErrorBadgeTextStyle" TargetType="{x:Type TextBlock}">
-                        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
-                        <Setter Property="FontSize" Value="{StaticResource FontSizeBadge}"/>
-                        <Setter Property="HorizontalAlignment" Value="Center"/>
-                        <Setter Property="VerticalAlignment" Value="Center"/>
                     </Style>
                     <!-- A settings box in error says why, to the eye and to a screen reader. A red
                          border alone told neither which rule the value broke nor, when the error
@@ -2951,34 +2935,40 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </Border>
 
-                <TabControl Grid.Row="2" x:Name="Mw_SettingsSubTabControl" TabStripPlacement="Top" Margin="16,8,16,0"
+                <!-- One rail lists every section under the name of its group; the arrow keys walk the
+                     sections across the groups and pass over the group names. -->
+                <TabControl Grid.Row="2" x:Name="Mw_SettingsSubTabControl" Margin="16,8,16,0"
                             AutomationProperties.Name="{loc:Translate A11ySettingsSections}"
-                            Background="Transparent" BorderThickness="0">
+                            Style="{StaticResource SettingsRailTabControlStyle}"
+                            SelectionChanged="OnSettingsRailSelectionChanged">
+                    <!-- Reset RDP defaults acts on the RDP group, so it shows under an RDP section only. -->
+                    <controls:SettingsRail.ContentFooter>
+                        <Button x:Name="Mw_SettingsResetRdpDefaults"
+                                Content="{loc:Translate SettingsResetRdpDefaults}"
+                                Command="{Binding Settings.ResetRdpDefaultsCommand}"
+                                FontSize="{StaticResource FontSizeCaption}"
+                                Foreground="{DynamicResource TextTertiaryBrush}"
+                                HorizontalAlignment="Left"
+                                Margin="{StaticResource SettingsRailFooterMargin}"
+                                Padding="0,4"
+                                ToolTip="{loc:Translate SettingsResetRdpDefaultsTooltip}"
+                                AutomationProperties.Name="{loc:Translate SettingsResetRdpDefaults}">
+                            <Button.Style>
+                                <Style TargetType="{x:Type Button}" BasedOn="{StaticResource GhostButtonStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedItem.(controls:SettingsRail.Group), RelativeSource={RelativeSource AncestorType={x:Type TabControl}}}" Value="Rdp">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </controls:SettingsRail.ContentFooter>
 
                     <!-- ═══════ GENERAL ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabGeneral" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabGeneral]"/>
-                                <Binding Path="Settings.GeneralTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabGeneral}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasGeneralTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.GeneralTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <TabControl x:Name="Mw_SettingsGeneralSubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabGeneral}"
-                                    Style="{StaticResource SettingsRailTabControlStyle}">
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabAppearance"
+                    <TabItem x:Name="Mw_SettingsTabGeneral" controls:SettingsRail.Group="General" Header="{loc:Translate SettingsTabGeneral}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabAppearance" controls:SettingsRail.Group="General" IsSelected="True"
                                      Header="{loc:Translate SettingsGeneralSubTabAppearance}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3086,7 +3076,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabBehavior"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabBehavior" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabBehavior}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3116,7 +3106,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabUpdates"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabUpdates" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabUpdates}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3211,7 +3201,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabFiles"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabFiles" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabFiles}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3350,7 +3340,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabSharedSources"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabSharedSources" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabSharedSources}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3519,7 +3509,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabOnboarding"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabOnboarding" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabOnboarding}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3561,30 +3551,13 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                        </TabControl>
-                    </TabItem>
 
                     <!-- ═══════ TERMINAL ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabTerminal" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabTerminal]"/>
-                                <Binding Path="Settings.TerminalTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabTerminal}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasTerminalTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.TerminalTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TabItem x:Name="Mw_SettingsTabTerminal" controls:SettingsRail.Group="Terminal" Header="{loc:Translate SettingsTabTerminal}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                    <TabItem x:Name="Mw_SettingsTerminalSubTabAppearance" controls:SettingsRail.Group="Terminal"
+                             Header="{loc:Translate SettingsSectionTerminal}"
+                             Style="{StaticResource SettingsRailTabItemStyle}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
@@ -3651,29 +3624,8 @@
                     </TabItem>
 
                     <!-- ═══════ SSH & SFTP ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabSsh" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabSshSftp]"/>
-                                <Binding Path="Settings.SshTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabSshSftp}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasSshTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.SshTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <TabControl x:Name="Mw_SettingsSshSubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabSshSftp}"
-                                    Style="{StaticResource SettingsRailTabControlStyle}">
-                            <TabItem x:Name="Mw_SettingsSshSubTabConnection"
+                    <TabItem x:Name="Mw_SettingsTabSsh" controls:SettingsRail.Group="Ssh" Header="{loc:Translate SettingsTabSshSftp}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                            <TabItem x:Name="Mw_SettingsSshSubTabConnection" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabConnection}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3765,7 +3717,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSshSubTabSession"
+                            <TabItem x:Name="Mw_SettingsSshSubTabSession" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabSession}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3834,7 +3786,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSshSubTabSftpX11"
+                            <TabItem x:Name="Mw_SettingsSshSubTabSftpX11" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabSftpX11}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -3881,7 +3833,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSshSubTabHostKeys"
+                            <TabItem x:Name="Mw_SettingsSshSubTabHostKeys" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabHostKeys}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4066,7 +4018,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSshSubTabGateways"
+                            <TabItem x:Name="Mw_SettingsSshSubTabGateways" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabGateways}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4126,40 +4078,10 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                        </TabControl>
-                    </TabItem>
 
                     <!-- ═══════ RDP ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabRdp" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabRdp]"/>
-                                <Binding Path="Settings.RdpTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabRdp}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasRdpTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.RdpTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TabControl x:Name="Mw_SettingsRdpSubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabRdp}"
-                                        Grid.Row="0"
-                                        Style="{StaticResource SettingsRailTabControlStyle}">
-                                <TabItem x:Name="Mw_SettingsRdpSubTabDisplayAudio"
+                    <TabItem x:Name="Mw_SettingsTabRdp" controls:SettingsRail.Group="Rdp" Header="{loc:Translate SettingsTabRdp}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                                <TabItem x:Name="Mw_SettingsRdpSubTabDisplayAudio" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabDisplayAudio}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4260,7 +4182,7 @@
                                     </ScrollViewer>
                                 </TabItem>
 
-                                <TabItem x:Name="Mw_SettingsRdpSubTabDevices"
+                                <TabItem x:Name="Mw_SettingsRdpSubTabDevices" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabDevices}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4291,7 +4213,7 @@
                                     </ScrollViewer>
                                 </TabItem>
 
-                                <TabItem x:Name="Mw_SettingsRdpSubTabPerformance"
+                                <TabItem x:Name="Mw_SettingsRdpSubTabPerformance" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabPerformance}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4343,7 +4265,7 @@
                                     </ScrollViewer>
                                 </TabItem>
 
-                                <TabItem x:Name="Mw_SettingsRdpSubTabBehavior"
+                                <TabItem x:Name="Mw_SettingsRdpSubTabBehavior" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabBehavior}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4465,7 +4387,7 @@
                                         </StackPanel>
                                     </ScrollViewer>
                                 </TabItem>
-                                <TabItem x:Name="Mw_SettingsRdpSubTabCertificates"
+                                <TabItem x:Name="Mw_SettingsRdpSubTabCertificates" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabCertificates}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4666,47 +4588,10 @@
                                         </StackPanel>
                                     </ScrollViewer>
                                 </TabItem>
-                            </TabControl>
-
-                                <Button x:Name="Mw_SettingsResetRdpDefaults"
-                                        Grid.Row="1"
-                                        Content="{loc:Translate SettingsResetRdpDefaults}"
-                                        Command="{Binding Settings.ResetRdpDefaultsCommand}"
-                                        Style="{DynamicResource GhostButtonStyle}"
-                                        FontSize="{StaticResource FontSizeCaption}"
-                                        Foreground="{DynamicResource TextTertiaryBrush}"
-                                        HorizontalAlignment="Left"
-                                        Margin="{StaticResource SettingsRailFooterMargin}"
-                                        Padding="0,4"
-                                        ToolTip="{loc:Translate SettingsResetRdpDefaultsTooltip}"
-                                        AutomationProperties.Name="{loc:Translate SettingsResetRdpDefaults}"/>
-                        </Grid>
-                    </TabItem>
 
                     <!-- ═══════ SECURITY ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabSecurity" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabSecurity]"/>
-                                <Binding Path="Settings.SecurityTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabSecurity}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasSecurityTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.SecurityTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <TabControl x:Name="Mw_SettingsSecuritySubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabSecurity}"
-                                    Style="{StaticResource SettingsRailTabControlStyle}">
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabOverview"
+                    <TabItem x:Name="Mw_SettingsTabSecurity" controls:SettingsRail.Group="Security" Header="{loc:Translate SettingsTabSecurity}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabOverview" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabOverview}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4764,7 +4649,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabVault"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabVault" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabVault}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4890,7 +4775,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabCredentialProvider"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabCredentialProvider" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabCredentialProvider}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -5023,7 +4908,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabConnectionChecks"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabConnectionChecks" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabConnectionChecks}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -5061,7 +4946,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabWebCertificates"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabWebCertificates" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabWebCertificates}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -5209,7 +5094,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabFileSharing"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabFileSharing" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabFileSharing}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -5235,33 +5120,10 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                        </TabControl>
-                    </TabItem>
 
                     <!-- ═══════ ADVANCED ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabAdvanced" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabAdvanced]"/>
-                                <Binding Path="Settings.AdvancedTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabAdvanced}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasAdvancedTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.AdvancedTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <TabControl x:Name="Mw_SettingsAdvancedSubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabAdvanced}"
-                                    Style="{StaticResource SettingsRailTabControlStyle}">
-                            <TabItem x:Name="Mw_SettingsAdvancedSubTabDiagnostics"
+                    <TabItem x:Name="Mw_SettingsTabAdvanced" controls:SettingsRail.Group="Advanced" Header="{loc:Translate SettingsTabAdvanced}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                            <TabItem x:Name="Mw_SettingsAdvancedSubTabDiagnostics" controls:SettingsRail.Group="Advanced"
                                      Header="{loc:Translate SettingsAdvancedSubTabDiagnostics}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -5413,7 +5275,7 @@
                                 </ScrollViewer>
                             </TabItem>
 
-                            <TabItem x:Name="Mw_SettingsAdvancedSubTabTools"
+                            <TabItem x:Name="Mw_SettingsAdvancedSubTabTools" controls:SettingsRail.Group="Advanced"
                                      Header="{loc:Translate SettingsAdvancedSubTabTools}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -5635,7 +5497,7 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsAdvancedSubTabCmdLibSync"
+                            <TabItem x:Name="Mw_SettingsAdvancedSubTabCmdLibSync" controls:SettingsRail.Group="Advanced"
                                      Header="{loc:Translate SettingsAdvancedSubTabCmdLibSync}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -5713,8 +5575,6 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                        </TabControl>
-                    </TabItem>
 
                 </TabControl>
             </Grid>

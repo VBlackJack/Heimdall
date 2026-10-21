@@ -51,7 +51,7 @@ and leaves your edits pending.
 
 **When Save is refused**, the message names the setting and the problem, the box in error turns
 red and its tooltip gives the reason, the banner says how many settings need attention, and the
-focus moves to the first of them, opening its tab.
+focus moves to the first of them, opening its section.
 
 **If a configuration file is damaged.** Each save keeps the file it replaces as a last good copy,
 `settings.json.bak` and `servers.json.bak`, beside it. If `settings.json` or `servers.json` is no
@@ -60,19 +60,19 @@ loads that copy instead, tells you which file was restored, and warns that chang
 copy was made may be missing. The next save replaces the damaged file. With no usable copy,
 startup fails as before.
 
-**Reset defaults** returns every tab to its factory value, as pending edits: nothing is written
+**Reset defaults** returns every section to its factory value, as pending edits: nothing is written
 until you save. It keeps your language, theme and accent, your sessions and SSH gateways, your
 external tools and credential provider unlock secret, your skipped update version, and your
 master password, PIN and Windows Hello enrolment. It does turn off the external credential
 provider, the Credential Guard and Windows Hello requirements and the TFTP share, and resets the
 Windows Hello grace period, the auto-lock delay and disconnect on lock; the confirmation lists
-them. **Reset RDP defaults** touches the RDP tab only: the RDP connection watchdog, on Advanced >
+them. **Reset RDP defaults**, under the RDP sections, touches those sections only: the RDP connection watchdog, on Advanced >
 Diagnostics, keeps its value.
 
-**Search** - the box above the tabs finds a setting by its label or its hint, tooltips included,
+**Search** - the box above the sections finds a setting by its label or its hint, tooltips included,
 ignoring case and accents. It counts only what is on screen for you ("Result 2 of 5"); Enter
-jumps to the next match, Shift+Enter to the previous one, opening the tab and any collapsed
-section on the way. Ctrl+F on the Settings tab puts the cursor in it.
+jumps to the next match, Shift+Enter to the previous one, opening its section and any collapsed
+panel on the way. Ctrl+F on the Settings tab puts the cursor in it.
 
 **Modified** - a setting whose value differs from its factory default shows a small "Modified"
 badge after its field, with a **Reset** button beside it. A screen reader reads the badge as
@@ -146,7 +146,7 @@ master password is on. 0 turns auto-lock off.
 
 ## Security
 
-**Security overview** - the first card of the Security tab lists, one line each, the choices on
+**Security overview** - the first card of the Security settings lists, one line each, the choices on
 this screen that affect security: RDP NLA and strict server authentication, TFTP sharing, session
 transcripts, the PowerShell execution policy, the master password, auto-lock, disconnect on lock,
 Credential Guard, Windows Hello before connecting, automatic update checks and the known_hosts
@@ -154,12 +154,12 @@ import at startup. It shows what the screen holds now, unsaved edits included, a
 "Unsaved" while it differs from what is saved. A line marked with a warning icon is a documented
 insecure choice: NLA off, TFTP on, transcripts on, the Bypass or Unrestricted execution policy, no
 auto-lock with the master password on, update checks off, or the known_hosts import on. It says
-why, and **Go to setting** opens the tab, scrolls to the setting and puts the focus on it. The line
+why, and **Go to setting** opens the section, scrolls to the setting and puts the focus on it. The line
 above the list says how many need attention, and a screen reader announces it when it changes.
 Strict server authentication off is reported but not flagged: it is the Windows default, which
 warns and asks.
 
-**Network Level Authentication (NLA)** and **Strict server authentication** are on the RDP tab,
+**Network Level Authentication (NLA)** and **Strict server authentication** are in the RDP settings,
 under Certificates, in the Connection security card.
 
 **Network Level Authentication (NLA)** - the remote machine authenticates you *before* opening
@@ -289,7 +289,7 @@ says how many are kept (0 to 8, 0 creates a control per session), the second how
 an idle one is kept before its memory is released (0 keeps it until Heimdall exits). Both apply
 without a restart. See [RDP-PERFORMANCE.md](RDP-PERFORMANCE.md).
 
-**Session keep-alive interval** and **Anti-idle interval**, on the RDP tab, are different things.
+**Session keep-alive interval** and **Anti-idle interval**, in the RDP settings, are different things.
 Keep-alive is protocol traffic that stops the *server* dropping an idle session. Anti-idle
 simulates activity so the remote *desktop* does not lock; 0 turns it off.
 

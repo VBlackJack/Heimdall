@@ -20,27 +20,26 @@ using Heimdall.App.Tests.Views.EmbeddedRdp;
 namespace Heimdall.App.Tests;
 
 /// <summary>
-/// "Go to gateway settings" lands on the gateways, not on whichever SSH sub-tab was shown last.
+/// "Go to gateway settings" lands on the gateways, not on whichever SSH section was shown last.
 /// </summary>
 /// <remarks>
-/// A source reading: the handler belongs to the main window, which cannot be built here.
+/// A source reading: the handler belongs to the main window, which cannot be built here. The
+/// settings rail holds every section, so the gateways section is selected on the rail itself;
+/// there is no SSH tab to open first any more.
 /// </remarks>
 public sealed class GatewaySettingsNavigationSourceTests
 {
     private const string HandlerMember = "private void OnNavigateToGatewaySettings(object sender, RoutedEventArgs e)";
 
-    private const string SelectSshTab = "Mw_SettingsSubTabControl.SelectedItem = Mw_SettingsTabSsh;";
-
-    private const string SelectGatewaysSubTab = "Mw_SettingsSshSubTabControl.SelectedItem = Mw_SettingsSshSubTabGateways;";
+    private const string SelectGatewaysSection = "Mw_SettingsSubTabControl.SelectedItem = Mw_SettingsSshSubTabGateways;";
 
     [Fact]
-    public void NavigatingToGatewaySettings_OpensTheGatewaysSubTab()
+    public void NavigatingToGatewaySettings_OpensTheGatewaysSection()
     {
         string full = Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App", "MainWindow.xaml.cs");
         Assert.True(File.Exists(full), $"Source not found: {full}");
         string logic = ViewSource.HandlerBody(ViewSource.WithoutCommentsAndLiterals(File.ReadAllText(full)), HandlerMember);
 
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, SelectSshTab), "the handler does not open the SSH tab");
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, SelectGatewaysSubTab), "the handler does not open the gateways sub-tab");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, SelectGatewaysSection), "the handler does not open the gateways section on the rail");
     }
 }
