@@ -34,6 +34,8 @@ public sealed class SettingsLayoutOrderGuardTests
 {
     private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
+    private static readonly XNamespace Rail = "clr-namespace:Heimdall.App.Controls";
+
     [Fact]
     public void SettingsFieldsComeBeforeTheirButtonsAndLabelsAreNotClipped()
     {
@@ -67,13 +69,16 @@ public sealed class SettingsLayoutOrderGuardTests
             Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
         XElement Named(string name) => markup.Descendants().Single(element => element.Attribute(Xaml + "Name")?.Value == name);
 
-        List<XElement> general = Named("Mw_SettingsTabGeneral").Descendants().ToList();
+        List<XElement> settings = Named("Mw_SettingsSubTabControl").Descendants().ToList();
         Assert.True(
-            general.IndexOf(Named("Mw_SettingsAppearanceTitle")) < general.IndexOf(Named("Mw_SettingsOnboardingTitle")),
+            settings.IndexOf(Named("Mw_SettingsAppearanceTitle")) < settings.IndexOf(Named("Mw_SettingsOnboardingTitle")),
             "Appearance comes before the welcome tour on General");
-        // General opens on its first rail section, so Appearance leads the rail and the tour closes it.
-        List<XElement> sections = Named("Mw_SettingsGeneralSubTabControl").Elements()
-            .Where(element => element.Name.LocalName == "TabItem")
+        // The rail opens on the first General section, so Appearance leads the group and the tour
+        // closes it.
+        List<XElement> sections = Named("Mw_SettingsSubTabControl").Elements()
+            .Where(element => element.Name.LocalName == "TabItem"
+                && element.Attribute(Rail + "SettingsRail.Group")?.Value == "General"
+                && element.Attribute("Style")?.Value == "{StaticResource SettingsRailTabItemStyle}")
             .ToList();
         Assert.Contains(sections[0].Descendants(), element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsAppearanceTitle");
         Assert.Contains(sections[^1].Descendants(), element => element.Attribute(Xaml + "Name")?.Value == "Mw_SettingsOnboardingTitle");
@@ -116,25 +121,34 @@ public sealed class SettingsLayoutOrderGuardTests
     /// <remarks>
     /// I-03. The PIN, the vault and the two trust lists are written the moment they change, so
     /// Discard cannot undo them and Save has nothing to do with them. Nothing on screen said so.
+    /// A badge under the title said it; a glyph beside the title says it now, with the same text
+    /// as its tooltip and as the name a screen reader hears.
     /// </remarks>
     [Theory]
-    [InlineData("Mw_SettingsPinTitle", "SettingsSavedImmediately")]
-    [InlineData("Mw_SettingsVaultTitle", "SettingsSavedImmediately")]
-    [InlineData("Mw_SettingsTrustedHostKeysTitle", "SettingsSavedImmediately")]
-    [InlineData("Mw_SettingsTrustedRdpCertificatesTitle", "SettingsSavedImmediately")]
-    [InlineData("Mw_SettingsAppearanceTitle", "SettingsAppliesImmediately")]
-    [InlineData("Mw_SettingsRdpDefaultsTitle", "SettingsAppliesToNewConnections")]
-    public void ASectionThatDoesNotWaitForSaveSaysWhenItApplies(string title, string key)
+    [InlineData("Mw_SettingsPinTitle", "SettingsSavedImmediately", "SettingsApplyGlyphSavedAtOnce")]
+    [InlineData("Mw_SettingsVaultTitle", "SettingsSavedImmediately", "SettingsApplyGlyphSavedAtOnce")]
+    [InlineData("Mw_SettingsTrustedHostKeysTitle", "SettingsSavedImmediately", "SettingsApplyGlyphSavedAtOnce")]
+    [InlineData("Mw_SettingsTrustedRdpCertificatesTitle", "SettingsSavedImmediately", "SettingsApplyGlyphSavedAtOnce")]
+    [InlineData("Mw_SettingsAppearanceTitle", "SettingsAppliesImmediately", "SettingsApplyGlyphImmediate")]
+    [InlineData("Mw_SettingsRdpDefaultsTitle", "SettingsAppliesToNewConnections", "SettingsApplyGlyphNextConnection")]
+    [InlineData("Mw_SettingsTerminalTitle", "SettingsAppliesToNewSessions", "SettingsApplyGlyphNextConnection")]
+    public void ASectionThatDoesNotWaitForSaveSaysWhenItApplies(string title, string key, string glyph)
     {
         XDocument markup = XDocument.Load(
             Path.Combine(SettingsNumericFields.FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
         XElement heading = markup.Descendants().Single(element => element.Attribute(Xaml + "Name")?.Value == title);
 
-        XElement? badge = heading.ElementsAfterSelf().FirstOrDefault();
+        XElement? sign = heading.ElementsAfterSelf().FirstOrDefault();
 
-        Assert.NotNull(badge);
-        Assert.Equal("{StaticResource SettingsApplyBadgeStyle}", badge!.Attribute("Style")?.Value);
-        Assert.Equal("{loc:Translate " + key + "}", badge.Elements().Single().Attribute("Text")?.Value);
+        Assert.NotNull(sign);
+        Assert.Equal("TextBlock", sign!.Name.LocalName);
+        Assert.Equal("{StaticResource SettingsApplyGlyphStyle}", sign.Attribute("Style")?.Value);
+        Assert.Equal("{StaticResource " + glyph + "}", sign.Attribute("Text")?.Value);
+        Assert.Equal("{loc:Translate " + key + "}", sign.Attribute("ToolTip")?.Value);
+        Assert.Equal("{loc:Translate " + key + "}", sign.Attribute("AutomationProperties.Name")?.Value);
+
+        // Beside the title, not under it.
+        Assert.Equal("Horizontal", heading.Parent?.Attribute("Orientation")?.Value);
     }
 
     /// <summary>
@@ -240,11 +254,22 @@ public sealed class SettingsLayoutOrderGuardTests
             XElement viewer = section.Elements().Single(element => element.Name.LocalName == "ScrollViewer");
             Assert.Equal("Disabled", viewer.Attribute("HorizontalScrollBarVisibility")?.Value);
 
-            // The viewer fills the column so its scroll bar sits at the window edge; the panel
-            // inside caps the section width and keeps it against the rail instead of centring.
-            XElement panel = viewer.Elements().Single();
-            Assert.Equal("{StaticResource SettingsContentMaxWidth}", panel.Attribute("MaxWidth")?.Value);
-            Assert.Equal("Left", panel.Attribute("HorizontalAlignment")?.Value);
+            // The viewer fills the column so its scroll bar sits at the window edge. Inside it, one
+            // star column capped at the section width holds the panel: the cards fill the cap and
+            // stay against the rail. A left-aligned panel with a MaxWidth took its desired width
+            // instead, so each section's cards were as wide as their content.
+            XElement grid = viewer.Elements().Single();
+            Assert.Equal("Grid", grid.Name.LocalName);
+            XElement column = grid.Elements()
+                .Single(element => element.Name.LocalName == "Grid.ColumnDefinitions")
+                .Elements()
+                .Single();
+            Assert.Equal("*", column.Attribute("Width")?.Value);
+            Assert.Equal("{StaticResource SettingsContentMaxWidth}", column.Attribute("MaxWidth")?.Value);
+
+            XElement panel = grid.Elements().Single(element => element.Name.LocalName == "StackPanel");
+            Assert.Null(panel.Attribute("MaxWidth"));
+            Assert.Null(panel.Attribute("HorizontalAlignment"));
         });
 
         XDocument theme = XDocument.Load(

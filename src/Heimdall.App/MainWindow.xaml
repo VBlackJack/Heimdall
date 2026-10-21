@@ -2766,42 +2766,33 @@
             </Grid>
 
             <!-- ============================================================ -->
-            <!-- SETTINGS TAB: top sub-tabs with search                        -->
+            <!-- SETTINGS TAB: one grouped section rail with search          -->
             <!-- ============================================================ -->
             <Grid x:Name="Mw_SettingsRoot"
                   Visibility="{Binding IsSettingsTabSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.Resources>
                     <converters:SettingsFieldErrorConverter x:Key="SettingsFieldErrorConverter"/>
-                    <!-- The error-count badge of a settings tab, once for all six tabs. -->
-                    <Style x:Key="SettingsTabErrorBadgeStyle" TargetType="{x:Type Border}">
-                        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMd}"/>
-                        <Setter Property="Background" Value="{DynamicResource ErrorTextBrush}"/>
-                        <Setter Property="MinWidth" Value="{StaticResource BadgeHeight}"/>
-                        <Setter Property="Height" Value="{StaticResource BadgeHeight}"/>
-                        <Setter Property="Padding" Value="5,0"/>
-                        <Setter Property="Margin" Value="6,0,0,0"/>
-                        <Setter Property="VerticalAlignment" Value="Center"/>
-                    </Style>
-                    <!-- When a card's settings take effect, where it is not simply "on Save". -->
-                    <Style x:Key="SettingsApplyBadgeStyle" TargetType="{x:Type Border}">
-                        <Setter Property="HorizontalAlignment" Value="Left"/>
-                        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                        <Setter Property="BorderThickness" Value="1"/>
-                        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusSm}"/>
-                        <Setter Property="Padding" Value="8,2"/>
-                        <Setter Property="Margin" Value="0,0,0,10"/>
-                    </Style>
-                    <Style x:Key="SettingsApplyBadgeTextStyle" TargetType="{x:Type TextBlock}">
+                    <!-- When a card's settings take effect, where it is not simply "on Save": a glyph beside its
+                         title, explained by its tooltip and read out by its automation name, and the legend at
+                         the foot of the rail says what each glyph means. -->
+                    <Style x:Key="SettingsApplyGlyphStyle" TargetType="{x:Type TextBlock}">
+                        <Setter Property="FontFamily" Value="{StaticResource FontFamilyIcons}"/>
+                        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
                         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
-                        <Setter Property="FontSize" Value="{StaticResource FontSizeSmallCaption}"/>
-                        <Setter Property="FontWeight" Value="SemiBold"/>
-                    </Style>
-                    <Style x:Key="SettingsTabErrorBadgeTextStyle" TargetType="{x:Type TextBlock}">
-                        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
-                        <Setter Property="FontSize" Value="{StaticResource FontSizeBadge}"/>
-                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                        <!-- Hit-testable around the glyph strokes too, so the tooltip shows on hover. -->
+                        <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="Margin" Value="8,0,0,0"/>
+                    </Style>
+                    <Style x:Key="SettingsApplyLegendTextStyle" TargetType="{x:Type TextBlock}">
+                        <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+                        <Setter Property="FontSize" Value="{StaticResource FontSizeSmallCaption}"/>
+                        <Setter Property="TextWrapping" Value="Wrap"/>
+                        <Setter Property="Margin" Value="0,0,0,4"/>
+                    </Style>
+                    <Style x:Key="SettingsApplyLegendGlyphStyle" TargetType="{x:Type Run}">
+                        <Setter Property="FontFamily" Value="{StaticResource FontFamilyIcons}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                     </Style>
                     <!-- A settings box in error says why, to the eye and to a screen reader. A red
                          border alone told neither which rule the value broke nor, when the error
@@ -2951,44 +2942,73 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </Border>
 
-                <TabControl Grid.Row="2" x:Name="Mw_SettingsSubTabControl" TabStripPlacement="Top" Margin="16,8,16,0"
+                <!-- One rail lists every section under the name of its group; the arrow keys walk the
+                     sections across the groups and pass over the group names. -->
+                <TabControl Grid.Row="2" x:Name="Mw_SettingsSubTabControl" Margin="{StaticResource SettingsRailHostMargin}"
                             AutomationProperties.Name="{loc:Translate A11ySettingsSections}"
-                            Background="Transparent" BorderThickness="0">
+                            Style="{StaticResource SettingsRailTabControlStyle}"
+                            SelectionChanged="OnSettingsRailSelectionChanged">
+                    <!-- What the glyph beside a section title means, under the rail. Each line is named by its
+                         text alone, so a screen reader does not read the glyph. -->
+                    <controls:SettingsRail.Footer>
+                        <StackPanel x:Name="Mw_SettingsApplyLegend" Margin="{StaticResource SettingsRailLegendMargin}">
+                            <TextBlock Style="{StaticResource SettingsApplyLegendTextStyle}" AutomationProperties.Name="{loc:Translate SettingsAppliesImmediately}">
+                                <Run Style="{StaticResource SettingsApplyLegendGlyphStyle}" Text="{StaticResource SettingsApplyGlyphImmediate}"/>
+                                <Run Text="{loc:Translate SettingsAppliesImmediately}"/>
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource SettingsApplyLegendTextStyle}" AutomationProperties.Name="{loc:Translate SettingsSavedImmediately}">
+                                <Run Style="{StaticResource SettingsApplyLegendGlyphStyle}" Text="{StaticResource SettingsApplyGlyphSavedAtOnce}"/>
+                                <Run Text="{loc:Translate SettingsSavedImmediately}"/>
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource SettingsApplyLegendTextStyle}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewConnections}">
+                                <Run Style="{StaticResource SettingsApplyLegendGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"/>
+                                <Run Text="{loc:Translate SettingsAppliesToNewConnections}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </controls:SettingsRail.Footer>
+                    <!-- Reset RDP defaults acts on the RDP group, so it shows under an RDP section only. -->
+                    <controls:SettingsRail.ContentFooter>
+                        <Button x:Name="Mw_SettingsResetRdpDefaults"
+                                Content="{loc:Translate SettingsResetRdpDefaults}"
+                                Command="{Binding Settings.ResetRdpDefaultsCommand}"
+                                FontSize="{StaticResource FontSizeCaption}"
+                                Foreground="{DynamicResource TextTertiaryBrush}"
+                                HorizontalAlignment="Left"
+                                Margin="{StaticResource SettingsRailFooterMargin}"
+                                Padding="0,4"
+                                ToolTip="{loc:Translate SettingsResetRdpDefaultsTooltip}"
+                                AutomationProperties.Name="{loc:Translate SettingsResetRdpDefaults}">
+                            <Button.Style>
+                                <Style TargetType="{x:Type Button}" BasedOn="{StaticResource GhostButtonStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedItem.(controls:SettingsRail.Group), RelativeSource={RelativeSource AncestorType={x:Type TabControl}}}" Value="Rdp">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </controls:SettingsRail.ContentFooter>
 
                     <!-- ═══════ GENERAL ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabGeneral" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabGeneral]"/>
-                                <Binding Path="Settings.GeneralTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabGeneral}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasGeneralTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.GeneralTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <TabControl x:Name="Mw_SettingsGeneralSubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabGeneral}"
-                                    Style="{StaticResource SettingsRailTabControlStyle}">
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabAppearance"
+                    <TabItem x:Name="Mw_SettingsTabGeneral" controls:SettingsRail.Group="General" Header="{loc:Translate SettingsTabGeneral}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabAppearance" controls:SettingsRail.Group="General" IsSelected="True"
                                      Header="{loc:Translate SettingsGeneralSubTabAppearance}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsAppearanceTitle" Text="{loc:Translate SettingsSectionAppearance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsAppearanceTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsAppearanceTitle" Text="{loc:Translate SettingsSectionAppearance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsAppearanceTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphImmediate}"
+                                                       ToolTip="{loc:Translate SettingsAppliesImmediately}" AutomationProperties.Name="{loc:Translate SettingsAppliesImmediately}"/>
+                                        </StackPanel>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -3064,10 +3084,11 @@
                                      and written on Save: a copy would undo a toggle made from the menu in the meantime. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsSessionTreeTitle" Text="{loc:Translate SettingsSectionSessionTree}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsSessionTreeTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsSessionTreeTitle" Text="{loc:Translate SettingsSectionSessionTree}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsSessionTreeTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphSavedAtOnce}"
+                                                       ToolTip="{loc:Translate SettingsSavedImmediately}" AutomationProperties.Name="{loc:Translate SettingsSavedImmediately}"/>
+                                        </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsShowPropertiesPanel"
                                                   Content="{loc:Translate SettingsShowPropertiesPanel}"
                                                   IsChecked="{Binding ServerList.ShowPropertiesPanel, Mode=TwoWay}"
@@ -3084,13 +3105,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabBehavior"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabBehavior" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabBehavior}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsBehaviorTitle" Text="{loc:Translate SettingsSectionBehavior}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3114,13 +3140,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabUpdates"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabUpdates" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabUpdates}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsUpdatesTitle" Text="{loc:Translate SettingsSectionUpdates}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3209,13 +3240,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabFiles"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabFiles" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabFiles}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Settings file: preferences out and in, never secrets. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -3348,13 +3384,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabSharedSources"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabSharedSources" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabSharedSources}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Shared session sources: MobaXterm files other people edit, listed read-only in the
                                      tree. The status column says what the last read found. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -3517,13 +3558,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsGeneralSubTabOnboarding"
+                            <TabItem x:Name="Mw_SettingsGeneralSubTabOnboarding" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabOnboarding}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Replaying the tour is the only way back into it. One reflex
                                      Escape used to end it permanently: Skip and Escape both call
                                      CompleteAsync, which persists OnboardingCompleted, and that
@@ -3559,39 +3605,28 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                        </TabControl>
-                    </TabItem>
 
                     <!-- ═══════ TERMINAL ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabTerminal" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabTerminal]"/>
-                                <Binding Path="Settings.TerminalTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabTerminal}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasTerminalTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.TerminalTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                    <TabItem x:Name="Mw_SettingsTabTerminal" controls:SettingsRail.Group="Terminal" Header="{loc:Translate SettingsTabTerminal}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                    <TabItem x:Name="Mw_SettingsTerminalSubTabAppearance" controls:SettingsRail.Group="Terminal"
+                             Header="{loc:Translate SettingsSectionTerminal}"
+                             Style="{StaticResource SettingsRailTabItemStyle}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                </Grid.ColumnDefinitions>
+                            <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsTerminalTitle" Text="{loc:Translate SettingsSectionTerminal}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsTerminalTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewSessions}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsTerminalTitle" Text="{loc:Translate SettingsSectionTerminal}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsTerminalTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"
+                                                       ToolTip="{loc:Translate SettingsAppliesToNewSessions}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewSessions}"/>
+                                        </StackPanel>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -3647,43 +3682,28 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+                            </Grid>
                         </ScrollViewer>
                     </TabItem>
 
                     <!-- ═══════ SSH & SFTP ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabSsh" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabSshSftp]"/>
-                                <Binding Path="Settings.SshTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabSshSftp}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasSshTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.SshTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <TabControl x:Name="Mw_SettingsSshSubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabSshSftp}"
-                                    Style="{StaticResource SettingsRailTabControlStyle}">
-                            <TabItem x:Name="Mw_SettingsSshSubTabConnection"
+                    <TabItem x:Name="Mw_SettingsTabSsh" controls:SettingsRail.Group="Ssh" Header="{loc:Translate SettingsTabSshSftp}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                            <TabItem x:Name="Mw_SettingsSshSubTabConnection" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabConnection}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsSshTitle" Text="{loc:Translate SettingsSectionSshDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsSshTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsSshTitle" Text="{loc:Translate SettingsSectionSshDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsSshTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"
+                                                       ToolTip="{loc:Translate SettingsAppliesToNewConnections}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewConnections}"/>
+                                        </StackPanel>
                                         <TextBlock x:Name="Mw_SettingsPlinkPathLabel" Text="{loc:Translate SettingsLabelPlinkPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -3763,13 +3783,18 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSshSubTabSession"
+                            <TabItem x:Name="Mw_SettingsSshSubTabSession" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabSession}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsSshSessionTitle" Text="{loc:Translate SettingsSectionSshSession}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3832,13 +3857,18 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSshSubTabSftpX11"
+                            <TabItem x:Name="Mw_SettingsSshSubTabSftpX11" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabSftpX11}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsSftpTitle" Text="{loc:Translate SettingsSectionSftp}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3879,21 +3909,27 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSshSubTabHostKeys"
+                            <TabItem x:Name="Mw_SettingsSshSubTabHostKeys" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabHostKeys}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
                                             <StackPanel>
-                                                <TextBlock x:Name="Mw_SettingsTrustedHostKeysTitle" Text="{loc:Translate SettingsSshTrustedHostKeysSectionTitle}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsTrustedHostKeysTitleApplies">
-                                                    <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                                </Border>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock x:Name="Mw_SettingsTrustedHostKeysTitle" Text="{loc:Translate SettingsSshTrustedHostKeysSectionTitle}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBlock x:Name="Mw_SettingsTrustedHostKeysTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphSavedAtOnce}"
+                                                               ToolTip="{loc:Translate SettingsSavedImmediately}" AutomationProperties.Name="{loc:Translate SettingsSavedImmediately}"/>
+                                                </StackPanel>
                                                 <TextBlock Text="{loc:Translate SettingsSshTrustedHostKeysSectionHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                             </StackPanel>
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
@@ -4064,13 +4100,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSshSubTabGateways"
+                            <TabItem x:Name="Mw_SettingsSshSubTabGateways" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabGateways}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
@@ -4124,52 +4165,28 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                        </TabControl>
-                    </TabItem>
 
                     <!-- ═══════ RDP ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabRdp" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabRdp]"/>
-                                <Binding Path="Settings.RdpTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabRdp}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasRdpTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.RdpTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TabControl x:Name="Mw_SettingsRdpSubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabRdp}"
-                                        Grid.Row="0"
-                                        Style="{StaticResource SettingsRailTabControlStyle}">
-                                <TabItem x:Name="Mw_SettingsRdpSubTabDisplayAudio"
+                    <TabItem x:Name="Mw_SettingsTabRdp" controls:SettingsRail.Group="Rdp" Header="{loc:Translate SettingsTabRdp}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                                <TabItem x:Name="Mw_SettingsRdpSubTabDisplayAudio" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabDisplayAudio}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsRdpDefaultsTitle" Text="{loc:Translate SettingsSectionRdpDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpDefaultsTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsRdpDefaultsTitle" Text="{loc:Translate SettingsSectionRdpDefaults}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsRdpDefaultsTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"
+                                                       ToolTip="{loc:Translate SettingsAppliesToNewConnections}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewConnections}"/>
+                                        </StackPanel>
                                         <StackPanel Margin="0,0,0,8">
                                             <TextBlock x:Name="Mw_SettingsRdpModeLabel" Text="{loc:Translate SettingsLabelRdpMode}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
@@ -4226,10 +4243,11 @@
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsRdpDisplayTitle" Text="{loc:Translate SettingsSectionRdpDisplay}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpDisplayTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsRdpDisplayTitle" Text="{loc:Translate SettingsSectionRdpDisplay}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsRdpDisplayTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"
+                                                       ToolTip="{loc:Translate SettingsAppliesToNewConnections}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewConnections}"/>
+                                        </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsRdpDynRes" Content="{loc:Translate SettingsLabelRdpDynamicRes}" IsChecked="{Binding Settings.RdpDefaultDynamicResolution}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpDynamicResolutionHint}" AutomationProperties.HelpText="{loc:Translate RdpDynamicResolutionHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RdpDefaultDynamicResolution]}"/>
                                         <CheckBox x:Name="Mw_SettingsRdpMultiMon" Content="{loc:Translate SettingsLabelRdpMultiMonitor}" IsChecked="{Binding Settings.RdpDefaultMultiMonitor}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpMultiMonitorHint}" AutomationProperties.HelpText="{loc:Translate RdpMultiMonitorHint}"/>
@@ -4239,10 +4257,11 @@
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsRdpAudioTitle" Text="{loc:Translate SettingsSectionRdpAudio}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpAudioTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsRdpAudioTitle" Text="{loc:Translate SettingsSectionRdpAudio}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsRdpAudioTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"
+                                                       ToolTip="{loc:Translate SettingsAppliesToNewConnections}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewConnections}"/>
+                                        </StackPanel>
                                         <StackPanel>
                                             <TextBlock x:Name="Mw_SettingsRdpAudioLabel" Text="{loc:Translate SettingsLabelRdpAudio}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox SelectedValue="{Binding Settings.RdpDefaultAudioMode}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsRdpAudioLabel}">
@@ -4257,20 +4276,26 @@
                                     </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
 
-                                <TabItem x:Name="Mw_SettingsRdpSubTabDevices"
+                                <TabItem x:Name="Mw_SettingsRdpSubTabDevices" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabDevices}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsRdpDevicesTitle" Text="{loc:Translate SettingsSectionRdpDevices}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpDevicesTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsRdpDevicesTitle" Text="{loc:Translate SettingsSectionRdpDevices}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsRdpDevicesTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"
+                                                       ToolTip="{loc:Translate SettingsAppliesToNewConnections}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewConnections}"/>
+                                        </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsRdpClipboard" Content="{loc:Translate ServerDialogRedirectClipboard}" IsChecked="{Binding Settings.RdpDefaultRedirectClipboard}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpRedirectClipboardHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectClipboardHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RdpDefaultRedirectClipboard]}"/>
                                         <CheckBox x:Name="Mw_SettingsRdpDrives" Content="{loc:Translate ServerDialogRedirectDrives}" IsChecked="{Binding Settings.RdpDefaultRedirectDrives}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpRedirectDrivesHint}" AutomationProperties.HelpText="{loc:Translate RdpRedirectDrivesHint}"/>
@@ -4288,21 +4313,27 @@
                                     </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
 
-                                <TabItem x:Name="Mw_SettingsRdpSubTabPerformance"
+                                <TabItem x:Name="Mw_SettingsRdpSubTabPerformance" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabPerformance}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsRdpPerformanceTitle" Text="{loc:Translate SettingsSectionRdpPerformance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpPerformanceTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsRdpPerformanceTitle" Text="{loc:Translate SettingsSectionRdpPerformance}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsRdpPerformanceTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"
+                                                       ToolTip="{loc:Translate SettingsAppliesToNewConnections}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewConnections}"/>
+                                        </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsRdpBitmapCache" Content="{loc:Translate SettingsLabelRdpBitmapCache}" IsChecked="{Binding Settings.RdpDefaultBitmapCaching}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpBitmapCachingHint}" AutomationProperties.HelpText="{loc:Translate RdpBitmapCachingHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RdpDefaultBitmapCaching]}"/>
                                          <CheckBox x:Name="Mw_SettingsRdpCompression" Content="{loc:Translate SettingsLabelRdpCompression}" IsChecked="{Binding Settings.RdpDefaultCompression}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpCompressionHint}" AutomationProperties.HelpText="{loc:Translate RdpCompressionHint}"/>
@@ -4340,14 +4371,19 @@
                                      </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
 
-                                <TabItem x:Name="Mw_SettingsRdpSubTabBehavior"
+                                <TabItem x:Name="Mw_SettingsRdpSubTabBehavior" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabBehavior}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <Expander x:Name="Mw_SettingsRdpAdvancedTimeoutsExpander"
@@ -4463,21 +4499,27 @@
                                     </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
-                                <TabItem x:Name="Mw_SettingsRdpSubTabCertificates"
+                                <TabItem x:Name="Mw_SettingsRdpSubTabCertificates" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabCertificates}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
                                 <!-- Connection security sits with the certificate trust it governs, not under
                                      Performance, where NLA and strict server authentication used to be. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsRdpSecurityTitle" Text="{loc:Translate SettingsSectionRdpSecurity}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsRdpSecurityTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsAppliesToNewConnections}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsRdpSecurityTitle" Text="{loc:Translate SettingsSectionRdpSecurity}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsRdpSecurityTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphNextConnection}"
+                                                       ToolTip="{loc:Translate SettingsAppliesToNewConnections}" AutomationProperties.Name="{loc:Translate SettingsAppliesToNewConnections}"/>
+                                        </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsRdpNla" Content="{loc:Translate SettingsLabelRdpNla}" IsChecked="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{loc:Translate RdpDefaultNlaHint}" AutomationProperties.HelpText="{loc:Translate RdpDefaultNlaHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RdpDefaultNla]}"/>
                                         <CheckBox x:Name="Mw_SettingsRdpStrictServerAuth" Content="{loc:Translate SettingsLabelRdpStrictServerAuth}" IsChecked="{Binding Settings.RdpDefaultStrictServerAuthentication}" IsEnabled="{Binding Settings.RdpDefaultNla}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,6,0,0" ToolTip="{loc:Translate RdpStrictServerAuthHint}" AutomationProperties.HelpText="{loc:Translate RdpStrictServerAuthHint}"/>
@@ -4488,14 +4530,15 @@
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
                                             <StackPanel>
-                                                <TextBlock x:Name="Mw_SettingsTrustedRdpCertificatesTitle"
-                                                           Text="{loc:Translate SettingsRdpTrustedCertificatesSectionTitle}"
-                                                           FontSize="{StaticResource FontSizeSubtitle}"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsTrustedRdpCertificatesTitleApplies">
-                                                    <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                                </Border>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock x:Name="Mw_SettingsTrustedRdpCertificatesTitle"
+                                                               Text="{loc:Translate SettingsRdpTrustedCertificatesSectionTitle}"
+                                                               FontSize="{StaticResource FontSizeSubtitle}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBlock x:Name="Mw_SettingsTrustedRdpCertificatesTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphSavedAtOnce}"
+                                                               ToolTip="{loc:Translate SettingsSavedImmediately}" AutomationProperties.Name="{loc:Translate SettingsSavedImmediately}"/>
+                                                </StackPanel>
                                                 <TextBlock Text="{loc:Translate SettingsRdpTrustedCertificatesSectionHint}"
                                                            Foreground="{DynamicResource TextTertiaryBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"
@@ -4664,53 +4707,21 @@
                                     </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
-                            </TabControl>
-
-                                <Button x:Name="Mw_SettingsResetRdpDefaults"
-                                        Grid.Row="1"
-                                        Content="{loc:Translate SettingsResetRdpDefaults}"
-                                        Command="{Binding Settings.ResetRdpDefaultsCommand}"
-                                        Style="{DynamicResource GhostButtonStyle}"
-                                        FontSize="{StaticResource FontSizeCaption}"
-                                        Foreground="{DynamicResource TextTertiaryBrush}"
-                                        HorizontalAlignment="Left"
-                                        Margin="{StaticResource SettingsRailFooterMargin}"
-                                        Padding="0,4"
-                                        ToolTip="{loc:Translate SettingsResetRdpDefaultsTooltip}"
-                                        AutomationProperties.Name="{loc:Translate SettingsResetRdpDefaults}"/>
-                        </Grid>
-                    </TabItem>
 
                     <!-- ═══════ SECURITY ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabSecurity" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabSecurity]"/>
-                                <Binding Path="Settings.SecurityTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabSecurity}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasSecurityTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.SecurityTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <TabControl x:Name="Mw_SettingsSecuritySubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabSecurity}"
-                                    Style="{StaticResource SettingsRailTabControlStyle}">
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabOverview"
+                    <TabItem x:Name="Mw_SettingsTabSecurity" controls:SettingsRail.Group="Security" Header="{loc:Translate SettingsTabSecurity}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabOverview" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabOverview}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Security posture: the security-relevant choices of the whole panel, one
                                      line each, as they stand now including unsaved edits. Which state is
                                      risky is decided in SecurityPosture, not here. One row per line rather
@@ -4762,19 +4773,25 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabVault"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabVault" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabVault}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsPinTitle" Text="{loc:Translate SettingsSectionPin}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsPinTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <TextBlock x:Name="Mw_SettingsPinTitle" Text="{loc:Translate SettingsSectionPin}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsPinTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphSavedAtOnce}"
+                                                       ToolTip="{loc:Translate SettingsSavedImmediately}" AutomationProperties.Name="{loc:Translate SettingsSavedImmediately}"/>
+                                        </StackPanel>
                                         <DockPanel>
                                             <Button x:Name="Mw_SettingsPinConfigureBtn"
                                                     DockPanel.Dock="Right"
@@ -4793,10 +4810,11 @@
                                 <!-- Master password vault -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
-                                        <TextBlock x:Name="Mw_SettingsVaultTitle" Text="{loc:Translate SettingsSectionVault}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
-                                        <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsVaultTitleApplies">
-                                            <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <TextBlock x:Name="Mw_SettingsVaultTitle" Text="{loc:Translate SettingsSectionVault}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="Mw_SettingsVaultTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphSavedAtOnce}"
+                                                       ToolTip="{loc:Translate SettingsSavedImmediately}" AutomationProperties.Name="{loc:Translate SettingsSavedImmediately}"/>
+                                        </StackPanel>
                                         <TextBlock x:Name="Mw_SettingsVaultExplanation" Text="{loc:Translate SettingsVaultExplanation}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,12"/>
                                         <DockPanel>
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -4888,13 +4906,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabCredentialProvider"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabCredentialProvider" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabCredentialProvider}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsCredProviderTitle" Text="{loc:Translate SettingsSectionCredentialProvider}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -5021,13 +5044,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabConnectionChecks"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabConnectionChecks" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabConnectionChecks}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsConnectionChecksTitle" Text="{loc:Translate SettingsSectionConnectionChecks}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -5059,27 +5087,33 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabWebCertificates"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabWebCertificates" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabWebCertificates}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Web console certificates: the pins "Trust certificate" leaves behind, and the
                                      only way to take one back short of editing settings.json. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
                                             <StackPanel>
-                                                <TextBlock x:Name="Mw_SettingsTrustedWebCertificatesTitle"
-                                                           Text="{loc:Translate SettingsTrustedWebCertificatesSectionTitle}"
-                                                           FontSize="{StaticResource FontSizeSubtitle}"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                <Border Style="{StaticResource SettingsApplyBadgeStyle}" x:Name="Mw_SettingsTrustedWebCertificatesTitleApplies">
-                                                    <TextBlock Text="{loc:Translate SettingsSavedImmediately}" Style="{StaticResource SettingsApplyBadgeTextStyle}"/>
-                                                </Border>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock x:Name="Mw_SettingsTrustedWebCertificatesTitle"
+                                                               Text="{loc:Translate SettingsTrustedWebCertificatesSectionTitle}"
+                                                               FontSize="{StaticResource FontSizeSubtitle}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBlock x:Name="Mw_SettingsTrustedWebCertificatesTitleApplies" Style="{StaticResource SettingsApplyGlyphStyle}" Text="{StaticResource SettingsApplyGlyphSavedAtOnce}"
+                                                               ToolTip="{loc:Translate SettingsSavedImmediately}" AutomationProperties.Name="{loc:Translate SettingsSavedImmediately}"/>
+                                                </StackPanel>
                                                 <TextBlock Text="{loc:Translate SettingsTrustedWebCertificatesSectionHint}"
                                                            Foreground="{DynamicResource TextTertiaryBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"
@@ -5207,13 +5241,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsSecuritySubTabFileSharing"
+                            <TabItem x:Name="Mw_SettingsSecuritySubTabFileSharing" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabFileSharing}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- File Sharing -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
@@ -5233,39 +5272,21 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                        </TabControl>
-                    </TabItem>
 
                     <!-- ═══════ ADVANCED ═══════ -->
-                    <TabItem x:Name="Mw_SettingsTabAdvanced" Style="{StaticResource ThemedTabItemStyle}">
-                        <!-- The header is a panel, so without this the tab reads out as its type name.
-                             The error count joins the name: the badge alone is only seen. -->
-                        <AutomationProperties.Name>
-                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SettingsTabAdvanced]"/>
-                                <Binding Path="Settings.AdvancedTabErrorCount"/>
-                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySettingsTabErrors]"/>
-                            </MultiBinding>
-                        </AutomationProperties.Name>
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Translate SettingsTabAdvanced}"/>
-                                <Border Style="{StaticResource SettingsTabErrorBadgeStyle}"
-                                        Visibility="{Binding Settings.HasAdvancedTabErrors, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding Settings.AdvancedTabErrorCount}" Style="{StaticResource SettingsTabErrorBadgeTextStyle}"/>
-                                </Border>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <TabControl x:Name="Mw_SettingsAdvancedSubTabControl"
-                                    AutomationProperties.Name="{loc:Translate SettingsTabAdvanced}"
-                                    Style="{StaticResource SettingsRailTabControlStyle}">
-                            <TabItem x:Name="Mw_SettingsAdvancedSubTabDiagnostics"
+                    <TabItem x:Name="Mw_SettingsTabAdvanced" controls:SettingsRail.Group="Advanced" Header="{loc:Translate SettingsTabAdvanced}" Style="{StaticResource SettingsRailGroupHeaderStyle}"/>
+                            <TabItem x:Name="Mw_SettingsAdvancedSubTabDiagnostics" controls:SettingsRail.Group="Advanced"
                                      Header="{loc:Translate SettingsAdvancedSubTabDiagnostics}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Logging -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -5410,14 +5431,19 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
 
-                            <TabItem x:Name="Mw_SettingsAdvancedSubTabTools"
+                            <TabItem x:Name="Mw_SettingsAdvancedSubTabTools" controls:SettingsRail.Group="Advanced"
                                      Header="{loc:Translate SettingsAdvancedSubTabTools}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
 
                                 <!-- External Editor -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -5633,13 +5659,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem x:Name="Mw_SettingsAdvancedSubTabCmdLibSync"
+                            <TabItem x:Name="Mw_SettingsAdvancedSubTabCmdLibSync" controls:SettingsRail.Group="Advanced"
                                      Header="{loc:Translate SettingsAdvancedSubTabCmdLibSync}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Command Library Git Sync -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -5711,10 +5742,9 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
-                        </TabControl>
-                    </TabItem>
 
                 </TabControl>
             </Grid>

@@ -60,20 +60,50 @@ public sealed class SettingsRailErrorCountTests
         });
     }
 
+    /// <summary>
+    /// The sections counted and searched are the rail items that hold content, in rail order; a
+    /// group heading holds none and is never one of them.
+    /// </summary>
     [Fact]
-    public void TheRailsAreFoundAtAnyDepth_AndATopStripIsNotOne()
+    public void TheRailSectionsAreItsItemsWithContent_AndAGroupHeadingIsNotOne()
     {
         RunOnStaThread(() =>
         {
-            TabControl top = new() { TabStripPlacement = System.Windows.Controls.Dock.Top };
-            TabControl rail = new() { TabStripPlacement = System.Windows.Controls.Dock.Left };
-            Grid wrapper = new();
-            wrapper.Children.Add(rail);
-            top.Items.Add(new TabItem { Content = wrapper });
+            TabControl rail = new();
+            TabItem general = new() { Header = "General" };
+            TabItem appearance = new() { Content = new StackPanel() };
+            TabItem ssh = new() { Header = "SSH" };
+            TabItem gateways = new() { Content = new StackPanel() };
+            rail.Items.Add(general);
+            rail.Items.Add(appearance);
+            rail.Items.Add(ssh);
+            rail.Items.Add(gateways);
 
-            List<TabControl> rails = MainWindow.SettingsRails(top).ToList();
+            List<TabItem> sections = MainWindow.SettingsRailSections(rail).ToList();
 
-            Assert.Equal([rail], rails);
+            Assert.Equal([appearance, gateways], sections);
+        });
+    }
+
+    /// <summary>
+    /// The first section of a group brings its heading into view with it; any other section
+    /// brings no heading.
+    /// </summary>
+    [Fact]
+    public void TheFirstSectionOfAGroupNamesTheHeadingAboveIt()
+    {
+        RunOnStaThread(() =>
+        {
+            TabControl rail = new();
+            TabItem general = new() { Header = "General" };
+            TabItem appearance = new() { Content = new StackPanel() };
+            TabItem behavior = new() { Content = new StackPanel() };
+            rail.Items.Add(general);
+            rail.Items.Add(appearance);
+            rail.Items.Add(behavior);
+
+            Assert.Same(general, MainWindow.SettingsRailHeadingAbove(rail, appearance));
+            Assert.Null(MainWindow.SettingsRailHeadingAbove(rail, behavior));
         });
     }
 

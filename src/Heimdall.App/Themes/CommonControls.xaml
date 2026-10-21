@@ -44,9 +44,22 @@
          in French on one line, and the thickness of the bar that marks the open section. -->
     <sys:Double x:Key="SettingsRailWidth">210</sys:Double>
     <Thickness x:Key="SettingsRailSelectedBar">3,0,0,0</Thickness>
-    <!-- A line under a rail control that belongs to its content column, not to the rail: the rail
-         width plus the inset, margin and card padding the section text starts at. -->
-    <Thickness x:Key="SettingsRailFooterMargin">258,8,0,12</Thickness>
+    <!-- A line under the open section, in the content column: the section margin plus the card
+         padding the section text starts at, so it lines up with that text. -->
+    <Thickness x:Key="SettingsRailFooterMargin">40,8,0,12</Thickness>
+    <!-- Where the settings rail sits under the toolbar rule: no right margin, so the section
+         scroll bar stays at the window edge. -->
+    <Thickness x:Key="SettingsRailHostMargin">16,0,0,0</Thickness>
+    <!-- The space above a group name in the rail, which sets the groups apart, and around the
+         legend of the apply glyphs at the foot of the rail. -->
+    <Thickness x:Key="SettingsRailGroupHeaderMargin">12,14,0,4</Thickness>
+    <Thickness x:Key="SettingsRailLegendMargin">12,8,0,4</Thickness>
+    <!-- The glyphs beside a section title that say when its settings take effect: at once and kept
+         on Save, written at once and never by Save, or on the next session or connection after
+         Save. -->
+    <sys:String x:Key="SettingsApplyGlyphImmediate">&#xE945;</sys:String>
+    <sys:String x:Key="SettingsApplyGlyphSavedAtOnce">&#xE74E;</sys:String>
+    <sys:String x:Key="SettingsApplyGlyphNextConnection">&#xE8A7;</sys:String>
     <!-- The gap between the rail and the open section. The section itself is capped by the
          SettingsContentMaxWidth of its content panel, so its scroll bar stays at the window edge. -->
     <Thickness x:Key="SettingsRailContentInset">8,0,0,0</Thickness>
@@ -1360,11 +1373,13 @@
         </Setter>
     </Style>
 
-    <!-- Settings section rail: the sections of a settings tab listed down the left, the open one on
-         the right. Each section is short enough to read without scrolling the whole tab. -->
+    <!-- Settings section rail: every settings section listed down the left under the name of its
+         group, the open one on the right. Each section is short enough to read without scrolling. -->
     <Style x:Key="SettingsRailTabControlStyle" TargetType="{x:Type TabControl}">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <!-- The rail's right divider: with no surface on either side, the line is what parts the
+             rail from the open section. -->
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="TabStripPlacement" Value="Left"/>
@@ -1378,41 +1393,45 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
+                        <!-- The rail is capped at its width and scrolls on a short window, so it never
+                             pushes the open section away; its footer, the legend of the apply
+                             glyphs, stays in sight under it. -->
                         <Border Grid.Column="0"
                                 Width="{StaticResource SettingsRailWidth}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="0,0,1,0"
                                 Padding="0,4,8,4">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          Focusable="False">
-                                <StackPanel x:Name="HeaderPanel"
-                                            IsItemsHost="True"
-                                            Orientation="Vertical"
-                                            KeyboardNavigation.TabNavigation="Once"
-                                            KeyboardNavigation.DirectionalNavigation="Cycle"/>
-                            </ScrollViewer>
+                            <DockPanel LastChildFill="True">
+                                <ContentPresenter DockPanel.Dock="Bottom"
+                                                  Content="{TemplateBinding controls:SettingsRail.Footer}"/>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              Focusable="False">
+                                    <StackPanel x:Name="HeaderPanel"
+                                                IsItemsHost="True"
+                                                Orientation="Vertical"
+                                                KeyboardNavigation.TabNavigation="Once"
+                                                KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                </ScrollViewer>
+                            </DockPanel>
                         </Border>
-                        <!-- The open section sits on the window background, so its cards stand out
-                             from it; on the tab's own card colour they did not. -->
-                        <Border Grid.Column="1"
-                                Margin="{StaticResource SettingsRailContentInset}"
-                                Background="{DynamicResource BackgroundBrush}"
-                                CornerRadius="{StaticResource CornerRadiusLg}">
-                            <!-- The section fills the column, so its scroll bar sits at the window edge;
-                                 each section panel caps its own width (SettingsContentMaxWidth) and
-                                 stays left against the rail. -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <ContentPresenter x:Name="PART_SelectedContentHost"
-                                                  HorizontalAlignment="Stretch"
-                                                  Margin="{TemplateBinding Padding}"
-                                                  ContentSource="SelectedContent"
-                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
-                            </Grid>
-                        </Border>
+                        <!-- The open section sits straight on the window background, with no surface of
+                             its own: its cards are the only one, so no card sits inside a card. The
+                             section fills the column, so its scroll bar sits at the window edge; each
+                             section panel caps its own width (SettingsContentMaxWidth) and stays left
+                             against the rail. A footer of the group, such as Reset RDP defaults, sits
+                             under it. -->
+                        <DockPanel Grid.Column="1"
+                                   Margin="{StaticResource SettingsRailContentInset}"
+                                   LastChildFill="True">
+                            <ContentPresenter DockPanel.Dock="Bottom"
+                                              Content="{TemplateBinding controls:SettingsRail.ContentFooter}"/>
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              HorizontalAlignment="Stretch"
+                                              Margin="{TemplateBinding Padding}"
+                                              ContentSource="SelectedContent"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </DockPanel>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -1509,6 +1528,36 @@
                             <Setter TargetName="RailBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The name of a group of sections in the settings rail. It is a heading, not a section:
+         disabled, so a click, the arrow keys, Ctrl+Tab, Home and End all pass over it, and
+         never focusable. Its template ignores the disabled state, so it reads as small muted
+         text rather than as a greyed-out section. -->
+    <Style x:Key="SettingsRailGroupHeaderStyle" TargetType="{x:Type TabItem}">
+        <Setter Property="IsEnabled" Value="False"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource Self}}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeSmallCaption}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Margin" Value="{StaticResource SettingsRailGroupHeaderMargin}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TabItem}">
+                    <ContentPresenter HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      ContentSource="Header">
+                        <ContentPresenter.Resources>
+                            <Style TargetType="{x:Type TextBlock}">
+                                <Setter Property="TextWrapping" Value="Wrap"/>
+                            </Style>
+                        </ContentPresenter.Resources>
+                    </ContentPresenter>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

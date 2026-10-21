@@ -33,7 +33,10 @@ qui est enregistré : changez une valeur puis remettez-la, et plus rien n'attend
 des passerelles SSH et des outils externes restent en attente jusqu'à l'enregistrement ou
 l'annulation.
 
-Une carte dont les réglages n'attendent pas simplement l'enregistrement le dit sous son titre :
+Une carte dont les réglages n'attendent pas simplement l'enregistrement affiche un pictogramme à
+côté de son titre : un éclair, une disquette ou une nouvelle fenêtre. Le survol du pictogramme
+affiche sa signification, un lecteur d'écran la lit comme nom du pictogramme, et la légende sous
+la liste des sections la reprend :
 
 - **S'applique aussitôt, conservé à l'enregistrement** (Apparence) : la langue, le thème et
   l'accent s'affichent dès que vous les choisissez ; Annuler les modifications revient à
@@ -57,7 +60,7 @@ Enregistrer. Refuser n'écrit rien et laisse vos modifications en attente.
 
 **Quand l'enregistrement est refusé**, le message nomme le réglage et le problème, la case en
 erreur passe en rouge et son infobulle donne la raison, le bandeau dit combien de réglages
-demandent votre attention, et le focus va au premier d'entre eux en ouvrant son onglet.
+demandent votre attention, et le focus va au premier d'entre eux en ouvrant sa section.
 
 **Si un fichier de configuration est endommagé.** Chaque enregistrement garde le fichier qu'il
 remplace comme dernière copie valide, `settings.json.bak` et `servers.json.bak`, à côté de
@@ -67,7 +70,7 @@ place, vous dit quel fichier a été restauré et prévient que des changements 
 cette copie peuvent manquer. L'enregistrement suivant remplace le fichier endommagé. Sans copie
 utilisable, le démarrage échoue comme avant.
 
-**Valeurs par défaut** ramène chaque onglet à sa valeur d'usine, sous forme de modifications en
+**Valeurs par défaut** ramène chaque section à sa valeur d'usine, sous forme de modifications en
 attente : rien n'est écrit avant l'enregistrement. Il garde votre langue, votre thème et votre
 accent, vos sessions et vos passerelles SSH, vos outils externes et le secret de déverrouillage
 du fournisseur d'identifiants, la version de mise à jour ignorée, ainsi que votre mot de passe
@@ -75,13 +78,13 @@ maître, votre PIN et votre enrôlement Windows Hello. Il désactive en revanche
 d'identifiants externe, les exigences Credential Guard et Windows Hello et le partage TFTP, et
 réinitialise le délai de
 grâce Windows Hello, le délai de verrouillage automatique et la déconnexion au verrouillage ; la
-confirmation les énumère. **Réinitialiser les valeurs RDP** ne touche que l'onglet RDP : le
+confirmation les énumère. **Réinitialiser les valeurs RDP**, sous les sections RDP, ne touche que ces sections : le
 délai de surveillance de connexion RDP, dans Avancé > Diagnostics, garde sa valeur.
 
-**Recherche** - le champ au-dessus des onglets trouve un réglage par son libellé ou son aide,
+**Recherche** - le champ au-dessus des sections trouve un réglage par son libellé ou son aide,
 infobulles comprises, sans tenir compte de la casse ni des accents. Il ne compte que ce qui est
 affiché pour vous ("Résultat 2 sur 5") ; Entrée passe au résultat suivant, Maj+Entrée au
-précédent, en ouvrant au passage l'onglet et toute section repliée. Ctrl+F dans l'onglet
+précédent, en ouvrant au passage sa section et tout panneau replié. Ctrl+F dans l'onglet
 Paramètres y place le curseur.
 
 **Modifié** - un réglage dont la valeur diffère de sa valeur d'usine affiche un petit badge
@@ -104,7 +107,7 @@ les parcourt. Ce n'est pas un filtre : les autres réglages restent affichés.
 
 ## Fichier de paramètres : exporter et importer
 
-La carte **Fichier de paramètres** de l'onglet Général copie vos préférences vers un autre
+La carte **Fichier de paramètres** de la rubrique Général copie vos préférences vers un autre
 ordinateur, ou en garde une sauvegarde.
 
 **Exporter les paramètres...** écrit les réglages tels qu'ils ont été enregistrés en dernier, pas
@@ -165,7 +168,7 @@ désactive le verrouillage automatique.
 
 ## Sécurité
 
-**Vue d'ensemble de la sécurité** - la première carte de l'onglet Sécurité liste, une ligne
+**Vue d'ensemble de la sécurité** - la première carte de la rubrique Sécurité liste, une ligne
 chacun, les choix de cet écran qui touchent à la sécurité : NLA et authentification stricte du
 serveur en RDP, partage TFTP, transcription des sessions, politique d'exécution PowerShell, mot de
 passe maître, verrouillage automatique, déconnexion au verrouillage, Credential Guard, Windows
@@ -176,13 +179,13 @@ Une ligne précédée d'une icône d'avertissement est un choix documenté comme
 désactivée, TFTP activé, transcription activée, politique d'exécution Bypass ou Unrestricted,
 pas de verrouillage automatique avec le mot de passe maître actif, vérification des mises à jour
 désactivée, ou import de known_hosts activé. Elle dit pourquoi, et **Aller au paramètre** ouvre
-l'onglet, fait défiler jusqu'au réglage et y place le focus. La ligne au-dessus de la liste dit
+la section, fait défiler jusqu'au réglage et y place le focus. La ligne au-dessus de la liste dit
 combien demandent attention, et un lecteur d'écran l'annonce quand elle change. L'authentification
 stricte du serveur désactivée est signalée sans être marquée : c'est le réglage par défaut de
 Windows, qui avertit et demande.
 
 **Network Level Authentication (NLA)** et **Authentification stricte du serveur** se trouvent dans
-l'onglet RDP, sous Certificats, dans la carte Sécurité de la connexion.
+la rubrique RDP, sous Certificats, dans la carte Sécurité de la connexion.
 
 **Network Level Authentication (NLA)** - la machine distante vous authentifie *avant* d'ouvrir
 une session de bureau. Laissez-la activée. Ne la désactivez que pour des cibles qui ne savent
@@ -332,7 +335,7 @@ chaque contrôle inactif retient environ 300 Mo. Le premier réglage dit combien
 que sa mémoire soit rendue (0 le garde jusqu'à la fermeture de Heimdall). Les deux s'appliquent
 sans redémarrage. Voir [RDP-PERFORMANCE.md](RDP-PERFORMANCE.md).
 
-**Intervalle de maintien de session** et **Intervalle anti-inactivité**, dans l'onglet RDP,
+**Intervalle de maintien de session** et **Intervalle anti-inactivité**, dans la rubrique RDP,
 sont deux choses différentes. Le maintien est du trafic protocolaire qui empêche le *serveur* de
 couper une session inactive. L'anti-inactivité simule une activité pour que le *bureau* distant
 ne se verrouille pas ; 0 la désactive.
