@@ -12,6 +12,86 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-21: tool icons back, readable text on every theme, dialogs without caption boxes (v2026.102102)
+
+Graphic pass over the interface (checks UI-01 to UI-08 of the project audit, static plus a live
+pass on Drakul and Parchment at 1400x900 and 800x600).
+
+### Tools tab and Port Scanner (#666, #672)
+
+- **Tool card icons** (#666). `ToolsTabPopulationService.CreateToolsTabCard` placed the icon
+  `Path` inside the tinted `Border` whose `Opacity` was 0.12, so WPF drew the icon at 12 percent on
+  every card. The tint and the icon are now siblings in a `Grid` (`ToolCardIconTintOpacity`);
+  guarded by `ToolsTabCardIconOpacityTests`, which walks from the `Path` to the card and requires an
+  effective opacity of 1.
+- **Single colon** (#666). `PortScannerView.FormatStatLabel` adds `:` only when the locale label
+  does not already end with one ("Open:" printed "Open:: 0"); `PortScannerStatLabelTests`.
+- **SNMP Walker glyph** (#672). `Geo.Tool.SnmpWalker` was line segments with no area, invisible
+  under a `Fill`; redrawn filled, and `ToolIconGeometryAreaTests` requires an area for every
+  `Geo.Tool.*` geometry.
+
+### Theme bridge and contrast (#668, #670, #672)
+
+- **Derived text colours** (#668). `Theming/ThemeTextColours` derives `ErrorTextColor`,
+  `WarningTextColor`, `SuccessTextColor`, `InfoTextColor` and `AccentTextColor` from the theme
+  colour of the same meaning, moving HSL lightness one percent at a time until the colour reaches
+  4.5:1 on `BackgroundColor` and on `SurfaceAltColor`, and keeping it byte-identical when it already
+  does. `HeimdallThemeService` writes them into the application resources in `ApplyTheme` and on
+  `OnThemeForgeThemeChanged` (theme and accent tint). New brushes `InfoTextBrush` and
+  `AccentTextBrush`; `ErrorTextBrush` and friends now point at the derived colours (Drakul error on
+  card 2.91:1 to 4.57:1, accent on card 3.79:1 to 4.69:1). `ThemeSurfaceTokenContrastTests` runs
+  over `ThemeForgeNames.All`.
+- **Hints** (#668). 23 readable texts painted with `TextDisabledBrush` (TextSecondary at 0.55:
+  3.33:1 Drakul, 2.40:1 Parchment) switched to `TextSecondaryBrush`; `TextDisabledBrushGuardTests`
+  refuses the brush on prose, with an allow-list for state glyphs and `IsEnabled=False` setters.
+  `AccentTextBrush` replaces `AccentBrush` on every text attribute site (93), then on the setters
+  and code sites (#672, `AccentForegroundSetterGuardTests`).
+- **Strong borders** (#670). `BorderStrongColor` is derived from `BorderColor` to 3:1 on the
+  background and on a card (every shipped theme defines `BorderColor` equal to `SurfaceAltColor`:
+  1.00:1 on a card, 1.56:1 on the Drakul background, 1.17:1 on Parchment). `BorderStrongBrush` is
+  used on the sidebar divider, the toolbar and status bar rules, the 104 tool header and footer
+  rules, `ThemedDataGridColumnHeaderStyle`, the `GridViewColumnHeader` style,
+  `DialogSectionCardStyle`, the session properties card (#670) and the sidebar properties panel
+  divider (#672); `BoundaryLineBrushMarkupTests`. `BorderBrush` is unchanged elsewhere.
+- **Overlay and fallbacks** (#671). `OverlayBackground` is `BackgroundColor` at 0.70 instead of
+  `#B3000000`; `TextDiffView` tints from `ErrorTextBrush` / `SuccessTextBrush` with no literal
+  fallback; `MarkdownLivePreviewTransformer` dims from `TextSecondaryBrush`.
+  `HardcodedColorGuardTests` now covers those three files.
+- The accessibility checklist (EN and FR) describes the derived brushes and `BorderStrongBrush`.
+
+### Dialogs (#667)
+
+- **No caption boxes on modal dialogs.** `Behaviors/DialogChromeBehavior.HideCaptionButtons`
+  clears `WS_MINIMIZEBOX` and `WS_MAXIMIZEBOX` on `SourceInitialized`; applied to the 25 dialogs
+  that kept the full chrome (the 10 `ToolWindow` dialogs are unchanged). `DialogCaptionButtonsTests`
+  requires one or the other on every `Views/Dialogs/*.xaml` window.
+- **Combo boxes fit their values.** 37 `<ComboBox Width=...>` became `MinWidth` after measuring
+  the longest EN and FR item with `FormattedText`; `ComboBoxWidthGuardTests` keeps the 15 measured
+  exceptions and re-measures them (ES added in #672, which widened `SshAgentPreference`).
+
+### Main window (#669, #671)
+
+- **Scheduled grid** sets `CanUserAddRows="False"` and `CanUserDeleteRows="False"` (the new-item
+  placeholder row showed a lone check box); `DataGridPlaceholderRowGuardTests` covers every
+  editable grid.
+- **Empty states.** Tunnels and Scheduled use `EmptyStateStyle` with a glyph, the title, the hint
+  and the action, like Sessions; the gateway link moved into the Tunnels card;
+  `TabEmptyStateConsistencyTests`.
+- **SSH and local session header** uses a `Grid` with the `SessionHeader*MaxWidth` tokens, so
+  `CharacterEllipsis` engages at narrow widths; `SshSessionHeaderLayoutTests`.
+- **File panes.** `SftpViewMetrics.FitNameColumnWidth` counts the 12 px of row chrome (border,
+  padding and the 2 px `GridViewRowPresenter` adds) and clamps to the minimum name column, shared by
+  `LocalFileBrowserView` and `EmbeddedSftpView`; `FileBrowserPaneHorizontalFitTests`.
+- **Onboarding card placement.** `MainWindow.OnboardingCardOrigin` places the tour card beside its
+  target (centred in the free band), then below, above, and the window centre last;
+  `OnboardingCardPlacementTests`.
+- **Startup focus.** `RestoreStartupSelection` restores the last selected row and hands focus to
+  it, or to `Mw_FilterBox`, when focus sits on the tree container; `StartupTreeFocusTests`.
+- **Tokens** (#671). 45 literal font sizes (XAML attributes and setters, `EmbeddedSessionManager`,
+  `ToolsTabPopulationService`) read a typography or icon token; `FontSizeTokenGuardTests`.
+  `SpacingXxs` (2) and `SpacingMl` (16) added and the uniform `Margin`/`Padding` literals of 2 and
+  16 migrated; `SpacingTokenScaleTests`.
+
 ## 2026-10-21: shared MobaXterm sessions a team can use on day one, a command library in your language with runbooks, and a masked copy of terminal output (v2026.102101)
 
 ### Command Library (#656-#663, #665)
