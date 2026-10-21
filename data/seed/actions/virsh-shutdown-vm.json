@@ -1,0 +1,77 @@
+{
+  "id": "virsh-shutdown-vm",
+  "title": "Shut down a KVM virtual machine",
+  "description": "Ask the guest operating system of a libvirt virtual machine to shut down cleanly.",
+  "category": "containers-vms",
+  "platform": 1,
+  "level": 2,
+  "tags": [
+    "virsh",
+    "libvirt",
+    "kvm",
+    "linux",
+    "vm",
+    "shutdown"
+  ],
+  "linuxCommandTemplateId": "virsh-shutdown-vm-cmd",
+  "linuxCommandTemplate": {
+    "id": "virsh-shutdown-vm-cmd",
+    "platform": 1,
+    "name": "virsh",
+    "commandPattern": "sudo virsh shutdown {domain}",
+    "parameters": [
+      {
+        "name": "domain",
+        "label": "Virtual machine",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name or UUID of the libvirt domain"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo virsh shutdown web01",
+      "description": "Shut down web01 cleanly",
+      "platform": 1
+    },
+    {
+      "command": "sudo virsh reboot web01",
+      "description": "Reboot the guest cleanly",
+      "platform": 1
+    },
+    {
+      "command": "sudo virsh destroy web01",
+      "description": "Cut the power of a guest that does not answer, like pulling the plug",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo or membership of the libvirt group. The guest must handle ACPI or run the QEMU guest agent; the services it hosts become unavailable.",
+  "links": [
+    {
+      "title": "virsh manual",
+      "url": "https://www.libvirt.org/manpages/virsh.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Arrêter une machine virtuelle KVM",
+      "description": "Demande au système invité d'une machine virtuelle libvirt de s'arrêter proprement.",
+      "notes": "Nécessite sudo ou l'appartenance au groupe libvirt. L'invité doit gérer l'ACPI ou exécuter l'agent invité QEMU ; les services qu'il héberge deviennent indisponibles.",
+      "parameters": {
+        "linux": {
+          "domain": {
+            "label": "Machine virtuelle",
+            "description": "Nom ou UUID du domaine libvirt"
+          }
+        }
+      },
+      "examples": {
+        "sudo virsh shutdown web01": "Arrête proprement web01",
+        "sudo virsh reboot web01": "Redémarre proprement l'invité",
+        "sudo virsh destroy web01": "Coupe l'alimentation d'un invité qui ne répond pas, comme débrancher la prise"
+      }
+    }
+  }
+}

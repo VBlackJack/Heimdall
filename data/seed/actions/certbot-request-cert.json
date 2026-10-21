@@ -1,0 +1,99 @@
+{
+  "id": "certbot-request-cert",
+  "title": "Request a Let's Encrypt certificate",
+  "description": "Obtain a certificate for a domain from Let's Encrypt without changing the web server configuration.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "certbot",
+    "letsencrypt",
+    "acme",
+    "tls",
+    "linux"
+  ],
+  "linuxCommandTemplateId": "certbot-request-cert-cmd",
+  "linuxCommandTemplate": {
+    "id": "certbot-request-cert-cmd",
+    "platform": 1,
+    "name": "certbot",
+    "commandPattern": "sudo certbot certonly {authenticator} -d {domain}",
+    "parameters": [
+      {
+        "name": "authenticator",
+        "label": "Validation method",
+        "type": "choice",
+        "allowedValues": [
+          "--standalone",
+          "--nginx",
+          "--apache"
+        ],
+        "defaultValue": "--standalone",
+        "required": true,
+        "description": "--standalone starts its own web server on port 80, --nginx and --apache use the running server"
+      },
+      {
+        "name": "domain",
+        "label": "Domain",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name the certificate is issued for"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo certbot certonly --nginx -d www.example.com -d example.com",
+      "description": "Get one certificate for two names through nginx",
+      "platform": 1
+    },
+    {
+      "command": "sudo certbot certonly --standalone -d mail.example.com",
+      "description": "Get a certificate on a host with no web server",
+      "platform": 1
+    },
+    {
+      "command": "sudo certbot certonly --webroot -w /var/www/html -d www.example.com",
+      "description": "Validate through files placed in the web root",
+      "platform": 1
+    },
+    {
+      "command": "sudo certbot certificates",
+      "description": "List the certificates certbot manages and their expiry",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo, a public DNS record for the domain and port 80 reachable from the Internet. The first run asks for an e-mail address and the terms of service.",
+  "links": [
+    {
+      "title": "Certbot user guide",
+      "url": "https://eff-certbot.readthedocs.io/en/stable/using.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Demander un certificat Let's Encrypt",
+      "description": "Obtient un certificat pour un domaine auprès de Let's Encrypt sans modifier la configuration du serveur web.",
+      "notes": "Nécessite sudo, un enregistrement DNS public pour le domaine et le port 80 joignable depuis Internet. Le premier lancement demande une adresse e-mail et l'acceptation des conditions.",
+      "parameters": {
+        "linux": {
+          "authenticator": {
+            "label": "Méthode de validation",
+            "description": "--standalone démarre son propre serveur web sur le port 80, --nginx et --apache utilisent le serveur en place"
+          },
+          "domain": {
+            "label": "Domaine",
+            "description": "Nom pour lequel le certificat est émis"
+          }
+        }
+      },
+      "examples": {
+        "sudo certbot certonly --nginx -d www.example.com -d example.com": "Obtient un certificat pour deux noms via nginx",
+        "sudo certbot certonly --standalone -d mail.example.com": "Obtient un certificat sur un hôte sans serveur web",
+        "sudo certbot certonly --webroot -w /var/www/html -d www.example.com": "Valide via des fichiers déposés dans la racine web",
+        "sudo certbot certificates": "Liste les certificats gérés par certbot et leur expiration"
+      }
+    }
+  }
+}
