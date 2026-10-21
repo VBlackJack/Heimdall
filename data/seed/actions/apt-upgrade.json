@@ -17,7 +17,7 @@
     "id": "apt-upgrade-cmd",
     "platform": 1,
     "name": "apt",
-    "commandPattern": "apt upgrade -y",
+    "commandPattern": "sudo apt upgrade -y",
     "parameters": []
   },
   "examples": [
@@ -32,17 +32,17 @@
       "platform": 1
     },
     {
-      "command": "apt upgrade -y -v",
+      "command": "sudo apt upgrade -y -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
-      "command": "apt upgrade -y --dry-run",
+      "command": "sudo apt upgrade -y --dry-run",
       "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     },
     {
-      "command": "apt upgrade -y",
+      "command": "sudo apt upgrade -y",
       "description": "Update every installed package",
       "platform": 1
     }
@@ -62,9 +62,9 @@
       "examples": {
         "sudo apt upgrade": "Met à niveau tous les paquets (avec confirmation)",
         "sudo apt full-upgrade": "Met à niveau en gérant les dépendances changées",
-        "apt upgrade -y -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "apt upgrade -y --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
-        "apt upgrade -y": "Mettre à jour tous les paquets installés"
+        "sudo apt upgrade -y -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "sudo apt upgrade -y --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+        "sudo apt upgrade -y": "Mettre à jour tous les paquets installés"
       }
     }
   }

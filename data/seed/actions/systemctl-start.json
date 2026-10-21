@@ -16,7 +16,7 @@
     "id": "systemctl-start-cmd",
     "platform": 1,
     "name": "systemctl",
-    "commandPattern": "systemctl start {service}",
+    "commandPattern": "sudo systemctl start {service}",
     "parameters": [
       {
         "name": "service",
@@ -40,7 +40,7 @@
       "platform": 1
     },
     {
-      "command": "systemctl start apache2",
+      "command": "sudo systemctl start apache2",
       "description": "Start the Apache service",
       "platform": 1
     }
@@ -68,7 +68,7 @@
       "examples": {
         "sudo systemctl start nginx": "Démarre le service nginx",
         "sudo systemctl start apache2.service": "Démarre Apache (l'extension .service est optionnelle)",
-        "systemctl start apache2": "Démarrer le service Apache"
+        "sudo systemctl start apache2": "Démarrer le service Apache"
       }
     }
   }

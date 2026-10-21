@@ -17,7 +17,7 @@
     "id": "fail2ban-status-cmd",
     "platform": 1,
     "name": "fail2ban-client",
-    "commandPattern": "fail2ban-client status {jail}",
+    "commandPattern": "sudo fail2ban-client status {jail}",
     "parameters": [
       {
         "name": "jail",
@@ -46,32 +46,22 @@
       "platform": 1
     },
     {
-      "command": "fail2ban-client status www",
+      "command": "sudo fail2ban-client status www",
       "description": "Example using the 'jail' parameter: jail name (empty = list the jails). Replace www with the value that fits your environment.",
       "platform": 1
     },
     {
-      "command": "fail2ban-client status",
-      "description": "Fail2ban status",
-      "platform": 1
-    },
-    {
-      "command": "fail2ban-client status sshd",
-      "description": "SSH jail status",
-      "platform": 1
-    },
-    {
-      "command": "fail2ban-client set sshd unbanip 192.168.1.100",
+      "command": "sudo fail2ban-client set sshd unbanip 192.168.1.100",
       "description": "Unban an IP address",
       "platform": 1
     },
     {
-      "command": "fail2ban-client banned",
+      "command": "sudo fail2ban-client banned",
       "description": "List the banned IPs",
       "platform": 1
     },
     {
-      "command": "fail2ban-client reload",
+      "command": "sudo fail2ban-client reload",
       "description": "Reload the configuration",
       "platform": 1
     }
@@ -100,12 +90,10 @@
         "sudo fail2ban-client status": "Liste toutes les jails actives",
         "sudo fail2ban-client status sshd": "État détaillé de la jail SSH",
         "sudo fail2ban-client set sshd unbanip 1.2.3.4": "Débanne une IP",
-        "fail2ban-client status www": "Exemple utilisant le paramètre 'jail': Nom de la jail (vide = liste des jails). Remplacez www par la valeur appropriée selon votre environnement.",
-        "fail2ban-client status": "État de Fail2ban",
-        "fail2ban-client status sshd": "État du jail SSH",
-        "fail2ban-client set sshd unbanip 192.168.1.100": "Débannir une IP",
-        "fail2ban-client banned": "Lister les IP bannies",
-        "fail2ban-client reload": "Recharger la configuration"
+        "sudo fail2ban-client status www": "Exemple utilisant le paramètre 'jail': Nom de la jail (vide = liste des jails). Remplacez www par la valeur appropriée selon votre environnement.",
+        "sudo fail2ban-client set sshd unbanip 192.168.1.100": "Débannir une IP",
+        "sudo fail2ban-client banned": "Lister les IP bannies",
+        "sudo fail2ban-client reload": "Recharger la configuration"
       }
     }
   }

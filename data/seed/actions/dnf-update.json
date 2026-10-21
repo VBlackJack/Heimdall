@@ -17,7 +17,7 @@
     "id": "dnf-update-cmd",
     "platform": 1,
     "name": "dnf",
-    "commandPattern": "dnf update -y",
+    "commandPattern": "sudo dnf update -y",
     "parameters": []
   },
   "examples": [
@@ -32,22 +32,22 @@
       "platform": 1
     },
     {
-      "command": "dnf update -y -v",
+      "command": "sudo dnf update -y -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
-      "command": "dnf update -y --dry-run",
+      "command": "sudo dnf update -y --dry-run",
       "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     },
     {
-      "command": "dnf update -y",
+      "command": "sudo dnf update -y",
       "description": "Update every package",
       "platform": 1
     },
     {
-      "command": "dnf install httpd -y",
+      "command": "sudo dnf install httpd -y",
       "description": "Install Apache HTTPD",
       "platform": 1
     },
@@ -77,10 +77,10 @@
       "examples": {
         "sudo dnf update": "Met à jour tous les paquets",
         "sudo dnf check-update": "Vérifie les mises à jour disponibles sans installer",
-        "dnf update -y -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "dnf update -y --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
-        "dnf update -y": "Mettre à jour tous les paquets",
-        "dnf install httpd -y": "Installer Apache HTTPD",
+        "sudo dnf update -y -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "sudo dnf update -y --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+        "sudo dnf update -y": "Mettre à jour tous les paquets",
+        "sudo dnf install httpd -y": "Installer Apache HTTPD",
         "dnf search nodejs": "Rechercher Node.js",
         "dnf list installed | grep kernel": "Lister les kernels installés"
       }

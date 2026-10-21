@@ -16,7 +16,7 @@
     "id": "systemctl-daemon-reload-cmd",
     "platform": 1,
     "name": "systemctl",
-    "commandPattern": "systemctl daemon-reload",
+    "commandPattern": "sudo systemctl daemon-reload",
     "parameters": []
   },
   "examples": [
@@ -26,13 +26,8 @@
       "platform": 1
     },
     {
-      "command": "sudo systemctl daemon-reload && systemctl restart myservice",
+      "command": "sudo systemctl daemon-reload && sudo systemctl restart myservice",
       "description": "Reload, then restart a service",
-      "platform": 1
-    },
-    {
-      "command": "systemctl daemon-reload",
-      "description": "Reload every systemd unit file after a change.",
       "platform": 1
     }
   ],
@@ -50,8 +45,7 @@
       "notes": "Nécessite sudo. À exécuter après création ou modification d'un fichier .service.",
       "examples": {
         "sudo systemctl daemon-reload": "Recharge la configuration systemd",
-        "sudo systemctl daemon-reload && systemctl restart myservice": "Recharge puis redémarre un service",
-        "systemctl daemon-reload": "Recharge tous les fichiers d'unités systemd après modification."
+        "sudo systemctl daemon-reload && sudo systemctl restart myservice": "Recharge puis redémarre un service"
       }
     }
   }

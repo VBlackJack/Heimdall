@@ -17,7 +17,7 @@
     "id": "iotop-cmd",
     "platform": 1,
     "name": "iotop",
-    "commandPattern": "iotop -o -n {iterations}",
+    "commandPattern": "sudo iotop -o -n {iterations}",
     "parameters": [
       {
         "name": "iterations",
@@ -31,27 +31,27 @@
   },
   "examples": [
     {
-      "command": "iotop",
+      "command": "sudo iotop",
       "description": "Monitor I/O in real time",
       "platform": 1
     },
     {
-      "command": "iotop -o",
+      "command": "sudo iotop -o",
       "description": "Show only the active processes",
       "platform": 1
     },
     {
-      "command": "iotop -b -n 5",
+      "command": "sudo iotop -b -n 5",
       "description": "Batch mode, 5 iterations",
       "platform": 1
     },
     {
-      "command": "iotop -a",
+      "command": "sudo iotop -a",
       "description": "Show the accumulated I/O",
       "platform": 1
     },
     {
-      "command": "iotop -P",
+      "command": "sudo iotop -P",
       "description": "Show by process (not threads)",
       "platform": 1
     }
@@ -77,11 +77,11 @@
         }
       },
       "examples": {
-        "iotop": "Monitorer I/O en temps réel",
-        "iotop -o": "Afficher seulement les processus actifs",
-        "iotop -b -n 5": "Batch mode, 5 itérations",
-        "iotop -a": "Afficher les I/O accumulés",
-        "iotop -P": "Afficher par processus (pas threads)"
+        "sudo iotop": "Monitorer I/O en temps réel",
+        "sudo iotop -o": "Afficher seulement les processus actifs",
+        "sudo iotop -b -n 5": "Batch mode, 5 itérations",
+        "sudo iotop -a": "Afficher les I/O accumulés",
+        "sudo iotop -P": "Afficher par processus (pas threads)"
       }
     }
   }

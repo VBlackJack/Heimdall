@@ -16,7 +16,7 @@
     "id": "ufw-status-cmd",
     "platform": 1,
     "name": "ufw",
-    "commandPattern": "ufw status {option}",
+    "commandPattern": "sudo ufw status {option}",
     "parameters": [
       {
         "name": "option",
@@ -45,33 +45,23 @@
       "platform": 1
     },
     {
-      "command": "ufw status verbose",
-      "description": "Example using the 'option' parameter: Display option (numbered, verbose, empty). Replace verbose with the value that fits your environment.",
-      "platform": 1
-    },
-    {
-      "command": "ufw allow 22/tcp",
+      "command": "sudo ufw allow 22/tcp",
       "description": "Allow SSH",
       "platform": 1
     },
     {
-      "command": "ufw allow from 192.168.1.0/24",
+      "command": "sudo ufw allow from 192.168.1.0/24",
       "description": "Allow a subnet",
       "platform": 1
     },
     {
-      "command": "ufw deny 3306",
+      "command": "sudo ufw deny 3306",
       "description": "Block MySQL",
       "platform": 1
     },
     {
-      "command": "ufw enable",
+      "command": "sudo ufw enable",
       "description": "Enable the firewall",
-      "platform": 1
-    },
-    {
-      "command": "ufw status numbered",
-      "description": "Numbered rules",
       "platform": 1
     }
   ],
@@ -99,12 +89,10 @@
         "sudo ufw status": "Affiche l'état du firewall",
         "sudo ufw status numbered": "Affiche avec numéros de règles",
         "sudo ufw status verbose": "Affichage détaillé",
-        "ufw status verbose": "Exemple utilisant le paramètre 'option': Option d'affichage (numbered, verbose, vide). Remplacez verbose par la valeur appropriée selon votre environnement.",
-        "ufw allow 22/tcp": "Autoriser SSH",
-        "ufw allow from 192.168.1.0/24": "Autoriser un sous-réseau",
-        "ufw deny 3306": "Bloquer MySQL",
-        "ufw enable": "Activer le firewall",
-        "ufw status numbered": "Règles numérotées"
+        "sudo ufw allow 22/tcp": "Autoriser SSH",
+        "sudo ufw allow from 192.168.1.0/24": "Autoriser un sous-réseau",
+        "sudo ufw deny 3306": "Bloquer MySQL",
+        "sudo ufw enable": "Activer le firewall"
       }
     }
   }

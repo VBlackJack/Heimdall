@@ -51,12 +51,12 @@
       "platform": 1
     },
     {
-      "command": "sysctl -w vm.swappiness=10",
+      "command": "sudo sysctl -w vm.swappiness=10",
       "description": "Change swappiness",
       "platform": 1
     },
     {
-      "command": "sysctl -p",
+      "command": "sudo sysctl -p",
       "description": "Reload /etc/sysctl.conf",
       "platform": 1
     },
@@ -66,7 +66,7 @@
       "platform": 1
     }
   ],
-  "notes": "Changes are temporary. Edit /etc/sysctl.conf to make them permanent. sysctl -p reloads the file.",
+  "notes": "Changes are temporary. Edit /etc/sysctl.conf to make them permanent. sysctl -p reloads the file. Writing a value (-w, -p) requires root (sudo).",
   "links": [
     {
       "title": "sysctl documentation",
@@ -77,7 +77,7 @@
     "fr": {
       "title": "Afficher/modifier les paramètres kernel",
       "description": "Affiche ou modifie les paramètres du noyau Linux en temps réel",
-      "notes": "Modifications temporaires. Éditer /etc/sysctl.conf pour permanence. sysctl -p recharge le fichier.",
+      "notes": "Modifications temporaires. Éditer /etc/sysctl.conf pour permanence. sysctl -p recharge le fichier. Écrire une valeur (-w, -p) nécessite les droits root (sudo).",
       "parameters": {
         "linux": {
           "parameter": {
@@ -91,8 +91,8 @@
         "sysctl net.ipv4.ip_forward": "Affiche un paramètre spécifique",
         "sudo sysctl -w net.ipv4.ip_forward=1": "Modifie un paramètre (temporaire)",
         "sysctl vm.swappiness": "Valeur de swappiness",
-        "sysctl -w vm.swappiness=10": "Modifier swappiness",
-        "sysctl -p": "Recharger /etc/sysctl.conf",
+        "sudo sysctl -w vm.swappiness=10": "Modifier swappiness",
+        "sudo sysctl -p": "Recharger /etc/sysctl.conf",
         "sysctl -a | head -50": "Tous les paramètres"
       }
     }

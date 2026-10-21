@@ -16,7 +16,7 @@
     "id": "systemctl-disable-cmd",
     "platform": 1,
     "name": "systemctl",
-    "commandPattern": "systemctl disable {service}",
+    "commandPattern": "sudo systemctl disable {service}",
     "parameters": [
       {
         "name": "service",

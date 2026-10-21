@@ -15,7 +15,7 @@
     "id": "mount-cmd",
     "platform": 1,
     "name": "mount",
-    "commandPattern": "mount {device} {mountpoint}",
+    "commandPattern": "sudo mount {device} {mountpoint}",
     "parameters": [
       {
         "name": "device",
@@ -52,17 +52,17 @@
       "platform": 1
     },
     {
-      "command": "mount /dev/sda1 /mnt/data",
+      "command": "sudo mount /dev/sda1 /mnt/data",
       "description": "Example using the 'mountpoint' parameter: directory to mount on. Replace /mnt/data with the value that fits your environment.",
       "platform": 1
     },
     {
-      "command": "mount -o remount,rw /",
+      "command": "sudo mount -o remount,rw /",
       "description": "Remount / read-write",
       "platform": 1
     },
     {
-      "command": "mount -t nfs server:/share /mnt/nfs",
+      "command": "sudo mount -t nfs server:/share /mnt/nfs",
       "description": "Mount an NFS share",
       "platform": 1
     },
@@ -72,7 +72,7 @@
       "platform": 1
     },
     {
-      "command": "mount -a",
+      "command": "sudo mount -a",
       "description": "Mount every filesystem of fstab",
       "platform": 1
     }
@@ -105,11 +105,11 @@
         "sudo mount /dev/sdb1 /mnt/data": "Monte /dev/sdb1 sur /mnt/data",
         "mount": "Liste tous les montages actifs",
         "sudo umount /mnt/data": "Démonte un filesystem",
-        "mount /dev/sda1 /mnt/data": "Exemple utilisant le paramètre 'mountpoint': Répertoire où monter. Remplacez /mnt/data par la valeur appropriée selon votre environnement.",
-        "mount -o remount,rw /": "Remonter / en lecture-écriture",
-        "mount -t nfs server:/share /mnt/nfs": "Monter un partage NFS",
+        "sudo mount /dev/sda1 /mnt/data": "Exemple utilisant le paramètre 'mountpoint': Répertoire où monter. Remplacez /mnt/data par la valeur appropriée selon votre environnement.",
+        "sudo mount -o remount,rw /": "Remonter / en lecture-écriture",
+        "sudo mount -t nfs server:/share /mnt/nfs": "Monter un partage NFS",
         "mount | grep ext4": "Afficher les montages ext4",
-        "mount -a": "Monter tous les systèmes de fichiers de fstab"
+        "sudo mount -a": "Monter tous les systèmes de fichiers de fstab"
       }
     }
   }

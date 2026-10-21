@@ -17,7 +17,7 @@
     "id": "yum-install-cmd",
     "platform": 1,
     "name": "yum",
-    "commandPattern": "yum install -y {package}",
+    "commandPattern": "sudo yum install -y {package}",
     "parameters": [
       {
         "name": "package",
@@ -41,22 +41,22 @@
       "platform": 1
     },
     {
-      "command": "yum install -y nginx -v",
+      "command": "sudo yum install -y nginx -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
       "platform": 1
     },
     {
-      "command": "yum update -y",
+      "command": "sudo yum update -y",
       "description": "Update every package",
       "platform": 1
     },
     {
-      "command": "yum install httpd -y",
+      "command": "sudo yum install httpd -y",
       "description": "Install Apache",
       "platform": 1
     },
     {
-      "command": "yum remove nginx",
+      "command": "sudo yum remove nginx",
       "description": "Remove nginx",
       "platform": 1
     },
@@ -94,10 +94,10 @@
       "examples": {
         "sudo yum install httpd": "Installe le serveur web Apache",
         "sudo yum install vim wget curl": "Installe plusieurs paquets",
-        "yum install -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "yum update -y": "Mettre à jour tous les paquets",
-        "yum install httpd -y": "Installer Apache",
-        "yum remove nginx": "Désinstaller nginx",
+        "sudo yum install -y nginx -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "sudo yum update -y": "Mettre à jour tous les paquets",
+        "sudo yum install httpd -y": "Installer Apache",
+        "sudo yum remove nginx": "Désinstaller nginx",
         "yum search php": "Rechercher des paquets PHP",
         "yum list installed | grep mysql": "Lister les paquets MySQL installés"
       }

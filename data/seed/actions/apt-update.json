@@ -17,7 +17,7 @@
     "id": "apt-update-cmd",
     "platform": 1,
     "name": "apt",
-    "commandPattern": "apt update",
+    "commandPattern": "sudo apt update",
     "parameters": []
   },
   "examples": [
@@ -32,18 +32,13 @@
       "platform": 1
     },
     {
-      "command": "apt update -v",
+      "command": "sudo apt update -v",
       "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
-      "command": "apt update --dry-run",
+      "command": "sudo apt update --dry-run",
       "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
-      "platform": 1
-    },
-    {
-      "command": "apt update",
-      "description": "Update the package list",
       "platform": 1
     }
   ],
@@ -62,9 +57,8 @@
       "examples": {
         "sudo apt update": "Met à jour la liste des paquets",
         "sudo apt update && apt list --upgradable": "Met à jour et liste les paquets pouvant être mis à niveau",
-        "apt update -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-        "apt update --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
-        "apt update": "Mettre à jour la liste des paquets"
+        "sudo apt update -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "sudo apt update --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques."
       }
     }
   }
