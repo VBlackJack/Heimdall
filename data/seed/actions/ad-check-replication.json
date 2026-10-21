@@ -1,7 +1,7 @@
 {
   "id": "ad-check-replication",
-  "title": "Vérifier la réplication Active Directory",
-  "description": "Vérifie l'état de la réplication entre les contrôleurs de domaine.",
+  "title": "Check Active Directory replication",
+  "description": "Check the replication status between domain controllers.",
   "category": "active-directory",
   "platform": 0,
   "level": 0,
@@ -22,25 +22,37 @@
   "examples": [
     {
       "command": "repadmin /showrepl",
-      "description": "Affiche l'état de réplication du DC local",
+      "description": "Show the replication status of the local DC",
       "platform": 0
     },
     {
       "command": "repadmin /showrepl -WhatIf",
-      "description": "Simulation de l'action avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter réellement. Indispensable pour tester les commandes de modification avant exécution. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action with -WhatIf (dry run). Shows what would be done without running it. Essential to test commands that change things before running them. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "repadmin /showrepl -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution.",
+      "description": "Run the action without an interactive confirmation. The -Confirm:$false parameter suppresses the confirmation prompts. Useful in automated scripts, but use with care.",
       "platform": 0
     }
   ],
-  "notes": "À exécuter sur un contrôleur de domaine. Pour vérifier tous les DCs: repadmin /replsummary.",
+  "notes": "Run it on a domain controller. To check every DC: repadmin /replsummary.",
   "links": [
     {
       "title": "Documentation repadmin",
       "url": "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/replication/repadmin-showrepl"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier la réplication Active Directory",
+      "description": "Vérifie l'état de la réplication entre les contrôleurs de domaine.",
+      "notes": "À exécuter sur un contrôleur de domaine. Pour vérifier tous les DCs: repadmin /replsummary.",
+      "examples": {
+        "repadmin /showrepl": "Affiche l'état de réplication du DC local",
+        "repadmin /showrepl -WhatIf": "Simulation de l'action avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter réellement. Indispensable pour tester les commandes de modification avant exécution. Retirez -WhatIf après validation pour exécuter.",
+        "repadmin /showrepl -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution."
+      }
+    }
+  }
 }

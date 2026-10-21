@@ -1,7 +1,7 @@
 {
   "id": "ad-check-lockout-status",
-  "title": "Vérifier le statut de verrouillage d'un compte",
-  "description": "Vérifie si un compte utilisateur est verrouillé et affiche les détails du verrouillage.",
+  "title": "Check the lockout status of an account",
+  "description": "Check whether a user account is locked out and show the lockout details.",
   "category": "active-directory",
   "platform": 0,
   "level": 0,
@@ -20,41 +20,62 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName de l'utilisateur"
+        "description": "SamAccountName of the user"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-ADUser -Identity jdupont -Properties LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt | Select-Object Name,LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt",
-      "description": "Vérifie le statut de verrouillage de jdupont",
+      "description": "Check the lockout status of jdupont",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Identity jdupont -Properties LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Identity jdupont -Properties LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Identity jdupont -Properties LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Utile pour diagnostiquer les problèmes de connexion. Affiche le nombre de tentatives échouées et l'heure du verrouillage.",
+  "notes": "Useful to diagnose logon problems. Shows the number of failed attempts and the lockout time.",
   "links": [
     {
       "title": "Documentation Get-ADUser",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-aduser"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier le statut de verrouillage d'un compte",
+      "description": "Vérifie si un compte utilisateur est verrouillé et affiche les détails du verrouillage.",
+      "notes": "Utile pour diagnostiquer les problèmes de connexion. Affiche le nombre de tentatives échouées et l'heure du verrouillage.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName de l'utilisateur"
+          }
+        }
+      },
+      "examples": {
+        "Get-ADUser -Identity jdupont -Properties LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt | Select-Object Name,LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt": "Vérifie le statut de verrouillage de jdupont",
+        "Get-ADUser -Identity jdupont -Properties LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-ADUser -Identity jdupont -Properties LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ADUser -Identity jdupont -Properties LockedOut,LockoutTime,BadPwdCount,LastBadPasswordAttempt | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

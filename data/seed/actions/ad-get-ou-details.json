@@ -1,7 +1,7 @@
 {
   "id": "ad-get-ou-details",
-  "title": "Obtenir les détails d'une OU",
-  "description": "Affiche toutes les propriétés détaillées d'une unité d'organisation.",
+  "title": "Show the details of an OU",
+  "description": "Show every detailed property of an organizational unit.",
   "category": "active-directory",
   "platform": 0,
   "level": 0,
@@ -20,46 +20,68 @@
     "parameters": [
       {
         "name": "ouDN",
-        "label": "DN de l'OU",
+        "label": "OU DN",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Distinguished Name de l'OU"
+        "description": "Distinguished Name of the OU"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-ADOrganizationalUnit -Identity \"OU=IT,DC=contoso,DC=com\" -Properties *",
-      "description": "Affiche tous les détails de l'OU IT",
+      "description": "Show every detail of the IT OU",
       "platform": 0
     },
     {
       "command": "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties * | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties * | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties * | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     },
     {
       "command": "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties *",
-      "description": "Exemple utilisant le paramètre 'ouDN': Distinguished Name de l'OU. Remplacez OU=Paris-Users,DC=contoso,DC=com par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'ouDN' parameter: Distinguished Name of the OU. Replace OU=Paris-Users,DC=contoso,DC=com with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Affiche toutes les propriétés incluant les GPO liées, la protection, etc.",
+  "notes": "Shows every property, including the linked GPOs, the protection and more.",
   "links": [
     {
       "title": "Documentation Get-ADOrganizationalUnit",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adorganizationalunit"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Obtenir les détails d'une OU",
+      "description": "Affiche toutes les propriétés détaillées d'une unité d'organisation.",
+      "notes": "Affiche toutes les propriétés incluant les GPO liées, la protection, etc.",
+      "parameters": {
+        "windows": {
+          "ouDN": {
+            "label": "DN de l'OU",
+            "description": "Distinguished Name de l'OU"
+          }
+        }
+      },
+      "examples": {
+        "Get-ADOrganizationalUnit -Identity \"OU=IT,DC=contoso,DC=com\" -Properties *": "Affiche tous les détails de l'OU IT",
+        "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties * | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties * | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties * | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties *": "Exemple utilisant le paramètre 'ouDN': Distinguished Name de l'OU. Remplacez OU=Paris-Users,DC=contoso,DC=com par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }
