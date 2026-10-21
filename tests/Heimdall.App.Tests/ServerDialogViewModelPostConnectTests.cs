@@ -223,6 +223,29 @@ public sealed class ServerDialogViewModelPostConnectTests
         Assert.True(vm.PostConnectSteps[1].IsBroken);
     }
 
+    /// <summary>
+    /// The step shows the linked action's title the way the picker that linked it did: in the
+    /// operator's language, not the stored English pivot.
+    /// </summary>
+    [Fact]
+    public async Task InitializePostConnectLinksAsync_ShowsTheTitleInTheCurrentLanguage()
+    {
+        var action = CommandLibraryTestHelpers.CreateLinuxAction(
+            "tail-log", "Tail log", "tail -f {path}", CommandLibraryTestHelpers.RequiredParameter("path", "Path"));
+        action.Translations = [new TwinShell.Core.Models.ActionTranslation { ActionId = "tail-log", CultureCode = "fr", Title = "Suivre un journal" }];
+        var provider = CommandLibraryTestHelpers.CreateResolverServiceProvider(action);
+        var vm = new ServerDialogViewModel
+        {
+            ServiceScopeFactory = provider.GetRequiredService<IServiceScopeFactory>(),
+            Localizer = await CommandLibraryTestHelpers.CreateAppLocalizerAsync("fr"),
+        };
+        vm.LoadPostConnectSteps([new PostConnectStep { Id = "1", CommandLibraryId = "tail-log", Input = "pwd" }]);
+
+        await vm.InitializePostConnectLinksAsync();
+
+        Assert.Equal("Suivre un journal", vm.PostConnectSteps[0].LinkedActionTitle);
+    }
+
     [Fact]
     public void ToDto_PreservesCommandLibraryLinkFields()
     {

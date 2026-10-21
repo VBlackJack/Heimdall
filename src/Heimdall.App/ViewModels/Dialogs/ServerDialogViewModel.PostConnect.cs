@@ -24,6 +24,7 @@ using Heimdall.App.Services.PostConnect;
 using Heimdall.Core.Models;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
+using TwinShell.Core.Services;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
@@ -377,11 +378,17 @@ public partial class ServerDialogViewModel
             return;
         }
 
+        // The stored action holds the pivot (English) text; the title is shown in the
+        // operator's language, as the picker that linked the step showed it.
+        var culture = Localizer?.CurrentLocale;
         using var scope = ServiceScopeFactory.CreateScope();
         var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
         var actions = (await actionService.GetAllActionsAsync().ConfigureAwait(false))
             .Where(action => linkedIds.Contains(action.Id, StringComparer.Ordinal))
-            .ToDictionary(action => action.Id, action => action.Title, StringComparer.Ordinal);
+            .ToDictionary(
+                action => action.Id,
+                action => ActionLocalizer.Localize(action, culture).Title,
+                StringComparer.Ordinal);
 
         // Resolving the titles is the dialog reading the command library, not the user editing the
         // session: neither LinkedActionTitle nor IsBroken is written by ToModel, and both are
