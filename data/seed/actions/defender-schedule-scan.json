@@ -1,7 +1,7 @@
 {
   "id": "defender-schedule-scan",
-  "title": "Planifier une analyse Defender automatique",
-  "description": "Configure une planification pour les analyses automatiques de Windows Defender.",
+  "title": "Schedule an automatic Defender scan",
+  "description": "Set up a schedule for automatic Windows Defender scans.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -19,64 +19,92 @@
     "parameters": [
       {
         "name": "day",
-        "label": "Jour",
+        "label": "Day",
         "type": "number",
         "defaultValue": "0",
         "required": true,
-        "description": "0=Tous les jours, 1=Dimanche, 2=Lundi... 7=Samedi, 8=Jamais"
+        "description": "0=Every day, 1=Sunday, 2=Monday... 7=Saturday, 8=Never"
       },
       {
         "name": "time",
-        "label": "Heure",
+        "label": "Time",
         "type": "string",
         "defaultValue": "02:00:00",
         "required": true,
-        "description": "Heure au format HH:mm:ss (ex: 02:00:00 pour 2h du matin)"
+        "description": "Time in HH:mm:ss format (e.g. 02:00:00 for 2 a.m.)"
       }
     ]
   },
   "examples": [
     {
       "command": "Set-MpPreference -ScanScheduleDay 0 -ScanScheduleTime 02:00:00",
-      "description": "Planifie une analyse quotidienne à 2h du matin",
+      "description": "Schedule a daily scan at 2 a.m.",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -ScanScheduleDay 7 -ScanScheduleTime 20:00:00",
-      "description": "Planifie une analyse tous les samedis à 20h",
+      "description": "Schedule a scan every Saturday at 8 p.m.",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -ScanScheduleDay 1 -ScanScheduleTime 12:00:00 -ScanParameters 1",
-      "description": "Analyse rapide tous les dimanches à midi (ScanParameters: 1=Quick, 2=Full)",
+      "description": "Quick scan every Sunday at noon (ScanParameters: 1=Quick, 2=Full)",
       "platform": 0
     },
     {
       "command": "Get-MpPreference | Select-Object ScanScheduleDay,ScanScheduleTime,ScanParameters",
-      "description": "Affiche la planification actuelle des analyses",
+      "description": "Show the current scan schedule",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -ScanScheduleDay 8",
-      "description": "Désactive les analyses planifiées (8=Jamais)",
+      "description": "Disable scheduled scans (8=Never)",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -ScanScheduleDay $0 -ScanScheduleTime $14:30:00",
-      "description": "Exemple utilisant le paramètre 'day': 0=Tous les jours, 1=Dimanche, 2=Lundi... 7=Samedi, 8=Jamais. Remplacez Monday par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'day' parameter: 0=Every day, 1=Sunday, 2=Monday... 7=Saturday, 8=Never. Replace Monday with the value that fits your environment.",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -ScanScheduleDay $Monday -ScanScheduleTime $02:00:00",
-      "description": "Exemple utilisant le paramètre 'time': Heure au format HH:mm:ss (ex: 02:00:00 pour 2h du matin). Remplacez 14:30:00 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'time' parameter: time in HH:mm:ss format (e.g. 02:00:00 for 2 a.m.). Replace 14:30:00 with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "ScanScheduleDay: 0=Quotidien, 1=Dimanche, 2=Lundi, 3=Mardi, 4=Mercredi, 5=Jeudi, 6=Vendredi, 7=Samedi, 8=Jamais. ScanParameters: 1=QuickScan (recommandé), 2=FullScan. Choisissez une heure où le PC est allumé mais peu utilisé.",
+  "notes": "ScanScheduleDay: 0=Every day, 1=Sunday, 2=Monday, 3=Tuesday, 4=Wednesday, 5=Thursday, 6=Friday, 7=Saturday, 8=Never. ScanParameters: 1=QuickScan (recommended), 2=FullScan. Pick a time when the PC is on but little used.",
   "links": [
     {
       "title": "Schedule Defender Scans",
       "url": "https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/scheduled-catch-up-scans-microsoft-defender-antivirus"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Planifier une analyse Defender automatique",
+      "description": "Configure une planification pour les analyses automatiques de Windows Defender.",
+      "notes": "ScanScheduleDay: 0=Quotidien, 1=Dimanche, 2=Lundi, 3=Mardi, 4=Mercredi, 5=Jeudi, 6=Vendredi, 7=Samedi, 8=Jamais. ScanParameters: 1=QuickScan (recommandé), 2=FullScan. Choisissez une heure où le PC est allumé mais peu utilisé.",
+      "parameters": {
+        "windows": {
+          "day": {
+            "label": "Jour",
+            "description": "0=Tous les jours, 1=Dimanche, 2=Lundi... 7=Samedi, 8=Jamais"
+          },
+          "time": {
+            "label": "Heure",
+            "description": "Heure au format HH:mm:ss (ex: 02:00:00 pour 2h du matin)"
+          }
+        }
+      },
+      "examples": {
+        "Set-MpPreference -ScanScheduleDay 0 -ScanScheduleTime 02:00:00": "Planifie une analyse quotidienne à 2h du matin",
+        "Set-MpPreference -ScanScheduleDay 7 -ScanScheduleTime 20:00:00": "Planifie une analyse tous les samedis à 20h",
+        "Set-MpPreference -ScanScheduleDay 1 -ScanScheduleTime 12:00:00 -ScanParameters 1": "Analyse rapide tous les dimanches à midi (ScanParameters: 1=Quick, 2=Full)",
+        "Get-MpPreference | Select-Object ScanScheduleDay,ScanScheduleTime,ScanParameters": "Affiche la planification actuelle des analyses",
+        "Set-MpPreference -ScanScheduleDay 8": "Désactive les analyses planifiées (8=Jamais)",
+        "Set-MpPreference -ScanScheduleDay $0 -ScanScheduleTime $14:30:00": "Exemple utilisant le paramètre 'day': 0=Tous les jours, 1=Dimanche, 2=Lundi... 7=Samedi, 8=Jamais. Remplacez Monday par la valeur appropriée selon votre environnement.",
+        "Set-MpPreference -ScanScheduleDay $Monday -ScanScheduleTime $02:00:00": "Exemple utilisant le paramètre 'time': Heure au format HH:mm:ss (ex: 02:00:00 pour 2h du matin). Remplacez 14:30:00 par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

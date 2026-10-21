@@ -1,7 +1,7 @@
 {
   "id": "dd-disk-image",
-  "title": "Créer une image disque",
-  "description": "Copie bit à bit des données (disques, partitions, fichiers)",
+  "title": "Create a disk image",
+  "description": "Bit-by-bit copy of data (disks, partitions, files)",
   "category": "files-storage",
   "platform": 1,
   "level": 2,
@@ -21,72 +21,104 @@
     "parameters": [
       {
         "name": "input",
-        "label": "Entrée",
+        "label": "Input",
         "type": "string",
         "defaultValue": "/dev/sda",
         "required": true,
-        "description": "Source (device, fichier, /dev/zero, etc.)"
+        "description": "Source (device, file, /dev/zero and so on)"
       },
       {
         "name": "output",
-        "label": "Sortie",
+        "label": "Output",
         "type": "string",
         "defaultValue": "/backup/disk.img",
         "required": true,
-        "description": "Destination (fichier ou device)"
+        "description": "Destination (file or device)"
       },
       {
         "name": "blocksize",
-        "label": "Taille de bloc",
+        "label": "Block size",
         "type": "string",
         "defaultValue": "4M",
         "required": true,
-        "description": "Taille des blocs (1M, 4M, etc.)"
+        "description": "Size of the blocks (1M, 4M and so on)"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo dd if=/dev/sda of=/backup/sda.img bs=4M status=progress",
-      "description": "Clone un disque complet",
+      "description": "Clone a whole disk",
       "platform": 1
     },
     {
       "command": "dd if=/dev/zero of=/swapfile bs=1M count=4096",
-      "description": "Crée un fichier de swap de 4GB",
+      "description": "Create a 4 GB swap file",
       "platform": 1
     },
     {
       "command": "dd if=/dev/sda of=/backup/sda.img bs=4M status=progress",
-      "description": "Image complète d'un disque",
+      "description": "Full image of a disk",
       "platform": 1
     },
     {
       "command": "dd if=/dev/zero of=/dev/sdb bs=1M count=100",
-      "description": "Écrire 100 Mo de zéros",
+      "description": "Write 100 MB of zeros",
       "platform": 1
     },
     {
       "command": "dd if=ubuntu.iso of=/dev/sdc bs=4M status=progress",
-      "description": "Créer une clé USB bootable",
+      "description": "Create a bootable USB key",
       "platform": 1
     },
     {
       "command": "dd if=/dev/urandom of=random.bin bs=1M count=10",
-      "description": "Fichier aléatoire de 10 Mo",
+      "description": "Random 10 MB file",
       "platform": 1
     },
     {
       "command": "dd if=/backup/sda.img of=/dev/sda bs=4M",
-      "description": "Restaurer une image",
+      "description": "Restore an image",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. TRÈS DANGEREUX: une erreur peut détruire des données. Vérifier 2x if/of.",
+  "notes": "Requires sudo. VERY DANGEROUS: one mistake can destroy data. Check if/of twice.",
   "links": [
     {
       "title": "dd command",
       "url": "https://man7.org/linux/man-pages/man1/dd.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer une image disque",
+      "description": "Copie bit à bit des données (disques, partitions, fichiers)",
+      "notes": "Nécessite sudo. TRÈS DANGEREUX: une erreur peut détruire des données. Vérifier 2x if/of.",
+      "parameters": {
+        "linux": {
+          "input": {
+            "label": "Entrée",
+            "description": "Source (device, fichier, /dev/zero, etc.)"
+          },
+          "output": {
+            "label": "Sortie",
+            "description": "Destination (fichier ou device)"
+          },
+          "blocksize": {
+            "label": "Taille de bloc",
+            "description": "Taille des blocs (1M, 4M, etc.)"
+          }
+        }
+      },
+      "examples": {
+        "sudo dd if=/dev/sda of=/backup/sda.img bs=4M status=progress": "Clone un disque complet",
+        "dd if=/dev/zero of=/swapfile bs=1M count=4096": "Crée un fichier de swap de 4GB",
+        "dd if=/dev/sda of=/backup/sda.img bs=4M status=progress": "Image complète d'un disque",
+        "dd if=/dev/zero of=/dev/sdb bs=1M count=100": "Écrire 100 Mo de zéros",
+        "dd if=ubuntu.iso of=/dev/sdc bs=4M status=progress": "Créer une clé USB bootable",
+        "dd if=/dev/urandom of=random.bin bs=1M count=10": "Fichier aléatoire de 10 Mo",
+        "dd if=/backup/sda.img of=/dev/sda bs=4M": "Restaurer une image"
+      }
+    }
+  }
 }

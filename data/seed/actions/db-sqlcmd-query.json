@@ -1,7 +1,7 @@
 {
   "id": "db-sqlcmd-query",
-  "title": "Requête SQL Server (SqlCmd)",
-  "description": "Exécute une requête T-SQL sur un serveur Microsoft SQL Server depuis la ligne de commande.",
+  "title": "Query SQL Server (sqlcmd)",
+  "description": "Run a T-SQL query on a Microsoft SQL Server from the command line.",
   "category": "database",
   "platform": 0,
   "level": 1,
@@ -20,36 +20,61 @@
     "parameters": [
       {
         "name": "server",
-        "label": "Serveur",
+        "label": "Server",
         "type": "string",
         "defaultValue": "localhost",
         "required": true,
-        "description": "Instance SQL (ex: .\\SQLEXPRESS)"
+        "description": "SQL instance (e.g. .\\SQLEXPRESS)"
       },
       {
         "name": "database",
-        "label": "Base de données",
+        "label": "Database",
         "type": "string",
         "defaultValue": "master",
         "required": true,
-        "description": "Nom de la BDD"
+        "description": "Name of the database"
       },
       {
         "name": "query",
-        "label": "Requête",
+        "label": "Query",
         "type": "string",
         "defaultValue": "SELECT name, state_desc FROM sys.databases",
         "required": true,
-        "description": "Requête T-SQL"
+        "description": "T-SQL query"
       }
     ]
   },
   "examples": [
     {
       "command": "sqlcmd -S PROD-SQL-01 -U sa -P Password123 -Q \"SELECT name, state_desc FROM sys.databases\"",
-      "description": "Liste l'état de toutes les bases de données (Online, Recovery, Suspect).",
+      "description": "List the state of every database (Online, Recovery, Suspect).",
       "platform": 0
     }
   ],
-  "windowsCommandTemplateId": "302fc47e-9c7b-4333-8fd5-4f67aec742c2"
+  "windowsCommandTemplateId": "302fc47e-9c7b-4333-8fd5-4f67aec742c2",
+  "translations": {
+    "fr": {
+      "title": "Requête SQL Server (SqlCmd)",
+      "description": "Exécute une requête T-SQL sur un serveur Microsoft SQL Server depuis la ligne de commande.",
+      "parameters": {
+        "windows": {
+          "server": {
+            "label": "Serveur",
+            "description": "Instance SQL (ex: .\\SQLEXPRESS)"
+          },
+          "database": {
+            "label": "Base de données",
+            "description": "Nom de la BDD"
+          },
+          "query": {
+            "label": "Requête",
+            "description": "Requête T-SQL"
+          }
+        }
+      },
+      "examples": {
+        "sqlcmd -S PROD-SQL-01 -U sa -P Password123 -Q \"SELECT name, state_desc FROM sys.databases\"": "Liste l'état de toutes les bases de données (Online, Recovery, Suspect)."
+      }
+    }
+  }
 }

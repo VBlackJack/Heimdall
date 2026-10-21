@@ -1,7 +1,7 @@
 {
   "id": "curl-http-test",
-  "title": "Tester une requête HTTP",
-  "description": "Effectue une requête HTTP/HTTPS et affiche la réponse",
+  "title": "Test an HTTP request",
+  "description": "Send an HTTP/HTTPS request and show the response",
   "category": "network-dns",
   "platform": 1,
   "level": 0,
@@ -25,57 +25,82 @@
         "type": "string",
         "defaultValue": "http://localhost",
         "required": true,
-        "description": "URL à tester"
+        "description": "URL to test"
       }
     ]
   },
   "examples": [
     {
       "command": "curl -I http://google.com",
-      "description": "Affiche uniquement les headers HTTP",
+      "description": "Show the HTTP headers only",
       "platform": 1
     },
     {
       "command": "curl -X GET https://api.example.com/users",
-      "description": "Requête GET sur une API",
+      "description": "GET request to an API",
       "platform": 1
     },
     {
       "command": "curl -o file.html http://example.com",
-      "description": "Télécharge dans un fichier",
+      "description": "Download into a file",
       "platform": 1
     },
     {
       "command": "curl -v -f http://localhost",
-      "description": "Exemple utilisant le paramètre 'url': URL à tester. Remplacez https://www.contoso.com par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'url' parameter: URL to test. Replace https://www.contoso.com with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "curl https://api.example.com",
-      "description": "Requête GET simple",
+      "description": "Simple GET request",
       "platform": 1
     },
     {
       "command": "curl -X POST -d '{\"key\":\"value\"}' -H \"Content-Type: application/json\" https://api.example.com",
-      "description": "Requête POST JSON",
+      "description": "JSON POST request",
       "platform": 1
     },
     {
       "command": "curl -I https://example.com",
-      "description": "Afficher les headers uniquement",
+      "description": "Show the headers only",
       "platform": 1
     },
     {
       "command": "curl -IL http://localhost",
-      "description": "Affiche les headers en suivant les redirections",
+      "description": "Show the headers while following redirects",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo. -v pour mode verbose. wget est une alternative pour télécharger.",
+  "notes": "Does not require sudo. -v for verbose mode. wget is an alternative for downloads.",
   "links": [
     {
       "title": "curl documentation",
       "url": "https://curl.se/docs/manpage.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester une requête HTTP",
+      "description": "Effectue une requête HTTP/HTTPS et affiche la réponse",
+      "notes": "Ne nécessite pas sudo. -v pour mode verbose. wget est une alternative pour télécharger.",
+      "parameters": {
+        "linux": {
+          "url": {
+            "label": "URL",
+            "description": "URL à tester"
+          }
+        }
+      },
+      "examples": {
+        "curl -I http://google.com": "Affiche uniquement les headers HTTP",
+        "curl -X GET https://api.example.com/users": "Requête GET sur une API",
+        "curl -o file.html http://example.com": "Télécharge dans un fichier",
+        "curl -v -f http://localhost": "Exemple utilisant le paramètre 'url': URL à tester. Remplacez https://www.contoso.com par la valeur appropriée selon votre environnement.",
+        "curl https://api.example.com": "Requête GET simple",
+        "curl -X POST -d '{\"key\":\"value\"}' -H \"Content-Type: application/json\" https://api.example.com": "Requête POST JSON",
+        "curl -I https://example.com": "Afficher les headers uniquement",
+        "curl -IL http://localhost": "Affiche les headers en suivant les redirections"
+      }
+    }
+  }
 }

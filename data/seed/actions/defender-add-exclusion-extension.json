@@ -1,7 +1,7 @@
 {
   "id": "defender-add-exclusion-extension",
-  "title": "Ajouter une exclusion d'extension de fichier Defender",
-  "description": "Exclut tous les fichiers d'une extension spécifique de l'analyse Defender.",
+  "title": "Add a Defender file extension exclusion",
+  "description": "Exclude every file with a specific extension from Defender scans.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -23,47 +23,70 @@
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Extension à exclure (avec point, ex: .tmp)"
+        "description": "Extension to exclude (with the dot, e.g. .tmp)"
       }
     ]
   },
   "examples": [
     {
       "command": "Add-MpPreference -ExclusionExtension '.tmp'",
-      "description": "Exclut tous les fichiers temporaires .tmp",
+      "description": "Exclude every temporary .tmp file",
       "platform": 0
     },
     {
       "command": "Add-MpPreference -ExclusionExtension '.bak'",
-      "description": "Exclut les fichiers de sauvegarde .bak",
+      "description": "Exclude the .bak backup files",
       "platform": 0
     },
     {
       "command": "Add-MpPreference -ExclusionExtension '.log'",
-      "description": "Exclut les fichiers de log (améliore perf si logs volumin eux)",
+      "description": "Exclude the log files (improves performance when logs are large)",
       "platform": 0
     },
     {
       "command": "@('.tmp','.bak','.log','.cache') | ForEach-Object { Add-MpPreference -ExclusionExtension $_ }",
-      "description": "Exclut plusieurs extensions temporaires/cache",
+      "description": "Exclude several temporary or cache extensions",
       "platform": 0
     },
     {
       "command": "Get-MpPreference | Select-Object -ExpandProperty ExclusionExtension",
-      "description": "Liste toutes les exclusions d'extensions actuelles",
+      "description": "List every current extension exclusion",
       "platform": 0
     },
     {
       "command": "Add-MpPreference -ExclusionExtension \".txt\"",
-      "description": "Exemple utilisant le paramètre 'extension': Extension à exclure (avec point, ex: .tmp). Remplacez .txt par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'extension' parameter: extension to exclude (with the dot, e.g. .tmp). Replace .txt with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "⚠️ DANGER: N'excluez JAMAIS les extensions exécutables (.exe, .dll, .bat, .ps1, .vbs, .js, .msi, .scr). Exclusions sûres: .tmp, .bak, .log, .cache, .obj. Chaque exclusion augmente le risque de sécurité!",
+  "notes": "⚠️ DANGER: NEVER exclude executable extensions (.exe, .dll, .bat, .ps1, .vbs, .js, .msi, .scr). Safe exclusions: .tmp, .bak, .log, .cache, .obj. Every exclusion increases the security risk!",
   "links": [
     {
       "title": "Defender Extension Exclusions",
       "url": "https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/configure-extension-file-exclusions-microsoft-defender-antivirus"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Ajouter une exclusion d'extension de fichier Defender",
+      "description": "Exclut tous les fichiers d'une extension spécifique de l'analyse Defender.",
+      "notes": "⚠️ DANGER: N'excluez JAMAIS les extensions exécutables (.exe, .dll, .bat, .ps1, .vbs, .js, .msi, .scr). Exclusions sûres: .tmp, .bak, .log, .cache, .obj. Chaque exclusion augmente le risque de sécurité!",
+      "parameters": {
+        "windows": {
+          "extension": {
+            "label": "Extension",
+            "description": "Extension à exclure (avec point, ex: .tmp)"
+          }
+        }
+      },
+      "examples": {
+        "Add-MpPreference -ExclusionExtension '.tmp'": "Exclut tous les fichiers temporaires .tmp",
+        "Add-MpPreference -ExclusionExtension '.bak'": "Exclut les fichiers de sauvegarde .bak",
+        "Add-MpPreference -ExclusionExtension '.log'": "Exclut les fichiers de log (améliore perf si logs volumineux)",
+        "@('.tmp','.bak','.log','.cache') | ForEach-Object { Add-MpPreference -ExclusionExtension $_ }": "Exclut plusieurs extensions temporaires/cache",
+        "Get-MpPreference | Select-Object -ExpandProperty ExclusionExtension": "Liste toutes les exclusions d'extensions actuelles",
+        "Add-MpPreference -ExclusionExtension \".txt\"": "Exemple utilisant le paramètre 'extension': Extension à exclure (avec point, ex: .tmp). Remplacez .txt par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

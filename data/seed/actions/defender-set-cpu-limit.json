@@ -1,7 +1,7 @@
 {
   "id": "defender-set-cpu-limit",
-  "title": "Limiter l'utilisation CPU de Defender",
-  "description": "Configure la limite maximale d'utilisation CPU pour les analyses Windows Defender.",
+  "title": "Limit Defender CPU usage",
+  "description": "Set the maximum CPU usage for Windows Defender scans.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -19,46 +19,68 @@
     "parameters": [
       {
         "name": "cpuPercent",
-        "label": "Pourcentage CPU max",
+        "label": "Maximum CPU percentage",
         "type": "string",
         "defaultValue": "25",
         "required": true,
-        "description": "Limite CPU en % (1-100)"
+        "description": "CPU limit in % (1-100)"
       }
     ]
   },
   "examples": [
     {
       "command": "Set-MpPreference -ScanAvgCPULoadFactor 25",
-      "description": "Limite Defender à 25% CPU (équilibre perf/vitesse scan)",
+      "description": "Limit Defender to 25% CPU (balance between performance and scan speed)",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -ScanAvgCPULoadFactor 10",
-      "description": "Limite Defender à 10% CPU (PC très lent, scan très long)",
+      "description": "Limit Defender to 10% CPU (very slow PC, very long scan)",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -ScanAvgCPULoadFactor 50",
-      "description": "Limite Defender à 50% CPU (défaut Windows, scan rapide)",
+      "description": "Limit Defender to 50% CPU (Windows default, fast scan)",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -ScanAvgCPULoadFactor 100",
-      "description": "Pas de limite CPU (scan le plus rapide, PC peut ralentir beaucoup)",
+      "description": "No CPU limit (fastest scan, the PC can slow down a lot)",
       "platform": 0
     },
     {
       "command": "Get-MpPreference | Select-Object ScanAvgCPULoadFactor",
-      "description": "Affiche la limite CPU actuelle",
+      "description": "Show the current CPU limit",
       "platform": 0
     }
   ],
-  "notes": "Par défaut: 50% CPU. Recommandations: PC gaming/streaming: 10-15%, PC bureautique: 25%, PC serveur/dédié: 50-100%. Plus la limite est basse: analyses plus longues mais PC plus fluide. Plus la limite est haute: analyses rapides mais ralentissements possibles.",
+  "notes": "Default: 50% CPU. Recommendations: gaming or streaming PC: 10-15%, office PC: 25%, server or dedicated PC: 50-100%. The lower the limit, the longer the scans but the smoother the PC. The higher the limit, the faster the scans but the PC may slow down.",
   "links": [
     {
       "title": "Defender Performance Tuning",
       "url": "https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/configure-advanced-scan-types-microsoft-defender-antivirus"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Limiter l'utilisation CPU de Defender",
+      "description": "Configure la limite maximale d'utilisation CPU pour les analyses Windows Defender.",
+      "notes": "Par défaut: 50% CPU. Recommandations: PC gaming/streaming: 10-15%, PC bureautique: 25%, PC serveur/dédié: 50-100%. Plus la limite est basse: analyses plus longues mais PC plus fluide. Plus la limite est haute: analyses rapides mais ralentissements possibles.",
+      "parameters": {
+        "windows": {
+          "cpuPercent": {
+            "label": "Pourcentage CPU max",
+            "description": "Limite CPU en % (1-100)"
+          }
+        }
+      },
+      "examples": {
+        "Set-MpPreference -ScanAvgCPULoadFactor 25": "Limite Defender à 25% CPU (équilibre perf/vitesse scan)",
+        "Set-MpPreference -ScanAvgCPULoadFactor 10": "Limite Defender à 10% CPU (PC très lent, scan très long)",
+        "Set-MpPreference -ScanAvgCPULoadFactor 50": "Limite Defender à 50% CPU (défaut Windows, scan rapide)",
+        "Set-MpPreference -ScanAvgCPULoadFactor 100": "Pas de limite CPU (scan le plus rapide, PC peut ralentir beaucoup)",
+        "Get-MpPreference | Select-Object ScanAvgCPULoadFactor": "Affiche la limite CPU actuelle"
+      }
+    }
+  }
 }

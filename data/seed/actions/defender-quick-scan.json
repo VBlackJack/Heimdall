@@ -1,7 +1,7 @@
 {
   "id": "defender-quick-scan",
-  "title": "Lancer une analyse rapide Windows Defender",
-  "description": "Lance une analyse rapide des zones système critiques (mémoire, démarrage, fichiers actifs).",
+  "title": "Start a Windows Defender quick scan",
+  "description": "Start a quick scan of the critical system areas (memory, startup, active files).",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Start-MpScan -ScanType QuickScan",
-      "description": "Lance une analyse rapide (5-15 minutes généralement)",
+      "description": "Start a quick scan (usually 5-15 minutes)",
       "platform": 0
     },
     {
       "command": "Start-MpScan -ScanType FullScan",
-      "description": "Lance une analyse complète de tous les fichiers (peut prendre plusieurs heures)",
+      "description": "Start a full scan of every file (can take several hours)",
       "platform": 0
     },
     {
       "command": "Start-MpScan -ScanType CustomScan -ScanPath 'C:\\Users\\UserName\\Downloads'",
-      "description": "Analyse uniquement le dossier Téléchargements de l'utilisateur",
+      "description": "Scan only the user's Downloads folder",
       "platform": 0
     },
     {
       "command": "Start-MpScan -ScanType CustomScan -ScanPath 'D:\\'",
-      "description": "Analyse complète du disque D:",
+      "description": "Full scan of drive D:",
       "platform": 0
     },
     {
       "command": "Update-MpSignature; Start-MpScan -ScanType QuickScan",
-      "description": "Met à jour les définitions puis lance une analyse rapide",
+      "description": "Update the definitions, then start a quick scan",
       "platform": 0
     }
   ],
-  "notes": "QuickScan: analyse rapide (zones critiques uniquement, ~5-15 min). FullScan: analyse complète (tous les fichiers, plusieurs heures). CustomScan: analyse d'un dossier spécifique. L'analyse s'exécute en arrière-plan.",
+  "notes": "QuickScan: quick scan (critical areas only, ~5-15 min). FullScan: full scan (every file, several hours). CustomScan: scan of a specific folder. The scan runs in the background.",
   "links": [
     {
       "title": "Start-MpScan Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/defender/start-mpscan"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lancer une analyse rapide Windows Defender",
+      "description": "Lance une analyse rapide des zones système critiques (mémoire, démarrage, fichiers actifs).",
+      "notes": "QuickScan: analyse rapide (zones critiques uniquement, ~5-15 min). FullScan: analyse complète (tous les fichiers, plusieurs heures). CustomScan: analyse d'un dossier spécifique. L'analyse s'exécute en arrière-plan.",
+      "examples": {
+        "Start-MpScan -ScanType QuickScan": "Lance une analyse rapide (5-15 minutes généralement)",
+        "Start-MpScan -ScanType FullScan": "Lance une analyse complète de tous les fichiers (peut prendre plusieurs heures)",
+        "Start-MpScan -ScanType CustomScan -ScanPath 'C:\\Users\\UserName\\Downloads'": "Analyse uniquement le dossier Téléchargements de l'utilisateur",
+        "Start-MpScan -ScanType CustomScan -ScanPath 'D:\\'": "Analyse complète du disque D:",
+        "Update-MpSignature; Start-MpScan -ScanType QuickScan": "Met à jour les définitions puis lance une analyse rapide"
+      }
+    }
+  }
 }
