@@ -1,8 +1,8 @@
 {
   "id": "chown-ownership",
-  "title": "Modifier le propriétaire d'un fichier",
-  "description": "Change le propriétaire (user et/ou group) d'un fichier ou répertoire",
-  "category": "🔒 Security & Encryption",
+  "title": "Change the owner of a file",
+  "description": "Change the owner (user and/or group) of a file or directory",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -21,87 +21,116 @@
     "parameters": [
       {
         "name": "owner",
-        "label": "Propriétaire",
+        "label": "Owner",
         "type": "string",
         "defaultValue": "www-data",
         "required": true,
-        "description": "Nouveau propriétaire"
+        "description": "New owner"
       },
       {
         "name": "group",
-        "label": "Groupe",
+        "label": "Group",
         "type": "string",
         "defaultValue": "www-data",
         "required": false,
-        "description": "Nouveau groupe (optionnel)"
+        "description": "New group (optional)"
       },
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "/var/www/html",
         "required": true,
-        "description": "Fichier ou répertoire à modifier"
+        "description": "File or directory to change"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo chown www-data:www-data /var/www/html",
-      "description": "Change owner et group",
+      "description": "Change the owner and the group",
       "platform": 1
     },
     {
       "command": "sudo chown -R john /home/john",
-      "description": "Change récursivement le propriétaire",
+      "description": "Change the owner recursively",
       "platform": 1
     },
     {
       "command": "sudo chown :developers file.txt",
-      "description": "Change uniquement le groupe",
+      "description": "Change the group only",
       "platform": 1
     },
     {
       "command": "chown admin:IT-Admins /var/log/app.log -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "chown www-data:IT-Admins /var/log/app.log",
-      "description": "Exemple utilisant le paramètre 'owner': Nouveau propriétaire. Remplacez admin par la valeur appropriée selon votre environnement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
       "command": "chown www-data:www-data /var/www/html -R",
-      "description": "Changer le propriétaire du dossier web Apache",
+      "description": "Change the owner of the Apache web folder",
       "platform": 1
     },
     {
       "command": "chown root:admin /etc/config.conf",
-      "description": "Définir root comme propriétaire avec groupe admin",
+      "description": "Make root the owner with the admin group",
       "platform": 1
     },
     {
       "command": "chown -R jdupont:users /home/jdupont/documents",
-      "description": "Changer récursivement le propriétaire d'un dossier",
+      "description": "Change the owner of a folder recursively",
       "platform": 1
     },
     {
       "command": "chown --reference=/etc/passwd /etc/shadow",
-      "description": "Copier le propriétaire d'un fichier de référence",
+      "description": "Copy the owner of a reference file",
       "platform": 1
     },
     {
       "command": "chown -h jdupont:users /tmp/mylink",
-      "description": "Changer le propriétaire d'un lien symbolique",
+      "description": "Change the owner of a symbolic link",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. -R pour récursif. user:group ou user seul ou :group seul.",
+  "notes": "Requires sudo. -R for recursive. user:group, user alone or :group alone.",
   "links": [
     {
       "title": "chown documentation",
       "url": "https://man7.org/linux/man-pages/man1/chown.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Modifier le propriétaire d'un fichier",
+      "description": "Change le propriétaire (user et/ou group) d'un fichier ou répertoire",
+      "notes": "Nécessite sudo. -R pour récursif. user:group ou user seul ou :group seul.",
+      "parameters": {
+        "linux": {
+          "owner": {
+            "label": "Propriétaire",
+            "description": "Nouveau propriétaire"
+          },
+          "group": {
+            "label": "Groupe",
+            "description": "Nouveau groupe (optionnel)"
+          },
+          "path": {
+            "label": "Chemin",
+            "description": "Fichier ou répertoire à modifier"
+          }
+        }
+      },
+      "examples": {
+        "sudo chown www-data:www-data /var/www/html": "Change owner et group",
+        "sudo chown -R john /home/john": "Change récursivement le propriétaire",
+        "sudo chown :developers file.txt": "Change uniquement le groupe",
+        "chown admin:IT-Admins /var/log/app.log -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "chown www-data:www-data /var/www/html -R": "Changer le propriétaire du dossier web Apache",
+        "chown root:admin /etc/config.conf": "Définir root comme propriétaire avec groupe admin",
+        "chown -R jdupont:users /home/jdupont/documents": "Changer récursivement le propriétaire d'un dossier",
+        "chown --reference=/etc/passwd /etc/shadow": "Copier le propriétaire d'un fichier de référence",
+        "chown -h jdupont:users /tmp/mylink": "Changer le propriétaire d'un lien symbolique"
+      }
+    }
+  }
 }

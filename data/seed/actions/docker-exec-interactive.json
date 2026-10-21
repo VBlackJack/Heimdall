@@ -1,8 +1,8 @@
 {
   "id": "docker-exec-interactive",
-  "title": "Entrer dans un conteneur (Docker Exec)",
-  "description": "Ouvre un shell interactif (bash/sh) à l'intérieur d'un conteneur en cours d'exécution pour le débogage.",
-  "category": "🐳 Containers & VMs",
+  "title": "Open a shell in a container (docker exec)",
+  "description": "Open an interactive shell (bash/sh) inside a running container for debugging.",
+  "category": "containers-vms",
   "platform": 2,
   "level": 1,
   "tags": [
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "container",
-        "label": "Conteneur",
+        "label": "Container",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou ID"
+        "description": "Name or ID"
       }
     ]
   },
@@ -36,11 +36,11 @@
     "parameters": [
       {
         "name": "container",
-        "label": "Conteneur",
+        "label": "Container",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou ID"
+        "description": "Name or ID"
       }
     ]
   },
@@ -48,20 +48,45 @@
   "linuxExamples": [
     {
       "command": "docker exec -it web_app /bin/bash",
-      "description": "🔥 DEBUG : Ouvre un terminal Bash dans le conteneur 'web_app'. Si bash n'existe pas, essayez /bin/sh.",
+      "description": "🔥 DEBUG: open a Bash terminal in the 'web_app' container. If bash does not exist, try /bin/sh.",
       "platform": 1
     },
     {
       "command": "docker exec -it db_prod mysql -u root -p",
-      "description": "Se connecte directement au client MySQL à l'intérieur du conteneur DB.",
+      "description": "Connect directly to the MySQL client inside the DB container.",
       "platform": 1
     },
     {
       "command": "docker exec -u 0 -it web_app bash",
-      "description": "Entre dans le conteneur en tant que ROOT (user 0). Utile si l'user par défaut n'a pas les droits d'installation d'outils de debug.",
+      "description": "Enter the container as ROOT (user 0). Useful when the default user cannot install debugging tools.",
       "platform": 1
     }
   ],
   "linuxCommandTemplateId": "26d6e56f-5604-4a86-841e-e43e6b058dfc",
-  "windowsCommandTemplateId": "dddbeeba-1030-40be-8275-e624002f2889"
+  "windowsCommandTemplateId": "dddbeeba-1030-40be-8275-e624002f2889",
+  "translations": {
+    "fr": {
+      "title": "Entrer dans un conteneur (Docker Exec)",
+      "description": "Ouvre un shell interactif (bash/sh) à l'intérieur d'un conteneur en cours d'exécution pour le débogage.",
+      "parameters": {
+        "windows": {
+          "container": {
+            "label": "Conteneur",
+            "description": "Nom ou ID"
+          }
+        },
+        "linux": {
+          "container": {
+            "label": "Conteneur",
+            "description": "Nom ou ID"
+          }
+        }
+      },
+      "examples": {
+        "docker exec -it web_app /bin/bash": "🔥 DEBUG : Ouvre un terminal Bash dans le conteneur 'web_app'. Si bash n'existe pas, essayez /bin/sh.",
+        "docker exec -it db_prod mysql -u root -p": "Se connecte directement au client MySQL à l'intérieur du conteneur DB.",
+        "docker exec -u 0 -it web_app bash": "Entre dans le conteneur en tant que ROOT (user 0). Utile si l'user par défaut n'a pas les droits d'installation d'outils de debug."
+      }
+    }
+  }
 }

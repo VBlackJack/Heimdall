@@ -38,16 +38,27 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     /// <summary>
     /// Creates a new display entry bound to the given action and owning VM.
     /// </summary>
-    /// <param name="source">Underlying TwinShell action model.</param>
+    /// <param name="source">The action as shown, in the operator's language.</param>
     /// <param name="viewModel">VM providing favorite/search/locale state.</param>
-    public CommandLibraryActionEntry(ActionModel source, CommandLibraryViewModel viewModel)
+    /// <param name="pivot">
+    /// The action as stored, when <paramref name="source"/> is a localized copy of it; null
+    /// when the two are the same.
+    /// </param>
+    public CommandLibraryActionEntry(ActionModel source, CommandLibraryViewModel viewModel, ActionModel? pivot = null)
     {
         Source = source;
         _viewModel = viewModel;
+        Pivot = pivot ?? source;
     }
 
-    /// <summary>The underlying TwinShell action model.</summary>
+    /// <summary>The action as shown, in the operator's language.</summary>
     public ActionModel Source { get; }
+
+    /// <summary>
+    /// The action as stored: pivot text and translations. What an edit starts from, so that a
+    /// save never writes the operator's language over the pivot.
+    /// </summary>
+    public ActionModel Pivot { get; }
 
     /// <summary>Action title (passthrough).</summary>
     public string Title => Source.Title;
@@ -55,7 +66,7 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     /// <summary>Action description; empty string if none.</summary>
     public string Description => Source.Description ?? string.Empty;
 
-    /// <summary>Action category, used for grouping and filtering.</summary>
+    /// <summary>Action category as stored (a key or free text), used for filtering.</summary>
     public string Category => Source.Category;
 
     /// <summary>
@@ -67,6 +78,12 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     /// filter's change already refreshes the list view, which re-binds every row.
     /// </remarks>
     public string CommandPreview => _viewModel.ResolveCommandPreview(Source);
+
+    /// Category label in the operator's language, used for grouping. Delegates to
+    /// <see cref="CommandPresentationResolver.ResolveCategoryLabel"/>.
+    /// </summary>
+    public string CategoryLabel =>
+        CommandPresentationResolver.ResolveCategoryLabel(Source.Category, _viewModel.LocalizeKey);
 
     /// <summary>Filled or hollow star glyph reflecting the current favorite state.</summary>
     public string FavoriteIcon => _viewModel.IsFavorite(Source.Id) ? "\u2605" : "\u2606";
@@ -130,12 +147,16 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
     /// The description is deliberately left out: it repeats the title for most seeded
     /// actions and would bury the risk word at the end of a long utterance.
     /// </para>
+    /// <para>
+    /// The category label comes last: the group header that shows it to a sighted user is
+    /// not part of the row, and the key it is stored as is not something to read aloud.
+    /// </para>
     /// </remarks>
     public string AccessibleName
     {
         get
         {
-            var parts = new List<string>(3) { Title };
+            var parts = new List<string>(4) { Title };
 
             var risk = RiskLabel;
             if (!string.IsNullOrWhiteSpace(risk))
@@ -147,6 +168,12 @@ public sealed partial class CommandLibraryActionEntry : ObservableObject, IAcces
             if (!string.IsNullOrWhiteSpace(platform))
             {
                 parts.Add(platform);
+            }
+
+            var category = CategoryLabel;
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                parts.Add(category);
             }
 
             return string.Join(", ", parts);

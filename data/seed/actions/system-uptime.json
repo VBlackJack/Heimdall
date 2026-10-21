@@ -1,8 +1,8 @@
 {
   "id": "system-uptime",
-  "title": "Afficher le temps de fonctionnement du système",
-  "description": "Montre depuis combien de temps le système est démarré.",
-  "category": "⚡ Performance",
+  "title": "Show the system uptime",
+  "description": "Show how long the system has been running.",
+  "category": "performance",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -27,35 +27,49 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "Sur Windows, calculer la différence avec Get-Date pour obtenir la durée. Sur Linux, 'uptime' sans option donne plus d'infos.",
+  "notes": "On Windows, subtract it from Get-Date to get the duration. On Linux, 'uptime' without options gives more information.",
   "links": [],
   "windowsExamples": [
     {
       "command": "(Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime",
-      "description": "Affiche la date/heure du dernier démarrage (Windows)",
+      "description": "Show the date and time of the last boot (Windows)",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "uptime -p",
-      "description": "Affiche l'uptime en format lisible (Linux)",
+      "description": "Show the uptime in a readable format (Linux)",
       "platform": 1
     },
     {
       "command": "uptime",
-      "description": "Temps de fonctionnement et charge système",
+      "description": "Uptime and system load",
       "platform": 1
     },
     {
       "command": "uptime -s",
-      "description": "Date et heure du dernier démarrage",
+      "description": "Date and time of the last boot",
       "platform": 1
     },
     {
       "command": "w",
-      "description": "Uptime + utilisateurs connectés",
+      "description": "Uptime + logged-on users",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher le temps de fonctionnement du système",
+      "description": "Montre depuis combien de temps le système est démarré.",
+      "notes": "Sur Windows, calculer la différence avec Get-Date pour obtenir la durée. Sur Linux, 'uptime' sans option donne plus d'infos.",
+      "examples": {
+        "(Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime": "Affiche la date/heure du dernier démarrage (Windows)",
+        "uptime -p": "Affiche l'uptime en format lisible (Linux)",
+        "uptime": "Temps de fonctionnement et charge système",
+        "uptime -s": "Date et heure du dernier démarrage",
+        "w": "Uptime + utilisateurs connectés"
+      }
+    }
+  }
 }

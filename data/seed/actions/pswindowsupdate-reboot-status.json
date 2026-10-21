@@ -1,8 +1,8 @@
 {
   "id": "pswindowsupdate-reboot-status",
-  "title": "Vérifier si un redémarrage est nécessaire",
-  "description": "Vérifie si des mises à jour en attente nécessitent un redémarrage système",
-  "category": "🔄 Windows Updates",
+  "title": "Check whether a restart is required",
+  "description": "Check whether pending updates require a system restart",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,40 +22,55 @@
   "examples": [
     {
       "command": "Get-WURebootStatus",
-      "description": "Affiche si un redémarrage est nécessaire",
+      "description": "Show whether a restart is required",
       "platform": 0
     },
     {
       "command": "if (Get-WURebootStatus -Silent) { 'Restart required' } else { 'No restart required' }",
-      "description": "Teste et affiche un message selon le statut",
+      "description": "Test the status and print a matching message",
       "platform": 0
     },
     {
       "command": "Get-WURebootStatus -Silent | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-WURebootStatus -Silent | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results as a table fitted to the console. Format-Table -AutoSize adjusts the column widths for readable output. Handy for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-WURebootStatus -Silent | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-WURebootStatus -Silent | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "Utile avant de planifier des maintenances. Nécessite PSWindowsUpdate.",
+  "notes": "Useful before scheduling maintenance. Requires PSWindowsUpdate.",
   "links": [
     {
       "title": "PSWindowsUpdate Module",
       "url": "https://www.powershellgallery.com/packages/PSWindowsUpdate"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier si un redémarrage est nécessaire",
+      "description": "Vérifie si des mises à jour en attente nécessitent un redémarrage système",
+      "notes": "Utile avant de planifier des maintenances. Nécessite PSWindowsUpdate.",
+      "examples": {
+        "Get-WURebootStatus": "Affiche si un redémarrage est nécessaire",
+        "if (Get-WURebootStatus -Silent) { 'Restart required' } else { 'No restart required' }": "Teste et affiche un message selon le statut",
+        "Get-WURebootStatus -Silent | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-WURebootStatus -Silent | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-WURebootStatus -Silent | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-WURebootStatus -Silent | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

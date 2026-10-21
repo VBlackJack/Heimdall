@@ -1,8 +1,8 @@
 {
   "id": "dnf-update",
-  "title": "Mettre à jour les paquets avec DNF",
-  "description": "Met à jour tous les paquets avec DNF (RHEL 8+/Fedora)",
-  "category": "📦 Package Management",
+  "title": "Update the packages with DNF",
+  "description": "Update every package with DNF (RHEL 8+/Fedora)",
+  "category": "package-management",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -23,50 +23,67 @@
   "examples": [
     {
       "command": "sudo dnf update",
-      "description": "Met à jour tous les paquets",
+      "description": "Update every package",
       "platform": 1
     },
     {
       "command": "sudo dnf check-update",
-      "description": "Vérifie les mises à jour disponibles sans installer",
+      "description": "Check the available updates without installing them",
       "platform": 1
     },
     {
       "command": "dnf update -y -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
       "command": "dnf update -y --dry-run",
-      "description": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+      "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     },
     {
       "command": "dnf update -y",
-      "description": "Mettre à jour tous les paquets",
+      "description": "Update every package",
       "platform": 1
     },
     {
       "command": "dnf install httpd -y",
-      "description": "Installer Apache HTTPD",
+      "description": "Install Apache HTTPD",
       "platform": 1
     },
     {
       "command": "dnf search nodejs",
-      "description": "Rechercher Node.js",
+      "description": "Search for Node.js",
       "platform": 1
     },
     {
       "command": "dnf list installed | grep kernel",
-      "description": "Lister les kernels installés",
+      "description": "List the installed kernels",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. DNF est le successeur de YUM sur les systèmes modernes RHEL/Fedora.",
+  "notes": "Requires sudo. DNF is the successor of YUM on modern RHEL/Fedora systems.",
   "links": [
     {
       "title": "DNF documentation",
       "url": "https://docs.fedoraproject.org/en-US/quick-docs/dnf/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Mettre à jour les paquets avec DNF",
+      "description": "Met à jour tous les paquets avec DNF (RHEL 8+/Fedora)",
+      "notes": "Nécessite sudo. DNF est le successeur de YUM sur les systèmes modernes RHEL/Fedora.",
+      "examples": {
+        "sudo dnf update": "Met à jour tous les paquets",
+        "sudo dnf check-update": "Vérifie les mises à jour disponibles sans installer",
+        "dnf update -y -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "dnf update -y --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+        "dnf update -y": "Mettre à jour tous les paquets",
+        "dnf install httpd -y": "Installer Apache HTTPD",
+        "dnf search nodejs": "Rechercher Node.js",
+        "dnf list installed | grep kernel": "Lister les kernels installés"
+      }
+    }
+  }
 }

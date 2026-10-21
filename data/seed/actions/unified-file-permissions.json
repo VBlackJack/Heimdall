@@ -1,8 +1,8 @@
 {
   "id": "unified-file-permissions",
-  "title": "Modifier les permissions de fichiers",
-  "description": "Modifie les permissions NTFS d'un fichier ou dossier.",
-  "category": "📁 Files & Storage",
+  "title": "Change file permissions",
+  "description": "Change the NTFS permissions of a file or folder.",
+  "category": "files-storage",
   "platform": 2,
   "level": 1,
   "tags": [
@@ -11,10 +11,10 @@
     "linux",
     "windows",
     "permissions",
-    "sécurité",
+    "security",
     "acl"
   ],
-  "notes": "Windows: /T pour récursif. Permissions: F (Full), M (Modify), RX (ReadExecute), R (Read), W (Write).\nLinux: 755=rwxr-xr-x, 644=rw-r--r--, 777=rwxrwxrwx. -R pour récursif. u=user, g=group, o=others, a=all.",
+  "notes": "Windows: /T for recursive. Permissions: F (Full), M (Modify), RX (ReadExecute), R (Read), W (Write).\nLinux: 755=rwxr-xr-x, 644=rw-r--r--, 777=rwxrwxrwx. -R for recursive. u=user, g=group, o=others, a=all.",
   "links": [],
   "windowsCommandTemplateId": "file-permissions-windows-cmd",
   "windowsCommandTemplate": {
@@ -25,19 +25,19 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ou dossier"
+        "description": "Path of the file or folder"
       },
       {
         "name": "user",
-        "label": "Utilisateur/Groupe",
+        "label": "User/Group",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de l'utilisateur ou du groupe"
+        "description": "Name of the user or group"
       },
       {
         "name": "permissions",
@@ -52,27 +52,12 @@
   "windowsExamples": [
     {
       "command": "icacls \"C:\\Data\" /grant Users:M",
-      "description": "Donne les droits de modification aux Users",
+      "description": "Give modify rights to Users",
       "platform": 0
     },
     {
       "command": "icacls \"C:\\Data\" /grant Administrators:F /T",
-      "description": "Donne le contrôle total récursivement",
-      "platform": 0
-    },
-    {
-      "command": "icacls \"<path>\" /grant {user}:{permissions}",
-      "description": "Exemple utilisant le paramètre 'path': Chemin du fichier ou dossier. Remplacez <path> par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "icacls \"{path}\" /grant <user>:{permissions}",
-      "description": "Exemple utilisant le paramètre 'user': Nom de l'utilisateur ou du groupe. Remplacez <user> par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "icacls \"{path}\" /grant {user}:F",
-      "description": "Exemple utilisant le paramètre 'permissions': F=Full, M=Modify, RX=ReadExecute, R=Read, W=Write. Remplacez <permissions> par la valeur appropriée selon votre environnement.",
+      "description": "Give full control recursively",
       "platform": 0
     }
   ],
@@ -89,44 +74,80 @@
         "type": "string",
         "defaultValue": "755",
         "required": true,
-        "description": "Permissions en octal (ex: 755, 644) ou symbolique (ex: u+x)"
+        "description": "Permissions in octal (e.g. 755, 644) or symbolic form (e.g. u+x)"
       },
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ou dossier"
+        "description": "Path of the file or folder"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "chmod 755 script.sh",
-      "description": "Rend un script exécutable (rwxr-xr-x)",
+      "description": "Make a script executable (rwxr-xr-x)",
       "platform": 1
     },
     {
       "command": "chmod -R 644 /var/www/html",
-      "description": "Définit les permissions récursivement",
+      "description": "Set the permissions recursively",
       "platform": 1
     },
     {
       "command": "chmod u+x file.sh",
-      "description": "Ajoute l'exécution pour le propriétaire",
+      "description": "Add execute permission for the owner",
       "platform": 1
     },
     {
       "command": "chmod {permissions} \"{path}\" -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "chmod 755 \"{path}\"",
-      "description": "Exemple utilisant le paramètre 'permissions': Permissions en octal (ex: 755, 644) ou symbolique (ex: u+x). Remplacez <permissions> par la valeur appropriée selon votre environnement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Modifier les permissions de fichiers",
+      "description": "Modifie les permissions NTFS d'un fichier ou dossier.",
+      "notes": "Windows: /T pour récursif. Permissions: F (Full), M (Modify), RX (ReadExecute), R (Read), W (Write).\nLinux: 755=rwxr-xr-x, 644=rw-r--r--, 777=rwxrwxrwx. -R pour récursif. u=user, g=group, o=others, a=all.",
+      "parameters": {
+        "windows": {
+          "path": {
+            "label": "Chemin",
+            "description": "Chemin du fichier ou dossier"
+          },
+          "user": {
+            "label": "Utilisateur/Groupe",
+            "description": "Nom de l'utilisateur ou du groupe"
+          },
+          "permissions": {
+            "label": "Permissions",
+            "description": "F=Full, M=Modify, RX=ReadExecute, R=Read, W=Write"
+          }
+        },
+        "linux": {
+          "permissions": {
+            "label": "Permissions",
+            "description": "Permissions en octal (ex: 755, 644) ou symbolique (ex: u+x)"
+          },
+          "path": {
+            "label": "Chemin",
+            "description": "Chemin du fichier ou dossier"
+          }
+        }
+      },
+      "examples": {
+        "icacls \"C:\\Data\" /grant Users:M": "Donne les droits de modification aux Users",
+        "icacls \"C:\\Data\" /grant Administrators:F /T": "Donne le contrôle total récursivement",
+        "chmod 755 script.sh": "Rend un script exécutable (rwxr-xr-x)",
+        "chmod -R 644 /var/www/html": "Définit les permissions récursivement",
+        "chmod u+x file.sh": "Ajoute l'exécution pour le propriétaire",
+        "chmod {permissions} \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
+      }
+    }
+  }
 }

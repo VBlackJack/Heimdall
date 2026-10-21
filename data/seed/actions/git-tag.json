@@ -1,8 +1,8 @@
 {
   "id": "git-tag",
-  "title": "Gérer les tags Git",
-  "description": "Crée, liste ou supprime des tags (versions)",
-  "category": "🔧 Development",
+  "title": "Manage Git tags",
+  "description": "Create, list or delete tags (versions).",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "tagName",
-        "label": "Nom du tag",
+        "label": "Tag name",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom du tag (vide pour lister)"
+        "description": "Tag name (empty to list)"
       }
     ]
   },
@@ -37,36 +37,62 @@
     "parameters": [
       {
         "name": "tagName",
-        "label": "Nom du tag",
+        "label": "Tag name",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom du tag"
+        "description": "Tag name"
       }
     ]
   },
   "examples": [
     {
       "command": "git tag",
-      "description": "Liste tous les tags",
+      "description": "List all tags",
       "platform": 2
     },
     {
       "command": "git tag v1.0.0",
-      "description": "Crée un tag léger",
+      "description": "Create a lightweight tag",
       "platform": 2
     },
     {
       "command": "git tag -a v1.0.0 -m \"Release 1.0.0\"",
-      "description": "Crée un tag annoté",
+      "description": "Create an annotated tag",
       "platform": 2
     }
   ],
-  "notes": "Utilisez -a pour créer des tags annotés (recommandé). N'oubliez pas de pousser les tags avec 'git push --tags'.",
+  "notes": "Use -a to create annotated tags (recommended). Remember to push the tags with 'git push --tags'.",
   "links": [
     {
       "title": "Git Tag Documentation",
       "url": "https://git-scm.com/docs/git-tag"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Gérer les tags Git",
+      "description": "Crée, liste ou supprime des tags (versions)",
+      "notes": "Utilisez -a pour créer des tags annotés (recommandé). N'oubliez pas de pousser les tags avec 'git push --tags'.",
+      "parameters": {
+        "windows": {
+          "tagName": {
+            "label": "Nom du tag",
+            "description": "Nom du tag (vide pour lister)"
+          }
+        },
+        "linux": {
+          "tagName": {
+            "label": "Nom du tag",
+            "description": "Nom du tag"
+          }
+        }
+      },
+      "examples": {
+        "git tag": "Liste tous les tags",
+        "git tag v1.0.0": "Crée un tag léger",
+        "git tag -a v1.0.0 -m \"Release 1.0.0\"": "Crée un tag annoté"
+      }
+    }
+  }
 }

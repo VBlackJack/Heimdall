@@ -1,8 +1,8 @@
 {
   "id": "wsus-server-cleanup",
-  "title": "Effectuer la maintenance du serveur WSUS",
-  "description": "Exécute les tâches de maintenance WSUS: suppression des mises à jour obsolètes, dépassées et des ordinateurs inactifs",
-  "category": "🔄 Windows Updates",
+  "title": "Run WSUS server maintenance",
+  "description": "Run the WSUS maintenance tasks: removal of obsolete and superseded updates and of inactive computers",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -22,20 +22,31 @@
   "examples": [
     {
       "command": "Invoke-WsusServerCleanup -CleanupObsoleteUpdates -CompressUpdates",
-      "description": "Nettoie les mises à jour obsolètes et compresse les révisions",
+      "description": "Clean the obsolete updates and compress the revisions",
       "platform": 0
     },
     {
       "command": "Invoke-WsusServerCleanup -CleanupObsoleteComputers",
-      "description": "Supprime les ordinateurs qui n'ont pas contacté le serveur depuis 30 jours",
+      "description": "Remove the computers that have not contacted the server for 30 days",
       "platform": 0
     }
   ],
-  "notes": "À exécuter sur le serveur WSUS. Peut prendre du temps selon la taille de la base WSUS. Libère de l'espace disque. Nécessite droits administrateur.",
+  "notes": "Run it on the WSUS server. Can take time depending on the size of the WSUS database. Frees disk space. Requires administrator rights.",
   "links": [
     {
       "title": "Invoke-WsusServerCleanup Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/updateservices/invoke-wsusservercleanup"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Effectuer la maintenance du serveur WSUS",
+      "description": "Exécute les tâches de maintenance WSUS: suppression des mises à jour obsolètes, dépassées et des ordinateurs inactifs",
+      "notes": "À exécuter sur le serveur WSUS. Peut prendre du temps selon la taille de la base WSUS. Libère de l'espace disque. Nécessite droits administrateur.",
+      "examples": {
+        "Invoke-WsusServerCleanup -CleanupObsoleteUpdates -CompressUpdates": "Nettoie les mises à jour obsolètes et compresse les révisions",
+        "Invoke-WsusServerCleanup -CleanupObsoleteComputers": "Supprime les ordinateurs qui n'ont pas contacté le serveur depuis 30 jours"
+      }
+    }
+  }
 }

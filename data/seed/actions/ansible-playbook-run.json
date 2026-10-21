@@ -1,8 +1,8 @@
 {
   "id": "ansible-playbook-run",
-  "title": "Exécuter un playbook Ansible",
-  "description": "Exécute un playbook Ansible sur les hôtes définis dans l'inventaire",
-  "category": "⚙️ Services & Automation",
+  "title": "Run an Ansible playbook",
+  "description": "Run an Ansible playbook on the hosts defined in the inventory",
+  "category": "services-automation",
   "platform": 2,
   "level": 1,
   "tags": [
@@ -20,19 +20,19 @@
     "parameters": [
       {
         "name": "playbookPath",
-        "label": "Chemin du playbook",
+        "label": "Playbook path",
         "type": "string",
         "defaultValue": "site.yml",
         "required": true,
-        "description": "Chemin vers le fichier playbook YAML"
+        "description": "Path to the YAML playbook file"
       },
       {
         "name": "inventory",
-        "label": "Inventaire",
+        "label": "Inventory",
         "type": "string",
         "defaultValue": "inventory.ini",
         "required": true,
-        "description": "Fichier d'inventaire des hôtes"
+        "description": "Host inventory file"
       }
     ]
   },
@@ -45,24 +45,24 @@
     "parameters": [
       {
         "name": "playbookPath",
-        "label": "Chemin du playbook",
+        "label": "Playbook path",
         "type": "string",
         "defaultValue": "site.yml",
         "required": true,
-        "description": "Chemin vers le fichier playbook YAML"
+        "description": "Path to the YAML playbook file"
       },
       {
         "name": "inventory",
-        "label": "Inventaire",
+        "label": "Inventory",
         "type": "string",
         "defaultValue": "inventory.ini",
         "required": true,
-        "description": "Fichier d'inventaire des hôtes"
+        "description": "Host inventory file"
       }
     ]
   },
   "examples": [],
-  "notes": "Utiliser --check pour un dry-run, --diff pour voir les changements, -v/-vv/-vvv pour plus de verbosité.",
+  "notes": "Use --check for a dry run, --diff to see the changes, -v/-vv/-vvv for more verbosity.",
   "links": [
     {
       "title": "Ansible Playbooks",
@@ -72,40 +72,66 @@
   "windowsExamples": [
     {
       "command": "ansible-playbook site.yml -i inventory.ini",
-      "description": "Execute un playbook avec un inventaire local.",
+      "description": "Run a playbook with a local inventory.",
       "platform": 0
     },
     {
       "command": "ansible-playbook deploy.yml -i hosts --check",
-      "description": "Mode dry-run pour verifier les changements sans les appliquer.",
+      "description": "Dry-run mode to check the changes without applying them.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ansible-playbook site.yml -i production",
-      "description": "Exécute le playbook sur l'inventaire de production",
+      "description": "Run the playbook on the production inventory",
       "platform": 1
     },
     {
       "command": "ansible-playbook deploy.yml -i staging --check",
-      "description": "Mode dry-run sur l'environnement de staging",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook site.yml -i /etc/ansible/hosts",
-      "description": "Exemple utilisant le paramètre 'playbookPath': Chemin vers le fichier playbook YAML. Remplacez /etc/ansible/playbooks/deploy.yml par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "ansible-playbook /etc/ansible/playbooks/deploy.yml -i inventory.ini",
-      "description": "Exemple utilisant le paramètre 'inventory': Fichier d'inventaire des hôtes. Remplacez /etc/ansible/hosts par la valeur appropriée selon votre environnement.",
+      "description": "Dry-run mode on the staging environment",
       "platform": 1
     },
     {
       "command": "ansible-playbook deploy.yml",
-      "description": "Exécuter un playbook",
+      "description": "Run a playbook",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exécuter un playbook Ansible",
+      "description": "Exécute un playbook Ansible sur les hôtes définis dans l'inventaire",
+      "notes": "Utiliser --check pour un dry-run, --diff pour voir les changements, -v/-vv/-vvv pour plus de verbosité.",
+      "parameters": {
+        "windows": {
+          "playbookPath": {
+            "label": "Chemin du playbook",
+            "description": "Chemin vers le fichier playbook YAML"
+          },
+          "inventory": {
+            "label": "Inventaire",
+            "description": "Fichier d'inventaire des hôtes"
+          }
+        },
+        "linux": {
+          "playbookPath": {
+            "label": "Chemin du playbook",
+            "description": "Chemin vers le fichier playbook YAML"
+          },
+          "inventory": {
+            "label": "Inventaire",
+            "description": "Fichier d'inventaire des hôtes"
+          }
+        }
+      },
+      "examples": {
+        "ansible-playbook site.yml -i inventory.ini": "Exécute un playbook avec un inventaire local.",
+        "ansible-playbook deploy.yml -i hosts --check": "Mode dry-run pour vérifier les changements sans les appliquer.",
+        "ansible-playbook site.yml -i production": "Exécute le playbook sur l'inventaire de production",
+        "ansible-playbook deploy.yml -i staging --check": "Mode dry-run sur l'environnement de staging",
+        "ansible-playbook deploy.yml": "Exécuter un playbook"
+      }
+    }
+  }
 }

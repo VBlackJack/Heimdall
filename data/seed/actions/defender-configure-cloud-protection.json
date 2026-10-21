@@ -1,8 +1,8 @@
 {
   "id": "defender-configure-cloud-protection",
-  "title": "Configurer la protection cloud Defender",
-  "description": "Active ou configure la protection cloud de Windows Defender (analyse dans le cloud Microsoft).",
-  "category": "🔒 Security & Encryption",
+  "title": "Configure Defender cloud protection",
+  "description": "Enable or configure Windows Defender cloud protection (analysis in the Microsoft cloud).",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -19,56 +19,74 @@
     "parameters": [
       {
         "name": "level",
-        "label": "Niveau de reporting",
+        "label": "Reporting level",
         "type": "number",
         "defaultValue": "2",
         "required": true,
-        "description": "0=Désactivé, 1=Basique, 2=Avancé (recommandé)"
+        "description": "0=Off, 1=Basic, 2=Advanced (recommended)"
       }
     ]
   },
   "examples": [
     {
       "command": "Set-MpPreference -MAPSReporting 2",
-      "description": "Active la protection cloud avancée (recommandé - meilleure détection)",
+      "description": "Enable advanced cloud protection (recommended, better detection)",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -MAPSReporting 1",
-      "description": "Active la protection cloud basique (moins de données envoyées)",
+      "description": "Enable basic cloud protection (less data sent)",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -MAPSReporting 0",
-      "description": "Désactive la protection cloud (réduit la sécurité!)",
+      "description": "Disable cloud protection (lowers security!)",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -SubmitSamplesConsent 2",
-      "description": "Configure l'envoi automatique des échantillons suspects (0=Demander, 1=Envoyer sûrs, 2=Jamais, 3=Toujours)",
+      "description": "Configure the automatic submission of suspicious samples (0=Ask, 1=Send safe ones, 2=Never, 3=Always)",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Select-Object MAPSReporting,SubmitSamplesConsent",
-      "description": "Vérifie les paramètres actuels de protection cloud",
+      "description": "Check the current cloud protection settings",
       "platform": 0
     },
     {
       "command": "Set-MpPreference -MAPSReporting 2 -SubmitSamplesConsent 1",
-      "description": "Configure protection cloud optimale (reporting avancé + envoi échantillons sûrs)",
-      "platform": 0
-    },
-    {
-      "command": "Set-MpPreference -MAPSReporting $2",
-      "description": "Exemple utilisant le paramètre 'level': 0=Désactivé, 1=Basique, 2=Avancé (recommandé). Remplacez Error par la valeur appropriée selon votre environnement.",
+      "description": "Configure optimal cloud protection (advanced reporting + safe sample submission)",
       "platform": 0
     }
   ],
-  "notes": "MAPSReporting (Microsoft Active Protection Service): 0=Off, 1=Basic, 2=Advanced. Advanced recommandé: meilleure détection des menaces zero-day grâce à l'analyse cloud. SubmitSamplesConsent: 0=Toujours demander, 1=Envoyer échantillons sûrs auto, 2=Ne jamais envoyer, 3=Tout envoyer auto.",
+  "notes": "MAPSReporting (Microsoft Active Protection Service): 0=Off, 1=Basic, 2=Advanced. Advanced is recommended: better detection of zero-day threats thanks to cloud analysis. SubmitSamplesConsent: 0=Always ask, 1=Send safe samples automatically, 2=Never send, 3=Send everything automatically.",
   "links": [
     {
       "title": "Defender Cloud Protection",
       "url": "https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/cloud-protection-microsoft-defender-antivirus"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Configurer la protection cloud Defender",
+      "description": "Active ou configure la protection cloud de Windows Defender (analyse dans le cloud Microsoft).",
+      "notes": "MAPSReporting (Microsoft Active Protection Service): 0=Off, 1=Basic, 2=Advanced. Advanced recommandé: meilleure détection des menaces zero-day grâce à l'analyse cloud. SubmitSamplesConsent: 0=Toujours demander, 1=Envoyer échantillons sûrs auto, 2=Ne jamais envoyer, 3=Tout envoyer auto.",
+      "parameters": {
+        "windows": {
+          "level": {
+            "label": "Niveau de reporting",
+            "description": "0=Désactivé, 1=Basique, 2=Avancé (recommandé)"
+          }
+        }
+      },
+      "examples": {
+        "Set-MpPreference -MAPSReporting 2": "Active la protection cloud avancée (recommandé - meilleure détection)",
+        "Set-MpPreference -MAPSReporting 1": "Active la protection cloud basique (moins de données envoyées)",
+        "Set-MpPreference -MAPSReporting 0": "Désactive la protection cloud (réduit la sécurité!)",
+        "Set-MpPreference -SubmitSamplesConsent 2": "Configure l'envoi automatique des échantillons suspects (0=Demander, 1=Envoyer sûrs, 2=Jamais, 3=Toujours)",
+        "Get-MpComputerStatus | Select-Object MAPSReporting,SubmitSamplesConsent": "Vérifie les paramètres actuels de protection cloud",
+        "Set-MpPreference -MAPSReporting 2 -SubmitSamplesConsent 1": "Configure protection cloud optimale (reporting avancé + envoi échantillons sûrs)"
+      }
+    }
+  }
 }

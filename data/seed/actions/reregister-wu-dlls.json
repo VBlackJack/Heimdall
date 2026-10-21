@@ -1,8 +1,8 @@
 {
   "id": "reregister-wu-dlls",
-  "title": "Réenregistrer les DLL Windows Update",
-  "description": "Réenregistre toutes les DLL critiques du système Windows Update",
-  "category": "🔄 Windows Updates",
+  "title": "Re-register the Windows Update DLLs",
+  "description": "Re-register every critical DLL of the Windows Update system",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -21,15 +21,20 @@
   "examples": [
     {
       "command": "regsvr32 /s wuaueng.dll",
-      "description": "Réenregistre la DLL du moteur Windows Update",
-      "platform": 0
-    },
-    {
-      "command": "regsvr32 /s wuaueng.dll && regsvr32 /s wuapi.dll && regsvr32 /s wups.dll && regsvr32 /s wups2.dll && regsvr32 /s wucltux.dll && regsvr32 /s wuwebv.dll && regsvr32 /s qmgr.dll && regsvr32 /s qmgrprxy.dll",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help regsvr32 -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Re-register the Windows Update engine DLL",
       "platform": 0
     }
   ],
-  "notes": "Droits administrateur requis. Résout les erreurs de composants Windows Update corrompus.",
-  "links": []
+  "notes": "Requires administrator rights. Fixes errors caused by corrupted Windows Update components.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Réenregistrer les DLL Windows Update",
+      "description": "Réenregistre toutes les DLL critiques du système Windows Update",
+      "notes": "Droits administrateur requis. Résout les erreurs de composants Windows Update corrompus.",
+      "examples": {
+        "regsvr32 /s wuaueng.dll": "Réenregistre la DLL du moteur Windows Update"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "ad-search-user",
-  "title": "Rechercher un utilisateur AD par nom",
-  "description": "Recherche un utilisateur spécifique dans Active Directory par son nom ou prénom.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Search an AD user by name",
+  "description": "Search Active Directory for a specific user by last name or first name.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -19,52 +19,75 @@
     "parameters": [
       {
         "name": "searchTerm",
-        "label": "Terme de recherche",
+        "label": "Search term",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou partie du nom à rechercher"
+        "description": "Name or part of the name to search for"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-ADUser -Filter \"Name -like '*Dupont*'\" -Properties DisplayName,EmailAddress,Department",
-      "description": "Recherche tous les utilisateurs dont le nom contient 'Dupont' (insensible à la casse). L'opérateur -like avec wildcards (*) permet une recherche partielle. Retourne le nom d'affichage, l'email et le département. Pratique pour trouver rapidement un utilisateur dont on ne connaît qu'une partie du nom.",
+      "description": "Search every user whose name contains 'Dupont' (case-insensitive). The -like operator with wildcards (*) allows a partial search. Returns the display name, email and department. Handy to find a user quickly when you only know part of the name.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter \"SamAccountName -eq 'jdupont'\" -Properties *",
-      "description": "Recherche exacte par SamAccountName (identifiant de connexion) et affiche toutes les propriétés. L'opérateur -eq effectue une comparaison stricte. Utilisez cette méthode quand vous connaissez précisément l'identifiant de connexion de l'utilisateur.",
+      "description": "Exact search by SamAccountName (logon name), showing every property. The -eq operator performs a strict comparison. Use it when you know the user's logon name exactly.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter \"(Name -like '*Dupont*') -or (DisplayName -like '*Dupont*')\" -Properties DisplayName,EmailAddress",
-      "description": "Recherche étendue sur plusieurs champs avec l'opérateur logique -or. Cherche 'Dupont' dans le Name OU le DisplayName. Augmente les chances de trouver l'utilisateur quand on ne sait pas dans quel champ le nom est stocké.",
+      "description": "Wider search across several fields with the logical -or operator. Looks for 'Dupont' in Name OR DisplayName. Improves the chance of finding the user when you do not know which field holds the name.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter \"GivenName -eq 'Jean' -and Surname -eq 'Dupont'\" -Properties GivenName,Surname,EmailAddress",
-      "description": "Recherche par prénom ET nom de famille avec l'opérateur -and. Plus précis qu'une recherche sur le nom complet car les champs sont séparés. Idéal quand vous connaissez exactement le prénom et le nom.",
+      "description": "Search by first name AND last name with the -and operator. More precise than a search on the full name because the fields are separate. Ideal when you know the exact first and last name.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter \"Department -eq 'IT' -and Enabled -eq $true\" -Properties Department,Title,Manager",
-      "description": "Recherche multicritère : utilisateurs actifs d'un département spécifique. Combine plusieurs conditions pour affiner les résultats. Très utilisé pour créer des listes de diffusion, des rapports par département ou des analyses organisationnelles.",
+      "description": "Multi-criteria search: enabled users of one department. Combines several conditions to narrow the results. Widely used to build mailing lists, per-department reports or organizational analyses.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter \"Description -like '*externe*'\" -Properties Description,Company,Enabled",
-      "description": "Recherche textuelle dans le champ Description. Utile pour identifier des types de comptes spécifiques (consultants, externes, temporaires) si votre organisation utilise des conventions de nommage dans ce champ.",
+      "description": "Text search in the Description field. Useful to find specific kinds of accounts (consultants, external, temporary) if your organization uses naming conventions in that field.",
       "platform": 0
     }
   ],
-  "notes": "Utilise une recherche avec wildcard (*). Pour une recherche exacte, retirer les astérisques.",
+  "notes": "Uses a wildcard (*) search. For an exact search, remove the asterisks.",
   "links": [
     {
       "title": "Documentation Get-ADUser",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-aduser"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher un utilisateur AD par nom",
+      "description": "Recherche un utilisateur spécifique dans Active Directory par son nom ou prénom.",
+      "notes": "Utilise une recherche avec wildcard (*). Pour une recherche exacte, retirer les astérisques.",
+      "parameters": {
+        "windows": {
+          "searchTerm": {
+            "label": "Terme de recherche",
+            "description": "Nom ou partie du nom à rechercher"
+          }
+        }
+      },
+      "examples": {
+        "Get-ADUser -Filter \"Name -like '*Dupont*'\" -Properties DisplayName,EmailAddress,Department": "Recherche tous les utilisateurs dont le nom contient 'Dupont' (insensible à la casse). L'opérateur -like avec wildcards (*) permet une recherche partielle. Retourne le nom d'affichage, l'email et le département. Pratique pour trouver rapidement un utilisateur dont on ne connaît qu'une partie du nom.",
+        "Get-ADUser -Filter \"SamAccountName -eq 'jdupont'\" -Properties *": "Recherche exacte par SamAccountName (identifiant de connexion) et affiche toutes les propriétés. L'opérateur -eq effectue une comparaison stricte. Utilisez cette méthode quand vous connaissez précisément l'identifiant de connexion de l'utilisateur.",
+        "Get-ADUser -Filter \"(Name -like '*Dupont*') -or (DisplayName -like '*Dupont*')\" -Properties DisplayName,EmailAddress": "Recherche étendue sur plusieurs champs avec l'opérateur logique -or. Cherche 'Dupont' dans le Name OU le DisplayName. Augmente les chances de trouver l'utilisateur quand on ne sait pas dans quel champ le nom est stocké.",
+        "Get-ADUser -Filter \"GivenName -eq 'Jean' -and Surname -eq 'Dupont'\" -Properties GivenName,Surname,EmailAddress": "Recherche par prénom ET nom de famille avec l'opérateur -and. Plus précis qu'une recherche sur le nom complet car les champs sont séparés. Idéal quand vous connaissez exactement le prénom et le nom.",
+        "Get-ADUser -Filter \"Department -eq 'IT' -and Enabled -eq $true\" -Properties Department,Title,Manager": "Recherche multicritère : utilisateurs actifs d'un département spécifique. Combine plusieurs conditions pour affiner les résultats. Très utilisé pour créer des listes de diffusion, des rapports par département ou des analyses organisationnelles.",
+        "Get-ADUser -Filter \"Description -like '*externe*'\" -Properties Description,Company,Enabled": "Recherche textuelle dans le champ Description. Utile pour identifier des types de comptes spécifiques (consultants, externes, temporaires) si votre organisation utilise des conventions de nommage dans ce champ."
+      }
+    }
+  }
 }

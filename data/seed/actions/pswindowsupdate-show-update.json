@@ -1,8 +1,8 @@
 {
   "id": "pswindowsupdate-show-update",
-  "title": "Afficher une mise à jour masquée",
-  "description": "Réaffiche une mise à jour précédemment masquée pour permettre son installation",
-  "category": "🔄 Windows Updates",
+  "title": "Unhide an update",
+  "description": "Unhide a previously hidden update so it can be installed",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -20,31 +20,50 @@
     "parameters": [
       {
         "name": "kbNumber",
-        "label": "Numéro KB",
+        "label": "KB number",
         "type": "string",
         "defaultValue": "KB5001234",
         "required": true,
-        "description": "Numéro KB de la mise à jour à réafficher"
+        "description": "KB number of the update to unhide"
       }
     ]
   },
   "examples": [
     {
       "command": "Show-WindowsUpdate -KBArticleID KB5001234",
-      "description": "Réaffiche la mise à jour KB5001234",
+      "description": "Unhide update KB5001234",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -IsHidden | Show-WindowsUpdate",
-      "description": "Réaffiche toutes les mises à jour masquées",
+      "description": "Unhide every hidden update",
       "platform": 0
     }
   ],
-  "notes": "Nécessite le module PSWindowsUpdate.",
+  "notes": "Requires the PSWindowsUpdate module.",
   "links": [
     {
       "title": "PSWindowsUpdate Module",
       "url": "https://www.powershellgallery.com/packages/PSWindowsUpdate"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher une mise à jour masquée",
+      "description": "Réaffiche une mise à jour précédemment masquée pour permettre son installation",
+      "notes": "Nécessite le module PSWindowsUpdate.",
+      "parameters": {
+        "windows": {
+          "kbNumber": {
+            "label": "Numéro KB",
+            "description": "Numéro KB de la mise à jour à réafficher"
+          }
+        }
+      },
+      "examples": {
+        "Show-WindowsUpdate -KBArticleID KB5001234": "Réaffiche la mise à jour KB5001234",
+        "Get-WindowsUpdate -IsHidden | Show-WindowsUpdate": "Réaffiche toutes les mises à jour masquées"
+      }
+    }
+  }
 }

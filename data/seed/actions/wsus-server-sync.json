@@ -1,8 +1,8 @@
 {
   "id": "wsus-server-sync",
-  "title": "Synchroniser le serveur WSUS avec Microsoft Update",
-  "description": "Lance la synchronisation du serveur WSUS avec Microsoft Update pour récupérer les nouvelles mises à jour",
-  "category": "🔄 Windows Updates",
+  "title": "Synchronize the WSUS server with Microsoft Update",
+  "description": "Start the synchronization of the WSUS server with Microsoft Update to retrieve new updates",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -22,20 +22,31 @@
   "examples": [
     {
       "command": "(Get-WsusServer).GetSubscription().StartSynchronization()",
-      "description": "Démarre la synchronisation du serveur WSUS (méthode courte)",
+      "description": "Start the WSUS server synchronization (short form)",
       "platform": 0
     },
     {
       "command": "Start-PSWSUSSync",
-      "description": "Alternative si le module PSWSUS est installé",
+      "description": "Alternative when the PSWSUS module is installed",
       "platform": 0
     }
   ],
-  "notes": "À exécuter sur le serveur WSUS. Nécessite droits administrateur et module UpdateServices. La synchronisation peut prendre plusieurs minutes.",
+  "notes": "Run it on the WSUS server. Requires administrator rights and the UpdateServices module. The synchronization can take several minutes.",
   "links": [
     {
       "title": "WSUS Server Synchronization",
       "url": "https://dscottraynsford.wordpress.com/2015/07/22/force-wsus-to-synchronize-now-from-powershell/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Synchroniser le serveur WSUS avec Microsoft Update",
+      "description": "Lance la synchronisation du serveur WSUS avec Microsoft Update pour récupérer les nouvelles mises à jour",
+      "notes": "À exécuter sur le serveur WSUS. Nécessite droits administrateur et module UpdateServices. La synchronisation peut prendre plusieurs minutes.",
+      "examples": {
+        "(Get-WsusServer).GetSubscription().StartSynchronization()": "Démarre la synchronisation du serveur WSUS (méthode courte)",
+        "Start-PSWSUSSync": "Alternative si le module PSWSUS est installé"
+      }
+    }
+  }
 }

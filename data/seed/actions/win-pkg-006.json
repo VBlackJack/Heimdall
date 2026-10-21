@@ -1,8 +1,8 @@
 {
   "id": "win-pkg-006",
-  "title": "Rechercher un package Winget",
-  "description": "Recherche des packages disponibles dans les sources Winget configurées.",
-  "category": "📦 Package Management",
+  "title": "Search for a Winget package",
+  "description": "Search for packages available in the configured Winget sources.",
+  "category": "package-management",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,31 +21,50 @@
     "parameters": [
       {
         "name": "searchTerm",
-        "label": "Terme de recherche",
+        "label": "Search term",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Mot-clé ou nom du package à rechercher"
+        "description": "Keyword or name of the package to search for"
       }
     ]
   },
   "examples": [
     {
       "command": "winget search vscode",
-      "description": "Recherche tous les packages contenant 'vscode'",
+      "description": "Search for every package that contains 'vscode'",
       "platform": 0
     },
     {
       "command": "winget search --name 'Visual Studio Code'",
-      "description": "Recherche par nom exact",
+      "description": "Search by exact name",
       "platform": 0
     }
   ],
-  "notes": "Recherche dans toutes les sources configurées. Utiliser --exact pour une correspondance exacte.",
+  "notes": "Searches every configured source. Use --exact for an exact match.",
   "links": [
     {
       "title": "Winget search documentation",
       "url": "https://learn.microsoft.com/en-us/windows/package-manager/winget/search"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher un package Winget",
+      "description": "Recherche des packages disponibles dans les sources Winget configurées.",
+      "notes": "Recherche dans toutes les sources configurées. Utiliser --exact pour une correspondance exacte.",
+      "parameters": {
+        "windows": {
+          "searchTerm": {
+            "label": "Terme de recherche",
+            "description": "Mot-clé ou nom du package à rechercher"
+          }
+        }
+      },
+      "examples": {
+        "winget search vscode": "Recherche tous les packages contenant 'vscode'",
+        "winget search --name 'Visual Studio Code'": "Recherche par nom exact"
+      }
+    }
+  }
 }

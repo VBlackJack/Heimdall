@@ -1,8 +1,8 @@
 {
   "id": "bitlocker-lock",
-  "title": "Verrouiller un volume BitLocker",
-  "description": "Verrouille immédiatement un volume BitLocker (le rend inaccessible sans déverrouillage).",
-  "category": "🔒 Security & Encryption",
+  "title": "Lock a BitLocker volume",
+  "description": "Lock a BitLocker volume at once (it becomes inaccessible until unlocked).",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -19,41 +19,62 @@
     "parameters": [
       {
         "name": "driveLetter",
-        "label": "Lettre du disque",
+        "label": "Drive letter",
         "type": "driveletter",
         "defaultValue": "D",
         "required": true,
-        "description": "Lettre du volume à verrouiller (généralement un disque de données, PAS C:)"
+        "description": "Letter of the volume to lock (usually a data disk, NOT C:)"
       }
     ]
   },
   "examples": [
     {
       "command": "Lock-BitLocker -MountPoint D: -ForceDismount",
-      "description": "Verrouille immédiatement le volume D: (ferme tous les fichiers ouverts)",
+      "description": "Lock volume D: at once (closes every open file)",
       "platform": 0
     },
     {
       "command": "Lock-BitLocker -MountPoint E:",
-      "description": "Verrouille E: sans forcer le démontage (échoue si fichiers ouverts)",
+      "description": "Lock E: without forcing the dismount (fails when files are open)",
       "platform": 0
     },
     {
       "command": "Get-BitLockerVolume | Where-Object {$_.VolumeType -eq 'Data' -and $_.ProtectionStatus -eq 'On'} | ForEach-Object { Lock-BitLocker -MountPoint $_.MountPoint -ForceDismount }",
-      "description": "Verrouille tous les volumes de données chiffrés (sécurité maximale)",
+      "description": "Lock every encrypted data volume (maximum security)",
       "platform": 0
     },
     {
       "command": "Lock-BitLocker -MountPoint \"D:\" -ForceDismount",
-      "description": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume à verrouiller (généralement un disque de données, PAS C:). Remplacez D par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'driveLetter' parameter: letter of the volume to lock (usually a data disk, NOT C:). Replace D with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "⚠️ Ne verrouillez JAMAIS le volume système (C:) pendant que Windows tourne! Utilisez pour sécuriser rapidement des disques externes ou de données. ForceDismount: ferme tous les fichiers ouverts (perte de données non sauvegardées possible). Sans ForceDismount: échoue si fichiers ouverts.",
+  "notes": "⚠️ NEVER lock the system volume (C:) while Windows is running! Use it to secure external or data disks quickly. ForceDismount: closes every open file (unsaved data may be lost). Without ForceDismount: fails when files are open.",
   "links": [
     {
       "title": "Lock-BitLocker Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/bitlocker/lock-bitlocker"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Verrouiller un volume BitLocker",
+      "description": "Verrouille immédiatement un volume BitLocker (le rend inaccessible sans déverrouillage).",
+      "notes": "⚠️ Ne verrouillez JAMAIS le volume système (C:) pendant que Windows tourne! Utilisez pour sécuriser rapidement des disques externes ou de données. ForceDismount: ferme tous les fichiers ouverts (perte de données non sauvegardées possible). Sans ForceDismount: échoue si fichiers ouverts.",
+      "parameters": {
+        "windows": {
+          "driveLetter": {
+            "label": "Lettre du disque",
+            "description": "Lettre du volume à verrouiller (généralement un disque de données, PAS C:)"
+          }
+        }
+      },
+      "examples": {
+        "Lock-BitLocker -MountPoint D: -ForceDismount": "Verrouille immédiatement le volume D: (ferme tous les fichiers ouverts)",
+        "Lock-BitLocker -MountPoint E:": "Verrouille E: sans forcer le démontage (échoue si fichiers ouverts)",
+        "Get-BitLockerVolume | Where-Object {$_.VolumeType -eq 'Data' -and $_.ProtectionStatus -eq 'On'} | ForEach-Object { Lock-BitLocker -MountPoint $_.MountPoint -ForceDismount }": "Verrouille tous les volumes de données chiffrés (sécurité maximale)",
+        "Lock-BitLocker -MountPoint \"D:\" -ForceDismount": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume à verrouiller (généralement un disque de données, PAS C:). Remplacez D par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

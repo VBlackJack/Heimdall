@@ -44,13 +44,13 @@ public sealed class SeedExampleListGuardTests
 
     /// <summary>
     /// The three guards iterate the lists, so finding none would leave them green over
-    /// nothing. The catalogue holds well over a thousand lists across 514 files.
+    /// nothing. The catalogue holds well over a thousand lists across 442 files.
     /// </summary>
     [Fact]
     public void TheSeedExampleListsAreFound()
     {
         Assert.True(
-            ExampleLists.Select(entry => entry.File).Distinct().Count() >= 500,
+            ExampleLists.Select(entry => entry.File).Distinct().Count() >= 400,
             $"Expected the seed catalogue, found {ExampleLists.Count} example lists.");
     }
 

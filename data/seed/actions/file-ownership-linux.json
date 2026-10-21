@@ -1,12 +1,12 @@
 {
   "id": "file-ownership-linux",
-  "title": "Changer le propriétaire de fichiers",
-  "description": "Modifie le propriétaire et le groupe d'un fichier ou dossier.",
-  "category": "📁 Files & Storage",
+  "title": "Change file ownership",
+  "description": "Change the owner and group of a file or folder.",
+  "category": "files-storage",
   "platform": 1,
   "level": 1,
   "tags": [
-    "propriétaire",
+    "owner",
     "chown",
     "permissions",
     "linux"
@@ -20,52 +20,81 @@
     "parameters": [
       {
         "name": "owner",
-        "label": "Propriétaire",
+        "label": "Owner",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du nouveau propriétaire"
+        "description": "Name of the new owner"
       },
       {
         "name": "group",
-        "label": "Groupe",
+        "label": "Group",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom du nouveau groupe"
+        "description": "Name of the new group"
       },
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ou dossier"
+        "description": "Path of the file or folder"
       }
     ]
   },
   "examples": [
     {
       "command": "chown www-data:www-data /var/www/html",
-      "description": "Change le propriétaire et le groupe",
+      "description": "Change the owner and group",
       "platform": 1
     },
     {
       "command": "chown -R user:group /home/user/documents",
-      "description": "Change récursivement pour un dossier",
+      "description": "Change recursively for a folder",
       "platform": 1
     },
     {
       "command": "chown admin:IT-Admins \"/var/log/app.log\" -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag shows each action as it happens. Essential to follow the progress of long operations and check that everything goes well.",
       "platform": 1
     },
     {
       "command": "chown admin:IT-Admins \"/var/log/app.log\"",
-      "description": "Exemple utilisant le paramètre 'owner': Nom du nouveau propriétaire. Remplacez admin par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'owner' parameter: name of the new owner. Replace admin with the value that fits your environment.",
       "platform": 1
     }
   ],
-  "notes": "-R pour récursif. Nécessite généralement sudo.",
-  "links": []
+  "notes": "-R for recursive. Usually requires sudo.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Changer le propriétaire de fichiers",
+      "description": "Modifie le propriétaire et le groupe d'un fichier ou dossier.",
+      "notes": "-R pour récursif. Nécessite généralement sudo.",
+      "parameters": {
+        "linux": {
+          "owner": {
+            "label": "Propriétaire",
+            "description": "Nom du nouveau propriétaire"
+          },
+          "group": {
+            "label": "Groupe",
+            "description": "Nom du nouveau groupe"
+          },
+          "path": {
+            "label": "Chemin",
+            "description": "Chemin du fichier ou dossier"
+          }
+        }
+      },
+      "examples": {
+        "chown www-data:www-data /var/www/html": "Change le propriétaire et le groupe",
+        "chown -R user:group /home/user/documents": "Change récursivement pour un dossier",
+        "chown admin:IT-Admins \"/var/log/app.log\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "chown admin:IT-Admins \"/var/log/app.log\"": "Exemple utilisant le paramètre 'owner': Nom du nouveau propriétaire. Remplacez admin par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

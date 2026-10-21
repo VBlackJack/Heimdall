@@ -175,6 +175,9 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Chaque ligne montre la commande elle-même sous son titre, en police à chasse fixe sur une seule ligne : le modèle sur lequel la ligne s'ouvre avec le filtre de plateforme courant (Windows sauf si le filtre est Linux, ou le seul modèle disponible), coupé à 96 caractères comme les aperçus d'extraits de la palette de commandes
 - Ouverte depuis une session, la bibliothèque démarre avec le filtre de plateforme de cette session. Un profil peut déclarer le système d'exploitation de sa machine distante (onglet Général, **Système d'exploitation distant**) : Windows ou Linux est alors pris tel quel, et Automatique garde la déduction tirée du protocole (SSH pour Linux ; RDP, WinRM et Local pour Windows). Les étapes post-connexion liées à la bibliothèque et leur sélecteur suivent la même déclaration, si bien qu'une connexion SSH vers un serveur Windows OpenSSH reçoit le modèle Windows
 
+- Les actions livrées et leurs catégories s'affichent dans la langue de l'interface, et un changement de langue recharge la bibliothèque en gardant l'action sélectionnée. Le catalogue est rédigé en anglais avec une traduction française à côté ; l'espagnol n'a pas encore de traduction livrée et affiche le texte anglais
+- Les actions livrées suivent la version installée : quand une mise à jour modifie le catalogue, les actions livrées sont remplacées au lancement suivant, tandis que vos propres actions, les favoris et l'historique des actions toujours livrées sont conservés
+
 **Construire la commande**
 - Paramètres typés : texte, entier, booléen, nom d'hôte, adresse IP, chemin, et **choice** (un jeu fixe de valeurs proposé en liste déroulante)
 - Un paramètre choice n'accepte que ce qu'il propose, la correspondance ignorant la casse et les espaces autour ; savoir si une valeur peut être absente reste du ressort de l'indicateur Requis du paramètre
@@ -201,6 +204,8 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - L'export demande d'abord ce que le fichier doit contenir : **Mes actions** (par défaut : les actions que vous avez créées ou importées), **Filtre actuel** (ce que la liste montre, recherche comprise) ou **Tout** (le catalogue fourni compris) ; l'avertissement sur les secrets des champs libres suit ce choix
 - Import et export en JSON, et synchronisation Git pour une bibliothèque d'équipe ; **Synchroniser au démarrage** s'exécute une fois après le déverrouillage du coffre, et un échec est signalé dans la barre d'état
 - Les actions issues d'un import voient leur niveau de risque et leur plateforme ramenés à des valeurs connues : un niveau non reconnu est traité comme dangereux plutôt qu'anodin
+- Un export conserve le texte anglais de chaque action avec ses traductions ; un export pris avant la localisation des catégories s'importe dans les catégories actuelles
+- **Pack d'allègement pour poste de travail** : 72 actions qui épurent un poste Windows personnel (applications du Store, Edge, OneDrive, télémétrie, réglages de performances) sont livrées à part du catalogue, dans `data/packs/windows-workstation-debloat.json` du dossier d'installation. Importez ce fichier avec le bouton Importer de la bibliothèque si vous les voulez. Elles visent un poste de travail, pas un serveur ; elles arrivent comme vos propres actions, que vous pouvez donc modifier et exporter ; leur texte est pour l'instant en français seulement ; et neuf d'entre elles s'ouvrent sur une erreur de longueur de commande tant que leurs scripts n'ont pas été réécrits
 
 ### Connexion rapide (Ctrl+K)
 - Palette de commandes pour des connexions ponctuelles sans enregistrer de profil de serveur
@@ -334,7 +339,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 274 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 287 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 

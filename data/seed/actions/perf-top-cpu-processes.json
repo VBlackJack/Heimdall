@@ -1,8 +1,8 @@
 {
   "id": "perf-top-cpu-processes",
-  "title": "Analyser les processus consommant le plus de CPU",
-  "description": "Identifie et affiche les processus consommant le plus de ressources CPU en temps réel avec leurs statistiques détaillées.",
-  "category": "⚡ Performance",
+  "title": "Analyze the processes that use the most CPU",
+  "description": "Find and show the processes that use the most CPU in real time, with detailed statistics.",
+  "category": "performance",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -23,11 +23,11 @@
     "parameters": [
       {
         "name": "topCount",
-        "label": "Nombre de processus",
+        "label": "Number of processes",
         "type": "string",
         "defaultValue": "10",
         "required": true,
-        "description": "Nombre de top processus à afficher"
+        "description": "Number of top processes to show"
       }
     ]
   },
@@ -40,7 +40,7 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "CPU est le temps total cumulé. Pour une vue en temps réel, utilisez Task Manager/htop ou Get-Counter. Sur Linux, htop est plus interactif que top.",
+  "notes": "CPU is the total accumulated time. For a real-time view, use Task Manager/htop or Get-Counter. On Linux, htop is more interactive than top.",
   "links": [
     {
       "title": "Documentation Get-Process",
@@ -50,15 +50,34 @@
   "windowsExamples": [
     {
       "command": "Get-Counter '\\Processor(_Total)\\% Processor Time' -Continuous -SampleInterval 1",
-      "description": "Surveillance CPU globale en continu",
+      "description": "Continuous overall CPU monitoring",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "ps aux --sort=-%cpu | head -n 11",
-      "description": "Top 10 processus Linux par CPU",
+      "description": "Top 10 Linux processes by CPU",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Analyser les processus consommant le plus de CPU",
+      "description": "Identifie et affiche les processus consommant le plus de ressources CPU en temps réel avec leurs statistiques détaillées.",
+      "notes": "CPU est le temps total cumulé. Pour une vue en temps réel, utilisez Task Manager/htop ou Get-Counter. Sur Linux, htop est plus interactif que top.",
+      "parameters": {
+        "windows": {
+          "topCount": {
+            "label": "Nombre de processus",
+            "description": "Nombre de top processus à afficher"
+          }
+        }
+      },
+      "examples": {
+        "Get-Counter '\\Processor(_Total)\\% Processor Time' -Continuous -SampleInterval 1": "Surveillance CPU globale en continu",
+        "ps aux --sort=-%cpu | head -n 11": "Top 10 processus Linux par CPU"
+      }
+    }
+  }
 }

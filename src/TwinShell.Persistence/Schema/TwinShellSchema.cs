@@ -22,6 +22,7 @@ using Heimdall.Core.Logging;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Models;
+using TwinShell.Persistence.Configurations;
 
 namespace TwinShell.Persistence.Schema;
 
@@ -42,9 +43,20 @@ public static class TwinShellSchema
 
     private const string ActionsTableName = "Actions";
 
+    private const string ActionTranslationsTableName = "ActionTranslations";
+
     private const string CommandHistoriesTableName = "CommandHistories";
 
     private const string TargetHostColumnName = "TargetHost";
+
+    // The translated parameter labels and example descriptions, added when the shipped
+    // catalogue started carrying its French beside an English pivot. Default '{}' matches the
+    // entity initializers, so a translation row that predates them still materialises.
+    private static readonly string[] TranslationTextColumns =
+    [
+        "ParametersJson",
+        "ExamplesJson"
+    ];
 
     private static readonly string[] PublicIdTables =
     [
@@ -70,6 +82,7 @@ public static class TwinShellSchema
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             [ActionsTableName] = [PublicIdColumnName, "WindowsExamplesJson", "LinuxExamplesJson"],
+            [ActionTranslationsTableName] = ["ParametersJson", "ExamplesJson"],
             [CommandHistoriesTableName] = [TargetHostColumnName],
             ["CommandBatches"] = [PublicIdColumnName],
             ["CustomCategories"] = [PublicIdColumnName],
@@ -94,7 +107,15 @@ public static class TwinShellSchema
         new SchemaStep(
             5,
             "Target host column on CommandHistories",
-            ApplyHistoryTargetHostColumnAsync)
+            ApplyHistoryTargetHostColumnAsync),
+        new SchemaStep(
+            6,
+            "Translated parameter and example columns on ActionTranslations",
+            ApplyTranslationTextColumnsAsync),
+        new SchemaStep(
+            7,
+            "SeedState table recording the seed last applied",
+            ApplySeedStateTableAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -190,6 +211,71 @@ public static class TwinShellSchema
             "ALTER TABLE " + CommandHistoriesTableName + " ADD COLUMN " + TargetHostColumnName + " TEXT NULL",
             cancellationToken);
     }
+
+    /// <summary>
+    /// Adds the translated parameter and example columns to <c>ActionTranslations</c> when
+    /// they are missing.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent by existence test, like <see cref="ApplyPlatformExampleColumnsAsync"/>. No
+    /// row is backfilled: a translation that predates the columns had no parameter or example
+    /// text to carry, and the DEFAULT says exactly that. A database without the table at all
+    /// is left alone: <c>EnsureCreated</c> writes the table whole, columns included, the
+    /// first time it creates it.
+    /// </remarks>
+    private static async Task ApplyTranslationTextColumnsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        if (!await TableExistsAsync(connection, transaction, ActionTranslationsTableName, cancellationToken))
+        {
+            return;
+        }
+
+        foreach (string columnName in TranslationTextColumns)
+        {
+            bool exists = await ColumnExistsAsync(
+                connection,
+                transaction,
+                ActionTranslationsTableName,
+                columnName,
+                cancellationToken);
+
+            if (exists)
+            {
+                continue;
+            }
+
+            await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                "ALTER TABLE " + ActionTranslationsTableName + " ADD COLUMN " + columnName
+                + " TEXT NOT NULL DEFAULT '{}'",
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Creates the <c>SeedState</c> key-value table that records the content hash of the seed
+    /// last applied, so a changed seed reaches a database seeded by an older build.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent through <c>IF NOT EXISTS</c>: on a database <c>EnsureCreated</c> has just
+    /// written from today's model, the table is already there. No row is written: a missing
+    /// hash on a populated database is what tells the refresh to run once.
+    /// </remarks>
+    private static Task ApplySeedStateTableAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+        => ExecuteNonQueryAsync(
+            connection,
+            transaction,
+            "CREATE TABLE IF NOT EXISTS \"" + SeedStateConfiguration.TableName + "\" ("
+            + "\"Key\" TEXT NOT NULL CONSTRAINT \"PK_" + SeedStateConfiguration.TableName + "\" PRIMARY KEY, "
+            + "\"Value\" TEXT NOT NULL)",
+            cancellationToken);
 
     private static async Task ApplyUnwrapDoubleQuotedPlaceholdersAsync(
         DbConnection connection,
@@ -648,11 +734,12 @@ public static class TwinShellSchema
     {
         await using DbCommand command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $tableName";
-        DbParameter parameter = command.CreateParameter();
-        parameter.ParameterName = "$tableName";
-        parameter.Value = tableName;
-        command.Parameters.Add(parameter);
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @name";
+
+        DbParameter nameParameter = command.CreateParameter();
+        nameParameter.ParameterName = "@name";
+        nameParameter.Value = tableName;
+        command.Parameters.Add(nameParameter);
 
         object? result = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(result, CultureInfo.InvariantCulture) > 0;

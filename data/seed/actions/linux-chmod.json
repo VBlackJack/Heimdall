@@ -1,8 +1,8 @@
 {
   "id": "linux-chmod",
-  "title": "Changer permissions (chmod)",
-  "description": "Modifie les droits d'accès (Lecture/Écriture/Exécution) des fichiers.",
-  "category": "🔒 Security & Encryption",
+  "title": "Change permissions (chmod)",
+  "description": "Change the access rights (Read/Write/Execute) of files.",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -23,34 +23,57 @@
         "type": "string",
         "defaultValue": "755",
         "required": true,
-        "description": "Octal (755) ou Symbolique (+x)"
+        "description": "Octal (755) or symbolic (+x)"
       },
       {
         "name": "file",
-        "label": "Fichier",
+        "label": "File",
         "type": "string",
         "defaultValue": "script.sh",
         "required": true,
-        "description": "Fichier cible"
+        "description": "Target file"
       }
     ]
   },
   "examples": [
     {
       "command": "chmod +x script.sh",
-      "description": "Rend un script exécutable.",
+      "description": "Make a script executable.",
       "platform": 1
     },
     {
       "command": "chmod -R 755 /var/www/html",
-      "description": "Applique les droits web standards (755) récursivement (-R).",
+      "description": "Apply the standard web rights (755) recursively (-R).",
       "platform": 1
     },
     {
       "command": "chmod 600 id_rsa",
-      "description": "Sécurise une clé privée SSH (lecture/écriture uniquement pour le propriétaire).",
+      "description": "Secure an SSH private key (read/write for the owner only).",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "a9615835-5cdd-48bd-b864-f28a733d0feb"
+  "linuxCommandTemplateId": "a9615835-5cdd-48bd-b864-f28a733d0feb",
+  "translations": {
+    "fr": {
+      "title": "Changer permissions (chmod)",
+      "description": "Modifie les droits d'accès (Lecture/Écriture/Exécution) des fichiers.",
+      "parameters": {
+        "linux": {
+          "mode": {
+            "label": "Mode",
+            "description": "Octal (755) ou Symbolique (+x)"
+          },
+          "file": {
+            "label": "Fichier",
+            "description": "Fichier cible"
+          }
+        }
+      },
+      "examples": {
+        "chmod +x script.sh": "Rend un script exécutable.",
+        "chmod -R 755 /var/www/html": "Applique les droits web standards (755) récursivement (-R).",
+        "chmod 600 id_rsa": "Sécurise une clé privée SSH (lecture/écriture uniquement pour le propriétaire)."
+      }
+    }
+  }
 }

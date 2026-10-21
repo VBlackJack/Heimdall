@@ -1,8 +1,8 @@
 {
   "id": "process-kill",
-  "title": "Terminer un processus",
-  "description": "Force l'arrêt d'un processus spécifique par son ID ou son nom.",
-  "category": "⚡ Performance",
+  "title": "Terminate a process",
+  "description": "Force a given process to stop by its ID or its name.",
+  "category": "performance",
   "platform": 2,
   "level": 2,
   "tags": [
@@ -19,11 +19,11 @@
     "parameters": [
       {
         "name": "processId",
-        "label": "ID du processus",
+        "label": "Process ID",
         "type": "int",
         "defaultValue": "",
         "required": true,
-        "description": "ID numérique du processus à terminer"
+        "description": "Numeric ID of the process to terminate"
       }
     ]
   },
@@ -36,47 +36,76 @@
     "parameters": [
       {
         "name": "processId",
-        "label": "ID du processus",
+        "label": "Process ID",
         "type": "int",
         "defaultValue": "",
         "required": true,
-        "description": "PID du processus à terminer"
+        "description": "PID of the process to terminate"
       }
     ]
   },
   "examples": [],
-  "notes": "⚠️ ATTENTION : Peut causer une perte de données non sauvegardées. -9 (SIGKILL) est un arrêt forcé.",
+  "notes": "⚠️ WARNING: can lose unsaved data. -9 (SIGKILL) is a forced stop.",
   "links": [],
   "linuxExamples": [
     {
       "command": "kill -9 1234",
-      "description": "Termine le processus 1234 (Linux)",
+      "description": "Terminate process 1234 (Linux)",
       "platform": 1
     },
     {
       "command": "kill -15 1234",
-      "description": "Terminer proprement le processus 1234",
+      "description": "Terminate process 1234 cleanly",
       "platform": 1
     },
     {
       "command": "kill -9 5678",
-      "description": "Forcer l'arrêt du processus 5678",
+      "description": "Force process 5678 to stop",
       "platform": 1
     },
     {
       "command": "pkill -f \"python script.py\"",
-      "description": "Tuer les processus contenant le pattern",
+      "description": "Kill the processes that match the pattern",
       "platform": 1
     },
     {
       "command": "kill 1234",
-      "description": "Termine gracieusement le processus 1234",
+      "description": "Terminate process 1234 gracefully",
       "platform": 1
     },
     {
       "command": "xkill",
-      "description": "Tuer par clic graphique",
+      "description": "Kill by clicking a window",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Terminer un processus",
+      "description": "Force l'arrêt d'un processus spécifique par son ID ou son nom.",
+      "notes": "⚠️ ATTENTION : Peut causer une perte de données non sauvegardées. -9 (SIGKILL) est un arrêt forcé.",
+      "parameters": {
+        "windows": {
+          "processId": {
+            "label": "ID du processus",
+            "description": "ID numérique du processus à terminer"
+          }
+        },
+        "linux": {
+          "processId": {
+            "label": "ID du processus",
+            "description": "PID du processus à terminer"
+          }
+        }
+      },
+      "examples": {
+        "kill -9 1234": "Termine le processus 1234 (Linux)",
+        "kill -15 1234": "Terminer proprement le processus 1234",
+        "kill -9 5678": "Forcer l'arrêt du processus 5678",
+        "pkill -f \"python script.py\"": "Tuer les processus contenant le pattern",
+        "kill 1234": "Termine gracieusement le processus 1234",
+        "xkill": "Tuer par clic graphique"
+      }
+    }
+  }
 }

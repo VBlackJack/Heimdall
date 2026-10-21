@@ -1,8 +1,8 @@
 {
   "id": "gpo-list-all",
-  "title": "Lister toutes les GPO du domaine",
-  "description": "Affiche la liste complète des stratégies de groupe (GPO) configurées dans le domaine.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "List every GPO of the domain",
+  "description": "Show the full list of Group Policy Objects (GPOs) configured in the domain.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,25 +21,38 @@
   "examples": [
     {
       "command": "Get-GPO -All | Select-Object DisplayName,Id,GpoStatus,CreationTime | Format-Table -AutoSize",
-      "description": "Liste toutes les GPO avec leurs détails",
+      "description": "List every GPO with its details",
       "platform": 0
     },
     {
       "command": "Get-GPO -All | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-GPO -All | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-GPO -All | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite le module Group Policy PowerShell.",
-  "links": []
+  "notes": "Requires the Group Policy PowerShell module.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Lister toutes les GPO du domaine",
+      "description": "Affiche la liste complète des stratégies de groupe (GPO) configurées dans le domaine.",
+      "notes": "Nécessite le module Group Policy PowerShell.",
+      "examples": {
+        "Get-GPO -All | Select-Object DisplayName,Id,GpoStatus,CreationTime | Format-Table -AutoSize": "Liste toutes les GPO avec leurs détails",
+        "Get-GPO -All | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-GPO -All | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-GPO -All | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

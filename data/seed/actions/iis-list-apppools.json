@@ -1,8 +1,8 @@
 {
   "id": "iis-list-apppools",
-  "title": "Lister tous les pools d'application IIS",
-  "description": "Affiche tous les pools d'application (Application Pools) configurés dans IIS avec leur état, version .NET et mode de pipeline.",
-  "category": "🌐 Network & DNS",
+  "title": "List all IIS application pools",
+  "description": "Show every application pool configured in IIS with its state, .NET version and pipeline mode.",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -25,35 +25,49 @@
   "examples": [
     {
       "command": "Get-IISAppPool | Select-Object Name, State",
-      "description": "Liste simple des pools et leur état",
+      "description": "Plain list of the pools and their state",
       "platform": 0
     },
     {
       "command": "Get-WebAppPoolState -Name 'DefaultAppPool'",
-      "description": "Obtient l'état d'un pool spécifique",
+      "description": "Get the state of a given pool",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Get-IISAppPool | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Get-IISAppPool | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; Get-IISAppPool | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Les pools en état 'Stopped' peuvent indiquer un problème. Runtime 'v4.0' = .NET Framework 4.x, '' = .NET Core/5+.",
+  "notes": "Pools in the 'Stopped' state can point to a problem. Runtime 'v4.0' = .NET Framework 4.x, '' = .NET Core/5+.",
   "links": [
     {
       "title": "Documentation Get-IISAppPool",
       "url": "https://learn.microsoft.com/en-us/powershell/module/iisadministration/get-iisapppool"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister tous les pools d'application IIS",
+      "description": "Affiche tous les pools d'application (Application Pools) configurés dans IIS avec leur état, version .NET et mode de pipeline.",
+      "notes": "Les pools en état 'Stopped' peuvent indiquer un problème. Runtime 'v4.0' = .NET Framework 4.x, '' = .NET Core/5+.",
+      "examples": {
+        "Get-IISAppPool | Select-Object Name, State": "Liste simple des pools et leur état",
+        "Get-WebAppPoolState -Name 'DefaultAppPool'": "Obtient l'état d'un pool spécifique",
+        "Import-Module WebAdministration; Get-IISAppPool | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Import-Module WebAdministration; Get-IISAppPool | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Import-Module WebAdministration; Get-IISAppPool | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

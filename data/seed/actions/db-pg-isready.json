@@ -1,8 +1,8 @@
 {
   "id": "db-pg-isready",
-  "title": "Vérifier statut PostgreSQL (pg_isready)",
-  "description": "Vérifie l'état de la connexion au serveur PostgreSQL.",
-  "category": "💽 Database",
+  "title": "Check PostgreSQL status (pg_isready)",
+  "description": "Check the connection status of the PostgreSQL server.",
+  "category": "database",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "host",
-        "label": "Hôte",
+        "label": "Host",
         "type": "string",
         "defaultValue": "localhost",
         "required": true,
-        "description": "IP ou nom du serveur"
+        "description": "IP or name of the server"
       },
       {
         "name": "port",
@@ -32,7 +32,7 @@
         "type": "number",
         "defaultValue": "5432",
         "required": true,
-        "description": "Port (défaut 5432)"
+        "description": "Port (default 5432)"
       }
     ]
   },
@@ -44,11 +44,11 @@
     "parameters": [
       {
         "name": "host",
-        "label": "Hôte",
+        "label": "Host",
         "type": "string",
         "defaultValue": "localhost",
         "required": true,
-        "description": "IP ou nom du serveur"
+        "description": "IP or name of the server"
       },
       {
         "name": "port",
@@ -56,7 +56,7 @@
         "type": "number",
         "defaultValue": "5432",
         "required": true,
-        "description": "Port (défaut 5432)"
+        "description": "Port (default 5432)"
       }
     ]
   },
@@ -64,10 +64,41 @@
   "linuxExamples": [
     {
       "command": "pg_isready -h 192.168.1.10",
-      "description": "Simple ping PostgreSQL. Retourne 'accepting connections' ou 'no response'.",
+      "description": "Simple PostgreSQL ping. Returns 'accepting connections' or 'no response'.",
       "platform": 1
     }
   ],
   "linuxCommandTemplateId": "54f945cf-e616-428e-bd7d-4addd1d7e127",
-  "windowsCommandTemplateId": "57114737-cf80-4f51-9af2-13a8b4f5ef1c"
+  "windowsCommandTemplateId": "57114737-cf80-4f51-9af2-13a8b4f5ef1c",
+  "translations": {
+    "fr": {
+      "title": "Vérifier statut PostgreSQL (pg_isready)",
+      "description": "Vérifie l'état de la connexion au serveur PostgreSQL.",
+      "parameters": {
+        "windows": {
+          "host": {
+            "label": "Hôte",
+            "description": "IP ou nom du serveur"
+          },
+          "port": {
+            "label": "Port",
+            "description": "Port (défaut 5432)"
+          }
+        },
+        "linux": {
+          "host": {
+            "label": "Hôte",
+            "description": "IP ou nom du serveur"
+          },
+          "port": {
+            "label": "Port",
+            "description": "Port (défaut 5432)"
+          }
+        }
+      },
+      "examples": {
+        "pg_isready -h 192.168.1.10": "Simple ping PostgreSQL. Retourne 'accepting connections' ou 'no response'."
+      }
+    }
+  }
 }

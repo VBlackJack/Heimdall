@@ -1,8 +1,8 @@
 {
   "id": "git-pull",
-  "title": "Récupérer et fusionner depuis le dépôt distant",
-  "description": "Récupère les modifications du dépôt distant et les fusionne avec la branche locale",
-  "category": "🔧 Development",
+  "title": "Fetch and merge from the remote repository",
+  "description": "Fetch the changes of the remote repository and merge them into the local branch.",
+  "category": "development",
   "platform": 2,
   "level": 1,
   "tags": [
@@ -24,15 +24,15 @@
         "type": "string",
         "defaultValue": "origin",
         "required": false,
-        "description": "Nom du dépôt distant"
+        "description": "Name of the remote repository"
       },
       {
         "name": "branch",
-        "label": "Branche",
+        "label": "Branch",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom de la branche"
+        "description": "Branch name"
       }
     ]
   },
@@ -49,35 +49,68 @@
         "type": "string",
         "defaultValue": "origin",
         "required": false,
-        "description": "Nom du dépôt distant"
+        "description": "Name of the remote repository"
       },
       {
         "name": "branch",
-        "label": "Branche",
+        "label": "Branch",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Nom de la branche"
+        "description": "Branch name"
       }
     ]
   },
   "examples": [
     {
       "command": "git pull origin main",
-      "description": "Récupère et fusionne les changements de main",
+      "description": "Fetch and merge the changes of main",
       "platform": 2
     },
     {
       "command": "git pull --rebase",
-      "description": "Récupère et rebase au lieu de merge",
+      "description": "Fetch and rebase instead of merging",
       "platform": 2
     }
   ],
-  "notes": "Utilisez --rebase pour un historique linéaire sans commits de merge.",
+  "notes": "Use --rebase for a linear history without merge commits.",
   "links": [
     {
       "title": "Git Pull Documentation",
       "url": "https://git-scm.com/docs/git-pull"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Récupérer et fusionner depuis le dépôt distant",
+      "description": "Récupère les modifications du dépôt distant et les fusionne avec la branche locale",
+      "notes": "Utilisez --rebase pour un historique linéaire sans commits de merge.",
+      "parameters": {
+        "windows": {
+          "remote": {
+            "label": "Dépôt distant",
+            "description": "Nom du dépôt distant"
+          },
+          "branch": {
+            "label": "Branche",
+            "description": "Nom de la branche"
+          }
+        },
+        "linux": {
+          "remote": {
+            "label": "Dépôt distant",
+            "description": "Nom du dépôt distant"
+          },
+          "branch": {
+            "label": "Branche",
+            "description": "Nom de la branche"
+          }
+        }
+      },
+      "examples": {
+        "git pull origin main": "Récupère et fusionne les changements de main",
+        "git pull --rebase": "Récupère et rebase au lieu de merge"
+      }
+    }
+  }
 }

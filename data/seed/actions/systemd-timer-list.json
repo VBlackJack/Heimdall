@@ -1,8 +1,8 @@
 {
   "id": "systemd-timer-list",
-  "title": "Lister les timers systemd",
-  "description": "Affiche tous les timers systemd (alternative moderne à cron)",
-  "category": "⚙️ Services & Automation",
+  "title": "List systemd timers",
+  "description": "Show every systemd timer (modern alternative to cron)",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -32,50 +32,45 @@
   "examples": [
     {
       "command": "systemctl list-timers",
-      "description": "Liste les timers actifs",
+      "description": "List the active timers",
       "platform": 1
     },
     {
       "command": "systemctl list-timers --all",
-      "description": "Liste tous les timers",
+      "description": "List every timer",
       "platform": 1
     },
     {
       "command": "systemctl status my-backup.timer",
-      "description": "État d'un timer spécifique",
-      "platform": 1
-    },
-    {
-      "command": "systemctl status nginx",
-      "description": "Vérifier l'état du service nginx",
-      "platform": 1
-    },
-    {
-      "command": "systemctl start apache2",
-      "description": "Démarrer le service Apache",
-      "platform": 1
-    },
-    {
-      "command": "systemctl stop mysql",
-      "description": "Arrêter le service MySQL",
-      "platform": 1
-    },
-    {
-      "command": "systemctl restart sshd",
-      "description": "Redémarrer le service SSH",
-      "platform": 1
-    },
-    {
-      "command": "systemctl enable docker",
-      "description": "Activer Docker au démarrage",
+      "description": "Status of a specific timer",
       "platform": 1
     }
   ],
-  "notes": "Les timers systemd sont plus flexibles que cron. Voir /etc/systemd/system/ pour les définitions.",
+  "notes": "systemd timers are more flexible than cron. See /etc/systemd/system/ for the definitions.",
   "links": [
     {
       "title": "systemd timers",
       "url": "https://www.freedesktop.org/software/systemd/man/systemd.timer.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les timers systemd",
+      "description": "Affiche tous les timers systemd (alternative moderne à cron)",
+      "notes": "Les timers systemd sont plus flexibles que cron. Voir /etc/systemd/system/ pour les définitions.",
+      "parameters": {
+        "linux": {
+          "options": {
+            "label": "Options",
+            "description": "Options (--all, --state=active, etc.)"
+          }
+        }
+      },
+      "examples": {
+        "systemctl list-timers": "Liste les timers actifs",
+        "systemctl list-timers --all": "Liste tous les timers",
+        "systemctl status my-backup.timer": "État d'un timer spécifique"
+      }
+    }
+  }
 }

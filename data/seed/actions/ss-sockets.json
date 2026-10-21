@@ -1,8 +1,8 @@
 {
   "id": "ss-sockets",
-  "title": "Afficher les sockets réseau (ss)",
-  "description": "Liste les sockets réseau actifs (remplaçant moderne de netstat)",
-  "category": "🌐 Network & DNS",
+  "title": "Show network sockets (ss)",
+  "description": "List the active network sockets (modern replacement for netstat)",
+  "category": "network-dns",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -32,30 +32,51 @@
   "examples": [
     {
       "command": "ss -tulpn",
-      "description": "Tous les ports TCP/UDP en écoute avec processus",
+      "description": "Every listening TCP/UDP port with its process",
       "platform": 1
     },
     {
       "command": "ss -s",
-      "description": "Statistiques résumées",
+      "description": "Summary statistics",
       "platform": 1
     },
     {
       "command": "ss -ltn sport = :80",
-      "description": "Sockets écoutant sur le port 80",
+      "description": "Sockets listening on port 80",
       "platform": 1
     },
     {
       "command": "ss -o",
-      "description": "Avec timers",
+      "description": "With timers",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo pour voir les PID. Plus rapide que netstat. Recommandé sur systèmes modernes.",
+  "notes": "Requires sudo to see the PIDs. Faster than netstat. Recommended on modern systems.",
   "links": [
     {
       "title": "ss command",
       "url": "https://man7.org/linux/man-pages/man8/ss.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les sockets réseau (ss)",
+      "description": "Liste les sockets réseau actifs (remplaçant moderne de netstat)",
+      "notes": "Nécessite sudo pour voir les PID. Plus rapide que netstat. Recommandé sur systèmes modernes.",
+      "parameters": {
+        "linux": {
+          "options": {
+            "label": "Options",
+            "description": "Options (t=TCP, u=UDP, l=listening, p=process, n=numeric)"
+          }
+        }
+      },
+      "examples": {
+        "ss -tulpn": "Tous les ports TCP/UDP en écoute avec processus",
+        "ss -s": "Statistiques résumées",
+        "ss -ltn sport = :80": "Sockets écoutant sur le port 80",
+        "ss -o": "Avec timers"
+      }
+    }
+  }
 }

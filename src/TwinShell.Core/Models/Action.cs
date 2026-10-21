@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.Text.Json.Serialization;
 using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
 
 namespace TwinShell.Core.Models;
 
@@ -122,4 +124,16 @@ public sealed class Action
     /// Whether this action was created by a user (vs. seeded)
     /// </summary>
     public bool IsUserCreated { get; set; }
+
+    /// <summary>
+    /// Other languages of the pivot text, one entry per culture.
+    /// </summary>
+    /// <remarks>
+    /// Serialized as an object keyed by two-letter culture code, the shape the shipped seeds
+    /// carry under <c>translations</c>, rather than as the list this is in memory. The text
+    /// fields above are the pivot (English for the shipped catalogue); a translation replaces
+    /// them only at presentation, field by field.
+    /// </remarks>
+    [JsonConverter(typeof(ActionTranslationsJsonConverter))]
+    public List<ActionTranslation> Translations { get; set; } = new();
 }

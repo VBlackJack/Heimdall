@@ -216,7 +216,7 @@ public sealed partial class CommandPaletteViewModel
 
         foreach (var snippet in Snippets)
         {
-            var score = ScoreSnippet(snippet, query);
+            var score = ScoreSnippetForQuery(snippet, query);
             if (score > 0)
             {
                 scored.Add((BuildSnippetItem(snippet), score));
@@ -503,7 +503,7 @@ public sealed partial class CommandPaletteViewModel
     /// "disk" or "df" usually match a tag), with Description and Category at
     /// halved weight.
     /// </summary>
-    private static int ScoreSnippet(ActionModel action, string query)
+    private static int ScoreSnippet(ActionModel action, string query, string categoryLabel)
     {
         var best = FuzzyScoreString(action.Title, query);
 
@@ -514,13 +514,26 @@ public sealed partial class CommandPaletteViewModel
         }
 
         best = Math.Max(best, FuzzyScoreString(action.Description, query) / 2);
-        best = Math.Max(best, FuzzyScoreString(action.Category, query) / 2);
+        best = Math.Max(best, FuzzyScoreString(categoryLabel, query) / 2);
         if (!string.IsNullOrEmpty(action.Notes))
         {
             best = Math.Max(best, FuzzyScoreString(action.Notes, query) / 2);
         }
         return best;
     }
+
+    /// <summary>
+    /// The label of a snippet's category in the operator's language, which is what a query
+    /// is typed against; the stored key is not something an operator would type.
+    /// </summary>
+    private string LocalizeCategory(string category)
+        => CommandPresentationResolver.ResolveCategoryLabel(category, key => _localizer[key]);
+
+    /// <summary>
+    /// Scores a snippet against a query, its category read by label.
+    /// </summary>
+    internal int ScoreSnippetForQuery(ActionModel action, string query)
+        => ScoreSnippet(action, query, LocalizeCategory(action.Category));
 
     /// <summary>
     /// Builds the palette item for a snippet. The endpoint slot carries a

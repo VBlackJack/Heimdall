@@ -1,8 +1,8 @@
 {
   "id": "win-pkg-003",
-  "title": "Mettre à jour une application Winget",
-  "description": "Met à jour une application spécifique vers sa dernière version disponible via Winget.",
-  "category": "📦 Package Management",
+  "title": "Update a Winget application",
+  "description": "Update a specific application to its latest version available through Winget.",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -21,31 +21,44 @@
     "parameters": [
       {
         "name": "packageName",
-        "label": "Nom du package",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou ID du package à mettre à jour"
+        "description": "Name or ID of the package to update"
       }
     ]
   },
   "examples": [
     {
       "command": "winget upgrade Microsoft.PowerToys --silent",
-      "description": "Met à jour PowerToys vers la dernière version",
-      "platform": 0
-    },
-    {
-      "command": "winget upgrade Microsoft.VisualStudioCode --silent --accept-package-agreements --accept-source-agreements",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Update PowerToys to the latest version",
       "platform": 0
     }
   ],
-  "notes": "Vérifie d'abord si une mise à jour est disponible avant d'installer.",
+  "notes": "Checks first whether an update is available before installing.",
   "links": [
     {
       "title": "Winget upgrade documentation",
       "url": "https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Mettre à jour une application Winget",
+      "description": "Met à jour une application spécifique vers sa dernière version disponible via Winget.",
+      "notes": "Vérifie d'abord si une mise à jour est disponible avant d'installer.",
+      "parameters": {
+        "windows": {
+          "packageName": {
+            "label": "Nom du package",
+            "description": "Nom ou ID du package à mettre à jour"
+          }
+        }
+      },
+      "examples": {
+        "winget upgrade Microsoft.PowerToys --silent": "Met à jour PowerToys vers la dernière version"
+      }
+    }
+  }
 }

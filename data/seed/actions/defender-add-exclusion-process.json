@@ -1,8 +1,8 @@
 {
   "id": "defender-add-exclusion-process",
-  "title": "Ajouter une exclusion de processus Defender",
-  "description": "Exclut un processus spécifique de l'analyse Windows Defender (utile pour outils de dev).",
-  "category": "🔒 Security & Encryption",
+  "title": "Add a Defender process exclusion",
+  "description": "Exclude a specific process from Windows Defender scanning (useful for development tools).",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -19,26 +19,44 @@
     "parameters": [
       {
         "name": "processName",
-        "label": "Nom du processus",
+        "label": "Process name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du fichier .exe (ex: devenv.exe)"
+        "description": "Name of the .exe file (e.g. devenv.exe)"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-MpPreference | Select-Object -ExpandProperty ExclusionProcess",
-      "description": "Liste toutes les exclusions de processus actuelles",
+      "description": "List every current process exclusion",
       "platform": 0
     }
   ],
-  "notes": "Exclusions processus recommandées: IDE (devenv.exe, rider64.exe), compilateurs (msbuild.exe, dotnet.exe, node.exe), outils build. ⚠️ N'excluez JAMAIS: navigateurs web (sauf besoin spécifique), clients email, outils de téléchargement.",
+  "notes": "Recommended process exclusions: IDEs (devenv.exe, rider64.exe), compilers (msbuild.exe, dotnet.exe, node.exe), build tools. ⚠️ NEVER exclude web browsers (unless there is a specific need), email clients or download tools.",
   "links": [
     {
       "title": "Defender Process Exclusions",
       "url": "https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/configure-process-opened-file-exclusions-microsoft-defender-antivirus"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Ajouter une exclusion de processus Defender",
+      "description": "Exclut un processus spécifique de l'analyse Windows Defender (utile pour outils de dev).",
+      "notes": "Exclusions processus recommandées: IDE (devenv.exe, rider64.exe), compilateurs (msbuild.exe, dotnet.exe, node.exe), outils build. ⚠️ N'excluez JAMAIS: navigateurs web (sauf besoin spécifique), clients email, outils de téléchargement.",
+      "parameters": {
+        "windows": {
+          "processName": {
+            "label": "Nom du processus",
+            "description": "Nom du fichier .exe (ex: devenv.exe)"
+          }
+        }
+      },
+      "examples": {
+        "Get-MpPreference | Select-Object -ExpandProperty ExclusionProcess": "Liste toutes les exclusions de processus actuelles"
+      }
+    }
+  }
 }

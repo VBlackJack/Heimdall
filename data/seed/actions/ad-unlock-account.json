@@ -1,8 +1,8 @@
 {
   "id": "ad-unlock-account",
-  "title": "Déverrouiller un compte utilisateur AD",
-  "description": "Déverrouille un compte utilisateur qui a été verrouillé suite à des tentatives de connexion échouées.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Unlock an AD user account",
+  "description": "Unlock a user account that was locked out after failed logon attempts.",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,56 +20,80 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName de l'utilisateur à déverrouiller"
+        "description": "SamAccountName of the user to unlock"
       }
     ]
   },
   "examples": [
     {
       "command": "Unlock-ADAccount -Identity jdupont",
-      "description": "Déverrouille immédiatement le compte de jdupont. Le paramètre -Identity accepte le SamAccountName, Distinguished Name, GUID ou SID. Le déverrouillage est instantané et permet à l'utilisateur de se reconnecter immédiatement.",
+      "description": "Unlock the account of jdupont at once. The -Identity parameter accepts the SamAccountName, Distinguished Name, GUID or SID. Unlocking is instant and lets the user log on again immediately.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter {LockedOut -eq $true} | Unlock-ADAccount",
-      "description": "Déverrouille automatiquement TOUS les comptes verrouillés du domaine via pipeline. Attention : à utiliser avec précaution car certains comptes peuvent être verrouillés pour des raisons de sécurité (tentatives d'intrusion). Vérifiez toujours les logs avant un déverrouillage massif.",
+      "description": "Unlock ALL the locked accounts of the domain automatically through the pipeline. Warning: use with care, because some accounts may be locked for security reasons (intrusion attempts). Always check the logs before a bulk unlock.",
       "platform": 0
     },
     {
       "command": "Unlock-ADAccount -Identity jdupont -Confirm:$false",
-      "description": "Déverrouille sans demander de confirmation. Le paramètre -Confirm:$false supprime l'invite de confirmation (utile pour les scripts automatisés). Par défaut, Unlock-ADAccount ne demande pas de confirmation, mais ce switch est utile si une politique organisationnelle force les confirmations.",
+      "description": "Unlock without asking for confirmation. The -Confirm:$false parameter suppresses the confirmation prompt (useful in automated scripts). Unlock-ADAccount does not ask for confirmation by default, but this switch helps when an organizational policy forces confirmations.",
       "platform": 0
     },
     {
       "command": "Get-ADUser jdupont -Properties LockedOut,LockoutTime | Select-Object Name,LockedOut,LockoutTime",
-      "description": "Vérifie l'état de verrouillage d'un compte avant de le déverrouiller. La propriété LockedOut indique si le compte est verrouillé ($true/$false). LockoutTime affiche l'heure exacte du verrouillage. Toujours vérifier ces informations avant de déverrouiller pour comprendre la cause du verrouillage.",
+      "description": "Check the lockout state of an account before unlocking it. The LockedOut property tells whether the account is locked ($true/$false). LockoutTime shows the exact lockout time. Always check this information before unlocking, to understand the cause of the lockout.",
       "platform": 0
     },
     {
       "command": "Unlock-ADAccount -Identity 'CN=Jean Dupont,OU=Users,DC=contoso,DC=com'",
-      "description": "Déverrouille un compte en utilisant son Distinguished Name (DN) complet. Cette syntaxe est utile quand vous travaillez avec des scripts qui manipulent des objets AD complets ou quand le SamAccountName n'est pas unique.",
+      "description": "Unlock an account by its full Distinguished Name (DN). This syntax helps when you work with scripts that handle full AD objects or when the SamAccountName is not unique.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter {LockedOut -eq $true} -Properties LockedOut,LockoutTime | Select-Object Name,SamAccountName,LockedOut,LockoutTime | Export-Csv C:\\Temp\\LockedAccounts.csv -NoTypeInformation",
-      "description": "Exporte la liste de tous les comptes verrouillés avec l'heure de verrouillage. Utile pour les audits de sécurité, l'analyse des patterns de verrouillage et l'identification de potentielles attaques par force brute. Conservez ces rapports pour la traçabilité.",
+      "description": "Export the list of every locked account with its lockout time. Useful for security audits, lockout pattern analysis and spotting possible brute-force attacks. Keep these reports for traceability.",
       "platform": 0
     },
     {
       "command": "Unlock-ADAccount -Identity jdupont -PassThru | Select-Object Name,LockedOut",
-      "description": "Déverrouille et affiche immédiatement le statut final du compte. Le switch -PassThru force la cmdlet à retourner l'objet utilisateur modifié dans le pipeline, permettant de vérifier que le déverrouillage a bien fonctionné. Essentiel pour les scripts avec gestion d'erreurs.",
+      "description": "Unlock and show the final status of the account at once. The -PassThru switch makes the cmdlet return the modified user object to the pipeline, so you can check that the unlock worked. Essential for scripts with error handling.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits d'administration AD. Vérifier la cause du verrouillage avant de déverrouiller.",
+  "notes": "Requires AD administration rights. Check the cause of the lockout before unlocking.",
   "links": [
     {
       "title": "Documentation Unlock-ADAccount",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/unlock-adaccount"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Déverrouiller un compte utilisateur AD",
+      "description": "Déverrouille un compte utilisateur qui a été verrouillé suite à des tentatives de connexion échouées.",
+      "notes": "Nécessite des droits d'administration AD. Vérifier la cause du verrouillage avant de déverrouiller.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName de l'utilisateur à déverrouiller"
+          }
+        }
+      },
+      "examples": {
+        "Unlock-ADAccount -Identity jdupont": "Déverrouille immédiatement le compte de jdupont. Le paramètre -Identity accepte le SamAccountName, Distinguished Name, GUID ou SID. Le déverrouillage est instantané et permet à l'utilisateur de se reconnecter immédiatement.",
+        "Get-ADUser -Filter {LockedOut -eq $true} | Unlock-ADAccount": "Déverrouille automatiquement TOUS les comptes verrouillés du domaine via pipeline. Attention : à utiliser avec précaution car certains comptes peuvent être verrouillés pour des raisons de sécurité (tentatives d'intrusion). Vérifiez toujours les logs avant un déverrouillage massif.",
+        "Unlock-ADAccount -Identity jdupont -Confirm:$false": "Déverrouille sans demander de confirmation. Le paramètre -Confirm:$false supprime l'invite de confirmation (utile pour les scripts automatisés). Par défaut, Unlock-ADAccount ne demande pas de confirmation, mais ce switch est utile si une politique organisationnelle force les confirmations.",
+        "Get-ADUser jdupont -Properties LockedOut,LockoutTime | Select-Object Name,LockedOut,LockoutTime": "Vérifie l'état de verrouillage d'un compte avant de le déverrouiller. La propriété LockedOut indique si le compte est verrouillé ($true/$false). LockoutTime affiche l'heure exacte du verrouillage. Toujours vérifier ces informations avant de déverrouiller pour comprendre la cause du verrouillage.",
+        "Unlock-ADAccount -Identity 'CN=Jean Dupont,OU=Users,DC=contoso,DC=com'": "Déverrouille un compte en utilisant son Distinguished Name (DN) complet. Cette syntaxe est utile quand vous travaillez avec des scripts qui manipulent des objets AD complets ou quand le SamAccountName n'est pas unique.",
+        "Get-ADUser -Filter {LockedOut -eq $true} -Properties LockedOut,LockoutTime | Select-Object Name,SamAccountName,LockedOut,LockoutTime | Export-Csv C:\\Temp\\LockedAccounts.csv -NoTypeInformation": "Exporte la liste de tous les comptes verrouillés avec l'heure de verrouillage. Utile pour les audits de sécurité, l'analyse des patterns de verrouillage et l'identification de potentielles attaques par force brute. Conservez ces rapports pour la traçabilité.",
+        "Unlock-ADAccount -Identity jdupont -PassThru | Select-Object Name,LockedOut": "Déverrouille et affiche immédiatement le statut final du compte. Le switch -PassThru force la cmdlet à retourner l'objet utilisateur modifié dans le pipeline, permettant de vérifier que le déverrouillage a bien fonctionné. Essentiel pour les scripts avec gestion d'erreurs."
+      }
+    }
+  }
 }

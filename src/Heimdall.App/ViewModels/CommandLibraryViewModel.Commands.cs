@@ -298,9 +298,9 @@ public sealed partial class CommandLibraryViewModel
         var vm = new CommandActionDialogViewModel
         {
             DialogTitle = LocalizeKey("ToolCmdLibDialogTitleAdd"),
-            Localizer = _localizer,
-            AvailableCategories = _categoryList.ToList()
+            Localizer = _localizer
         };
+        vm.UseCategoryLabels(_categoryList, LocalizeKey);
 
         var saved = await ShowActionDialogAsync(vm);
         if (!saved) return;
@@ -341,7 +341,7 @@ public sealed partial class CommandLibraryViewModel
             string.Format(LocalizeKey("ToolCmdLibDuplicateTitleFormat"), entry.Title));
         vm.DialogTitle = LocalizeKey("ToolCmdLibDialogTitleDuplicate");
         vm.Localizer = _localizer;
-        vm.AvailableCategories = _categoryList.ToList();
+        vm.UseCategoryLabels(_categoryList, LocalizeKey);
 
         var saved = await ShowActionDialogAsync(vm);
         if (!saved) return;
@@ -369,10 +369,10 @@ public sealed partial class CommandLibraryViewModel
     {
         if (entry is null || ShowActionDialogAsync is null) return;
 
-        var vm = CommandActionDialogViewModel.FromAction(entry.Source);
+        var vm = CommandActionDialogViewModel.FromAction(entry.Pivot);
         vm.DialogTitle = LocalizeKey("ToolCmdLibDialogTitleEdit");
         vm.Localizer = _localizer;
-        vm.AvailableCategories = _categoryList.ToList();
+        vm.UseCategoryLabels(_categoryList, LocalizeKey);
 
         var saved = await ShowActionDialogAsync(vm);
         if (!saved) return;

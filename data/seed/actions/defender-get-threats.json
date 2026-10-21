@@ -1,8 +1,8 @@
 {
   "id": "defender-get-threats",
-  "title": "Lister les menaces détectées par Defender",
-  "description": "Affiche l'historique des menaces détectées et bloquées par Windows Defender.",
-  "category": "🔒 Security & Encryption",
+  "title": "List the threats detected by Defender",
+  "description": "Show the history of the threats detected and blocked by Windows Defender.",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,25 +22,37 @@
   "examples": [
     {
       "command": "Get-MpThreat",
-      "description": "Liste toutes les menaces détectées récemment",
+      "description": "List every recently detected threat",
       "platform": 0
     },
     {
       "command": "(Get-MpThreat).Count",
-      "description": "Compte le nombre total de menaces détectées",
+      "description": "Count the detected threats",
       "platform": 0
     },
     {
       "command": "Get-MpThreatDetection",
-      "description": "Affiche l'historique détaillé de toutes les détections avec actions",
+      "description": "Show the detailed history of every detection with its actions",
       "platform": 0
     }
   ],
-  "notes": "SeverityID: 0=Unknown, 1=Low, 2=Medium, 4=High, 5=Severe. Resources: chemin des fichiers infectés. IsActive: $true si menace toujours présente. Get-MpThreatDetection: historique détaillé avec actions effectuées.",
+  "notes": "SeverityID: 0=Unknown, 1=Low, 2=Medium, 4=High, 5=Severe. Resources: path of the infected files. IsActive: $true when the threat is still present. Get-MpThreatDetection: detailed history with the actions taken.",
   "links": [
     {
       "title": "Get-MpThreat Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/defender/get-mpthreat"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les menaces détectées par Defender",
+      "description": "Affiche l'historique des menaces détectées et bloquées par Windows Defender.",
+      "notes": "SeverityID: 0=Unknown, 1=Low, 2=Medium, 4=High, 5=Severe. Resources: chemin des fichiers infectés. IsActive: $true si menace toujours présente. Get-MpThreatDetection: historique détaillé avec actions effectuées.",
+      "examples": {
+        "Get-MpThreat": "Liste toutes les menaces détectées récemment",
+        "(Get-MpThreat).Count": "Compte le nombre total de menaces détectées",
+        "Get-MpThreatDetection": "Affiche l'historique détaillé de toutes les détections avec actions"
+      }
+    }
+  }
 }

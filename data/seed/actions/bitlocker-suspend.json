@@ -1,8 +1,8 @@
 {
   "id": "bitlocker-suspend",
-  "title": "Suspendre temporairement la protection BitLocker",
-  "description": "Suspend la protection BitLocker temporairement (utile pour mises à jour BIOS/firmware).",
-  "category": "🔒 Security & Encryption",
+  "title": "Suspend BitLocker protection temporarily",
+  "description": "Suspend BitLocker protection temporarily (useful for BIOS or firmware updates).",
+  "category": "security",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -19,59 +19,74 @@
     "parameters": [
       {
         "name": "driveLetter",
-        "label": "Lettre du disque",
+        "label": "Drive letter",
         "type": "driveletter",
         "defaultValue": "C",
         "required": true,
-        "description": "Lettre du volume (ex: C)"
+        "description": "Volume letter (e.g. C)"
       },
       {
         "name": "rebootCount",
-        "label": "Nombre de redémarrages",
+        "label": "Number of restarts",
         "type": "string",
         "defaultValue": "1",
         "required": false,
-        "description": "Nombre de redémarrages avant réactivation automatique"
+        "description": "Number of restarts before protection resumes automatically"
       }
     ]
   },
   "examples": [
     {
       "command": "Suspend-BitLocker -MountPoint C: -RebootCount 1",
-      "description": "Suspend BitLocker pour 1 redémarrage (réactivation auto après)",
+      "description": "Suspend BitLocker for 1 restart (resumes automatically afterwards)",
       "platform": 0
     },
     {
       "command": "Suspend-BitLocker -MountPoint C: -RebootCount 2",
-      "description": "Suspend BitLocker pour 2 redémarrages (mise à jour BIOS multi-étapes)",
+      "description": "Suspend BitLocker for 2 restarts (multi-step BIOS update)",
       "platform": 0
     },
     {
       "command": "Suspend-BitLocker -MountPoint C: -RebootCount 0",
-      "description": "Suspend BitLocker indéfiniment jusqu'à réactivation manuelle",
+      "description": "Suspend BitLocker indefinitely until resumed by hand",
       "platform": 0
     },
     {
       "command": "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'On'} | ForEach-Object { Suspend-BitLocker -MountPoint $_.MountPoint -RebootCount 1 }",
-      "description": "Suspend BitLocker sur tous les volumes protégés pour 1 redémarrage",
-      "platform": 0
-    },
-    {
-      "command": "Suspend-BitLocker -MountPoint \"C:\" -RebootCount 5",
-      "description": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume (ex: C). Remplacez D par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "Suspend-BitLocker -MountPoint \"D:\" -RebootCount 1",
-      "description": "Exemple utilisant le paramètre 'rebootCount': Nombre de redémarrages avant réactivation automatique. Remplacez 5 par la valeur appropriée selon votre environnement.",
+      "description": "Suspend BitLocker on every protected volume for 1 restart",
       "platform": 0
     }
   ],
-  "notes": "⚠️ Durant la suspension, le disque reste CHIFFRÉ mais ACCESSIBLE sans authentification! Utilisez uniquement pour maintenance (BIOS, firmware, drivers). RebootCount=0: suspension permanente jusqu'à Resume-BitLocker. RebootCount=1+: réactivation automatique après N redémarrages.",
+  "notes": "⚠️ While suspended, the disk stays ENCRYPTED but is ACCESSIBLE without authentication! Use it only for maintenance (BIOS, firmware, drivers). RebootCount=0: suspended until Resume-BitLocker. RebootCount=1+: resumes automatically after N restarts.",
   "links": [
     {
       "title": "Suspend-BitLocker Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/bitlocker/suspend-bitlocker"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Suspendre temporairement la protection BitLocker",
+      "description": "Suspend la protection BitLocker temporairement (utile pour mises à jour BIOS/firmware).",
+      "notes": "⚠️ Durant la suspension, le disque reste CHIFFRÉ mais ACCESSIBLE sans authentification! Utilisez uniquement pour maintenance (BIOS, firmware, drivers). RebootCount=0: suspension permanente jusqu'à Resume-BitLocker. RebootCount=1+: réactivation automatique après N redémarrages.",
+      "parameters": {
+        "windows": {
+          "driveLetter": {
+            "label": "Lettre du disque",
+            "description": "Lettre du volume (ex: C)"
+          },
+          "rebootCount": {
+            "label": "Nombre de redémarrages",
+            "description": "Nombre de redémarrages avant réactivation automatique"
+          }
+        }
+      },
+      "examples": {
+        "Suspend-BitLocker -MountPoint C: -RebootCount 1": "Suspend BitLocker pour 1 redémarrage (réactivation auto après)",
+        "Suspend-BitLocker -MountPoint C: -RebootCount 2": "Suspend BitLocker pour 2 redémarrages (mise à jour BIOS multi-étapes)",
+        "Suspend-BitLocker -MountPoint C: -RebootCount 0": "Suspend BitLocker indéfiniment jusqu'à réactivation manuelle",
+        "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'On'} | ForEach-Object { Suspend-BitLocker -MountPoint $_.MountPoint -RebootCount 1 }": "Suspend BitLocker sur tous les volumes protégés pour 1 redémarrage"
+      }
+    }
+  }
 }

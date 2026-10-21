@@ -1,8 +1,8 @@
 {
   "id": "defender-ad-get-protection-status-domain",
-  "title": "Auditer l'état de Windows Defender sur tout le domaine",
-  "description": "Vérifie l'état de Windows Defender (protection active/inactive) sur tous les ordinateurs du domaine via requêtes à distance.",
-  "category": "🔒 Security & Encryption",
+  "title": "Audit the Windows Defender state across the domain",
+  "description": "Check the Windows Defender state (protection on or off) on every computer of the domain through remote queries.",
+  "category": "security",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -23,25 +23,37 @@
   "examples": [
     {
       "command": "$report = @(); Get-ADComputer -Filter {Enabled -eq $true} | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter {Enabled -eq $true} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "$report = @(); Get-ADComputer -Filter {Enabled -eq $true} | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "⚠️ PERFORMANCE: Sur gros domaines, cette commande prend du temps (requêtes à distance). Optimisation: limitez avec -SearchBase à une OU. Nécessite: WinRM activé, droits admin sur machines cibles. Offline/Error: PC éteints, WinRM désactivé, firewall bloqué. COMPLIANCE: 100% protection temps réel obligatoire!",
+  "notes": "⚠️ PERFORMANCE: on large domains this command takes time (remote queries). To speed it up, limit it to one OU with -SearchBase. Requires: WinRM enabled, administrator rights on the target machines. Offline/Error: PC turned off, WinRM disabled, firewall blocking. COMPLIANCE: 100% real-time protection is mandatory!",
   "links": [
     {
       "title": "Remote Defender Management",
       "url": "https://learn.microsoft.com/en-us/powershell/module/defender/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Auditer l'état de Windows Defender sur tout le domaine",
+      "description": "Vérifie l'état de Windows Defender (protection active/inactive) sur tous les ordinateurs du domaine via requêtes à distance.",
+      "notes": "⚠️ PERFORMANCE: Sur gros domaines, cette commande prend du temps (requêtes à distance). Optimisation: limitez avec -SearchBase à une OU. Nécessite: WinRM activé, droits admin sur machines cibles. Offline/Error: PC éteints, WinRM désactivé, firewall bloqué. COMPLIANCE: 100% protection temps réel obligatoire!",
+      "examples": {
+        "$report = @(); Get-ADComputer -Filter {Enabled -eq $true} | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$report = @(); Get-ADComputer -Filter {Enabled -eq $true} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "$report = @(); Get-ADComputer -Filter {Enabled -eq $true} | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

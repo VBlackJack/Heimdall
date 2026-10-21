@@ -1,8 +1,8 @@
 {
   "id": "performance-check-services",
-  "title": "Vérifier l'état des services critiques",
-  "description": "Vérifie l'état de services Windows critiques et identifie ceux qui sont arrêtés alors qu'ils devraient être démarrés",
-  "category": "⚡ Performance",
+  "title": "Check the state of critical services",
+  "description": "Check the state of critical Windows services and find the ones that are stopped when they should be running.",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,15 +22,25 @@
   "examples": [
     {
       "command": "Get-Service -Name wuauserv,spooler,Dnscache | Format-Table Name,Status,StartType",
-      "description": "Vérifie des services spécifiques",
+      "description": "Check given services",
       "platform": 0
     }
   ],
-  "notes": "StartType Automatic = devrait démarrer au boot. Status Running = en cours. Services critiques: wuauserv, Dnscache, EventLog, RpcSs, spooler.",
+  "notes": "StartType Automatic = should start at boot. Status Running = running. Critical services: wuauserv, Dnscache, EventLog, RpcSs, spooler.",
   "links": [
     {
       "title": "Get-Service Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-service"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier l'état des services critiques",
+      "description": "Vérifie l'état de services Windows critiques et identifie ceux qui sont arrêtés alors qu'ils devraient être démarrés",
+      "notes": "StartType Automatic = devrait démarrer au boot. Status Running = en cours. Services critiques: wuauserv, Dnscache, EventLog, RpcSs, spooler.",
+      "examples": {
+        "Get-Service -Name wuauserv,spooler,Dnscache | Format-Table Name,Status,StartType": "Vérifie des services spécifiques"
+      }
+    }
+  }
 }

@@ -50,9 +50,15 @@ public sealed class ActionTranslationConfiguration : IEntityTypeConfiguration<Ac
         builder.Property(e => e.Notes)
             .HasMaxLength(2000);
 
+        builder.Property(e => e.ParametersJson)
+            .IsRequired();
+
+        builder.Property(e => e.ExamplesJson)
+            .IsRequired();
+
         // Relationship with Action
         builder.HasOne(e => e.Action)
-            .WithMany()
+            .WithMany(a => a.Translations)
             .HasForeignKey(e => e.ActionId)
             .OnDelete(DeleteBehavior.Cascade);
 

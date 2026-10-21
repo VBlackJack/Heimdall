@@ -175,6 +175,9 @@ generator that produces the final command for you.
 - Each row shows the command itself under its title, in monospace on one line: the template the row opens on under the current platform filter (Windows unless the filter is Linux, or the only template there is), cut at 96 characters like the command palette's snippet previews
 - Opened from a session, the platform filter starts on the platform of that session. A profile can declare the operating system of its far end (General tab, **Operating system of the far end**): Windows or Linux is then used as given, and Automatic keeps the guess from the protocol (SSH as Linux; RDP, WinRM and Local as Windows). Post-connect steps linked to the library and their picker follow the same declaration, so SSH into a Windows OpenSSH server gets the Windows template
 
+- Shipped actions and their categories show in the interface language, and a language switch reloads the library keeping the selected action. The catalogue is written in English with a French translation beside it; Spanish has no shipped translation yet and shows the English text
+- Shipped actions follow the installed version: when an update changes the catalogue, the shipped actions are replaced at the next launch, while your own actions, the favorites and history of actions still shipped are kept
+
 **Building the command**
 - Typed parameters: text, integer, boolean, hostname, IP address, path, and **choice** (a fixed set of values offered as a drop-down)
 - A choice parameter accepts only what it offers, matched without regard to case or surrounding space; whether a value may be absent is left to the parameter's own Required flag
@@ -201,6 +204,8 @@ generator that produces the final command for you.
 - Export first asks what the file should contain: **My actions** (the default: the actions you created or imported), **Current filter** (what the list shows now, search included) or **Everything** (the seeded catalogue too); the warning about secrets in free-text fields follows the choice
 - Import and export as JSON, and Git synchronization for a shared team library; **Sync on startup** runs once after the vault is unlocked, and a failure is reported on the status bar
 - Actions that arrive from an import have their risk level and platform clamped to known values, so an unrecognized level is treated as dangerous rather than harmless
+- An export keeps the English text of each action with its translations; an export taken before the categories were localized imports into the current categories
+- **Workstation debloat pack**: 72 actions that strip a personal Windows workstation (store apps, Edge, OneDrive, telemetry, performance tweaks) ship apart from the catalogue, in `data/packs/windows-workstation-debloat.json` in the installation folder. Import that file with the library's Import button if you want them. They are aimed at a workstation, not a server; they arrive as your own actions, so you can edit and export them; their text is French only for now; and nine of them open with a command-length error until their scripts are rewritten
 
 ### Quick Connect (Ctrl+K)
 - Command palette for ad-hoc connections without saving a server profile
@@ -334,7 +339,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,274 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,287 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 

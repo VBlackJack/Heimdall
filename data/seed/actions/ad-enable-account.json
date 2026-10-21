@@ -1,8 +1,8 @@
 {
   "id": "ad-enable-account",
-  "title": "Activer un compte utilisateur AD",
-  "description": "Active un compte utilisateur Active Directory qui a été désactivé.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Enable an AD user account",
+  "description": "Enable a disabled Active Directory user account.",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,46 +20,68 @@
     "parameters": [
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName de l'utilisateur à activer"
+        "description": "SamAccountName of the user to enable"
       }
     ]
   },
   "examples": [
     {
       "command": "Enable-ADAccount -Identity jdupont",
-      "description": "Réactive immédiatement un compte désactivé. L'utilisateur peut se reconnecter dès que la réplication AD est complète (quelques secondes à quelques minutes selon la topo réseau). Utilisé pour les retours de congés, fins de suspension disciplinaire, etc.",
+      "description": "Re-enable a disabled account at once. The user can log on again as soon as AD replication completes (a few seconds to a few minutes depending on the network topology). Used when people come back from leave, at the end of a disciplinary suspension, and so on.",
       "platform": 0
     },
     {
       "command": "Enable-ADAccount -Identity jdupont -PassThru | Select-Object Name,Enabled",
-      "description": "Réactive le compte et affiche immédiatement la confirmation. Le switch -PassThru retourne l'objet utilisateur modifié. Select affiche le nom et le statut Enabled pour vérification visuelle. Pratique pour confirmer que la réactivation a fonctionné.",
+      "description": "Re-enable the account and show the confirmation at once. The -PassThru switch returns the modified user object. Select shows the name and the Enabled status for a visual check. Handy to confirm that re-enabling worked.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter {Enabled -eq $false -and Department -eq 'IT'} | Enable-ADAccount -WhatIf",
-      "description": "Simulation de réactivation de tous les comptes IT désactivés. -WhatIf effectue un dry-run sans modifier l'AD. Affiche quels comptes seraient réactivés. Vérifiez toujours avec -WhatIf avant d'exécuter des actions de masse.",
+      "description": "Simulate re-enabling every disabled IT account. -WhatIf performs a dry run without changing AD. Shows which accounts would be re-enabled. Always check with -WhatIf before running bulk actions.",
       "platform": 0
     },
     {
       "command": "Enable-ADAccount -Identity jdupont -Confirm:$false",
-      "description": "Réactive sans confirmation interactive. Utile dans les scripts automatisés ou les processus de réintégration standardisés. La réactivation est immédiate dès l'exécution.",
+      "description": "Re-enable without an interactive confirmation. Useful in automated scripts or standardized return-to-work processes. The account is enabled as soon as the command runs.",
       "platform": 0
     },
     {
       "command": "Get-ADUser -Filter * -Properties Enabled,Description | Where-Object {$_.Enabled -eq $false -and $_.Description -like '*leave*'} | Enable-ADAccount",
-      "description": "Réactive automatiquement les comptes désactivés pour congés (basé sur le champ Description). Utile si votre organisation utilise des conventions de nommage dans Description. Adaptez le filtre selon vos pratiques internes.",
+      "description": "Re-enable the accounts disabled for leave automatically (based on the Description field). Useful if your organization uses naming conventions in Description. Adapt the filter to your internal practices.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits d'administration AD. L'utilisateur pourra se connecter immédiatement après activation.",
+  "notes": "Requires AD administration rights. The user can log on as soon as the account is enabled.",
   "links": [
     {
       "title": "Documentation Enable-ADAccount",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/enable-adaccount"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Activer un compte utilisateur AD",
+      "description": "Active un compte utilisateur Active Directory qui a été désactivé.",
+      "notes": "Nécessite des droits d'administration AD. L'utilisateur pourra se connecter immédiatement après activation.",
+      "parameters": {
+        "windows": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName de l'utilisateur à activer"
+          }
+        }
+      },
+      "examples": {
+        "Enable-ADAccount -Identity jdupont": "Réactive immédiatement un compte désactivé. L'utilisateur peut se reconnecter dès que la réplication AD est complète (quelques secondes à quelques minutes selon la topo réseau). Utilisé pour les retours de congés, fins de suspension disciplinaire, etc.",
+        "Enable-ADAccount -Identity jdupont -PassThru | Select-Object Name,Enabled": "Réactive le compte et affiche immédiatement la confirmation. Le switch -PassThru retourne l'objet utilisateur modifié. Select affiche le nom et le statut Enabled pour vérification visuelle. Pratique pour confirmer que la réactivation a fonctionné.",
+        "Get-ADUser -Filter {Enabled -eq $false -and Department -eq 'IT'} | Enable-ADAccount -WhatIf": "Simulation de réactivation de tous les comptes IT désactivés. -WhatIf effectue un dry-run sans modifier l'AD. Affiche quels comptes seraient réactivés. Vérifiez toujours avec -WhatIf avant d'exécuter des actions de masse.",
+        "Enable-ADAccount -Identity jdupont -Confirm:$false": "Réactive sans confirmation interactive. Utile dans les scripts automatisés ou les processus de réintégration standardisés. La réactivation est immédiate dès l'exécution.",
+        "Get-ADUser -Filter * -Properties Enabled,Description | Where-Object {$_.Enabled -eq $false -and $_.Description -like '*leave*'} | Enable-ADAccount": "Réactive automatiquement les comptes désactivés pour congés (basé sur le champ Description). Utile si votre organisation utilise des conventions de nommage dans Description. Adaptez le filtre selon vos pratiques internes."
+      }
+    }
+  }
 }

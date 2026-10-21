@@ -1,14 +1,13 @@
 {
   "id": "sql-backup-database",
-  "title": "Sauvegarder une base de données SQL Server",
-  "description": "Effectue une sauvegarde complète (FULL) d'une base de données SQL Server vers un fichier .bak spécifié.",
-  "category": "💽 Database",
+  "title": "Back up a SQL Server database",
+  "description": "Take a full (FULL) backup of a SQL Server database to the given .bak file.",
+  "category": "database",
   "platform": 0,
   "level": 2,
   "tags": [
     "sql",
     "backup",
-    "sauvegarde",
     "database",
     "mssql",
     "protection",
@@ -23,50 +22,77 @@
     "parameters": [
       {
         "name": "serverInstance",
-        "label": "Instance SQL Server",
+        "label": "SQL Server instance",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "localhost",
         "required": true,
-        "description": "Instance SQL Server"
+        "description": "SQL Server instance"
       },
       {
         "name": "databaseName",
-        "label": "Nom de la base",
+        "label": "Database name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la base de données à sauvegarder"
+        "description": "Name of the database to back up"
       },
       {
         "name": "backupPath",
-        "label": "Chemin de sauvegarde",
+        "label": "Backup path",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Backups\\backup.bak",
         "required": true,
-        "description": "Chemin complet du fichier de sauvegarde"
+        "description": "Full path of the backup file"
       }
     ]
   },
   "examples": [
     {
       "command": "Backup-SqlDatabase -ServerInstance 'localhost' -Database 'MyDB' -BackupFile 'C:\\Backups\\MyDB.bak'",
-      "description": "Sauvegarde complète de MyDB",
+      "description": "Full backup of MyDB",
       "platform": 0
     },
     {
       "command": "Invoke-Sqlcmd -Query \"BACKUP DATABASE [MyDB] TO DISK='C:\\Backups\\MyDB.bak' WITH COMPRESSION\"",
-      "description": "Alternative avec T-SQL",
+      "description": "Alternative with T-SQL",
       "platform": 0
     }
   ],
-  "notes": "ATTENTION: Vérifiez l'espace disque disponible. La compression réduit la taille de ~50%. Le compte SQL Server doit avoir accès au chemin de backup.",
+  "notes": "WARNING: check the free disk space. Compression cuts the size by about 50%. The SQL Server account must have access to the backup path.",
   "links": [
     {
       "title": "Documentation Backup-SqlDatabase",
       "url": "https://learn.microsoft.com/en-us/powershell/module/sqlserver/backup-sqldatabase"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Sauvegarder une base de données SQL Server",
+      "description": "Effectue une sauvegarde complète (FULL) d'une base de données SQL Server vers un fichier .bak spécifié.",
+      "notes": "ATTENTION: Vérifiez l'espace disque disponible. La compression réduit la taille de ~50%. Le compte SQL Server doit avoir accès au chemin de backup.",
+      "parameters": {
+        "windows": {
+          "serverInstance": {
+            "label": "Instance SQL Server",
+            "description": "Instance SQL Server"
+          },
+          "databaseName": {
+            "label": "Nom de la base",
+            "description": "Nom de la base de données à sauvegarder"
+          },
+          "backupPath": {
+            "label": "Chemin de sauvegarde",
+            "description": "Chemin complet du fichier de sauvegarde"
+          }
+        }
+      },
+      "examples": {
+        "Backup-SqlDatabase -ServerInstance 'localhost' -Database 'MyDB' -BackupFile 'C:\\Backups\\MyDB.bak'": "Sauvegarde complète de MyDB",
+        "Invoke-Sqlcmd -Query \"BACKUP DATABASE [MyDB] TO DISK='C:\\Backups\\MyDB.bak' WITH COMPRESSION\"": "Alternative avec T-SQL"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "security-audit-ntfs-permissions",
-  "title": "Auditer les permissions NTFS d'un dossier",
-  "description": "Affiche les permissions NTFS détaillées d'un dossier ou fichier avec les droits accordés à chaque utilisateur/groupe",
-  "category": "🔒 Security & Encryption",
+  "title": "Audit the NTFS permissions of a folder",
+  "description": "Show the detailed NTFS permissions of a folder or file, with the rights granted to each user or group",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,27 +21,45 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin du dossier/fichier",
+        "label": "Folder or file path",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "C:\\",
         "required": true,
-        "description": "Chemin complet du dossier ou fichier à auditer"
+        "description": "Full path of the folder or file to audit"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-Acl C:\\Users | Format-List",
-      "description": "Affiche les permissions du dossier Users",
+      "description": "Show the permissions of the Users folder",
       "platform": 0
     }
   ],
-  "notes": "AccessControlType: Allow (autoriser) ou Deny (refuser). IsInherited: True (hérité du parent). FileSystemRights: droits spécifiques (Read, Write, FullControl, etc.).",
+  "notes": "AccessControlType: Allow or Deny. IsInherited: True (inherited from the parent). FileSystemRights: specific rights (Read, Write, FullControl, etc.).",
   "links": [
     {
       "title": "Get-Acl Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/get-acl"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Auditer les permissions NTFS d'un dossier",
+      "description": "Affiche les permissions NTFS détaillées d'un dossier ou fichier avec les droits accordés à chaque utilisateur/groupe",
+      "notes": "AccessControlType: Allow (autoriser) ou Deny (refuser). IsInherited: True (hérité du parent). FileSystemRights: droits spécifiques (Read, Write, FullControl, etc.).",
+      "parameters": {
+        "windows": {
+          "path": {
+            "label": "Chemin du dossier/fichier",
+            "description": "Chemin complet du dossier ou fichier à auditer"
+          }
+        }
+      },
+      "examples": {
+        "Get-Acl C:\\Users | Format-List": "Affiche les permissions du dossier Users"
+      }
+    }
+  }
 }

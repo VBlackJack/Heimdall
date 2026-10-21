@@ -1,8 +1,8 @@
 {
   "id": "hyperv-list-vms",
-  "title": "Lister toutes les machines virtuelles Hyper-V",
-  "description": "Affiche la liste complète de toutes les machines virtuelles configurées dans Hyper-V avec leur état, mémoire allouée et version de configuration.",
-  "category": "🐳 Containers & VMs",
+  "title": "List all Hyper-V virtual machines",
+  "description": "Show every virtual machine configured in Hyper-V with its state, assigned memory and configuration version.",
+  "category": "containers-vms",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -25,40 +25,55 @@
   "examples": [
     {
       "command": "Get-VM | Select-Object Name, State, Status",
-      "description": "Liste simple des VMs et leur état",
+      "description": "Plain list of the VMs and their state",
       "platform": 0
     },
     {
       "command": "Get-VM | Where-Object {$_.State -eq 'Running'}",
-      "description": "Affiche uniquement les VMs en cours d'exécution",
+      "description": "Show only the running VMs",
       "platform": 0
     },
     {
       "command": "Get-VM | Measure-VMResourcePool",
-      "description": "Statistiques d'utilisation des ressources",
+      "description": "Resource usage statistics",
       "platform": 0
     },
     {
       "command": "Get-VM | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-VM | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-VM | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite le rôle Hyper-V installé et des privilèges administrateur. États possibles: Running, Off, Saved, Paused.",
+  "notes": "Requires the Hyper-V role and administrator privileges. Possible states: Running, Off, Saved, Paused.",
   "links": [
     {
       "title": "Documentation Get-VM",
       "url": "https://learn.microsoft.com/en-us/powershell/module/hyper-v/get-vm"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister toutes les machines virtuelles Hyper-V",
+      "description": "Affiche la liste complète de toutes les machines virtuelles configurées dans Hyper-V avec leur état, mémoire allouée et version de configuration.",
+      "notes": "Nécessite le rôle Hyper-V installé et des privilèges administrateur. États possibles: Running, Off, Saved, Paused.",
+      "examples": {
+        "Get-VM | Select-Object Name, State, Status": "Liste simple des VMs et leur état",
+        "Get-VM | Where-Object {$_.State -eq 'Running'}": "Affiche uniquement les VMs en cours d'exécution",
+        "Get-VM | Measure-VMResourcePool": "Statistiques d'utilisation des ressources",
+        "Get-VM | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-VM | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-VM | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

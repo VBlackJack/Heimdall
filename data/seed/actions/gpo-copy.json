@@ -1,8 +1,8 @@
 {
   "id": "gpo-copy",
-  "title": "Copier une GPO",
-  "description": "Crée une copie d'une stratégie de groupe existante.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Copy a GPO",
+  "description": "Create a copy of an existing Group Policy.",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,39 +20,56 @@
     "parameters": [
       {
         "name": "sourceGPO",
-        "label": "GPO source",
+        "label": "Source GPO",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la GPO à copier"
+        "description": "Name of the GPO to copy"
       },
       {
         "name": "targetGPO",
-        "label": "GPO destination",
+        "label": "Destination GPO",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la nouvelle GPO"
+        "description": "Name of the new GPO"
       }
     ]
   },
   "examples": [
     {
       "command": "Copy-GPO -SourceName \"Security-Policy-IT\" -TargetName \"Security-Policy-Finance\"",
-      "description": "Copie la GPO IT vers une nouvelle GPO Finance",
-      "platform": 0
-    },
-    {
-      "command": "Copy-GPO -SourceName \"Default-Domain-Policy\" -TargetName \"Custom-Security-Policy\"",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Copy-GPO -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Copy the IT GPO to a new Finance GPO",
       "platform": 0
     }
   ],
-  "notes": "Copie tous les paramètres mais pas les liens GPO. Les liens doivent être recréés manuellement.",
+  "notes": "Copies every setting but not the GPO links. The links must be created again by hand.",
   "links": [
     {
       "title": "Documentation Copy-GPO",
       "url": "https://learn.microsoft.com/en-us/powershell/module/grouppolicy/copy-gpo"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Copier une GPO",
+      "description": "Crée une copie d'une stratégie de groupe existante.",
+      "notes": "Copie tous les paramètres mais pas les liens GPO. Les liens doivent être recréés manuellement.",
+      "parameters": {
+        "windows": {
+          "sourceGPO": {
+            "label": "GPO source",
+            "description": "Nom de la GPO à copier"
+          },
+          "targetGPO": {
+            "label": "GPO destination",
+            "description": "Nom de la nouvelle GPO"
+          }
+        }
+      },
+      "examples": {
+        "Copy-GPO -SourceName \"Security-Policy-IT\" -TargetName \"Security-Policy-Finance\"": "Copie la GPO IT vers une nouvelle GPO Finance"
+      }
+    }
+  }
 }

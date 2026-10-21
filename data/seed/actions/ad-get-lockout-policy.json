@@ -1,8 +1,8 @@
 {
   "id": "ad-get-lockout-policy",
-  "title": "Obtenir la politique de verrouillage de compte",
-  "description": "Affiche les paramètres de verrouillage de compte du domaine.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Show the account lockout policy",
+  "description": "Show the domain's account lockout settings.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Get-ADDefaultDomainPasswordPolicy | Select-Object LockoutDuration,LockoutObservationWindow,LockoutThreshold",
-      "description": "Affiche les paramètres de verrouillage",
+      "description": "Show the lockout settings",
       "platform": 0
     },
     {
       "command": "Get-ADDefaultDomainPasswordPolicy | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-ADDefaultDomainPasswordPolicy | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-ADDefaultDomainPasswordPolicy | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ADDefaultDomainPasswordPolicy | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "LockoutThreshold: nombre de tentatives échouées. LockoutDuration: durée du verrouillage.",
+  "notes": "LockoutThreshold: number of failed attempts. LockoutDuration: lockout duration.",
   "links": [
     {
       "title": "Documentation Get-ADDefaultDomainPasswordPolicy",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-addefaultdomainpasswordpolicy"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Obtenir la politique de verrouillage de compte",
+      "description": "Affiche les paramètres de verrouillage de compte du domaine.",
+      "notes": "LockoutThreshold: nombre de tentatives échouées. LockoutDuration: durée du verrouillage.",
+      "examples": {
+        "Get-ADDefaultDomainPasswordPolicy | Select-Object LockoutDuration,LockoutObservationWindow,LockoutThreshold": "Affiche les paramètres de verrouillage",
+        "Get-ADDefaultDomainPasswordPolicy | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-ADDefaultDomainPasswordPolicy | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-ADDefaultDomainPasswordPolicy | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ADDefaultDomainPasswordPolicy | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

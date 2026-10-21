@@ -1,8 +1,8 @@
 {
   "id": "wsus-check-client-status",
-  "title": "Vérifier la configuration WSUS du client",
-  "description": "Affiche la configuration actuelle du client WSUS en lisant le registre",
-  "category": "🔄 Windows Updates",
+  "title": "Check the client WSUS configuration",
+  "description": "Show the current WSUS client configuration by reading the registry",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Get-ItemProperty 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' | Select-Object WUServer,WUStatusServer",
-      "description": "Affiche le serveur WSUS configuré",
+      "description": "Show the configured WSUS server",
       "platform": 0
     },
     {
       "command": "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     },
     {
       "command": "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Format-List",
-      "description": "Affiche la configuration actuelle du client WSUS en lisant le registre.",
+      "description": "Show the current WSUS client configuration by reading the registry.",
       "platform": 0
     }
   ],
-  "notes": "Vérifie la configuration WSUS dans le registre. Si les valeurs sont vides, le client utilise Windows Update public.",
+  "notes": "Checks the WSUS configuration in the registry. When the values are empty, the client uses public Windows Update.",
   "links": [
     {
       "title": "WSUS Client Registry Keys",
       "url": "https://learn.microsoft.com/en-us/windows/deployment/update/waas-wu-settings"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier la configuration WSUS du client",
+      "description": "Affiche la configuration actuelle du client WSUS en lisant le registre",
+      "notes": "Vérifie la configuration WSUS dans le registre. Si les valeurs sont vides, le client utilise Windows Update public.",
+      "examples": {
+        "Get-ItemProperty 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' | Select-Object WUServer,WUStatusServer": "Affiche le serveur WSUS configuré",
+        "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Format-List": "Affiche la configuration actuelle du client WSUS en lisant le registre."
+      }
+    }
+  }
 }

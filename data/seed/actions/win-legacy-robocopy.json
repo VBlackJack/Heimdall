@@ -1,8 +1,8 @@
 {
   "id": "win-legacy-robocopy",
-  "title": "Copie de fichiers robuste (Robocopy)",
-  "description": "L'outil de copie le plus fiable de Windows. Supporte la reprise sur erreur, le multithreading, et la préservation des attributs/permissions.",
-  "category": "📁 Files & Storage",
+  "title": "Robust file copy (Robocopy)",
+  "description": "The most reliable copy tool of Windows. Supports resuming after errors, multithreading, and preserving attributes and permissions.",
+  "category": "files-storage",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -25,7 +25,7 @@
         "type": "string",
         "defaultValue": "D:\\Data",
         "required": true,
-        "description": "Dossier source"
+        "description": "Source folder"
       },
       {
         "name": "destination",
@@ -33,32 +33,32 @@
         "type": "string",
         "defaultValue": "\\\\NAS\\Backup",
         "required": true,
-        "description": "Dossier de destination"
+        "description": "Destination folder"
       },
       {
         "name": "logFile",
-        "label": "Fichier Log",
+        "label": "Log file",
         "type": "string",
         "defaultValue": "C:\\Temp\\robo.log",
         "required": true,
-        "description": "Chemin du fichier de log"
+        "description": "Path of the log file"
       }
     ]
   },
   "examples": [
     {
-      "command": "robocopy \"D:\\Source\" \"\\\\渀AS\\Dest\" /MIR /MT:32 /R:0 /W:0 /NP /LOG:\"C:\\Temp\\migration.log\"",
-      "description": "🔥 MIGRATION EXPRESS : Mode Miroir (/MIR), 32 threads (/MT:32) pour la vitesse, 0 tentative (/R:0) pour ne pas bloquer sur les erreurs. /NP masque la progression % pour accélérer les logs.",
+      "command": "robocopy \"D:\\Source\" \"\\\\NAS\\Dest\" /MIR /MT:32 /R:0 /W:0 /NP /LOG:\"C:\\Temp\\migration.log\"",
+      "description": "🔥 EXPRESS MIGRATION: mirror mode (/MIR), 32 threads (/MT:32) for speed, 0 retries (/R:0) so errors do not block. /NP hides the % progress to speed up the logs.",
       "platform": 0
     },
     {
       "command": "robocopy \"C:\\Source\" \"D:\\Dest\" /E /COPYALL /B /R:1 /W:1",
-      "description": "🔥 FULL BACKUP : Copie tout (/E), avec TOUS les attributs de sécurité/audit (/COPYALL). Le mode /B (Backup Operator) permet de copier des fichiers que l'admin ne peut normalement pas lire.",
+      "description": "🔥 FULL BACKUP: copy everything (/E) with ALL the security and audit attributes (/COPYALL). The /B mode (Backup Operator) can copy files the administrator normally cannot read.",
       "platform": 0
     },
     {
       "command": "robocopy \"C:\\Source\" \"D:\\Dest\" /MOVE /E",
-      "description": "DÉPLACEMENT : Déplace les fichiers (supprime de la source après copie). Attention : destructif pour la source.",
+      "description": "MOVE: move the files (deletes them from the source after the copy). Warning: destructive for the source.",
       "platform": 0
     }
   ],
@@ -68,5 +68,32 @@
       "url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy"
     }
   ],
-  "windowsCommandTemplateId": "e9651f13-04b4-4e5a-a3b4-381bf498816d"
+  "windowsCommandTemplateId": "e9651f13-04b4-4e5a-a3b4-381bf498816d",
+  "translations": {
+    "fr": {
+      "title": "Copie de fichiers robuste (Robocopy)",
+      "description": "L'outil de copie le plus fiable de Windows. Supporte la reprise sur erreur, le multithreading, et la préservation des attributs/permissions.",
+      "parameters": {
+        "windows": {
+          "source": {
+            "label": "Source",
+            "description": "Dossier source"
+          },
+          "destination": {
+            "label": "Destination",
+            "description": "Dossier de destination"
+          },
+          "logFile": {
+            "label": "Fichier Log",
+            "description": "Chemin du fichier de log"
+          }
+        }
+      },
+      "examples": {
+        "robocopy \"D:\\Source\" \"\\\\NAS\\Dest\" /MIR /MT:32 /R:0 /W:0 /NP /LOG:\"C:\\Temp\\migration.log\"": "🔥 MIGRATION EXPRESS : Mode Miroir (/MIR), 32 threads (/MT:32) pour la vitesse, 0 tentative (/R:0) pour ne pas bloquer sur les erreurs. /NP masque la progression % pour accélérer les logs.",
+        "robocopy \"C:\\Source\" \"D:\\Dest\" /E /COPYALL /B /R:1 /W:1": "🔥 FULL BACKUP : Copie tout (/E), avec TOUS les attributs de sécurité/audit (/COPYALL). Le mode /B (Backup Operator) permet de copier des fichiers que l'admin ne peut normalement pas lire.",
+        "robocopy \"C:\\Source\" \"D:\\Dest\" /MOVE /E": "DÉPLACEMENT : Déplace les fichiers (supprime de la source après copie). Attention : destructif pour la source."
+      }
+    }
+  }
 }

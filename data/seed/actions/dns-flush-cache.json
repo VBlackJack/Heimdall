@@ -1,8 +1,8 @@
 {
   "id": "dns-flush-cache",
-  "title": "Vider le cache DNS",
-  "description": "Efface le cache DNS local pour forcer la résolution fraîche des noms de domaine.",
-  "category": "🌐 Network & DNS",
+  "title": "Flush the DNS cache",
+  "description": "Clear the local DNS cache to force fresh resolution of domain names.",
+  "category": "network-dns",
   "platform": 2,
   "level": 1,
   "tags": [
@@ -28,60 +28,79 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "Utile après modification d'enregistrements DNS. Sur certaines distributions Linux, utiliser 'sudo systemctl restart nscd'.",
+  "notes": "Useful after changing DNS records. On some Linux distributions, use 'sudo systemctl restart nscd'.",
   "links": [],
   "windowsExamples": [
     {
       "command": "ipconfig /flushdns",
-      "description": "Vide le cache DNS sur Windows",
+      "description": "Flush the DNS cache on Windows",
       "platform": 0
     },
     {
       "command": "Clear-DnsClientCache",
-      "description": "Vide le cache DNS local",
+      "description": "Flush the local DNS cache",
       "platform": 0
     },
     {
       "command": "Clear-DnsClientCache; Get-DnsClientCache | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Clear-DnsClientCache; Get-DnsClientCache | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Clear-DnsClientCache; Get-DnsClientCache | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Clear-DnsClientCache; Get-DnsClientCache | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "sudo systemd-resolve --flush-caches",
-      "description": "Vide le cache DNS sur Linux (systemd)",
+      "description": "Flush the DNS cache on Linux (systemd)",
       "platform": 1
     },
     {
       "command": "sudo resolvectl flush-caches",
-      "description": "Alternative avec resolvectl",
+      "description": "Alternative with resolvectl",
       "platform": 1
     },
     {
       "command": "sudo nscd -i hosts",
-      "description": "Vider le cache nscd",
+      "description": "Flush the nscd cache",
       "platform": 1
     },
     {
       "command": "resolvectl statistics",
-      "description": "Vérifier les statistiques DNS",
+      "description": "Check the DNS statistics",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vider le cache DNS",
+      "description": "Efface le cache DNS local pour forcer la résolution fraîche des noms de domaine.",
+      "notes": "Utile après modification d'enregistrements DNS. Sur certaines distributions Linux, utiliser 'sudo systemctl restart nscd'.",
+      "examples": {
+        "ipconfig /flushdns": "Vide le cache DNS sur Windows",
+        "Clear-DnsClientCache": "Vide le cache DNS local",
+        "Clear-DnsClientCache; Get-DnsClientCache | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Clear-DnsClientCache; Get-DnsClientCache | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Clear-DnsClientCache; Get-DnsClientCache | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Clear-DnsClientCache; Get-DnsClientCache | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "sudo systemd-resolve --flush-caches": "Vide le cache DNS sur Linux (systemd)",
+        "sudo resolvectl flush-caches": "Alternative avec resolvectl",
+        "sudo nscd -i hosts": "Vider le cache nscd",
+        "resolvectl statistics": "Vérifier les statistiques DNS"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "pswindowsupdate-installer-status",
-  "title": "Vérifier le statut de l'installeur Windows Update",
-  "description": "Affiche si l'installeur Windows Update est en cours d'exécution",
-  "category": "🔄 Windows Updates",
+  "title": "Check the Windows Update installer status",
+  "description": "Show whether the Windows Update installer is running",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Get-WUInstallerStatus",
-      "description": "Vérifie si une installation est en cours",
+      "description": "Check whether an installation is in progress",
       "platform": 0
     },
     {
       "command": "Get-WUInstallerStatus | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-WUInstallerStatus | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results as a table fitted to the console. Format-Table -AutoSize adjusts the column widths for readable output. Handy for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-WUInstallerStatus | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-WUInstallerStatus | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "Utile avant de lancer d'autres opérations de mise à jour. Nécessite PSWindowsUpdate.",
+  "notes": "Useful before starting other update operations. Requires PSWindowsUpdate.",
   "links": [
     {
       "title": "PSWindowsUpdate Module",
       "url": "https://www.powershellgallery.com/packages/PSWindowsUpdate"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier le statut de l'installeur Windows Update",
+      "description": "Affiche si l'installeur Windows Update est en cours d'exécution",
+      "notes": "Utile avant de lancer d'autres opérations de mise à jour. Nécessite PSWindowsUpdate.",
+      "examples": {
+        "Get-WUInstallerStatus": "Vérifie si une installation est en cours",
+        "Get-WUInstallerStatus | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-WUInstallerStatus | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-WUInstallerStatus | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-WUInstallerStatus | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

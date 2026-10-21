@@ -31,6 +31,7 @@ using TwinShell.Persistence;
 using TwinShell.Persistence.Repositories;
 using TwinShell.Persistence.Schema;
 using TwinShell.Persistence.Security;
+using TwinShell.Persistence.Seeding;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.Services;
@@ -121,15 +122,7 @@ internal static class TwinShellBootstrapper
 
         await PruneCommandHistoryAsync(scope.ServiceProvider);
 
-        // Seed only if the database is empty
         var repo = scope.ServiceProvider.GetRequiredService<IActionRepository>();
-        var count = await repo.CountAsync();
-        if (count > 0)
-        {
-            Heimdall.Core.Logging.FileLogger.Info(
-                $"[TwinShell] Command library ready ({count} actions)");
-            return;
-        }
 
         // Locate seed files: prefer output-dir copy, fall back to AppData
         var seedDir = Path.Combine(
@@ -143,7 +136,7 @@ internal static class TwinShellBootstrapper
         if (!Directory.Exists(seedDir))
         {
             Heimdall.Core.Logging.FileLogger.Warn(
-                "[TwinShell] No seed directory found - command library will be empty");
+                "[TwinShell] No seed directory found - command library keeps what it holds");
             return;
         }
 
@@ -152,12 +145,68 @@ internal static class TwinShellBootstrapper
             .OrderBy(f => f)
             .ToArray();
 
-        var options = JsonOptionsHelper.CaseInsensitive;
-        var validActions = new List<ActionModel>(jsonFiles.Length);
+        // The seed reaches a database whenever it differs from the one last applied, not
+        // only on the first launch: see SystemSeedRefresher.
+        var seedHash = SeedCatalogueHash.Compute(jsonFiles);
+        var refresher = new SystemSeedRefresher(context);
+        if (string.Equals(await refresher.ReadAppliedHashAsync(), seedHash, StringComparison.Ordinal))
+        {
+            Heimdall.Core.Logging.FileLogger.Info(
+                $"[TwinShell] Command library ready ({await repo.CountAsync()} actions)");
+            return;
+        }
 
-        // Parse/validate/normalize pass: per-file try/catch so one malformed or oversized
-        // file is logged and skipped without aborting the rest of the batch.
-        foreach (var file in jsonFiles)
+        var validActions = await ReadSeedActionsAsync(jsonFiles);
+
+        // An empty parse is a broken install, not an empty catalogue: applying it would delete
+        // every shipped action.
+        if (validActions.Count == 0)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[TwinShell] No valid seed action in {jsonFiles.Length} files - command library keeps what it holds");
+            return;
+        }
+
+        // One transaction for the whole refresh: a failure (a duplicate id across two seed
+        // files, say) rolls back and leaves the previous catalogue in place, so the library
+        // still opens on what it had.
+        try
+        {
+            var result = await refresher.RefreshAsync(validActions, seedHash);
+            Heimdall.Core.Logging.FileLogger.Info(
+                $"[TwinShell] Seed applied from {jsonFiles.Length} files: {result.Inserted} inserted, "
+                + $"{result.Updated} updated, {result.Removed} removed, {result.FavoritesRemoved} orphan favorite(s) removed");
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Error(
+                "[TwinShell] Seed refresh failed and was rolled back; the previous catalogue is kept", ex);
+        }
+    }
+
+    /// <summary>
+    /// Parses the seed files into system actions, skipping any file that is malformed,
+    /// oversized, untitled, uncategorized, or in the workstation debloat category.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Per-file try/catch, so one bad file is logged and skipped without aborting the rest.
+    /// </para>
+    /// <para>
+    /// The debloat category belongs to the optional pack under <c>data/packs</c>. The
+    /// installer copies over an existing installation without deleting what the new build no
+    /// longer ships, so the 72 files that moved to the pack stay in the seed directory of
+    /// every upgraded copy; read as seeds, they would come back as shipped actions on the
+    /// next launch. Their category is matched after <see cref="CategoryMigration"/>, because
+    /// a file left by an older build still carries the old string.
+    /// </para>
+    /// </remarks>
+    internal static async Task<List<ActionModel>> ReadSeedActionsAsync(IReadOnlyCollection<string> files)
+    {
+        var options = JsonOptionsHelper.CaseInsensitive;
+        var validActions = new List<ActionModel>(files.Count);
+
+        foreach (var file in files)
         {
             try
             {
@@ -168,6 +217,10 @@ internal static class TwinShellBootstrapper
                 if (action is null
                     || string.IsNullOrWhiteSpace(action.Title)
                     || string.IsNullOrWhiteSpace(action.Category))
+                    continue;
+
+                action.Category = CategoryMigration.Normalize(action.Category);
+                if (string.Equals(action.Category, CommandCategories.WindowsDebloat, StringComparison.Ordinal))
                     continue;
 
                 action.IsUserCreated = false;
@@ -183,19 +236,7 @@ internal static class TwinShellBootstrapper
             }
         }
 
-        // Single-transaction batch insert: one SaveChanges for the whole seed instead of
-        // ~514 serialized AddAsync transactions on the awaited startup path. The seed runs
-        // only on an empty DB, so AddRangeAsync's within-batch template dedup is sufficient.
-        // Atomicity tradeoff: a DbUpdateException (e.g. a duplicate Id across two seed files)
-        // now fails the whole seed rather than skipping a single row. This is acceptable and
-        // arguably preferable (all-or-nothing) for curated, version-controlled seed data.
-        if (validActions.Count > 0)
-        {
-            await repo.AddRangeAsync(validActions);
-        }
-
-        Heimdall.Core.Logging.FileLogger.Info(
-            $"[TwinShell] Seeded {validActions.Count} actions from {jsonFiles.Length} files");
+        return validActions;
     }
 
     /// <summary>

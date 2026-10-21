@@ -1,19 +1,18 @@
 {
   "id": "unified-file-copy",
-  "title": "Copier des fichiers ou dossiers",
-  "description": "Copie des fichiers ou des répertoires avec leurs sous-dossiers.",
-  "category": "📁 Files & Storage",
+  "title": "Copy files or folders",
+  "description": "Copy files or directories with their subfolders.",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [
     "linux",
     "windows",
-    "fichier",
+    "file",
     "cp",
-    "copy",
-    "copie"
+    "copy"
   ],
-  "notes": "Windows: -Recurse copie les sous-dossiers. -Force écrase les fichiers existants.\nLinux: -r pour récursif (dossiers), -v pour verbeux, -p pour préserver les permissions.",
+  "notes": "Windows: -Recurse copies the subfolders. -Force overwrites existing files.\nLinux: -r for recursive (folders), -v for verbose, -p to preserve permissions.",
   "links": [
     {
       "title": "Documentation Copy-Item",
@@ -29,36 +28,26 @@
     "parameters": [
       {
         "name": "sourcePath",
-        "label": "Chemin source",
+        "label": "Source path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ou dossier à copier"
+        "description": "Path of the file or folder to copy"
       },
       {
         "name": "destinationPath",
-        "label": "Chemin destination",
+        "label": "Destination path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin de destination"
+        "description": "Destination path"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "Copy-Item -Path \"C:\\Source\\*\" -Destination \"D:\\Backup\" -Recurse -Force",
-      "description": "Copie tout le contenu de C:\\Source vers D:\\Backup",
-      "platform": 0
-    },
-    {
-      "command": "Copy-Item -Path \"<sourcePath>\" -Destination \"{destinationPath}\" -Recurse -Force",
-      "description": "Exemple utilisant le paramètre 'sourcePath': Chemin du fichier ou dossier à copier. Remplacez <sourcePath> par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "Copy-Item -Path \"{sourcePath}\" -Destination \"<destinationPath>\" -Recurse -Force",
-      "description": "Exemple utilisant le paramètre 'destinationPath': Chemin de destination. Remplacez <destinationPath> par la valeur appropriée selon votre environnement.",
+      "description": "Copy the whole content of C:\\Source to D:\\Backup",
       "platform": 0
     }
   ],
@@ -71,68 +60,97 @@
     "parameters": [
       {
         "name": "sourcePath",
-        "label": "Chemin source",
+        "label": "Source path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ou dossier à copier"
+        "description": "Path of the file or folder to copy"
       },
       {
         "name": "destinationPath",
-        "label": "Chemin destination",
+        "label": "Destination path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin de destination"
+        "description": "Destination path"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "cp -r /home/user/documents /backup/documents",
-      "description": "Copie le dossier documents vers le backup",
+      "description": "Copy the documents folder to the backup",
       "platform": 1
     },
     {
       "command": "cp -v file.txt /destination/",
-      "description": "Copie un fichier en mode verbeux",
+      "description": "Copy a file in verbose mode",
       "platform": 1
     },
     {
       "command": "cp -r \"{sourcePath}\" \"{destinationPath}\" -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "cp -r \"<sourcePath>\" \"{destinationPath}\"",
-      "description": "Exemple utilisant le paramètre 'sourcePath': Chemin du fichier ou dossier à copier. Remplacez <sourcePath> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "cp -r \"{sourcePath}\" \"<destinationPath>\"",
-      "description": "Exemple utilisant le paramètre 'destinationPath': Chemin de destination. Remplacez <destinationPath> par la valeur appropriée selon votre environnement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
       "platform": 1
     },
     {
       "command": "cp -r /home/user/docs /backup/",
-      "description": "Copier un dossier récursivement",
+      "description": "Copy a folder recursively",
       "platform": 1
     },
     {
       "command": "cp -av /var/www /backup/www-$(date +%Y%m%d)",
-      "description": "Copie avec verbose et date",
+      "description": "Copy with verbose output and dates",
       "platform": 1
     },
     {
       "command": "cp -p file.txt /tmp/",
-      "description": "Copier en préservant les attributs",
+      "description": "Copy and preserve the attributes",
       "platform": 1
     },
     {
       "command": "cp -u *.log /archive/",
-      "description": "Copier uniquement les plus récents",
+      "description": "Copy only the newer files",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Copier des fichiers ou dossiers",
+      "description": "Copie des fichiers ou des répertoires avec leurs sous-dossiers.",
+      "notes": "Windows: -Recurse copie les sous-dossiers. -Force écrase les fichiers existants.\nLinux: -r pour récursif (dossiers), -v pour verbeux, -p pour préserver les permissions.",
+      "parameters": {
+        "windows": {
+          "sourcePath": {
+            "label": "Chemin source",
+            "description": "Chemin du fichier ou dossier à copier"
+          },
+          "destinationPath": {
+            "label": "Chemin destination",
+            "description": "Chemin de destination"
+          }
+        },
+        "linux": {
+          "sourcePath": {
+            "label": "Chemin source",
+            "description": "Chemin du fichier ou dossier à copier"
+          },
+          "destinationPath": {
+            "label": "Chemin destination",
+            "description": "Chemin de destination"
+          }
+        }
+      },
+      "examples": {
+        "Copy-Item -Path \"C:\\Source\\*\" -Destination \"D:\\Backup\" -Recurse -Force": "Copie tout le contenu de C:\\Source vers D:\\Backup",
+        "cp -r /home/user/documents /backup/documents": "Copie le dossier documents vers le backup",
+        "cp -v file.txt /destination/": "Copie un fichier en mode verbeux",
+        "cp -r \"{sourcePath}\" \"{destinationPath}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "cp -r /home/user/docs /backup/": "Copier un dossier récursivement",
+        "cp -av /var/www /backup/www-$(date +%Y%m%d)": "Copie avec verbose et date",
+        "cp -p file.txt /tmp/": "Copier en préservant les attributs",
+        "cp -u *.log /archive/": "Copier uniquement les plus récents"
+      }
+    }
+  }
 }

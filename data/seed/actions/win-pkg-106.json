@@ -1,8 +1,8 @@
 {
   "id": "win-pkg-106",
-  "title": "Rechercher un package Chocolatey",
-  "description": "Recherche des packages disponibles dans le dépôt Chocolatey.",
-  "category": "📦 Package Management",
+  "title": "Search for a Chocolatey package",
+  "description": "Search for packages available in the Chocolatey repository.",
+  "category": "package-management",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,31 +21,50 @@
     "parameters": [
       {
         "name": "searchTerm",
-        "label": "Terme de recherche",
+        "label": "Search term",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Mot-clé ou nom du package à rechercher"
+        "description": "Keyword or name of the package to search for"
       }
     ]
   },
   "examples": [
     {
       "command": "choco search chrome",
-      "description": "Recherche tous les packages contenant 'chrome'",
+      "description": "Search for every package that contains 'chrome'",
       "platform": 0
     },
     {
       "command": "choco search --exact googlechrome",
-      "description": "Recherche par nom exact",
+      "description": "Search by exact name",
       "platform": 0
     }
   ],
-  "notes": "Recherche dans le dépôt community.chocolatey.org par défaut. Utiliser --exact pour correspondance exacte.",
+  "notes": "Searches the community.chocolatey.org repository by default. Use --exact for an exact match.",
   "links": [
     {
       "title": "Chocolatey search documentation",
       "url": "https://docs.chocolatey.org/en-us/choco/commands/search"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher un package Chocolatey",
+      "description": "Recherche des packages disponibles dans le dépôt Chocolatey.",
+      "notes": "Recherche dans le dépôt community.chocolatey.org par défaut. Utiliser --exact pour correspondance exacte.",
+      "parameters": {
+        "windows": {
+          "searchTerm": {
+            "label": "Terme de recherche",
+            "description": "Mot-clé ou nom du package à rechercher"
+          }
+        }
+      },
+      "examples": {
+        "choco search chrome": "Recherche tous les packages contenant 'chrome'",
+        "choco search --exact googlechrome": "Recherche par nom exact"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "unified-service-status",
-  "title": "Vérifier le statut d'un service",
-  "description": "Affiche l'état actuel d'un service Windows.",
-  "category": "⚙️ Services & Automation",
+  "title": "Check the status of a service",
+  "description": "Show the current state of a Windows service.",
+  "category": "services-automation",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -12,7 +12,7 @@
     "service",
     "systemd"
   ],
-  "notes": "Windows: Pour voir tous les services : Get-Service\nLinux: La plupart des commandes systemctl nécessitent sudo pour les actions de modification.",
+  "notes": "Windows: to see every service: Get-Service\nLinux: most systemctl commands that change something require sudo.",
   "links": [],
   "windowsCommandTemplateId": "win-service-status-cmd",
   "windowsCommandTemplate": {
@@ -23,43 +23,43 @@
     "parameters": [
       {
         "name": "serviceName",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du service Windows (ex: W32Time, Spooler)"
+        "description": "Windows service name (e.g. W32Time, Spooler)"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "Get-Service -Name W32Time",
-      "description": "Vérifie le statut du service Windows Time",
+      "description": "Check the status of the Windows Time service",
       "platform": 0
     },
     {
       "command": "Get-Service -Name {serviceName} | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-Service -Name {serviceName} | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results as a table fitted to the console. Format-Table -AutoSize adjusts the column widths for readable output. Handy for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-Service -Name {serviceName} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-Service -Name {serviceName} | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     },
     {
       "command": "Get-Service -Name Spooler",
-      "description": "Vérifie le statut du service d'impression Windows (Spooler).",
+      "description": "Check the status of the Windows print service (Spooler).",
       "platform": 0
     }
   ],
@@ -72,35 +72,68 @@
     "parameters": [
       {
         "name": "serviceName",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du service systemd (ex: nginx, apache2, ssh)"
+        "description": "systemd service name (e.g. nginx, apache2, ssh)"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "systemctl status nginx",
-      "description": "Vérifie le statut du service nginx",
+      "description": "Check the status of the nginx service",
       "platform": 1
     },
     {
       "command": "systemctl status sshd",
-      "description": "Vérifie le statut du service SSH",
+      "description": "Check the status of the SSH service",
       "platform": 1
     },
     {
       "command": "systemctl status apache2",
-      "description": "Vérifie le statut du serveur web Apache.",
+      "description": "Check the status of the Apache web server.",
       "platform": 1
     },
     {
       "command": "systemctl status cron",
-      "description": "Vérifie le statut du service de tâches planifiées cron.",
+      "description": "Check the status of the cron scheduled task service.",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Vérifier le statut d'un service",
+      "description": "Affiche l'état actuel d'un service Windows.",
+      "notes": "Windows: Pour voir tous les services : Get-Service\nLinux: La plupart des commandes systemctl nécessitent sudo pour les actions de modification.",
+      "parameters": {
+        "windows": {
+          "serviceName": {
+            "label": "Nom du service",
+            "description": "Nom du service Windows (ex: W32Time, Spooler)"
+          }
+        },
+        "linux": {
+          "serviceName": {
+            "label": "Nom du service",
+            "description": "Nom du service systemd (ex: nginx, apache2, ssh)"
+          }
+        }
+      },
+      "examples": {
+        "Get-Service -Name W32Time": "Vérifie le statut du service Windows Time",
+        "Get-Service -Name {serviceName} | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-Service -Name {serviceName} | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-Service -Name {serviceName} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-Service -Name {serviceName} | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "Get-Service -Name Spooler": "Vérifie le statut du service d'impression Windows (Spooler).",
+        "systemctl status nginx": "Vérifie le statut du service nginx",
+        "systemctl status sshd": "Vérifie le statut du service SSH",
+        "systemctl status apache2": "Vérifie le statut du serveur web Apache.",
+        "systemctl status cron": "Vérifie le statut du service de tâches planifiées cron."
+      }
+    }
+  }
 }

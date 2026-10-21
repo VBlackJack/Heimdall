@@ -1,8 +1,8 @@
 {
   "id": "get-scheduledtaskinfo",
-  "title": "Voir l'historique d'une tâche planifiée",
-  "description": "Affiche les informations d'exécution et l'historique d'une tâche planifiée",
-  "category": "⚙️ Services & Automation",
+  "title": "View the history of a scheduled task",
+  "description": "Show the run information and history of a scheduled task.",
+  "category": "services-automation",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,65 +21,93 @@
     "parameters": [
       {
         "name": "taskname",
-        "label": "Nom de la tâche",
+        "label": "Task name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "MyTask",
         "required": true,
-        "description": "Nom de la tâche"
+        "description": "Task name"
       },
       {
         "name": "taskpath",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Chemin de la tâche"
+        "description": "Task path"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-ScheduledTaskInfo -TaskName 'DailyBackup'",
-      "description": "Affiche l'historique de la tâche de sauvegarde",
+      "description": "Show the history of the backup task",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTask | Get-ScheduledTaskInfo | Where-Object {$_.LastTaskResult -ne 0}",
-      "description": "Trouve les tâches avec erreurs",
+      "description": "Find the tasks that failed",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTaskInfo -TaskName 'MyTask' | Select-Object LastRunTime, LastTaskResult, NextRunTime, NumberOfMissedRuns",
-      "description": "Informations détaillées d'exécution",
+      "description": "Detailed run information",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTaskInfo -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTaskInfo -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTaskInfo -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ScheduledTaskInfo -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "LastTaskResult 0 = succès, autre = erreur. Voir aussi les événements dans Event Viewer (TaskScheduler).",
+  "notes": "LastTaskResult 0 = success, anything else = error. See also the events in Event Viewer (TaskScheduler).",
   "links": [
     {
       "title": "Get-ScheduledTaskInfo Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/get-scheduledtaskinfo"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Voir l'historique d'une tâche planifiée",
+      "description": "Affiche les informations d'exécution et l'historique d'une tâche planifiée",
+      "notes": "LastTaskResult 0 = succès, autre = erreur. Voir aussi les événements dans Event Viewer (TaskScheduler).",
+      "parameters": {
+        "windows": {
+          "taskname": {
+            "label": "Nom de la tâche",
+            "description": "Nom de la tâche"
+          },
+          "taskpath": {
+            "label": "Chemin",
+            "description": "Chemin de la tâche"
+          }
+        }
+      },
+      "examples": {
+        "Get-ScheduledTaskInfo -TaskName 'DailyBackup'": "Affiche l'historique de la tâche de sauvegarde",
+        "Get-ScheduledTask | Get-ScheduledTaskInfo | Where-Object {$_.LastTaskResult -ne 0}": "Trouve les tâches avec erreurs",
+        "Get-ScheduledTaskInfo -TaskName 'MyTask' | Select-Object LastRunTime, LastTaskResult, NextRunTime, NumberOfMissedRuns": "Informations détaillées d'exécution",
+        "Get-ScheduledTaskInfo -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-ScheduledTaskInfo -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-ScheduledTaskInfo -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ScheduledTaskInfo -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

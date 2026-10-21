@@ -1,8 +1,8 @@
 {
   "id": "defender-get-status",
-  "title": "Obtenir le statut complet de Windows Defender",
-  "description": "Affiche l'état détaillé de Windows Defender (protection temps réel, définitions, dernière analyse, etc.).",
-  "category": "🔒 Security & Encryption",
+  "title": "Get the full Windows Defender status",
+  "description": "Show the detailed Windows Defender state (real-time protection, definitions, last scan and more).",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Get-MpComputerStatus",
-      "description": "Affiche tous les détails du statut Defender",
+      "description": "Show every detail of the Defender status",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled,BehaviorMonitorEnabled,IoavProtectionEnabled,OnAccessProtectionEnabled",
-      "description": "Vérifie les 4 protections en temps réel essentielles",
+      "description": "Check the 4 essential real-time protections",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Select-Object AntivirusSignatureVersion,AntivirusSignatureLastUpdated",
-      "description": "Affiche la version et date des définitions antivirus",
+      "description": "Show the version and date of the antivirus definitions",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Select-Object QuickScanStartTime,QuickScanEndTime,FullScanStartTime,FullScanEndTime",
-      "description": "Affiche les dates des dernières analyses rapides et complètes",
+      "description": "Show the dates of the last quick and full scans",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Select-Object AMEngineVersion,AMProductVersion,AMServiceEnabled",
-      "description": "Vérifie les versions du moteur antimalware et du service",
+      "description": "Check the versions of the antimalware engine and service",
       "platform": 0
     }
   ],
-  "notes": "RealTimeProtectionEnabled: protection en temps réel. BehaviorMonitorEnabled: surveillance comportementale. IoavProtectionEnabled: inspection à l'accès. NISEnabled: système d'inspection réseau. QuickScanAge/FullScanAge: nombre de jours depuis dernière analyse.",
+  "notes": "RealTimeProtectionEnabled: real-time protection. BehaviorMonitorEnabled: behavior monitoring. IoavProtectionEnabled: on-access inspection. NISEnabled: network inspection system. QuickScanAge/FullScanAge: number of days since the last scan.",
   "links": [
     {
       "title": "Get-MpComputerStatus Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/defender/get-mpcomputerstatus"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Obtenir le statut complet de Windows Defender",
+      "description": "Affiche l'état détaillé de Windows Defender (protection temps réel, définitions, dernière analyse, etc.).",
+      "notes": "RealTimeProtectionEnabled: protection en temps réel. BehaviorMonitorEnabled: surveillance comportementale. IoavProtectionEnabled: inspection à l'accès. NISEnabled: système d'inspection réseau. QuickScanAge/FullScanAge: nombre de jours depuis dernière analyse.",
+      "examples": {
+        "Get-MpComputerStatus": "Affiche tous les détails du statut Defender",
+        "Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled,BehaviorMonitorEnabled,IoavProtectionEnabled,OnAccessProtectionEnabled": "Vérifie les 4 protections en temps réel essentielles",
+        "Get-MpComputerStatus | Select-Object AntivirusSignatureVersion,AntivirusSignatureLastUpdated": "Affiche la version et date des définitions antivirus",
+        "Get-MpComputerStatus | Select-Object QuickScanStartTime,QuickScanEndTime,FullScanStartTime,FullScanEndTime": "Affiche les dates des dernières analyses rapides et complètes",
+        "Get-MpComputerStatus | Select-Object AMEngineVersion,AMProductVersion,AMServiceEnabled": "Vérifie les versions du moteur antimalware et du service"
+      }
+    }
+  }
 }

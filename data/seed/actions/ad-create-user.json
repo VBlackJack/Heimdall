@@ -1,8 +1,8 @@
 {
   "id": "ad-create-user",
-  "title": "Créer un nouvel utilisateur AD",
-  "description": "Crée un nouveau compte utilisateur dans Active Directory avec les paramètres de base.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Create an AD user",
+  "description": "Create a user account in Active Directory with the basic settings.",
+  "category": "active-directory",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -20,94 +20,140 @@
     "parameters": [
       {
         "name": "fullName",
-        "label": "Nom complet",
+        "label": "Full name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom complet de l'utilisateur (ex: Jean Dupont)"
+        "description": "Full name of the user (e.g. Jean Dupont)"
       },
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "Username",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "SamAccountName (ex: jdupont)"
+        "description": "SamAccountName (e.g. jdupont)"
       },
       {
         "name": "domain",
-        "label": "Domaine",
+        "label": "Domain",
         "type": "string",
         "defaultValue": "contoso.com",
         "required": true,
-        "description": "Domaine AD (ex: contoso.com)"
+        "description": "AD domain (e.g. contoso.com)"
       },
       {
         "name": "firstName",
-        "label": "Prénom",
+        "label": "First name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Prénom de l'utilisateur"
+        "description": "First name of the user"
       },
       {
         "name": "lastName",
-        "label": "Nom",
+        "label": "Last name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de famille de l'utilisateur"
+        "description": "Last name of the user"
       },
       {
         "name": "ouPath",
-        "label": "Chemin OU",
+        "label": "OU path",
         "type": "string",
         "defaultValue": "OU=Users,DC=contoso,DC=com",
         "required": true,
-        "description": "Distinguished Name de l'OU de destination"
+        "description": "Distinguished Name of the target OU"
       },
       {
         "name": "password",
-        "label": "Mot de passe",
+        "label": "Password",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Mot de passe initial (doit respecter la politique)"
+        "description": "Initial password (must meet the policy)"
       }
     ]
   },
   "examples": [
     {
       "command": "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true",
-      "description": "Crée l'utilisateur Jean Dupont dans l'OU Users",
+      "description": "Create the user Jean Dupont in the Users OU",
       "platform": 0
     },
     {
       "command": "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf after checking to run it.",
       "platform": 0
     },
     {
       "command": "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the confirmation prompts. Useful in automated scripts, but use with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the modified or created object to the pipeline. By default the Set- and New- cmdlets return nothing. -PassThru turns the output on, for chained operations or an immediate check.",
       "platform": 0
     },
     {
       "command": "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the command's execution. -Verbose turns on the diagnostic messages that show exactly what happens. Essential for troubleshooting and to understand the internal operations.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits d'administration AD. Le mot de passe doit respecter la politique de domaine. L'utilisateur est activé par défaut.",
+  "notes": "Requires AD administration rights. The password must meet the domain policy. The user is enabled by default.",
   "links": [
     {
       "title": "Documentation New-ADUser",
       "url": "https://learn.microsoft.com/en-us/powershell/module/activedirectory/new-aduser"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer un nouvel utilisateur AD",
+      "description": "Crée un nouveau compte utilisateur dans Active Directory avec les paramètres de base.",
+      "notes": "Nécessite des droits d'administration AD. Le mot de passe doit respecter la politique de domaine. L'utilisateur est activé par défaut.",
+      "parameters": {
+        "windows": {
+          "fullName": {
+            "label": "Nom complet",
+            "description": "Nom complet de l'utilisateur (ex: Jean Dupont)"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "SamAccountName (ex: jdupont)"
+          },
+          "domain": {
+            "label": "Domaine",
+            "description": "Domaine AD (ex: contoso.com)"
+          },
+          "firstName": {
+            "label": "Prénom",
+            "description": "Prénom de l'utilisateur"
+          },
+          "lastName": {
+            "label": "Nom",
+            "description": "Nom de famille de l'utilisateur"
+          },
+          "ouPath": {
+            "label": "Chemin OU",
+            "description": "Distinguished Name de l'OU de destination"
+          },
+          "password": {
+            "label": "Mot de passe",
+            "description": "Mot de passe initial (doit respecter la politique)"
+          }
+        }
+      },
+      "examples": {
+        "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true": "Crée l'utilisateur Jean Dupont dans l'OU Users",
+        "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
+      }
+    }
+  }
 }

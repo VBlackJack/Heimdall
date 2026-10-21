@@ -1,8 +1,8 @@
 {
   "id": "chmod-permissions",
-  "title": "Modifier les permissions d'un fichier",
-  "description": "Change les permissions (lecture, écriture, exécution) d'un fichier ou répertoire",
-  "category": "🔒 Security & Encryption",
+  "title": "Change the permissions of a file",
+  "description": "Change the permissions (read, write, execute) of a file or directory",
+  "category": "security",
   "platform": 1,
   "level": 1,
   "tags": [
@@ -24,75 +24,100 @@
         "type": "string",
         "defaultValue": "755",
         "required": true,
-        "description": "Permissions (755, 644, +x, u+w, etc.)"
+        "description": "Permissions (755, 644, +x, u+w and so on)"
       },
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "/path/to/file",
         "required": true,
-        "description": "Fichier ou répertoire à modifier"
+        "description": "File or directory to change"
       }
     ]
   },
   "examples": [
     {
       "command": "chmod 755 script.sh",
-      "description": "Rend un script exécutable",
+      "description": "Make a script executable",
       "platform": 1
     },
     {
       "command": "chmod -R 644 /var/www/html",
-      "description": "644 récursif sur un répertoire",
+      "description": "Recursive 644 on a directory",
       "platform": 1
     },
     {
       "command": "chmod +x file.sh",
-      "description": "Ajoute le droit d'exécution",
+      "description": "Add the execute permission",
       "platform": 1
     },
     {
       "command": "chmod Full /var/log/app.log -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "chmod 755 /var/log/app.log",
-      "description": "Exemple utilisant le paramètre 'mode': Permissions (755, 644, +x, u+w, etc.). Remplacez Full par la valeur appropriée selon votre environnement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
       "command": "chmod 755 /var/www/html/index.php",
-      "description": "Permissions rwxr-xr-x pour un fichier web",
+      "description": "rwxr-xr-x permissions for a web file",
       "platform": 1
     },
     {
       "command": "chmod 600 ~/.ssh/id_rsa",
-      "description": "Sécuriser la clé SSH privée (lecture/écriture propriétaire seulement)",
+      "description": "Secure the private SSH key (read and write for the owner only)",
       "platform": 1
     },
     {
       "command": "chmod -R 644 /var/log/*.log",
-      "description": "Permissions rw-r--r-- pour les fichiers de logs",
+      "description": "rw-r--r-- permissions for the log files",
       "platform": 1
     },
     {
       "command": "chmod u+x script.sh",
-      "description": "Ajouter le droit d'exécution pour le propriétaire",
+      "description": "Add the execute permission for the owner",
       "platform": 1
     },
     {
       "command": "chmod go-rwx /etc/secrets",
-      "description": "Retirer tous les droits pour groupe et autres",
+      "description": "Remove every permission for group and others",
       "platform": 1
     }
   ],
-  "notes": "755=rwxr-xr-x, 644=rw-r--r--. -R pour récursif. u=user, g=group, o=others, a=all.",
+  "notes": "755=rwxr-xr-x, 644=rw-r--r--. -R for recursive. u=user, g=group, o=others, a=all.",
   "links": [
     {
       "title": "chmod guide",
       "url": "https://man7.org/linux/man-pages/man1/chmod.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Modifier les permissions d'un fichier",
+      "description": "Change les permissions (lecture, écriture, exécution) d'un fichier ou répertoire",
+      "notes": "755=rwxr-xr-x, 644=rw-r--r--. -R pour récursif. u=user, g=group, o=others, a=all.",
+      "parameters": {
+        "linux": {
+          "mode": {
+            "label": "Mode",
+            "description": "Permissions (755, 644, +x, u+w, etc.)"
+          },
+          "path": {
+            "label": "Chemin",
+            "description": "Fichier ou répertoire à modifier"
+          }
+        }
+      },
+      "examples": {
+        "chmod 755 script.sh": "Rend un script exécutable",
+        "chmod -R 644 /var/www/html": "644 récursif sur un répertoire",
+        "chmod +x file.sh": "Ajoute le droit d'exécution",
+        "chmod Full /var/log/app.log -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "chmod 755 /var/www/html/index.php": "Permissions rwxr-xr-x pour un fichier web",
+        "chmod 600 ~/.ssh/id_rsa": "Sécuriser la clé SSH privée (lecture/écriture propriétaire seulement)",
+        "chmod -R 644 /var/log/*.log": "Permissions rw-r--r-- pour les fichiers de logs",
+        "chmod u+x script.sh": "Ajouter le droit d'exécution pour le propriétaire",
+        "chmod go-rwx /etc/secrets": "Retirer tous les droits pour groupe et autres"
+      }
+    }
+  }
 }

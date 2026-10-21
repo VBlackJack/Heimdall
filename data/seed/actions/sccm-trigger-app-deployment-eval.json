@@ -1,8 +1,8 @@
 {
   "id": "sccm-trigger-app-deployment-eval",
-  "title": "Déclencher l'évaluation des déploiements d'applications",
-  "description": "Force l'évaluation de tous les déploiements d'applications SCCM pour vérifier les nouvelles applications disponibles",
-  "category": "🔄 Windows Updates",
+  "title": "Trigger the application deployment evaluation",
+  "description": "Force the evaluation of every SCCM application deployment to check for newly available applications",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,26 +21,26 @@
   },
   "examples": [
     {
-      "command": "ss -tulpn",
-      "description": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
-      "platform": 1
-    },
-    {
-      "command": "ss -s",
-      "description": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
-      "platform": 1
-    },
-    {
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000121}'",
-      "description": "Déclenche l'évaluation des déploiements d'applications",
+      "description": "Trigger the application deployment evaluation",
       "platform": 0
     }
   ],
-  "notes": "Schedule ID {121} = Application Deployment Evaluation Cycle. Utile pour forcer la vérification de nouvelles applications déployées.",
+  "notes": "Schedule ID {121} = Application Deployment Evaluation Cycle. Useful to force a check for newly deployed applications.",
   "links": [
     {
       "title": "SCCM Client Actions PowerShell",
       "url": "https://sccmpowershell.com/trigger-sccm-client-actions-remotely"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Déclencher l'évaluation des déploiements d'applications",
+      "description": "Force l'évaluation de tous les déploiements d'applications SCCM pour vérifier les nouvelles applications disponibles",
+      "notes": "Schedule ID {121} = Application Deployment Evaluation Cycle. Utile pour forcer la vérification de nouvelles applications déployées.",
+      "examples": {
+        "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000121}'": "Déclenche l'évaluation des déploiements d'applications"
+      }
+    }
+  }
 }

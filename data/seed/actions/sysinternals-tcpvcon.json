@@ -1,8 +1,8 @@
 {
   "id": "sysinternals-tcpvcon",
-  "title": "Connexions TCP détaillées (Tcpvcon)",
-  "description": "Version ligne de commande de TCPView. Affiche les connexions réseau avec les processus associés.",
-  "category": "🌐 Network & DNS",
+  "title": "Detailed TCP connections (Tcpvcon)",
+  "description": "Command-line version of TCPView. Shows the network connections with their processes.",
+  "category": "network-dns",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,9 +21,18 @@
   "examples": [
     {
       "command": "tcpvcon.exe -a -n -c -AcceptEula",
-      "description": "Affiche toutes les connexions (-a) sans résolution DNS (-n) au format CSV (-c). Idéal pour scripter ou analyser dans Excel.",
+      "description": "Show every connection (-a) without DNS resolution (-n) as CSV (-c). Ideal for scripting or analysis in Excel.",
       "platform": 0
     }
   ],
-  "windowsCommandTemplateId": "6a97b19b-d2fd-4b3b-8e43-502b585e074c"
+  "windowsCommandTemplateId": "6a97b19b-d2fd-4b3b-8e43-502b585e074c",
+  "translations": {
+    "fr": {
+      "title": "Connexions TCP détaillées (Tcpvcon)",
+      "description": "Version ligne de commande de TCPView. Affiche les connexions réseau avec les processus associés.",
+      "examples": {
+        "tcpvcon.exe -a -n -c -AcceptEula": "Affiche toutes les connexions (-a) sans résolution DNS (-n) au format CSV (-c). Idéal pour scripter ou analyser dans Excel."
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "defender-check-definition-version",
-  "title": "Vérifier la version des définitions Defender",
-  "description": "Affiche la version actuelle des définitions antivirus et vérifie si elles sont à jour.",
-  "category": "🔒 Security & Encryption",
+  "title": "Check the Defender definition version",
+  "description": "Show the current version of the antivirus definitions and check whether they are up to date.",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,40 +21,55 @@
   "examples": [
     {
       "command": "Get-MpComputerStatus | Select-Object AMEngineVersion,AMProductVersion,AMServiceVersion",
-      "description": "Affiche les versions du moteur antimalware",
+      "description": "Show the versions of the antimalware engine",
       "platform": 0
     },
     {
       "command": "$status = Get-MpComputerStatus; [PSCustomObject]@{ AV_Version=$status.AntivirusSignatureVersion; AV_Updated=$status.AntivirusSignatureLastUpdated; NIS_Version=$status.NISSignatureVersion; NIS_Updated=$status.NISSignatureLastUpdated }",
-      "description": "Rapport complet formaté des versions AV et NIS",
+      "description": "Full formatted report of the AV and NIS versions",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to every column. -First 1 keeps the first result only. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table sized for the console. Format-Table -AutoSize adjusts the column widths for readable output. Good for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file that Excel can open. -NoTypeInformation drops the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-MpComputerStatus | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "AntivirusSignatureVersion: définitions antimalware (format: 1.xxx.xxxx.x). NISSignatureVersion: Network Inspection System signatures. Les définitions doivent être mises à jour quotidiennement (max 2-3 jours). Si obsolètes: Update-MpSignature.",
+  "notes": "AntivirusSignatureVersion: antimalware definitions (format: 1.xxx.xxxx.x). NISSignatureVersion: Network Inspection System signatures. Definitions must be updated daily (2-3 days at most). If they are out of date: Update-MpSignature.",
   "links": [
     {
       "title": "Defender Signature Updates",
       "url": "https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier la version des définitions Defender",
+      "description": "Affiche la version actuelle des définitions antivirus et vérifie si elles sont à jour.",
+      "notes": "AntivirusSignatureVersion: définitions antimalware (format: 1.xxx.xxxx.x). NISSignatureVersion: Network Inspection System signatures. Les définitions doivent être mises à jour quotidiennement (max 2-3 jours). Si obsolètes: Update-MpSignature.",
+      "examples": {
+        "Get-MpComputerStatus | Select-Object AMEngineVersion,AMProductVersion,AMServiceVersion": "Affiche les versions du moteur antimalware",
+        "$status = Get-MpComputerStatus; [PSCustomObject]@{ AV_Version=$status.AntivirusSignatureVersion; AV_Updated=$status.AntivirusSignatureLastUpdated; NIS_Version=$status.NISSignatureVersion; NIS_Updated=$status.NISSignatureLastUpdated }": "Rapport complet formaté des versions AV et NIS",
+        "Get-MpComputerStatus | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-MpComputerStatus | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-MpComputerStatus | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-MpComputerStatus | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

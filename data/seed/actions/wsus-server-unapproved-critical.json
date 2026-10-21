@@ -1,8 +1,8 @@
 {
   "id": "wsus-server-unapproved-critical",
-  "title": "Lister les mises à jour critiques non approuvées sur WSUS",
-  "description": "Affiche toutes les mises à jour critiques non encore approuvées sur le serveur WSUS",
-  "category": "🔄 Windows Updates",
+  "title": "List the unapproved critical updates on WSUS",
+  "description": "Show every critical update not yet approved on the WSUS server",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -23,35 +23,49 @@
   "examples": [
     {
       "command": "Get-WsusUpdate -Classification Critical,Security -Approval Unapproved -Status Any",
-      "description": "Liste les mises à jour critiques et de sécurité non approuvées",
+      "description": "List the unapproved critical and security updates",
       "platform": 0
     },
     {
       "command": "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     },
     {
       "command": "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Select-Object Title,Classification,Approval,CreationDate | Format-Table -AutoSize",
-      "description": "Affiche toutes les mises à jour critiques non encore approuvées sur le serveur WSUS.",
+      "description": "Show every critical update not yet approved on the WSUS server.",
       "platform": 0
     }
   ],
-  "notes": "À exécuter sur le serveur WSUS. Nécessite le module UpdateServices. Utile pour identifier les mises à jour importantes en attente d'approbation.",
+  "notes": "Run it on the WSUS server. Requires the UpdateServices module. Useful to find important updates waiting for approval.",
   "links": [
     {
       "title": "Get-WsusUpdate Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/updateservices/get-wsusupdate"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les mises à jour critiques non approuvées sur WSUS",
+      "description": "Affiche toutes les mises à jour critiques non encore approuvées sur le serveur WSUS",
+      "notes": "À exécuter sur le serveur WSUS. Nécessite le module UpdateServices. Utile pour identifier les mises à jour importantes en attente d'approbation.",
+      "examples": {
+        "Get-WsusUpdate -Classification Critical,Security -Approval Unapproved -Status Any": "Liste les mises à jour critiques et de sécurité non approuvées",
+        "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Select-Object Title,Classification,Approval,CreationDate | Format-Table -AutoSize": "Affiche toutes les mises à jour critiques non encore approuvées sur le serveur WSUS."
+      }
+    }
+  }
 }

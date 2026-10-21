@@ -1,8 +1,8 @@
 {
   "id": "performance-system-health-report",
-  "title": "Générer un rapport de santé système complet",
-  "description": "Collecte et affiche un rapport complet sur la santé du système: CPU, RAM, disque, services, uptime",
-  "category": "⚡ Performance",
+  "title": "Generate a full system health report",
+  "description": "Collect and show a full report on the system health: CPU, RAM, disk, services, uptime.",
+  "category": "performance",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -23,15 +23,25 @@
   "examples": [
     {
       "command": "Get-ComputerInfo | Select-Object CsName,WindowsVersion,OsLastBootUpTime,OsTotalVisibleMemorySize",
-      "description": "Informations système de base",
+      "description": "Basic system information",
       "platform": 0
     }
   ],
-  "notes": "Rapport complet incluant: nom PC, OS, dernier boot, uptime, CPU, RAM, disque C:, services défaillants. Idéal pour un diagnostic rapide.",
+  "notes": "Full report including: PC name, OS, last boot, uptime, CPU, RAM, C: disk, failed services. Ideal for a quick diagnosis.",
   "links": [
     {
       "title": "System Health Monitoring",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-computerinfo"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Générer un rapport de santé système complet",
+      "description": "Collecte et affiche un rapport complet sur la santé du système: CPU, RAM, disque, services, uptime",
+      "notes": "Rapport complet incluant: nom PC, OS, dernier boot, uptime, CPU, RAM, disque C:, services défaillants. Idéal pour un diagnostic rapide.",
+      "examples": {
+        "Get-ComputerInfo | Select-Object CsName,WindowsVersion,OsLastBootUpTime,OsTotalVisibleMemorySize": "Informations système de base"
+      }
+    }
+  }
 }

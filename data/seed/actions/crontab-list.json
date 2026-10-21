@@ -1,8 +1,8 @@
 {
   "id": "crontab-list",
-  "title": "Lister les tâches cron",
-  "description": "Affiche les tâches planifiées cron de l'utilisateur",
-  "category": "⚙️ Services & Automation",
+  "title": "List the cron jobs",
+  "description": "Show the user's scheduled cron jobs",
+  "category": "services-automation",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -17,78 +17,67 @@
     "id": "crontab-list-cmd",
     "platform": 1,
     "name": "crontab",
-    "commandPattern": "crontab -{option} {user}",
-    "parameters": [
-      {
-        "name": "option",
-        "label": "Option",
-        "type": "string",
-        "defaultValue": "l",
-        "required": true,
-        "description": "Option (l=list, e=edit, r=remove, -u user)"
-      },
-      {
-        "name": "user",
-        "label": "Utilisateur",
-        "type": "string",
-        "defaultValue": "",
-        "required": false,
-        "description": "Utilisateur (nécessite sudo)"
-      }
-    ]
+    "commandPattern": "crontab -l",
+    "parameters": []
   },
   "examples": [
     {
       "command": "crontab -l",
-      "description": "Liste vos tâches cron",
+      "description": "List your cron jobs",
       "platform": 1
     },
     {
       "command": "crontab -e",
-      "description": "Édite vos tâches cron",
+      "description": "Edit your cron jobs",
       "platform": 1
     },
     {
       "command": "sudo crontab -l -u username",
-      "description": "Liste les tâches d'un autre utilisateur",
-      "platform": 1
-    },
-    {
-      "command": "crontab -l jdupont",
-      "description": "Exemple utilisant le paramètre 'option': Option (l=list, e=edit, r=remove, -u user). Remplacez verbose par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "crontab -verbose jdupont",
-      "description": "Exemple utilisant le paramètre 'user': Utilisateur (nécessite sudo). Remplacez jdupont par la valeur appropriée selon votre environnement.",
+      "description": "List the jobs of another user",
       "platform": 1
     },
     {
       "command": "crontab -r",
-      "description": "Supprimer toutes les tâches cron",
+      "description": "Delete every cron job",
       "platform": 1
     },
     {
       "command": "crontab -l -u www-data",
-      "description": "Lister les tâches d'un autre utilisateur",
+      "description": "List the jobs of another user",
       "platform": 1
     },
     {
       "command": "cat /etc/crontab",
-      "description": "Afficher le crontab système",
+      "description": "Show the system crontab",
       "platform": 1
     },
     {
       "command": "ls -la /etc/cron.d/",
-      "description": "Fichiers cron.d",
+      "description": "cron.d files",
       "platform": 1
     }
   ],
-  "notes": "Format: min hour day month weekday command. -e pour éditer. Logs dans /var/log/syslog.",
+  "notes": "Format: min hour day month weekday command. -e to edit. Logs in /var/log/syslog.",
   "links": [
     {
       "title": "Crontab documentation",
       "url": "https://man7.org/linux/man-pages/man5/crontab.5.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister les tâches cron",
+      "description": "Affiche les tâches planifiées cron de l'utilisateur",
+      "notes": "Format: min hour day month weekday command. -e pour éditer. Logs dans /var/log/syslog.",
+      "examples": {
+        "crontab -l": "Liste vos tâches cron",
+        "crontab -e": "Édite vos tâches cron",
+        "sudo crontab -l -u username": "Liste les tâches d'un autre utilisateur",
+        "crontab -r": "Supprimer toutes les tâches cron",
+        "crontab -l -u www-data": "Lister les tâches d'un autre utilisateur",
+        "cat /etc/crontab": "Afficher le crontab système",
+        "ls -la /etc/cron.d/": "Fichiers cron.d"
+      }
+    }
+  }
 }

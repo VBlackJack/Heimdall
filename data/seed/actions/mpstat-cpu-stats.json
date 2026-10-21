@@ -1,8 +1,8 @@
 {
   "id": "mpstat-cpu-stats",
-  "title": "Statistiques CPU par processeur",
-  "description": "Affiche les statistiques d'utilisation CPU par processeur individuel",
-  "category": "📊 Monitoring & Logs",
+  "title": "CPU statistics per processor",
+  "description": "Show the CPU usage statistics of each individual processor.",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -21,39 +21,62 @@
     "parameters": [
       {
         "name": "interval",
-        "label": "Intervalle",
+        "label": "Interval",
         "type": "number",
         "defaultValue": "5",
         "required": true,
-        "description": "Intervalle en secondes"
+        "description": "Interval in seconds"
       },
       {
         "name": "count",
-        "label": "Nombre",
+        "label": "Count",
         "type": "number",
         "defaultValue": "3",
         "required": true,
-        "description": "Nombre de mesures"
+        "description": "Number of samples"
       }
     ]
   },
   "examples": [
     {
       "command": "mpstat",
-      "description": "Stats CPU par processeur",
+      "description": "CPU stats per processor",
       "platform": 1
     },
     {
       "command": "nproc",
-      "description": "Nombre de processeurs",
+      "description": "Number of processors",
       "platform": 1
     }
   ],
-  "notes": "Fait partie du package sysstat. -P ALL pour voir chaque cœur séparément.",
+  "notes": "Part of the sysstat package. -P ALL to see each core separately.",
   "links": [
     {
       "title": "mpstat documentation",
       "url": "https://man7.org/linux/man-pages/man1/mpstat.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Statistiques CPU par processeur",
+      "description": "Affiche les statistiques d'utilisation CPU par processeur individuel",
+      "notes": "Fait partie du package sysstat. -P ALL pour voir chaque coeur séparément.",
+      "parameters": {
+        "linux": {
+          "interval": {
+            "label": "Intervalle",
+            "description": "Intervalle en secondes"
+          },
+          "count": {
+            "label": "Nombre",
+            "description": "Nombre de mesures"
+          }
+        }
+      },
+      "examples": {
+        "mpstat": "Stats CPU par processeur",
+        "nproc": "Nombre de processeurs"
+      }
+    }
+  }
 }

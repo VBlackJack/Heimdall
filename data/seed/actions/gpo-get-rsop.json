@@ -1,8 +1,8 @@
 {
   "id": "gpo-get-rsop",
-  "title": "Obtenir le RSoP (Resultant Set of Policy)",
-  "description": "Génère un rapport RSoP détaillé des stratégies appliquées à un utilisateur/ordinateur.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Get the RSoP (Resultant Set of Policy)",
+  "description": "Generate a detailed RSoP report of the policies applied to a user or computer.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -20,26 +20,39 @@
     "parameters": [
       {
         "name": "outputPath",
-        "label": "Fichier de sortie",
+        "label": "Output file",
         "type": "string",
         "defaultValue": "C:\\GPOReports\\rsop.html",
         "required": true,
-        "description": "Chemin complet du fichier HTML à créer"
+        "description": "Full path of the HTML file to create"
       }
     ]
   },
   "examples": [
     {
       "command": "gpresult /H \"C:\\GPOReports\\rsop.html\" /F",
-      "description": "Génère un rapport RSoP HTML complet",
-      "platform": 0
-    },
-    {
-      "command": "gpresult /H \"C:\\Reports\\output.txt\" /F",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help gpresult -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Generate a full HTML RSoP report",
       "platform": 0
     }
   ],
-  "notes": "Le rapport RSoP montre toutes les GPO appliquées et leurs paramètres effectifs. /F force l'écrasement du fichier.",
-  "links": []
+  "notes": "The RSoP report shows every applied GPO and its effective settings. /F forces the file to be overwritten.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Obtenir le RSoP (Resultant Set of Policy)",
+      "description": "Génère un rapport RSoP détaillé des stratégies appliquées à un utilisateur/ordinateur.",
+      "notes": "Le rapport RSoP montre toutes les GPO appliquées et leurs paramètres effectifs. /F force l'écrasement du fichier.",
+      "parameters": {
+        "windows": {
+          "outputPath": {
+            "label": "Fichier de sortie",
+            "description": "Chemin complet du fichier HTML à créer"
+          }
+        }
+      },
+      "examples": {
+        "gpresult /H \"C:\\GPOReports\\rsop.html\" /F": "Génère un rapport RSoP HTML complet"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "win-pkg-103",
-  "title": "Mettre à jour un package Chocolatey",
-  "description": "Met à jour un package spécifique vers sa dernière version disponible via Chocolatey.",
-  "category": "📦 Package Management",
+  "title": "Update a Chocolatey package",
+  "description": "Update a specific package to its latest version available through Chocolatey.",
+  "category": "package-management",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -21,31 +21,44 @@
     "parameters": [
       {
         "name": "packageName",
-        "label": "Nom du package",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du package à mettre à jour"
+        "description": "Name of the package to update"
       }
     ]
   },
   "examples": [
     {
       "command": "choco upgrade googlechrome -y",
-      "description": "Met à jour Google Chrome vers la dernière version",
-      "platform": 0
-    },
-    {
-      "command": "choco upgrade Microsoft.VisualStudioCode -y",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help choco -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Update Google Chrome to the latest version",
       "platform": 0
     }
   ],
-  "notes": "Vérifie automatiquement si une mise à jour est disponible avant d'installer.",
+  "notes": "Checks automatically whether an update is available before installing.",
   "links": [
     {
       "title": "Chocolatey upgrade documentation",
       "url": "https://docs.chocolatey.org/en-us/choco/commands/upgrade"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Mettre à jour un package Chocolatey",
+      "description": "Met à jour un package spécifique vers sa dernière version disponible via Chocolatey.",
+      "notes": "Vérifie automatiquement si une mise à jour est disponible avant d'installer.",
+      "parameters": {
+        "windows": {
+          "packageName": {
+            "label": "Nom du package",
+            "description": "Nom du package à mettre à jour"
+          }
+        }
+      },
+      "examples": {
+        "choco upgrade googlechrome -y": "Met à jour Google Chrome vers la dernière version"
+      }
+    }
+  }
 }

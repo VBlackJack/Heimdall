@@ -1,8 +1,8 @@
 {
   "id": "defender-update-signatures",
-  "title": "Mettre à jour les définitions Windows Defender",
-  "description": "Force la mise à jour immédiate des signatures antivirus et antimalware de Defender.",
-  "category": "🔒 Security & Encryption",
+  "title": "Update the Windows Defender definitions",
+  "description": "Force an immediate update of the Defender antivirus and antimalware signatures.",
+  "category": "security",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,30 +22,43 @@
   "examples": [
     {
       "command": "Update-MpSignature",
-      "description": "Met à jour les signatures Defender depuis Microsoft Update",
+      "description": "Update the Defender signatures from Microsoft Update",
       "platform": 0
     },
     {
       "command": "Update-MpSignature -UpdateSource MicrosoftUpdateServer",
-      "description": "Force la mise à jour depuis les serveurs Microsoft Update",
+      "description": "Force the update from the Microsoft Update servers",
       "platform": 0
     },
     {
       "command": "Update-MpSignature -UpdateSource MMPC",
-      "description": "Met à jour depuis le Microsoft Malware Protection Center (backup)",
+      "description": "Update from the Microsoft Malware Protection Center (fallback)",
       "platform": 0
     },
     {
       "command": "Update-MpSignature; Get-MpComputerStatus | Select-Object AntivirusSignatureVersion,AntivirusSignatureLastUpdated",
-      "description": "Met à jour puis affiche la version des signatures installées",
+      "description": "Update, then show the version of the installed signatures",
       "platform": 0
     }
   ],
-  "notes": "Exécute une mise à jour immédiate (ne pas attendre la planification). UpdateSource: MicrosoftUpdateServer (WSUS/Windows Update), MMPC (serveurs Microsoft directs), FileShares (partage réseau). Nécessite une connexion Internet active.",
+  "notes": "Runs an immediate update (does not wait for the schedule). UpdateSource: MicrosoftUpdateServer (WSUS/Windows Update), MMPC (direct Microsoft servers), FileShares (network share). Requires an active Internet connection.",
   "links": [
     {
       "title": "Update-MpSignature Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/defender/update-mpsignature"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Mettre à jour les définitions Windows Defender",
+      "description": "Force la mise à jour immédiate des signatures antivirus et antimalware de Defender.",
+      "notes": "Exécute une mise à jour immédiate (ne pas attendre la planification). UpdateSource: MicrosoftUpdateServer (WSUS/Windows Update), MMPC (serveurs Microsoft directs), FileShares (partage réseau). Nécessite une connexion Internet active.",
+      "examples": {
+        "Update-MpSignature": "Met à jour les signatures Defender depuis Microsoft Update",
+        "Update-MpSignature -UpdateSource MicrosoftUpdateServer": "Force la mise à jour depuis les serveurs Microsoft Update",
+        "Update-MpSignature -UpdateSource MMPC": "Met à jour depuis le Microsoft Malware Protection Center (backup)",
+        "Update-MpSignature; Get-MpComputerStatus | Select-Object AntivirusSignatureVersion,AntivirusSignatureLastUpdated": "Met à jour puis affiche la version des signatures installées"
+      }
+    }
+  }
 }

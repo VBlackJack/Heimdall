@@ -1,8 +1,8 @@
 {
   "id": "build-maven",
-  "title": "Construire un projet Maven",
-  "description": "Compile et package un projet Java avec Maven.",
-  "category": "🔧 Development",
+  "title": "Build a Maven project",
+  "description": "Build and package a Java project with Maven.",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -30,42 +30,58 @@
   "examples": [
     {
       "command": "mvn clean package",
-      "description": "Nettoie et package le projet",
+      "description": "Clean and package the project",
       "platform": 2
     },
     {
       "command": "mvn clean install",
-      "description": "Installe dans le repo local",
+      "description": "Install into the local repository",
       "platform": 2
     },
     {
       "command": "mvn clean package -DskipTests",
-      "description": "Package sans exécuter les tests",
+      "description": "Package without running the tests",
       "platform": 2
     }
   ],
-  "notes": "clean supprime le dossier target. package crée le JAR/WAR. install met dans le repo local Maven.",
+  "notes": "clean deletes the target folder. package creates the JAR/WAR. install puts it in the local Maven repository.",
   "links": [],
   "linuxExamples": [
     {
       "command": "mvn test",
-      "description": "Exécuter les tests",
+      "description": "Run the tests",
       "platform": 1
     },
     {
       "command": "mvn package -DskipTests",
-      "description": "Construire sans les tests",
+      "description": "Build without the tests",
       "platform": 1
     },
     {
       "command": "mvn dependency:tree",
-      "description": "Afficher l'arbre des dépendances",
+      "description": "Show the dependency tree",
       "platform": 1
     },
     {
       "command": "mvn spring-boot:run",
-      "description": "Démarrer une application Spring Boot",
+      "description": "Start a Spring Boot application",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Construire un projet Maven",
+      "description": "Compile et package un projet Java avec Maven.",
+      "notes": "clean supprime le dossier target. package crée le JAR/WAR. install met dans le repo local Maven.",
+      "examples": {
+        "mvn test": "Exécuter les tests",
+        "mvn package -DskipTests": "Construire sans les tests",
+        "mvn dependency:tree": "Afficher l'arbre des dépendances",
+        "mvn spring-boot:run": "Démarrer une application Spring Boot",
+        "mvn clean package": "Nettoie et package le projet",
+        "mvn clean install": "Installe dans le repo local",
+        "mvn clean package -DskipTests": "Package sans exécuter les tests"
+      }
+    }
+  }
 }

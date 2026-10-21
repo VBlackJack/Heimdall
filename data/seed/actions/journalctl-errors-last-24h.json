@@ -1,8 +1,8 @@
 {
   "id": "journalctl-errors-last-24h",
-  "title": "Consulter les erreurs système des dernières 24h",
-  "description": "Affiche tous les messages d'erreur et critiques du journal systemd des dernières 24 heures",
-  "category": "📊 Monitoring & Logs",
+  "title": "Show the system errors of the last 24 hours",
+  "description": "Show every error and critical message of the systemd journal over the last 24 hours.",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -20,79 +20,80 @@
     "parameters": [
       {
         "name": "hours",
-        "label": "Nombre d'heures",
+        "label": "Number of hours",
         "type": "number",
         "defaultValue": "24",
         "required": true,
-        "description": "Nombre d'heures à analyser en arrière"
+        "description": "Number of hours to look back"
       },
       {
         "name": "priority",
-        "label": "Priorité",
+        "label": "Priority",
         "type": "string",
         "defaultValue": "err",
         "required": true,
-        "description": "Niveau de priorité (emerg, alert, crit, err, warning)"
+        "description": "Priority level (emerg, alert, crit, err, warning)"
       }
     ]
   },
   "examples": [
     {
       "command": "journalctl -xe",
-      "description": "🔥 STANDARD : Affiche les logs système les plus récents avec explications étendues. La commande réflexe quand un service Linux refuse de démarrer.",
+      "description": "🔥 STANDARD: show the most recent system logs with extended explanations. The first command to reach for when a Linux service refuses to start.",
       "platform": 1
     },
     {
       "command": "journalctl -p 3 -xb",
-      "description": "Affiche uniquement les Erreurs (p 3) survenues depuis le dernier démarrage (boot).",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -n 50",
-      "description": "Affiche les 50 derniers messages du journal systemd. Le flag -n (lines) limite l'output. journalctl est le système de logs central de systemd qui agrège tous les journaux (kernel, services, applications). Première commande pour diagnostiquer n'importe quel problème sous Linux moderne.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -f",
-      "description": "Mode suivi en temps réel (follow). Le flag -f affiche les nouveaux messages au fur et à mesure. Équivalent de 'tail -f' mais pour tous les logs systemd. Essentiel pour observer en direct l'activité système, surveiller un déploiement ou debugger un service problématique. Arrêtez avec Ctrl+C.",
+      "description": "Show only the Errors (p 3) raised since the last boot.",
       "platform": 1
     },
     {
       "command": "journalctl -p err",
-      "description": "Affiche uniquement les messages d'erreur. Le flag -p (priority) filtre par niveau de sévérité. Niveaux : emerg, alert, crit, err, warning, notice, info, debug. Utilisez -p err pour se concentrer sur les vrais problèmes sans le bruit des infos/warnings.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -u nginx.service",
-      "description": "Affiche tous les logs d'un service spécifique (ici nginx). Le flag -u (unit) filtre par unité systemd. Équivalent de consulter /var/log/nginx/* mais via journalctl. Toutes les sorties stdout/stderr du service sont capturées. Parfait pour le troubleshooting service par service.",
+      "description": "Show only the error messages. The -p (priority) flag filters by severity level. Levels: emerg, alert, crit, err, warning, notice, info, debug. Use -p err to focus on real problems without the noise of info and warning messages.",
       "platform": 1
     },
     {
       "command": "journalctl --since \"2024-01-15 10:00:00\" --until \"2024-01-15 11:00:00\"",
-      "description": "Affiche les logs d'une plage horaire précise. Les flags --since et --until acceptent des dates absolues. Format : 'YYYY-MM-DD HH:MM:SS'. Indispensable pour investiguer un incident survenu à un moment précis. Vous pouvez aussi utiliser des dates relatives : --since \"1 hour ago\".",
+      "description": "Show the logs of a precise time range. The --since and --until flags accept absolute dates. Format: 'YYYY-MM-DD HH:MM:SS'. Essential to investigate an incident that happened at a precise time. You can also use relative dates: --since \"1 hour ago\".",
       "platform": 1
     },
     {
       "command": "journalctl --since today -p err",
-      "description": "Affiche toutes les erreurs depuis minuit (aujourd'hui). --since today est un raccourci pour depuis 00:00. Combiné avec -p err pour ne voir que les erreurs. Excellente commande pour la revue quotidienne des problèmes : à exécuter chaque matin pour identifier les incidents de la nuit.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -u ssh.service --since \"10 minutes ago\"",
-      "description": "Affiche les logs SSH des 10 dernières minutes. --since accepte des durées relatives (minutes, hours, days ago). Utile pour diagnostiquer un problème de connexion SSH juste après qu'il se soit produit. Adaptez le service et la durée selon vos besoins.",
-      "platform": 1
-    },
-    {
-      "command": "journalctl -k -n 100",
-      "description": "Affiche les 100 derniers messages du kernel. Le flag -k (kernel) filtre uniquement les messages noyau (équivalent de dmesg). Essentiel pour diagnostiquer les problèmes hardware, drivers, panics kernel, erreurs disque/réseau de bas niveau.",
+      "description": "Show every error since midnight (today). --since today is a shortcut for since 00:00. Combined with -p err to see only the errors. A good command for the daily problem review: run it every morning to find the incidents of the night.",
       "platform": 1
     }
   ],
-  "notes": "Nécessite les privilèges sudo pour voir tous les logs. Priorités disponibles: 0=emerg, 1=alert, 2=crit, 3=err, 4=warning, 5=notice, 6=info, 7=debug",
+  "notes": "Requires sudo privileges to see every log. Available priorities: 0=emerg, 1=alert, 2=crit, 3=err, 4=warning, 5=notice, 6=info, 7=debug",
   "links": [
     {
       "title": "Man page journalctl",
       "url": "https://man7.org/linux/man-pages/man1/journalctl.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Consulter les erreurs système des dernières 24h",
+      "description": "Affiche tous les messages d'erreur et critiques du journal systemd des dernières 24 heures",
+      "notes": "Nécessite les privilèges sudo pour voir tous les logs. Priorités disponibles: 0=emerg, 1=alert, 2=crit, 3=err, 4=warning, 5=notice, 6=info, 7=debug",
+      "parameters": {
+        "linux": {
+          "hours": {
+            "label": "Nombre d'heures",
+            "description": "Nombre d'heures à analyser en arrière"
+          },
+          "priority": {
+            "label": "Priorité",
+            "description": "Niveau de priorité (emerg, alert, crit, err, warning)"
+          }
+        }
+      },
+      "examples": {
+        "journalctl -xe": "🔥 STANDARD : Affiche les logs système les plus récents avec explications étendues. La commande réflexe quand un service Linux refuse de démarrer.",
+        "journalctl -p 3 -xb": "Affiche uniquement les Erreurs (p 3) survenues depuis le dernier démarrage (boot).",
+        "journalctl -p err": "Affiche uniquement les messages d'erreur. Le flag -p (priority) filtre par niveau de sévérité. Niveaux : emerg, alert, crit, err, warning, notice, info, debug. Utilisez -p err pour se concentrer sur les vrais problèmes sans le bruit des infos/warnings.",
+        "journalctl --since \"2024-01-15 10:00:00\" --until \"2024-01-15 11:00:00\"": "Affiche les logs d'une plage horaire précise. Les flags --since et --until acceptent des dates absolues. Format : 'YYYY-MM-DD HH:MM:SS'. Indispensable pour investiguer un incident survenu à un moment précis. Vous pouvez aussi utiliser des dates relatives : --since \"1 hour ago\".",
+        "journalctl --since today -p err": "Affiche toutes les erreurs depuis minuit (aujourd'hui). --since today est un raccourci pour depuis 00:00. Combiné avec -p err pour ne voir que les erreurs. Excellente commande pour la revue quotidienne des problèmes : à exécuter chaque matin pour identifier les incidents de la nuit."
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "build-npm-install",
-  "title": "Installer les dépendances npm",
-  "description": "Installe les dépendances Node.js d'un projet.",
-  "category": "🔧 Development",
+  "title": "Install the npm dependencies",
+  "description": "Install the Node.js dependencies of a project.",
+  "category": "development",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -29,23 +29,35 @@
     "parameters": []
   },
   "examples": [],
-  "notes": "npm ci est plus rapide et déterministe pour CI/CD. --save-dev pour dev dependencies.",
+  "notes": "npm ci is faster and deterministic for CI/CD. --save-dev for development dependencies.",
   "links": [],
   "linuxExamples": [
     {
       "command": "npm install",
-      "description": "Installe toutes les dépendances de package.json",
+      "description": "Install every dependency of package.json",
       "platform": 1
     },
     {
       "command": "npm install --production",
-      "description": "Installe uniquement les dépendances de production",
+      "description": "Install the production dependencies only",
       "platform": 1
     },
     {
       "command": "npm ci",
-      "description": "Installation propre pour CI/CD",
+      "description": "Clean install for CI/CD",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Installer les dépendances npm",
+      "description": "Installe les dépendances Node.js d'un projet.",
+      "notes": "npm ci est plus rapide et déterministe pour CI/CD. --save-dev pour dev dependencies.",
+      "examples": {
+        "npm install": "Installe toutes les dépendances de package.json",
+        "npm install --production": "Installe uniquement les dépendances de production",
+        "npm ci": "Installation propre pour CI/CD"
+      }
+    }
+  }
 }

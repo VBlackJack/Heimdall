@@ -1,8 +1,8 @@
 {
   "id": "gpo-get-permissions",
-  "title": "Obtenir les permissions d'une GPO",
-  "description": "Affiche les permissions de sécurité configurées sur une stratégie de groupe.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Get the permissions of a GPO",
+  "description": "Show the security permissions set on a Group Policy.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -20,26 +20,44 @@
     "parameters": [
       {
         "name": "gpoName",
-        "label": "Nom de la GPO",
+        "label": "GPO name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la GPO"
+        "description": "GPO name"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-GPPermission -Name \"Default Domain Policy\" -All | Select-Object Trustee,Permission,Inherited",
-      "description": "Liste toutes les permissions de la Default Domain Policy",
+      "description": "List every permission of the Default Domain Policy",
       "platform": 0
     }
   ],
-  "notes": "Affiche qui peut lire, modifier ou appliquer la GPO. Utile pour l'audit de sécurité.",
+  "notes": "Shows who can read, edit or apply the GPO. Useful for security audits.",
   "links": [
     {
       "title": "Documentation Get-GPPermission",
       "url": "https://learn.microsoft.com/en-us/powershell/module/grouppolicy/get-gppermission"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Obtenir les permissions d'une GPO",
+      "description": "Affiche les permissions de sécurité configurées sur une stratégie de groupe.",
+      "notes": "Affiche qui peut lire, modifier ou appliquer la GPO. Utile pour l'audit de sécurité.",
+      "parameters": {
+        "windows": {
+          "gpoName": {
+            "label": "Nom de la GPO",
+            "description": "Nom de la GPO"
+          }
+        }
+      },
+      "examples": {
+        "Get-GPPermission -Name \"Default Domain Policy\" -All | Select-Object Trustee,Permission,Inherited": "Liste toutes les permissions de la Default Domain Policy"
+      }
+    }
+  }
 }

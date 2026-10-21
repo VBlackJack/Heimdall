@@ -1,8 +1,8 @@
 {
   "id": "clean-sccm-cache",
-  "title": "Vider le cache SCCM",
-  "description": "Supprime tous les fichiers du cache du client Configuration Manager",
-  "category": "🔄 Windows Updates",
+  "title": "Clear the SCCM cache",
+  "description": "Delete every file from the Configuration Manager client cache",
+  "category": "windows-updates",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -15,31 +15,32 @@
     "id": "clean-sccm-cache-cmd",
     "platform": 0,
     "name": "Invoke-WmiMethod",
-    "commandPattern": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }\"",
+    "commandPattern": "$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }",
     "parameters": []
   },
   "examples": [
     {
-      "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "command": "$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }",
+      "description": "Delete every element of the client cache (the action's own command)",
       "platform": 0
     },
     {
-      "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "command": "(Get-WmiObject -Namespace root\\ccm\\SoftMgmtAgent -Class CacheInfoEx | Measure-Object -Property ContentSize -Sum).Sum",
+      "description": "Show only the total size of the cached content (sum of ContentSize), without deleting anything",
       "platform": 0
     }
   ],
-  "notes": "Droits administrateur requis. Libère de l'espace disque en supprimant les packages téléchargés.",
-  "links": []
+  "notes": "Requires administrator rights. Frees disk space by deleting the downloaded packages.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Vider le cache SCCM",
+      "description": "Supprime tous les fichiers du cache du client Configuration Manager",
+      "notes": "Droits administrateur requis. Libère de l'espace disque en supprimant les packages téléchargés.",
+      "examples": {
+        "$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }": "Supprime tous les éléments du cache client (la commande de l'action elle-même)",
+        "(Get-WmiObject -Namespace root\\ccm\\SoftMgmtAgent -Class CacheInfoEx | Measure-Object -Property ContentSize -Sum).Sum": "Affiche uniquement la taille totale du contenu en cache (somme de ContentSize), sans rien supprimer"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "iis-create-site",
-  "title": "Créer un nouveau site IIS",
-  "description": "Crée un nouveau site web dans IIS avec un nom, un chemin physique et un binding spécifiques.",
-  "category": "🌐 Network & DNS",
+  "title": "Create a new IIS site",
+  "description": "Create a new website in IIS with a given name, physical path and binding.",
+  "category": "network-dns",
   "platform": 0,
   "level": 2,
   "tags": [
@@ -24,21 +24,21 @@
     "parameters": [
       {
         "name": "siteName",
-        "label": "Nom du site",
+        "label": "Site name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Nom du nouveau site IIS"
+        "description": "Name of the new IIS site"
       },
       {
         "name": "physicalPath",
-        "label": "Chemin physique",
+        "label": "Physical path",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "C:\\inetpub\\wwwroot",
         "required": true,
-        "description": "Chemin du dossier contenant le site"
+        "description": "Path of the folder that holds the site"
       },
       {
         "name": "port",
@@ -46,7 +46,7 @@
         "type": "string",
         "defaultValue": "80",
         "required": true,
-        "description": "Port d'écoute HTTP"
+        "description": "HTTP listening port"
       },
       {
         "name": "hostHeader",
@@ -55,52 +55,88 @@
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": false,
-        "description": "En-tête d'hôte (ex: www.example.com)"
+        "description": "Host header (e.g. www.example.com)"
       }
     ]
   },
   "examples": [
     {
       "command": "New-Website -Name 'MonSite' -PhysicalPath 'C:\\Sites\\MonSite' -Port 8080",
-      "description": "Crée un site sur le port 8080",
+      "description": "Create a site on port 8080",
       "platform": 0
     },
     {
       "command": "New-Website -Name 'App1' -PhysicalPath 'D:\\WebApps\\App1' -Port 80 -HostHeader 'app1.local'",
-      "description": "Crée un site avec un host header spécifique",
+      "description": "Create a site with a given host header",
       "platform": 0
     },
     {
       "command": "New-Website -Name 'SecureSite' -PhysicalPath 'C:\\SecureSite' -Port 443 -Ssl",
-      "description": "Crée un site HTTPS",
+      "description": "Create an HTTPS site",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; New-Website -Name 'Default Web Site' -PhysicalPath 'C:\\inetpub\\wwwroot' -Port 443 -HostHeader 'www.contoso.com' -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying anything. ESSENTIAL before any bulk action or critical change. Remove -WhatIf once checked to run it.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; New-Website -Name 'Default Web Site' -PhysicalPath 'C:\\inetpub\\wwwroot' -Port 443 -HostHeader 'www.contoso.com' -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false removes the prompts. Useful in automated scripts but use it with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; New-Website -Name 'Default Web Site' -PhysicalPath 'C:\\inetpub\\wwwroot' -Port 443 -HostHeader 'www.contoso.com' -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the changed or created object in the pipeline. By default, Set- and New- cmdlets return nothing. -PassThru turns the output on for chained operations or immediate checks.",
       "platform": 0
     },
     {
       "command": "Import-Module WebAdministration; New-Website -Name 'Default Web Site' -PhysicalPath 'C:\\inetpub\\wwwroot' -Port 443 -HostHeader 'www.contoso.com' -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the run of the command. -Verbose turns on debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
       "platform": 0
     }
   ],
-  "notes": "DANGER: Le dossier physique doit exister. Vérifiez les permissions NTFS. Pour HTTPS, configurez le certificat SSL séparément.",
+  "notes": "DANGER: the physical folder must exist. Check the NTFS permissions. For HTTPS, set up the SSL certificate separately.",
   "links": [
     {
       "title": "Documentation New-Website",
       "url": "https://learn.microsoft.com/en-us/powershell/module/webadministration/new-website"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer un nouveau site IIS",
+      "description": "Crée un nouveau site web dans IIS avec un nom, un chemin physique et un binding spécifiques.",
+      "notes": "DANGER: Le dossier physique doit exister. Vérifiez les permissions NTFS. Pour HTTPS, configurez le certificat SSL séparément.",
+      "parameters": {
+        "windows": {
+          "siteName": {
+            "label": "Nom du site",
+            "description": "Nom du nouveau site IIS"
+          },
+          "physicalPath": {
+            "label": "Chemin physique",
+            "description": "Chemin du dossier contenant le site"
+          },
+          "port": {
+            "label": "Port",
+            "description": "Port d'écoute HTTP"
+          },
+          "hostHeader": {
+            "label": "En-tête d'hôte",
+            "description": "En-tête d'hôte (ex: www.example.com)"
+          }
+        }
+      },
+      "examples": {
+        "New-Website -Name 'MonSite' -PhysicalPath 'C:\\Sites\\MonSite' -Port 8080": "Crée un site sur le port 8080",
+        "New-Website -Name 'App1' -PhysicalPath 'D:\\WebApps\\App1' -Port 80 -HostHeader 'app1.local'": "Crée un site avec un host header spécifique",
+        "New-Website -Name 'SecureSite' -PhysicalPath 'C:\\SecureSite' -Port 443 -Ssl": "Crée un site HTTPS",
+        "Import-Module WebAdministration; New-Website -Name 'Default Web Site' -PhysicalPath 'C:\\inetpub\\wwwroot' -Port 443 -HostHeader 'www.contoso.com' -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "Import-Module WebAdministration; New-Website -Name 'Default Web Site' -PhysicalPath 'C:\\inetpub\\wwwroot' -Port 443 -HostHeader 'www.contoso.com' -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "Import-Module WebAdministration; New-Website -Name 'Default Web Site' -PhysicalPath 'C:\\inetpub\\wwwroot' -Port 443 -HostHeader 'www.contoso.com' -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "Import-Module WebAdministration; New-Website -Name 'Default Web Site' -PhysicalPath 'C:\\inetpub\\wwwroot' -Port 443 -HostHeader 'www.contoso.com' -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
+      }
+    }
+  }
 }

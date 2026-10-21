@@ -1,8 +1,8 @@
 {
   "id": "windowsupdate-dism-repair",
-  "title": "Réparer Windows Update avec DISM",
-  "description": "Utilise DISM pour réparer l'image Windows et résoudre les problèmes de Windows Update",
-  "category": "🔄 Windows Updates",
+  "title": "Repair Windows Update with DISM",
+  "description": "Use DISM to repair the Windows image and fix Windows Update problems",
+  "category": "windows-updates",
   "platform": 0,
   "level": 1,
   "tags": [
@@ -22,30 +22,43 @@
   "examples": [
     {
       "command": "DISM /Online /Cleanup-Image /RestoreHealth",
-      "description": "Version CMD de la réparation DISM",
+      "description": "CMD version of the DISM repair",
       "platform": 0
     },
     {
       "command": "Repair-WindowsImage -Online -RestoreHealth",
-      "description": "Version PowerShell de la réparation DISM",
+      "description": "PowerShell version of the DISM repair",
       "platform": 0
     },
     {
       "command": "DISM /Online /Cleanup-Image /ScanHealth",
-      "description": "Scanne l'image sans réparer (diagnostic uniquement)",
+      "description": "Scan the image without repairing it (diagnostic only)",
       "platform": 0
     },
     {
       "command": "Repair-WindowsImage -Online -RestoreHealth -Verbose",
-      "description": "Utilise DISM pour réparer l'image Windows et résoudre les problèmes de Windows Update.",
+      "description": "Use DISM to repair the Windows image and fix Windows Update problems.",
       "platform": 0
     }
   ],
-  "notes": "Peut prendre 15-30 minutes. Nécessite une connexion Internet active. Exécuter DISM AVANT SFC pour de meilleurs résultats. Nécessite droits administrateur.",
+  "notes": "Can take 15-30 minutes. Requires an active Internet connection. Run DISM BEFORE SFC for better results. Requires administrator rights.",
   "links": [
     {
       "title": "DISM Repair Documentation",
       "url": "https://learn.microsoft.com/en-us/troubleshoot/windows-server/deployment/fix-windows-update-errors"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Réparer Windows Update avec DISM",
+      "description": "Utilise DISM pour réparer l'image Windows et résoudre les problèmes de Windows Update",
+      "notes": "Peut prendre 15-30 minutes. Nécessite une connexion Internet active. Exécuter DISM AVANT SFC pour de meilleurs résultats. Nécessite droits administrateur.",
+      "examples": {
+        "DISM /Online /Cleanup-Image /RestoreHealth": "Version CMD de la réparation DISM",
+        "Repair-WindowsImage -Online -RestoreHealth": "Version PowerShell de la réparation DISM",
+        "DISM /Online /Cleanup-Image /ScanHealth": "Scanne l'image sans réparer (diagnostic uniquement)",
+        "Repair-WindowsImage -Online -RestoreHealth -Verbose": "Utilise DISM pour réparer l'image Windows et résoudre les problèmes de Windows Update."
+      }
+    }
+  }
 }

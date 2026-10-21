@@ -1,8 +1,8 @@
 {
   "id": "sccm-check-client-status",
-  "title": "Vérifier l'état du client SCCM",
-  "description": "Affiche l'état détaillé du client SCCM incluant la version, le site assigné et la dernière communication",
-  "category": "🔄 Windows Updates",
+  "title": "Check the SCCM client status",
+  "description": "Show the detailed status of the SCCM client, including its version, assigned site and last communication",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -22,15 +22,25 @@
   "examples": [
     {
       "command": "Get-Service ccmexec | Select-Object Name,Status,StartType",
-      "description": "Vérifie l'état du service client SCCM",
+      "description": "Check the status of the SCCM client service",
       "platform": 0
     }
   ],
-  "notes": "Le service ccmexec doit être en cours d'exécution. Vérifier C:\\Windows\\CCM\\Logs pour les logs détaillés.",
+  "notes": "The ccmexec service must be running. See C:\\Windows\\CCM\\Logs for detailed logs.",
   "links": [
     {
       "title": "SCCM Client Troubleshooting",
       "url": "https://learn.microsoft.com/en-us/mem/configmgr/core/clients/manage/monitor-clients"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier l'état du client SCCM",
+      "description": "Affiche l'état détaillé du client SCCM incluant la version, le site assigné et la dernière communication",
+      "notes": "Le service ccmexec doit être en cours d'exécution. Vérifier C:\\Windows\\CCM\\Logs pour les logs détaillés.",
+      "examples": {
+        "Get-Service ccmexec | Select-Object Name,Status,StartType": "Vérifie l'état du service client SCCM"
+      }
+    }
+  }
 }

@@ -1,8 +1,8 @@
 {
   "id": "hyperv-get-vm-stats",
-  "title": "Obtenir les statistiques d'une VM",
-  "description": "Affiche des statistiques détaillées d'utilisation des ressources (CPU, mémoire, disque, réseau) pour une machine virtuelle Hyper-V.",
-  "category": "🐳 Containers & VMs",
+  "title": "Get the statistics of a VM",
+  "description": "Show detailed resource usage statistics (CPU, memory, disk, network) for a Hyper-V virtual machine.",
+  "category": "containers-vms",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -24,42 +24,63 @@
     "parameters": [
       {
         "name": "vmName",
-        "label": "Nom de la VM",
+        "label": "VM name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la VM à analyser"
+        "description": "Name of the VM to analyze"
       }
     ]
   },
   "examples": [
     {
       "command": "Measure-VM -Name 'Production-Web' | Format-List",
-      "description": "Statistiques détaillées de la VM Production-Web",
+      "description": "Detailed statistics of the Production-Web VM",
       "platform": 0
     },
     {
       "command": "Get-VM | Where-Object {$_.State -eq 'Running'} | Measure-VM | Sort-Object AvgCPU -Descending",
-      "description": "Toutes les VMs triées par utilisation CPU",
+      "description": "Every VM sorted by CPU usage",
       "platform": 0
     },
     {
       "command": "Get-VM 'TestVM' | Select-Object Name, CPUUsage, MemoryDemand, Uptime",
-      "description": "Métriques en temps réel d'une VM",
+      "description": "Real-time metrics of a VM",
       "platform": 0
     },
     {
       "command": "Measure-VM -Name 'VM-WEB-01' | Select-Object VMName, AvgCPU, AvgRAM, MaxRAM, TotalDisk, NetworkMeteredTrafficReport | Format-List",
-      "description": "Exemple utilisant le paramètre 'vmName': Nom de la VM à analyser. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'vmName' parameter: name of the VM to analyze. Replace VM-WEB-01 with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Measure-VM fournit des moyennes sur la durée de vie de la VM. Pour le temps réel, utilisez Get-VM avec CPUUsage et MemoryDemand.",
+  "notes": "Measure-VM gives averages over the life of the VM. For real time, use Get-VM with CPUUsage and MemoryDemand.",
   "links": [
     {
       "title": "Documentation Measure-VM",
       "url": "https://learn.microsoft.com/en-us/powershell/module/hyper-v/measure-vm"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Obtenir les statistiques d'une VM",
+      "description": "Affiche des statistiques détaillées d'utilisation des ressources (CPU, mémoire, disque, réseau) pour une machine virtuelle Hyper-V.",
+      "notes": "Measure-VM fournit des moyennes sur la durée de vie de la VM. Pour le temps réel, utilisez Get-VM avec CPUUsage et MemoryDemand.",
+      "parameters": {
+        "windows": {
+          "vmName": {
+            "label": "Nom de la VM",
+            "description": "Nom de la VM à analyser"
+          }
+        }
+      },
+      "examples": {
+        "Measure-VM -Name 'Production-Web' | Format-List": "Statistiques détaillées de la VM Production-Web",
+        "Get-VM | Where-Object {$_.State -eq 'Running'} | Measure-VM | Sort-Object AvgCPU -Descending": "Toutes les VMs triées par utilisation CPU",
+        "Get-VM 'TestVM' | Select-Object Name, CPUUsage, MemoryDemand, Uptime": "Métriques en temps réel d'une VM",
+        "Measure-VM -Name 'VM-WEB-01' | Select-Object VMName, AvgCPU, AvgRAM, MaxRAM, TotalDisk, NetworkMeteredTrafficReport | Format-List": "Exemple utilisant le paramètre 'vmName': Nom de la VM à analyser. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

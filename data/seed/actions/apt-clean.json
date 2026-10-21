@@ -1,8 +1,8 @@
 {
   "id": "apt-clean",
-  "title": "Nettoyer le cache APT",
-  "description": "Supprime les fichiers .deb téléchargés du cache local",
-  "category": "📦 Package Management",
+  "title": "Clean the APT cache",
+  "description": "Delete the downloaded .deb files from the local cache",
+  "category": "package-management",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -23,30 +23,43 @@
   "examples": [
     {
       "command": "sudo apt clean",
-      "description": "Nettoie complètement le cache",
+      "description": "Clean the cache completely",
       "platform": 1
     },
     {
       "command": "sudo apt autoclean",
-      "description": "Nettoie uniquement les paquets obsolètes",
+      "description": "Clean the obsolete packages only",
       "platform": 1
     },
     {
       "command": "apt clean -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag prints each action as it happens. Essential to follow the progress of long operations and check that everything goes as expected.",
       "platform": 1
     },
     {
       "command": "apt clean --dry-run",
-      "description": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
+      "description": "Simulate without running (dry run). --dry-run shows what would be done without applying the changes. ESSENTIAL before bulk operations or critical changes.",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. autoclean ne supprime que les paquets qui ne peuvent plus être téléchargés.",
+  "notes": "Requires sudo. autoclean only deletes the packages that can no longer be downloaded.",
   "links": [
     {
       "title": "APT cache management",
       "url": "https://manpages.ubuntu.com/manpages/jammy/man8/apt.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Nettoyer le cache APT",
+      "description": "Supprime les fichiers .deb téléchargés du cache local",
+      "notes": "Nécessite sudo. autoclean ne supprime que les paquets qui ne peuvent plus être téléchargés.",
+      "examples": {
+        "sudo apt clean": "Nettoie complètement le cache",
+        "sudo apt autoclean": "Nettoie uniquement les paquets obsolètes",
+        "apt clean -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "apt clean --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques."
+      }
+    }
+  }
 }

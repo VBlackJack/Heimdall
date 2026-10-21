@@ -1,8 +1,8 @@
 {
   "id": "sccm-trigger-update-scan",
-  "title": "Déclencher l'analyse des mises à jour SCCM",
-  "description": "Force le client SCCM à analyser immédiatement les mises à jour logicielles disponibles",
-  "category": "🔄 Windows Updates",
+  "title": "Trigger the SCCM update scan",
+  "description": "Force the SCCM client to scan for available software updates now",
+  "category": "windows-updates",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -21,31 +21,32 @@
   },
   "examples": [
     {
-      "command": "ss -tulpn",
-      "description": "🔥 STANDARD LINUX : Liste tous les ports TCP/UDP en écoute (-tul) avec les processus associés (-p) et sans résolution DNS (-n). La commande de référence pour savoir 'qui écoute sur ce port'.",
-      "platform": 1
-    },
-    {
-      "command": "ss -s",
-      "description": "Résumé statistique rapide des sockets (Total, TCP, UDP). Utile pour détecter une saturation de sockets ou une attaque DDoS.",
-      "platform": 1
-    },
-    {
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000113}'",
-      "description": "Déclenche l'analyse des mises à jour",
+      "description": "Trigger the update scan",
       "platform": 0
     },
     {
       "command": "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000114}'",
-      "description": "Déclenche l'évaluation du déploiement des mises à jour",
+      "description": "Trigger the update deployment evaluation",
       "platform": 0
     }
   ],
-  "notes": "Schedule ID {113} = Software Updates Scan Cycle, {114} = Software Updates Deployment Evaluation. Nécessite SCCM et WSUS configurés.",
+  "notes": "Schedule ID {113} = Software Updates Scan Cycle, {114} = Software Updates Deployment Evaluation. Requires SCCM and WSUS to be configured.",
   "links": [
     {
       "title": "SCCM Update Actions",
       "url": "https://www.manishbangia.com/initiate-sccm-client-actions-cmd-line/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Déclencher l'analyse des mises à jour SCCM",
+      "description": "Force le client SCCM à analyser immédiatement les mises à jour logicielles disponibles",
+      "notes": "Schedule ID {113} = Software Updates Scan Cycle, {114} = Software Updates Deployment Evaluation. Nécessite SCCM et WSUS configurés.",
+      "examples": {
+        "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000113}'": "Déclenche l'analyse des mises à jour",
+        "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000114}'": "Déclenche l'évaluation du déploiement des mises à jour"
+      }
+    }
+  }
 }

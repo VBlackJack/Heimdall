@@ -28,4 +28,15 @@ public sealed class ActionTranslationEntity
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Translated parameter text stored as JSON: <c>{"windows": {name: {label, description}},
+    /// "linux": {...}}</c>.
+    /// </summary>
+    public string ParametersJson { get; set; } = "{}";
+
+    /// <summary>
+    /// Translated example descriptions stored as JSON, keyed by the exact example command.
+    /// </summary>
+    public string ExamplesJson { get; set; } = "{}";
 }

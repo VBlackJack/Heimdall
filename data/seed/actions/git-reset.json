@@ -1,8 +1,8 @@
 {
   "id": "git-reset",
-  "title": "Réinitialiser l'état du dépôt",
-  "description": "Réinitialise HEAD à un état spécifique",
-  "category": "🔧 Development",
+  "title": "Reset the repository state",
+  "description": "Reset HEAD to a given state.",
+  "category": "development",
   "platform": 2,
   "level": 2,
   "tags": [
@@ -20,18 +20,23 @@
       {
         "name": "mode",
         "label": "Mode",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "--soft",
+          "--mixed",
+          "--hard"
+        ],
         "defaultValue": "--mixed",
         "required": false,
-        "description": "Mode de reset (--soft, --mixed, --hard)"
+        "description": "Reset mode (--soft, --mixed, --hard)"
       },
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "HEAD~1",
         "required": false,
-        "description": "Commit cible"
+        "description": "Target commit"
       }
     ]
   },
@@ -45,57 +50,79 @@
       {
         "name": "mode",
         "label": "Mode",
-        "type": "string",
+        "type": "choice",
+        "allowedValues": [
+          "--soft",
+          "--mixed",
+          "--hard"
+        ],
         "defaultValue": "--mixed",
         "required": false,
-        "description": "Mode de reset"
+        "description": "Reset mode"
       },
       {
         "name": "target",
-        "label": "Cible",
+        "label": "Target",
         "type": "string",
         "defaultValue": "HEAD~1",
         "required": false,
-        "description": "Commit cible"
+        "description": "Target commit"
       }
     ]
   },
   "examples": [
     {
       "command": "git reset --hard origin/main",
-      "description": "Réinitialise complètement au state de origin/main",
-      "platform": 2
-    },
-    {
-      "command": "git reset --mixed srv-web-01.contoso.com",
-      "description": "Exemple utilisant le paramètre 'mode': Mode de reset (--soft, --mixed, --hard). Remplacez Full par la valeur appropriée selon votre environnement.",
+      "description": "Reset completely to the state of origin/main",
       "platform": 2
     }
   ],
-  "notes": "ATTENTION : --hard supprime les modifications. --soft garde tout staged, --mixed unstage.",
+  "notes": "WARNING: --hard discards the changes. --soft keeps everything staged, --mixed unstages.",
   "links": [
     {
       "title": "Git Reset Documentation",
       "url": "https://git-scm.com/docs/git-reset"
     }
   ],
-  "windowsExamples": [
-    {
-      "command": "git reset Full srv-web-01.contoso.com",
-      "description": "Exemple Windows utilisant git. Remplacez les paramètres entre <> par vos valeurs.",
-      "platform": 0
-    }
-  ],
+  "windowsExamples": [],
   "linuxExamples": [
     {
       "command": "git reset HEAD~1",
-      "description": "Annule le dernier commit en gardant les modifications",
-      "platform": 1
-    },
-    {
-      "command": "git reset Full HEAD~1",
-      "description": "Exemple utilisant le paramètre 'target': Commit cible. Remplacez srv-web-01.contoso.com par la valeur appropriée selon votre environnement.",
+      "description": "Undo the last commit and keep the changes",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Réinitialiser l'état du dépôt",
+      "description": "Réinitialise HEAD à un état spécifique",
+      "notes": "ATTENTION : --hard supprime les modifications. --soft garde tout staged, --mixed unstage.",
+      "parameters": {
+        "windows": {
+          "mode": {
+            "label": "Mode",
+            "description": "Mode de reset (--soft, --mixed, --hard)"
+          },
+          "target": {
+            "label": "Cible",
+            "description": "Commit cible"
+          }
+        },
+        "linux": {
+          "mode": {
+            "label": "Mode",
+            "description": "Mode de reset"
+          },
+          "target": {
+            "label": "Cible",
+            "description": "Commit cible"
+          }
+        }
+      },
+      "examples": {
+        "git reset HEAD~1": "Annule le dernier commit en gardant les modifications",
+        "git reset --hard origin/main": "Réinitialise complètement au state de origin/main"
+      }
+    }
+  }
 }

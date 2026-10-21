@@ -1,8 +1,8 @@
 {
   "id": "last-logins",
-  "title": "Afficher l'historique des connexions",
-  "description": "Liste les dernières connexions utilisateurs au système",
-  "category": "📊 Monitoring & Logs",
+  "title": "Show the logon history",
+  "description": "List the latest user logons to the system.",
+  "category": "monitoring-logs",
   "platform": 1,
   "level": 0,
   "tags": [
@@ -20,79 +20,104 @@
     "parameters": [
       {
         "name": "count",
-        "label": "Nombre d'entrées",
+        "label": "Number of entries",
         "type": "number",
         "defaultValue": "20",
         "required": true,
-        "description": "Nombre de connexions à afficher"
+        "description": "Number of logons to show"
       },
       {
         "name": "username",
-        "label": "Nom d'utilisateur",
+        "label": "User name",
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Filtrer par utilisateur (vide = tous)"
+        "description": "Filter by user (empty = all)"
       }
     ]
   },
   "examples": [
     {
       "command": "last -n 20",
-      "description": "Affiche les 20 dernières connexions",
+      "description": "Show the last 20 logons",
       "platform": 1
     },
     {
       "command": "last root",
-      "description": "Affiche toutes les connexions de l'utilisateur root",
+      "description": "Show every logon of the root user",
       "platform": 1
     },
     {
       "command": "lastb",
-      "description": "Affiche les tentatives de connexion échouées",
-      "platform": 1
-    },
-    {
-      "command": "last -n 20 jdupont",
-      "description": "Exemple utilisant le paramètre 'count': Nombre de connexions à afficher. Remplacez 10 par la valeur appropriée selon votre environnement.",
+      "description": "Show the failed logon attempts",
       "platform": 1
     },
     {
       "command": "last -n 10 jdupont",
-      "description": "Exemple utilisant le paramètre 'username': Filtrer par utilisateur (vide = tous). Remplacez jdupont par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'username' parameter: filter by user (empty = all). Replace jdupont with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "last",
-      "description": "Historique des connexions",
+      "description": "Logon history",
       "platform": 1
     },
     {
       "command": "last -x",
-      "description": "Inclure shutdown et runlevel",
+      "description": "Include shutdown and runlevel entries",
       "platform": 1
     },
     {
       "command": "lastlog",
-      "description": "Dernière connexion de chaque utilisateur",
+      "description": "Last logon of each user",
       "platform": 1
     },
     {
       "command": "last reboot",
-      "description": "Historique des redémarrages",
+      "description": "Reboot history",
       "platform": 1
     },
     {
       "command": "last -F",
-      "description": "Avec dates complètes",
+      "description": "With full dates",
       "platform": 1
     }
   ],
-  "notes": "lastb affiche les bad logins. Les données proviennent de /var/log/wtmp et /var/log/btmp.",
+  "notes": "lastb shows the bad logins. The data comes from /var/log/wtmp and /var/log/btmp.",
   "links": [
     {
       "title": "last command",
       "url": "https://man7.org/linux/man-pages/man1/last.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'historique des connexions",
+      "description": "Liste les dernières connexions utilisateurs au système",
+      "notes": "lastb affiche les bad logins. Les données proviennent de /var/log/wtmp et /var/log/btmp.",
+      "parameters": {
+        "linux": {
+          "count": {
+            "label": "Nombre d'entrées",
+            "description": "Nombre de connexions à afficher"
+          },
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Filtrer par utilisateur (vide = tous)"
+          }
+        }
+      },
+      "examples": {
+        "last -n 20": "Affiche les 20 dernières connexions",
+        "last root": "Affiche toutes les connexions de l'utilisateur root",
+        "lastb": "Affiche les tentatives de connexion échouées",
+        "last -n 10 jdupont": "Exemple utilisant le paramètre 'username': Filtrer par utilisateur (vide = tous). Remplacez jdupont par la valeur appropriée selon votre environnement.",
+        "last": "Historique des connexions",
+        "last -x": "Inclure shutdown et runlevel",
+        "lastlog": "Dernière connexion de chaque utilisateur",
+        "last reboot": "Historique des redémarrages",
+        "last -F": "Avec dates complètes"
+      }
+    }
+  }
 }

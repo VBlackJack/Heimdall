@@ -1,8 +1,8 @@
 {
   "id": "gpo-generate-html-report",
-  "title": "Générer un rapport HTML d'une GPO",
-  "description": "Génère un rapport HTML détaillé des paramètres d'une stratégie de groupe.",
-  "category": "🏢 Active Directory & GPO",
+  "title": "Generate an HTML report of a GPO",
+  "description": "Generate a detailed HTML report of the settings of a Group Policy.",
+  "category": "active-directory",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -20,64 +20,86 @@
     "parameters": [
       {
         "name": "gpoName",
-        "label": "Nom de la GPO",
+        "label": "GPO name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom de la GPO"
+        "description": "GPO name"
       },
       {
         "name": "outputPath",
-        "label": "Fichier de sortie",
+        "label": "Output file",
         "type": "string",
         "defaultValue": "C:\\GPOReports\\report.html",
         "required": true,
-        "description": "Chemin complet du fichier HTML à créer"
+        "description": "Full path of the HTML file to create"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-GPOReport -Name \"Default Domain Policy\" -ReportType Html -Path \"C:\\GPOReports\\default-domain-policy.html\"",
-      "description": "Génère un rapport HTML de la Default Domain Policy",
+      "description": "Generate an HTML report of the Default Domain Policy",
       "platform": 0
     },
     {
       "command": "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     },
     {
       "command": "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\"",
-      "description": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO. Remplacez Security-Baseline par la valeur appropriée selon votre environnement.",
-      "platform": 0
-    },
-    {
-      "command": "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\GPOReports\\report.html\"",
-      "description": "Exemple utilisant le paramètre 'outputPath': Chemin complet du fichier HTML à créer. Remplacez C:\\Reports\\output.txt par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'gpoName' parameter: GPO name. Replace Security-Baseline with the value that fits your environment.",
       "platform": 0
     }
   ],
-  "notes": "Le rapport HTML est détaillé et facile à partager. Utile pour la documentation et l'audit.",
+  "notes": "The HTML report is detailed and easy to share. Useful for documentation and audits.",
   "links": [
     {
       "title": "Documentation Get-GPOReport",
       "url": "https://learn.microsoft.com/en-us/powershell/module/grouppolicy/get-gporeport"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Générer un rapport HTML d'une GPO",
+      "description": "Génère un rapport HTML détaillé des paramètres d'une stratégie de groupe.",
+      "notes": "Le rapport HTML est détaillé et facile à partager. Utile pour la documentation et l'audit.",
+      "parameters": {
+        "windows": {
+          "gpoName": {
+            "label": "Nom de la GPO",
+            "description": "Nom de la GPO"
+          },
+          "outputPath": {
+            "label": "Fichier de sortie",
+            "description": "Chemin complet du fichier HTML à créer"
+          }
+        }
+      },
+      "examples": {
+        "Get-GPOReport -Name \"Default Domain Policy\" -ReportType Html -Path \"C:\\GPOReports\\default-domain-policy.html\"": "Génère un rapport HTML de la Default Domain Policy",
+        "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\" | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "Get-GPOReport -Name \"Security-Baseline\" -ReportType Html -Path \"C:\\Reports\\output.txt\"": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

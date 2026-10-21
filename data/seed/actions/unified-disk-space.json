@@ -1,8 +1,8 @@
 {
   "id": "unified-disk-space",
-  "title": "Afficher l'espace disque disponible",
-  "description": "Affiche l'espace disque utilisé et disponible sur les partitions",
-  "category": "📁 Files & Storage",
+  "title": "Show the available disk space",
+  "description": "Show the used and available disk space of the partitions",
+  "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [
@@ -31,35 +31,49 @@
   "windowsExamples": [
     {
       "command": "Get-Volume | Select-Object DriveLetter,Size,SizeRemaining | Format-Table",
-      "description": "Affiche l'espace disque sur Windows avec taille totale et restante",
+      "description": "Show the disk space on Windows with the total and remaining size",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "df -h",
-      "description": "Affiche l'espace disque sur Linux",
+      "description": "Show the disk space on Linux",
       "platform": 1
     },
     {
       "command": "df -h /home",
-      "description": "Espace disque du point de montage /home",
+      "description": "Disk space of the /home mount point",
       "platform": 1
     },
     {
       "command": "df -T",
-      "description": "Afficher le type de filesystem",
+      "description": "Show the filesystem type",
       "platform": 1
     },
     {
       "command": "df -i",
-      "description": "Afficher l'utilisation des inodes",
+      "description": "Show inode usage",
       "platform": 1
     },
     {
       "command": "df -h --total",
-      "description": "Avec le total global",
+      "description": "With the grand total",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'espace disque disponible",
+      "description": "Affiche l'espace disque utilisé et disponible sur les partitions",
+      "examples": {
+        "Get-Volume | Select-Object DriveLetter,Size,SizeRemaining | Format-Table": "Affiche l'espace disque sur Windows avec taille totale et restante",
+        "df -h": "Affiche l'espace disque sur Linux",
+        "df -h /home": "Espace disque du point de montage /home",
+        "df -T": "Afficher le type de filesystem",
+        "df -i": "Afficher l'utilisation des inodes",
+        "df -h --total": "Avec le total global"
+      }
+    }
+  }
 }

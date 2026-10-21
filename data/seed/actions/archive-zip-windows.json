@@ -1,8 +1,8 @@
 {
   "id": "archive-zip-windows",
-  "title": "Créer une archive ZIP",
-  "description": "Compresse des fichiers ou dossiers dans une archive ZIP.",
-  "category": "📁 Files & Storage",
+  "title": "Create a ZIP archive",
+  "description": "Compress files or folders into a ZIP archive.",
+  "category": "files-storage",
   "platform": 0,
   "level": 0,
   "tags": [
@@ -24,35 +24,58 @@
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Fichiers ou dossiers à compresser"
+        "description": "Files or folders to compress"
       },
       {
         "name": "zipPath",
-        "label": "Fichier ZIP",
+        "label": "ZIP file",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ZIP à créer"
+        "description": "Path of the ZIP file to create"
       }
     ]
   },
   "examples": [
     {
       "command": "Compress-Archive -Path \"C:\\Data\\*\" -DestinationPath \"C:\\Backup\\data.zip\"",
-      "description": "Compresse un dossier entier",
+      "description": "Compress a whole folder",
       "platform": 0
     },
     {
       "command": "Compress-Archive -Path \"*.txt\",\"*.log\" -DestinationPath \"logs.zip\"",
-      "description": "Compresse plusieurs types de fichiers",
+      "description": "Compress several file types",
       "platform": 0
     }
   ],
-  "notes": "-CompressionLevel: Optimal, Fastest, NoCompression. -Force écrase le ZIP existant.",
+  "notes": "-CompressionLevel: Optimal, Fastest, NoCompression. -Force overwrites the existing ZIP.",
   "links": [
     {
       "title": "Documentation Compress-Archive",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.archive/compress-archive"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Créer une archive ZIP",
+      "description": "Compresse des fichiers ou dossiers dans une archive ZIP.",
+      "notes": "-CompressionLevel: Optimal, Fastest, NoCompression. -Force écrase le ZIP existant.",
+      "parameters": {
+        "windows": {
+          "sourcePath": {
+            "label": "Source",
+            "description": "Fichiers ou dossiers à compresser"
+          },
+          "zipPath": {
+            "label": "Fichier ZIP",
+            "description": "Chemin du fichier ZIP à créer"
+          }
+        }
+      },
+      "examples": {
+        "Compress-Archive -Path \"C:\\Data\\*\" -DestinationPath \"C:\\Backup\\data.zip\"": "Compresse un dossier entier",
+        "Compress-Archive -Path \"*.txt\",\"*.log\" -DestinationPath \"logs.zip\"": "Compresse plusieurs types de fichiers"
+      }
+    }
+  }
 }
