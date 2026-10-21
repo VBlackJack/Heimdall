@@ -68,6 +68,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Surcouche de reconnexion automatique en cas de déconnexion inattendue (SSH et RDP)
 - Le plantage ou le redémarrage d'un processus auxiliaire GPU ou utilitaire de WebView2 (réinitialisation du pilote graphique, changement d'affichage) laisse tourner les terminaux ouverts ; seule la perte du processus navigateur ou de rendu déclenche le repli, et la transcription et les étapes d'attente des macros continuent sur la connexion qui reste derrière
 - **Copier la sortie, secrets masqués** (Ctrl+Shift+M, menu de l'onglet de session, palette Ctrl+K) : lit le texte d'une session SSH, Telnet, WinRM ou shell local (4 derniers Mio de l'historique), masque clés privées, en-têtes d'autorisation, identifiants d'URL, mots de passe de ligne de commande et d'invite, secrets clé-valeur et jetons AWS, GitHub, Slack et JWT sous la forme `[masked:<rule-id>]`, et affiche un aperçu avec le compte par règle et un pseudonyme stable optionnel pour les adresses IPv4 et les noms d'hôte. Ne copie qu'au clic sur **Copier** ; fonctionne hors ligne, n'écrit rien sur le disque, refuse de copier si une règle dépasse son délai ; les journaux de session ne sont pas masqués
+- **Enregistrer la sélection dans la bibliothèque de commandes** (Ctrl+Shift+L, ou Maj+clic droit) : ouvre l'éditeur de la Command Library prérempli avec la commande sélectionnée (voir Command Library, **Capturer une commande**) ; un clic droit simple colle toujours
 
 ### VNC
 - Visionneuse VNC embarquée via noVNC + WebView2
@@ -188,6 +189,12 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Les commandes marquées dangereuses demandent confirmation avant envoi
 - **Envoyer vers plusieurs terminaux ouverts** : cochez les terminaux dans un panneau à côté du bouton Envoyer et la même commande part vers chacun. Elle atteint des terminaux déjà ouverts et n'en connecte jamais aucun ; tous reçoivent le même texte ; une seule confirmation nomme combien vont recevoir, quel que soit le risque déclaré de l'action ; et un terminal qui refuse n'arrête pas les autres : le résumé nomme ceux qui n'ont pas reçu
 - Clavier : `Entrée` copie, `Maj+Entrée` insère, `Ctrl+Entrée` envoie, `Ctrl+D` duplique l'action sélectionnée
+
+**Capturer une commande**
+- Sélectionnez une commande dans un terminal (SSH, Telnet, WinRM ou shell local) et appuyez sur `Ctrl+Shift+L`, ou faites Maj+clic droit et choisissez **Enregistrer la sélection dans la bibliothèque de commandes** ; l'entrée est grisée quand rien n'est sélectionné, et un clic droit simple colle toujours
+- L'éditeur d'une nouvelle action s'ouvre, dans l'onglet de bibliothèque déjà ouvert s'il y en a un, prérempli à partir de la sélection : la commande va dans le motif de la plateforme de la session (Windows pour les sessions Local, RDP et WinRM ou une machine distante déclarée Windows, Linux sinon), le risque part de Run, le tag est le protocole, la catégorie est celle de la dernière action que vous avez créée pendant cette session, et le titre vous est laissé
+- Une sélection sur plusieurs lignes devient une seule ligne, ses lignes reliées par ` ; ` pour Windows et ` && ` pour Linux, à relire avant d'enregistrer
+- Annuler laisse la bibliothèque sur sa liste ; Enregistrer ajoute l'action et la sélectionne. Une capture n'écrit rien dans l'historique
 
 **Historique**
 - Chaque commande copiée ou envoyée est enregistrée avec son titre, sa catégorie et son horodatage, l'hôte de la session depuis laquelle la bibliothèque a été ouverte, et le fait qu'elle a été envoyée ou seulement copiée
