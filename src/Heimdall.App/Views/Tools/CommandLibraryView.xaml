@@ -965,8 +965,16 @@
                 MaxHeight="420">
             <Grid>
                 <!-- The list of runbooks -->
-                <DockPanel x:Name="RunbookListPanel">
+                <DockPanel x:Name="RunbookListPanel"
+                           Visibility="{Binding IsRunbookListVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                     <DockPanel DockPanel.Dock="Top" Margin="12,8,12,4">
+                        <Button DockPanel.Dock="Right"
+                                Content="&#xE768;" FontFamily="{StaticResource FontFamilyIcons}"
+                                Command="{Binding RunRunbookCommand}"
+                                ToolTip="{loc:Translate ToolCmdLibRunbookRun}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookRun}"
+                                Style="{DynamicResource GhostButtonStyle}"
+                                FontSize="14" MinWidth="28" Height="28" Padding="4"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding DeleteRunbookCommand}"
@@ -1040,6 +1048,170 @@
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                TextTrimming="CharacterEllipsis"
                                                VerticalAlignment="Center"/>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </DockPanel>
+
+                <!-- A run: the variables, the steps with their status, the current command, and
+                     Send / Insert / Copy / Skip / Stop. Nothing advances by itself: a terminal
+                     returns no exit code, so the operator reads the output and decides. -->
+                <DockPanel x:Name="RunbookRunPanel"
+                           DataContext="{Binding ActiveRun}"
+                           Visibility="{Binding DataContext.IsRunbookRunVisible, ElementName=RunbooksPanel, Converter={StaticResource BoolToVisibilityConverter}}"
+                           Margin="12,8,12,8">
+                    <DockPanel DockPanel.Dock="Top">
+                        <Button DockPanel.Dock="Right"
+                                Content="{loc:Translate ToolCmdLibRunbookStop}"
+                                Command="{Binding StopCommand}"
+                                ToolTip="{loc:Translate ToolCmdLibRunbookStopTooltip}"
+                                AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookStop}"
+                                Style="{DynamicResource SecondaryButtonStyle}"/>
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="{Binding ExecutionModeText}"
+                                   ToolTip="{loc:Translate ToolCmdLibRunbookModeTooltip}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="{StaticResource MarginInlineControl}"/>
+                        <TextBlock Text="{Binding Title}"
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+                    </DockPanel>
+
+                    <StackPanel DockPanel.Dock="Top"
+                                Visibility="{Binding HasVariables, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Margin="0,6,0,0">
+                        <TextBlock Text="{loc:Translate ToolCmdLibRunbookRunVariables}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <ItemsControl ItemsSource="{Binding Variables}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,2,0,2">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   Text="{Binding Reference}" Width="150"
+                                                   FontFamily="Consolas"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                 AutomationProperties.Name="{Binding Reference}"
+                                                 FontFamily="Consolas"
+                                                 Padding="{StaticResource PaddingInput}"
+                                                 Background="{DynamicResource CardBrush}"
+                                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                                 BorderBrush="{DynamicResource BorderBrush}"/>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- The current step: its command, why it cannot go, and the five gestures. -->
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                        <TextBlock Text="{loc:Translate ToolCmdLibRunbookRunCommand}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBox Text="{Binding CurrentCommand, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookRunCommand}"
+                                 FontFamily="Consolas"
+                                 TextWrapping="Wrap"
+                                 Padding="{StaticResource PaddingInput}"
+                                 Background="{DynamicResource CardBrush}"
+                                 Foreground="{DynamicResource AccentBrush}"
+                                 BorderBrush="{DynamicResource BorderBrush}"/>
+                        <TextBlock Text="{Binding CurrentValidationError}"
+                                   Visibility="{Binding HasCurrentValidationError, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource ErrorTextBrush}"
+                                   TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        <TextBlock Text="{loc:Translate ToolCmdLibRunbookNoTerminal}"
+                                   Visibility="{Binding ShowNoTerminalHint, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        <TextBlock Text="{loc:Translate ToolCmdLibRunbookFinished}"
+                                   Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{DynamicResource SuccessTextBrush}"
+                                   TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                            <Button Content="{loc:Translate ToolCmdLibRunbookSkip}"
+                                    Command="{Binding SkipCommand}"
+                                    AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookSkip}"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Margin="0,0,8,0"/>
+                            <Button Content="{loc:Translate ToolCmdLibBtnCopy}"
+                                    Command="{Binding CopyCommand}"
+                                    AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopy}"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Margin="0,0,8,0"/>
+                            <Button Content="{loc:Translate ToolCmdLibBtnInsert}"
+                                    Command="{Binding InsertCommand}"
+                                    ToolTip="{loc:Translate ToolCmdLibBtnInsertTooltip}"
+                                    AutomationProperties.Name="{loc:Translate ToolCmdLibBtnInsert}"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Margin="0,0,8,0"/>
+                            <Button Content="{loc:Translate ToolCmdLibBtnSend}"
+                                    Command="{Binding SendCommand}"
+                                    AutomationProperties.Name="{loc:Translate ToolCmdLibBtnSend}"
+                                    Style="{DynamicResource PrimaryButtonStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <ListView ItemsSource="{Binding Steps}"
+                              AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookSectionSteps}"
+                              Background="Transparent" BorderThickness="0"
+                              Margin="0,6,0,0"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="4,2"/>
+                                <Setter Property="Focusable" Value="False"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Right"
+                                               Text="{Binding StatusText}"
+                                               FontSize="{StaticResource FontSizeSmallCaption}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="{StaticResource MarginInlineControl}"/>
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="{Binding Number}"
+                                               Width="24"
+                                               FontSize="{StaticResource FontSizeCaption}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding ValidationError}"
+                                                   Visibility="{Binding HasValidationError, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                                   Foreground="{DynamicResource ErrorTextBrush}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
                                 </DockPanel>
                             </DataTemplate>
                         </ListView.ItemTemplate>

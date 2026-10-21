@@ -293,6 +293,24 @@ public sealed partial class CommandLibraryViewModel
             parameters[parameter.Name] = parameter.Value;
         }
 
+        WriteHistoryRow(action, command, parameters, template.Platform, isExecuted);
+    }
+
+    /// <summary>
+    /// Writes one history row for <paramref name="action"/>, against the host this library was
+    /// opened for, on a worker thread. The payload is passed in already captured.
+    /// </summary>
+    /// <remarks>
+    /// Shared by the generator's gestures and a runbook run's steps, so a step sent from a
+    /// runbook reads in the history panel exactly as the same command sent from the generator.
+    /// </remarks>
+    private void WriteHistoryRow(
+        TwinShell.Core.Models.Action action,
+        string command,
+        Dictionary<string, string> parameters,
+        TwinShell.Core.Enums.Platform platform,
+        bool isExecuted)
+    {
         var targetHost = _targetHost;
 
         _ = Task.Run(async () =>
@@ -303,7 +321,7 @@ public sealed partial class CommandLibraryViewModel
                 var historyService = scope.ServiceProvider.GetRequiredService<ICommandHistoryService>();
                 await historyService.AddCommandAsync(
                     action.Id, command, parameters,
-                    template.Platform, action.Title, action.Category,
+                    platform, action.Title, action.Category,
                     targetHost, isExecuted);
             }
             catch (VaultLockedException)
