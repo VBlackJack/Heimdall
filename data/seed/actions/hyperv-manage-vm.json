@@ -34,14 +34,7 @@
       {
         "name": "action",
         "label": "Action",
-        "type": "choice",
-        "allowedValues": [
-          "Start",
-          "Stop",
-          "Save",
-          "Suspend",
-          "Resume"
-        ],
+        "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "Start",
         "required": true,
