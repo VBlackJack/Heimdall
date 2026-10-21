@@ -716,7 +716,7 @@
                      VerticalAlignment="Top"
                      Height="{StaticResource SftpLoadingBarHeight}"
                      IsIndeterminate="True"
-                     Foreground="{DynamicResource AccentBrush}"
+                     Foreground="{DynamicResource AccentTextBrush}"
                      Background="Transparent"
                      BorderThickness="0"
                      IsHitTestVisible="False"
@@ -834,7 +834,7 @@
                                      IsIndeterminate="{Binding IsTransferIndeterminate}"
                                      Height="{StaticResource SftpTransferBarHeight}" Margin="0,4,0,0"
                                      Minimum="0" Maximum="100"
-                                     Foreground="{DynamicResource AccentBrush}"
+                                     Foreground="{DynamicResource AccentTextBrush}"
                                      Background="{DynamicResource HighlightBrush}"
                                      AutomationProperties.Name="{loc:Translate A11yPrgTransfer}"/>
                     </StackPanel>

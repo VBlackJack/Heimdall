@@ -313,7 +313,7 @@
                                 <TextBlock Text="{Binding Name}"
                                            FontSize="{StaticResource FontSizeBodyLarge}"
                                            FontWeight="SemiBold"
-                                           Foreground="{DynamicResource AccentBrush}"/>
+                                           Foreground="{DynamicResource AccentTextBrush}"/>
                             </Border>
                         </DataTemplate>
                     </GroupStyle.HeaderTemplate>
@@ -498,7 +498,7 @@
                                  FontSize="{StaticResource FontSizeBody}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
-                                 Foreground="{DynamicResource AccentBrush}"
+                                 Foreground="{DynamicResource AccentTextBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
                                  Margin="{StaticResource MarginStackItem}"/>
 
@@ -558,7 +558,7 @@
                                                         <TextBlock Text="{Binding Command}"
                                                                    FontFamily="Consolas"
                                                                    FontSize="{StaticResource FontSizeCaption}"
-                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                                    TextWrapping="Wrap"/>
                                                         <TextBlock Text="{Binding Description}"
                                                                    FontSize="{StaticResource FontSizeSmallCaption}"
@@ -587,7 +587,7 @@
                                         <TextBlock FontSize="{StaticResource FontSizeCaption}">
                                             <Hyperlink NavigateUri="{Binding Url}"
                                                        RequestNavigate="OnLinkNavigate"
-                                                       Foreground="{DynamicResource AccentBrush}">
+                                                       Foreground="{DynamicResource AccentTextBrush}">
                                                 <Run Text="{Binding Title, Mode=OneWay}"/>
                                             </Hyperlink>
                                         </TextBlock>
@@ -909,7 +909,7 @@
                                            Visibility="{Binding IsExecuted, Converter={StaticResource BoolToVisibilityConverter}}"
                                            FontSize="{StaticResource FontSizeSmallCaption}"
                                            FontWeight="SemiBold"
-                                           Foreground="{DynamicResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentTextBrush}"
                                            VerticalAlignment="Center"
                                            Margin="{StaticResource MarginInlineControl}"/>
                                 <TextBlock DockPanel.Dock="Right"
@@ -938,7 +938,7 @@
                                         <TextBlock Text="{Binding GeneratedCommand}"
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    FontFamily="Consolas"
-                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                    TextWrapping="NoWrap"/>
                                     </ScrollViewer>
                                     <!-- A sealed row whose key is gone. The title and the
@@ -1153,7 +1153,7 @@
                                  TextWrapping="Wrap"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
-                                 Foreground="{DynamicResource AccentBrush}"
+                                 Foreground="{DynamicResource AccentTextBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"/>
                         <TextBlock Text="{Binding CurrentValidationError}"
                                    Visibility="{Binding HasCurrentValidationError, Converter={StaticResource BoolToVisibilityConverter}}"

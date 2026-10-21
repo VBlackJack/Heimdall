@@ -88,7 +88,7 @@ public sealed partial class ToolsTabViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Resource key resolved into a <see cref="System.Windows.Media.Brush"/>
     /// at bind time via <c>ResourceKeyToBrushConverter</c>. Toggled between
-    /// <c>"AccentBrush"</c> (a target host is inherited) and
+    /// <c>"AccentTextBrush"</c> (a target host is inherited) and
     /// <c>"TextSecondaryBrush"</c> (no target host) to mirror the previous
     /// imperative <c>SetResourceReference</c> behavior.
     /// </summary>

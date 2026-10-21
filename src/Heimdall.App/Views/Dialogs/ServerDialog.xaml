@@ -1813,7 +1813,7 @@
                                                                        Visibility="{Binding CanSwitchToAuto, Converter={StaticResource BoolToVisibilityConverter}}"
                                                                        HorizontalAlignment="Left">
                                                                 <Hyperlink Command="{Binding SwitchToAutoCommand}"
-                                                                           Foreground="{DynamicResource AccentBrush}"
+                                                                           Foreground="{DynamicResource AccentTextBrush}"
                                                                            AutomationProperties.Name="{loc:Translate ServerDialogResolutionModeSwitchToAuto}">
                                                                     <Run Text="{loc:Translate ServerDialogResolutionModeSwitchToAuto}"/>
                                                                 </Hyperlink>

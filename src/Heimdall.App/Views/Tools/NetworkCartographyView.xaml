@@ -153,7 +153,7 @@
         <StackPanel Grid.Row="3" x:Name="ProgressPanel" Visibility="Collapsed">
             <ProgressBar x:Name="ScanProgress" Height="4"
                          Minimum="0" Maximum="100"
-                         Foreground="{DynamicResource AccentBrush}"
+                         Foreground="{DynamicResource AccentTextBrush}"
                          Background="{DynamicResource SurfaceBrush}"/>
             <TextBlock x:Name="TxtStatus" Text="" FontSize="{StaticResource FontSizeCaption}"
                        Foreground="{DynamicResource TextSecondaryBrush}"
@@ -318,7 +318,7 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="TxtDiff" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
-                       Foreground="{DynamicResource AccentBrush}"
+                       Foreground="{DynamicResource AccentTextBrush}"
                        TextWrapping="Wrap"/>
         </Border>
     </Grid>

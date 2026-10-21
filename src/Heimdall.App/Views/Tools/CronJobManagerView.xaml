@@ -251,7 +251,7 @@
                                        Margin="{StaticResource MarginLabelBottom}"
                                        FontSize="{StaticResource FontSizeBodyLarge}"
                                        FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        Text="{Binding DetailHeaderText}"/>
                             <TextBlock x:Name="TxtDetailSchedule"
                                        Margin="0,0,0,2"

@@ -216,7 +216,7 @@
                     <TextBlock x:Name="LblTotal" Text="{loc:Translate ToolServicesTotal}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
                     <TextBlock x:Name="TxtTotal" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
-                               Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"
                                AutomationProperties.AutomationId="ServiceStatus.TotalCount"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"

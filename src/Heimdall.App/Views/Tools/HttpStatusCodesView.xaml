@@ -139,7 +139,7 @@
                             <Border Padding="12,8,12,4"
                                     Background="{DynamicResource BackgroundBrush}">
                                 <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource AccentBrush}"/>
+                                           Foreground="{DynamicResource AccentTextBrush}"/>
                             </Border>
                         </DataTemplate>
                     </GroupStyle.HeaderTemplate>

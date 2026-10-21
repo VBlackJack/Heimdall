@@ -262,7 +262,7 @@
                              TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
                              AutomationProperties.Name="{loc:Translate ToolTextCaseOutputLabel}" />
                 </DockPanel>

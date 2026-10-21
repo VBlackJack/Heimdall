@@ -209,7 +209,7 @@
                             <TextBlock Text="{Binding ResultHeader}"
                                        FontSize="{StaticResource FontSizeBodyLarge}"
                                        FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        VerticalAlignment="Center" />
                         </DockPanel>
                         <TextBlock Text="{Binding Results}"

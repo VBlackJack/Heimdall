@@ -154,7 +154,7 @@
                                     AutomationProperties.Name="{loc:Translate ToolWhoisBtnCopy}"/>
                             <TextBlock x:Name="TxtResultHeader" Text="{Binding ResultHeader}"
                                        FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        VerticalAlignment="Center"/>
                         </DockPanel>
                         <TextBox x:Name="TxtResults" Text="{Binding Results}"

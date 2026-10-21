@@ -236,7 +236,7 @@
                              FontWeight="Bold"
                              MaxLength="3"
                              Background="Transparent"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderThickness="0"
                              VerticalAlignment="Center"
                              AutomationProperties.Name="{loc:Translate ToolChmodOctal}"
@@ -317,7 +317,7 @@
                                Text="{Binding CommandPreviewText}"
                                FontFamily="Consolas"
                                FontSize="{StaticResource FontSizeSubtitle}"
-                               Foreground="{DynamicResource AccentBrush}"
+                               Foreground="{DynamicResource AccentTextBrush}"
                                VerticalAlignment="Center" />
                     <Button Grid.Column="2"
                             AutomationProperties.AutomationId="Chmod.CopyCommandButton"

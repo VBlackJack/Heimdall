@@ -186,7 +186,7 @@
                                  FontSize="{StaticResource FontSizeHeadline}" FontFamily="Consolas" FontWeight="Bold"
                                  IsReadOnly="True"
                                  Background="Transparent"
-                                 Foreground="{DynamicResource AccentBrush}"
+                                 Foreground="{DynamicResource AccentTextBrush}"
                                  BorderThickness="0"
                                  VerticalAlignment="Center"/>
                     </DockPanel>

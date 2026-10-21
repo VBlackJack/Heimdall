@@ -213,7 +213,7 @@
                         Margin="{StaticResource MarginInlineControl}" VerticalAlignment="Center"
                         TabIndex="9"/>
                 <TextBlock x:Name="TailStatusText" DockPanel.Dock="Right"
-                           Foreground="{DynamicResource AccentBrush}"
+                           Foreground="{DynamicResource AccentTextBrush}"
                            FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"
                            Margin="{StaticResource MarginInlineControl}"
                            Visibility="Collapsed"/>

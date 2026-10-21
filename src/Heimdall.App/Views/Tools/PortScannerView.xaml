@@ -290,7 +290,7 @@
                                Foreground="{DynamicResource BorderBrush}"/>
 
                     <TextBlock x:Name="TxtTotal" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
-                               Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"
                                Margin="{StaticResource MarginInlineXs}"/>
                 </WrapPanel>
 

@@ -308,7 +308,7 @@
                                 <TextBlock x:Name="LblCertKeySize" Grid.Row="6" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="TxtCertKeySize" Grid.Row="6" Grid.Column="2" Text=""
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource AccentBrush}"
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource AccentTextBrush}"
                                            FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </Grid>
                         </StackPanel>
