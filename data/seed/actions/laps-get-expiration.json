@@ -1,7 +1,7 @@
 {
   "id": "laps-get-expiration",
-  "title": "Vérifier la date d'expiration du mot de passe LAPS",
-  "description": "Affiche la date d'expiration du mot de passe administrateur local géré par LAPS.",
+  "title": "Check the LAPS password expiration date",
+  "description": "Show the expiration date of the local administrator password managed by LAPS.",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -19,56 +19,80 @@
     "parameters": [
       {
         "name": "computerName",
-        "label": "Nom de l'ordinateur",
+        "label": "Computer name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom NetBIOS de l'ordinateur"
+        "description": "NetBIOS name of the computer"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-AdmPwdPassword -ComputerName PC-001 | Select-Object ExpirationTimestamp",
-      "description": "Affiche la date d'expiration du mot de passe LAPS",
+      "description": "Show the expiration date of the LAPS password",
       "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwdExpirationTime | Select-Object Name,@{N='LAPSExpiration';E={[DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime')}}",
-      "description": "Liste tous les ordinateurs avec leurs dates d'expiration LAPS",
+      "description": "List every computer with its LAPS expiration date",
       "platform": 0
     },
     {
       "command": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwdExpirationTime | Where-Object {[DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime') -lt (Get-Date).AddDays(7)}",
-      "description": "Liste les ordinateurs dont le mot de passe LAPS expire dans moins de 7 jours",
+      "description": "List the computers whose LAPS password expires in less than 7 days",
       "platform": 0
     },
     {
       "command": "Get-AdmPwdPassword -ComputerName PC-PARIS-001 | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first object returned. Select-Object * widens the output to show all columns. -First 1 limits it to the first result. Use this command to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-AdmPwdPassword -ComputerName PC-PARIS-001 | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results in a table suited to the console. Format-Table -AutoSize fits the column widths for readable output. Ideal to scan structured data quickly.",
       "platform": 0
     },
     {
       "command": "Get-AdmPwdPassword -ComputerName PC-PARIS-001 | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file usable in Excel. -NoTypeInformation removes the metadata line. -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-AdmPwdPassword -ComputerName PC-PARIS-001 | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the objects returned. Measure-Object returns Count, Sum, Average, Min, Max depending on the properties. Useful for quick statistics and to validate results.",
       "platform": 0
     }
   ],
-  "notes": "ExpirationTimestamp: date/heure de prochaine rotation automatique. Par défaut LAPS rotate tous les 30 jours. Si expiré, le mot de passe sera renouvelé au prochain redémarrage ou au prochain intervalle de mise à jour GPO.",
+  "notes": "ExpirationTimestamp: date and time of the next automatic rotation. By default LAPS rotates every 30 days. Once expired, the password is renewed at the next restart or the next GPO update interval.",
   "links": [
     {
       "title": "LAPS Password Expiration",
       "url": "https://learn.microsoft.com/en-us/windows-server/identity/laps/laps-management-policy-settings"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier la date d'expiration du mot de passe LAPS",
+      "description": "Affiche la date d'expiration du mot de passe administrateur local géré par LAPS.",
+      "notes": "ExpirationTimestamp: date/heure de prochaine rotation automatique. Par défaut LAPS rotate tous les 30 jours. Si expiré, le mot de passe sera renouvelé au prochain redémarrage ou au prochain intervalle de mise à jour GPO.",
+      "parameters": {
+        "windows": {
+          "computerName": {
+            "label": "Nom de l'ordinateur",
+            "description": "Nom NetBIOS de l'ordinateur"
+          }
+        }
+      },
+      "examples": {
+        "Get-AdmPwdPassword -ComputerName PC-001 | Select-Object ExpirationTimestamp": "Affiche la date d'expiration du mot de passe LAPS",
+        "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwdExpirationTime | Select-Object Name,@{N='LAPSExpiration';E={[DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime')}}": "Liste tous les ordinateurs avec leurs dates d'expiration LAPS",
+        "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwdExpirationTime | Where-Object {[DateTime]::FromFileTime($_.'ms-Mcs-AdmPwdExpirationTime') -lt (Get-Date).AddDays(7)}": "Liste les ordinateurs dont le mot de passe LAPS expire dans moins de 7 jours",
+        "Get-AdmPwdPassword -ComputerName PC-PARIS-001 | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-AdmPwdPassword -ComputerName PC-PARIS-001 | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-AdmPwdPassword -ComputerName PC-PARIS-001 | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-AdmPwdPassword -ComputerName PC-PARIS-001 | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

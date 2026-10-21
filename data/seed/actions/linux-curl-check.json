@@ -1,7 +1,7 @@
 {
   "id": "linux-curl-check",
-  "title": "Test HTTP/API (Curl)",
-  "description": "Transfère des données via URL. L'outil standard pour tester les API et sites web.",
+  "title": "Test HTTP/API (curl)",
+  "description": "Transfer data through a URL. The standard tool to test APIs and websites.",
   "category": "network-dns",
   "platform": 1,
   "level": 0,
@@ -24,26 +24,45 @@
         "type": "string",
         "defaultValue": "https://google.com",
         "required": true,
-        "description": "Adresse cible"
+        "description": "Target address"
       }
     ]
   },
   "examples": [
     {
       "command": "curl -I https://mon-site.com",
-      "description": "Affiche uniquement les en-têtes (Headers) HTTP (-I). Utile pour vérifier les codes 200/404/301 sans télécharger la page.",
+      "description": "Show only the HTTP headers (-I). Useful to check 200/404/301 codes without downloading the page.",
       "platform": 1
     },
     {
       "command": "curl -k https://dev-interne.local",
-      "description": "Ignore les erreurs de certificat SSL (-k).",
+      "description": "Ignore SSL certificate errors (-k).",
       "platform": 1
     },
     {
       "command": "curl -L -v https://google.com",
-      "description": "Suit les redirections (-L) et affiche le détail de la connexion SSL (-v).",
+      "description": "Follow redirects (-L) and show the details of the SSL connection (-v).",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "9269b12e-99e9-42ee-85bd-c6ad069219db"
+  "linuxCommandTemplateId": "9269b12e-99e9-42ee-85bd-c6ad069219db",
+  "translations": {
+    "fr": {
+      "title": "Test HTTP/API (Curl)",
+      "description": "Transfère des données via URL. L'outil standard pour tester les API et sites web.",
+      "parameters": {
+        "linux": {
+          "url": {
+            "label": "URL",
+            "description": "Adresse cible"
+          }
+        }
+      },
+      "examples": {
+        "curl -I https://mon-site.com": "Affiche uniquement les en-têtes (Headers) HTTP (-I). Utile pour vérifier les codes 200/404/301 sans télécharger la page.",
+        "curl -k https://dev-interne.local": "Ignore les erreurs de certificat SSL (-k).",
+        "curl -L -v https://google.com": "Suit les redirections (-L) et affiche le détail de la connexion SSL (-v)."
+      }
+    }
+  }
 }

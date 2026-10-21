@@ -1,7 +1,7 @@
 {
   "id": "linux-disk-du",
-  "title": "Analyser taille dossiers (du)",
-  "description": "Estime l'espace disque utilisé par les fichiers et répertoires.",
+  "title": "Analyze folder sizes (du)",
+  "description": "Estimate the disk space used by files and directories.",
   "category": "files-storage",
   "platform": 1,
   "level": 0,
@@ -20,20 +20,37 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "*",
         "required": true,
-        "description": "Cible"
+        "description": "Target"
       }
     ]
   },
   "examples": [
     {
       "command": "du -sh * | sort -rh | head -10",
-      "description": "🔥 ENQUÊTEUR : Affiche les 10 plus gros dossiers/fichiers du répertoire courant, triés par taille décroissante. Indispensable pour trouver qui mange le disque.",
+      "description": "🔥 INVESTIGATOR: show the 10 largest folders or files of the current directory, sorted by size, largest first. Essential to find what eats the disk.",
       "platform": 1
     }
   ],
-  "linuxCommandTemplateId": "c1bdd523-de45-4cf1-97ec-af202ac32f5a"
+  "linuxCommandTemplateId": "c1bdd523-de45-4cf1-97ec-af202ac32f5a",
+  "translations": {
+    "fr": {
+      "title": "Analyser taille dossiers (du)",
+      "description": "Estime l'espace disque utilisé par les fichiers et répertoires.",
+      "parameters": {
+        "linux": {
+          "path": {
+            "label": "Chemin",
+            "description": "Cible"
+          }
+        }
+      },
+      "examples": {
+        "du -sh * | sort -rh | head -10": "🔥 ENQUÊTEUR : Affiche les 10 plus gros dossiers/fichiers du répertoire courant, triés par taille décroissante. Indispensable pour trouver qui mange le disque."
+      }
+    }
+  }
 }
