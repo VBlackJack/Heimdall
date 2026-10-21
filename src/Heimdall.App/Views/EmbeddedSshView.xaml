@@ -126,25 +126,40 @@
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </Border>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- A grid, not a horizontal StackPanel: a StackPanel measures its children with
+                     unbounded width, so their ellipsis never engages and the panel is cut off
+                     mid-letter by the docked buttons. Star columns hand each text its share of
+                     whatever width the buttons leave; aligned left, the grid shrinks back to the
+                     texts' own widths when they all fit, so no gap opens between them. -->
+                <Grid HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="3*"/>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="2*"/>
+                    </Grid.ColumnDefinitions>
                     <TextBlock x:Name="SessionTitleText"
+                               Grid.Column="0"
                                FontSize="{StaticResource FontSizeBody}"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
-                               MaxWidth="300"/>
+                               MaxWidth="{StaticResource SessionHeaderTitleMaxWidth}"/>
                     <TextBlock x:Name="EndpointTextBlock"
+                               Grid.Column="1"
                                Margin="8,0,0,0"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
-                               MaxWidth="250"/>
+                               MaxWidth="{StaticResource SessionHeaderEndpointMaxWidth}"/>
                     <!-- Gateway / tunnel route ("via ..."), shown once the route is resolved. -->
                     <TextBlock x:Name="GatewayRouteText"
+                               Grid.Column="2"
                                Margin="8,0,0,0"
                                Visibility="Collapsed"
                                FontSize="{StaticResource FontSizeCaption}"
@@ -152,16 +167,20 @@
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
-                               MaxWidth="250"/>
-                    <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
+                               MaxWidth="{StaticResource SessionHeaderEndpointMaxWidth}"/>
+                    <TextBlock Grid.Column="3"
+                               Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
                     <TextBlock x:Name="StatusTextBlock"
+                               Grid.Column="4"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="{StaticResource SessionHeaderStatusMaxWidth}"
                                AutomationProperties.LiveSetting="Polite"
                                behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
-                </StackPanel>
+                </Grid>
             </DockPanel>
         </Border>
 
