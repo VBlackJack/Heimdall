@@ -52,6 +52,12 @@ public sealed class CommandLibraryImportResult
     /// <summary>Number of actions skipped (invalid or system-owned).</summary>
     public int Skipped { get; init; }
 
+    /// <summary>
+    /// Number of examples dropped from the imported actions because a list was longer than
+    /// <c>ValidationConstants.MaxActionExamplesCount</c>.
+    /// </summary>
+    public int TruncatedExamples { get; init; }
+
     /// <summary>Creates a file-too-large result.</summary>
     public static CommandLibraryImportResult FileTooLarge() =>
         new() { Outcome = CommandLibraryImportOutcome.FileTooLarge };
@@ -65,12 +71,13 @@ public sealed class CommandLibraryImportResult
         new() { Outcome = CommandLibraryImportOutcome.InvalidFormat };
 
     /// <summary>Creates a success result with the given merge counts.</summary>
-    public static CommandLibraryImportResult Success(int imported, int updated, int skipped) =>
+    public static CommandLibraryImportResult Success(int imported, int updated, int skipped, int truncatedExamples = 0) =>
         new()
         {
             Outcome = CommandLibraryImportOutcome.Success,
             Imported = imported,
             Updated = updated,
-            Skipped = skipped
+            Skipped = skipped,
+            TruncatedExamples = truncatedExamples
         };
 }

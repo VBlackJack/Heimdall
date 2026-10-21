@@ -42,11 +42,6 @@
       "platform": 0
     },
     {
-      "command": "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:{mp_server} SMSSITECODE={site_code} /forceinstall",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help C:\\Windows\\ccmsetup\\ccmsetup.exe -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
-    },
-    {
       "command": "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:<mp_server> SMSSITECODE={site_code} /forceinstall",
       "description": "Exemple utilisant le paramètre 'mp_server': FQDN du serveur Management Point SCCM.",
       "platform": 0

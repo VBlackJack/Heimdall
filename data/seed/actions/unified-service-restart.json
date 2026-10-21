@@ -4,10 +4,6 @@
   "description": "Redémarre un service Windows.",
   "category": "⚙️ Services & Automation",
   "platform": 2,
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "level": 1,
   "tags": [
     "linux",
@@ -47,23 +43,8 @@
       "platform": 0
     },
     {
-      "command": "Restart-Service -Name {serviceName} -Force",
-      "description": "Exécution standard de la commande Restart. Consultez la documentation officielle avec Get-Help Restart-Service -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
-    },
-    {
       "command": "Restart-Service -Name W32Time -Force",
       "description": "Redémarre le service Windows Time pour resynchroniser l'horloge.",
-      "platform": 0
-    },
-    {
-      "command": "Restart-Service -Name {serviceName} -Force",
-      "description": "Cas d'usage standard. Redémarre un service Windows. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
-      "platform": 0
-    },
-    {
-      "command": "Restart-Service -Name wuauserv -Force",
-      "description": "Exemple Windows pour Redémarrer un service",
       "platform": 0
     }
   ],
@@ -91,16 +72,6 @@
       "platform": 1
     },
     {
-      "command": "sudo --help",
-      "description": "Affiche l'aide complète de la commande sudo. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man sudo",
-      "description": "Affiche le manuel complet de sudo. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "sudo systemctl restart mysql",
       "description": "Redémarre le service de base de données MySQL.",
       "platform": 1
@@ -116,14 +87,5 @@
       "platform": 1
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'Restart-Service', Linux utilise 'systemctl'"
-    ],
-    "commonalities": [
-      "Les deux permettent de redémarrer un service",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

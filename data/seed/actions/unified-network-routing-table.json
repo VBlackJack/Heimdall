@@ -27,7 +27,6 @@
     "commandPattern": "ip route show",
     "parameters": []
   },
-  "parameters": [],
   "examples": [],
   "windowsExamples": [
     {

@@ -241,7 +241,9 @@ public sealed class CommandGeneratorServiceTests
         command.Should().Be(expected);
     }
 
-    // Dangerous shell characters in a string value block generation (command injection guard).
+    // A-03: a ShellQuote value is wrapped in single quotes, where both shells read every
+    // metacharacter literally, so the blacklist no longer refuses them. They have to arrive
+    // intact inside the quotes, on both platforms and through both validation paths.
     [Theory]
     [InlineData("a&b")]
     [InlineData("a|b")]
@@ -252,15 +254,130 @@ public sealed class CommandGeneratorServiceTests
     [InlineData("a)b")]
     [InlineData("a<b")]
     [InlineData("a>b")]
-    [InlineData("a\nb")]
-    public void GenerateCommand_StringWithDangerousCharacter_Throws(string value)
+    [InlineData("(objectClass=user)")]
+    [InlineData("error|warn")]
+    [InlineData("$env:TEMP")]
+    [InlineData("-Confirm:$false")]
+    public void GenerateCommand_ShellQuoteStringWithShellCharacters_ArrivesLiterallyInsideQuotes(string value)
     {
         CommandGeneratorService service = CreateService();
-        CommandTemplate template = WindowsTemplate(
-            "echo {v}",
+        CommandTemplate windows = WindowsTemplate(
+            "Write-Output {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        CommandTemplate linux = LinuxTemplate(
+            "printf %s {v}",
             CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
         Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = value };
 
+        service.ValidateParameters(windows, values, out List<string> windowsErrors);
+        service.ValidateParameters(linux, values, out List<string> linuxErrors);
+
+        windowsErrors.Should().BeEmpty();
+        linuxErrors.Should().BeEmpty();
+        service.GenerateCommand(windows, values).Should().Be("Write-Output '" + value + "'");
+        service.GenerateCommand(linux, values).Should().Be("printf %s '" + value + "'");
+    }
+
+    // A-03: with the blacklist gone for ShellQuote, the quote escaping is the only thing that
+    // keeps a value inside its quotes. An attempt to close the quote has to stay data.
+    [Fact]
+    public void GenerateCommand_ShellQuoteStringClosingTheQuote_StaysInsideTheQuotes()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate windows = WindowsTemplate(
+            "Write-Output {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        CommandTemplate linux = LinuxTemplate(
+            "printf %s {v}",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "x'; rm -rf /" };
+
+        service.GenerateCommand(linux, values).Should().Be("printf %s 'x'\\''; rm -rf /'");
+        service.GenerateCommand(windows, values).Should().Be("Write-Output 'x''; rm -rf /'");
+    }
+
+    // A-03: an InlineInQuotes parameter whose placeholder is not inside a single-quoted span
+    // only gets its quotes escaped, so it lands bare and the blacklist still applies.
+    [Theory]
+    [InlineData("Windows")]
+    [InlineData("Linux")]
+    public void ValidateParameters_InlineInQuotesOutsideSingleQuotes_StillRefusesSemicolon(string platform)
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("v", "Value");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = platform == "Windows"
+            ? WindowsTemplate("Write-Output {v}", parameter)
+            : LinuxTemplate("echo {v}", parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "a; whoami" };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().Equal(MessageKeys.ValidationParameterDangerousCharacters);
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    // A-03: a correctly placed InlineInQuotes parameter is literal, so an LDAP filter passes.
+    [Fact]
+    public void GenerateCommand_InlineInQuotesInsideSingleQuotes_AcceptsAnLdapFilter()
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("filter", "Filter");
+        parameter.Quoting = QuotingMode.InlineInQuotes;
+        CommandTemplate template = WindowsTemplate("Get-ADObject -LDAPFilter '{filter}'", parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["filter"] = "(&(objectClass=user)(cn=O'Brien))" };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().BeEmpty();
+        service.GenerateCommand(template, values)
+            .Should().Be("Get-ADObject -LDAPFilter '(&(objectClass=user)(cn=O''Brien))'");
+    }
+
+    // A-03: single quotes the shell reads inside a double-quoted string are not literal:
+    // PowerShell expands $(...) in "Done: '{v}'". A ShellQuote placeholder written inside a
+    // double-quoted string keeps the blacklist, because its own quotes would not protect it.
+    [Fact]
+    public void ValidateParameters_ShellQuoteInsideDoubleQuotes_StillRefusesSubexpression()
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = WindowsTemplate(
+            "Write-Host \"Done: {v}\"",
+            CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "$(whoami)" };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().Equal(MessageKeys.ValidationParameterDangerousCharacters);
+        Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
+    }
+
+    // A-03: a carriage return or a line feed submits the command on the terminal, which no
+    // quoting prevents, so both are refused whatever the quoting mode and placement.
+    [Theory]
+    [InlineData("shell-quote", "\r")]
+    [InlineData("shell-quote", "\n")]
+    [InlineData("inline-in-single-quotes", "\r")]
+    [InlineData("inline-in-single-quotes", "\n")]
+    [InlineData("inline-misplaced", "\r")]
+    [InlineData("inline-misplaced", "\n")]
+    public void ValidateParameters_CarriageReturnOrLineFeed_IsRefusedInEveryMode(string mode, string newline)
+    {
+        CommandGeneratorService service = CreateService();
+        TemplateParameter parameter = CommandLibraryTestHelpers.RequiredParameter("v", "Value");
+        string pattern = "Write-Output {v}";
+        if (mode != "shell-quote")
+        {
+            parameter.Quoting = QuotingMode.InlineInQuotes;
+            pattern = mode == "inline-in-single-quotes" ? "Write-Output '{v}'" : pattern;
+        }
+
+        CommandTemplate template = WindowsTemplate(pattern, parameter);
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "a" + newline + "b" };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().Equal(MessageKeys.ValidationParameterDangerousCharacters);
         Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
     }
 
@@ -538,6 +655,106 @@ public sealed class CommandGeneratorServiceTests
         command.Should().NotContain("''A B''", $"{fileName} / {templateName} / {parameterName} must not double-wrap");
     }
 
+    // A-02: every shipped template opens with the defaults it ships, so each one has to
+    // validate and generate with exactly those values. The value dictionary is what the
+    // Command Library view model starts from (GetInitialParameterValue): the default, or an
+    // empty string when there is none. A required parameter with no default is the one
+    // error allowed, because the operator is expected to fill it; any other error (a
+    // refused character, a malformed number) means the action opens broken.
+    [Theory]
+    [MemberData(nameof(EverySeedTemplate))]
+    public void GenerateCommand_EverySeedTemplate_AcceptsItsShippedDefaults(string seedTemplate)
+    {
+        string[] parts = seedTemplate.Split(" / ", StringSplitOptions.None);
+        CommandTemplate template = LoadSeedTemplate(parts[0], parts[1]);
+        CommandGeneratorService service = CreateService();
+
+        Dictionary<string, string> values = new(StringComparer.Ordinal);
+        List<string> expectedRequiredErrors = [];
+        foreach (TemplateParameter parameter in template.Parameters)
+        {
+            values[parameter.Name] = parameter.DefaultValue ?? string.Empty;
+            if (parameter.Required && string.IsNullOrWhiteSpace(values[parameter.Name]))
+            {
+                expectedRequiredErrors.Add(
+                    string.Format(System.Globalization.CultureInfo.InvariantCulture, MessageKeys.ValidationParameterRequired, parameter.Label));
+            }
+        }
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        errors.Should().BeEquivalentTo(
+            expectedRequiredErrors,
+            $"{seedTemplate} must validate with its shipped defaults; only an empty required field may be reported");
+
+        // The operator fills the required fields before generating; every other value keeps
+        // its shipped default, so generation still exercises each default.
+        foreach (TemplateParameter parameter in template.Parameters.Where(parameter =>
+            parameter.Required && string.IsNullOrWhiteSpace(values[parameter.Name])))
+        {
+            values[parameter.Name] = parameter.IsChoice
+                ? parameter.AllowedValues![0]
+                : SafeValueForParameter(parameter);
+        }
+
+        Func<string> generate = () => service.GenerateCommand(template, values);
+        if (OverlongShippedTemplates.Contains(seedTemplate))
+        {
+            // Pinned from the other side too: once one of these is shortened, this assertion
+            // fails and the entry has to leave the list, so the list cannot outlive the defect.
+            generate.Should().Throw<InvalidOperationException>(
+                    $"{seedTemplate} is listed as longer than the generator accepts; remove it from the list once it fits")
+                .WithMessage($"*{ValidationConstants.MaxCommandLength}*");
+            return;
+        }
+
+        generate.Should().NotThrow($"{seedTemplate} must generate with its shipped defaults");
+    }
+
+    /// <summary>
+    /// Shipped templates whose pattern alone is longer than
+    /// <see cref="ValidationConstants.MaxCommandLength"/>, so they cannot generate whatever
+    /// the values. Found by the theory above; they open on a generation error today.
+    /// Whether the bound or the scripts should change is an open decision, not this test's
+    /// to make, so the list records the defect instead of hiding it.
+    /// </summary>
+    private static readonly HashSet<string> OverlongShippedTemplates = new(StringComparer.Ordinal)
+    {
+        "win-perf-201.json / windowsCommandTemplate",
+        "win-perf-403.json / windowsCommandTemplate",
+        "win-perf-404.json / windowsCommandTemplate",
+        "win-privacy-101.json / windowsCommandTemplate",
+        "win-privacy-203.json / windowsCommandTemplate",
+        "win-privacy-205.json / windowsCommandTemplate",
+        "win-privacy-206.json / windowsCommandTemplate",
+        "win-privacy-303.json / windowsCommandTemplate",
+        "win-privacy-304.json / windowsCommandTemplate",
+    };
+
+    public static IEnumerable<object[]> EverySeedTemplate()
+    {
+        string seedActionsDirectory = FindSeedActionsDirectory();
+        foreach (string filePath in Directory.EnumerateFiles(seedActionsDirectory, "*.json").OrderBy(path => path, StringComparer.Ordinal))
+        {
+            ActionModel? action = JsonSerializer.Deserialize<ActionModel>(File.ReadAllText(filePath), JsonOptionsHelper.CaseInsensitive);
+            if (action == null)
+            {
+                continue;
+            }
+
+            string fileName = Path.GetFileName(filePath);
+            if (action.WindowsCommandTemplate != null)
+            {
+                yield return new object[] { fileName + " / windowsCommandTemplate" };
+            }
+
+            if (action.LinuxCommandTemplate != null)
+            {
+                yield return new object[] { fileName + " / linuxCommandTemplate" };
+            }
+        }
+    }
+
     // D2 Lot B step 2b: seed driveLetter parameters must be validated bare values.
     // Producer: CommandGeneratorService.GenerateCommand -> EscapeParameterValue.
     [Theory]
@@ -788,18 +1005,68 @@ public sealed class CommandGeneratorServiceTests
         Assert.Throws<InvalidOperationException>(() => service.GenerateCommand(template, values));
     }
 
+    // E-01: a path is checked by its shape, not resolved on this machine. The rows that
+    // relied on the local AppData folders (tilde, percent sign, traversal, relative path,
+    // Desktop/Downloads/Documents) are retired on purpose: the command runs elsewhere, the
+    // value is quoted like a string, and all of those are literal text inside the quotes.
     public static IEnumerable<object[]> InvalidPaths()
     {
-        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        yield return new object[] { "   " };                                                         // blank
+        yield return new object[] { "/var/log/" + (char)0 + "syslog" };                               // NUL
+        yield return new object[] { "/var/log/syslog\nrm -rf /" };                                    // line feed
+        yield return new object[] { "C:\\inetpub\\wwwroot\r" };                                       // carriage return
+        yield return new object[] { "C:\\" + new string('a', ValidationConstants.MaxPathLength) };   // over the bound
+    }
 
-        yield return new object[] { "~/secret.txt" };                                              // tilde expansion
-        yield return new object[] { "%APPDATA%\\secret.txt" };                                      // env-var expansion
-        yield return new object[] { Path.Combine(appData, "..", "..", "..", "..", "evil.txt") };    // traversal out of allowed base
-        yield return new object[] { Path.Combine("relative", "path", "file.txt") };                 // non-rooted (relative)
-        yield return new object[] { Path.Combine(userProfile, "Desktop", "evil.txt") };             // blocked subfolder
-        yield return new object[] { Path.Combine(userProfile, "Downloads", "evil.txt") };           // blocked subfolder
-        yield return new object[] { Path.Combine(userProfile, "Documents", "evil.txt") };           // blocked subfolder
+    // E-01: paths of another machine validate and come out quoted, on both platforms.
+    [Theory]
+    [InlineData("/var/log/syslog")]
+    [InlineData("/etc/nginx/nginx.conf")]
+    [InlineData("C:\\inetpub\\wwwroot")]
+    [InlineData("C:\\Program Files (x86)\\App")]
+    [InlineData("~/backup")]
+    [InlineData("relative/dir")]
+    public void GenerateCommand_RemotePath_ValidatesAndComesOutQuoted(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate windows = WindowsTemplate(
+            "Get-Item -Path {p}",
+            CommandLibraryTestHelpers.RequiredParameter("p", "Path", "path"));
+        CommandTemplate linux = LinuxTemplate(
+            "tail -n 50 {p}",
+            CommandLibraryTestHelpers.RequiredParameter("p", "Path", "path"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["p"] = value };
+
+        service.ValidateParameters(windows, values, out List<string> windowsErrors);
+        service.ValidateParameters(linux, values, out List<string> linuxErrors);
+
+        windowsErrors.Should().BeEmpty();
+        linuxErrors.Should().BeEmpty();
+        service.GenerateCommand(windows, values).Should().Be("Get-Item -Path '" + value + "'");
+        service.GenerateCommand(linux, values).Should().Be("tail -n 50 '" + value + "'");
+    }
+
+    // E-01: the localized path reports the same refusals as the generation path.
+    [Theory]
+    [MemberData(nameof(InvalidPaths))]
+    public void ValidateParameters_InvalidPath_ReportsInvalidPath(string value)
+    {
+        CommandGeneratorService service = CreateService();
+        CommandTemplate template = LinuxTemplate(
+            "tail {p}",
+            CommandLibraryTestHelpers.RequiredParameter("p", "Path", "path"));
+        Dictionary<string, string> values = new(StringComparer.Ordinal) { ["p"] = value };
+
+        service.ValidateParameters(template, values, out List<string> errors);
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            // A blank required value is reported as missing, not as malformed.
+            errors.Should().Equal(MessageKeys.ValidationParameterRequired);
+            return;
+        }
+
+        errors.Should().Equal(MessageKeys.ValidationParameterInvalidPath);
     }
 
     // ===== TEST-01: ValidateParameters localized path (line 120) =====
@@ -822,9 +1089,11 @@ public sealed class CommandGeneratorServiceTests
     [Fact]
     public void ValidateParameters_DangerousCharacterInString_ReturnsFalseWithError()
     {
+        // A-03: a bare ShellQuote placeholder no longer refuses '&' (its quotes make it
+        // literal); inside a double-quoted string it still does.
         CommandGeneratorService service = CreateService();
         CommandTemplate template = WindowsTemplate(
-            "echo {v}",
+            "echo \"{v}\"",
             CommandLibraryTestHelpers.RequiredParameter("v", "Value"));
         Dictionary<string, string> values = new(StringComparer.Ordinal) { ["v"] = "a&b" };
 
@@ -1076,7 +1345,7 @@ public sealed class CommandGeneratorServiceTests
             _ => "value"
         };
 
-    private static string FindSeedActionsDirectory()
+    internal static string FindSeedActionsDirectory()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);
         while (current != null)

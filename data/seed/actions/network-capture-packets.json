@@ -82,11 +82,6 @@
       "command": "netsh trace start capture=yes tracefile=C:\\Temp\\trace.etl maxSize=500",
       "description": "Démarre une capture réseau (max 500 MB)",
       "platform": 0
-    },
-    {
-      "command": "netsh trace start capture=yes tracefile=C:\\Reports\\output.txt maxSize=100",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help netsh -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "linuxExamples": [
@@ -138,11 +133,6 @@
     {
       "command": "tcpdump -r capture.pcap",
       "description": "Lire un fichier de capture",
-      "platform": 1
-    },
-    {
-      "command": "tcpdump host 192.168.1.100",
-      "description": "Trafic vers/depuis une IP",
       "platform": 1
     }
   ],

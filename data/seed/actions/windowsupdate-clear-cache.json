@@ -42,7 +42,7 @@
     },
     {
       "command": "Stop-Service -Name wuauserv,bits -Force; Remove-Item -Path C:\\Windows\\SoftwareDistribution\\Download\\* -Recurse -Force -ErrorAction SilentlyContinue; Start-Service -Name wuauserv,bits",
-      "description": "Cas d'usage standard. Arrête les services Windows Update et nettoie le dossier SoftwareDistribution pour résoudre les problèmes de mises à jour Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Arrête les services Windows Update et nettoie le dossier SoftwareDistribution pour résoudre les problèmes de mises à jour.",
       "platform": 0
     }
   ],

@@ -40,11 +40,6 @@
       "platform": 0
     },
     {
-      "command": "Hide-WindowsUpdate -KBArticleID KB5012345 -Confirm:$false",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Hide-WindowsUpdate -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
-    },
-    {
       "command": "Hide-WindowsUpdate -KBArticleID KB5001234 -Confirm:$false",
       "description": "Exemple utilisant le paramètre 'kbNumber': Numéro KB de la mise à jour à masquer (ex: KB5001234). Remplacez KB5012345 par la valeur appropriée selon votre environnement.",
       "platform": 0

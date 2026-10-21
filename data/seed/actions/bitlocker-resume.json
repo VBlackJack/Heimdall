@@ -50,7 +50,7 @@
     },
     {
       "command": "Resume-BitLocker -MountPoint \"D:\"",
-      "description": "Cas d'usage standard. Réactive la protection BitLocker après une suspension temporaire. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Réactive la protection BitLocker après une suspension temporaire.",
       "platform": 0
     }
   ],

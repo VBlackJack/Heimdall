@@ -44,7 +44,7 @@
     },
     {
       "command": "Get-Service | Where-Object {$_.StartType -eq 'Disabled'} | Select-Object Name,DisplayName,Status | Sort-Object Name | Format-Table -AutoSize",
-      "description": "Cas d'usage standard. Affiche la liste de tous les services Windows actuellement désactivés pour vérification. Consultez la documentation pour des paramètres avancés et des options de filtrage.",
+      "description": "Affiche la liste de tous les services Windows actuellement désactivés pour vérification.",
       "platform": 0
     }
   ],

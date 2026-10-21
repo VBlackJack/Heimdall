@@ -35,7 +35,7 @@
         "label": "Nom du snapshot",
         "type": "string",
         "quoting": "InlineInQuotes",
-        "defaultValue": "Checkpoint-$(Get-Date -Format 'yyyy-MM-dd_HH-mm')",
+        "defaultValue": "Checkpoint-before-change",
         "required": true,
         "description": "Nom du point de contrôle"
       }
@@ -45,6 +45,11 @@
     {
       "command": "Checkpoint-VM -Name 'Windows11-Dev' -SnapshotName 'Before-Updates'",
       "description": "Snapshot avant mise à jour",
+      "platform": 0
+    },
+    {
+      "command": "Checkpoint-VM -Name 'Windows11-Dev' -SnapshotName \"Checkpoint-$(Get-Date -Format 'yyyy-MM-dd_HH-mm')\"",
+      "description": "Snapshot nommé avec la date et l'heure (chaîne entre guillemets doubles, évaluée par PowerShell)",
       "platform": 0
     },
     {

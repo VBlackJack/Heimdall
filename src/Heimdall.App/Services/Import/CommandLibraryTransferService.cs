@@ -18,10 +18,12 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Heimdall.Core.Configuration;
+using TwinShell.Core.Constants;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Interfaces;
 using ActionModel = TwinShell.Core.Models.Action;
+using CommandExample = TwinShell.Core.Models.CommandExample;
 using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 
 namespace Heimdall.App.Services.Import;
@@ -98,7 +100,7 @@ public sealed class CommandLibraryTransferService(
             return CommandLibraryImportResult.InvalidFormat();
         }
 
-        int imported = 0, updated = 0, skipped = 0;
+        int imported = 0, updated = 0, skipped = 0, truncatedExamples = 0;
 
         foreach (var action in actions)
         {
@@ -113,6 +115,7 @@ public sealed class CommandLibraryTransferService(
 
             NormalizeEnumDomains(action);
             NormalizeParameterQuoting(action);
+            var truncatedHere = TruncateExampleLists(action);
 
             var existing = await actionService.GetActionByPublicIdAsync(action.PublicId)
                 ?? await actionService.GetActionByIdAsync(action.Id);
@@ -126,6 +129,7 @@ public sealed class CommandLibraryTransferService(
                     action.UpdatedAt = DateTime.UtcNow;
                     await actionService.UpdateActionAsync(action);
                     updated++;
+                    truncatedExamples += truncatedHere;
                 }
                 else
                 {
@@ -139,10 +143,46 @@ public sealed class CommandLibraryTransferService(
                 action.UpdatedAt = DateTime.UtcNow;
                 await actionService.CreateActionAsync(action);
                 imported++;
+                truncatedExamples += truncatedHere;
             }
         }
 
-        return CommandLibraryImportResult.Success(imported, updated, skipped);
+        if (truncatedExamples > 0)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[CommandLibrary] Import kept the first {ValidationConstants.MaxActionExamplesCount} examples per list; {truncatedExamples} example(s) beyond that were dropped");
+        }
+
+        return CommandLibraryImportResult.Success(imported, updated, skipped, truncatedExamples);
+    }
+
+    /// <summary>
+    /// Cuts each example list of <paramref name="action"/> to
+    /// <see cref="ValidationConstants.MaxActionExamplesCount"/>, keeping the first entries,
+    /// and returns how many examples were dropped.
+    /// </summary>
+    /// <remarks>
+    /// Truncated rather than rejected: an action with too many examples is still a good
+    /// action, and the shipped catalogue is held to the same bound by a guard test, so an
+    /// export of it re-imports unchanged. The count goes into the result the way skipped
+    /// actions do; the import summary shows per-action counts only, so it is logged rather
+    /// than shown.
+    /// </remarks>
+    private static int TruncateExampleLists(ActionModel action)
+    {
+        return Truncate(action.Examples) + Truncate(action.WindowsExamples) + Truncate(action.LinuxExamples);
+
+        static int Truncate(List<CommandExample>? examples)
+        {
+            if (examples is null || examples.Count <= ValidationConstants.MaxActionExamplesCount)
+            {
+                return 0;
+            }
+
+            var dropped = examples.Count - ValidationConstants.MaxActionExamplesCount;
+            examples.RemoveRange(ValidationConstants.MaxActionExamplesCount, dropped);
+            return dropped;
+        }
     }
 
     /// <summary>

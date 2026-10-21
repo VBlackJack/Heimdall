@@ -38,11 +38,6 @@
       "command": "Get-WindowsUpdate -IsHidden | Show-WindowsUpdate",
       "description": "Réaffiche toutes les mises à jour masquées",
       "platform": 0
-    },
-    {
-      "command": "Show-WindowsUpdate -KBArticleID KB5012345",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Show-WindowsUpdate -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "Nécessite le module PSWindowsUpdate.",

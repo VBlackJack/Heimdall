@@ -31,11 +31,6 @@
       "command": "powercfg /setactive GUID",
       "description": "Active le plan d'alimentation",
       "platform": 0
-    },
-    {
-      "command": "powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61; $ultimateGuid = (powercfg -list",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help powercfg -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
     }
   ],
   "notes": "Plan Ultimate Performance: élimine les micro-latences, désactive les économies d'énergie. Augmente la consommation électrique de 5-10%. Recommandé uniquement pour PC fixes gaming/workstation. Sur portable: réduit considérablement l'autonomie.",

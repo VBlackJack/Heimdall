@@ -15,6 +15,7 @@
  */
 
 using System.Text.RegularExpressions;
+using Heimdall.Core.Security;
 
 namespace TwinShell.Core.Helpers;
 
@@ -171,4 +172,162 @@ public static class CommandPatternQuoting
 
         return quoteCount % 2 == 1;
     }
+
+    /// <summary>
+    /// How the shell reads the text at one occurrence of a placeholder.
+    /// </summary>
+    public enum QuoteContext
+    {
+        /// <summary>Outside any quoted span.</summary>
+        Bare,
+
+        /// <summary>Inside a single-quoted span, where the shell takes every character literally.</summary>
+        SingleQuoted,
+
+        /// <summary>
+        /// Inside a span the shell still interprets: a double-quoted string, where
+        /// <c>$(...)</c> and backticks expand even between inner single quotes, or a bash
+        /// <c>$'...'</c> string, which reads backslash escapes.
+        /// </summary>
+        Expanding,
+    }
+
+    /// <summary>
+    /// The quoting context of every occurrence of the <paramref name="parameterName"/>
+    /// placeholder in <paramref name="commandPattern"/>, in order. Empty when the
+    /// placeholder does not appear.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A small lexer rather than a quote count, because the count is wrong exactly where it
+    /// matters: in <c>-Filter "Name -like '*{x}*'"</c> the placeholder follows one single
+    /// quote, yet the shell reads it inside a double-quoted string and expands
+    /// <c>$(...)</c> there. Every occurrence is reported because the generator replaces
+    /// every occurrence.
+    /// </para>
+    /// <para>
+    /// <paramref name="powerShell"/> selects the rules: PowerShell escapes with a backtick
+    /// and also closes strings on typographic quotes; bash escapes with a backslash outside
+    /// single quotes and has <c>$'...'</c>.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<QuoteContext> GetPlaceholderQuoteContexts(
+        string? commandPattern, string parameterName, bool powerShell)
+    {
+        ArgumentNullException.ThrowIfNull(parameterName);
+
+        if (string.IsNullOrEmpty(commandPattern) || parameterName.Length == 0)
+        {
+            return [];
+        }
+
+        string placeholder = Placeholder(parameterName);
+        char escape = powerShell ? '`' : '\\';
+        var contexts = new List<QuoteContext>();
+        var state = LexerState.Bare;
+        int index = 0;
+
+        while (index < commandPattern.Length)
+        {
+            if (string.CompareOrdinal(commandPattern, index, placeholder, 0, placeholder.Length) == 0)
+            {
+                contexts.Add(state switch
+                {
+                    LexerState.Bare => QuoteContext.Bare,
+                    LexerState.Single => QuoteContext.SingleQuoted,
+                    _ => QuoteContext.Expanding,
+                });
+                index += placeholder.Length;
+                continue;
+            }
+
+            char c = commandPattern[index];
+            switch (state)
+            {
+                case LexerState.Bare:
+                    if (c == escape)
+                    {
+                        index += 2;
+                        continue;
+                    }
+
+                    if (!powerShell && c == '$' && index + 1 < commandPattern.Length && commandPattern[index + 1] == '\'')
+                    {
+                        state = LexerState.AnsiC;
+                        index += 2;
+                        continue;
+                    }
+
+                    if (IsSingleQuote(c, powerShell))
+                    {
+                        state = LexerState.Single;
+                    }
+                    else if (IsDoubleQuote(c, powerShell))
+                    {
+                        state = LexerState.Double;
+                    }
+
+                    break;
+
+                case LexerState.Single:
+                    if (IsSingleQuote(c, powerShell))
+                    {
+                        state = LexerState.Bare;
+                    }
+
+                    break;
+
+                case LexerState.Double:
+                    if (c == escape)
+                    {
+                        index += 2;
+                        continue;
+                    }
+
+                    if (IsDoubleQuote(c, powerShell))
+                    {
+                        state = LexerState.Bare;
+                    }
+
+                    break;
+
+                case LexerState.AnsiC:
+                    if (c == '\\')
+                    {
+                        index += 2;
+                        continue;
+                    }
+
+                    if (c == '\'')
+                    {
+                        state = LexerState.Bare;
+                    }
+
+                    break;
+            }
+
+            index++;
+        }
+
+        return contexts;
+    }
+
+    private enum LexerState
+    {
+        Bare,
+        Single,
+        Double,
+        AnsiC,
+    }
+
+    private static bool IsSingleQuote(char c, bool powerShell) =>
+        powerShell ? PowerShellSingleQuotedString.IsSingleQuote(c) : c == '\'';
+
+    private static bool IsDoubleQuote(char c, bool powerShell) =>
+        c == '"' || (powerShell && c is LeftDoubleQuotationMark or RightDoubleQuotationMark or DoubleLow9QuotationMark);
+
+    // PowerShell closes a double-quoted string on these as well as on the ASCII quote.
+    private const char LeftDoubleQuotationMark = (char)0x201C;
+    private const char RightDoubleQuotationMark = (char)0x201D;
+    private const char DoubleLow9QuotationMark = (char)0x201E;
 }

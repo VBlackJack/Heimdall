@@ -63,7 +63,11 @@ public static class PowerShellSingleQuotedString
         return escaped.ToString();
     }
 
-    private static bool IsSingleQuote(char c)
+    /// <summary>
+    /// True when PowerShell reads <paramref name="c"/> as a single quote: the apostrophe or one
+    /// of the four typographic single quotes.
+    /// </summary>
+    public static bool IsSingleQuote(char c)
     {
         return c is Apostrophe
             or LeftSingleQuotationMark

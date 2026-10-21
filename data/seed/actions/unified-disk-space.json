@@ -27,7 +27,6 @@
     "commandPattern": "df -h",
     "parameters": []
   },
-  "parameters": [],
   "examples": [],
   "windowsExamples": [
     {

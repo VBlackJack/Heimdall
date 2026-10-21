@@ -50,10 +50,6 @@
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/new-localuser"
     }
   ],
-  "supportedPlatforms": [
-    0,
-    1
-  ],
   "linuxExamples": [
     {
       "command": "sudo useradd -m -s /bin/bash john",
@@ -71,16 +67,6 @@
       "platform": 1
     },
     {
-      "command": "useradd --help",
-      "description": "Affiche l'aide complète de la commande useradd. --help liste tous les paramètres disponibles, les options et des exemples d'utilisation. Première commande à utiliser pour découvrir les capacités d'un outil.",
-      "platform": 1
-    },
-    {
-      "command": "man useradd",
-      "description": "Affiche le manuel complet de useradd. Les pages man fournissent la documentation détaillée : syntaxe, paramètres, exemples, notes. Plus complet que --help. Naviguez avec flèches, cherchez avec '/', quittez avec 'q'.",
-      "platform": 1
-    },
-    {
       "command": "useradd -m -s /bin/bash {username}",
       "description": "Exemple utilisant le paramètre 'shell': Shell par défaut. Remplacez <shell> par la valeur appropriée selon votre environnement.",
       "platform": 1
@@ -88,11 +74,6 @@
     {
       "command": "useradd -m -s {shell} newuser",
       "description": "Exemple utilisant le paramètre 'username': Nom du nouvel utilisateur. Remplacez <username> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "useradd -m -s bash jdupont",
-      "description": "Exemple Linux pour Créer un utilisateur local",
       "platform": 1
     },
     {
@@ -138,27 +119,7 @@
       "command": "New-LocalUser -Name \"john\" -FullName \"John Doe\" -Description \"Developer\"",
       "description": "Crée john avec nom complet et description",
       "platform": 0
-    },
-    {
-      "command": "Get-Help New-LocalUser -Full",
-      "description": "Affiche l'aide complète de New-LocalUser",
-      "platform": 0
-    },
-    {
-      "command": "New-LocalUser -Name \"jdupont\" -NoPassword",
-      "description": "Exemple Windows pour Créer un utilisateur local",
-      "platform": 0
     }
   ],
-  "crossPlatformNotes": {
-    "differences": [
-      "Syntaxe: Windows utilise 'New-LocalUser', Linux utilise 'useradd'",
-      "Windows: -NoPassword par défaut, Linux: passwd séparé"
-    ],
-    "commonalities": [
-      "Les deux permettent de créer un utilisateur local",
-      "Fonctionnalité équivalente sur les deux plateformes"
-    ]
-  },
   "examples": []
 }

@@ -43,11 +43,6 @@
       "platform": 0
     },
     {
-      "command": "Backup-GPO -Name \"Security-Baseline\" -Path \"D:\\Backups\\daily\"",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help Backup-GPO -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
-      "platform": 0
-    },
-    {
       "command": "Backup-GPO -Name \"Security-Baseline\" -Path \"C:\\GPOBackups\"",
       "description": "Exemple utilisant le paramètre 'backupPath': Chemin du dossier de sauvegarde. Remplacez D:\\Backups\\daily par la valeur appropriée selon votre environnement.",
       "platform": 0
