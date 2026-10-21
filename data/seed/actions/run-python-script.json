@@ -1,7 +1,7 @@
 {
   "id": "run-python-script",
-  "title": "Exécuter un script Python",
-  "description": "Lance un script Python.",
+  "title": "Run a Python script",
+  "description": "Start a Python script.",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "scriptPath",
-        "label": "Script Python",
+        "label": "Python script",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier .py"
+        "description": "Path of the .py file"
       }
     ]
   },
@@ -37,60 +37,84 @@
     "parameters": [
       {
         "name": "scriptPath",
-        "label": "Script Python",
+        "label": "Python script",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier .py"
+        "description": "Path of the .py file"
       }
     ]
   },
-  "examples": [
-    {
-      "command": "python \"C:\\Scripts\\deploy.ps1\"",
-      "description": "Exemple utilisant le paramètre 'scriptPath': Chemin du fichier .py. Remplacez C:\\Scripts\\deploy.ps1 par la valeur appropriée selon votre environnement.",
-      "platform": 2
-    }
-  ],
-  "notes": "python3 pour Linux/Mac, python pour Windows. -m pour exécuter un module.",
+  "examples": [],
+  "notes": "python3 on Linux/Mac, python on Windows. -m runs a module.",
   "links": [],
   "windowsExamples": [
     {
       "command": "python script.py",
-      "description": "Exécute un script Python",
+      "description": "Run a Python script",
       "platform": 0
     },
     {
       "command": "python -m module_name",
-      "description": "Exécute un module Python",
+      "description": "Run a Python module",
       "platform": 0
     }
   ],
   "linuxExamples": [
     {
       "command": "python3 script.py",
-      "description": "Exécute un script Python",
+      "description": "Run a Python script",
       "platform": 1
     },
     {
       "command": "python3 -m module_name",
-      "description": "Exécute un module Python",
+      "description": "Run a Python module",
       "platform": 1
     },
     {
       "command": "python3 script.py arg1 arg2",
-      "description": "Exécute avec des arguments",
+      "description": "Run with arguments",
       "platform": 1
     },
     {
       "command": "python3 -m venv venv && source venv/bin/activate",
-      "description": "Créer et activer un venv",
+      "description": "Create and activate a venv",
       "platform": 1
     },
     {
       "command": "python3 -c \"print('Hello')\"",
-      "description": "Exécuter une ligne de code",
+      "description": "Run one line of code",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exécuter un script Python",
+      "description": "Lance un script Python.",
+      "notes": "python3 pour Linux/Mac, python pour Windows. -m pour exécuter un module.",
+      "parameters": {
+        "windows": {
+          "scriptPath": {
+            "label": "Script Python",
+            "description": "Chemin du fichier .py"
+          }
+        },
+        "linux": {
+          "scriptPath": {
+            "label": "Script Python",
+            "description": "Chemin du fichier .py"
+          }
+        }
+      },
+      "examples": {
+        "python script.py": "Exécute un script Python",
+        "python -m module_name": "Exécute un module Python",
+        "python3 script.py": "Exécute un script Python",
+        "python3 -m module_name": "Exécute un module Python",
+        "python3 script.py arg1 arg2": "Exécute avec des arguments",
+        "python3 -m venv venv && source venv/bin/activate": "Créer et activer un venv",
+        "python3 -c \"print('Hello')\"": "Exécuter une ligne de code"
+      }
+    }
+  }
 }

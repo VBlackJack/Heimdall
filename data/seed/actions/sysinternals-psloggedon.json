@@ -1,7 +1,7 @@
 {
   "id": "sysinternals-psloggedon",
-  "title": "Qui est connecté ? (PsLoggedOn)",
-  "description": "Affiche les utilisateurs connectés localement et via des partages de ressources.",
+  "title": "Who is logged on? (PsLoggedOn)",
+  "description": "Show the users logged on locally and through resource shares.",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -21,14 +21,24 @@
   "examples": [
     {
       "command": "psloggedon.exe -l -AcceptEula",
-      "description": "Affiche uniquement les connexions locales (-l), pas les connexions via partages réseau.",
+      "description": "Show only local logons (-l), not logons through network shares.",
       "platform": 0
     },
     {
-      "command": "psloggedon.exe \\SERVER01",
-      "description": "Vérifie qui est connecté sur un serveur distant.",
+      "command": "psloggedon.exe \\\\SERVER01",
+      "description": "Check who is logged on to a remote server.",
       "platform": 0
     }
   ],
-  "windowsCommandTemplateId": "e7e3cfd9-421d-4fdb-bf5e-bb11d5d7ab1c"
+  "windowsCommandTemplateId": "e7e3cfd9-421d-4fdb-bf5e-bb11d5d7ab1c",
+  "translations": {
+    "fr": {
+      "title": "Qui est connecté ? (PsLoggedOn)",
+      "description": "Affiche les utilisateurs connectés localement et via des partages de ressources.",
+      "examples": {
+        "psloggedon.exe -l -AcceptEula": "Affiche uniquement les connexions locales (-l), pas les connexions via partages réseau.",
+        "psloggedon.exe \\\\SERVER01": "Vérifie qui est connecté sur un serveur distant."
+      }
+    }
+  }
 }

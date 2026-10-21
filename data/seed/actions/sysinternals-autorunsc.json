@@ -1,7 +1,7 @@
 {
   "id": "sysinternals-autorunsc",
-  "title": "Lister les programmes au démarrage (Autoruns)",
-  "description": "Version ligne de commande d'Autoruns. Liste tout ce qui démarre automatiquement (clés Run, Services, Drivers, Tâches planifiées).",
+  "title": "List startup programs (Autoruns)",
+  "description": "Command-line version of Autoruns. Lists everything that starts automatically (Run keys, services, drivers, scheduled tasks).",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -22,14 +22,24 @@
   "examples": [
     {
       "command": "autorunsc.exe -a * -c -h -AcceptEula > autoruns.csv",
-      "description": "🔥 FORENSIC : Exporte TOUS les points de démarrage (-a *) en format CSV (-c) avec les hashs MD5 (-h). À analyser pour trouver la persistance d'un malware.",
+      "description": "🔥 FORENSIC: export ALL startup points (-a *) as CSV (-c) with their MD5 hashes (-h). Analyze it to find malware persistence.",
       "platform": 0
     },
     {
       "command": "autorunsc.exe -v -AcceptEula",
-      "description": "Vérifie les signatures numériques (-v) de Microsoft. Cache les entrées signées par Microsoft pour se concentrer sur les tiers.",
+      "description": "Check the digital signatures (-v) from Microsoft. Hides the entries Microsoft signed to focus on third parties.",
       "platform": 0
     }
   ],
-  "windowsCommandTemplateId": "9077aae3-d9a7-430c-8d91-484989845849"
+  "windowsCommandTemplateId": "9077aae3-d9a7-430c-8d91-484989845849",
+  "translations": {
+    "fr": {
+      "title": "Lister les programmes au démarrage (Autoruns)",
+      "description": "Version ligne de commande d'Autoruns. Liste tout ce qui démarre automatiquement (clés Run, Services, Drivers, Tâches planifiées).",
+      "examples": {
+        "autorunsc.exe -a * -c -h -AcceptEula > autoruns.csv": "🔥 FORENSIC : Exporte TOUS les points de démarrage (-a *) en format CSV (-c) avec les hashs MD5 (-h). À analyser pour trouver la persistance d'un malware.",
+        "autorunsc.exe -v -AcceptEula": "Vérifie les signatures numériques (-v) de Microsoft. Cache les entrées signées par Microsoft pour se concentrer sur les tiers."
+      }
+    }
+  }
 }

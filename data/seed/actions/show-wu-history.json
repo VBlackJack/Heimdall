@@ -1,7 +1,7 @@
 {
   "id": "show-wu-history",
-  "title": "Afficher l'historique Windows Update",
-  "description": "Liste les 50 dernières mises à jour installées avec leur statut",
+  "title": "Show the Windows Update history",
+  "description": "List the last 50 installed updates with their status",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -21,30 +21,26 @@
   "examples": [
     {
       "command": "Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object -First 10",
-      "description": "Affiche les 10 dernières mises à jour installées",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"Get-HotFix | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"Get-HotFix | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"Get-HotFix | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Show the last 10 installed updates",
       "platform": 0
     },
     {
       "command": "powershell -Command \"Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object -First 50 | Format-Table -AutoSize\"",
-      "description": "Liste les 50 dernières mises à jour installées avec leur statut.",
+      "description": "List the last 50 installed updates with their status.",
       "platform": 0
     }
   ],
-  "notes": "Ne nécessite pas de droits administrateur. Affiche les KB installés avec leur date.",
-  "links": []
+  "notes": "Does not require administrator rights. Shows the installed KBs with their date.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'historique Windows Update",
+      "description": "Liste les 50 dernières mises à jour installées avec leur statut",
+      "notes": "Ne nécessite pas de droits administrateur. Affiche les KB installés avec leur date.",
+      "examples": {
+        "Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object -First 10": "Affiche les 10 dernières mises à jour installées",
+        "powershell -Command \"Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object -First 50 | Format-Table -AutoSize\"": "Liste les 50 dernières mises à jour installées avec leur statut."
+      }
+    }
+  }
 }

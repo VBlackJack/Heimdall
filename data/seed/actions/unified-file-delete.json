@@ -1,20 +1,19 @@
 {
   "id": "unified-file-delete",
-  "title": "Supprimer des fichiers ou dossiers",
-  "description": "Supprime des fichiers ou des répertoires de manière permanente.",
+  "title": "Delete files or folders",
+  "description": "Delete files or directories permanently.",
   "category": "files-storage",
   "platform": 2,
   "level": 2,
   "tags": [
     "linux",
     "windows",
-    "fichier",
+    "file",
     "delete",
     "remove",
-    "rm",
-    "supprimer"
+    "rm"
   ],
-  "notes": "Windows: ATTENTION: Suppression définitive, pas de corbeille. -Recurse supprime les sous-dossiers.\nLinux: ATTENTION: rm -rf est dangereux! -r pour récursif, -f pour forcer, -i pour demander confirmation.",
+  "notes": "Windows: WARNING: permanent deletion, no Recycle Bin. -Recurse deletes the subfolders.\nLinux: WARNING: rm -rf is dangerous! -r for recursive, -f to force, -i to ask for confirmation.",
   "links": [
     {
       "title": "Documentation Remove-Item",
@@ -30,43 +29,38 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ou dossier à supprimer"
+        "description": "Path of the file or folder to delete"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "Remove-Item -Path \"C:\\Temp\\*\" -Recurse -Force",
-      "description": "Supprime tout le contenu de C:\\Temp",
+      "description": "Delete the whole content of C:\\Temp",
       "platform": 0
     },
     {
       "command": "Remove-Item -Path \"C:\\file.txt\"",
-      "description": "Supprime un fichier spécifique",
+      "description": "Delete a specific file",
       "platform": 0
     },
     {
       "command": "Remove-Item -Path \"{path}\" -Recurse -Force -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf once checked to run it.",
       "platform": 0
     },
     {
       "command": "Remove-Item -Path \"{path}\" -Recurse -Force -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the prompts. Useful in automated scripts, but use it with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "Remove-Item -Path \"{path}\" -Recurse -Force -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
-      "platform": 0
-    },
-    {
-      "command": "Remove-Item -Path \"<path>\" -Recurse -Force",
-      "description": "Exemple utilisant le paramètre 'path': Chemin du fichier ou dossier à supprimer. Remplacez <path> par la valeur appropriée selon votre environnement.",
+      "description": "Show detailed information about the command's execution. -Verbose enables debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
       "platform": 0
     }
   ],
@@ -79,60 +73,91 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier ou dossier à supprimer"
+        "description": "Path of the file or folder to delete"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "rm -rf /tmp/oldfiles",
-      "description": "Supprime un dossier et son contenu",
+      "description": "Delete a folder and its content",
       "platform": 1
     },
     {
       "command": "rm file.txt",
-      "description": "Supprime un fichier",
+      "description": "Delete a file",
       "platform": 1
     },
     {
       "command": "rm -i *.log",
-      "description": "Supprime tous les .log avec confirmation",
+      "description": "Delete every .log file with confirmation",
       "platform": 1
     },
     {
       "command": "rm -rf \"{path}\" -v",
-      "description": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
-      "platform": 1
-    },
-    {
-      "command": "rm -rf \"<path>\"",
-      "description": "Exemple utilisant le paramètre 'path': Chemin du fichier ou dossier à supprimer. Remplacez <path> par la valeur appropriée selon votre environnement.",
+      "description": "Run the command in verbose mode. The -v (verbose) flag shows every action as it happens. Essential to follow long operations and check that everything goes well.",
       "platform": 1
     },
     {
       "command": "rm -rf /tmp/cache/*",
-      "description": "Supprimer récursivement le cache",
+      "description": "Delete the cache recursively",
       "platform": 1
     },
     {
       "command": "rm -i *.tmp",
-      "description": "Supprimer avec confirmation",
+      "description": "Delete with confirmation",
       "platform": 1
     },
     {
       "command": "rm -v old_file.log",
-      "description": "Supprimer en mode verbose",
+      "description": "Delete in verbose mode",
       "platform": 1
     },
     {
       "command": "find /tmp -name \"*.bak\" -delete",
-      "description": "Supprimer par pattern",
+      "description": "Delete by pattern",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Supprimer des fichiers ou dossiers",
+      "description": "Supprime des fichiers ou des répertoires de manière permanente.",
+      "notes": "Windows: ATTENTION: Suppression définitive, pas de corbeille. -Recurse supprime les sous-dossiers.\nLinux: ATTENTION: rm -rf est dangereux! -r pour récursif, -f pour forcer, -i pour demander confirmation.",
+      "parameters": {
+        "windows": {
+          "path": {
+            "label": "Chemin",
+            "description": "Chemin du fichier ou dossier à supprimer"
+          }
+        },
+        "linux": {
+          "path": {
+            "label": "Chemin",
+            "description": "Chemin du fichier ou dossier à supprimer"
+          }
+        }
+      },
+      "examples": {
+        "Remove-Item -Path \"C:\\Temp\\*\" -Recurse -Force": "Supprime tout le contenu de C:\\Temp",
+        "Remove-Item -Path \"C:\\file.txt\"": "Supprime un fichier spécifique",
+        "Remove-Item -Path \"{path}\" -Recurse -Force -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "Remove-Item -Path \"{path}\" -Recurse -Force -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "Remove-Item -Path \"{path}\" -Recurse -Force -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+        "rm -rf /tmp/oldfiles": "Supprime un dossier et son contenu",
+        "rm file.txt": "Supprime un fichier",
+        "rm -i *.log": "Supprime tous les .log avec confirmation",
+        "rm -rf \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
+        "rm -rf /tmp/cache/*": "Supprimer récursivement le cache",
+        "rm -i *.tmp": "Supprimer avec confirmation",
+        "rm -v old_file.log": "Supprimer en mode verbose",
+        "find /tmp -name \"*.bak\" -delete": "Supprimer par pattern"
+      }
+    }
+  }
 }

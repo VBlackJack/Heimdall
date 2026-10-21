@@ -1,7 +1,7 @@
 {
   "id": "unified-network-test-port",
-  "title": "Tester l'ouverture d'un port TCP",
-  "description": "Vérifie si un port TCP spécifique est ouvert et accessible sur un hôte distant",
+  "title": "Test whether a TCP port is open",
+  "description": "Check whether a specific TCP port is open and reachable on a remote host",
   "category": "network-dns",
   "platform": 2,
   "level": 0,
@@ -23,23 +23,23 @@
     "parameters": [
       {
         "name": "hostname",
-        "label": "Nom d'hôte ou IP",
+        "label": "Host name or IP",
         "type": "string",
         "defaultValue": "google.com",
         "required": true,
-        "description": "Nom d'hôte ou adresse IP"
+        "description": "Host name or IP address"
       },
       {
         "name": "port",
-        "label": "Port TCP",
+        "label": "TCP port",
         "type": "number",
         "defaultValue": "443",
         "required": true,
-        "description": "Numéro de port TCP à tester"
+        "description": "TCP port number to test"
       }
     ]
   },
-  "notes": "Windows: TcpTestSucceeded=$true signifie que le port est ouvert. Test-NetConnection plus verbeux.\nLinux: nc (netcat) avec -z (scan) et -v (verbose). Retourne 0 si succès.",
+  "notes": "Windows: TcpTestSucceeded=$true means the port is open. Test-NetConnection is more verbose.\nLinux: nc (netcat) with -z (scan) and -v (verbose). Returns 0 on success.",
   "links": [
     {
       "title": "Test-NetConnection Port Testing",
@@ -53,37 +53,37 @@
   "windowsExamples": [
     {
       "command": "Test-NetConnection google.com",
-      "description": "Test de connectivité complet vers google.com. Effectue un ping ICMP ET une résolution DNS. Retourne l'IP résolue, le temps de réponse ping et le statut de connectivité. Plus complet que Test-Connection car il combine ping + nslookup.",
+      "description": "Full connectivity test to google.com. Runs an ICMP ping AND a DNS resolution. Returns the resolved IP, the ping response time and the connectivity status. More complete than Test-Connection because it combines ping + nslookup.",
       "platform": 0
     },
     {
       "command": "Test-NetConnection server01 -Port 3389",
-      "description": "Teste si le port RDP (3389) est ouvert sur server01. Effectue un test TCP sur le port spécifié. Retourne TcpTestSucceeded: True/False. Équivalent PowerShell de 'telnet server01 3389'. Essentiel pour diagnostiquer les problèmes de connectivité applicative et vérifier les règles de pare-feu.",
+      "description": "Test whether the RDP port (3389) is open on server01. Runs a TCP test on the given port. Returns TcpTestSucceeded: True/False. The PowerShell equivalent of 'telnet server01 3389'. Essential to diagnose application connectivity problems and check firewall rules.",
       "platform": 0
     },
     {
       "command": "Test-NetConnection 192.168.1.100 -Port 443 -InformationLevel Detailed",
-      "description": "Test TCP détaillé sur le port HTTPS (443). -InformationLevel Detailed affiche beaucoup plus d'informations : route réseau, temps de réponse, interfaces utilisées, etc. Utile pour le troubleshooting approfondi des problèmes de connectivité web.",
+      "description": "Detailed TCP test on the HTTPS port (443). -InformationLevel Detailed shows much more information: network route, response time, interfaces used, etc. Useful for in-depth troubleshooting of web connectivity problems.",
       "platform": 0
     },
     {
       "command": "Test-NetConnection mail.contoso.com -Port 25",
-      "description": "Vérifie si le port SMTP (25) est accessible sur le serveur mail. Test crucial avant de configurer un client mail ou diagnostiquer des problèmes d'envoi d'email. Un échec indique généralement un blocage par pare-feu ou un service mail arrêté.",
+      "description": "Check whether the SMTP port (25) is reachable on the mail server. A key test before configuring a mail client or diagnosing email sending problems. A failure usually means a firewall block or a stopped mail service.",
       "platform": 0
     },
     {
       "command": "Test-NetConnection server01 -Port 445 -WarningAction SilentlyContinue",
-      "description": "Teste le port SMB/CIFS (445) sans afficher les warnings. -WarningAction SilentlyContinue supprime les messages d'avertissement. Le port 445 est utilisé pour les partages réseau Windows. Utile pour diagnostiquer les problèmes d'accès aux partages.",
+      "description": "Test the SMB/CIFS port (445) without showing warnings. -WarningAction SilentlyContinue suppresses the warning messages. Port 445 is used by Windows network shares. Useful to diagnose share access problems.",
       "platform": 0
     },
     {
       "command": "1..100 | ForEach-Object {Test-NetConnection 192.168.1.$_ -Port 80 -WarningAction SilentlyContinue} | Where-Object {$_.TcpTestSucceeded -eq $true}",
-      "description": "Scan du réseau 192.168.1.0/24 pour trouver tous les serveurs web (port 80 ouvert). 1..100 génère une séquence de nombres. ForEach-Object teste chaque IP. Where-Object filtre les succès. Utile pour l'inventaire réseau ou la détection de serveurs. ATTENTION : peut être considéré comme du scanning et violer certaines politiques de sécurité.",
+      "description": "Scan the 192.168.1.0/24 network for every web server (port 80 open). 1..100 generates a sequence of numbers, ForEach-Object tests each IP, Where-Object keeps the successes. Useful for network inventory or server discovery. WARNING: this can be considered scanning and break some security policies.",
       "platform": 0
     },
     {
       "command": "Test-NetConnection server01 -CommonTCPPort RDP",
-      "description": "Teste un port courant en utilisant son nom au lieu du numéro. -CommonTCPPort accepte : HTTP (80), RDP (3389), SMB (445), WINRM (5985). Plus lisible que les numéros de port, facilite la compréhension des scripts.",
+      "description": "Test a common port by its name instead of its number. -CommonTCPPort accepts: HTTP (80), RDP (3389), SMB (445), WINRM (5985). More readable than port numbers, which makes scripts easier to understand.",
       "platform": 0
     }
   ],
@@ -96,68 +96,115 @@
     "parameters": [
       {
         "name": "hostname",
-        "label": "Nom d'hôte ou IP",
+        "label": "Host name or IP",
         "type": "string",
         "defaultValue": "google.com",
         "required": true,
-        "description": "Nom d'hôte ou adresse IP"
+        "description": "Host name or IP address"
       },
       {
         "name": "port",
-        "label": "Port TCP",
+        "label": "TCP port",
         "type": "number",
         "defaultValue": "443",
         "required": true,
-        "description": "Numéro de port TCP à tester"
+        "description": "TCP port number to test"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "nc -zv google.com 443",
-      "description": "Teste si le port HTTPS est ouvert sur google.com",
+      "description": "Test whether the HTTPS port is open on google.com",
       "platform": 1
     },
     {
       "command": "nc -zv 192.168.1.1 22",
-      "description": "Teste si le port SSH est ouvert",
+      "description": "Test whether the SSH port is open",
       "platform": 1
     },
     {
       "command": "nc -zv server01 3389",
-      "description": "Teste si le port RDP est ouvert",
+      "description": "Test whether the RDP port is open",
       "platform": 1
     },
     {
       "command": "nc -zv mail.example.com 25",
-      "description": "Teste si le port SMTP est ouvert",
+      "description": "Test whether the SMTP port is open",
       "platform": 1
     },
     {
       "command": "nc -w 3 -zv server01 80",
-      "description": "Test avec timeout de 3 secondes",
+      "description": "Test with a 3-second timeout",
       "platform": 1
     },
     {
       "command": "for port in 22 80 443 3389; do nc -zv server01 $port; done",
-      "description": "Teste plusieurs ports sur un serveur",
+      "description": "Test several ports on a server",
       "platform": 1
     },
     {
       "command": "nc -zv server.example.com 443",
-      "description": "Tester le port HTTPS",
+      "description": "Test the HTTPS port",
       "platform": 1
     },
     {
       "command": "nc -zv -w 5 db.example.com 3306",
-      "description": "Tester MySQL avec timeout 5s",
+      "description": "Test MySQL with a 5 s timeout",
       "platform": 1
     },
     {
       "command": "timeout 3 bash -c \"echo > /dev/tcp/host/80\"",
-      "description": "Test sans netcat",
+      "description": "Test without netcat",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Tester l'ouverture d'un port TCP",
+      "description": "Vérifie si un port TCP spécifique est ouvert et accessible sur un hôte distant",
+      "notes": "Windows: TcpTestSucceeded=$true signifie que le port est ouvert. Test-NetConnection plus verbeux.\nLinux: nc (netcat) avec -z (scan) et -v (verbose). Retourne 0 si succès.",
+      "parameters": {
+        "windows": {
+          "hostname": {
+            "label": "Nom d'hôte ou IP",
+            "description": "Nom d'hôte ou adresse IP"
+          },
+          "port": {
+            "label": "Port TCP",
+            "description": "Numéro de port TCP à tester"
+          }
+        },
+        "linux": {
+          "hostname": {
+            "label": "Nom d'hôte ou IP",
+            "description": "Nom d'hôte ou adresse IP"
+          },
+          "port": {
+            "label": "Port TCP",
+            "description": "Numéro de port TCP à tester"
+          }
+        }
+      },
+      "examples": {
+        "Test-NetConnection google.com": "Test de connectivité complet vers google.com. Effectue un ping ICMP ET une résolution DNS. Retourne l'IP résolue, le temps de réponse ping et le statut de connectivité. Plus complet que Test-Connection car il combine ping + nslookup.",
+        "Test-NetConnection server01 -Port 3389": "Teste si le port RDP (3389) est ouvert sur server01. Effectue un test TCP sur le port spécifié. Retourne TcpTestSucceeded: True/False. Équivalent PowerShell de 'telnet server01 3389'. Essentiel pour diagnostiquer les problèmes de connectivité applicative et vérifier les règles de pare-feu.",
+        "Test-NetConnection 192.168.1.100 -Port 443 -InformationLevel Detailed": "Test TCP détaillé sur le port HTTPS (443). -InformationLevel Detailed affiche beaucoup plus d'informations : route réseau, temps de réponse, interfaces utilisées, etc. Utile pour le troubleshooting approfondi des problèmes de connectivité web.",
+        "Test-NetConnection mail.contoso.com -Port 25": "Vérifie si le port SMTP (25) est accessible sur le serveur mail. Test crucial avant de configurer un client mail ou diagnostiquer des problèmes d'envoi d'email. Un échec indique généralement un blocage par pare-feu ou un service mail arrêté.",
+        "Test-NetConnection server01 -Port 445 -WarningAction SilentlyContinue": "Teste le port SMB/CIFS (445) sans afficher les warnings. -WarningAction SilentlyContinue supprime les messages d'avertissement. Le port 445 est utilisé pour les partages réseau Windows. Utile pour diagnostiquer les problèmes d'accès aux partages.",
+        "1..100 | ForEach-Object {Test-NetConnection 192.168.1.$_ -Port 80 -WarningAction SilentlyContinue} | Where-Object {$_.TcpTestSucceeded -eq $true}": "Scan du réseau 192.168.1.0/24 pour trouver tous les serveurs web (port 80 ouvert). 1..100 génère une séquence de nombres. ForEach-Object teste chaque IP. Where-Object filtre les succès. Utile pour l'inventaire réseau ou la détection de serveurs. ATTENTION : peut être considéré comme du scanning et violer certaines politiques de sécurité.",
+        "Test-NetConnection server01 -CommonTCPPort RDP": "Teste un port courant en utilisant son nom au lieu du numéro. -CommonTCPPort accepte : HTTP (80), RDP (3389), SMB (445), WINRM (5985). Plus lisible que les numéros de port, facilite la compréhension des scripts.",
+        "nc -zv google.com 443": "Teste si le port HTTPS est ouvert sur google.com",
+        "nc -zv 192.168.1.1 22": "Teste si le port SSH est ouvert",
+        "nc -zv server01 3389": "Teste si le port RDP est ouvert",
+        "nc -zv mail.example.com 25": "Teste si le port SMTP est ouvert",
+        "nc -w 3 -zv server01 80": "Test avec timeout de 3 secondes",
+        "for port in 22 80 443 3389; do nc -zv server01 $port; done": "Teste plusieurs ports sur un serveur",
+        "nc -zv server.example.com 443": "Tester le port HTTPS",
+        "nc -zv -w 5 db.example.com 3306": "Tester MySQL avec timeout 5s",
+        "timeout 3 bash -c \"echo > /dev/tcp/host/80\"": "Test sans netcat"
+      }
+    }
+  }
 }

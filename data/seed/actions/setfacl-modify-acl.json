@@ -1,7 +1,7 @@
 {
   "id": "setfacl-modify-acl",
-  "title": "Modifier les ACL d'un fichier",
-  "description": "Définit ou modifie les listes de contrôle d'accès (ACL) étendues",
+  "title": "Modify the ACLs of a file",
+  "description": "Set or modify extended access control lists (ACLs)",
   "category": "security",
   "platform": 1,
   "level": 1,
@@ -24,75 +24,94 @@
         "type": "string",
         "defaultValue": "u:username:rwx",
         "required": true,
-        "description": "ACL à appliquer (u:user:perms ou g:group:perms)"
+        "description": "ACL to apply (u:user:perms or g:group:perms)"
       },
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "/path/to/file",
         "required": true,
-        "description": "Fichier ou répertoire à modifier"
+        "description": "File or directory to modify"
       }
     ]
   },
   "examples": [
     {
       "command": "setfacl -m u:john:rwx /shared/folder",
-      "description": "Donne rwx à l'utilisateur john",
+      "description": "Give rwx to the user john",
       "platform": 1
     },
     {
       "command": "setfacl -m g:developers:rw- /project",
-      "description": "Donne rw au groupe developers",
+      "description": "Give rw to the developers group",
       "platform": 1
     },
     {
       "command": "setfacl -x u:john /shared/folder",
-      "description": "Supprime l'ACL de john",
-      "platform": 1
-    },
-    {
-      "command": "setfacl -m u:username:rwx C:\\Logs\\app.log",
-      "description": "Exemple utilisant le paramètre 'acl': ACL à appliquer (u:user:perms ou g:group:perms). Remplacez user:jdupont:rwx par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "setfacl -m user:jdupont:rwx /path/to/file",
-      "description": "Exemple utilisant le paramètre 'path': Fichier ou répertoire à modifier. Remplacez C:\\Logs\\app.log par la valeur appropriée selon votre environnement.",
+      "description": "Remove john's ACL",
       "platform": 1
     },
     {
       "command": "setfacl -m u:jdupont:rwx /shared",
-      "description": "Donner rwx à jdupont",
+      "description": "Give rwx to jdupont",
       "platform": 1
     },
     {
       "command": "setfacl -m g:devs:rx /app",
-      "description": "Donner rx au groupe devs",
+      "description": "Give rx to the devs group",
       "platform": 1
     },
     {
       "command": "setfacl -x u:olduser /shared",
-      "description": "Supprimer les ACL d'un utilisateur",
+      "description": "Remove a user's ACLs",
       "platform": 1
     },
     {
       "command": "setfacl -b /shared",
-      "description": "Supprimer toutes les ACL",
+      "description": "Remove every ACL",
       "platform": 1
     },
     {
       "command": "setfacl -R -m u:www-data:rx /var/www",
-      "description": "ACL récursives",
+      "description": "Recursive ACLs",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. -m pour modifier, -x pour supprimer, -R pour récursif.",
+  "notes": "Requires sudo. -m to modify, -x to remove, -R for recursive.",
   "links": [
     {
       "title": "setfacl documentation",
       "url": "https://man7.org/linux/man-pages/man1/setfacl.1.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Modifier les ACL d'un fichier",
+      "description": "Définit ou modifie les listes de contrôle d'accès (ACL) étendues",
+      "notes": "Nécessite sudo. -m pour modifier, -x pour supprimer, -R pour récursif.",
+      "parameters": {
+        "linux": {
+          "acl": {
+            "label": "ACL",
+            "description": "ACL à appliquer (u:user:perms ou g:group:perms)"
+          },
+          "path": {
+            "label": "Chemin",
+            "description": "Fichier ou répertoire à modifier"
+          }
+        }
+      },
+      "examples": {
+        "setfacl -m u:john:rwx /shared/folder": "Donne rwx à l'utilisateur john",
+        "setfacl -m g:developers:rw- /project": "Donne rw au groupe developers",
+        "setfacl -x u:john /shared/folder": "Supprime l'ACL de john",
+        "setfacl -m u:jdupont:rwx /shared": "Donner rwx à jdupont",
+        "setfacl -m g:devs:rx /app": "Donner rx au groupe devs",
+        "setfacl -x u:olduser /shared": "Supprimer les ACL d'un utilisateur",
+        "setfacl -b /shared": "Supprimer toutes les ACL",
+        "setfacl -R -m u:www-data:rx /var/www": "ACL récursives"
+      }
+    }
+  }
 }

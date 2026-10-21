@@ -1,7 +1,7 @@
 {
   "id": "security-audit-rdp-sessions",
-  "title": "Auditer les connexions RDP récentes",
-  "description": "Liste les événements de connexion Bureau à distance (RDP) réussies et échouées",
+  "title": "Audit recent RDP logons",
+  "description": "List successful and failed Remote Desktop (RDP) logon events",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -21,51 +21,68 @@
     "parameters": [
       {
         "name": "days",
-        "label": "Nombre de jours",
+        "label": "Number of days",
         "type": "number",
         "defaultValue": "7",
         "required": true,
-        "description": "Nombre de jours à analyser en arrière"
+        "description": "Number of days to look back"
       }
     ]
   },
   "examples": [
     {
-      "command": "Get-WinEvent -FilterHashtable @{LogName='System'; Level=2; StartTime=(Get-Date).AddHours(-24)}",
-      "description": "Méthode performante pour filtrer les erreurs (Level=2) des dernières 24h. Beaucoup plus rapide que Get-EventLog sur les gros volumes.",
-      "platform": 0
-    },
-    {
       "command": "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} | Where-Object {$_.Properties[8].Value -eq 10} | Select-Object TimeCreated,Message",
-      "description": "Connexions RDP réussies (LogonType 10)",
+      "description": "Successful RDP logons (LogonType 10)",
       "platform": 0
     },
     {
       "command": "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625} | Select-Object -First 20",
-      "description": "20 dernières tentatives de connexion échouées",
+      "description": "Last 20 failed logon attempts",
       "platform": 0
     },
     {
       "command": "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get-Date).AddDays(-30)} | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get-Date).AddDays(-30)} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get-Date).AddDays(-30)} | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "EventID 4624 = connexion réussie, 4625 = échec. LogonType 10 = RemoteInteractive (RDP), 3 = Network. Surveillez les échecs répétés (attaque).",
+  "notes": "EventID 4624 = successful logon, 4625 = failure. LogonType 10 = RemoteInteractive (RDP), 3 = Network. Watch for repeated failures (attack).",
   "links": [
     {
       "title": "Audit RDP Sessions",
       "url": "https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/event-4624"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Auditer les connexions RDP récentes",
+      "description": "Liste les événements de connexion Bureau à distance (RDP) réussies et échouées",
+      "notes": "EventID 4624 = connexion réussie, 4625 = échec. LogonType 10 = RemoteInteractive (RDP), 3 = Network. Surveillez les échecs répétés (attaque).",
+      "parameters": {
+        "windows": {
+          "days": {
+            "label": "Nombre de jours",
+            "description": "Nombre de jours à analyser en arrière"
+          }
+        }
+      },
+      "examples": {
+        "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} | Where-Object {$_.Properties[8].Value -eq 10} | Select-Object TimeCreated,Message": "Connexions RDP réussies (LogonType 10)",
+        "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625} | Select-Object -First 20": "20 dernières tentatives de connexion échouées",
+        "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get-Date).AddDays(-30)} | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get-Date).AddDays(-30)} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625; StartTime=(Get-Date).AddDays(-30)} | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

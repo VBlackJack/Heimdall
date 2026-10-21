@@ -1,7 +1,7 @@
 {
   "id": "show-pending-updates",
-  "title": "Afficher les mises à jour en attente",
-  "description": "Liste toutes les mises à jour disponibles mais non installées",
+  "title": "Show pending updates",
+  "description": "List every available update that is not installed",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -21,30 +21,20 @@
   "examples": [
     {
       "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates.Count\"",
-      "description": "Compte le nombre de mises à jour en attente",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
-      "platform": 0
-    },
-    {
-      "command": "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Count the pending updates",
       "platform": 0
     }
   ],
-  "notes": "Utilise l'API COM de Windows Update. Peut prendre quelques secondes.",
-  "links": []
+  "notes": "Uses the Windows Update COM API. Can take a few seconds.",
+  "links": [],
+  "translations": {
+    "fr": {
+      "title": "Afficher les mises à jour en attente",
+      "description": "Liste toutes les mises à jour disponibles mais non installées",
+      "notes": "Utilise l'API COM de Windows Update. Peut prendre quelques secondes.",
+      "examples": {
+        "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates.Count\"": "Compte le nombre de mises à jour en attente"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "set-service-starttype",
-  "title": "Changer le type de démarrage d'un service",
-  "description": "Modifie le type de démarrage d'un service (Automatic, Manual, Disabled)",
+  "title": "Change the startup type of a service",
+  "description": "Change the startup type of a service (Automatic, Manual, Disabled)",
   "category": "services-automation",
   "platform": 0,
   "level": 1,
@@ -21,70 +21,99 @@
     "parameters": [
       {
         "name": "servicename",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "wuauserv",
         "required": true,
-        "description": "Nom du service à configurer"
+        "description": "Name of the service to configure"
       },
       {
         "name": "startuptype",
-        "label": "Type de démarrage",
+        "label": "Startup type",
         "type": "string",
         "defaultValue": "Automatic",
         "required": true,
-        "description": "Automatic, Manual, Disabled, ou AutomaticDelayedStart"
+        "description": "Automatic, Manual, Disabled, or AutomaticDelayedStart"
       }
     ]
   },
   "examples": [
     {
       "command": "Set-Service -Name 'wuauserv' -StartupType Automatic",
-      "description": "Configure Windows Update en démarrage automatique",
+      "description": "Set Windows Update to start automatically",
       "platform": 0
     },
     {
       "command": "Set-Service -Name 'Spooler' -StartupType Manual",
-      "description": "Configure le spooler en manuel",
+      "description": "Set the spooler to manual",
       "platform": 0
     },
     {
       "command": "Set-Service -Name 'UnusedService' -StartupType Disabled",
-      "description": "Désactive un service inutilisé",
+      "description": "Disable an unused service",
       "platform": 0
     },
     {
       "command": "Get-Service | Where-Object {$_.DisplayName -like '*Telemetry*'} | Set-Service -StartupType Disabled",
-      "description": "Désactive la télémétrie",
+      "description": "Disable telemetry",
       "platform": 0
     },
     {
       "command": "Set-Service -Name 'wuauserv' -StartupType Automatic -WhatIf",
-      "description": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+      "description": "Simulate the action without running it (dry run). The -WhatIf switch shows what would change without applying it. ESSENTIAL before any bulk action or critical change. Remove -WhatIf once checked to run it.",
       "platform": 0
     },
     {
       "command": "Set-Service -Name 'wuauserv' -StartupType Automatic -Confirm:$false",
-      "description": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+      "description": "Run the action without an interactive confirmation. -Confirm:$false suppresses the prompts. Useful in automated scripts, but use it with care: there is no safety net.",
       "platform": 0
     },
     {
       "command": "Set-Service -Name 'wuauserv' -StartupType Automatic -PassThru",
-      "description": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+      "description": "Make the command return the modified or created object in the pipeline. By default the Set-/New- cmdlets return nothing. -PassThru enables the return for chained operations or immediate checks.",
       "platform": 0
     },
     {
       "command": "Set-Service -Name 'wuauserv' -StartupType Automatic -Verbose",
-      "description": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
+      "description": "Show detailed information about the command's execution. -Verbose enables debug messages to understand exactly what happens. Essential for troubleshooting and for understanding the internal operations.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite admin. AutomaticDelayedStart démarre 2 min après le boot pour améliorer les perfs.",
+  "notes": "Requires administrator rights. AutomaticDelayedStart starts 2 minutes after boot to improve performance.",
   "links": [
     {
       "title": "Set-Service Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/set-service"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Changer le type de démarrage d'un service",
+      "description": "Modifie le type de démarrage d'un service (Automatic, Manual, Disabled)",
+      "notes": "Nécessite admin. AutomaticDelayedStart démarre 2 min après le boot pour améliorer les perfs.",
+      "parameters": {
+        "windows": {
+          "servicename": {
+            "label": "Nom du service",
+            "description": "Nom du service à configurer"
+          },
+          "startuptype": {
+            "label": "Type de démarrage",
+            "description": "Automatic, Manual, Disabled, ou AutomaticDelayedStart"
+          }
+        }
+      },
+      "examples": {
+        "Set-Service -Name 'wuauserv' -StartupType Automatic": "Configure Windows Update en démarrage automatique",
+        "Set-Service -Name 'Spooler' -StartupType Manual": "Configure le spooler en manuel",
+        "Set-Service -Name 'UnusedService' -StartupType Disabled": "Désactive un service inutilisé",
+        "Get-Service | Where-Object {$_.DisplayName -like '*Telemetry*'} | Set-Service -StartupType Disabled": "Désactive la télémétrie",
+        "Set-Service -Name 'wuauserv' -StartupType Automatic -WhatIf": "Simulation de l'action sans exécution réelle (dry-run). Le switch -WhatIf affiche ce qui serait modifié sans appliquer les changements. INDISPENSABLE avant toute action de masse ou modification critique. Retirez -WhatIf après validation pour exécuter.",
+        "Set-Service -Name 'wuauserv' -StartupType Automatic -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
+        "Set-Service -Name 'wuauserv' -StartupType Automatic -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
+        "Set-Service -Name 'wuauserv' -StartupType Automatic -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
+      }
+    }
+  }
 }

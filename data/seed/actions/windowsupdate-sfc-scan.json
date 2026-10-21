@@ -1,7 +1,7 @@
 {
   "id": "windowsupdate-sfc-scan",
-  "title": "Vérifier l'intégrité des fichiers système (SFC)",
-  "description": "Exécute System File Checker pour détecter et réparer les fichiers système corrompus",
+  "title": "Check system file integrity (SFC)",
+  "description": "Run System File Checker to detect and repair corrupted system files",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -22,20 +22,31 @@
   "examples": [
     {
       "command": "sfc /scannow",
-      "description": "Scanne et répare tous les fichiers système protégés",
+      "description": "Scan and repair every protected system file",
       "platform": 0
     },
     {
       "command": "sfc /verifyonly",
-      "description": "Scanne sans réparer (diagnostic uniquement)",
+      "description": "Scan without repairing (diagnostic only)",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des droits administrateur. Peut prendre 15-30 minutes. Logs disponibles dans C:\\Windows\\Logs\\CBS\\CBS.log. Exécuter DISM avant SFC si SFC échoue.",
+  "notes": "Requires administrator rights. Can take 15-30 minutes. Logs are in C:\\Windows\\Logs\\CBS\\CBS.log. Run DISM before SFC if SFC fails.",
   "links": [
     {
       "title": "SFC Documentation",
       "url": "https://learn.microsoft.com/en-us/troubleshoot/windows-server/deployment/fix-windows-update-errors"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier l'intégrité des fichiers système (SFC)",
+      "description": "Exécute System File Checker pour détecter et réparer les fichiers système corrompus",
+      "notes": "Nécessite des droits administrateur. Peut prendre 15-30 minutes. Logs disponibles dans C:\\Windows\\Logs\\CBS\\CBS.log. Exécuter DISM avant SFC si SFC échoue.",
+      "examples": {
+        "sfc /scannow": "Scanne et répare tous les fichiers système protégés",
+        "sfc /verifyonly": "Scanne sans réparer (diagnostic uniquement)"
+      }
+    }
+  }
 }

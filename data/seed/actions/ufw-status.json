@@ -1,7 +1,7 @@
 {
   "id": "ufw-status",
-  "title": "Vérifier l'état du firewall UFW",
-  "description": "Affiche l'état et les règles du firewall UFW (Uncomplicated Firewall)",
+  "title": "Check the UFW firewall status",
+  "description": "Show the status and rules of the UFW (Uncomplicated Firewall) firewall",
   "category": "security",
   "platform": 1,
   "level": 0,
@@ -24,62 +24,88 @@
         "type": "string",
         "defaultValue": "verbose",
         "required": false,
-        "description": "Option d'affichage (numbered, verbose, vide)"
+        "description": "Display option (numbered, verbose, empty)"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo ufw status",
-      "description": "Affiche l'état du firewall",
+      "description": "Show the firewall status",
       "platform": 1
     },
     {
       "command": "sudo ufw status numbered",
-      "description": "Affiche avec numéros de règles",
+      "description": "Show with rule numbers",
       "platform": 1
     },
     {
       "command": "sudo ufw status verbose",
-      "description": "Affichage détaillé",
+      "description": "Detailed output",
       "platform": 1
     },
     {
       "command": "ufw status verbose",
-      "description": "Exemple utilisant le paramètre 'option': Option d'affichage (numbered, verbose, vide). Remplacez verbose par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'option' parameter: Display option (numbered, verbose, empty). Replace verbose with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "ufw allow 22/tcp",
-      "description": "Autoriser SSH",
+      "description": "Allow SSH",
       "platform": 1
     },
     {
       "command": "ufw allow from 192.168.1.0/24",
-      "description": "Autoriser un sous-réseau",
+      "description": "Allow a subnet",
       "platform": 1
     },
     {
       "command": "ufw deny 3306",
-      "description": "Bloquer MySQL",
+      "description": "Block MySQL",
       "platform": 1
     },
     {
       "command": "ufw enable",
-      "description": "Activer le firewall",
+      "description": "Enable the firewall",
       "platform": 1
     },
     {
       "command": "ufw status numbered",
-      "description": "Règles numérotées",
+      "description": "Numbered rules",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. UFW est préinstallé sur Ubuntu/Debian. Frontend simplifié pour iptables.",
+  "notes": "Requires sudo. UFW comes preinstalled on Ubuntu/Debian. A simplified front end for iptables.",
   "links": [
     {
       "title": "UFW documentation",
       "url": "https://help.ubuntu.com/community/UFW"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier l'état du firewall UFW",
+      "description": "Affiche l'état et les règles du firewall UFW (Uncomplicated Firewall)",
+      "notes": "Nécessite sudo. UFW est préinstallé sur Ubuntu/Debian. Frontend simplifié pour iptables.",
+      "parameters": {
+        "linux": {
+          "option": {
+            "label": "Option",
+            "description": "Option d'affichage (numbered, verbose, vide)"
+          }
+        }
+      },
+      "examples": {
+        "sudo ufw status": "Affiche l'état du firewall",
+        "sudo ufw status numbered": "Affiche avec numéros de règles",
+        "sudo ufw status verbose": "Affichage détaillé",
+        "ufw status verbose": "Exemple utilisant le paramètre 'option': Option d'affichage (numbered, verbose, vide). Remplacez verbose par la valeur appropriée selon votre environnement.",
+        "ufw allow 22/tcp": "Autoriser SSH",
+        "ufw allow from 192.168.1.0/24": "Autoriser un sous-réseau",
+        "ufw deny 3306": "Bloquer MySQL",
+        "ufw enable": "Activer le firewall",
+        "ufw status numbered": "Règles numérotées"
+      }
+    }
+  }
 }

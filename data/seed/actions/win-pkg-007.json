@@ -1,7 +1,7 @@
 {
   "id": "win-pkg-007",
-  "title": "Afficher les détails d'un package Winget",
-  "description": "Affiche les informations détaillées d'un package spécifique (version, éditeur, description, etc.).",
+  "title": "Show the details of a Winget package",
+  "description": "Show detailed information about a specific package (version, publisher, description, etc.).",
   "category": "package-management",
   "platform": 0,
   "level": 0,
@@ -21,31 +21,44 @@
     "parameters": [
       {
         "name": "packageName",
-        "label": "Nom du package",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Nom ou ID du package à afficher"
+        "description": "Name or ID of the package to show"
       }
     ]
   },
   "examples": [
     {
       "command": "winget show Microsoft.PowerToys",
-      "description": "Affiche les détails complets de PowerToys",
-      "platform": 0
-    },
-    {
-      "command": "winget show Microsoft.VisualStudioCode",
-      "description": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés.",
+      "description": "Show the full details of PowerToys",
       "platform": 0
     }
   ],
-  "notes": "Affiche version, éditeur, licence, description et dépendances du package.",
+  "notes": "Shows the version, publisher, license, description and dependencies of the package.",
   "links": [
     {
       "title": "Winget show documentation",
       "url": "https://learn.microsoft.com/en-us/windows/package-manager/winget/show"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les détails d'un package Winget",
+      "description": "Affiche les informations détaillées d'un package spécifique (version, éditeur, description, etc.).",
+      "notes": "Affiche version, éditeur, licence, description et dépendances du package.",
+      "parameters": {
+        "windows": {
+          "packageName": {
+            "label": "Nom du package",
+            "description": "Nom ou ID du package à afficher"
+          }
+        }
+      },
+      "examples": {
+        "winget show Microsoft.PowerToys": "Affiche les détails complets de PowerToys"
+      }
+    }
+  }
 }

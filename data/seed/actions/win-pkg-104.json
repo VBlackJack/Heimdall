@@ -1,7 +1,7 @@
 {
   "id": "win-pkg-104",
-  "title": "Mettre à jour tous les packages Chocolatey",
-  "description": "Met à jour tous les packages installés vers leurs dernières versions disponibles.",
+  "title": "Update every Chocolatey package",
+  "description": "Update every installed package to its latest available version.",
   "category": "package-management",
   "platform": 0,
   "level": 1,
@@ -23,20 +23,31 @@
   "examples": [
     {
       "command": "choco upgrade all -y",
-      "description": "Met à jour tous les packages Chocolatey",
+      "description": "Update every Chocolatey package",
       "platform": 0
     },
     {
       "command": "choco upgrade all -y --except=\"package1,package2\"",
-      "description": "Met à jour tous sauf certains packages",
+      "description": "Update everything except some packages",
       "platform": 0
     }
   ],
-  "notes": "Peut prendre du temps. L'option --except permet d'exclure certains packages.",
+  "notes": "Can take time. The --except option excludes some packages.",
   "links": [
     {
       "title": "Chocolatey upgrade documentation",
       "url": "https://docs.chocolatey.org/en-us/choco/commands/upgrade"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Mettre à jour tous les packages Chocolatey",
+      "description": "Met à jour tous les packages installés vers leurs dernières versions disponibles.",
+      "notes": "Peut prendre du temps. L'option --except permet d'exclure certains packages.",
+      "examples": {
+        "choco upgrade all -y": "Met à jour tous les packages Chocolatey",
+        "choco upgrade all -y --except=\"package1,package2\"": "Met à jour tous sauf certains packages"
+      }
+    }
+  }
 }

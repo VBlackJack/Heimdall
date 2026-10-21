@@ -1,7 +1,7 @@
 {
   "id": "sudo-visudo",
-  "title": "Éditer la configuration sudo",
-  "description": "Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo",
+  "title": "Edit the sudo configuration",
+  "description": "Edit the sudoers file safely to configure sudo rights",
   "category": "security",
   "platform": 1,
   "level": 2,
@@ -23,40 +23,55 @@
   "examples": [
     {
       "command": "sudo visudo",
-      "description": "Édite /etc/sudoers en mode sécurisé",
+      "description": "Edit /etc/sudoers in safe mode",
       "platform": 1
     },
     {
       "command": "sudo visudo -c",
-      "description": "Vérifie la syntaxe du fichier sudoers",
+      "description": "Check the syntax of the sudoers file",
       "platform": 1
     },
     {
       "command": "visudo",
-      "description": "Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo.",
+      "description": "Edit the sudoers file safely to configure sudo rights.",
       "platform": 1
     },
     {
       "command": "visudo -c",
-      "description": "Vérifier la syntaxe de sudoers",
+      "description": "Check the sudoers syntax",
       "platform": 1
     },
     {
       "command": "visudo -f /etc/sudoers.d/custom",
-      "description": "Éditer un fichier sudoers personnalisé",
+      "description": "Edit a custom sudoers file",
       "platform": 1
     },
     {
       "command": "sudo -l -U jdupont",
-      "description": "Afficher les permissions sudo d'un utilisateur",
+      "description": "Show a user's sudo permissions",
       "platform": 1
     }
   ],
-  "notes": "TOUJOURS utiliser visudo, JAMAIS éditer /etc/sudoers directement. Vérifie la syntaxe avant sauvegarde.",
+  "notes": "ALWAYS use visudo, NEVER edit /etc/sudoers directly. It checks the syntax before saving.",
   "links": [
     {
       "title": "visudo documentation",
       "url": "https://man7.org/linux/man-pages/man8/visudo.8.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Éditer la configuration sudo",
+      "description": "Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo",
+      "notes": "TOUJOURS utiliser visudo, JAMAIS éditer /etc/sudoers directement. Vérifie la syntaxe avant sauvegarde.",
+      "examples": {
+        "sudo visudo": "Édite /etc/sudoers en mode sécurisé",
+        "sudo visudo -c": "Vérifie la syntaxe du fichier sudoers",
+        "visudo": "Édite le fichier sudoers de manière sécurisée pour configurer les droits sudo.",
+        "visudo -c": "Vérifier la syntaxe de sudoers",
+        "visudo -f /etc/sudoers.d/custom": "Éditer un fichier sudoers personnalisé",
+        "sudo -l -U jdupont": "Afficher les permissions sudo d'un utilisateur"
+      }
+    }
+  }
 }

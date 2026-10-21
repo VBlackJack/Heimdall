@@ -1,7 +1,7 @@
 {
   "id": "wsus-reset-client-authorization",
-  "title": "Réinitialiser l'autorisation WSUS du client",
-  "description": "Réinitialise l'identifiant du client WSUS pour forcer une nouvelle autorisation sur le serveur",
+  "title": "Reset the client WSUS authorization",
+  "description": "Reset the WSUS client identifier to force a new authorization on the server",
   "category": "windows-updates",
   "platform": 0,
   "level": 1,
@@ -22,15 +22,25 @@
   "examples": [
     {
       "command": "wuauclt /resetauthorization /detectnow",
-      "description": "Réinitialise l'autorisation et force la détection",
+      "description": "Reset the authorization and force a detection",
       "platform": 0
     }
   ],
-  "notes": "ATTENTION: Supprime l'identifiant client WSUS. Le client recevra un nouvel ID lors de la prochaine connexion au serveur WSUS. Nécessite droits administrateur.",
+  "notes": "WARNING: deletes the WSUS client identifier. The client gets a new ID at its next connection to the WSUS server. Requires administrator rights.",
   "links": [
     {
       "title": "Reset WSUS Client",
       "url": "https://learn.microsoft.com/en-us/troubleshoot/windows-server/installing-updates-features-roles/fix-windows-update-errors"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Réinitialiser l'autorisation WSUS du client",
+      "description": "Réinitialise l'identifiant du client WSUS pour forcer une nouvelle autorisation sur le serveur",
+      "notes": "ATTENTION: Supprime l'identifiant client WSUS. Le client recevra un nouvel ID lors de la prochaine connexion au serveur WSUS. Nécessite droits administrateur.",
+      "examples": {
+        "wuauclt /resetauthorization /detectnow": "Réinitialise l'autorisation et force la détection"
+      }
+    }
+  }
 }

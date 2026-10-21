@@ -1,7 +1,7 @@
 {
   "id": "sysinternals-procdump",
-  "title": "Capturer un Dump Mémoire (ProcDump)",
-  "description": "Génère un dump mémoire d'un processus pour analyse (crash, hang, memory leak).",
+  "title": "Capture a memory dump (ProcDump)",
+  "description": "Create a memory dump of a process for analysis (crash, hang, memory leak).",
   "category": "development",
   "platform": 0,
   "level": 1,
@@ -24,34 +24,57 @@
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "ID ou nom du processus (ex: 1234 ou notepad)"
+        "description": "Process ID or name (e.g. 1234 or notepad)"
       },
       {
         "name": "outputFile",
-        "label": "Fichier de sortie",
+        "label": "Output file",
         "type": "string",
         "defaultValue": "C:\\Temp\\dump.dmp",
         "required": true,
-        "description": "Chemin du fichier .dmp"
+        "description": "Path of the .dmp file"
       }
     ]
   },
   "examples": [
     {
       "command": "procdump.exe -ma -AcceptEula lsass.exe C:\\Temp\\lsass.dmp",
-      "description": "🔥 CRASH ANALYSIS : Dump complet (-ma) de LSASS. Attention : geler LSASS peut redémarrer le serveur. Indispensable pour debugger les problèmes d'authentification.",
+      "description": "🔥 CRASH ANALYSIS: full dump (-ma) of LSASS. Warning: freezing LSASS can restart the server. Essential to debug authentication problems.",
       "platform": 0
     },
     {
       "command": "procdump.exe -h -AcceptEula notepad.exe",
-      "description": "Attend que la fenêtre 'Ne répond pas' (Hung window -h) pour déclencher le dump automatiquement.",
+      "description": "Wait for a 'Not responding' window (hung window, -h) to trigger the dump automatically.",
       "platform": 0
     },
     {
       "command": "procdump.exe -e 1 -f C0000005 -AcceptEula w3wp.exe",
-      "description": "Déclenche un dump dès qu'une exception spécifique (Access Violation C0000005) survient.",
+      "description": "Trigger a dump as soon as a specific exception (Access Violation C0000005) occurs.",
       "platform": 0
     }
   ],
-  "windowsCommandTemplateId": "2db0eee4-efb0-4027-b533-b9a9cafbc8b4"
+  "windowsCommandTemplateId": "2db0eee4-efb0-4027-b533-b9a9cafbc8b4",
+  "translations": {
+    "fr": {
+      "title": "Capturer un Dump Mémoire (ProcDump)",
+      "description": "Génère un dump mémoire d'un processus pour analyse (crash, hang, memory leak).",
+      "parameters": {
+        "windows": {
+          "pid": {
+            "label": "Process ID / Name",
+            "description": "ID ou nom du processus (ex: 1234 ou notepad)"
+          },
+          "outputFile": {
+            "label": "Fichier de sortie",
+            "description": "Chemin du fichier .dmp"
+          }
+        }
+      },
+      "examples": {
+        "procdump.exe -ma -AcceptEula lsass.exe C:\\Temp\\lsass.dmp": "🔥 CRASH ANALYSIS : Dump complet (-ma) de LSASS. Attention : geler LSASS peut redémarrer le serveur. Indispensable pour debugger les problèmes d'authentification.",
+        "procdump.exe -h -AcceptEula notepad.exe": "Attend que la fenêtre 'Ne répond pas' (Hung window -h) pour déclencher le dump automatiquement.",
+        "procdump.exe -e 1 -f C0000005 -AcceptEula w3wp.exe": "Déclenche un dump dès qu'une exception spécifique (Access Violation C0000005) survient."
+      }
+    }
+  }
 }

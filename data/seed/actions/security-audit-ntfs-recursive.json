@@ -1,7 +1,7 @@
 {
   "id": "security-audit-ntfs-recursive",
-  "title": "Auditer récursivement les permissions NTFS",
-  "description": "Analyse récursivement tous les sous-dossiers et génère un rapport des permissions NTFS",
+  "title": "Audit NTFS permissions recursively",
+  "description": "Scan every subfolder recursively and report its NTFS permissions",
   "category": "security",
   "platform": 0,
   "level": 0,
@@ -21,50 +21,57 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin de base",
+        "label": "Base path",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "C:\\Shares",
         "required": true,
-        "description": "Chemin du dossier racine à auditer"
+        "description": "Path of the root folder to audit"
       },
       {
         "name": "depth",
-        "label": "Profondeur",
+        "label": "Depth",
         "type": "number",
         "defaultValue": "2",
         "required": true,
-        "description": "Profondeur de récursion (niveaux de sous-dossiers)"
+        "description": "Recursion depth (levels of subfolders)"
       }
     ]
   },
   "examples": [
     {
       "command": "Get-ChildItem C:\\Shares -Directory -Recurse | ForEach-Object {Get-Acl $_.FullName}",
-      "description": "Audit complet de tous les sous-dossiers de C:\\Shares",
-      "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path 'C:\\Logs\\app.log' -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Full audit of every subfolder of C:\\Shares",
       "platform": 0
     }
   ],
-  "notes": "ATTENTION: Peut être lent sur de grandes arborescences. Utilisez -Depth pour limiter la récursion. Exportez vers CSV pour analyse: | Export-Csv report.csv",
+  "notes": "WARNING: can be slow on large trees. Use -Depth to limit the recursion. Export to CSV for analysis: | Export-Csv report.csv",
   "links": [
     {
       "title": "NTFS Permissions Auditing",
       "url": "https://jfrmilner.wordpress.com/2011/05/01/audit-ntfs-permissions-powershell-script/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Auditer récursivement les permissions NTFS",
+      "description": "Analyse récursivement tous les sous-dossiers et génère un rapport des permissions NTFS",
+      "notes": "ATTENTION: Peut être lent sur de grandes arborescences. Utilisez -Depth pour limiter la récursion. Exportez vers CSV pour analyse: | Export-Csv report.csv",
+      "parameters": {
+        "windows": {
+          "path": {
+            "label": "Chemin de base",
+            "description": "Chemin du dossier racine à auditer"
+          },
+          "depth": {
+            "label": "Profondeur",
+            "description": "Profondeur de récursion (niveaux de sous-dossiers)"
+          }
+        }
+      },
+      "examples": {
+        "Get-ChildItem C:\\Shares -Directory -Recurse | ForEach-Object {Get-Acl $_.FullName}": "Audit complet de tous les sous-dossiers de C:\\Shares"
+      }
+    }
+  }
 }

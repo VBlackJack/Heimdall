@@ -1,7 +1,7 @@
 {
   "id": "restart-service",
-  "title": "Redémarrer un service Windows",
-  "description": "Arrête puis redémarre un service Windows",
+  "title": "Restart a Windows service",
+  "description": "Stop and then start a Windows service",
   "category": "services-automation",
   "platform": 0,
   "level": 1,
@@ -17,64 +17,73 @@
     "id": "restart-service-cmd",
     "platform": 0,
     "name": "Restart-Service",
-    "commandPattern": "Restart-Service -Name '{servicename}' {force}",
+    "commandPattern": "Restart-Service -Name '{servicename}' -Force",
     "parameters": [
       {
         "name": "servicename",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "wuauserv",
         "required": true,
-        "description": "Nom du service à redémarrer"
-      },
-      {
-        "name": "force",
-        "label": "Forcer",
-        "type": "string",
-        "defaultValue": "-Force",
-        "required": false,
-        "description": "Forcer l'arrêt (-Force)"
+        "description": "Name of the service to restart"
       }
     ]
   },
   "examples": [
     {
       "command": "Restart-Service -Name 'wuauserv' -Force",
-      "description": "Redémarre Windows Update",
+      "description": "Restart Windows Update",
       "platform": 0
     },
     {
       "command": "Restart-Service -Name 'Spooler'",
-      "description": "Redémarre le spooler d'impression",
+      "description": "Restart the print spooler",
       "platform": 0
     },
     {
       "command": "Get-Service -DisplayName '*IIS*' | Restart-Service -Force",
-      "description": "Redémarre tous les services IIS",
+      "description": "Restart every IIS service",
       "platform": 0
     },
     {
-      "command": "Restart-Service -Name 'wuauserv' $true -PassThru",
-      "description": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
+      "command": "Restart-Service -Name 'wuauserv' -Force -PassThru",
+      "description": "Run the action and return the resulting object for an immediate check. -PassThru confirms that the operation succeeded by showing the final status. Useful for scripts with error handling.",
       "platform": 0
     },
     {
-      "command": "Restart-Service -Name 'wuauserv' $true -Force",
-      "description": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances.",
-      "platform": 0
-    },
-    {
-      "command": "Restart-Service -Name 'wuauserv' $true",
-      "description": "Exemple utilisant le paramètre 'servicename': Nom du service à redémarrer. Remplacez wuauserv par la valeur appropriée selon votre environnement.",
+      "command": "Restart-Service -Name 'Spooler' -Force",
+      "description": "Force the action despite resistance (dependent services, protected processes, and so on). -Force bypasses some safeguards. Use it with care after checking the dependencies.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite des privilèges admin. -Force arrête les services dépendants. Utile pour résoudre des problèmes.",
+  "notes": "Requires administrator rights. -Force also stops the dependent services. Useful to fix problems.",
   "links": [
     {
       "title": "Restart-Service Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/restart-service"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Redémarrer un service Windows",
+      "description": "Arrête puis redémarre un service Windows",
+      "notes": "Nécessite des privilèges admin. -Force arrête les services dépendants. Utile pour résoudre des problèmes.",
+      "parameters": {
+        "windows": {
+          "servicename": {
+            "label": "Nom du service",
+            "description": "Nom du service à redémarrer"
+          }
+        }
+      },
+      "examples": {
+        "Restart-Service -Name 'wuauserv' -Force": "Redémarre Windows Update",
+        "Restart-Service -Name 'Spooler'": "Redémarre le spooler d'impression",
+        "Get-Service -DisplayName '*IIS*' | Restart-Service -Force": "Redémarre tous les services IIS",
+        "Restart-Service -Name 'wuauserv' -Force -PassThru": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
+        "Restart-Service -Name 'Spooler' -Force": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances."
+      }
+    }
+  }
 }

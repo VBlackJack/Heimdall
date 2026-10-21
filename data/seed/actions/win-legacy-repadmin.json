@@ -1,7 +1,7 @@
 {
   "id": "win-legacy-repadmin",
-  "title": "Diagnostic Réplication AD (RepAdmin)",
-  "description": "Outil en ligne de commande pour diagnostiquer et gérer la réplication Active Directory.",
+  "title": "AD replication diagnostics (RepAdmin)",
+  "description": "Command-line tool to diagnose and manage Active Directory replication.",
   "category": "active-directory",
   "platform": 0,
   "level": 0,
@@ -22,19 +22,30 @@
   "examples": [
     {
       "command": "repadmin /replsummary",
-      "description": "🔥 DAILY CHECK : Affiche un résumé rapide de l'état de réplication de toute la forêt. Affiche les échecs et les deltas de temps. À lancer tous les matins.",
+      "description": "🔥 DAILY CHECK: show a quick summary of the replication state of the whole forest, with the failures and the time deltas. Run it every morning.",
       "platform": 0
     },
     {
       "command": "repadmin /syncall /A /e /P",
-      "description": "Force la réplication immédiate de toutes les partitions vers tous les contrôleurs. Utile après une modification urgente (création utilisateur, GPO).",
+      "description": "Force an immediate replication of every partition to every domain controller. Useful after an urgent change (user creation, GPO).",
       "platform": 0
     },
     {
       "command": "repadmin /kcc",
-      "description": "Force le KCC (Knowledge Consistency Checker) à recalculer la topologie de réplication. Utile si un DC vient d'être ajouté ou supprimé.",
+      "description": "Force the KCC (Knowledge Consistency Checker) to recompute the replication topology. Useful when a DC has just been added or removed.",
       "platform": 0
     }
   ],
-  "windowsCommandTemplateId": "06d34abe-fc02-49e0-84f4-79b78c28d421"
+  "windowsCommandTemplateId": "06d34abe-fc02-49e0-84f4-79b78c28d421",
+  "translations": {
+    "fr": {
+      "title": "Diagnostic Réplication AD (RepAdmin)",
+      "description": "Outil en ligne de commande pour diagnostiquer et gérer la réplication Active Directory.",
+      "examples": {
+        "repadmin /replsummary": "🔥 DAILY CHECK : Affiche un résumé rapide de l'état de réplication de toute la forêt. Affiche les échecs et les deltas de temps. À lancer tous les matins.",
+        "repadmin /syncall /A /e /P": "Force la réplication immédiate de toutes les partitions vers tous les contrôleurs. Utile après une modification urgente (création utilisateur, GPO).",
+        "repadmin /kcc": "Force le KCC (Knowledge Consistency Checker) à recalculer la topologie de réplication. Utile si un DC vient d'être ajouté ou supprimé."
+      }
+    }
+  }
 }

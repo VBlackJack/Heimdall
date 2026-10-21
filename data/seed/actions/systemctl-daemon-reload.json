@@ -1,7 +1,7 @@
 {
   "id": "systemctl-daemon-reload",
-  "title": "Recharger la configuration systemd",
-  "description": "Recharge tous les fichiers d'unités systemd après modification",
+  "title": "Reload the systemd configuration",
+  "description": "Reload every systemd unit file after a change",
   "category": "services-automation",
   "platform": 1,
   "level": 1,
@@ -22,25 +22,37 @@
   "examples": [
     {
       "command": "sudo systemctl daemon-reload",
-      "description": "Recharge la configuration systemd",
+      "description": "Reload the systemd configuration",
       "platform": 1
     },
     {
       "command": "sudo systemctl daemon-reload && systemctl restart myservice",
-      "description": "Recharge puis redémarre un service",
+      "description": "Reload, then restart a service",
       "platform": 1
     },
     {
       "command": "systemctl daemon-reload",
-      "description": "Recharge tous les fichiers d'unités systemd après modification.",
+      "description": "Reload every systemd unit file after a change.",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. À exécuter après création ou modification d'un fichier .service.",
+  "notes": "Requires sudo. Run it after creating or modifying a .service file.",
   "links": [
     {
       "title": "systemctl daemon-reload",
       "url": "https://www.freedesktop.org/software/systemd/man/systemctl.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Recharger la configuration systemd",
+      "description": "Recharge tous les fichiers d'unités systemd après modification",
+      "notes": "Nécessite sudo. À exécuter après création ou modification d'un fichier .service.",
+      "examples": {
+        "sudo systemctl daemon-reload": "Recharge la configuration systemd",
+        "sudo systemctl daemon-reload && systemctl restart myservice": "Recharge puis redémarre un service",
+        "systemctl daemon-reload": "Recharge tous les fichiers d'unités systemd après modification."
+      }
+    }
+  }
 }

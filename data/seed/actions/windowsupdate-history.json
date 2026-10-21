@@ -1,7 +1,7 @@
 {
   "id": "windowsupdate-history",
-  "title": "Consulter l'historique des mises à jour installées",
-  "description": "Affiche l'historique complet des mises à jour Windows installées sur le système",
+  "title": "Show the history of installed updates",
+  "description": "Show the full history of the Windows updates installed on the system",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -22,35 +22,49 @@
   "examples": [
     {
       "command": "Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 20",
-      "description": "Affiche les 20 mises à jour les plus récentes",
+      "description": "Show the 20 most recent updates",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdateLog",
-      "description": "Génère un log Windows Update lisible sur Windows 10/11",
+      "description": "Generate a readable Windows Update log on Windows 10/11",
       "platform": 0
     },
     {
       "command": "Get-HotFix | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-HotFix | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-HotFix | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "Get-HotFix affiche les mises à jour installées. Pour Windows 10/11, utiliser Get-WindowsUpdateLog pour créer un fichier WindowsUpdate.log sur le bureau.",
+  "notes": "Get-HotFix shows the installed updates. On Windows 10/11, use Get-WindowsUpdateLog to create a WindowsUpdate.log file on the desktop.",
   "links": [
     {
       "title": "Get-HotFix Documentation",
       "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-hotfix"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Consulter l'historique des mises à jour installées",
+      "description": "Affiche l'historique complet des mises à jour Windows installées sur le système",
+      "notes": "Get-HotFix affiche les mises à jour installées. Pour Windows 10/11, utiliser Get-WindowsUpdateLog pour créer un fichier WindowsUpdate.log sur le bureau.",
+      "examples": {
+        "Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 20": "Affiche les 20 mises à jour les plus récentes",
+        "Get-WindowsUpdateLog": "Génère un log Windows Update lisible sur Windows 10/11",
+        "Get-HotFix | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-HotFix | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-HotFix | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

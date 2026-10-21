@@ -1,7 +1,7 @@
 {
   "id": "repair-sccm-client-forced",
-  "title": "Réparer le client SCCM (installation forcée)",
-  "description": "Lance la réparation forcée du client Configuration Manager avec réinstallation",
+  "title": "Repair the SCCM client (forced installation)",
+  "description": "Start a forced repair of the Configuration Manager client with a reinstallation",
   "category": "windows-updates",
   "platform": 0,
   "level": 1,
@@ -19,44 +19,56 @@
     "parameters": [
       {
         "name": "mp_server",
-        "label": "Serveur MP SCCM",
+        "label": "SCCM MP server",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "FQDN du serveur Management Point SCCM"
+        "description": "FQDN of the SCCM Management Point server"
       },
       {
         "name": "site_code",
-        "label": "Code du site",
+        "label": "Site code",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Code du site SCCM (3 caractères)"
+        "description": "SCCM site code (3 characters)"
       }
     ]
   },
   "examples": [
     {
       "command": "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:sccm.contoso.com SMSSITECODE=ABC /forceinstall",
-      "description": "Réinstalle le client SCCM avec le site ABC",
-      "platform": 0
-    },
-    {
-      "command": "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:<mp_server> SMSSITECODE={site_code} /forceinstall",
-      "description": "Exemple utilisant le paramètre 'mp_server': FQDN du serveur Management Point SCCM.",
-      "platform": 0
-    },
-    {
-      "command": "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:{mp_server} SMSSITECODE=<site_code> /forceinstall",
-      "description": "Exemple utilisant le paramètre 'site_code': Code du site SCCM (3 caractères).",
+      "description": "Reinstall the SCCM client with site ABC",
       "platform": 0
     }
   ],
-  "notes": "Droits administrateur requis. /forceinstall réinstalle le client même s'il est déjà présent.",
+  "notes": "Requires administrator rights. /forceinstall reinstalls the client even when it is already present.",
   "links": [
     {
       "title": "SCCM Client Installation",
       "url": "https://learn.microsoft.com/en-us/mem/configmgr/core/clients/deploy/about-client-installation-properties"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Réparer le client SCCM (installation forcée)",
+      "description": "Lance la réparation forcée du client Configuration Manager avec réinstallation",
+      "notes": "Droits administrateur requis. /forceinstall réinstalle le client même s'il est déjà présent.",
+      "parameters": {
+        "windows": {
+          "mp_server": {
+            "label": "Serveur MP SCCM",
+            "description": "FQDN du serveur Management Point SCCM"
+          },
+          "site_code": {
+            "label": "Code du site",
+            "description": "Code du site SCCM (3 caractères)"
+          }
+        }
+      },
+      "examples": {
+        "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:sccm.contoso.com SMSSITECODE=ABC /forceinstall": "Réinstalle le client SCCM avec le site ABC"
+      }
+    }
+  }
 }

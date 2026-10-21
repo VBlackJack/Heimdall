@@ -1,7 +1,7 @@
 {
   "id": "windowsupdate-force-scan",
-  "title": "Forcer la recherche immédiate de mises à jour",
-  "description": "Force Windows Update à rechercher immédiatement de nouvelles mises à jour",
+  "title": "Force an immediate update scan",
+  "description": "Force Windows Update to search for new updates now",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -22,15 +22,25 @@
   "examples": [
     {
       "command": "usoclient StartScan",
-      "description": "Force la recherche de mises à jour (Windows 10/11)",
+      "description": "Force an update scan (Windows 10/11)",
       "platform": 0
     }
   ],
-  "notes": "usoclient (Update Session Orchestrator) est l'outil recommandé pour Windows 10/11. Sur systèmes plus anciens, utiliser wuauclt.",
+  "notes": "usoclient (Update Session Orchestrator) is the recommended tool on Windows 10/11. On older systems, use wuauclt.",
   "links": [
     {
       "title": "USOClient Commands",
       "url": "https://techdirectarchive.com/2020/02/05/handy-windows-server-update-services-commands-wauaclt-powershell-and-usoclient/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Forcer la recherche immédiate de mises à jour",
+      "description": "Force Windows Update à rechercher immédiatement de nouvelles mises à jour",
+      "notes": "usoclient (Update Session Orchestrator) est l'outil recommandé pour Windows 10/11. Sur systèmes plus anciens, utiliser wuauclt.",
+      "examples": {
+        "usoclient StartScan": "Force la recherche de mises à jour (Windows 10/11)"
+      }
+    }
+  }
 }

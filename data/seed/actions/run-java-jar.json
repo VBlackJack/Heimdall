@@ -1,7 +1,7 @@
 {
   "id": "run-java-jar",
-  "title": "Exécuter un fichier JAR Java",
-  "description": "Lance une application Java packagée en JAR.",
+  "title": "Run a Java JAR file",
+  "description": "Start a Java application packaged as a JAR.",
   "category": "development",
   "platform": 2,
   "level": 0,
@@ -20,11 +20,11 @@
     "parameters": [
       {
         "name": "jarPath",
-        "label": "Fichier JAR",
+        "label": "JAR file",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier .jar"
+        "description": "Path of the .jar file"
       }
     ]
   },
@@ -37,63 +37,95 @@
     "parameters": [
       {
         "name": "jarPath",
-        "label": "Fichier JAR",
+        "label": "JAR file",
         "type": "string",
         "defaultValue": "",
         "required": true,
-        "description": "Chemin du fichier .jar"
+        "description": "Path of the .jar file"
       }
     ]
   },
   "examples": [
     {
       "command": "java -jar application.jar",
-      "description": "Lance un fichier JAR",
+      "description": "Run a JAR file",
       "platform": 2
     },
     {
       "command": "java -Xmx2G -jar application.jar",
-      "description": "Lance avec 2GB de mémoire max",
+      "description": "Run with 2 GB of maximum memory",
       "platform": 2
     },
     {
       "command": "java -jar app.jar --spring.profiles.active=prod",
-      "description": "Lance avec des arguments Spring",
+      "description": "Run with Spring arguments",
       "platform": 2
     },
     {
       "command": "java -jar \"C:\\Apps\\myapp.jar\"",
-      "description": "Exemple utilisant le paramètre 'jarPath': Chemin du fichier .jar. Remplacez C:\\Apps\\myapp.jar par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'jarPath' parameter: Path of the .jar file. Replace C:\\Apps\\myapp.jar with the value that fits your environment.",
       "platform": 2
     }
   ],
-  "notes": "-Xmx définit la mémoire max. -Xms définit la mémoire initiale. Les arguments après le JAR sont passés à l'app.",
+  "notes": "-Xmx sets the maximum memory, -Xms the initial memory. Arguments after the JAR are passed to the application.",
   "links": [],
   "linuxExamples": [
     {
       "command": "java -Xmx2g -jar app.jar",
-      "description": "Exécuter avec 2 Go de heap",
+      "description": "Run with a 2 GB heap",
       "platform": 1
     },
     {
       "command": "java -version",
-      "description": "Afficher la version de Java",
+      "description": "Show the Java version",
       "platform": 1
     },
     {
       "command": "java -cp \"lib/*:.\" MainClass",
-      "description": "Exécuter avec classpath personnalisé",
+      "description": "Run with a custom classpath",
       "platform": 1
     },
     {
       "command": "java -Dspring.profiles.active=prod -jar app.jar",
-      "description": "Définir un profil Spring",
+      "description": "Set a Spring profile",
       "platform": 1
     },
     {
       "command": "java -jar app.jar --server.port=8081",
-      "description": "Avec port personnalisé",
+      "description": "With a custom port",
       "platform": 1
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Exécuter un fichier JAR Java",
+      "description": "Lance une application Java packagée en JAR.",
+      "notes": "-Xmx définit la mémoire max. -Xms définit la mémoire initiale. Les arguments après le JAR sont passés à l'app.",
+      "parameters": {
+        "windows": {
+          "jarPath": {
+            "label": "Fichier JAR",
+            "description": "Chemin du fichier .jar"
+          }
+        },
+        "linux": {
+          "jarPath": {
+            "label": "Fichier JAR",
+            "description": "Chemin du fichier .jar"
+          }
+        }
+      },
+      "examples": {
+        "java -Xmx2g -jar app.jar": "Exécuter avec 2 Go de heap",
+        "java -version": "Afficher la version de Java",
+        "java -cp \"lib/*:.\" MainClass": "Exécuter avec classpath personnalisé",
+        "java -Dspring.profiles.active=prod -jar app.jar": "Définir un profil Spring",
+        "java -jar app.jar --server.port=8081": "Avec port personnalisé",
+        "java -jar application.jar": "Lance un fichier JAR",
+        "java -Xmx2G -jar application.jar": "Lance avec 2GB de mémoire max",
+        "java -jar app.jar --spring.profiles.active=prod": "Lance avec des arguments Spring",
+        "java -jar \"C:\\Apps\\myapp.jar\"": "Exemple utilisant le paramètre 'jarPath': Chemin du fichier .jar. Remplacez C:\\Apps\\myapp.jar par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

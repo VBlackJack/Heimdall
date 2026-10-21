@@ -1,7 +1,7 @@
 {
   "id": "systemctl-stop",
-  "title": "Arrêter un service systemd",
-  "description": "Arrête immédiatement un service systemd en cours d'exécution",
+  "title": "Stop a systemd service",
+  "description": "Stop a running systemd service now",
   "category": "services-automation",
   "platform": 1,
   "level": 1,
@@ -20,41 +20,56 @@
     "parameters": [
       {
         "name": "service",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "nginx.service",
         "required": true,
-        "description": "Nom de l'unité systemd à arrêter"
+        "description": "Name of the systemd unit to stop"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo systemctl stop nginx",
-      "description": "Arrête le service nginx",
+      "description": "Stop the nginx service",
       "platform": 1
     },
     {
       "command": "sudo systemctl stop mysql.service",
-      "description": "Arrête MySQL/MariaDB",
-      "platform": 1
-    },
-    {
-      "command": "systemctl stop nginx.service",
-      "description": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à arrêter. Remplacez spooler par la valeur appropriée selon votre environnement.",
+      "description": "Stop MySQL/MariaDB",
       "platform": 1
     },
     {
       "command": "systemctl stop mysql",
-      "description": "Arrêter le service MySQL",
+      "description": "Stop the MySQL service",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. Le service peut redémarrer automatiquement au prochain boot s'il est enabled.",
+  "notes": "Requires sudo. The service may start again at the next boot if it is enabled.",
   "links": [
     {
       "title": "systemctl stop",
       "url": "https://www.freedesktop.org/software/systemd/man/systemctl.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Arrêter un service systemd",
+      "description": "Arrête immédiatement un service systemd en cours d'exécution",
+      "notes": "Nécessite sudo. Le service peut redémarrer automatiquement au prochain boot s'il est enabled.",
+      "parameters": {
+        "linux": {
+          "service": {
+            "label": "Nom du service",
+            "description": "Nom de l'unité systemd à arrêter"
+          }
+        }
+      },
+      "examples": {
+        "sudo systemctl stop nginx": "Arrête le service nginx",
+        "sudo systemctl stop mysql.service": "Arrête MySQL/MariaDB",
+        "systemctl stop mysql": "Arrêter le service MySQL"
+      }
+    }
+  }
 }

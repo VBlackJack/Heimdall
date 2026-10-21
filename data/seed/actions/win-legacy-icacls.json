@@ -1,7 +1,7 @@
 {
   "id": "win-legacy-icacls",
-  "title": "Gestion des permissions NTFS (ICACLS)",
-  "description": "Affiche ou modifie les listes de contrôle d'accès (ACL) des fichiers et dossiers.",
+  "title": "Manage NTFS permissions (ICACLS)",
+  "description": "Show or change the access control lists (ACLs) of files and folders.",
   "category": "security",
   "platform": 0,
   "level": 1,
@@ -21,39 +21,62 @@
     "parameters": [
       {
         "name": "path",
-        "label": "Chemin",
+        "label": "Path",
         "type": "string",
         "defaultValue": "C:\\Data",
         "required": true,
-        "description": "Dossier ou fichier cible"
+        "description": "Target folder or file"
       },
       {
         "name": "user",
-        "label": "Utilisateur/Groupe",
+        "label": "User/Group",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "Users",
         "required": true,
-        "description": "Nom de l'utilisateur ou du groupe"
+        "description": "Name of the user or group"
       }
     ]
   },
   "examples": [
     {
       "command": "icacls \"C:\\Data\" /grant \"Domain Admins:(OI)(CI)F\" /T",
-      "description": "Donne le Contrôle Total (F) aux Admins, avec héritage sur les objets (OI) et conteneurs (CI), récursivement (/T).",
+      "description": "Give Full Control (F) to the admins, with inheritance on objects (OI) and containers (CI), recursively (/T).",
       "platform": 0
     },
     {
       "command": "icacls \"C:\\BrokenFolder\" /reset /T",
-      "description": "🔥 REPAIR PERMISSIONS : Réinitialise (/reset) les permissions en forçant l'héritage du dossier parent. La commande de secours quand les droits sont corrompus.",
+      "description": "🔥 REPAIR PERMISSIONS: reset (/reset) the permissions by forcing inheritance from the parent folder. The emergency command when the rights are corrupted.",
       "platform": 0
     },
     {
       "command": "icacls \"C:\\Data\" /save \"C:\\Temp\\Acls.txt\" /T /C",
-      "description": "Sauvegarde toutes les permissions dans un fichier texte. Utile avant une migration ou une modification risquée. Restaurer avec /restore.",
+      "description": "Save every permission to a text file. Useful before a migration or a risky change. Restore with /restore.",
       "platform": 0
     }
   ],
-  "windowsCommandTemplateId": "11f285b1-4f34-4366-87e4-7483e496705f"
+  "windowsCommandTemplateId": "11f285b1-4f34-4366-87e4-7483e496705f",
+  "translations": {
+    "fr": {
+      "title": "Gestion des permissions NTFS (ICACLS)",
+      "description": "Affiche ou modifie les listes de contrôle d'accès (ACL) des fichiers et dossiers.",
+      "parameters": {
+        "windows": {
+          "path": {
+            "label": "Chemin",
+            "description": "Dossier ou fichier cible"
+          },
+          "user": {
+            "label": "Utilisateur/Groupe",
+            "description": "Nom de l'utilisateur ou du groupe"
+          }
+        }
+      },
+      "examples": {
+        "icacls \"C:\\Data\" /grant \"Domain Admins:(OI)(CI)F\" /T": "Donne le Contrôle Total (F) aux Admins, avec héritage sur les objets (OI) et conteneurs (CI), récursivement (/T).",
+        "icacls \"C:\\BrokenFolder\" /reset /T": "🔥 REPAIR PERMISSIONS : Réinitialise (/reset) les permissions en forçant l'héritage du dossier parent. La commande de secours quand les droits sont corrompus.",
+        "icacls \"C:\\Data\" /save \"C:\\Temp\\Acls.txt\" /T /C": "Sauvegarde toutes les permissions dans un fichier texte. Utile avant une migration ou une modification risquée. Restaurer avec /restore."
+      }
+    }
+  }
 }

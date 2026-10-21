@@ -1,7 +1,7 @@
 {
   "id": "win-perf-001",
-  "title": "Configurer DNS Google (8.8.8.8)",
-  "description": "Configure les serveurs DNS Google (8.8.8.8 et 8.8.4.4) pour améliorer la vitesse de résolution DNS et la fiabilité.",
+  "title": "Configure Google DNS (8.8.8.8)",
+  "description": "Configure the Google DNS servers (8.8.8.8 and 8.8.4.4) to improve DNS resolution speed and reliability.",
   "category": "network-dns",
   "platform": 0,
   "level": 1,
@@ -10,7 +10,7 @@
     "dns",
     "network",
     "google",
-    "optimisation",
+    "optimization",
     "windows"
   ],
   "windowsCommandTemplateId": "win-perf-001-cmd",
@@ -22,42 +22,63 @@
     "parameters": [
       {
         "name": "InterfaceName",
-        "label": "Nom de l'interface réseau",
+        "label": "Network interface name",
         "type": "string",
         "quoting": "InlineInQuotes",
         "defaultValue": "Ethernet",
         "required": false,
-        "description": "Nom de l'interface réseau (Ethernet, Wi-Fi, etc.)"
+        "description": "Name of the network interface (Ethernet, Wi-Fi, etc.)"
       }
     ]
   },
   "examples": [
     {
-      "command": "$interface = Get-NetAdapter | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "command": "Get-NetAdapter | Select-Object * -First 1",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
-      "command": "$interface = Get-NetAdapter | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "command": "Get-NetAdapter | Format-Table -AutoSize",
+      "description": "Show the results as a table fitted to the console. Format-Table -AutoSize adjusts the column widths for readable output. Handy for a quick look at structured data.",
       "platform": 0
     },
     {
-      "command": "$interface = Get-NetAdapter | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "command": "Get-NetAdapter | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
-      "command": "$interface = Get-NetAdapter | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "command": "Get-NetAdapter | Measure-Object",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "DNS Google: rapide et fiable. Vitesse moyenne ~20ms. Vide automatiquement le cache DNS après configuration.",
+  "notes": "Google DNS: fast and reliable. Average speed ~20 ms. Flushes the DNS cache automatically after the configuration.",
   "links": [
     {
       "title": "Google Public DNS",
       "url": "https://developers.google.com/speed/public-dns"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Configurer DNS Google (8.8.8.8)",
+      "description": "Configure les serveurs DNS Google (8.8.8.8 et 8.8.4.4) pour améliorer la vitesse de résolution DNS et la fiabilité.",
+      "notes": "DNS Google: rapide et fiable. Vitesse moyenne ~20ms. Vide automatiquement le cache DNS après configuration.",
+      "parameters": {
+        "windows": {
+          "InterfaceName": {
+            "label": "Nom de l'interface réseau",
+            "description": "Nom de l'interface réseau (Ethernet, Wi-Fi, etc.)"
+          }
+        }
+      },
+      "examples": {
+        "Get-NetAdapter | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-NetAdapter | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-NetAdapter | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-NetAdapter | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

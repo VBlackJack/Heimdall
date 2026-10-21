@@ -1,7 +1,7 @@
 {
   "id": "windowsupdate-check-pending",
-  "title": "Vérifier les mises à jour Windows en attente",
-  "description": "Liste toutes les mises à jour Windows disponibles mais non encore installées",
+  "title": "Check pending Windows updates",
+  "description": "List every available Windows update that is not installed yet",
   "category": "windows-updates",
   "platform": 0,
   "level": 0,
@@ -22,36 +22,36 @@
   "examples": [
     {
       "command": "Get-WindowsUpdate -MicrosoftUpdate",
-      "description": "Liste toutes les mises à jour disponibles depuis Windows Update et Microsoft Update",
+      "description": "List every update available from Windows Update and Microsoft Update",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -NotCategory 'Drivers'",
-      "description": "Liste les mises à jour en excluant les pilotes",
+      "description": "List the updates, excluding drivers",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -MicrosoftUpdate -Verbose | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -MicrosoftUpdate -Verbose | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results as a table fitted to the console. Format-Table -AutoSize adjusts the column widths for readable output. Handy for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -MicrosoftUpdate -Verbose | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-WindowsUpdate -MicrosoftUpdate -Verbose | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
-  "notes": "Nécessite le module PSWindowsUpdate (Install-Module PSWindowsUpdate). Droits administrateur requis.",
+  "notes": "Requires the PSWindowsUpdate module (Install-Module PSWindowsUpdate). Requires administrator rights.",
   "links": [
     {
       "title": "PSWindowsUpdate Module",
@@ -61,5 +61,20 @@
       "title": "Documentation PSWindowsUpdate",
       "url": "https://woshub.com/pswindowsupdate-module/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Vérifier les mises à jour Windows en attente",
+      "description": "Liste toutes les mises à jour Windows disponibles mais non encore installées",
+      "notes": "Nécessite le module PSWindowsUpdate (Install-Module PSWindowsUpdate). Droits administrateur requis.",
+      "examples": {
+        "Get-WindowsUpdate -MicrosoftUpdate": "Liste toutes les mises à jour disponibles depuis Windows Update et Microsoft Update",
+        "Get-WindowsUpdate -NotCategory 'Drivers'": "Liste les mises à jour en excluant les pilotes",
+        "Get-WindowsUpdate -MicrosoftUpdate -Verbose | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-WindowsUpdate -MicrosoftUpdate -Verbose | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-WindowsUpdate -MicrosoftUpdate -Verbose | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-WindowsUpdate -MicrosoftUpdate -Verbose | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
+      }
+    }
+  }
 }

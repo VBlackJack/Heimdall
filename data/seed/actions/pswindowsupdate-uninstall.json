@@ -1,7 +1,7 @@
 {
   "id": "pswindowsupdate-uninstall",
-  "title": "Désinstaller une mise à jour Windows",
-  "description": "Désinstalle une mise à jour Windows spécifique par son numéro KB",
+  "title": "Uninstall a Windows update",
+  "description": "Uninstall a specific Windows update by its KB number",
   "category": "windows-updates",
   "platform": 0,
   "level": 2,
@@ -20,36 +20,50 @@
     "parameters": [
       {
         "name": "kbNumber",
-        "label": "Numéro KB",
+        "label": "KB number",
         "type": "string",
         "defaultValue": "KB5001234",
         "required": true,
-        "description": "Numéro KB de la mise à jour à désinstaller"
+        "description": "KB number of the update to uninstall"
       }
     ]
   },
   "examples": [
     {
       "command": "Uninstall-WindowsUpdate -KBArticleID KB5001234",
-      "description": "Désinstalle la mise à jour KB5001234",
+      "description": "Uninstall update KB5001234",
       "platform": 0
     },
     {
       "command": "Uninstall-WindowsUpdate -KBArticleID KB5001234 -IgnoreReboot",
-      "description": "Désinstalle sans redémarrer automatiquement",
-      "platform": 0
-    },
-    {
-      "command": "Uninstall-WindowsUpdate -KBArticleID KB5001234 -Confirm:$false",
-      "description": "Exemple utilisant le paramètre 'kbNumber': Numéro KB de la mise à jour à désinstaller. Remplacez KB5012345 par la valeur appropriée selon votre environnement.",
+      "description": "Uninstall without restarting automatically",
       "platform": 0
     }
   ],
-  "notes": "DANGER: Peut nécessiter un redémarrage. Peut créer des instabilités système. Nécessite droits administrateur et PSWindowsUpdate.",
+  "notes": "DANGER: may require a restart. May make the system unstable. Requires administrator rights and PSWindowsUpdate.",
   "links": [
     {
       "title": "Uninstall Windows Updates",
       "url": "https://woshub.com/pswindowsupdate-module/"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Désinstaller une mise à jour Windows",
+      "description": "Désinstalle une mise à jour Windows spécifique par son numéro KB",
+      "notes": "DANGER: Peut nécessiter un redémarrage. Peut créer des instabilités système. Nécessite droits administrateur et PSWindowsUpdate.",
+      "parameters": {
+        "windows": {
+          "kbNumber": {
+            "label": "Numéro KB",
+            "description": "Numéro KB de la mise à jour à désinstaller"
+          }
+        }
+      },
+      "examples": {
+        "Uninstall-WindowsUpdate -KBArticleID KB5001234": "Désinstalle la mise à jour KB5001234",
+        "Uninstall-WindowsUpdate -KBArticleID KB5001234 -IgnoreReboot": "Désinstalle sans redémarrer automatiquement"
+      }
+    }
+  }
 }

@@ -1,19 +1,18 @@
 {
   "id": "unified-find-files",
-  "title": "Rechercher des fichiers par nom",
-  "description": "Recherche des fichiers ou dossiers par nom ou motif.",
+  "title": "Find files by name",
+  "description": "Search for files or folders by name or pattern.",
   "category": "files-storage",
   "platform": 2,
   "level": 0,
   "tags": [
     "linux",
     "windows",
-    "fichier",
+    "file",
     "find",
-    "search",
-    "recherche"
+    "search"
   ],
-  "notes": "Windows: -Recurse cherche dans les sous-dossiers. -ErrorAction SilentlyContinue ignore les erreurs d'accès.\nLinux: -name sensible à la casse, -iname insensible. -type f pour fichiers, -type d pour dossiers.",
+  "notes": "Windows: -Recurse searches the subfolders. -ErrorAction SilentlyContinue ignores access errors.\nLinux: -name is case-sensitive, -iname is not. -type f for files, -type d for folders.",
   "links": [
     {
       "title": "Documentation Get-ChildItem",
@@ -29,56 +28,51 @@
     "parameters": [
       {
         "name": "searchPath",
-        "label": "Chemin de recherche",
+        "label": "Search path",
         "type": "string",
         "defaultValue": "C:\\",
         "required": true,
-        "description": "Dossier où commencer la recherche"
+        "description": "Folder where the search starts"
       },
       {
         "name": "pattern",
-        "label": "Motif de recherche",
+        "label": "Search pattern",
         "type": "string",
         "defaultValue": "*.txt",
         "required": true,
-        "description": "Motif de nom de fichier (ex: *.txt, *.log)"
+        "description": "File name pattern (e.g. *.txt, *.log)"
       }
     ]
   },
   "windowsExamples": [
     {
       "command": "Get-ChildItem -Path \"C:\\Users\" -Filter \"*.pdf\" -Recurse -ErrorAction SilentlyContinue",
-      "description": "Trouve tous les fichiers PDF dans C:\\Users",
+      "description": "Find every PDF file under C:\\Users",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"C:\\\" -Filter \"config.json\" -Recurse",
-      "description": "Cherche tous les fichiers config.json",
+      "description": "Find every config.json file",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Select-Object * -First 1",
-      "description": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+      "description": "Show every property of the first returned object. Select-Object * widens the output to every column, -First 1 keeps the first result. Use it to discover the available properties before filtering.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Format-Table -AutoSize",
-      "description": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+      "description": "Show the results as a table fitted to the console. Format-Table -AutoSize adjusts the column widths for readable output. Handy for a quick look at structured data.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8",
-      "description": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+      "description": "Export the results to a CSV file Excel can open. -NoTypeInformation drops the metadata line, -Encoding UTF8 keeps accented characters intact. Useful for archiving, reports and external analysis.",
       "platform": 0
     },
     {
       "command": "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Measure-Object",
-      "description": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
-      "platform": 0
-    },
-    {
-      "command": "Get-ChildItem -Path \"C:\\\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime",
-      "description": "Exemple utilisant le paramètre 'searchPath': Dossier où commencer la recherche. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
+      "description": "Count the returned objects. Measure-Object returns Count, Sum, Average, Min and Max depending on the properties. Useful for quick statistics and checking results.",
       "platform": 0
     }
   ],
@@ -91,48 +85,78 @@
     "parameters": [
       {
         "name": "searchPath",
-        "label": "Chemin de recherche",
+        "label": "Search path",
         "type": "string",
         "defaultValue": "/",
         "required": true,
-        "description": "Dossier où commencer la recherche"
+        "description": "Folder where the search starts"
       },
       {
         "name": "pattern",
-        "label": "Motif de recherche",
+        "label": "Search pattern",
         "type": "string",
         "defaultValue": "*.txt",
         "required": true,
-        "description": "Motif de nom de fichier (ex: *.txt, *.log)"
+        "description": "File name pattern (e.g. *.txt, *.log)"
       }
     ]
   },
   "linuxExamples": [
     {
       "command": "find /home -name \"*.pdf\"",
-      "description": "Trouve tous les fichiers PDF dans /home",
+      "description": "Find every PDF file under /home",
       "platform": 1
     },
     {
       "command": "find / -name \"config.json\" 2>/dev/null",
-      "description": "Cherche config.json en ignorant les erreurs",
+      "description": "Find config.json and ignore errors",
       "platform": 1
     },
     {
       "command": "find . -type f -mtime -7",
-      "description": "Fichiers modifiés dans les 7 derniers jours",
-      "platform": 1
-    },
-    {
-      "command": "find \"/\" -name \"{pattern}\"",
-      "description": "Exemple utilisant le paramètre 'searchPath': Dossier où commencer la recherche. Remplacez <searchPath> par la valeur appropriée selon votre environnement.",
-      "platform": 1
-    },
-    {
-      "command": "find \"{searchPath}\" -name \"*.txt\"",
-      "description": "Exemple utilisant le paramètre 'pattern': Motif de nom de fichier (ex: *.txt, *.log). Remplacez <pattern> par la valeur appropriée selon votre environnement.",
+      "description": "Files modified in the last 7 days",
       "platform": 1
     }
   ],
-  "examples": []
+  "examples": [],
+  "translations": {
+    "fr": {
+      "title": "Rechercher des fichiers par nom",
+      "description": "Recherche des fichiers ou dossiers par nom ou motif.",
+      "notes": "Windows: -Recurse cherche dans les sous-dossiers. -ErrorAction SilentlyContinue ignore les erreurs d'accès.\nLinux: -name sensible à la casse, -iname insensible. -type f pour fichiers, -type d pour dossiers.",
+      "parameters": {
+        "windows": {
+          "searchPath": {
+            "label": "Chemin de recherche",
+            "description": "Dossier où commencer la recherche"
+          },
+          "pattern": {
+            "label": "Motif de recherche",
+            "description": "Motif de nom de fichier (ex: *.txt, *.log)"
+          }
+        },
+        "linux": {
+          "searchPath": {
+            "label": "Chemin de recherche",
+            "description": "Dossier où commencer la recherche"
+          },
+          "pattern": {
+            "label": "Motif de recherche",
+            "description": "Motif de nom de fichier (ex: *.txt, *.log)"
+          }
+        }
+      },
+      "examples": {
+        "Get-ChildItem -Path \"C:\\Users\" -Filter \"*.pdf\" -Recurse -ErrorAction SilentlyContinue": "Trouve tous les fichiers PDF dans C:\\Users",
+        "Get-ChildItem -Path \"C:\\\" -Filter \"config.json\" -Recurse": "Cherche tous les fichiers config.json",
+        "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Select-Object * -First 1": "Affiche toutes les propriétés du premier objet retourné. Select-Object * élargit l'affichage pour montrer toutes les colonnes. -First 1 limite au premier résultat. Utilisez cette commande pour découvrir les propriétés disponibles avant de filtrer.",
+        "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
+        "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
+        "Get-ChildItem -Path \"{searchPath}\" -Filter \"{pattern}\" -Recurse -ErrorAction SilentlyContinue | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
+        "find /home -name \"*.pdf\"": "Trouve tous les fichiers PDF dans /home",
+        "find / -name \"config.json\" 2>/dev/null": "Cherche config.json en ignorant les erreurs",
+        "find . -type f -mtime -7": "Fichiers modifiés dans les 7 derniers jours"
+      }
+    }
+  }
 }
