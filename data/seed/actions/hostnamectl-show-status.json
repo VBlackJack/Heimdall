@@ -32,8 +32,8 @@
       "platform": 1
     },
     {
-      "command": "hostnamectl --static",
-      "description": "Show only the static host name",
+      "command": "uname -r",
+      "description": "Show the release of the running kernel",
       "platform": 1
     }
   ],
@@ -52,7 +52,7 @@
       "examples": {
         "hostnamectl status": "Affiche l'identité de l'hôte",
         "cat /etc/os-release": "Affiche le nom et la version de la distribution",
-        "hostnamectl --static": "Affiche seulement le nom d'hôte statique"
+        "uname -r": "Affiche la version du noyau en cours d'exécution"
       }
     }
   }
