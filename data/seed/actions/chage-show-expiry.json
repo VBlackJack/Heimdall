@@ -1,0 +1,76 @@
+{
+  "id": "chage-show-expiry",
+  "title": "Show the password ageing of an account",
+  "description": "Show when the password of a local account was changed, when it expires and when the account expires.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "chage",
+    "linux",
+    "password",
+    "account",
+    "expiry"
+  ],
+  "linuxCommandTemplateId": "chage-show-expiry-cmd",
+  "linuxCommandTemplate": {
+    "id": "chage-show-expiry-cmd",
+    "platform": 1,
+    "name": "chage",
+    "commandPattern": "sudo chage -l {username}",
+    "parameters": [
+      {
+        "name": "username",
+        "label": "User name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Login name of the local account"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo chage -l alice",
+      "description": "Show the password and account expiry of alice",
+      "platform": 1
+    },
+    {
+      "command": "sudo chage -l root",
+      "description": "Check whether the root password expires",
+      "platform": 1
+    },
+    {
+      "command": "grep -E '^PASS_(MAX|MIN|WARN)' /etc/login.defs",
+      "description": "Show the ageing defaults applied to new accounts",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo, because the values live in /etc/shadow.",
+  "links": [
+    {
+      "title": "chage(1)",
+      "url": "https://man7.org/linux/man-pages/man1/chage.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher le vieillissement du mot de passe d'un compte",
+      "description": "Affiche quand le mot de passe d'un compte local a changé, quand il expire et quand le compte expire.",
+      "notes": "Nécessite sudo, car les valeurs sont dans /etc/shadow.",
+      "parameters": {
+        "linux": {
+          "username": {
+            "label": "Nom d'utilisateur",
+            "description": "Identifiant du compte local"
+          }
+        }
+      },
+      "examples": {
+        "sudo chage -l alice": "Affiche l'expiration du mot de passe et du compte de alice",
+        "sudo chage -l root": "Vérifie si le mot de passe root expire",
+        "grep -E '^PASS_(MAX|MIN|WARN)' /etc/login.defs": "Affiche les valeurs de vieillissement appliquées aux nouveaux comptes"
+      }
+    }
+  }
+}

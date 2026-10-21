@@ -1,0 +1,65 @@
+{
+  "id": "aa-status-show-profiles",
+  "title": "Show the AppArmor status",
+  "description": "Show the loaded AppArmor profiles, their mode, and the processes they confine.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "apparmor",
+    "aa-status",
+    "linux",
+    "security",
+    "ubuntu"
+  ],
+  "linuxCommandTemplateId": "aa-status-show-profiles-cmd",
+  "linuxCommandTemplate": {
+    "id": "aa-status-show-profiles-cmd",
+    "platform": 1,
+    "name": "aa-status",
+    "commandPattern": "sudo aa-status",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo aa-status",
+      "description": "Show every profile and confined process",
+      "platform": 1
+    },
+    {
+      "command": "sudo aa-status --enabled && echo enabled",
+      "description": "Check only whether AppArmor is enabled",
+      "platform": 1
+    },
+    {
+      "command": "sudo journalctl -k | grep -i 'apparmor=\"DENIED\"'",
+      "description": "Show the AppArmor denials in the kernel log",
+      "platform": 1
+    },
+    {
+      "command": "sudo aa-complain /etc/apparmor.d/usr.sbin.mysqld",
+      "description": "Put one profile in complain mode to diagnose it",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. AppArmor is the default on Debian, Ubuntu and SUSE; RHEL uses SELinux instead.",
+  "links": [
+    {
+      "title": "aa-status(8)",
+      "url": "https://manpages.debian.org/bookworm/apparmor/aa-status.8.en.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'état d'AppArmor",
+      "description": "Affiche les profils AppArmor chargés, leur mode et les processus qu'ils confinent.",
+      "notes": "Nécessite sudo. AppArmor est le choix par défaut sur Debian, Ubuntu et SUSE ; RHEL utilise SELinux.",
+      "examples": {
+        "sudo aa-status": "Affiche chaque profil et chaque processus confiné",
+        "sudo aa-status --enabled && echo enabled": "Vérifie seulement si AppArmor est activé",
+        "sudo journalctl -k | grep -i 'apparmor=\"DENIED\"'": "Affiche les refus AppArmor dans le journal du noyau",
+        "sudo aa-complain /etc/apparmor.d/usr.sbin.mysqld": "Passe un profil en mode complain pour le diagnostiquer"
+      }
+    }
+  }
+}

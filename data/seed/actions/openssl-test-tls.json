@@ -1,0 +1,94 @@
+{
+  "id": "openssl-test-tls",
+  "title": "Test a TLS connection to a server",
+  "description": "Open a TLS connection to a host and port with SNI, then show the certificate chain, the protocol and the verification result.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "openssl",
+    "s_client",
+    "tls",
+    "certificate",
+    "linux"
+  ],
+  "linuxCommandTemplateId": "openssl-test-tls-cmd",
+  "linuxCommandTemplate": {
+    "id": "openssl-test-tls-cmd",
+    "platform": 1,
+    "name": "openssl",
+    "commandPattern": "openssl s_client -connect {host}:{port} -servername {host} </dev/null",
+    "parameters": [
+      {
+        "name": "host",
+        "label": "Host",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the server, also sent as SNI"
+      },
+      {
+        "name": "port",
+        "label": "Port",
+        "type": "int",
+        "defaultValue": "443",
+        "required": true,
+        "description": "TLS port of the service"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "openssl s_client -connect www.example.com:443 -servername www.example.com </dev/null",
+      "description": "Check the chain and the verify return code of a web site",
+      "platform": 1
+    },
+    {
+      "command": "openssl s_client -connect www.example.com:443 -servername www.example.com </dev/null 2>/dev/null | openssl x509 -noout -dates",
+      "description": "Show only the expiry dates of the served certificate",
+      "platform": 1
+    },
+    {
+      "command": "openssl s_client -connect mail.example.com:25 -starttls smtp </dev/null",
+      "description": "Test STARTTLS on an SMTP server",
+      "platform": 1
+    },
+    {
+      "command": "openssl s_client -connect dc01.example.com:636 </dev/null",
+      "description": "Test the LDAPS certificate of a domain controller",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs no special rights. Reading from /dev/null closes the connection as soon as the handshake ends.",
+  "links": [
+    {
+      "title": "openssl-s_client(1)",
+      "url": "https://docs.openssl.org/3.0/man1/openssl-s_client/"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester une connexion TLS vers un serveur",
+      "description": "Ouvre une connexion TLS vers un hôte et un port avec SNI, puis affiche la chaîne de certificats, le protocole et le résultat de la vérification.",
+      "notes": "Aucun droit particulier. La lecture depuis /dev/null ferme la connexion dès la fin de la négociation.",
+      "parameters": {
+        "linux": {
+          "host": {
+            "label": "Hôte",
+            "description": "Nom du serveur, aussi envoyé en SNI"
+          },
+          "port": {
+            "label": "Port",
+            "description": "Port TLS du service"
+          }
+        }
+      },
+      "examples": {
+        "openssl s_client -connect www.example.com:443 -servername www.example.com </dev/null": "Vérifie la chaîne et le code de vérification d'un site web",
+        "openssl s_client -connect www.example.com:443 -servername www.example.com </dev/null 2>/dev/null | openssl x509 -noout -dates": "Affiche seulement les dates d'expiration du certificat servi",
+        "openssl s_client -connect mail.example.com:25 -starttls smtp </dev/null": "Teste STARTTLS sur un serveur SMTP",
+        "openssl s_client -connect dc01.example.com:636 </dev/null": "Teste le certificat LDAPS d'un contrôleur de domaine"
+      }
+    }
+  }
+}

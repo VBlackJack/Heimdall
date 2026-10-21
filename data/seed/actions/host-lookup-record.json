@@ -1,0 +1,105 @@
+{
+  "id": "host-lookup-record",
+  "title": "Look up a DNS record with host",
+  "description": "Query DNS for one record type of a name, or the name behind an IP address.",
+  "category": "network-dns",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "host",
+    "dns",
+    "linux",
+    "lookup",
+    "bind"
+  ],
+  "linuxCommandTemplateId": "host-lookup-record-cmd",
+  "linuxCommandTemplate": {
+    "id": "host-lookup-record-cmd",
+    "platform": 1,
+    "name": "host",
+    "commandPattern": "host -t {recordType} {name}",
+    "parameters": [
+      {
+        "name": "recordType",
+        "label": "Record type",
+        "type": "choice",
+        "allowedValues": [
+          "A",
+          "AAAA",
+          "CNAME",
+          "MX",
+          "NS",
+          "TXT",
+          "SOA",
+          "SRV",
+          "PTR"
+        ],
+        "defaultValue": "A",
+        "required": true,
+        "description": "DNS record type to query"
+      },
+      {
+        "name": "name",
+        "label": "Name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Domain name to look up, or an IP address for PTR"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "host -t MX example.com",
+      "description": "Show the mail servers of a domain",
+      "platform": 1
+    },
+    {
+      "command": "host 10.0.0.25",
+      "description": "Find the name behind an IP address",
+      "platform": 1
+    },
+    {
+      "command": "host -t SRV _ldap._tcp.example.com",
+      "description": "Find the LDAP servers a domain advertises",
+      "platform": 1
+    },
+    {
+      "command": "host web01.example.com 10.0.0.53",
+      "description": "Ask a given DNS server instead of the configured one",
+      "platform": 1
+    }
+  ],
+  "notes": "Ships with the bind-utils (RHEL) or bind9-host (Debian) package.",
+  "links": [
+    {
+      "title": "host(1)",
+      "url": "https://manpages.debian.org/bookworm/bind9-host/host.1.en.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher un enregistrement DNS avec host",
+      "description": "Interroge le DNS sur un type d'enregistrement d'un nom, ou sur le nom associé à une adresse IP.",
+      "notes": "Fourni par le paquet bind-utils (RHEL) ou bind9-host (Debian).",
+      "parameters": {
+        "linux": {
+          "recordType": {
+            "label": "Type d'enregistrement",
+            "description": "Type d'enregistrement DNS à interroger"
+          },
+          "name": {
+            "label": "Nom",
+            "description": "Nom de domaine à rechercher, ou une adresse IP pour PTR"
+          }
+        }
+      },
+      "examples": {
+        "host -t MX example.com": "Affiche les serveurs de messagerie d'un domaine",
+        "host 10.0.0.25": "Trouve le nom associé à une adresse IP",
+        "host -t SRV _ldap._tcp.example.com": "Trouve les serveurs LDAP annoncés par un domaine",
+        "host web01.example.com 10.0.0.53": "Interroge un serveur DNS donné au lieu de celui configuré"
+      }
+    }
+  }
+}

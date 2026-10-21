@@ -1,0 +1,65 @@
+{
+  "id": "nginx-show-sites",
+  "title": "Show the sites nginx serves",
+  "description": "Print the server names and listen addresses of every server block in the loaded nginx configuration.",
+  "category": "services-automation",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "nginx",
+    "linux",
+    "web",
+    "sites",
+    "vhost"
+  ],
+  "linuxCommandTemplateId": "nginx-show-sites-cmd",
+  "linuxCommandTemplate": {
+    "id": "nginx-show-sites-cmd",
+    "platform": 1,
+    "name": "nginx",
+    "commandPattern": "sudo nginx -T | grep -E 'server_name|listen'",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo nginx -T | grep -E 'server_name|listen'",
+      "description": "List the names and ports of every server block",
+      "platform": 1
+    },
+    {
+      "command": "ls -l /etc/nginx/sites-enabled/",
+      "description": "Show the enabled site links on Debian and Ubuntu",
+      "platform": 1
+    },
+    {
+      "command": "ls -l /etc/nginx/conf.d/",
+      "description": "Show the site files on RHEL and derivatives",
+      "platform": 1
+    },
+    {
+      "command": "sudo nginx -T | grep -E '^# configuration file'",
+      "description": "List every file the configuration loads",
+      "platform": 1
+    }
+  ],
+  "notes": "nginx -T dumps the whole configuration, so it needs sudo and a valid configuration.",
+  "links": [
+    {
+      "title": "nginx command-line parameters",
+      "url": "https://nginx.org/en/docs/switches.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les sites servis par nginx",
+      "description": "Affiche les noms de serveur et les adresses d'écoute de chaque bloc server de la configuration nginx chargée.",
+      "notes": "nginx -T affiche toute la configuration : il faut sudo et une configuration valide.",
+      "examples": {
+        "sudo nginx -T | grep -E 'server_name|listen'": "Liste les noms et les ports de chaque bloc server",
+        "ls -l /etc/nginx/sites-enabled/": "Affiche les liens des sites activés sur Debian et Ubuntu",
+        "ls -l /etc/nginx/conf.d/": "Affiche les fichiers de sites sur RHEL et dérivées",
+        "sudo nginx -T | grep -E '^# configuration file'": "Liste chaque fichier chargé par la configuration"
+      }
+    }
+  }
+}

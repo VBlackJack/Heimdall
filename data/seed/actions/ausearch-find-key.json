@@ -1,0 +1,103 @@
+{
+  "id": "ausearch-find-key",
+  "title": "Search the audit log by key",
+  "description": "Show the audit events recorded under a rule key since a given time, with user and system call names resolved.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "ausearch",
+    "auditd",
+    "linux",
+    "audit",
+    "logs"
+  ],
+  "linuxCommandTemplateId": "ausearch-find-key-cmd",
+  "linuxCommandTemplate": {
+    "id": "ausearch-find-key-cmd",
+    "platform": 1,
+    "name": "ausearch",
+    "commandPattern": "sudo ausearch -k {key} --start {start} -i",
+    "parameters": [
+      {
+        "name": "key",
+        "label": "Key",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Key given to the audit rule with -k"
+      },
+      {
+        "name": "start",
+        "label": "Since",
+        "type": "choice",
+        "allowedValues": [
+          "recent",
+          "this-hour",
+          "boot",
+          "today",
+          "yesterday",
+          "this-week",
+          "this-month"
+        ],
+        "defaultValue": "today",
+        "required": true,
+        "description": "Start of the search window"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo ausearch -k sudoers --start today -i",
+      "description": "Show today's changes to /etc/sudoers",
+      "platform": 1
+    },
+    {
+      "command": "sudo ausearch -m avc --start recent",
+      "description": "Show the SELinux denials of the last ten minutes",
+      "platform": 1
+    },
+    {
+      "command": "sudo ausearch -m USER_LOGIN --success no --start this-week -i",
+      "description": "Show this week's failed logins",
+      "platform": 1
+    },
+    {
+      "command": "sudo aureport --summary",
+      "description": "Show a summary report of the audit log",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo and the auditd service. -i turns numeric IDs into names.",
+  "links": [
+    {
+      "title": "ausearch(8)",
+      "url": "https://man7.org/linux/man-pages/man8/ausearch.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher dans le journal d'audit par clé",
+      "description": "Affiche les événements d'audit enregistrés sous une clé de règle depuis un moment donné, avec les noms d'utilisateurs et d'appels système résolus.",
+      "notes": "Nécessite sudo et le service auditd. -i transforme les identifiants numériques en noms.",
+      "parameters": {
+        "linux": {
+          "key": {
+            "label": "Clé",
+            "description": "Clé donnée à la règle d'audit avec -k"
+          },
+          "start": {
+            "label": "Depuis",
+            "description": "Début de la fenêtre de recherche"
+          }
+        }
+      },
+      "examples": {
+        "sudo ausearch -k sudoers --start today -i": "Affiche les modifications du jour de /etc/sudoers",
+        "sudo ausearch -m avc --start recent": "Affiche les refus SELinux des dix dernières minutes",
+        "sudo ausearch -m USER_LOGIN --success no --start this-week -i": "Affiche les connexions échouées de la semaine",
+        "sudo aureport --summary": "Affiche un rapport de synthèse du journal d'audit"
+      }
+    }
+  }
+}

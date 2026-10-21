@@ -1,0 +1,60 @@
+{
+  "id": "realm-list-domains",
+  "title": "Show the domains the host has joined",
+  "description": "Show the Active Directory or IdM domains the host is joined to, with the client software and the login policy.",
+  "category": "active-directory",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "realm",
+    "realmd",
+    "sssd",
+    "linux",
+    "domain",
+    "active-directory"
+  ],
+  "linuxCommandTemplateId": "realm-list-domains-cmd",
+  "linuxCommandTemplate": {
+    "id": "realm-list-domains-cmd",
+    "platform": 1,
+    "name": "realm",
+    "commandPattern": "realm list",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "realm list",
+      "description": "Check whether and how the host is joined",
+      "platform": 1
+    },
+    {
+      "command": "realm discover example.com",
+      "description": "Discover a domain before joining it",
+      "platform": 1
+    },
+    {
+      "command": "sudo realm permit -g 'linux-admins'",
+      "description": "Allow a domain group to log in",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs no special rights to read. Ships with the realmd package.",
+  "links": [
+    {
+      "title": "realm(8)",
+      "url": "https://www.freedesktop.org/software/realmd/docs/realm.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les domaines rejoints par l'hôte",
+      "description": "Affiche les domaines Active Directory ou IdM que l'hôte a rejoints, avec le logiciel client et la politique de connexion.",
+      "notes": "La lecture ne demande aucun droit. Fourni par le paquet realmd.",
+      "examples": {
+        "realm list": "Vérifie si l'hôte a rejoint un domaine et comment",
+        "realm discover example.com": "Découvre un domaine avant de le rejoindre",
+        "sudo realm permit -g 'linux-admins'": "Autorise un groupe du domaine à se connecter"
+      }
+    }
+  }
+}

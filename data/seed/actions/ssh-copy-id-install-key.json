@@ -1,0 +1,112 @@
+{
+  "id": "ssh-copy-id-install-key",
+  "title": "Install a public key on a remote host",
+  "description": "Append a local SSH public key to the authorized_keys file of an account on a remote host.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "ssh",
+    "ssh-copy-id",
+    "linux",
+    "key",
+    "authorized_keys"
+  ],
+  "linuxCommandTemplateId": "ssh-copy-id-install-key-cmd",
+  "linuxCommandTemplate": {
+    "id": "ssh-copy-id-install-key-cmd",
+    "platform": 1,
+    "name": "ssh-copy-id",
+    "commandPattern": "ssh-copy-id -i ~/.ssh/{keyName}.pub -p {port} {user}@{host}",
+    "parameters": [
+      {
+        "name": "keyName",
+        "label": "Key file name",
+        "type": "string",
+        "defaultValue": "id_ed25519",
+        "required": true,
+        "description": "Name of the key in ~/.ssh, without the .pub extension"
+      },
+      {
+        "name": "port",
+        "label": "SSH port",
+        "type": "int",
+        "defaultValue": "22",
+        "required": true,
+        "description": "Port of the remote SSH server"
+      },
+      {
+        "name": "user",
+        "label": "Remote user",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Account that receives the key on the remote host"
+      },
+      {
+        "name": "host",
+        "label": "Remote host",
+        "type": "hostname",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name or address of the remote host"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "ssh-copy-id -i ~/.ssh/id_ed25519.pub admin@web01",
+      "description": "Install the Ed25519 key for admin on web01",
+      "platform": 1
+    },
+    {
+      "command": "ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 deploy@build01",
+      "description": "Install a key on a server that listens on port 2222",
+      "platform": 1
+    },
+    {
+      "command": "ssh-copy-id -n -i ~/.ssh/id_ed25519.pub admin@web01",
+      "description": "Show which keys would be installed, without installing them",
+      "platform": 1
+    }
+  ],
+  "notes": "Asks for the remote password once. Skips keys the remote file already holds.",
+  "links": [
+    {
+      "title": "ssh-copy-id(1)",
+      "url": "https://man7.org/linux/man-pages/man1/ssh-copy-id.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Installer une clé publique sur un hôte distant",
+      "description": "Ajoute une clé publique SSH locale au fichier authorized_keys d'un compte sur un hôte distant.",
+      "notes": "Demande une fois le mot de passe distant. Ignore les clés déjà présentes dans le fichier distant.",
+      "parameters": {
+        "linux": {
+          "keyName": {
+            "label": "Nom du fichier de clé",
+            "description": "Nom de la clé dans ~/.ssh, sans l'extension .pub"
+          },
+          "port": {
+            "label": "Port SSH",
+            "description": "Port du serveur SSH distant"
+          },
+          "user": {
+            "label": "Utilisateur distant",
+            "description": "Compte qui reçoit la clé sur l'hôte distant"
+          },
+          "host": {
+            "label": "Hôte distant",
+            "description": "Nom ou adresse de l'hôte distant"
+          }
+        }
+      },
+      "examples": {
+        "ssh-copy-id -i ~/.ssh/id_ed25519.pub admin@web01": "Installe la clé Ed25519 pour admin sur web01",
+        "ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 deploy@build01": "Installe une clé sur un serveur qui écoute sur le port 2222",
+        "ssh-copy-id -n -i ~/.ssh/id_ed25519.pub admin@web01": "Montre les clés qui seraient installées, sans les installer"
+      }
+    }
+  }
+}

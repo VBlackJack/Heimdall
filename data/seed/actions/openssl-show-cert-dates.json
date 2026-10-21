@@ -1,0 +1,82 @@
+{
+  "id": "openssl-show-cert-dates",
+  "title": "Show the dates of a certificate file",
+  "description": "Show the subject, the issuer and the validity dates of a PEM certificate file.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "openssl",
+    "certificate",
+    "tls",
+    "linux",
+    "expiry"
+  ],
+  "linuxCommandTemplateId": "openssl-show-cert-dates-cmd",
+  "linuxCommandTemplate": {
+    "id": "openssl-show-cert-dates-cmd",
+    "platform": 1,
+    "name": "openssl",
+    "commandPattern": "openssl x509 -in {certFile} -noout -subject -issuer -dates",
+    "parameters": [
+      {
+        "name": "certFile",
+        "label": "Certificate file",
+        "type": "path",
+        "defaultValue": "",
+        "required": true,
+        "description": "Path of the PEM certificate"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "openssl x509 -in /etc/pki/tls/certs/web.crt -noout -subject -issuer -dates",
+      "description": "Check who issued a certificate and when it expires",
+      "platform": 1
+    },
+    {
+      "command": "openssl x509 -in web.crt -noout -checkend 2592000",
+      "description": "Fail when the certificate expires within 30 days",
+      "platform": 1
+    },
+    {
+      "command": "openssl x509 -in web.crt -noout -ext subjectAltName",
+      "description": "List the names the certificate covers",
+      "platform": 1
+    },
+    {
+      "command": "openssl x509 -in web.der -inform DER -noout -dates",
+      "description": "Read a DER-encoded certificate",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs read access to the file only. A private key in the same file is ignored.",
+  "links": [
+    {
+      "title": "openssl-x509(1)",
+      "url": "https://docs.openssl.org/3.0/man1/openssl-x509/"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les dates d'un fichier de certificat",
+      "description": "Affiche le sujet, l'émetteur et les dates de validité d'un fichier de certificat PEM.",
+      "notes": "Nécessite seulement l'accès en lecture au fichier. Une clé privée dans le même fichier est ignorée.",
+      "parameters": {
+        "linux": {
+          "certFile": {
+            "label": "Fichier de certificat",
+            "description": "Chemin du certificat PEM"
+          }
+        }
+      },
+      "examples": {
+        "openssl x509 -in /etc/pki/tls/certs/web.crt -noout -subject -issuer -dates": "Vérifie qui a émis un certificat et quand il expire",
+        "openssl x509 -in web.crt -noout -checkend 2592000": "Échoue si le certificat expire dans les 30 jours",
+        "openssl x509 -in web.crt -noout -ext subjectAltName": "Liste les noms couverts par le certificat",
+        "openssl x509 -in web.der -inform DER -noout -dates": "Lit un certificat encodé en DER"
+      }
+    }
+  }
+}

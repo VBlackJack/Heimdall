@@ -1,0 +1,82 @@
+{
+  "id": "cryptsetup-show-status",
+  "title": "Show the status of an encrypted volume",
+  "description": "Show the cipher, the key size, the underlying device and the size of an open LUKS or dm-crypt mapping.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "cryptsetup",
+    "luks",
+    "linux",
+    "encryption",
+    "disk"
+  ],
+  "linuxCommandTemplateId": "cryptsetup-show-status-cmd",
+  "linuxCommandTemplate": {
+    "id": "cryptsetup-show-status-cmd",
+    "platform": 1,
+    "name": "cryptsetup",
+    "commandPattern": "sudo cryptsetup status {mappingName}",
+    "parameters": [
+      {
+        "name": "mappingName",
+        "label": "Mapping name",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Name of the mapping under /dev/mapper"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo cryptsetup status luks-data",
+      "description": "Show the state of the luks-data mapping",
+      "platform": 1
+    },
+    {
+      "command": "sudo cryptsetup luksDump /dev/sdb1",
+      "description": "Show the LUKS header and the key slots of a device",
+      "platform": 1
+    },
+    {
+      "command": "lsblk -o NAME,TYPE,FSTYPE,MOUNTPOINT",
+      "description": "Find the crypt mappings and where they are mounted",
+      "platform": 1
+    },
+    {
+      "command": "sudo cryptsetup isLuks /dev/sdb1 && echo LUKS",
+      "description": "Check whether a device holds a LUKS header",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. Only an opened mapping has a status; use luksDump to read a closed device.",
+  "links": [
+    {
+      "title": "cryptsetup(8)",
+      "url": "https://man7.org/linux/man-pages/man8/cryptsetup.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'état d'un volume chiffré",
+      "description": "Affiche l'algorithme, la taille de clé, le périphérique sous-jacent et la taille d'un mappage LUKS ou dm-crypt ouvert.",
+      "notes": "Nécessite sudo. Seul un mappage ouvert a un état ; utiliser luksDump pour lire un périphérique fermé.",
+      "parameters": {
+        "linux": {
+          "mappingName": {
+            "label": "Nom du mappage",
+            "description": "Nom du mappage sous /dev/mapper"
+          }
+        }
+      },
+      "examples": {
+        "sudo cryptsetup status luks-data": "Affiche l'état du mappage luks-data",
+        "sudo cryptsetup luksDump /dev/sdb1": "Affiche l'en-tête LUKS et les emplacements de clé d'un périphérique",
+        "lsblk -o NAME,TYPE,FSTYPE,MOUNTPOINT": "Trouve les mappages chiffrés et leur point de montage",
+        "sudo cryptsetup isLuks /dev/sdb1 && echo LUKS": "Vérifie si un périphérique porte un en-tête LUKS"
+      }
+    }
+  }
+}

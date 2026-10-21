@@ -1,0 +1,82 @@
+{
+  "id": "firewall-cmd-list-zone",
+  "title": "Show the firewalld rules of a zone",
+  "description": "Show the interfaces, services, ports and rich rules of a firewalld zone.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "firewalld",
+    "firewall-cmd",
+    "linux",
+    "firewall",
+    "zone"
+  ],
+  "linuxCommandTemplateId": "firewall-cmd-list-zone-cmd",
+  "linuxCommandTemplate": {
+    "id": "firewall-cmd-list-zone-cmd",
+    "platform": 1,
+    "name": "firewall-cmd",
+    "commandPattern": "sudo firewall-cmd --zone={zone} --list-all",
+    "parameters": [
+      {
+        "name": "zone",
+        "label": "Zone",
+        "type": "string",
+        "defaultValue": "public",
+        "required": true,
+        "description": "firewalld zone the rule belongs to"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo firewall-cmd --zone=public --list-all",
+      "description": "Show everything the public zone allows",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --get-active-zones",
+      "description": "Show which zone each interface uses",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --list-all-zones",
+      "description": "Show the rules of every zone",
+      "platform": 1
+    },
+    {
+      "command": "sudo firewall-cmd --permanent --zone=public --list-all",
+      "description": "Show the saved rules, which can differ from the running ones",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo and the firewalld service. Without --permanent it shows the running configuration.",
+  "links": [
+    {
+      "title": "firewall-cmd(1)",
+      "url": "https://firewalld.org/documentation/man-pages/firewall-cmd.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les règles firewalld d'une zone",
+      "description": "Affiche les interfaces, services, ports et règles riches d'une zone firewalld.",
+      "notes": "Nécessite sudo et le service firewalld. Sans --permanent, montre la configuration active.",
+      "parameters": {
+        "linux": {
+          "zone": {
+            "label": "Zone",
+            "description": "Zone firewalld à laquelle appartient la règle"
+          }
+        }
+      },
+      "examples": {
+        "sudo firewall-cmd --zone=public --list-all": "Affiche tout ce que la zone public autorise",
+        "sudo firewall-cmd --get-active-zones": "Affiche la zone utilisée par chaque interface",
+        "sudo firewall-cmd --list-all-zones": "Affiche les règles de toutes les zones",
+        "sudo firewall-cmd --permanent --zone=public --list-all": "Affiche les règles enregistrées, qui peuvent différer des règles actives"
+      }
+    }
+  }
+}

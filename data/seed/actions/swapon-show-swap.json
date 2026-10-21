@@ -1,0 +1,58 @@
+{
+  "id": "swapon-show-swap",
+  "title": "Show the swap areas",
+  "description": "Show each active swap area with its type, size, usage and priority.",
+  "category": "performance",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "swapon",
+    "swap",
+    "linux",
+    "memory"
+  ],
+  "linuxCommandTemplateId": "swapon-show-swap-cmd",
+  "linuxCommandTemplate": {
+    "id": "swapon-show-swap-cmd",
+    "platform": 1,
+    "name": "swapon",
+    "commandPattern": "swapon --show",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "swapon --show",
+      "description": "List the active swap areas",
+      "platform": 1
+    },
+    {
+      "command": "free -h",
+      "description": "Compare the swap usage with the memory usage",
+      "platform": 1
+    },
+    {
+      "command": "grep -i swap /etc/fstab",
+      "description": "Show the swap areas mounted at boot",
+      "platform": 1
+    }
+  ],
+  "notes": "Needs no special rights. No output means the host has no active swap.",
+  "links": [
+    {
+      "title": "swapon(8)",
+      "url": "https://man7.org/linux/man-pages/man8/swapon.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher les zones de swap",
+      "description": "Affiche chaque zone de swap active avec son type, sa taille, son occupation et sa priorité.",
+      "notes": "Aucun droit particulier. Une sortie vide signifie que l'hôte n'a pas de swap actif.",
+      "examples": {
+        "swapon --show": "Liste les zones de swap actives",
+        "free -h": "Compare l'occupation du swap à celle de la mémoire",
+        "grep -i swap /etc/fstab": "Affiche les zones de swap montées au démarrage"
+      }
+    }
+  }
+}

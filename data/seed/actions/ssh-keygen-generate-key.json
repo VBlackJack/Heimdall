@@ -1,0 +1,111 @@
+{
+  "id": "ssh-keygen-generate-key",
+  "title": "Generate an SSH key pair",
+  "description": "Create a new SSH key pair in ~/.ssh with the chosen key type and a comment.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "ssh",
+    "ssh-keygen",
+    "linux",
+    "key",
+    "openssh"
+  ],
+  "linuxCommandTemplateId": "ssh-keygen-generate-key-cmd",
+  "linuxCommandTemplate": {
+    "id": "ssh-keygen-generate-key-cmd",
+    "platform": 1,
+    "name": "ssh-keygen",
+    "commandPattern": "ssh-keygen -t {keyType} -f ~/.ssh/{keyName} -C {comment}",
+    "parameters": [
+      {
+        "name": "keyType",
+        "label": "Key type",
+        "type": "choice",
+        "allowedValues": [
+          "ed25519",
+          "rsa",
+          "ecdsa"
+        ],
+        "defaultValue": "ed25519",
+        "required": true,
+        "description": "Algorithm of the new key; ed25519 is the modern default"
+      },
+      {
+        "name": "keyName",
+        "label": "Key file name",
+        "type": "string",
+        "defaultValue": "id_ed25519",
+        "required": true,
+        "description": "File name of the private key in ~/.ssh; the public key gets .pub"
+      },
+      {
+        "name": "comment",
+        "label": "Comment",
+        "type": "string",
+        "defaultValue": "ops-key",
+        "required": true,
+        "description": "Comment stored in the public key, usually the owner and the host"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C ops@admin01",
+      "description": "Create an Ed25519 key for an administrator",
+      "platform": 1
+    },
+    {
+      "command": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_legacy -C legacy",
+      "description": "Create a 4096-bit RSA key for a host that refuses Ed25519",
+      "platform": 1
+    },
+    {
+      "command": "ssh-keygen -p -f ~/.ssh/id_ed25519",
+      "description": "Change the passphrase of an existing key",
+      "platform": 1
+    },
+    {
+      "command": "ssh-keygen -lf ~/.ssh/id_ed25519.pub",
+      "description": "Show the fingerprint of a public key",
+      "platform": 1
+    }
+  ],
+  "notes": "Asks for a passphrase, which protects the private key at rest. Refuses to overwrite an existing file unless you confirm.",
+  "links": [
+    {
+      "title": "ssh-keygen(1)",
+      "url": "https://man7.org/linux/man-pages/man1/ssh-keygen.1.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Générer une paire de clés SSH",
+      "description": "Crée une nouvelle paire de clés SSH dans ~/.ssh avec le type de clé choisi et un commentaire.",
+      "notes": "Demande une phrase de passe, qui protège la clé privée au repos. Refuse d'écraser un fichier existant sans confirmation.",
+      "parameters": {
+        "linux": {
+          "keyType": {
+            "label": "Type de clé",
+            "description": "Algorithme de la nouvelle clé ; ed25519 est le choix moderne par défaut"
+          },
+          "keyName": {
+            "label": "Nom du fichier de clé",
+            "description": "Nom du fichier de la clé privée dans ~/.ssh ; la clé publique reçoit .pub"
+          },
+          "comment": {
+            "label": "Commentaire",
+            "description": "Commentaire enregistré dans la clé publique, en général le propriétaire et l'hôte"
+          }
+        }
+      },
+      "examples": {
+        "ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C ops@admin01": "Crée une clé Ed25519 pour un administrateur",
+        "ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_legacy -C legacy": "Crée une clé RSA de 4096 bits pour un hôte qui refuse Ed25519",
+        "ssh-keygen -p -f ~/.ssh/id_ed25519": "Change la phrase de passe d'une clé existante",
+        "ssh-keygen -lf ~/.ssh/id_ed25519.pub": "Affiche l'empreinte d'une clé publique"
+      }
+    }
+  }
+}

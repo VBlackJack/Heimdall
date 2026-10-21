@@ -1,0 +1,82 @@
+{
+  "id": "sssctl-show-domain-status",
+  "title": "Show the SSSD status of a domain",
+  "description": "Show whether SSSD is online for a domain and which domain controllers it is using.",
+  "category": "active-directory",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "sssctl",
+    "sssd",
+    "linux",
+    "domain",
+    "active-directory"
+  ],
+  "linuxCommandTemplateId": "sssctl-show-domain-status-cmd",
+  "linuxCommandTemplate": {
+    "id": "sssctl-show-domain-status-cmd",
+    "platform": 1,
+    "name": "sssctl",
+    "commandPattern": "sudo sssctl domain-status {domain}",
+    "parameters": [
+      {
+        "name": "domain",
+        "label": "Domain",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "SSSD domain name, as written in sssd.conf"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo sssctl domain-status example.com",
+      "description": "Check that SSSD is online for example.com",
+      "platform": 1
+    },
+    {
+      "command": "sudo sssctl domain-list",
+      "description": "List the domains SSSD serves",
+      "platform": 1
+    },
+    {
+      "command": "sudo sssctl user-checks alice@example.com",
+      "description": "Check that a domain user can be looked up and log in",
+      "platform": 1
+    },
+    {
+      "command": "sudo sss_cache -E",
+      "description": "Clear the SSSD cache after a change in the directory",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo and the sssd-tools package.",
+  "links": [
+    {
+      "title": "sssctl(8)",
+      "url": "https://manpages.debian.org/bookworm/sssd-tools/sssctl.8.en.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Afficher l'état SSSD d'un domaine",
+      "description": "Indique si SSSD est en ligne pour un domaine et quels contrôleurs de domaine il utilise.",
+      "notes": "Nécessite sudo et le paquet sssd-tools.",
+      "parameters": {
+        "linux": {
+          "domain": {
+            "label": "Domaine",
+            "description": "Nom de domaine SSSD, tel qu'écrit dans sssd.conf"
+          }
+        }
+      },
+      "examples": {
+        "sudo sssctl domain-status example.com": "Vérifie que SSSD est en ligne pour example.com",
+        "sudo sssctl domain-list": "Liste les domaines servis par SSSD",
+        "sudo sssctl user-checks alice@example.com": "Vérifie qu'un utilisateur du domaine est trouvé et peut se connecter",
+        "sudo sss_cache -E": "Vide le cache SSSD après une modification dans l'annuaire"
+      }
+    }
+  }
+}

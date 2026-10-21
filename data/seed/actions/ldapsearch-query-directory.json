@@ -1,0 +1,130 @@
+{
+  "id": "ldapsearch-query-directory",
+  "title": "Search an LDAP directory",
+  "description": "Search an LDAP directory or Active Directory under a base DN with a filter, after a simple bind.",
+  "category": "active-directory",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "ldapsearch",
+    "ldap",
+    "openldap",
+    "linux",
+    "active-directory"
+  ],
+  "linuxCommandTemplateId": "ldapsearch-query-directory-cmd",
+  "linuxCommandTemplate": {
+    "id": "ldapsearch-query-directory-cmd",
+    "platform": 1,
+    "name": "ldapsearch",
+    "commandPattern": "ldapsearch -H {uri} -x -D {bindDn} -W -b {baseDn} {filter} {attribute}",
+    "parameters": [
+      {
+        "name": "uri",
+        "label": "Server URI",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "LDAP server address, such as ldaps://dc01.example.com"
+      },
+      {
+        "name": "bindDn",
+        "label": "Bind DN",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Account used to bind, as a DN or as user@domain on Active Directory"
+      },
+      {
+        "name": "baseDn",
+        "label": "Base DN",
+        "type": "string",
+        "defaultValue": "",
+        "required": true,
+        "description": "Entry under which the search starts, such as DC=example,DC=com"
+      },
+      {
+        "name": "filter",
+        "label": "Filter",
+        "type": "string",
+        "defaultValue": "(objectClass=*)",
+        "required": true,
+        "description": "LDAP search filter"
+      },
+      {
+        "name": "attribute",
+        "label": "Attribute",
+        "type": "string",
+        "defaultValue": "cn",
+        "required": true,
+        "description": "Attribute to return for each entry"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "ldapsearch -H ldaps://dc01.example.com -x -D alice@example.com -W -b DC=example,DC=com '(sAMAccountName=jdoe)' memberOf",
+      "description": "Show the groups of an Active Directory user",
+      "platform": 1
+    },
+    {
+      "command": "ldapsearch -H ldap://ldap01.example.com -x -b dc=example,dc=com '(uid=jdoe)'",
+      "description": "Look up a user anonymously on OpenLDAP",
+      "platform": 1
+    },
+    {
+      "command": "ldapsearch -H ldaps://dc01.example.com -x -D alice@example.com -W -b OU=Servers,DC=example,DC=com '(objectClass=computer)' dNSHostName",
+      "description": "List the computer accounts of an OU",
+      "platform": 1
+    },
+    {
+      "command": "ldapsearch -H ldap://ldap01.example.com -x -s base -b '' namingContexts",
+      "description": "Find the naming contexts the server holds",
+      "platform": 1
+    }
+  ],
+  "notes": "Asks for the bind password. Ships with openldap-clients (RHEL) or ldap-utils (Debian); prefer ldaps:// so the password is not sent in clear.",
+  "links": [
+    {
+      "title": "ldapsearch(1)",
+      "url": "https://www.openldap.org/software/man.cgi?query=ldapsearch"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Rechercher dans un annuaire LDAP",
+      "description": "Recherche dans un annuaire LDAP ou Active Directory sous un DN de base avec un filtre, après une authentification simple.",
+      "notes": "Demande le mot de passe de connexion. Fourni par openldap-clients (RHEL) ou ldap-utils (Debian) ; préférer ldaps:// pour ne pas envoyer le mot de passe en clair.",
+      "parameters": {
+        "linux": {
+          "uri": {
+            "label": "URI du serveur",
+            "description": "Adresse du serveur LDAP, comme ldaps://dc01.example.com"
+          },
+          "bindDn": {
+            "label": "DN de connexion",
+            "description": "Compte utilisé pour la connexion, en DN ou en utilisateur@domaine sur Active Directory"
+          },
+          "baseDn": {
+            "label": "DN de base",
+            "description": "Entrée sous laquelle commence la recherche, comme DC=example,DC=com"
+          },
+          "filter": {
+            "label": "Filtre",
+            "description": "Filtre de recherche LDAP"
+          },
+          "attribute": {
+            "label": "Attribut",
+            "description": "Attribut à renvoyer pour chaque entrée"
+          }
+        }
+      },
+      "examples": {
+        "ldapsearch -H ldaps://dc01.example.com -x -D alice@example.com -W -b DC=example,DC=com '(sAMAccountName=jdoe)' memberOf": "Affiche les groupes d'un utilisateur Active Directory",
+        "ldapsearch -H ldap://ldap01.example.com -x -b dc=example,dc=com '(uid=jdoe)'": "Recherche un utilisateur de façon anonyme sur OpenLDAP",
+        "ldapsearch -H ldaps://dc01.example.com -x -D alice@example.com -W -b OU=Servers,DC=example,DC=com '(objectClass=computer)' dNSHostName": "Liste les comptes ordinateur d'une OU",
+        "ldapsearch -H ldap://ldap01.example.com -x -s base -b '' namingContexts": "Trouve les contextes de nommage du serveur"
+      }
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "id": "ufw-allow-port",
+  "title": "Allow a port in ufw",
+  "description": "Add a ufw rule that allows incoming traffic on a TCP or UDP port or range.",
+  "category": "security",
+  "platform": 1,
+  "level": 1,
+  "tags": [
+    "ufw",
+    "linux",
+    "firewall",
+    "port",
+    "ubuntu"
+  ],
+  "linuxCommandTemplateId": "ufw-allow-port-cmd",
+  "linuxCommandTemplate": {
+    "id": "ufw-allow-port-cmd",
+    "platform": 1,
+    "name": "ufw",
+    "commandPattern": "sudo ufw allow {port}/{protocol}",
+    "parameters": [
+      {
+        "name": "port",
+        "label": "Port or range",
+        "type": "string",
+        "defaultValue": "8080",
+        "required": true,
+        "description": "Port number, or a range such as 8000-8100"
+      },
+      {
+        "name": "protocol",
+        "label": "Protocol",
+        "type": "choice",
+        "allowedValues": [
+          "tcp",
+          "udp"
+        ],
+        "defaultValue": "tcp",
+        "required": true,
+        "description": "Transport protocol of the port"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo ufw allow 443/tcp",
+      "description": "Allow HTTPS",
+      "platform": 1
+    },
+    {
+      "command": "sudo ufw allow from 10.0.0.0/8 to any port 22 proto tcp",
+      "description": "Allow SSH from the internal network only",
+      "platform": 1
+    },
+    {
+      "command": "sudo ufw allow OpenSSH",
+      "description": "Allow an application profile",
+      "platform": 1
+    },
+    {
+      "command": "sudo ufw status numbered",
+      "description": "List the rules with their numbers",
+      "platform": 1
+    },
+    {
+      "command": "sudo ufw delete allow 8080/tcp",
+      "description": "Remove a rule added earlier",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. Allow SSH before running ufw enable on a remote host, or the session is cut.",
+  "links": [
+    {
+      "title": "ufw(8)",
+      "url": "https://manpages.debian.org/bookworm/ufw/ufw.8.en.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Autoriser un port dans ufw",
+      "description": "Ajoute une règle ufw qui autorise le trafic entrant sur un port ou une plage TCP ou UDP.",
+      "notes": "Nécessite sudo. Autoriser SSH avant ufw enable sur un hôte distant, sinon la session est coupée.",
+      "parameters": {
+        "linux": {
+          "port": {
+            "label": "Port ou plage",
+            "description": "Numéro de port, ou une plage comme 8000-8100"
+          },
+          "protocol": {
+            "label": "Protocole",
+            "description": "Protocole de transport du port"
+          }
+        }
+      },
+      "examples": {
+        "sudo ufw allow 443/tcp": "Autorise HTTPS",
+        "sudo ufw allow from 10.0.0.0/8 to any port 22 proto tcp": "Autorise SSH depuis le réseau interne seulement",
+        "sudo ufw allow OpenSSH": "Autorise un profil d'application",
+        "sudo ufw status numbered": "Liste les règles avec leur numéro",
+        "sudo ufw delete allow 8080/tcp": "Supprime une règle ajoutée précédemment"
+      }
+    }
+  }
+}

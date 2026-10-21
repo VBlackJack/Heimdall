@@ -1,0 +1,59 @@
+{
+  "id": "certbot-test-renewal",
+  "title": "Test the renewal of the Let's Encrypt certificates",
+  "description": "Simulate the renewal of every certificate against the staging server, without saving anything.",
+  "category": "security",
+  "platform": 1,
+  "level": 0,
+  "tags": [
+    "certbot",
+    "letsencrypt",
+    "acme",
+    "renewal",
+    "linux"
+  ],
+  "linuxCommandTemplateId": "certbot-test-renewal-cmd",
+  "linuxCommandTemplate": {
+    "id": "certbot-test-renewal-cmd",
+    "platform": 1,
+    "name": "certbot",
+    "commandPattern": "sudo certbot renew --dry-run",
+    "parameters": []
+  },
+  "examples": [
+    {
+      "command": "sudo certbot renew --dry-run",
+      "description": "Check that every renewal would succeed",
+      "platform": 1
+    },
+    {
+      "command": "sudo certbot renew --cert-name www.example.com --dry-run",
+      "description": "Test the renewal of one certificate",
+      "platform": 1
+    },
+    {
+      "command": "systemctl list-timers | grep certbot",
+      "description": "Check that the automatic renewal timer is scheduled",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. The dry run uses the Let's Encrypt staging server and does not run the deploy hooks.",
+  "links": [
+    {
+      "title": "Certbot user guide",
+      "url": "https://eff-certbot.readthedocs.io/en/stable/using.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Tester le renouvellement des certificats Let's Encrypt",
+      "description": "Simule le renouvellement de tous les certificats auprès du serveur de test, sans rien enregistrer.",
+      "notes": "Nécessite sudo. La simulation utilise le serveur de test de Let's Encrypt et n'exécute pas les hooks de déploiement.",
+      "examples": {
+        "sudo certbot renew --dry-run": "Vérifie que chaque renouvellement réussirait",
+        "sudo certbot renew --cert-name www.example.com --dry-run": "Teste le renouvellement d'un seul certificat",
+        "systemctl list-timers | grep certbot": "Vérifie que le minuteur de renouvellement automatique est planifié"
+      }
+    }
+  }
+}

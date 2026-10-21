@@ -1,0 +1,86 @@
+{
+  "id": "setenforce-set-mode",
+  "title": "Switch the SELinux mode",
+  "description": "Switch SELinux between enforcing and permissive until the next reboot.",
+  "category": "security",
+  "platform": 1,
+  "level": 2,
+  "tags": [
+    "setenforce",
+    "selinux",
+    "linux",
+    "security",
+    "rhel"
+  ],
+  "linuxCommandTemplateId": "setenforce-set-mode-cmd",
+  "linuxCommandTemplate": {
+    "id": "setenforce-set-mode-cmd",
+    "platform": 1,
+    "name": "setenforce",
+    "commandPattern": "sudo setenforce {mode}",
+    "parameters": [
+      {
+        "name": "mode",
+        "label": "Mode",
+        "type": "choice",
+        "allowedValues": [
+          "Enforcing",
+          "Permissive"
+        ],
+        "defaultValue": "Enforcing",
+        "required": true,
+        "description": "Enforcing blocks and logs denials, Permissive only logs them"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "command": "sudo setenforce Permissive",
+      "description": "Log denials without blocking, to diagnose an application",
+      "platform": 1
+    },
+    {
+      "command": "sudo setenforce Enforcing",
+      "description": "Turn enforcement back on after the diagnosis",
+      "platform": 1
+    },
+    {
+      "command": "sestatus",
+      "description": "Show the current and the configured mode",
+      "platform": 1
+    },
+    {
+      "command": "sudo semanage permissive -a httpd_t",
+      "description": "Make one domain permissive instead of the whole system",
+      "platform": 1
+    }
+  ],
+  "notes": "Requires sudo. Permissive removes a security barrier and Enforcing can stop mislabelled services; the boot mode is set in /etc/selinux/config.",
+  "links": [
+    {
+      "title": "setenforce(8)",
+      "url": "https://man7.org/linux/man-pages/man8/setenforce.8.html"
+    }
+  ],
+  "translations": {
+    "fr": {
+      "title": "Changer le mode SELinux",
+      "description": "Bascule SELinux entre enforcing et permissive jusqu'au prochain redémarrage.",
+      "notes": "Nécessite sudo. Permissive retire une barrière de sécurité et Enforcing peut arrêter des services mal étiquetés ; le mode au démarrage se règle dans /etc/selinux/config.",
+      "parameters": {
+        "linux": {
+          "mode": {
+            "label": "Mode",
+            "description": "Enforcing bloque et journalise les refus, Permissive les journalise seulement"
+          }
+        }
+      },
+      "examples": {
+        "sudo setenforce Permissive": "Journalise les refus sans bloquer, pour diagnostiquer une application",
+        "sudo setenforce Enforcing": "Réactive l'application des règles après le diagnostic",
+        "sestatus": "Affiche le mode actuel et le mode configuré",
+        "sudo semanage permissive -a httpd_t": "Rend un seul domaine permissif au lieu de tout le système"
+      }
+    }
+  }
+}
