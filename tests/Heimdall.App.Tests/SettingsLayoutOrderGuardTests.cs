@@ -254,11 +254,22 @@ public sealed class SettingsLayoutOrderGuardTests
             XElement viewer = section.Elements().Single(element => element.Name.LocalName == "ScrollViewer");
             Assert.Equal("Disabled", viewer.Attribute("HorizontalScrollBarVisibility")?.Value);
 
-            // The viewer fills the column so its scroll bar sits at the window edge; the panel
-            // inside caps the section width and keeps it against the rail instead of centring.
-            XElement panel = viewer.Elements().Single();
-            Assert.Equal("{StaticResource SettingsContentMaxWidth}", panel.Attribute("MaxWidth")?.Value);
-            Assert.Equal("Left", panel.Attribute("HorizontalAlignment")?.Value);
+            // The viewer fills the column so its scroll bar sits at the window edge. Inside it, one
+            // star column capped at the section width holds the panel: the cards fill the cap and
+            // stay against the rail. A left-aligned panel with a MaxWidth took its desired width
+            // instead, so each section's cards were as wide as their content.
+            XElement grid = viewer.Elements().Single();
+            Assert.Equal("Grid", grid.Name.LocalName);
+            XElement column = grid.Elements()
+                .Single(element => element.Name.LocalName == "Grid.ColumnDefinitions")
+                .Elements()
+                .Single();
+            Assert.Equal("*", column.Attribute("Width")?.Value);
+            Assert.Equal("{StaticResource SettingsContentMaxWidth}", column.Attribute("MaxWidth")?.Value);
+
+            XElement panel = grid.Elements().Single(element => element.Name.LocalName == "StackPanel");
+            Assert.Null(panel.Attribute("MaxWidth"));
+            Assert.Null(panel.Attribute("HorizontalAlignment"));
         });
 
         XDocument theme = XDocument.Load(

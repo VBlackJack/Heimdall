@@ -2997,7 +2997,11 @@
                                      Header="{loc:Translate SettingsGeneralSubTabAppearance}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -3101,13 +3105,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsGeneralSubTabBehavior" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabBehavior}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsBehaviorTitle" Text="{loc:Translate SettingsSectionBehavior}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3131,13 +3140,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsGeneralSubTabUpdates" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabUpdates}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsUpdatesTitle" Text="{loc:Translate SettingsSectionUpdates}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3226,13 +3240,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsGeneralSubTabFiles" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabFiles}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Settings file: preferences out and in, never secrets. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -3365,13 +3384,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsGeneralSubTabSharedSources" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabSharedSources}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Shared session sources: MobaXterm files other people edit, listed read-only in the
                                      tree. The status column says what the last read found. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -3534,13 +3558,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsGeneralSubTabOnboarding" controls:SettingsRail.Group="General"
                                      Header="{loc:Translate SettingsGeneralSubTabOnboarding}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Replaying the tour is the only way back into it. One reflex
                                      Escape used to end it permanently: Skip and Escape both call
                                      CompleteAsync, which persists OnboardingCompleted, and that
@@ -3576,6 +3605,7 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
 
@@ -3585,7 +3615,11 @@
                              Header="{loc:Translate SettingsSectionTerminal}"
                              Style="{StaticResource SettingsRailTabItemStyle}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                            <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                </Grid.ColumnDefinitions>
+                            <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -3648,6 +3682,7 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+                            </Grid>
                         </ScrollViewer>
                     </TabItem>
 
@@ -3657,7 +3692,11 @@
                                      Header="{loc:Translate SettingsSshSubTabConnection}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -3744,13 +3783,18 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSshSubTabSession" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabSession}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsSshSessionTitle" Text="{loc:Translate SettingsSectionSshSession}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3813,13 +3857,18 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSshSubTabSftpX11" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabSftpX11}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                         <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                             <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsSftpTitle" Text="{loc:Translate SettingsSectionSftp}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -3860,13 +3909,18 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSshSubTabHostKeys" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabHostKeys}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
@@ -4046,13 +4100,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSshSubTabGateways" controls:SettingsRail.Group="Ssh"
                                      Header="{loc:Translate SettingsSshSubTabGateways}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">
@@ -4106,6 +4165,7 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
 
@@ -4115,7 +4175,11 @@
                                          Header="{loc:Translate SettingsRdpSubTabDisplayAudio}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -4212,6 +4276,7 @@
                                     </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
 
@@ -4219,7 +4284,11 @@
                                          Header="{loc:Translate SettingsRdpSubTabDevices}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -4244,6 +4313,7 @@
                                     </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
 
@@ -4251,7 +4321,11 @@
                                          Header="{loc:Translate SettingsRdpSubTabPerformance}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
@@ -4297,6 +4371,7 @@
                                      </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
 
@@ -4304,7 +4379,11 @@
                                          Header="{loc:Translate SettingsRdpSubTabBehavior}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
 
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
                                     <Expander x:Name="Mw_SettingsRdpAdvancedTimeoutsExpander"
@@ -4420,13 +4499,18 @@
                                     </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
                                 <TabItem x:Name="Mw_SettingsRdpSubTabCertificates" controls:SettingsRail.Group="Rdp"
                                          Header="{loc:Translate SettingsRdpSubTabCertificates}"
                                          Style="{StaticResource SettingsRailTabItemStyle}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                        <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                            </Grid.ColumnDefinitions>
+                                        <StackPanel>
                                 <!-- Connection security sits with the certificate trust it governs, not under
                                      Performance, where NLA and strict server authentication used to be. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
@@ -4623,6 +4707,7 @@
                                     </StackPanel>
                                 </Border>
                                         </StackPanel>
+                                        </Grid>
                                     </ScrollViewer>
                                 </TabItem>
 
@@ -4632,7 +4717,11 @@
                                      Header="{loc:Translate SettingsSecuritySubTabOverview}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Security posture: the security-relevant choices of the whole panel, one
                                      line each, as they stand now including unsaved edits. Which state is
                                      risky is decided in SecurityPosture, not here. One row per line rather
@@ -4684,13 +4773,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSecuritySubTabVault" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabVault}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -4812,13 +4906,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSecuritySubTabCredentialProvider" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabCredentialProvider}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsCredProviderTitle" Text="{loc:Translate SettingsSectionCredentialProvider}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -4945,13 +5044,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSecuritySubTabConnectionChecks" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabConnectionChecks}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsConnectionChecksTitle" Text="{loc:Translate SettingsSectionConnectionChecks}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
@@ -4983,13 +5087,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSecuritySubTabWebCertificates" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabWebCertificates}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Web console certificates: the pins "Trust certificate" leaves behind, and the
                                      only way to take one back short of editing settings.json. -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,12">
@@ -5132,13 +5241,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsSecuritySubTabFileSharing" controls:SettingsRail.Group="Security"
                                      Header="{loc:Translate SettingsSecuritySubTabFileSharing}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- File Sharing -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
@@ -5158,6 +5272,7 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
 
@@ -5167,7 +5282,11 @@
                                      Header="{loc:Translate SettingsAdvancedSubTabDiagnostics}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Logging -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -5312,6 +5431,7 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
 
@@ -5319,7 +5439,11 @@
                                      Header="{loc:Translate SettingsAdvancedSubTabTools}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
 
                                 <!-- External Editor -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -5535,13 +5659,18 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
                             <TabItem x:Name="Mw_SettingsAdvancedSubTabCmdLibSync" controls:SettingsRail.Group="Advanced"
                                      Header="{loc:Translate SettingsAdvancedSubTabCmdLibSync}"
                                      Style="{StaticResource SettingsRailTabItemStyle}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Margin="{StaticResource SettingsTabContentMargin}" MaxWidth="{StaticResource SettingsContentMaxWidth}" HorizontalAlignment="Left">
+                                    <Grid Margin="{StaticResource SettingsTabContentMargin}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
+                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
                                 <!-- Command Library Git Sync -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -5613,6 +5742,7 @@
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>
+                                    </Grid>
                                 </ScrollViewer>
                             </TabItem>
 

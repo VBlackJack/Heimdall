@@ -794,6 +794,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// Keeps the open section in sight on the rail: a search jump or a "Go to setting" can open a
     /// section scrolled out of a short rail.
     /// </summary>
+    /// <remarks>
+    /// Bringing the first section of a group into view alone scrolled its group heading out above
+    /// it, so the rail showed "Appearance" under no group name. The heading is brought in too.
+    /// </remarks>
     private void OnSettingsRailSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // A combo box inside a section raises the same routed event through the rail.
@@ -803,7 +807,23 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => section.BringIntoView()));
+        TabItem? heading = SettingsRailHeadingAbove(Mw_SettingsSubTabControl, section);
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            section.BringIntoView();
+            heading?.BringIntoView();
+        }));
+    }
+
+    /// <summary>
+    /// The group heading right above <paramref name="section"/> on the rail, when the section is
+    /// the first of its group; null otherwise.
+    /// </summary>
+    internal static TabItem? SettingsRailHeadingAbove(ItemsControl rail, TabItem section)
+    {
+        ArgumentNullException.ThrowIfNull(rail);
+        int index = rail.Items.IndexOf(section);
+        return index > 0 && rail.Items[index - 1] is TabItem { Content: null } heading ? heading : null;
     }
 
     /// <summary>

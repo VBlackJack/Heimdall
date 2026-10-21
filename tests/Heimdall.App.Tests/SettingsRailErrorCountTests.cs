@@ -85,6 +85,28 @@ public sealed class SettingsRailErrorCountTests
         });
     }
 
+    /// <summary>
+    /// The first section of a group brings its heading into view with it; any other section
+    /// brings no heading.
+    /// </summary>
+    [Fact]
+    public void TheFirstSectionOfAGroupNamesTheHeadingAboveIt()
+    {
+        RunOnStaThread(() =>
+        {
+            TabControl rail = new();
+            TabItem general = new() { Header = "General" };
+            TabItem appearance = new() { Content = new StackPanel() };
+            TabItem behavior = new() { Content = new StackPanel() };
+            rail.Items.Add(general);
+            rail.Items.Add(appearance);
+            rail.Items.Add(behavior);
+
+            Assert.Same(general, MainWindow.SettingsRailHeadingAbove(rail, appearance));
+            Assert.Null(MainWindow.SettingsRailHeadingAbove(rail, behavior));
+        });
+    }
+
     private static TextBox Box(string path)
     {
         TextBox box = new();
