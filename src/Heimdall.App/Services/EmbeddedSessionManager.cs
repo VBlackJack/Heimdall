@@ -875,6 +875,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         ApplyQueuedReconnectAttempt(view, sessionTab);
 
         WireBroadcast(view);
+        WireSaveToLibrary(view, sessionTab);
         WireSplitRequested(view, sessionTab);
         WireReconnectRequested(view, sessionTab);
         WireSessionEnded(view, sessionTab);
@@ -947,6 +948,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         };
         view.InitializeSession(session, tab, displayName, string.Empty, keepAliveIntervalSeconds);
         WireBroadcast(view);
+        WireSaveToLibrary(view, tab);
         WireSplitRequested(view, tab);
         WireReconnectRequested(view, tab);
         WireSessionEnded(view, tab);
@@ -992,6 +994,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         }
 
         WireBroadcast(view);
+        WireSaveToLibrary(view, tab);
         WireSplitRequested(view, tab);
         WireReconnectRequested(view, tab);
         WireSessionEnded(view, tab);
@@ -1053,6 +1056,69 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         {
             view.SetBroadcastIndicator(true);
         }
+    }
+
+    private void WireSaveToLibrary(EmbeddedSshView view, SessionTabViewModel tab)
+    {
+        view.SaveToLibraryRequested += selection => _ = OpenLibraryWithCaptureAsync(tab, view.OwningPane, selection);
+    }
+
+    /// <summary>
+    /// Opens the Command Library editor prefilled with text selected in a terminal of
+    /// <paramref name="tab"/>, through <see cref="OpenToolCallback"/>.
+    /// </summary>
+    /// <param name="tab">The session tab the terminal belongs to.</param>
+    /// <param name="pane">The terminal's pane, or null when the tab is not split.</param>
+    /// <param name="selection">The selection as the terminal page posted it.</param>
+    internal async Task OpenLibraryWithCaptureAsync(SessionTabViewModel tab, SessionPaneModel? pane, string selection)
+    {
+        var callback = OpenToolCallback;
+        if (callback is null)
+        {
+            return;
+        }
+
+        ToolContext? context = BuildCaptureContext(tab, pane, selection);
+        if (context is null)
+        {
+            return;
+        }
+
+        var descriptor = _toolRegistry.GetById(ToolRegistry.CommandLibraryToolId);
+        string title = descriptor is null ? ToolRegistry.CommandLibraryToolId : _localizer[descriptor.LabelKey];
+        try
+        {
+            await callback(ToolRegistry.CommandLibraryToolId, title, context);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSessionManager could not open the library with a capture: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The context a capture opens the library with: the session facts of the terminal's own
+    /// profile, as <see cref="CreateToolControl"/> gives a library docked beside it, plus the
+    /// selection as one command line for the platform the session resolves to.
+    /// </summary>
+    /// <returns>Null when the selection holds nothing but whitespace.</returns>
+    internal ToolContext? BuildCaptureContext(SessionTabViewModel tab, SessionPaneModel? pane, string selection)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+
+        var context = WithSessionProfile(new ToolContext(), ResolveSessionProfile(tab, pane)) ?? new ToolContext();
+        if (string.IsNullOrWhiteSpace(context.ConnectionType))
+        {
+            string? connectionType = pane?.ConnectionType;
+            context = context with
+            {
+                ConnectionType = string.IsNullOrWhiteSpace(connectionType) ? tab.ConnectionType : connectionType
+            };
+        }
+
+        RemoteOs platform = CommandCapture.ResolvePlatform(context.RemoteOs, context.ConnectionType);
+        string commandLine = CommandCapture.ToCommandLine(selection, platform);
+        return commandLine.Length == 0 ? null : context with { InitialCommandText = commandLine };
     }
 
     private EmbeddedSftpView CreateSftpView(
@@ -1650,6 +1716,17 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     /// </remarks>
     private ServerProfileDto? ResolveSessionProfile(SessionTabViewModel sessionTab)
     {
+        var sinkPane = SplitTreeHelper.EnumerateLeaves(sessionTab.RootContent)
+            .FirstOrDefault(pane => pane.HostControl is ITerminalCommandSink);
+        return ResolveSessionProfile(sessionTab, sinkPane);
+    }
+
+    /// <summary>
+    /// The profile behind <paramref name="pane"/> of <paramref name="sessionTab"/>; the tab's
+    /// primary pane when <paramref name="pane"/> is null.
+    /// </summary>
+    private ServerProfileDto? ResolveSessionProfile(SessionTabViewModel sessionTab, SessionPaneModel? pane)
+    {
         if (ConnectionTypeCatalog.IsToolConnectionType(sessionTab.ConnectionType))
         {
             return null;
@@ -1660,9 +1737,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             return snapshot;
         }
 
-        var sinkPane = SplitTreeHelper.EnumerateLeaves(sessionTab.RootContent)
-            .FirstOrDefault(pane => pane.HostControl is ITerminalCommandSink);
-        var profileId = sessionTab.ProfileLookupServerIdFor(sinkPane);
+        var profileId = sessionTab.ProfileLookupServerIdFor(pane);
         return string.IsNullOrWhiteSpace(profileId) ? null : ProfileResolver?.Invoke(profileId);
     }
 
