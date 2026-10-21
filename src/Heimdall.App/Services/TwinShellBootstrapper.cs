@@ -31,6 +31,7 @@ using TwinShell.Persistence;
 using TwinShell.Persistence.Repositories;
 using TwinShell.Persistence.Schema;
 using TwinShell.Persistence.Security;
+using TwinShell.Persistence.Seeding;
 using ActionModel = TwinShell.Core.Models.Action;
 
 namespace Heimdall.App.Services;
@@ -121,15 +122,7 @@ internal static class TwinShellBootstrapper
 
         await PruneCommandHistoryAsync(scope.ServiceProvider);
 
-        // Seed only if the database is empty
         var repo = scope.ServiceProvider.GetRequiredService<IActionRepository>();
-        var count = await repo.CountAsync();
-        if (count > 0)
-        {
-            Heimdall.Core.Logging.FileLogger.Info(
-                $"[TwinShell] Command library ready ({count} actions)");
-            return;
-        }
 
         // Locate seed files: prefer output-dir copy, fall back to AppData
         var seedDir = Path.Combine(
@@ -143,7 +136,7 @@ internal static class TwinShellBootstrapper
         if (!Directory.Exists(seedDir))
         {
             Heimdall.Core.Logging.FileLogger.Warn(
-                "[TwinShell] No seed directory found - command library will be empty");
+                "[TwinShell] No seed directory found - command library keeps what it holds");
             return;
         }
 
@@ -151,6 +144,17 @@ internal static class TwinShellBootstrapper
             .Where(f => !Path.GetFileName(f).StartsWith('_'))
             .OrderBy(f => f)
             .ToArray();
+
+        // The seed reaches a database whenever it differs from the one last applied, not
+        // only on the first launch: see SystemSeedRefresher.
+        var seedHash = SeedCatalogueHash.Compute(jsonFiles);
+        var refresher = new SystemSeedRefresher(context);
+        if (string.Equals(await refresher.ReadAppliedHashAsync(), seedHash, StringComparison.Ordinal))
+        {
+            Heimdall.Core.Logging.FileLogger.Info(
+                $"[TwinShell] Command library ready ({await repo.CountAsync()} actions)");
+            return;
+        }
 
         var options = JsonOptionsHelper.CaseInsensitive;
         var validActions = new List<ActionModel>(jsonFiles.Length);
@@ -183,19 +187,30 @@ internal static class TwinShellBootstrapper
             }
         }
 
-        // Single-transaction batch insert: one SaveChanges for the whole seed instead of
-        // ~514 serialized AddAsync transactions on the awaited startup path. The seed runs
-        // only on an empty DB, so AddRangeAsync's within-batch template dedup is sufficient.
-        // Atomicity tradeoff: a DbUpdateException (e.g. a duplicate Id across two seed files)
-        // now fails the whole seed rather than skipping a single row. This is acceptable and
-        // arguably preferable (all-or-nothing) for curated, version-controlled seed data.
-        if (validActions.Count > 0)
+        // An empty parse is a broken install, not an empty catalogue: applying it would delete
+        // every shipped action.
+        if (validActions.Count == 0)
         {
-            await repo.AddRangeAsync(validActions);
+            Heimdall.Core.Logging.FileLogger.Warn(
+                $"[TwinShell] No valid seed action in {jsonFiles.Length} files - command library keeps what it holds");
+            return;
         }
 
-        Heimdall.Core.Logging.FileLogger.Info(
-            $"[TwinShell] Seeded {validActions.Count} actions from {jsonFiles.Length} files");
+        // One transaction for the whole refresh: a failure (a duplicate id across two seed
+        // files, say) rolls back and leaves the previous catalogue in place, so the library
+        // still opens on what it had.
+        try
+        {
+            var result = await refresher.RefreshAsync(validActions, seedHash);
+            Heimdall.Core.Logging.FileLogger.Info(
+                $"[TwinShell] Seed applied from {jsonFiles.Length} files: {result.Inserted} inserted, "
+                + $"{result.Updated} updated, {result.Removed} removed, {result.FavoritesRemoved} orphan favorite(s) removed");
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Error(
+                "[TwinShell] Seed refresh failed and was rolled back; the previous catalogue is kept", ex);
+        }
     }
 
     /// <summary>

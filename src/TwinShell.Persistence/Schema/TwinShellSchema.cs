@@ -22,6 +22,7 @@ using Heimdall.Core.Logging;
 using TwinShell.Core.Enums;
 using TwinShell.Core.Helpers;
 using TwinShell.Core.Models;
+using TwinShell.Persistence.Configurations;
 
 namespace TwinShell.Persistence.Schema;
 
@@ -101,7 +102,11 @@ public static class TwinShellSchema
         new SchemaStep(
             5,
             "Translated parameter and example columns on ActionTranslations",
-            ApplyTranslationTextColumnsAsync)
+            ApplyTranslationTextColumnsAsync),
+        new SchemaStep(
+            6,
+            "SeedState table recording the seed last applied",
+            ApplySeedStateTableAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -202,6 +207,27 @@ public static class TwinShellSchema
                 cancellationToken);
         }
     }
+
+    /// <summary>
+    /// Creates the <c>SeedState</c> key-value table that records the content hash of the seed
+    /// last applied, so a changed seed reaches a database seeded by an older build.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent through <c>IF NOT EXISTS</c>: on a database <c>EnsureCreated</c> has just
+    /// written from today's model, the table is already there. No row is written: a missing
+    /// hash on a populated database is what tells the refresh to run once.
+    /// </remarks>
+    private static Task ApplySeedStateTableAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+        => ExecuteNonQueryAsync(
+            connection,
+            transaction,
+            "CREATE TABLE IF NOT EXISTS \"" + SeedStateConfiguration.TableName + "\" ("
+            + "\"Key\" TEXT NOT NULL CONSTRAINT \"PK_" + SeedStateConfiguration.TableName + "\" PRIMARY KEY, "
+            + "\"Value\" TEXT NOT NULL)",
+            cancellationToken);
 
     private static async Task ApplyUnwrapDoubleQuotedPlaceholdersAsync(
         DbConnection connection,
