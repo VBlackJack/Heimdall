@@ -1,7 +1,7 @@
 {
   "id": "systemctl-disable",
-  "title": "Désactiver un service au démarrage",
-  "description": "Empêche un service de démarrer automatiquement au boot",
+  "title": "Disable a service at boot",
+  "description": "Prevent a service from starting automatically at boot",
   "category": "services-automation",
   "platform": 1,
   "level": 1,
@@ -20,46 +20,68 @@
     "parameters": [
       {
         "name": "service",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "nginx.service",
         "required": true,
-        "description": "Nom de l'unité systemd à désactiver"
+        "description": "Name of the systemd unit to disable"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo systemctl disable nginx",
-      "description": "Désactive nginx au démarrage",
+      "description": "Disable nginx at boot",
       "platform": 1
     },
     {
       "command": "sudo systemctl disable --now nginx",
-      "description": "Désactive et arrête immédiatement",
+      "description": "Disable and stop immediately",
       "platform": 1
     },
     {
       "command": "systemctl disable nginx.service",
-      "description": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à désactiver. Remplacez spooler par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'service' parameter: Name of the systemd unit to disable. Replace spooler with the value that fits your environment.",
       "platform": 1
     },
     {
       "command": "sudo systemctl disable apache2",
-      "description": "Désactive apache2 au démarrage",
+      "description": "Disable apache2 at boot",
       "platform": 1
     },
     {
       "command": "sudo systemctl disable wuauserv",
-      "description": "Exemple utilisant le paramètre 'serviceName': Nom du service à désactiver au démarrage. Remplacez wuauserv par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'serviceName' parameter: Name of the service to disable at boot. Replace wuauserv with the value that fits your environment.",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. N'arrête pas le service s'il est en cours d'exécution (sauf avec --now).",
+  "notes": "Requires sudo. Does not stop the service if it is running (except with --now).",
   "links": [
     {
       "title": "systemctl disable",
       "url": "https://www.freedesktop.org/software/systemd/man/systemctl.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Désactiver un service au démarrage",
+      "description": "Empêche un service de démarrer automatiquement au boot",
+      "notes": "Nécessite sudo. N'arrête pas le service s'il est en cours d'exécution (sauf avec --now).",
+      "parameters": {
+        "linux": {
+          "service": {
+            "label": "Nom du service",
+            "description": "Nom de l'unité systemd à désactiver"
+          }
+        }
+      },
+      "examples": {
+        "sudo systemctl disable nginx": "Désactive nginx au démarrage",
+        "sudo systemctl disable --now nginx": "Désactive et arrête immédiatement",
+        "systemctl disable nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à désactiver. Remplacez spooler par la valeur appropriée selon votre environnement.",
+        "sudo systemctl disable apache2": "Désactive apache2 au démarrage",
+        "sudo systemctl disable wuauserv": "Exemple utilisant le paramètre 'serviceName': Nom du service à désactiver au démarrage. Remplacez wuauserv par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

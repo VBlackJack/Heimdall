@@ -1,7 +1,7 @@
 {
   "id": "systemctl-reload",
-  "title": "Recharger la configuration d'un service",
-  "description": "Recharge la configuration du service sans l'arrêter (si supporté)",
+  "title": "Reload the configuration of a service",
+  "description": "Reload the service configuration without stopping it (when supported)",
   "category": "services-automation",
   "platform": 1,
   "level": 1,
@@ -20,36 +20,56 @@
     "parameters": [
       {
         "name": "service",
-        "label": "Nom du service",
+        "label": "Service name",
         "type": "string",
         "defaultValue": "nginx.service",
         "required": true,
-        "description": "Nom de l'unité systemd à recharger"
+        "description": "Name of the systemd unit to reload"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo systemctl reload nginx",
-      "description": "Recharge la config nginx sans interruption",
+      "description": "Reload the nginx configuration without interruption",
       "platform": 1
     },
     {
       "command": "sudo systemctl reload-or-restart nginx",
-      "description": "Recharge ou redémarre si reload non supporté",
+      "description": "Reload, or restart if reload is not supported",
       "platform": 1
     },
     {
       "command": "systemctl reload nginx.service",
-      "description": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à recharger. Remplacez spooler par la valeur appropriée selon votre environnement.",
+      "description": "Example using the 'service' parameter: Name of the systemd unit to reload. Replace spooler with the value that fits your environment.",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. Plus rapide que restart. Tous les services ne supportent pas reload.",
+  "notes": "Requires sudo. Faster than restart. Not every service supports reload.",
   "links": [
     {
       "title": "systemctl reload",
       "url": "https://www.freedesktop.org/software/systemd/man/systemctl.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Recharger la configuration d'un service",
+      "description": "Recharge la configuration du service sans l'arrêter (si supporté)",
+      "notes": "Nécessite sudo. Plus rapide que restart. Tous les services ne supportent pas reload.",
+      "parameters": {
+        "linux": {
+          "service": {
+            "label": "Nom du service",
+            "description": "Nom de l'unité systemd à recharger"
+          }
+        }
+      },
+      "examples": {
+        "sudo systemctl reload nginx": "Recharge la config nginx sans interruption",
+        "sudo systemctl reload-or-restart nginx": "Recharge ou redémarre si reload non supporté",
+        "systemctl reload nginx.service": "Exemple utilisant le paramètre 'service': Nom de l'unité systemd à recharger. Remplacez spooler par la valeur appropriée selon votre environnement."
+      }
+    }
+  }
 }

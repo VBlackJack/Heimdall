@@ -1,7 +1,7 @@
 {
   "id": "systemctl-list-services",
-  "title": "Lister tous les services systemd",
-  "description": "Affiche la liste de toutes les unités de type service",
+  "title": "List every systemd service",
+  "description": "Show the list of every unit of type service",
   "category": "services-automation",
   "platform": 1,
   "level": 0,
@@ -20,36 +20,56 @@
     "parameters": [
       {
         "name": "state",
-        "label": "État",
+        "label": "State",
         "type": "string",
         "defaultValue": "running",
         "required": true,
-        "description": "État à filtrer (running, failed, active, inactive, all)"
+        "description": "State to filter on (running, failed, active, inactive, all)"
       }
     ]
   },
   "examples": [
     {
       "command": "systemctl list-units --type=service --state=running",
-      "description": "Liste tous les services en cours d'exécution",
+      "description": "List every running service",
       "platform": 1
     },
     {
       "command": "systemctl list-units --type=service --state=failed",
-      "description": "Liste les services en échec",
+      "description": "List the failed services",
       "platform": 1
     },
     {
       "command": "systemctl list-unit-files --type=service",
-      "description": "Liste tous les fichiers d'unités service",
+      "description": "List every service unit file",
       "platform": 1
     }
   ],
-  "notes": "Ne nécessite pas sudo. --all affiche aussi les unités inactives.",
+  "notes": "Does not require sudo. --all also shows inactive units.",
   "links": [
     {
       "title": "systemctl list-units",
       "url": "https://www.freedesktop.org/software/systemd/man/systemctl.html"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Lister tous les services systemd",
+      "description": "Affiche la liste de toutes les unités de type service",
+      "notes": "Ne nécessite pas sudo. --all affiche aussi les unités inactives.",
+      "parameters": {
+        "linux": {
+          "state": {
+            "label": "État",
+            "description": "État à filtrer (running, failed, active, inactive, all)"
+          }
+        }
+      },
+      "examples": {
+        "systemctl list-units --type=service --state=running": "Liste tous les services en cours d'exécution",
+        "systemctl list-units --type=service --state=failed": "Liste les services en échec",
+        "systemctl list-unit-files --type=service": "Liste tous les fichiers d'unités service"
+      }
+    }
+  }
 }
