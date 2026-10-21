@@ -20,8 +20,8 @@ using Color = System.Windows.Media.Color;
 namespace Heimdall.App.Theming;
 
 /// <summary>
-/// The colours the theme bridge paints semantic and accent text with, derived from the active
-/// theme so that each one is readable on the window background and on a card.
+/// The colours the theme bridge paints semantic and accent text and boundary lines with, derived
+/// from the active theme so that each one stands out on the window background and on a card.
 /// </summary>
 /// <remarks>
 /// <para>A ThemeForge palette gives one colour per meaning (error, warning, success, info,
@@ -31,11 +31,17 @@ namespace Heimdall.App.Theming;
 /// grounds (lighter on a dark theme, darker on a light one), one small step at a time, and stops
 /// at the first value readable on both grounds. A theme colour that already passes is returned
 /// unchanged, byte for byte.</para>
+/// <para>Each pair carries its own target: text asks 4.5 to 1 (WCAG 1.4.3), a boundary line that
+/// identifies a region asks 3 to 1 (WCAG 1.4.11). On Drakul the border colour is the card colour
+/// itself, 1.00 to 1 on a card.</para>
 /// </remarks>
 internal static class ThemeTextColours
 {
     /// <summary>The WCAG 1.4.3 minimum for body text.</summary>
     internal const double MinimumContrast = 4.5;
+
+    /// <summary>The WCAG 1.4.11 minimum for a boundary that identifies a component or a region.</summary>
+    internal const double MinimumBoundaryContrast = 3.0;
 
     /// <summary>The theme key of the window background.</summary>
     internal const string BackgroundKey = "BackgroundColor";
@@ -61,15 +67,17 @@ internal static class ThemeTextColours
     private const double ChannelMaximum = 255.0;
 
     /// <summary>
-    /// Each theme colour and the resource key of the text colour derived from it.
+    /// Each theme colour, the resource key of the colour derived from it, and the contrast the
+    /// derived colour must reach against both grounds.
     /// </summary>
-    internal static IReadOnlyList<(string SourceKey, string TextKey)> Pairs { get; } =
+    internal static IReadOnlyList<(string SourceKey, string TextKey, double Target)> Pairs { get; } =
     [
-        ("ErrorColor", "ErrorTextColor"),
-        ("WarningColor", "WarningTextColor"),
-        ("SuccessColor", "SuccessTextColor"),
-        ("InfoColor", "InfoTextColor"),
-        ("AccentColor", "AccentTextColor"),
+        ("ErrorColor", "ErrorTextColor", MinimumContrast),
+        ("WarningColor", "WarningTextColor", MinimumContrast),
+        ("SuccessColor", "SuccessTextColor", MinimumContrast),
+        ("InfoColor", "InfoTextColor", MinimumContrast),
+        ("AccentColor", "AccentTextColor", MinimumContrast),
+        ("BorderColor", "BorderStrongColor", MinimumBoundaryContrast),
     ];
 
     /// <summary>
@@ -89,25 +97,26 @@ internal static class ThemeTextColours
             return;
         }
 
-        foreach ((string sourceKey, string textKey) in Pairs)
+        foreach ((string sourceKey, string textKey, double contrast) in Pairs)
         {
             if (find(sourceKey) is Color source)
             {
-                target[textKey] = Derive(source, background, card);
+                target[textKey] = Derive(source, background, card, contrast);
             }
         }
     }
 
     /// <summary>
     /// The colour closest to <paramref name="colour"/>, same hue and saturation, that reaches
-    /// <see cref="MinimumContrast"/> against both grounds; the colour itself when it already does.
+    /// <paramref name="target"/> against both grounds; the colour itself when it already does.
     /// </summary>
     /// <param name="colour">The theme's own colour for the meaning.</param>
     /// <param name="background">The window background.</param>
     /// <param name="card">The card surface.</param>
-    internal static Color Derive(Color colour, Color background, Color card)
+    /// <param name="target">The contrast to reach; <see cref="MinimumContrast"/> for text.</param>
+    internal static Color Derive(Color colour, Color background, Color card, double target = MinimumContrast)
     {
-        if (IsReadable(colour, background, card))
+        if (IsReadable(colour, background, card, target))
         {
             return colour;
         }
@@ -121,7 +130,7 @@ internal static class ThemeTextColours
                 ? Math.Min(1.0, lightness + (step * LightnessStep))
                 : Math.Max(0.0, lightness - (step * LightnessStep));
             candidate = FromHsl(hue, saturation, moved, colour.A);
-            if (IsReadable(candidate, background, card))
+            if (IsReadable(candidate, background, card, target))
             {
                 return candidate;
             }
@@ -140,9 +149,9 @@ internal static class ThemeTextColours
         return (Math.Max(a, b) + LuminanceFlare) / (Math.Min(a, b) + LuminanceFlare);
     }
 
-    private static bool IsReadable(Color colour, Color background, Color card) =>
-        ContrastRatio(colour, background) >= MinimumContrast
-        && ContrastRatio(colour, card) >= MinimumContrast;
+    private static bool IsReadable(Color colour, Color background, Color card, double target) =>
+        ContrastRatio(colour, background) >= target
+        && ContrastRatio(colour, card) >= target;
 
     private static double RelativeLuminance(Color colour) =>
         (RedWeight * Linear(colour.R)) + (GreenWeight * Linear(colour.G)) + (BlueWeight * Linear(colour.B));
