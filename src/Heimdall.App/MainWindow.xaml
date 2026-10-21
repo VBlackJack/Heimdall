@@ -2459,17 +2459,6 @@
                     </StackPanel>
                 </DockPanel>
 
-                <!-- Manage gateways link -->
-                <Button x:Name="Mw_TunnelsManageGatewaysLink" DockPanel.Dock="Bottom"
-                        Content="{loc:Translate TunnelsManageGatewaysLink}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Foreground="{DynamicResource AccentBrush}"
-                        HorizontalAlignment="Center"
-                        Margin="0,8,0,8"
-                        Click="OnNavigateToGatewaySettings"
-                        AutomationProperties.Name="{loc:Translate TunnelsManageGatewaysLink}"/>
-
                 <Grid>
                     <!-- Tunnel DataGrid -->
                     <DataGrid ItemsSource="{Binding Tunnels.List}"
@@ -2563,12 +2552,53 @@
                     </DataGrid>
 
                     <!-- Empty state -->
-                    <TextBlock x:Name="Mw_TunnelsEmpty" Text="{loc:Translate TunnelsEmptyState}"
-                               FontSize="{StaticResource FontSizeBodyLarge}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Visibility="{Binding Tunnels.HasNoTunnels, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <Border Style="{StaticResource EmptyStateStyle}"
+                            Background="{DynamicResource CardBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource CornerRadiusXl}"
+                            Visibility="{Binding Tunnels.HasNoTunnels, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Border Width="56" Height="56"
+                                    CornerRadius="28"
+                                    Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,0,0,14">
+                                <TextBlock Text="&#xE71B;"
+                                           FontFamily="{StaticResource FontFamilyIcons}"
+                                           FontSize="{StaticResource IconSizeLarge}"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock x:Name="Mw_TunnelsEmpty" Text="{loc:Translate TunnelsEmptyState}"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold"
+                                       FontSize="{StaticResource FontSizeSubtitle}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,6"/>
+                            <!-- Manage gateways link -->
+                            <Button x:Name="Mw_TunnelsManageGatewaysLink"
+                                    Content="{loc:Translate TunnelsManageGatewaysLink}"
+                                    Style="{DynamicResource GhostButtonStyle}"
+                                    FontSize="{StaticResource FontSizeCaption}"
+                                    Foreground="{DynamicResource AccentBrush}"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,0,0,16"
+                                    Click="OnNavigateToGatewaySettings"
+                                    AutomationProperties.Name="{loc:Translate TunnelsManageGatewaysLink}"/>
+                            <Button x:Name="Mw_TunnelsEmptyNewBtn" Content="{loc:Translate TunnelsBtnNew}"
+                                    Command="{Binding Tunnels.NewTunnelCommand}"
+                                    Style="{DynamicResource PrimaryButtonStyle}"
+                                    Padding="14,6" FontSize="{StaticResource FontSizeBody}"
+                                    HorizontalAlignment="Center"
+                                    AutomationProperties.Name="{loc:Translate TunnelsBtnNew}"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </DockPanel>
 
@@ -2638,19 +2668,43 @@
                     </DataGrid>
 
                     <!-- Empty state -->
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
-                                Visibility="{Binding Scheduled.HasNoTasks, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock x:Name="Mw_ScheduledEmpty" Text="{loc:Translate ScheduledEmptyState}"
-                                   FontSize="{StaticResource FontSizeBodyLarge}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                        <Button x:Name="Mw_ScheduledCreateBtn" Content="{loc:Translate ScheduledEmptyAddButton}"
-                                Command="{Binding Scheduled.AddTaskCommand}"
-                                Style="{DynamicResource PrimaryButtonStyle}"
-                                Padding="12,6" FontSize="{StaticResource FontSizeBody}"
-                                HorizontalAlignment="Center"
-                                AutomationProperties.Name="{loc:Translate AccessScheduledCreate}"/>
-                    </StackPanel>
+                    <Border Style="{StaticResource EmptyStateStyle}"
+                            Background="{DynamicResource CardBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource CornerRadiusXl}"
+                            Visibility="{Binding Scheduled.HasNoTasks, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Border Width="56" Height="56"
+                                    CornerRadius="28"
+                                    Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,0,0,14">
+                                <TextBlock Text="&#xE787;"
+                                           FontFamily="{StaticResource FontFamilyIcons}"
+                                           FontSize="{StaticResource IconSizeLarge}"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock x:Name="Mw_ScheduledEmpty" Text="{loc:Translate ScheduledEmptyState}"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold"
+                                       FontSize="{StaticResource FontSizeSubtitle}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,16"/>
+                            <Button x:Name="Mw_ScheduledCreateBtn" Content="{loc:Translate ScheduledEmptyAddButton}"
+                                    Command="{Binding Scheduled.AddTaskCommand}"
+                                    Style="{DynamicResource PrimaryButtonStyle}"
+                                    Padding="14,6" FontSize="{StaticResource FontSizeBody}"
+                                    HorizontalAlignment="Center"
+                                    AutomationProperties.Name="{loc:Translate AccessScheduledCreate}"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </DockPanel>
 
