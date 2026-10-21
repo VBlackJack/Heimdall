@@ -179,10 +179,13 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Les actions livrées suivent la version installée : quand une mise à jour modifie le catalogue, les actions livrées sont remplacées au lancement suivant, tandis que vos propres actions, les favoris et l'historique des actions toujours livrées sont conservés
 
 **Construire la commande**
-- Paramètres typés : texte, entier, booléen, nom d'hôte, adresse IP, chemin, et **choice** (un jeu fixe de valeurs proposé en liste déroulante)
+- Paramètres typés : texte, entier, nombre, lettre de lecteur, booléen, nom d'hôte, adresse IP, chemin, et **choice** (un jeu fixe de valeurs proposé en liste déroulante)
 - Un paramètre choice n'accepte que ce qu'il propose, la correspondance ignorant la casse et les espaces autour ; savoir si une valeur peut être absente reste du ressort de l'indicateur Requis du paramètre
 - L'éditeur signale quand le motif de commande et les paramètres déclarés divergent : un `{placeholder}` sans paramètre, ou un paramètre que le motif n'utilise jamais. Il avertit et ne bloque jamais, parce que les accolades sont de la ponctuation shell ordinaire
 - Aperçu en direct de la commande générée, avec échappement shell appliqué aux valeurs substituées
+- Une valeur qu'aucun shell ne lit de façon particulière (`8080`, `/var/log/syslog`, `id_ed25519`) entre sans guillemets, si bien que `--add-port={port}/{protocol}` donne `--add-port=8080/tcp` ; tout ce qui contient une espace, un guillemet ou un caractère shell garde ses guillemets
+- Un paramètre facultatif laissé vide est retiré de la commande, avec l'espace qu'il laisse, au lieu d'être passé comme un argument vide `''` ; un paramètre requis laissé vide reste refusé
+- Les commandes générées vont jusqu'à 4 096 caractères, à partir de motifs jusqu'à 4 000 caractères et de valeurs de paramètre jusqu'à 1 024
 - Ouverte depuis une session, la bibliothèque préremplit un paramètre d'hôte avec l'hôte de la session et un paramètre d'utilisateur (`user`, `username`, `login`, `account`, `samaccountname`) avec le nom d'utilisateur de la session ; la valeur par défaut du paramètre est conservée quand la session n'a pas d'utilisateur
 
 **L'exécuter**
@@ -203,9 +206,11 @@ paramètres et un générateur qui produit la commande finale à votre place.
 **Partager**
 - L'export demande d'abord ce que le fichier doit contenir : **Mes actions** (par défaut : les actions que vous avez créées ou importées), **Filtre actuel** (ce que la liste montre, recherche comprise) ou **Tout** (le catalogue fourni compris) ; l'avertissement sur les secrets des champs libres suit ce choix
 - Import et export en JSON, et synchronisation Git pour une bibliothèque d'équipe ; **Synchroniser au démarrage** s'exécute une fois après le déverrouillage du coffre, et un échec est signalé dans la barre d'état
+- Après une synchronisation, la barre de titre de la bibliothèque indique combien de vos actions ont été gardées en local parce que votre copie était plus récente que celle du dépôt ; leurs titres figurent dans son info-bulle et dans le résumé de la synchronisation
+- Le nom et l'adresse e-mail d'auteur de la synchronisation Git partent de votre identité `git config --global` quand Git est installé et que les champs portent encore leurs valeurs par défaut ; rien n'est écrit avant que vous enregistriez
 - Les actions issues d'un import voient leur niveau de risque et leur plateforme ramenés à des valeurs connues : un niveau non reconnu est traité comme dangereux plutôt qu'anodin
 - Un export conserve le texte anglais de chaque action avec ses traductions ; un export pris avant la localisation des catégories s'importe dans les catégories actuelles
-- **Pack d'allègement pour poste de travail** : 72 actions qui épurent un poste Windows personnel (applications du Store, Edge, OneDrive, télémétrie, réglages de performances) sont livrées à part du catalogue, dans `data/packs/windows-workstation-debloat.json` du dossier d'installation. Importez ce fichier avec le bouton Importer de la bibliothèque si vous les voulez. Elles visent un poste de travail, pas un serveur ; elles arrivent comme vos propres actions, que vous pouvez donc modifier et exporter ; leur texte est pour l'instant en français seulement ; et neuf d'entre elles s'ouvrent sur une erreur de longueur de commande tant que leurs scripts n'ont pas été réécrits
+- **Pack d'allègement pour poste de travail** : 72 actions qui épurent un poste Windows personnel (applications du Store, Edge, OneDrive, télémétrie, réglages de performances) sont livrées à part du catalogue, dans `data/packs/windows-workstation-debloat.json` du dossier d'installation. Importez ce fichier avec le bouton Importer de la bibliothèque si vous les voulez. Elles visent un poste de travail, pas un serveur ; elles arrivent comme vos propres actions, que vous pouvez donc modifier et exporter ; et leur texte est pour l'instant en français seulement. Toutes se génèrent, le plus long script compris
 
 ### Connexion rapide (Ctrl+K)
 - Palette de commandes pour des connexions ponctuelles sans enregistrer de profil de serveur
