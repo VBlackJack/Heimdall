@@ -1,7 +1,7 @@
 {
   "id": "zypper-install",
-  "title": "Installer un paquet avec Zypper",
-  "description": "Installe un paquet avec Zypper (openSUSE/SLES)",
+  "title": "Install a package with Zypper",
+  "description": "Install a package with Zypper (openSUSE/SLES)",
   "category": "package-management",
   "platform": 1,
   "level": 1,
@@ -21,36 +21,56 @@
     "parameters": [
       {
         "name": "package",
-        "label": "Nom du paquet",
+        "label": "Package name",
         "type": "string",
         "defaultValue": "nginx",
         "required": true,
-        "description": "Nom du paquet à installer"
+        "description": "Name of the package to install"
       }
     ]
   },
   "examples": [
     {
       "command": "sudo zypper in vim",
-      "description": "Forme courte de install",
+      "description": "Short form of install",
       "platform": 1
     },
     {
       "command": "zypper update",
-      "description": "Mettre à jour les paquets",
+      "description": "Update the packages",
       "platform": 1
     },
     {
       "command": "zypper repos",
-      "description": "Lister les dépôts",
+      "description": "List the repositories",
       "platform": 1
     }
   ],
-  "notes": "Nécessite sudo. 'in' est un alias de 'install'. Gestionnaire de paquets de SUSE.",
+  "notes": "Requires sudo. 'in' is an alias of 'install'. The SUSE package manager.",
   "links": [
     {
       "title": "Zypper documentation",
       "url": "https://en.opensuse.org/SDB:Zypper_usage"
     }
-  ]
+  ],
+  "translations": {
+    "fr": {
+      "title": "Installer un paquet avec Zypper",
+      "description": "Installe un paquet avec Zypper (openSUSE/SLES)",
+      "notes": "Nécessite sudo. 'in' est un alias de 'install'. Gestionnaire de paquets de SUSE.",
+      "parameters": {
+        "linux": {
+          "package": {
+            "label": "Nom du paquet",
+            "description": "Nom du paquet à installer"
+          }
+        }
+      },
+      "examples": {
+        "sudo zypper in vim": "Forme courte de install",
+        "zypper update": "Mettre à jour les paquets",
+        "zypper repos": "Lister les dépôts"
+      }
+    }
+  }
 }
