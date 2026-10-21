@@ -340,6 +340,18 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     [ObservableProperty]
     private string _syncStatusMessage = string.Empty;
 
+    /// <summary>
+    /// After a Git sync, the sentence saying how many actions it kept local because the
+    /// local copy was newer; empty when it kept none. Shown next to the title until the
+    /// next sync.
+    /// </summary>
+    [ObservableProperty]
+    private string _syncKeptLocalSummary = string.Empty;
+
+    /// <summary>The titles behind <see cref="SyncKeptLocalSummary"/>, one per line.</summary>
+    [ObservableProperty]
+    private string _syncKeptLocalTitles = string.Empty;
+
     /// <summary>Status text shown in the empty state placeholder.</summary>
     [ObservableProperty]
     private string _emptyStateMessage = string.Empty;

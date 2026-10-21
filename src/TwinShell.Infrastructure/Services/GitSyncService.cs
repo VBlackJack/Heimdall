@@ -681,13 +681,31 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                     "Pull and import completed: {CommitsMerged} commits merged, {Created} created, {Updated} updated",
                     commitsMerged, importResult.TotalCreated, importResult.TotalUpdated);
 
+                // The import keeps the local copy of an entity that is newer than the
+                // remote one. Carried out with the result so the library can say which ones,
+                // instead of the operator finding out later that their edit did not travel.
+                var keptLocal = importResult.Conflicts
+                    .Where(conflict => conflict.Resolution == SyncConflictResolution.KeepLocal)
+                    .Select(conflict => new SyncConflict
+                    {
+                        EntityType = conflict.EntityType,
+                        EntityId = conflict.EntityId,
+                        EntityName = conflict.EntityName,
+                        LocalModifiedAt = conflict.LocalUpdatedAt,
+                        RemoteModifiedAt = conflict.RemoteUpdatedAt,
+                        Resolution = ConflictResolution.KeepLocal,
+                    })
+                    .ToList();
+
                 var successResult = new GitOperationResult
                 {
                     Success = true,
                     Message = $"Pull completed. {commitsMerged} commits merged.",
                     ItemsImported = totalImported,
                     ItemsUpdated = importResult.TotalUpdated,
-                    CommitsMerged = commitsMerged
+                    CommitsMerged = commitsMerged,
+                    ConflictsDetected = keptLocal.Count,
+                    Conflicts = keptLocal
                 };
                 await LogSyncOperationAsync(successResult, SyncOperationType.Pull, startedAt);
                 return successResult;
@@ -958,6 +976,8 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                 ItemsUpdated = pullResult.ItemsUpdated,
                 ItemsExported = pushResult.ItemsExported,
                 CommitsMerged = pullResult.CommitsMerged,
+                ConflictsDetected = pullResult.ConflictsDetected,
+                Conflicts = pullResult.Conflicts,
                 Warnings = pushResult.Success ? new List<string>() : new List<string> { pushResult.Message }
             };
         }

@@ -6434,6 +6434,8 @@
   "ToolCmdLibSyncError": "Sync Failed",
   "ToolCmdLibSyncNotConfigured": "Git Sync Not Configured",
   "ToolCmdLibSyncNotConfiguredDesc": "Enable Git Sync and configure a repository URL in Settings to use this feature.",
+  "ToolCmdLibSyncKeptLocal": "{0} actions kept local: your copy is newer than the repository's",
+  "ToolCmdLibSyncKeptLocalOne": "{0} action kept local: your copy is newer than the repository's",
   "SettingsCmdLibSyncTitle": "Command Library Git Sync",
   "SettingsCmdLibSyncEnable": "Enable Git Sync",
   "SettingsCmdLibSyncUrl": "Repository URL",

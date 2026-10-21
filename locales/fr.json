@@ -6433,6 +6433,8 @@
   "ToolCmdLibSyncError": "\u00c9chec de la synchronisation",
   "ToolCmdLibSyncNotConfigured": "Git Sync non configur\u00e9",
   "ToolCmdLibSyncNotConfiguredDesc": "Activez Git Sync et configurez l'URL du d\u00e9p\u00f4t dans les Param\u00e8tres pour utiliser cette fonctionnalit\u00e9.",
+  "ToolCmdLibSyncKeptLocal": "{0} actions gard\u00e9es en local : votre copie est plus r\u00e9cente que celle du d\u00e9p\u00f4t",
+  "ToolCmdLibSyncKeptLocalOne": "{0} action gard\u00e9e en local : votre copie est plus r\u00e9cente que celle du d\u00e9p\u00f4t",
   "SettingsCmdLibSyncTitle": "Synchronisation Git de la biblioth\u00e8que de commandes",
   "SettingsCmdLibSyncEnable": "Activer la synchronisation Git",
   "SettingsCmdLibSyncUrl": "URL du d\u00e9p\u00f4t",
