@@ -34,11 +34,6 @@
       "command": "winget show Microsoft.PowerToys",
       "description": "Show the full details of PowerToys",
       "platform": 0
-    },
-    {
-      "command": "winget show Microsoft.VisualStudioCode",
-      "description": "Standard run of the command. See the official documentation with Get-Help winget -Full for the available parameters and advanced uses.",
-      "platform": 0
     }
   ],
   "notes": "Shows the version, publisher, license, description and dependencies of the package.",
@@ -62,8 +57,7 @@
         }
       },
       "examples": {
-        "winget show Microsoft.PowerToys": "Affiche les détails complets de PowerToys",
-        "winget show Microsoft.VisualStudioCode": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "winget show Microsoft.PowerToys": "Affiche les détails complets de PowerToys"
       }
     }
   }

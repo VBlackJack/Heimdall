@@ -34,11 +34,6 @@
       "command": "winget install Microsoft.PowerToys --silent",
       "description": "Install PowerToys silently",
       "platform": 0
-    },
-    {
-      "command": "winget install Microsoft.VisualStudioCode --silent --accept-package-agreements --accept-source-agreements",
-      "description": "Standard run of the command. See the official documentation with Get-Help winget -Full for the available parameters and advanced uses.",
-      "platform": 0
     }
   ],
   "notes": "Requires Windows 10 1809 or later. The --silent option avoids user interaction.",
@@ -62,8 +57,7 @@
         }
       },
       "examples": {
-        "winget install Microsoft.PowerToys --silent": "Installe PowerToys de manière silencieuse",
-        "winget install Microsoft.VisualStudioCode --silent --accept-package-agreements --accept-source-agreements": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "winget install Microsoft.PowerToys --silent": "Installe PowerToys de manière silencieuse"
       }
     }
   }

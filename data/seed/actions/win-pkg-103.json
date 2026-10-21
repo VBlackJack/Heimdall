@@ -34,11 +34,6 @@
       "command": "choco upgrade googlechrome -y",
       "description": "Update Google Chrome to the latest version",
       "platform": 0
-    },
-    {
-      "command": "choco upgrade Microsoft.VisualStudioCode -y",
-      "description": "Standard run of the command. See the official documentation with Get-Help choco -Full for the available parameters and advanced uses.",
-      "platform": 0
     }
   ],
   "notes": "Checks automatically whether an update is available before installing.",
@@ -62,8 +57,7 @@
         }
       },
       "examples": {
-        "choco upgrade googlechrome -y": "Met à jour Google Chrome vers la dernière version",
-        "choco upgrade Microsoft.VisualStudioCode -y": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help choco -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "choco upgrade googlechrome -y": "Met à jour Google Chrome vers la dernière version"
       }
     }
   }

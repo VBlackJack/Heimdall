@@ -99,7 +99,7 @@
       "platform": 1
     },
     {
-      "command": "echo \"hash_attendu  fichier\" | sha256sum -c -",
+      "command": "echo \"expected_hash  file\" | sha256sum -c -",
       "description": "Check a specific hash",
       "platform": 1
     },
@@ -152,7 +152,7 @@
         "sha256sum /home/user/download.iso": "Calcule le SHA256 d'un fichier ISO",
         "sha256sum -c checksums.sha256": "Vérifie les hash depuis un fichier de checksums",
         "sha256sum * > checksums.sha256": "Génère les hash de tous les fichiers",
-        "echo \"hash_attendu  fichier\" | sha256sum -c -": "Vérifie un hash spécifique",
+        "echo \"expected_hash  file\" | sha256sum -c -": "Vérifie un hash spécifique",
         "sha256sum /etc/passwd": "Hash SHA256 d'un fichier",
         "md5sum /var/log/syslog": "Hash MD5",
         "sha512sum important_file.tar.gz": "Hash SHA512",

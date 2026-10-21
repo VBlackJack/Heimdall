@@ -42,11 +42,6 @@
       "command": "choco source add --name=MyRepo --source=https://packages.example.com/chocolatey",
       "description": "Add a custom source",
       "platform": 0
-    },
-    {
-      "command": "choco source add --name=MyResource --source=https://www.contoso.com",
-      "description": "Standard run of the command. See the official documentation with Get-Help choco -Full for the available parameters and advanced uses.",
-      "platform": 0
     }
   ],
   "notes": "Requires administrator rights. Check that the source is trustworthy before adding it.",
@@ -74,8 +69,7 @@
         }
       },
       "examples": {
-        "choco source add --name=MyRepo --source=https://packages.example.com/chocolatey": "Ajoute une source personnalisée",
-        "choco source add --name=MyResource --source=https://www.contoso.com": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help choco -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "choco source add --name=MyRepo --source=https://packages.example.com/chocolatey": "Ajoute une source personnalisée"
       }
     }
   }

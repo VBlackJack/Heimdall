@@ -23,11 +23,6 @@
       "command": "regsvr32 /s wuaueng.dll",
       "description": "Re-register the Windows Update engine DLL",
       "platform": 0
-    },
-    {
-      "command": "regsvr32 /s wuaueng.dll && regsvr32 /s wuapi.dll && regsvr32 /s wups.dll && regsvr32 /s wups2.dll && regsvr32 /s wucltux.dll && regsvr32 /s wuwebv.dll && regsvr32 /s qmgr.dll && regsvr32 /s qmgrprxy.dll",
-      "description": "Standard run of the command. See the official documentation with Get-Help regsvr32 -Full for the available parameters and advanced uses.",
-      "platform": 0
     }
   ],
   "notes": "Requires administrator rights. Fixes errors caused by corrupted Windows Update components.",
@@ -38,8 +33,7 @@
       "description": "Réenregistre toutes les DLL critiques du système Windows Update",
       "notes": "Droits administrateur requis. Résout les erreurs de composants Windows Update corrompus.",
       "examples": {
-        "regsvr32 /s wuaueng.dll": "Réenregistre la DLL du moteur Windows Update",
-        "regsvr32 /s wuaueng.dll && regsvr32 /s wuapi.dll && regsvr32 /s wups.dll && regsvr32 /s wups2.dll && regsvr32 /s wucltux.dll && regsvr32 /s wuwebv.dll && regsvr32 /s qmgr.dll && regsvr32 /s qmgrprxy.dll": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help regsvr32 -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "regsvr32 /s wuaueng.dll": "Réenregistre la DLL du moteur Windows Update"
       }
     }
   }

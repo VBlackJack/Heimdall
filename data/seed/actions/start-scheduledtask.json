@@ -34,7 +34,7 @@
         "type": "string",
         "defaultValue": "",
         "required": false,
-        "description": "Task path (e.g. -TaskPath '\\CustomTasks\\')"
+        "description": "Task path (e.g. \\CustomTasks\\), passed positionally after the task name"
       }
     ]
   },
@@ -80,7 +80,7 @@
           },
           "taskpath": {
             "label": "Chemin",
-            "description": "Chemin de la tâche (ex: -TaskPath '\\CustomTasks\\')"
+            "description": "Chemin de la tâche (ex: \\CustomTasks\\), passé en position après le nom de la tâche"
           }
         }
       },

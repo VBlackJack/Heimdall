@@ -22,7 +22,7 @@
   "examples": [
     {
       "command": "net stop wuauserv && net stop cryptSvc && net stop bits && net stop msiserver && ren C:\\Windows\\SoftwareDistribution SoftwareDistribution.old && ren C:\\Windows\\System32\\catroot2 catroot2.old && net start wuauserv && net start cryptSvc && net start bits && net start msiserver",
-      "description": "Standard run of the command. See the official documentation with Get-Help net -Full for the available parameters and advanced uses.",
+      "description": "Stop the update services, rename the SoftwareDistribution and catroot2 folders, then start the services again",
       "platform": 0
     }
   ],
@@ -34,7 +34,7 @@
       "description": "Arrête les services WU, supprime les caches SoftwareDistribution et Catroot2, puis redémarre les services",
       "notes": "⚠️ Nécessite redémarrage du PC après exécution. Supprime tout l'historique de mises à jour. Commande à exécuter avec droits administrateur.",
       "examples": {
-        "net stop wuauserv && net stop cryptSvc && net stop bits && net stop msiserver && ren C:\\Windows\\SoftwareDistribution SoftwareDistribution.old && ren C:\\Windows\\System32\\catroot2 catroot2.old && net start wuauserv && net start cryptSvc && net start bits && net start msiserver": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help net -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "net stop wuauserv && net stop cryptSvc && net stop bits && net stop msiserver && ren C:\\Windows\\SoftwareDistribution SoftwareDistribution.old && ren C:\\Windows\\System32\\catroot2 catroot2.old && net start wuauserv && net start cryptSvc && net start bits && net start msiserver": "Arrête les services de mise à jour, renomme les dossiers SoftwareDistribution et catroot2, puis redémarre les services"
       }
     }
   }

@@ -22,7 +22,7 @@
   "examples": [
     {
       "command": "DISM /Online /Cleanup-Image /RestoreHealth && sfc /scannow",
-      "description": "Standard run of the command. See the official documentation with Get-Help DISM -Full for the available parameters and advanced uses.",
+      "description": "Repair the component store with DISM, then check the system files with SFC",
       "platform": 0
     }
   ],
@@ -39,7 +39,7 @@
       "description": "Utilise l'outil DISM pour réparer les composants Windows Update corrompus",
       "notes": "⏱️ Peut prendre 15-30 minutes selon la vitesse du PC et de la connexion Internet. Droits administrateur requis.",
       "examples": {
-        "DISM /Online /Cleanup-Image /RestoreHealth && sfc /scannow": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help DISM -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "DISM /Online /Cleanup-Image /RestoreHealth && sfc /scannow": "Répare le magasin de composants avec DISM, puis vérifie les fichiers système avec SFC"
       }
     }
   }

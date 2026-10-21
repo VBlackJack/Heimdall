@@ -34,11 +34,6 @@
       "command": "winget uninstall Microsoft.PowerToys --silent",
       "description": "Uninstall PowerToys",
       "platform": 0
-    },
-    {
-      "command": "winget uninstall Microsoft.VisualStudioCode --silent",
-      "description": "Standard run of the command. See the official documentation with Get-Help winget -Full for the available parameters and advanced uses.",
-      "platform": 0
     }
   ],
   "notes": "⚠️ WARNING: this action removes the application from the system. Make sure to back up your data.",
@@ -62,8 +57,7 @@
         }
       },
       "examples": {
-        "winget uninstall Microsoft.PowerToys --silent": "Désinstalle PowerToys",
-        "winget uninstall Microsoft.VisualStudioCode --silent": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "winget uninstall Microsoft.PowerToys --silent": "Désinstalle PowerToys"
       }
     }
   }

@@ -34,11 +34,6 @@
       "command": "winget upgrade Microsoft.PowerToys --silent",
       "description": "Update PowerToys to the latest version",
       "platform": 0
-    },
-    {
-      "command": "winget upgrade Microsoft.VisualStudioCode --silent --accept-package-agreements --accept-source-agreements",
-      "description": "Standard run of the command. See the official documentation with Get-Help winget -Full for the available parameters and advanced uses.",
-      "platform": 0
     }
   ],
   "notes": "Checks first whether an update is available before installing.",
@@ -62,8 +57,7 @@
         }
       },
       "examples": {
-        "winget upgrade Microsoft.PowerToys --silent": "Met à jour PowerToys vers la dernière version",
-        "winget upgrade Microsoft.VisualStudioCode --silent --accept-package-agreements --accept-source-agreements": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "winget upgrade Microsoft.PowerToys --silent": "Met à jour PowerToys vers la dernière version"
       }
     }
   }

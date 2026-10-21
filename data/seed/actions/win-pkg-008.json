@@ -42,11 +42,6 @@
       "command": "winget source add --name CustomRepo https://packages.example.com/winget",
       "description": "Add a custom source",
       "platform": 0
-    },
-    {
-      "command": "winget source add --name MyResource https://www.contoso.com",
-      "description": "Standard run of the command. See the official documentation with Get-Help winget -Full for the available parameters and advanced uses.",
-      "platform": 0
     }
   ],
   "notes": "Requires administrator rights. Check that the source is trustworthy before adding it.",
@@ -74,8 +69,7 @@
         }
       },
       "examples": {
-        "winget source add --name CustomRepo https://packages.example.com/winget": "Ajoute une source personnalisée",
-        "winget source add --name MyResource https://www.contoso.com": "Exécution standard de la commande None. Consultez la documentation officielle avec Get-Help winget -Full pour plus de détails sur les paramètres disponibles et les cas d'usage avancés."
+        "winget source add --name CustomRepo https://packages.example.com/winget": "Ajoute une source personnalisée"
       }
     }
   }
