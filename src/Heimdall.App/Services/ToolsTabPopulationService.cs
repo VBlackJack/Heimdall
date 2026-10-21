@@ -271,7 +271,7 @@ public sealed class ToolsTabPopulationService
                     FontSize = (double)Application.Current.FindResource("FontSizeCaption"),
                     Margin = new Thickness(4, 0, 0, 16)
                 };
-                emptyFav.SetResourceReference(TextBlock.ForegroundProperty, "TextDisabledBrush");
+                emptyFav.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
                 target.Children.Add(emptyFav);
             }
 
@@ -383,7 +383,7 @@ public sealed class ToolsTabPopulationService
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextAlignment = TextAlignment.Center
             };
-            noResultsHint.SetResourceReference(TextBlock.ForegroundProperty, "TextDisabledBrush");
+            noResultsHint.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
             emptyState.Children.Add(noResultsHint);
 
             target.Children.Add(emptyState);

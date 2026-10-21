@@ -185,7 +185,7 @@
                         <TextBlock x:Name="LblTotalHosts" Grid.Row="10" Grid.Column="0" Text=""
                                    FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                         <TextBlock x:Name="TxtTotalHosts" Grid.Row="10" Grid.Column="2" Text=""
-                                   FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                   FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         <Button x:Name="BtnCopyTotalHosts" Grid.Row="10" Grid.Column="3" Click="OnCopyValueClick"
                                 Tag="TotalHosts" Style="{DynamicResource SecondaryButtonStyle}"
                                 Padding="{StaticResource PaddingButtonHelp}" Margin="{StaticResource MarginInlineControl}" FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"

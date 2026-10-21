@@ -37,6 +37,16 @@ namespace Heimdall.App.Tests;
 public sealed class ThemeSurfaceTokenContrastTests
 {
     private const string ThemeUriFormat = "/ThemeForge.Theme;component/Themes/{0}.xaml";
+    private const double MinimumTextContrast = 4.5;
+
+    private static readonly string[] SemanticTextBrushes =
+    [
+        "ErrorTextBrush",
+        "WarningTextBrush",
+        "SuccessTextBrush",
+        "InfoTextBrush",
+        "AccentTextBrush",
+    ];
 
     public static TheoryData<string> Themes { get; } = new(ThemeNames.All);
 
@@ -86,6 +96,145 @@ public sealed class ThemeSurfaceTokenContrastTests
         Assert.True(Contrast(Over(text, highlight), highlight) >= 4.5, Report(theme, "primary on hover", text, highlight));
     }
 
+    /// <summary>
+    /// Semantic and accent text reads at 4.5 to 1 on the window background and on a card. The
+    /// bridge used to paint ErrorTextBrush with the theme's ErrorColor itself: #FF5555 on the
+    /// Drakul card #44475A is 2.91 to 1, and the accent #BD93F9 there is 3.79 to 1.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void SemanticAndAccentTextIsReadableOnTheBackgroundAndOnACard(string theme)
+    {
+        ResourceDictionary palette = Palette(theme);
+        List<string> unreadable = [];
+
+        foreach (string text in SemanticTextBrushes)
+        {
+            if (!palette.Contains(text))
+            {
+                unreadable.Add($"{theme}: the bridge resolves no {text}");
+                continue;
+            }
+
+            Color foreground = ColorOf(palette, text);
+            foreach (string ground in new[] { "BackgroundBrush", "CardBrush" })
+            {
+                Color under = ColorOf(palette, ground);
+                if (Contrast(Over(foreground, under), under) < MinimumTextContrast)
+                {
+                    unreadable.Add(Report(theme, text + " on " + ground, foreground, under));
+                }
+            }
+        }
+
+        Assert.True(unreadable.Count == 0, string.Join(Environment.NewLine, unreadable));
+    }
+
+    /// <summary>Text drawn on an accent fill, a primary button's label, stays readable.</summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TextOnAccentIsReadableOnTheAccent(string theme)
+    {
+        ResourceDictionary palette = Palette(theme);
+        Color accent = ColorOf(palette, "AccentBrush");
+        Color text = ColorOf(palette, "TextOnAccentBrush");
+
+        Assert.True(Contrast(Over(text, accent), accent) >= MinimumTextContrast, Report(theme, "text on accent", text, accent));
+    }
+
+    /// <summary>
+    /// A theme colour that already reads at 4.5 to 1 on both grounds is used as it is, byte for
+    /// byte; one that does not is moved, and only then.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void ADerivedTextColourIsTheThemeColourWheneverThatAlreadyPasses(string theme)
+    {
+        ResourceDictionary colours = ThemeColours(theme);
+        Color background = Assert.IsType<Color>(colours[ThemeTextColours.BackgroundKey]);
+        Color card = Assert.IsType<Color>(colours[ThemeTextColours.CardKey]);
+        ResourceDictionary derived = new();
+        ThemeTextColours.Apply(derived, key => colours[key]);
+
+        foreach ((string sourceKey, string textKey) in ThemeTextColours.Pairs)
+        {
+            Color source = Assert.IsType<Color>(colours[sourceKey]);
+            Color text = Assert.IsType<Color>(derived[textKey]);
+            bool passes = Contrast(source, background) >= MinimumTextContrast && Contrast(source, card) >= MinimumTextContrast;
+
+            if (passes)
+            {
+                Assert.True(source == text, $"{theme}: {sourceKey} {source} already passes and was changed to {text}");
+            }
+            else
+            {
+                Assert.True(source != text, $"{theme}: {sourceKey} {source} does not pass and was kept");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The derivation is not vacuous: across the shipped themes it keeps some colours and moves
+    /// others. On Drakul the error red #FF5555 becomes #FF9C9C, the first step of one lightness
+    /// percent that passes: 4.57 to 1 on the card and 7.11 on the background, where the step
+    /// below it, #FF9999, is under 4.5 on the card.
+    /// </summary>
+    [Fact]
+    public void TheDerivationKeepsSomeThemeColoursAndMovesOthers()
+    {
+        int kept = 0;
+        int moved = 0;
+        foreach (string theme in ThemeNames.All)
+        {
+            ResourceDictionary colours = ThemeColours(theme);
+            ResourceDictionary derived = new();
+            ThemeTextColours.Apply(derived, key => colours[key]);
+            foreach ((string sourceKey, string textKey) in ThemeTextColours.Pairs)
+            {
+                if ((Color)colours[sourceKey] == (Color)derived[textKey])
+                {
+                    kept++;
+                }
+                else
+                {
+                    moved++;
+                }
+            }
+        }
+
+        Assert.True(kept > 0, "no theme colour was kept");
+        Assert.True(moved > 0, "no theme colour was moved");
+        Assert.Equal(Color.FromRgb(0xFF, 0x9C, 0x9C), ColorOf(Palette(ThemeNames.Drakul), "ErrorTextBrush"));
+    }
+
+    /// <summary>
+    /// A theme switch recomputes the derived colours from the new theme rather than keeping the
+    /// previous theme's: the same dictionary, applied after Drakul then after Parchment, ends
+    /// with Parchment's values.
+    /// </summary>
+    [Fact]
+    public void ASwitchOfThemeRecomputesTheDerivedTextColours()
+    {
+        ResourceDictionary application = new();
+        application.MergedDictionaries.Add(ThemeColours(ThemeNames.Drakul));
+        ThemeTextColours.Apply(application, key => application[key]);
+        Color drakulError = Assert.IsType<Color>(application["ErrorTextColor"]);
+
+        application.MergedDictionaries.Clear();
+        ResourceDictionary parchment = ThemeColours(ThemeNames.Parchment);
+        application.MergedDictionaries.Add(parchment);
+        ThemeTextColours.Apply(application, key => application[key]);
+        Color parchmentError = Assert.IsType<Color>(application["ErrorTextColor"]);
+
+        Assert.NotEqual(drakulError, parchmentError);
+        Assert.Equal(
+            ThemeTextColours.Derive(
+                (Color)parchment["ErrorColor"],
+                (Color)parchment[ThemeTextColours.BackgroundKey],
+                (Color)parchment[ThemeTextColours.CardKey]),
+            parchmentError);
+    }
+
     [Fact]
     public void TheTitleBarGetsItsColoursInTheOrderDwmReadsThem()
     {
@@ -105,12 +254,13 @@ public sealed class ThemeSurfaceTokenContrastTests
 
     /// <summary>
     /// One theme's colours, under the bridge's brushes: each brush named by the bridge is
-    /// rebuilt from the colour key and opacity the bridge gives it.
+    /// rebuilt from the colour key and opacity the bridge gives it, after the derived text
+    /// colours are written beside the theme's own, as the theme service writes them.
     /// </summary>
     private static ResourceDictionary Palette(string theme)
     {
-        var colours = (ResourceDictionary)Application.LoadComponent(
-            new Uri(string.Format(CultureInfo.InvariantCulture, ThemeUriFormat, theme), UriKind.Relative));
+        ResourceDictionary colours = ThemeColours(theme);
+        ThemeTextColours.Apply(colours, key => colours[key]);
         ResourceDictionary resolved = new();
         foreach ((string key, string colourKey, double opacity) in BridgeBrushes())
         {
@@ -122,6 +272,11 @@ public sealed class ThemeSurfaceTokenContrastTests
 
         return resolved;
     }
+
+    /// <summary>One theme's own colours, as ThemeForge ships them.</summary>
+    private static ResourceDictionary ThemeColours(string theme) =>
+        (ResourceDictionary)Application.LoadComponent(
+            new Uri(string.Format(CultureInfo.InvariantCulture, ThemeUriFormat, theme), UriKind.Relative));
 
     private static IEnumerable<(string Key, string ColourKey, double Opacity)> BridgeBrushes()
     {

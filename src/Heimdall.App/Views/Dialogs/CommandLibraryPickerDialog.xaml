@@ -150,7 +150,7 @@
                                                    Foreground="{DynamicResource BadgeTextBrush}"/>
                                     </Border>
                                     <TextBlock Text="{Binding PlatformBadge}"
-                                               Foreground="{DynamicResource AccentBrush}"
+                                               Foreground="{DynamicResource AccentTextBrush}"
                                                FontWeight="SemiBold"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>

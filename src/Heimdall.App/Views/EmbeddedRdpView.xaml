@@ -395,7 +395,7 @@
                             <TextBlock Text="&#xE945;"
                                        FontFamily="{StaticResource FontFamilyIcons}"
                                        FontSize="{StaticResource FontSizeCaption}"
-                                       Foreground="{DynamicResource AccentBrush}"
+                                       Foreground="{DynamicResource AccentTextBrush}"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -869,7 +869,7 @@
                          Height="2"
                          Margin="16,0,16,0"
                          IsIndeterminate="True"
-                         Foreground="{DynamicResource AccentBrush}"
+                         Foreground="{DynamicResource AccentTextBrush}"
                          Background="Transparent"
                          BorderThickness="0"
                          IsHitTestVisible="False"/>

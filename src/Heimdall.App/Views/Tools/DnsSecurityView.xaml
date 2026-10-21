@@ -216,7 +216,7 @@
                                                 <TextBlock Margin="0,2,0,0"
                                                            Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}"
                                                            FontSize="{StaticResource FontSizeCaption}"
-                                                           Foreground="{DynamicResource TextDisabledBrush}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                                            Text="{Binding Detail}"
                                                            TextWrapping="Wrap" />
                                             </StackPanel>

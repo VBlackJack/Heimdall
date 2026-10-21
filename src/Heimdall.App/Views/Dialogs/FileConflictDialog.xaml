@@ -53,7 +53,7 @@
                        TextWrapping="Wrap"/>
             <TextBlock Margin="0,6,0,0"
                        Text="{Binding SummaryText}"
-                       Foreground="{DynamicResource TextDisabledBrush}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
                        FontSize="{StaticResource FontSizeCaption}"/>
         </StackPanel>
 
@@ -213,7 +213,7 @@
                        VerticalAlignment="Center"
                        Margin="0,0,12,0"
                        TextWrapping="Wrap"
-                       Foreground="{DynamicResource TextDisabledBrush}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
                        FontSize="{StaticResource FontSizeCaption}"/>
         </DockPanel>
     </Grid>

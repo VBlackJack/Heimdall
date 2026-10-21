@@ -221,7 +221,7 @@
                     <DataGridTextColumn x:Name="ColOid" Binding="{Binding Oid}" Width="260"
                                         Foreground="{DynamicResource TextPrimaryBrush}"/>
                     <DataGridTextColumn x:Name="ColName" Binding="{Binding Name}" Width="180"
-                                        Foreground="{DynamicResource AccentBrush}"/>
+                                        Foreground="{DynamicResource AccentTextBrush}"/>
                     <DataGridTextColumn x:Name="ColType" Binding="{Binding Type}" Width="100"
                                         Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <DataGridTextColumn x:Name="ColValue" Binding="{Binding Value}" Width="*"

@@ -154,7 +154,7 @@
         <StackPanel Grid.Row="3" x:Name="ProgressPanel" Visibility="Collapsed">
             <ProgressBar x:Name="AuditProgress" Height="4"
                          Minimum="0" Maximum="100"
-                         Foreground="{DynamicResource AccentBrush}"
+                         Foreground="{DynamicResource AccentTextBrush}"
                          Background="{DynamicResource SurfaceBrush}"/>
             <!-- Retained non-token asymmetric dock spacing: no exact CommonControls token maps to 12,2,12,4. -->
             <DockPanel Margin="12,2,12,4">

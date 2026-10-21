@@ -120,7 +120,7 @@
                              IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolUuidResult}"
                              Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource AccentBrush}"
+                             Foreground="{DynamicResource AccentTextBrush}"
                              BorderBrush="{DynamicResource BorderBrush}" />
                 </DockPanel>
 
@@ -204,7 +204,7 @@
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Auto"
                                  Background="{DynamicResource CardBrush}"
-                                 Foreground="{DynamicResource AccentBrush}"
+                                 Foreground="{DynamicResource AccentTextBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}" />
                         <Button x:Name="BtnCopyBatch"
                                 TabIndex="7"

@@ -276,7 +276,7 @@
                             <TextBlock x:Name="LblKeySize" Grid.Row="14" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtKeySize" Grid.Row="14" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource AccentBrush}"
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource AccentTextBrush}"
                                        FontWeight="SemiBold" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblSans" Grid.Row="16" Grid.Column="0" Text=""
@@ -305,7 +305,7 @@
                                            VerticalAlignment="Center" Width="120"/>
                                 <TextBlock x:Name="TxtTlsVersion" Text=""
                                            FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
-                                           Foreground="{DynamicResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentTextBrush}"
                                            FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </DockPanel>
                             <DockPanel>
@@ -452,7 +452,7 @@
                                             <TextBlock Grid.Row="14" Grid.Column="0" Text="{Binding KeySizeLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Grid.Row="14" Grid.Column="2" Text="{Binding KeySizeText}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"/>
                                         </Grid>
 
                                         <!-- TLS version + hostname match -->
@@ -462,7 +462,7 @@
                                                        VerticalAlignment="Center" Width="90"/>
                                             <TextBlock Text="{Binding TlsVersion}"
                                                        FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
-                                                       Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"
                                                        VerticalAlignment="Center"/>
                                         </DockPanel>
                                         <TextBlock Text="{Binding HostnameMatchText}"
