@@ -12,6 +12,39 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-21: one rail for every setting (v2026.102103)
+
+### Settings (#674, #675)
+
+- **Scroll bar at the window edge** (#674). `SettingsRailTabControlStyle` capped its section
+  column at 940 px, so the section `ScrollViewer` and its scroll bar stopped there on a wide
+  window. The column is a plain star; the cap moved onto the section content. The
+  `SettingsRailContentMaxWidth` token is removed.
+- **One grouped rail** (#675). `Mw_SettingsSubTabControl` is now the single rail: the six top
+  TabItems are gone and every section TabItem carries its group; `SettingsRail` renders a disabled,
+  non-focusable heading TabItem per group (the six `Mw_SettingsTab*` ids sit on the headings) and
+  scrolls; Up and Down skip the headings. Navigation routes resolve to a section:
+  `OnNavigateToGatewaySettings` selects `Mw_SettingsSshSubTabGateways`, `SettingsSearchEntry`
+  carries (Target, Section), `RefreshSettingsRailErrorCounts` walks `SettingsRailSections`;
+  `OnSettingsRailSelectionChanged` brings the section and, for the first of a group, its heading
+  into view (`SettingsRailHeadingAbove`). Terminal gains `Mw_SettingsTerminalSubTabAppearance`.
+  `Mw_SettingsResetRdpDefaults` moves to `SettingsRail.ContentFooter`, shown under an RDP section.
+- **No card in a card** (#675). The Settings area and the open section lost their rounded
+  surfaces; the rail keeps a `BorderStrongBrush` right divider, the section cards keep `CardBrush`.
+- **Apply glyph** (#675). `SettingsApplyBadgeStyle` is gone; each card title carries a
+  `FontFamilyIcons` glyph (E945 applies immediately, E74E saved immediately, E8A7 applies to new
+  connections) in `AccentTextBrush` with a `ToolTip` and `AutomationProperties.Name` from the
+  existing keys, and `Mw_SettingsApplyLegend` at the rail foot explains the three.
+- **Section width** (#675). Each section `ScrollViewer` holds a `Grid` with one star column capped
+  at `SettingsContentMaxWidth` around the section `StackPanel`, so cards fill the cap and stay
+  against the rail while the scroll bar stays at the edge (a Left-aligned panel with a `MaxWidth`
+  shrank the cards to their content).
+- Tests: `SettingsSingleRailMarkupTests` (groups, headings, no top tabs, no card in card, no
+  badge, glyph names, legend), `EveryRailSectionTakesTheSameWidth` pins the capped column shape,
+  `SettingsRailErrorCountTests.TheFirstSectionOfAGroupNamesTheHeadingAboveIt`; the search index
+  and navigation tests follow the (Target, Section) shape. `docs/SETTINGS-FAQ.md` (EN, FR) no
+  longer describes the top tabs.
+
 ## 2026-10-21: tool icons back, readable text on every theme, dialogs without caption boxes (v2026.102102)
 
 Graphic pass over the interface (checks UI-01 to UI-08 of the project audit, static plus a live
