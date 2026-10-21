@@ -810,6 +810,9 @@
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
+                            <!-- Title, host, sent or copied, and time, as the action rows do it:
+                                 the row's TextBlocks give its container no name of their own. -->
+                            <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             <Setter Property="Padding" Value="12,4"/>
                             <Setter Property="Cursor" Value="Hand"/>

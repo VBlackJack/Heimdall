@@ -146,6 +146,7 @@ public sealed partial class CommandLibraryViewModel
                     Parameters = h.Parameters,
                     TargetHost = h.TargetHost,
                     IsExecuted = h.IsExecuted,
+                    Localize = LocalizeKey,
                     // Explicit CurrentCulture, matching every other formatting site in the
                     // app. Heimdall has no mapping from its own locale to a CultureInfo,
                     // so introducing one here would make this the only surface that

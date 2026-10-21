@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.ViewModels;
 using TwinShell.Core.Enums;
 
 namespace Heimdall.App.ViewModels.CommandLibrary;
@@ -23,7 +24,7 @@ namespace Heimdall.App.ViewModels.CommandLibrary;
 /// history panel. Built once per <see cref="ICommandHistoryService"/> page load
 /// and never mutated, so plain init-only properties are sufficient.
 /// </summary>
-public sealed class CommandLibraryHistoryEntry
+public sealed class CommandLibraryHistoryEntry : IAccessibleItemViewModel
 {
     /// <summary>Title of the action that produced the command.</summary>
     public string ActionTitle { get; init; } = string.Empty;
@@ -90,4 +91,47 @@ public sealed class CommandLibraryHistoryEntry
     /// so the offer is withheld rather than made and then refused.
     /// </remarks>
     public bool CanReplay => IsReadable && !string.IsNullOrEmpty(ActionId);
+
+    /// <summary>
+    /// Resolves the localized words of <see cref="AccessibleName"/>; supplied by the view model
+    /// that builds the row. Without it the sent / copied word is left out.
+    /// </summary>
+    public Func<string, string>? Localize { get; init; }
+
+    /// <summary>
+    /// What a screen reader announces for this row: the title, the host when there is one,
+    /// whether the command was sent or copied, and when.
+    /// </summary>
+    /// <remarks>
+    /// The row paints these in separate <c>TextBlock</c>s that contribute nothing to the
+    /// container's name, so without this the row announced the entry's class name. The command
+    /// itself is left out: it can be long, and it is what the row's copy button is for.
+    /// </remarks>
+    public string AccessibleName
+    {
+        get
+        {
+            var parts = new List<string>(4) { ActionTitle };
+
+            if (HasTargetHost)
+            {
+                parts.Add(TargetHost!);
+            }
+
+            if (Localize is not null)
+            {
+                parts.Add(Localize(IsExecuted ? "ToolCmdLibHistorySent" : "ToolCmdLibHistoryCopied"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(Timestamp))
+            {
+                parts.Add(Timestamp);
+            }
+
+            return string.Join(", ", parts);
+        }
+    }
+
+    /// <inheritdoc/>
+    public string? AccessibleHelpText => null;
 }
