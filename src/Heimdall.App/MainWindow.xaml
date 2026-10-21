@@ -2604,6 +2604,8 @@
                     <DataGrid ItemsSource="{Binding Scheduled.Tasks}"
                               SelectedItem="{Binding Scheduled.SelectedTask}"
                               AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
                               SelectionMode="Single"
                               Margin="16,0,16,8"
                               MouseDoubleClick="OnScheduledTaskDoubleClick"
