@@ -76,4 +76,62 @@ public sealed class CommandLibraryInsertShortcutTests
 
         WpfTestHost.Invoke(() => window!.Close());
     }
+
+    /// <summary>
+    /// Ctrl+Enter reaches Send through the declared binding, so the command it resolves to must
+    /// refuse an invalid command; with a valid one and a terminal it must accept.
+    /// </summary>
+    [StaFact]
+    public void CtrlReturn_ResolvesToACommandThatRefusesAnInvalidCommand()
+    {
+        Window? window = null;
+        bool invalidCanExecute = true;
+        bool validCanExecute = false;
+
+        WpfTestHost.Invoke(() =>
+        {
+            var viewModel = new CommandLibraryViewModel(
+                serviceProvider: null!,
+                configManager: null!,
+                WpfTestHost.Localizer,
+                dialogService: null!,
+                gitSyncService: null!,
+                transferService: null!)
+            {
+                SendCommandHandler = _ => { },
+                CanSendToTerminalProbe = () => true
+            };
+            var view = new CommandLibraryView { DataContext = viewModel };
+            window = new Window
+            {
+                Width = 640,
+                Height = 700,
+                Content = view,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.None
+            };
+            window.Show();
+            view.UpdateLayout();
+
+            var binding = view.InputBindings
+                .OfType<KeyBinding>()
+                .Single(candidate => candidate.Key == Key.Return && candidate.Modifiers == ModifierKeys.Control);
+
+            // Nothing generated yet: the command is not valid.
+            invalidCanExecute = binding.Command.CanExecute(null);
+
+            viewModel.ApplyExampleText("echo ready");
+            validCanExecute = binding.Command.CanExecute(null);
+        });
+
+        try
+        {
+            Assert.False(invalidCanExecute);
+            Assert.True(validCanExecute);
+        }
+        finally
+        {
+            WpfTestHost.Invoke(() => window!.Close());
+        }
+    }
 }

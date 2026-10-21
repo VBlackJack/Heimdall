@@ -44,6 +44,7 @@ public sealed class CommandLibraryViewModelSendTests
 
         var sent = new List<string>();
         viewModel.SendCommandHandler = sent.Add;
+        viewModel.CanSendToTerminalProbe = () => true;
 
         viewModel.ApplyExample("rm -rf /");
         await viewModel.SendAsync();
@@ -60,6 +61,7 @@ public sealed class CommandLibraryViewModelSendTests
 
         var sent = new List<string>();
         viewModel.SendCommandHandler = sent.Add;
+        viewModel.CanSendToTerminalProbe = () => true;
 
         viewModel.ApplyExample("rm -rf /");
         await viewModel.SendAsync();
@@ -76,6 +78,7 @@ public sealed class CommandLibraryViewModelSendTests
 
         var sent = new List<string>();
         viewModel.SendCommandHandler = sent.Add;
+        viewModel.CanSendToTerminalProbe = () => true;
 
         await viewModel.SendAsync();
 

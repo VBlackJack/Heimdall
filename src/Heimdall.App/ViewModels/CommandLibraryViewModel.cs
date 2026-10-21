@@ -293,6 +293,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     [NotifyPropertyChangedFor(nameof(SendTooltip))]
     [NotifyPropertyChangedFor(nameof(ShowCopyHint))]
     [NotifyPropertyChangedFor(nameof(CopyTooltip))]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
     private bool _isCommandValid;
 
     /// <summary>Multi-line validation error text (one bullet per error).</summary>
@@ -569,6 +570,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     public void RefreshSendState()
     {
         OnPropertyChanged(nameof(IsSendEnabled));
+        SendCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SendTooltip));
         OnPropertyChanged(nameof(ShowCopyHint));
     }

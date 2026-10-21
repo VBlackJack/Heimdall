@@ -59,6 +59,7 @@ public sealed class CommandLibraryHistoryHostTests
         var history = new RecordingHistoryService();
         using var viewModel = await CreateSelectedViewModelAsync(history, Host);
         viewModel.SendCommandHandler = _ => { };
+        viewModel.CanSendToTerminalProbe = () => true;
 
         await viewModel.SendAsync();
 

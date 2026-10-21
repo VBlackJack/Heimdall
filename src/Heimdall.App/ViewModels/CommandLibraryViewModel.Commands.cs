@@ -58,10 +58,17 @@ public sealed partial class CommandLibraryViewModel
     /// Commands originating from an applied example always require confirmation,
     /// since example text bypasses parameter validation and escaping.
     /// </summary>
-    [RelayCommand]
+    /// <remarks>
+    /// Refuses unless <see cref="IsSendEnabled"/>: a valid command and a terminal to receive it.
+    /// The command's CanExecute carries the same condition for the button and Ctrl+Enter, and the
+    /// method checks it again because it is reachable directly. When validation fails the
+    /// generator leaves the raw pattern, braces and all, in <see cref="GeneratedCommand"/>, so a
+    /// non-empty command is not a sendable one.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(IsSendEnabled))]
     public async Task SendAsync()
     {
-        if (string.IsNullOrEmpty(GeneratedCommand) || SendCommandHandler is null) return;
+        if (string.IsNullOrEmpty(GeneratedCommand) || SendCommandHandler is null || !IsSendEnabled) return;
 
         // Example text bypasses GenerateCommand validation and escaping, and both the
         // example string and the action level come from (possibly imported) data. Force a
