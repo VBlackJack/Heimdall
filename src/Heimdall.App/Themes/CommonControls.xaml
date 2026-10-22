@@ -1223,11 +1223,15 @@
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Padding" Value="14,8"/>
-        <Setter Property="Margin" Value="0,0,4,0"/>
+        <!-- The gap between tabs is the border's own margin, not the item's: a TabItem margin inside
+             a TabPanel left the template root at the full slot width and clipped its right edge,
+             so the selected tab lost its right border (measured 2026-10-22). -->
+        <Setter Property="Margin" Value="0"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TabItem}">
                     <Border x:Name="TabBorder"
+                            Margin="0,0,4,0"
                             Background="{TemplateBinding Background}"
                             BorderBrush="Transparent"
                             BorderThickness="1,1,1,0"
@@ -1254,7 +1258,9 @@
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource CardBrush}"/>
-                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                            <!-- BorderBrush equals the card colour on every shipped theme, which left the
+                                 selected tab without an outline; the strong border keeps 3:1 on the strip. -->
+                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}"/>
                             <Setter TargetName="Underline" Property="Background" Value="{DynamicResource AccentBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
