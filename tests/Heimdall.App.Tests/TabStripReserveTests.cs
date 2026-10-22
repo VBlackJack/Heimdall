@@ -21,32 +21,37 @@ using Heimdall.App.Tests.Views.EmbeddedRdp;
 namespace Heimdall.App.Tests;
 
 /// <summary>
-/// The session tab strip leaves room at its right end for the quick connect button, always, and
-/// for the list button while the tabs overflow.
+/// The session tab strip leaves room at its right end for the list button while the tabs
+/// overflow, and none otherwise.
 /// </summary>
 public sealed class TabStripReserveTests
 {
-    private const double QuickAdd = 32;
     private const double List = 32;
 
+    /// <summary>
+    /// Quick connect is clicked from the toolbar button and the empty session area; the tab strip no
+    /// longer carries a duplicate of it.
+    /// </summary>
+    private const int QuickConnectClickSites = 2;
+
     [Fact]
-    public void WithoutOverflowOnlyTheQuickConnectButtonIsReserved()
+    public void WithoutOverflowNothingIsReserved()
     {
         MainWindow.TabStripReserve reserve = MainWindow.ComputeTabStripReserve(
-            extentWidth: 400, viewportWidth: 500, currentRightMargin: QuickAdd, QuickAdd, List);
+            extentWidth: 400, viewportWidth: 500, currentRightMargin: 0, List);
 
         Assert.False(reserve.Overflowing);
-        Assert.Equal(QuickAdd, reserve.RightMargin);
+        Assert.Equal(0, reserve.RightMargin);
     }
 
     [Fact]
-    public void AnOverflowReservesTheListButtonBesideIt()
+    public void AnOverflowReservesTheListButton()
     {
         MainWindow.TabStripReserve reserve = MainWindow.ComputeTabStripReserve(
-            extentWidth: 600, viewportWidth: 500, currentRightMargin: QuickAdd, QuickAdd, List);
+            extentWidth: 600, viewportWidth: 500, currentRightMargin: 0, List);
 
         Assert.True(reserve.Overflowing);
-        Assert.Equal(QuickAdd + List + MainWindow.TabStripButtonGap, reserve.RightMargin);
+        Assert.Equal(List + MainWindow.TabStripButtonGap, reserve.RightMargin);
     }
 
     /// <summary>
@@ -57,41 +62,36 @@ public sealed class TabStripReserveTests
     [Fact]
     public void TakingTheRoomDoesNotUndoTheDecision()
     {
-        double reserved = QuickAdd + List + MainWindow.TabStripButtonGap;
-        double narrowed = 500 - (List + MainWindow.TabStripButtonGap);
+        double reserved = List + MainWindow.TabStripButtonGap;
+        double narrowed = 500 - reserved;
 
         MainWindow.TabStripReserve stillOver = MainWindow.ComputeTabStripReserve(
-            extentWidth: 501, viewportWidth: narrowed, currentRightMargin: reserved, QuickAdd, List);
+            extentWidth: 501, viewportWidth: narrowed, currentRightMargin: reserved, List);
         MainWindow.TabStripReserve backUnder = MainWindow.ComputeTabStripReserve(
-            extentWidth: 490, viewportWidth: narrowed, currentRightMargin: reserved, QuickAdd, List);
+            extentWidth: 490, viewportWidth: narrowed, currentRightMargin: reserved, List);
 
         Assert.True(stillOver.Overflowing);
+        Assert.Equal(reserved, stillOver.RightMargin);
         Assert.False(backUnder.Overflowing);
-        Assert.Equal(QuickAdd, backUnder.RightMargin);
+        Assert.Equal(0, backUnder.RightMargin);
     }
 
+    /// <summary>
+    /// The list button alone sits at the strip's right end; the quick add button that duplicated
+    /// quick connect is gone, and quick connect keeps only its toolbar and empty area buttons.
+    /// </summary>
     [Fact]
-    public void AQuickConnectButtonNotYetMeasuredReservesNothing()
-    {
-        MainWindow.TabStripReserve reserve = MainWindow.ComputeTabStripReserve(
-            extentWidth: 400, viewportWidth: 500, currentRightMargin: 0, double.NaN, List);
-
-        Assert.Equal(0, reserve.RightMargin);
-    }
-
-    /// <summary>The two buttons sit side by side at the strip's right end, list first.</summary>
-    [Fact]
-    public void TheListAndQuickConnectButtonsShareOneRightAlignedRow()
+    public void OnlyTheListButtonSitsAtTheStripRightEnd()
     {
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
         XDocument window = XDocument.Load(Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
         XElement list = Assert.Single(window.Descendants(), e => (string?)e.Attribute(x + "Name") == "Mw_SessionTabListButton");
-        XElement quick = Assert.Single(window.Descendants(), e => (string?)e.Attribute(x + "Name") == "Mw_SessionTabQuickAddButton");
 
-        Assert.Same(list.Parent, quick.Parent);
         Assert.Equal("StackPanel", list.Parent!.Name.LocalName);
         Assert.Equal("Right", (string?)list.Parent.Attribute("HorizontalAlignment"));
-        Assert.True(list.IsBefore(quick));
-        Assert.Equal("OnQuickConnectButtonClick", (string?)quick.Attribute("Click"));
+        Assert.DoesNotContain(window.Descendants(), e => (string?)e.Attribute(x + "Name") == "Mw_SessionTabQuickAddButton");
+        Assert.Equal(
+            QuickConnectClickSites,
+            window.Descendants().Count(e => (string?)e.Attribute("Click") == "OnQuickConnectButtonClick"));
     }
 }

@@ -110,7 +110,6 @@ public partial class MainWindow
             _tabStripScroller.ExtentWidth,
             _tabStripScroller.ViewportWidth,
             _tabStripScroller.Margin.Right,
-            Mw_SessionTabQuickAddButton.Width,
             Mw_SessionTabListButton.Width);
 
         Mw_SessionTabListButton.Visibility = reserve.Overflowing ? Visibility.Visible : Visibility.Collapsed;
@@ -125,26 +124,23 @@ public partial class MainWindow
     internal readonly record struct TabStripReserve(bool Overflowing, double RightMargin);
 
     /// <summary>
-    /// Decides the strip's right margin: the quick connect button always, the list button while
-    /// the tabs overflow. Overflow is judged with the list button's share of the current margin
+    /// Decides the strip's right margin: the list button and its gap while the tabs overflow,
+    /// nothing otherwise. Overflow is judged with the list button's share of the current margin
     /// added back, so taking the room does not undo the decision that took it.
     /// </summary>
     /// <param name="extentWidth">The width the tabs need.</param>
     /// <param name="viewportWidth">The width the strip shows.</param>
-    /// <param name="currentRightMargin">The margin the strip has now.</param>
-    /// <param name="quickAddWidth">The quick connect button's width.</param>
+    /// <param name="currentRightMargin">The margin the strip has now, all of it the list button's share.</param>
     /// <param name="listButtonWidth">The list button's width.</param>
     internal static TabStripReserve ComputeTabStripReserve(
         double extentWidth,
         double viewportWidth,
         double currentRightMargin,
-        double quickAddWidth,
         double listButtonWidth)
     {
-        double quickAdd = double.IsNaN(quickAddWidth) ? 0 : quickAddWidth;
-        double listShare = Math.Max(0, currentRightMargin - quickAdd);
+        double listShare = currentRightMargin;
         bool overflowing = extentWidth > viewportWidth + listShare + TabStripOverflowTolerance;
-        double margin = quickAdd + (overflowing ? listButtonWidth + TabStripButtonGap : 0);
+        double margin = overflowing ? listButtonWidth + TabStripButtonGap : 0;
         return new TabStripReserve(overflowing, margin);
     }
 
