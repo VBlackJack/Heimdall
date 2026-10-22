@@ -1954,9 +1954,9 @@
                         </TabControl>
 
                         <!-- The strip's right end: the list of every open tab, folded-away ones
-                             included, shown only while the tabs overflow; then quick connect, always
-                             there. Drawn over the strip, which makes room for both so the selected
-                             tab never sits underneath (UpdateTabStripOverflow). -->
+                             included, shown only while the tabs overflow. Drawn over the strip, which
+                             makes room for it so the selected tab never sits underneath
+                             (UpdateTabStripOverflow). -->
                         <StackPanel Grid.Row="0"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right"
@@ -1975,19 +1975,6 @@
                                 <!-- The icon font sits on the glyph alone: the tab list menu takes its font
                                      from the button it opens from, and drew every title as empty boxes. -->
                                 <TextBlock Text="&#xE70D;"
-                                           FontFamily="{StaticResource FontFamilyIcons}"
-                                           FontSize="{StaticResource FontSizeSmallCaption}"/>
-                            </Button>
-                            <Button x:Name="Mw_SessionTabQuickAddButton"
-                                    VerticalAlignment="Stretch"
-                                    Width="{StaticResource SessionTabListButtonWidth}"
-                                    Padding="0"
-                                    Click="OnQuickConnectButtonClick"
-                                    Background="{DynamicResource SurfaceBrush}"
-                                    ToolTip="{loc:Translate QuickConnectShortcut}"
-                                    AutomationProperties.Name="{loc:Translate QuickConnectShortcut}"
-                                    Style="{DynamicResource SecondaryButtonStyle}">
-                                <TextBlock Text="&#xE710;"
                                            FontFamily="{StaticResource FontFamilyIcons}"
                                            FontSize="{StaticResource FontSizeSmallCaption}"/>
                             </Button>
