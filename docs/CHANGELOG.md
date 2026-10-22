@@ -12,6 +12,30 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-22: a whole outline on the selected tab, no quick add button (v2026.102201)
+
+### Session tabs (#677, #678)
+
+- **Whole outline on the selected tab** (#677). `ThemedTabItemStyle` in `CommonControls.xaml` put
+  a right `Margin` on the TabItem itself; inside a `TabPanel` that left the template root `Border`
+  at the full slot width, so its right edge was clipped and the selected session tab read as cut
+  on one side. The TabItem now has `Margin="0"` and the 4 px gap is the root `Border`'s own
+  `Margin="0,0,4,0"`. The selected outline used `BorderBrush`, which equals the card colour on
+  every shipped theme, so no outline showed: it is `BorderStrongBrush` (the derived 3:1 border).
+  Measured on the running build by reading the pixels at both edges. The ServerDialog sub-tabs use
+  the same style and get the same outline.
+- **No quick add button** (#678). `Mw_SessionTabQuickAddButton` at the right end of the session
+  tab strip called `OnQuickConnectButtonClick`, the same action as the toolbar Quick Connect
+  button (Ctrl+K), and is removed. The tab list button stays, shown while the tabs overflow.
+  `MainWindow.ComputeTabStripReserve` loses its quick add parameter: the strip reserves
+  `listButtonWidth + TabStripButtonGap` only while overflowing, 0 otherwise, and overflow is still
+  judged with the list button's share of the current margin added back.
+- Tests: `SessionTabOutlineMarkupTests` (`TheTabItemCarriesNoMarginOfItsOwn`,
+  `TheTabGapIsTheBorderMargin`, `TheSelectedTabIsOutlinedWithTheStrongBorder`);
+  `TabStripReserveTests` follows the 4-argument signature and gains
+  `OnlyTheListButtonSitsAtTheStripRightEnd` (list button in its right-aligned row, no element named
+  `Mw_SessionTabQuickAddButton`, two Quick Connect click sites left).
+
 ## 2026-10-21: one rail for every setting (v2026.102103)
 
 ### Settings (#674, #675)
