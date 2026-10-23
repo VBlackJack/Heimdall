@@ -139,6 +139,9 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.NanaRunPath)] = new("SettingsLblNanaRunPath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.NirSoftPath)] = new("SettingsLblNirSoftPath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.SysinternalsPath)] = new("SettingsLblSysinternalsPath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
+        [nameof(AppSettings.CitrixSelfServicePath)] = new("SettingsLblCitrixSelfServicePath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
+        [nameof(AppSettings.CitrixCacheDirectory)] = new("SettingsLblCitrixCacheDirectory", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
+        [nameof(AppSettings.CitrixCacheStorePrefix)] = new("SettingsLblCitrixCacheStorePrefix", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
     };
 
     /// <summary>The panel place of a setting, when the catalog knows it.</summary>

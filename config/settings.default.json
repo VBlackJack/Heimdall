@@ -122,6 +122,9 @@
     "sysinternalsPath": null,
     "nirSoftPath": null,
     "nanaRunPath": null,
+    "citrixSelfServicePath": null,
+    "citrixCacheDirectory": null,
+    "citrixCacheStorePrefix": null,
     "externalTools": [
         {
             "name": "Ping",
