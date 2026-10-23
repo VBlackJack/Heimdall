@@ -4211,6 +4211,77 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportCitrixApps_TwiceWithVaultDisabled_DoesNotDuplicateAndPreservesProfileId()
+    {
+        const string firstToken = "-launch -s store-01 -CitrixID store-01@@App -ica https://store.example.test/first -cmdline";
+        const string secondToken = "-launch -s store-01 -CitrixID store-01@@App -ica https://store.example.test/second -cmdline";
+        ResetCredentialProtector();
+        try
+        {
+            FakeConfigManager config = new();
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog);
+
+            viewModel.CitrixScanProvider = () => CreateCitrixScanResult(firstToken, "store-01@@App");
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+            ServerProfileDto firstImport = Assert.Single(config.Servers);
+            string originalId = firstImport.Id;
+            firstImport.DisplayName = "Custom Calculator";
+            firstImport.Group = "Custom Group";
+
+            viewModel.CitrixScanProvider = () => CreateCitrixScanResult(secondToken, "store-01@@App");
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+            ServerProfileDto afterReimport = Assert.Single(config.Servers);
+            Assert.Equal(originalId, afterReimport.Id);
+            Assert.Equal("Custom Calculator", afterReimport.DisplayName);
+            Assert.Equal("Custom Group", afterReimport.Group);
+            Assert.Equal("store-01@@App", afterReimport.CitrixId);
+            Assert.Equal(secondToken, afterReimport.CitrixLaunchCommandLine);
+        }
+        finally
+        {
+            ResetCredentialProtector();
+        }
+    }
+
+    [Fact]
+    public async Task ImportCitrixApps_TwiceWithVaultEnabledAndUnlocked_DoesNotDuplicateDespiteRandomNonce()
+    {
+        const string launchToken = "-launch -s store-01 -CitrixID store-01@@App -ica https://store.example.test/launch -cmdline";
+        ResetCredentialProtector();
+        try
+        {
+            using VaultDekHolder dek = VaultKeyManager.GenerateDek();
+            CredentialProtector.SetVaultEnabled(true);
+            CredentialProtector.SetVaultKey(dek);
+            FakeConfigManager config = new();
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog);
+            viewModel.CitrixScanProvider = () => CreateCitrixScanResult(launchToken, "store-01@@App");
+
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+            ServerProfileDto firstImport = Assert.Single(config.Servers);
+            string originalId = firstImport.Id;
+            string? firstCipherBlob = firstImport.CitrixLaunchCommandLine;
+
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+            ServerProfileDto secondImport = Assert.Single(config.Servers);
+
+            Assert.Equal(originalId, secondImport.Id);
+            Assert.Equal("store-01@@App", secondImport.CitrixId);
+            Assert.True(VaultSecretBlob.IsSecretBlob(secondImport.CitrixLaunchCommandLine));
+            Assert.NotEqual(firstCipherBlob, secondImport.CitrixLaunchCommandLine);
+            Assert.Equal(launchToken, CredentialProtector.Unprotect(secondImport.CitrixLaunchCommandLine));
+        }
+        finally
+        {
+            ResetCredentialProtector();
+        }
+    }
+
+    [Fact]
     public void Dispose_UnsubscribesExternalToolTracking()
     {
         SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
@@ -5013,14 +5084,15 @@ public sealed partial class SettingsViewModelTests : IDisposable
             SshGatewayId = gatewayId
         };
 
-    private static CitrixScanResult CreateCitrixScanResult(string launchToken)
+    private static CitrixScanResult CreateCitrixScanResult(string launchToken, string? citrixId = "store-01@@App")
     {
         var result = new CitrixScanResult();
         result.Resources.Add(new CitrixResource
         {
+            CitrixId = citrixId,
             FriendlyName = "Calculator",
             LaunchCommandLine = launchToken,
-            StoreFrontUrl = "https://citrix.example.test"
+            StoreFrontUrl = "https://store.example.test"
         });
         return result;
     }
