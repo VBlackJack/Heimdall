@@ -254,6 +254,83 @@ public sealed class CitrixCacheScannerScanDirectoryTests : IDisposable
         Assert.Contains("Broken_Cache.xml", warning);
     }
 
+    [Fact]
+    public void ScanDirectory_ServerStateFilter_KeepsOnlySubscribedAndMissingServerState()
+    {
+        WriteCacheFile(
+            "ServerState_Cache.xml",
+            """
+            <root>
+              <resource>
+                <FriendlyName>Subscribed App</FriendlyName>
+                <ServerState>Subscribed</ServerState>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID store-01@@SubscribedApp -ica https://store.example.test/Citrix/Store/resources/v2/sub1/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+              <resource>
+                <FriendlyName>Case Insensitive Subscribed App</FriendlyName>
+                <ServerState>subscribed</ServerState>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID "store-01@@Subscribed App Two" -ica https://store.example.test/Citrix/Store/resources/v2/sub2/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+              <resource>
+                <FriendlyName>Unsubscribed Catalog App</FriendlyName>
+                <ServerState>NotSpecified</ServerState>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID store-01@@UnsubscribedApp -ica https://store.example.test/Citrix/Store/resources/v2/unsub/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+              <resource>
+                <FriendlyName>Legacy OnPrem App Without ServerState</FriendlyName>
+                <LaunchCommandLine>SelfService.exe -qlaunch "Legacy OnPrem App Without ServerState"</LaunchCommandLine>
+              </resource>
+            </root>
+            """);
+
+        CitrixScanResult result = CitrixCacheScanner.ScanDirectory(_tempDir);
+
+        Assert.Empty(result.Warnings);
+        Assert.Equal(3, result.Resources.Count);
+        Assert.Equal("Subscribed App", result.Resources[0].FriendlyName);
+        Assert.Equal("store-01@@SubscribedApp", result.Resources[0].CitrixId);
+        Assert.Equal("Case Insensitive Subscribed App", result.Resources[1].FriendlyName);
+        Assert.Equal("store-01@@Subscribed App Two", result.Resources[1].CitrixId);
+        Assert.Equal("Legacy OnPrem App Without ServerState", result.Resources[2].FriendlyName);
+        Assert.Null(result.Resources[2].CitrixId);
+    }
+
+    [Fact]
+    public void ScanDirectory_DuplicateLaunchCommandLineAndTwoPuttyVariants_UsesFirstLaunchCommandAndExtractsDistinctCitrixIds()
+    {
+        WriteCacheFile(
+            "CloudStore_Cache.xml",
+            """
+            <root>
+              <resource>
+                <FriendlyName>PuTTy</FriendlyName>
+                <ServerState>Subscribed</ServerState>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID store-01@@PuTTy -ica https://store.example.test/Citrix/Store/resources/v2/id1/launch/ica -cmdline</LaunchCommandLine>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID store-01@@PuTTy -ica https://store.example.test/Citrix/Store/resources/v2/id1/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+              <resource>
+                <FriendlyName>PuTTy 🛡️</FriendlyName>
+                <ServerState>Subscribed</ServerState>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID "store-01@@PuTTy 🛡️" -ica https://store.example.test/Citrix/Store/resources/v2/id2/launch/ica -cmdline</LaunchCommandLine>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID "store-01@@PuTTy 🛡️" -ica https://store.example.test/Citrix/Store/resources/v2/id2/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+            </root>
+            """);
+
+        CitrixScanResult result = CitrixCacheScanner.ScanDirectory(_tempDir);
+
+        Assert.Empty(result.Warnings);
+        Assert.Equal(2, result.Resources.Count);
+        Assert.Equal("PuTTy", result.Resources[0].FriendlyName);
+        Assert.Equal("store-01@@PuTTy", result.Resources[0].CitrixId);
+        Assert.Equal(
+            "-launch -s store-01 -CitrixID store-01@@PuTTy -ica https://store.example.test/Citrix/Store/resources/v2/id1/launch/ica -cmdline",
+            result.Resources[0].LaunchCommandLine);
+        Assert.Equal("PuTTy 🛡️", result.Resources[1].FriendlyName);
+        Assert.Equal("store-01@@PuTTy 🛡️", result.Resources[1].CitrixId);
+        Assert.NotEqual(result.Resources[0].CitrixId, result.Resources[1].CitrixId);
+    }
+
     private void WriteCacheFile(string fileName, string content)
     {
         string filePath = Path.Combine(_tempDir, fileName);
@@ -262,7 +339,8 @@ public sealed class CitrixCacheScannerScanDirectoryTests : IDisposable
 
     private static bool ResourceContains(CitrixResource resource, string text)
     {
-        return Contains(resource.FriendlyName, text)
+        return Contains(resource.CitrixId, text)
+            || Contains(resource.FriendlyName, text)
             || Contains(resource.Description, text)
             || Contains(resource.ResourceType, text)
             || Contains(resource.Category, text)

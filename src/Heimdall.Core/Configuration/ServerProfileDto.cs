@@ -445,6 +445,7 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
         : Models.ElevationMode.None;
 
     // Citrix settings
+    public string? CitrixId { get; set; }
     public string? CitrixStoreFrontUrl { get; set; }
     public string? CitrixAppName { get; set; }
     public string? CitrixIcaFilePath { get; set; }

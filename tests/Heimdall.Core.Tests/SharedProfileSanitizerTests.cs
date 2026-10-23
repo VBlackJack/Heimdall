@@ -83,7 +83,7 @@ public sealed class SharedProfileSanitizerTests
         nameof(ServerProfileDto.LocalShellExecutable), nameof(ServerProfileDto.LocalShellArguments),
         nameof(ServerProfileDto.LocalShellWorkingDirectory), nameof(ServerProfileDto.LocalShellElevated),
         nameof(ServerProfileDto.ElevationMode), nameof(ServerProfileDto.ExecutionConfirmed),
-        nameof(ServerProfileDto.CitrixStoreFrontUrl), nameof(ServerProfileDto.CitrixAppName),
+        nameof(ServerProfileDto.CitrixId), nameof(ServerProfileDto.CitrixStoreFrontUrl), nameof(ServerProfileDto.CitrixAppName),
         nameof(ServerProfileDto.CitrixIcaFilePath), nameof(ServerProfileDto.CitrixSeamlessMode),
         nameof(ServerProfileDto.CitrixUseSso), nameof(ServerProfileDto.CitrixLaunchCommandLine),
         nameof(ServerProfileDto.FtpPort), nameof(ServerProfileDto.FtpUsername),

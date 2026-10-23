@@ -30,6 +30,7 @@ public sealed class ImportedProfileSanitizerTests
                 Id = "profile-1",
                 DisplayName = "Citrix App",
                 RemoteServer = "citrix.example.com",
+                CitrixId = "store-01@@Calculator",
                 CitrixAppName = "Calculator",
                 CitrixStoreFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/",
                 CitrixLaunchCommandLine = "-launch cached value",
@@ -52,6 +53,7 @@ public sealed class ImportedProfileSanitizerTests
         Assert.Equal("profile-1", profiles[0].Id);
         Assert.Equal("Citrix App", profiles[0].DisplayName);
         Assert.Equal("citrix.example.com", profiles[0].RemoteServer);
+        Assert.Equal("store-01@@Calculator", profiles[0].CitrixId);
         Assert.Equal("Calculator", profiles[0].CitrixAppName);
         Assert.Equal("https://citrix.example.com/Citrix/StoreWeb/", profiles[0].CitrixStoreFrontUrl);
         Assert.Equal("profile-2", profiles[1].Id);

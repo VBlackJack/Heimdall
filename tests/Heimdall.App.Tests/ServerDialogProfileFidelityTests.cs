@@ -146,6 +146,7 @@ public sealed class ServerDialogProfileFidelityTests
             RemoteServer = "host.example.test",
             SortOrder = 41,
             TunnelsPanelExpanded = true,
+            CitrixId = "store-01@@app",
             CitrixLaunchCommandLine = "\"C:/Program Files/Citrix/SelfServicePlugin.exe\" -qlaunch app",
         };
 
@@ -156,6 +157,7 @@ public sealed class ServerDialogProfileFidelityTests
 
         Assert.Equal(41, edited.SortOrder);
         Assert.True(edited.TunnelsPanelExpanded);
+        Assert.Equal(stored.CitrixId, edited.CitrixId);
         Assert.Equal(stored.CitrixLaunchCommandLine, edited.CitrixLaunchCommandLine);
         Assert.True(edited.ExtensionData.ContainsKey("ASettingFromANewerVersion"));
         Assert.Equal("keep me", edited.ExtensionData["ASettingFromANewerVersion"].GetString());
@@ -170,6 +172,7 @@ public sealed class ServerDialogProfileFidelityTests
 
         Assert.Equal(0, composed.SortOrder);
         Assert.Null(composed.TunnelsPanelExpanded);
+        Assert.Null(composed.CitrixId);
         Assert.Null(composed.CitrixLaunchCommandLine);
         Assert.Empty(composed.ExtensionData);
     }
