@@ -665,6 +665,169 @@ public sealed class CitrixHandlerTests
         Assert.Equal(baseline, session.PreLaunchWindows);
     }
 
+    [Theory]
+    [InlineData(@"C:\Custom\Citrix\SelfService.exe")]
+    [InlineData(@"C:\Custom\Citrix\selfservice.exe")]
+    [InlineData(@"  C:\Custom\Citrix\SELFSERVICE.EXE  ")]
+    public async Task ConnectAsync_SelfServiceCache_WithValidCitrixSelfServicePathOverride_UsesOverrideWithoutFallbackOrWarning(
+        string configuredPath)
+    {
+        string? launchedExecutable = null;
+        int fallbackResolverCalls = 0;
+        List<string> warnings = [];
+        CitrixHandler handler = new(
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            startInfo =>
+            {
+                launchedExecutable = startInfo.FileName;
+                return null;
+            },
+            static stored => stored,
+            () =>
+            {
+                fallbackResolverCalls++;
+                return @"C:\Fallback\SelfService.exe";
+            },
+            static _ => { },
+            warnings.Add,
+            fileExists: static path => string.Equals(
+                path,
+                @"C:\Custom\Citrix\SelfService.exe",
+                StringComparison.OrdinalIgnoreCase));
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateCacheServer("-launch -s store-01 -CitrixID store-01@@App -ica https://store.example.test/launch -cmdline"),
+            new AppSettings { CitrixSelfServicePath = configuredPath },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(configuredPath.Trim(), launchedExecutable);
+        Assert.Equal(0, fallbackResolverCalls);
+        Assert.Empty(warnings);
+    }
+
+    [Theory]
+    [InlineData(@"C:\Custom\Citrix\storebrowse.exe")]
+    [InlineData(@"C:\Windows\System32\cmd.exe")]
+    public async Task ConnectAsync_SelfServiceCache_WithWrongFileNameOverride_LogsWarningAndFallsBackToDefaultProbe(
+        string wrongExecutablePath)
+    {
+        const string launchArguments = "-launch -s store-01 -CitrixID store-01@@SecretApp -ica https://store.example.test/launch -cmdline";
+        string? launchedExecutable = null;
+        int fallbackResolverCalls = 0;
+        List<string> warnings = [];
+        CitrixHandler handler = new(
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            startInfo =>
+            {
+                launchedExecutable = startInfo.FileName;
+                return null;
+            },
+            static stored => stored,
+            () =>
+            {
+                fallbackResolverCalls++;
+                return @"C:\Fallback\SelfService.exe";
+            },
+            static _ => { },
+            warnings.Add,
+            fileExists: static _ => true);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateCacheServer(launchArguments),
+            new AppSettings { CitrixSelfServicePath = wrongExecutablePath },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(@"C:\Fallback\SelfService.exe", launchedExecutable);
+        Assert.Equal(1, fallbackResolverCalls);
+        string warning = Assert.Single(warnings);
+        Assert.Contains(wrongExecutablePath, warning, StringComparison.Ordinal);
+        Assert.DoesNotContain(launchArguments, warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("store-01@@SecretApp", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_SelfServiceCache_WithMissingSelfServiceOverride_LogsWarningAndFallsBackToDefaultProbe()
+    {
+        const string missingPath = @"C:\Missing\Citrix\SelfService.exe";
+        const string launchArguments = "-launch -s store-01 -CitrixID store-01@@SecretApp -ica https://store.example.test/launch -cmdline";
+        string? launchedExecutable = null;
+        int fallbackResolverCalls = 0;
+        List<string> warnings = [];
+        CitrixHandler handler = new(
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            startInfo =>
+            {
+                launchedExecutable = startInfo.FileName;
+                return null;
+            },
+            static stored => stored,
+            () =>
+            {
+                fallbackResolverCalls++;
+                return @"C:\Fallback\SelfService.exe";
+            },
+            static _ => { },
+            warnings.Add,
+            fileExists: static _ => false);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateCacheServer(launchArguments),
+            new AppSettings { CitrixSelfServicePath = missingPath },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(@"C:\Fallback\SelfService.exe", launchedExecutable);
+        Assert.Equal(1, fallbackResolverCalls);
+        string warning = Assert.Single(warnings);
+        Assert.Contains(missingPath, warning, StringComparison.Ordinal);
+        Assert.DoesNotContain(launchArguments, warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("store-01@@SecretApp", warning, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ConnectAsync_SelfServiceCache_WithUnsetOverride_UsesDefaultProbeWithoutWarning(
+        string? unsetOverride)
+    {
+        string? launchedExecutable = null;
+        int fallbackResolverCalls = 0;
+        List<string> warnings = [];
+        CitrixHandler handler = new(
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            startInfo =>
+            {
+                launchedExecutable = startInfo.FileName;
+                return null;
+            },
+            static stored => stored,
+            () =>
+            {
+                fallbackResolverCalls++;
+                return @"C:\DefaultProbe\SelfService.exe";
+            },
+            static _ => { },
+            warnings.Add,
+            fileExists: static _ => false);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateCacheServer("-launch -s store-01 -CitrixID store-01@@App -ica https://store.example.test/launch -cmdline"),
+            new AppSettings { CitrixSelfServicePath = unsetOverride },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(@"C:\DefaultProbe\SelfService.exe", launchedExecutable);
+        Assert.Equal(1, fallbackResolverCalls);
+        Assert.Empty(warnings);
+    }
+
     private static CitrixHandler CreateHandler(
         Func<ProcessStartInfo, Process?> startProcess,
         Func<string, string?> unprotectSecret,

@@ -55,6 +55,7 @@ internal sealed class CitrixHandler : IProtocolHandler
     private readonly Func<string?> _resolveCitrixLauncher;
     private readonly Action<string> _logInfo;
     private readonly Action<string> _logWarning;
+    private readonly Func<string, bool> _fileExists;
 
     /// <summary>
     /// Baseline of visible windows, taken before the launcher starts. Injectable so a test can
@@ -85,7 +86,8 @@ internal sealed class CitrixHandler : IProtocolHandler
         Action<string> logInfo,
         Action<string> logWarning,
         Func<string?>? resolveCitrixLauncher = null,
-        Func<IReadOnlySet<nint>>? capturePreLaunchWindows = null)
+        Func<IReadOnlySet<nint>>? capturePreLaunchWindows = null,
+        Func<string, bool>? fileExists = null)
     {
         _capturePreLaunchWindows = capturePreLaunchWindows ?? VisibleWindowSnapshot.Capture;
         ArgumentNullException.ThrowIfNull(connectionSm);
@@ -104,6 +106,7 @@ internal sealed class CitrixHandler : IProtocolHandler
         _resolveCitrixLauncher = resolveCitrixLauncher ?? ResolveCitrixLauncher;
         _logInfo = logInfo;
         _logWarning = logWarning;
+        _fileExists = fileExists ?? File.Exists;
     }
 
     public string Protocol => "CITRIX";
@@ -194,7 +197,7 @@ internal sealed class CitrixHandler : IProtocolHandler
                     return Task.FromResult(new ConnectionResult(false, msg, null));
                 }
 
-                var selfServicePath = _resolveSelfServicePath();
+                var selfServicePath = ResolveEffectiveSelfServicePath(settings.CitrixSelfServicePath);
                 if (selfServicePath is null)
                 {
                     var msg = _localizer["CitrixWorkspaceNotFound"];
@@ -377,6 +380,31 @@ internal sealed class CitrixHandler : IProtocolHandler
     /// <summary>
     /// Resolves the SelfService.exe path specifically (used for cache-based launch).
     /// </summary>
+    private string? ResolveEffectiveSelfServicePath(string? configuredOverridePath)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredOverridePath))
+        {
+            string candidate = Environment.ExpandEnvironmentVariables(configuredOverridePath.Trim());
+            string fileName = Path.GetFileName(candidate);
+            if (!string.Equals(fileName, SelfServiceExecutableName, StringComparison.OrdinalIgnoreCase))
+            {
+                _logWarning(
+                    $"Citrix SelfService path override rejected (file name must be {SelfServiceExecutableName}): path={candidate}");
+            }
+            else if (!_fileExists(candidate))
+            {
+                _logWarning(
+                    $"Citrix SelfService path override not found on disk; falling back to default probe list: path={candidate}");
+            }
+            else
+            {
+                return candidate;
+            }
+        }
+
+        return _resolveSelfServicePath();
+    }
+
     private static string? ResolveSelfServicePath()
     {
         var paths = new[]

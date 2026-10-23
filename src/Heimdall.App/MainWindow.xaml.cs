@@ -3378,6 +3378,42 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
     }
 
+    private void OnCitrixSelfServicePathBrowseClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = vm.Localize("BrowseCitrixSelfServicePathTitle"),
+            Filter = vm.Localize("BrowseCitrixSelfServicePathFilter")
+        };
+        if (!string.IsNullOrEmpty(vm.Settings.CitrixSelfServicePath))
+        {
+            var dir = System.IO.Path.GetDirectoryName(vm.Settings.CitrixSelfServicePath);
+            if (!string.IsNullOrEmpty(dir) && System.IO.Directory.Exists(dir))
+                dlg.InitialDirectory = dir;
+        }
+        if (dlg.ShowDialog(this) == true)
+            vm.Settings.CitrixSelfServicePath = dlg.FileName;
+    }
+
+    private void OnCitrixCacheDirectoryBrowseClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        using var dlg = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = vm.Localize("BrowseCitrixCacheDirectoryTitle"),
+            ShowNewFolderButton = false
+        };
+        if (!string.IsNullOrEmpty(vm.Settings.CitrixCacheDirectory)
+            && System.IO.Directory.Exists(vm.Settings.CitrixCacheDirectory))
+            dlg.SelectedPath = vm.Settings.CitrixCacheDirectory;
+        if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            vm.Settings.CitrixCacheDirectory = dlg.SelectedPath;
+            vm.Settings.IsDirty = true;
+        }
+    }
+
     private void OnBrowseEditorPathClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

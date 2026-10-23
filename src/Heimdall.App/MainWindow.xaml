@@ -5528,6 +5528,55 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- Citrix Workspace -->
+                                <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsCitrixTitle" Text="{loc:Translate SettingsSectionCitrixWorkspace}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsCitrixDesc" Text="{loc:Translate SettingsCitrixWorkspaceDesc}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <StackPanel>
+                                            <TextBlock x:Name="Mw_SettingsLblCitrixSelfServicePath" Text="{loc:Translate SettingsLblCitrixSelfServicePath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" x:Name="Mw_SettingsTxtCitrixSelfServicePath" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblCitrixSelfServicePath}" Text="{Binding Settings.CitrixSelfServicePath, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}"/>
+                                                <Button Grid.Column="1" x:Name="Mw_SettingsBtnCitrixSelfServiceBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseCitrixSelfServicePath}" Padding="6,2" Margin="4,0,0,0" Click="OnCitrixSelfServicePathBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CitrixSelfServicePath]}"/>
+                                            <TextBlock x:Name="Mw_SettingsCitrixSelfServicePathMissing" Text="{loc:Translate SettingsFileNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsCitrixSelfServicePathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsLblCitrixCacheDirectory" Text="{loc:Translate SettingsLblCitrixCacheDirectory}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" x:Name="Mw_SettingsTxtCitrixCacheDirectory" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblCitrixCacheDirectory}" Text="{Binding Settings.CitrixCacheDirectory, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}"/>
+                                                <Button Grid.Column="1" x:Name="Mw_SettingsBtnCitrixCacheDirectoryBrowse" AutomationProperties.Name="{loc:Translate A11yBrowseCitrixCacheDirectory}" Padding="6,2" Margin="4,0,0,0" Click="OnCitrixCacheDirectoryBrowseClick" Style="{DynamicResource SecondaryButtonStyle}" FontSize="{StaticResource FontSizeCaption}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CitrixCacheDirectory]}"/>
+                                            <TextBlock x:Name="Mw_SettingsCitrixCacheDirectoryMissing" Text="{loc:Translate SettingsFolderNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsCitrixCacheDirectoryMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsLblCitrixCacheStorePrefix" Text="{loc:Translate SettingsLblCitrixCacheStorePrefix}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <TextBox x:Name="Mw_SettingsTxtCitrixCacheStorePrefix" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblCitrixCacheStorePrefix}" Text="{Binding Settings.CitrixCacheStorePrefix, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}" ToolTip="{loc:Translate SettingsHintCitrixCacheStorePrefix}"/>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CitrixCacheStorePrefix]}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}">
                                     <StackPanel>
                                         <DockPanel Margin="0,0,0,12">

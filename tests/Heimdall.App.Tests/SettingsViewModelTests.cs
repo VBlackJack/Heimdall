@@ -4282,6 +4282,176 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportCitrixApps_ShowsAddedUpdatedAndUnchangedCountsInSummaryMessage()
+    {
+        ResetCredentialProtector();
+        try
+        {
+            LocalizationManager localizer = new();
+            await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "fr");
+
+            FakeConfigManager config = new();
+            for (int i = 1; i <= 12; i++)
+            {
+                config.Servers.Add(new ServerProfileDto
+                {
+                    Id = $"existing-unchanged-{i}",
+                    DisplayName = $"App {i}",
+                    ConnectionType = "Citrix",
+                    RemoteServer = "https://store.example.test",
+                    CitrixId = $"store-01@@App{i}",
+                    CitrixAppName = $"App {i}",
+                    CitrixStoreFrontUrl = "https://store.example.test",
+                    CitrixLaunchCommandLine = "-launch -s store-01 -CitrixID store-01@@App" + i
+                });
+            }
+
+            config.Servers.Add(new ServerProfileDto
+            {
+                Id = "existing-updated",
+                DisplayName = "Updated App",
+                ConnectionType = "Citrix",
+                RemoteServer = "https://old-store.example.test",
+                CitrixId = "store-01@@UpdatedApp",
+                CitrixAppName = "Old Name",
+                CitrixStoreFrontUrl = "https://old-store.example.test",
+                CitrixLaunchCommandLine = "-launch -s store-01 -CitrixID store-01@@UpdatedApp"
+            });
+
+            CitrixScanResult scanResult = new();
+            for (int i = 1; i <= 12; i++)
+            {
+                scanResult.Resources.Add(new CitrixResource
+                {
+                    CitrixId = $"store-01@@App{i}",
+                    FriendlyName = $"App {i}",
+                    StoreFrontUrl = "https://store.example.test",
+                    LaunchCommandLine = "-launch -s store-01 -CitrixID store-01@@App" + i + " -cmdline"
+                });
+            }
+
+            scanResult.Resources.Add(new CitrixResource
+            {
+                CitrixId = "store-01@@UpdatedApp",
+                FriendlyName = "Updated App",
+                StoreFrontUrl = "https://store.example.test",
+                LaunchCommandLine = "-launch -s store-01 -CitrixID store-01@@UpdatedApp -cmdline"
+            });
+
+            for (int i = 1; i <= 3; i++)
+            {
+                scanResult.Resources.Add(new CitrixResource
+                {
+                    CitrixId = $"store-01@@NewApp{i}",
+                    FriendlyName = $"New App {i}",
+                    StoreFrontUrl = "https://store.example.test",
+                    LaunchCommandLine = "-launch -s store-01 -CitrixID store-01@@NewApp" + i + " -cmdline"
+                });
+            }
+
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+            viewModel.CitrixScanProvider = () => scanResult;
+
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+            (string Title, string Message) info = Assert.Single(dialog.InfoCalls);
+            Assert.Equal("3 applications Citrix ajout\u00e9es, 1 mise \u00e0 jour, 12 d\u00e9j\u00e0 \u00e0 jour.", info.Message);
+        }
+        finally
+        {
+            ResetCredentialProtector();
+        }
+    }
+
+    [Fact]
+    public async Task ImportCitrixApps_UsesConfiguredCacheDirectoryAndStorePrefix()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "heimdall-citrix-vm-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        ResetCredentialProtector();
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(tempDir, "store-01-9c74e619_Cache.xml"),
+                """
+                <root>
+                  <resource>
+                    <FriendlyName>Target Store App</FriendlyName>
+                    <ServerState>Subscribed</ServerState>
+                    <LaunchCommandLine>-launch -s store-01 -CitrixID store-01@@TargetApp -ica https://store.example.test/Citrix/Store/resources/v2/id1/launch/ica -cmdline</LaunchCommandLine>
+                  </resource>
+                </root>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempDir, "other-02_Cache.xml"),
+                """
+                <root>
+                  <resource>
+                    <FriendlyName>Other Store App</FriendlyName>
+                    <ServerState>Subscribed</ServerState>
+                    <LaunchCommandLine>-launch -s other-02 -CitrixID other-02@@OtherApp -ica https://other.example.test/Citrix/Store/resources/v2/id2/launch/ica -cmdline</LaunchCommandLine>
+                  </resource>
+                </root>
+                """);
+
+            FakeConfigManager config = new();
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog);
+            viewModel.LoadFromSettings(new AppSettings
+            {
+                CitrixCacheDirectory = tempDir,
+                CitrixCacheStorePrefix = "store-01-"
+            });
+
+            await viewModel.ImportCitrixAppsCommand.ExecuteAsync(null);
+
+            ServerProfileDto imported = Assert.Single(config.Servers);
+            Assert.Equal("Target Store App", imported.DisplayName);
+            Assert.Equal("store-01@@TargetApp", imported.CitrixId);
+        }
+        finally
+        {
+            ResetCredentialProtector();
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CitrixSettings_RoundTripAndMissingPathIndicators_ReflectConfiguredState()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.FileExists = static path => string.Equals(path, @"C:\Citrix\SelfService.exe", StringComparison.OrdinalIgnoreCase);
+        viewModel.DirectoryExists = static path => string.Equals(path, @"C:\Citrix\Cache", StringComparison.OrdinalIgnoreCase);
+
+        viewModel.LoadFromSettings(new AppSettings
+        {
+            CitrixSelfServicePath = @"C:\Citrix\SelfService.exe",
+            CitrixCacheDirectory = @"C:\Citrix\Cache",
+            CitrixCacheStorePrefix = "store-01-"
+        });
+
+        Assert.False(viewModel.IsCitrixSelfServicePathMissing);
+        Assert.False(viewModel.IsCitrixCacheDirectoryMissing);
+
+        viewModel.CitrixSelfServicePath = @"C:\Missing\SelfService.exe";
+        viewModel.CitrixCacheDirectory = @"C:\Missing\Cache";
+        Assert.True(viewModel.IsCitrixSelfServicePathMissing);
+        Assert.True(viewModel.IsCitrixCacheDirectoryMissing);
+
+        viewModel.CitrixCacheStorePrefix = "../invalid*prefix";
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        Assert.NotNull(config.SavedSettings);
+        Assert.Equal(@"C:\Missing\SelfService.exe", config.SavedSettings.CitrixSelfServicePath);
+        Assert.Equal(@"C:\Missing\Cache", config.SavedSettings.CitrixCacheDirectory);
+        Assert.Null(config.SavedSettings.CitrixCacheStorePrefix);
+    }
+
+    [Fact]
     public void Dispose_UnsubscribesExternalToolTracking()
     {
         SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());

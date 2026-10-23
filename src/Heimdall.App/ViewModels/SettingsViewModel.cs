@@ -455,6 +455,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private string _nanaRunPath = "";
 
+    [ObservableProperty]
+    private string _citrixSelfServicePath = "";
+
+    [ObservableProperty]
+    private string _citrixCacheDirectory = "";
+
+    [ObservableProperty]
+    private string _citrixCacheStorePrefix = "";
+
     /// <summary>Checks a file path; replaceable so the "not found" hints can be exercised without a disk.</summary>
     internal Func<string, bool> FileExists { get; set; } = File.Exists;
 
@@ -483,6 +492,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// <summary>True when a NanaRun folder is typed and does not exist.</summary>
     public bool IsNanaRunPathMissing => IsFolderMissing(NanaRunPath);
 
+    /// <summary>True when a Citrix SelfService.exe path is typed and no file is there.</summary>
+    public bool IsCitrixSelfServicePathMissing => IsFileMissing(CitrixSelfServicePath);
+
+    /// <summary>True when a Citrix cache folder is typed and does not exist.</summary>
+    public bool IsCitrixCacheDirectoryMissing => IsFolderMissing(CitrixCacheDirectory);
+
     private bool IsFileMissing(string? path) =>
         !string.IsNullOrWhiteSpace(path) && !FileExists(Environment.ExpandEnvironmentVariables(path.Trim()));
 
@@ -500,6 +515,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnNirSoftPathChanged(string value) => OnPropertyChanged(nameof(IsNirSoftPathMissing));
 
     partial void OnNanaRunPathChanged(string value) => OnPropertyChanged(nameof(IsNanaRunPathMissing));
+
+    partial void OnCitrixSelfServicePathChanged(string value) => OnPropertyChanged(nameof(IsCitrixSelfServicePathMissing));
+
+    partial void OnCitrixCacheDirectoryChanged(string value) => OnPropertyChanged(nameof(IsCitrixCacheDirectoryMissing));
 
     // --- Command Library Git Sync ---
 
@@ -1822,6 +1841,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SysinternalsPath = settings.SysinternalsPath ?? "";
             NirSoftPath = settings.NirSoftPath ?? "";
             NanaRunPath = settings.NanaRunPath ?? "";
+            CitrixSelfServicePath = settings.CitrixSelfServicePath ?? "";
+            CitrixCacheDirectory = settings.CitrixCacheDirectory ?? "";
+            CitrixCacheStorePrefix = settings.CitrixCacheStorePrefix ?? "";
 
             // Command Library Git Sync
             CmdLibGitSyncEnabled = settings.CmdLibGitSyncEnabled;
@@ -2299,6 +2321,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.SysinternalsPath = string.IsNullOrWhiteSpace(SysinternalsPath) ? null : SysinternalsPath;
         settings.NirSoftPath = string.IsNullOrWhiteSpace(NirSoftPath) ? null : NirSoftPath;
         settings.NanaRunPath = string.IsNullOrWhiteSpace(NanaRunPath) ? null : NanaRunPath;
+        settings.CitrixSelfServicePath = string.IsNullOrWhiteSpace(CitrixSelfServicePath) ? null : CitrixSelfServicePath;
+        settings.CitrixCacheDirectory = string.IsNullOrWhiteSpace(CitrixCacheDirectory) ? null : CitrixCacheDirectory;
+        settings.CitrixCacheStorePrefix = CitrixCacheScanner.NormalizeStorePrefix(CitrixCacheStorePrefix);
 
         // Command Library Git Sync
         settings.CmdLibGitSyncEnabled = CmdLibGitSyncEnabled;
@@ -3328,7 +3353,21 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         try
         {
-            CitrixScanResult scanResult = CitrixScanProvider?.Invoke() ?? CitrixCacheScanner.Scan();
+            AppSettings? loadedSettings = _savedSettings is null
+                ? await _configManager.LoadSettingsAsync()
+                : null;
+            string? cacheDirectory = !string.IsNullOrWhiteSpace(CitrixCacheDirectory)
+                ? CitrixCacheDirectory
+                : loadedSettings?.CitrixCacheDirectory;
+            string? storePrefix = !string.IsNullOrWhiteSpace(CitrixCacheStorePrefix)
+                ? CitrixCacheStorePrefix
+                : loadedSettings?.CitrixCacheStorePrefix;
+            Func<CitrixScanResult>? scanProvider = CitrixScanProvider;
+            CitrixScanResult scanResult = await Task.Run(
+                () => scanProvider is not null
+                    ? scanProvider()
+                    : CitrixCacheScanner.Scan(cacheDirectory, storePrefix),
+                cancellationToken);
 
             if (scanResult.Resources.Count == 0)
             {
@@ -3358,11 +3397,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             CitrixImportMergeResult mergeResult = await _configManager.MutateServersAsync(existing =>
             {
                 return CitrixImportMerger.Merge(existing, imported);
-
             });
 
             var updatedText = _localizer.FormatCount(mergeResult.Updated, "CitrixScanUpdatedOne", "CitrixScanUpdated", mergeResult.Updated);
-            var statusMsg = _localizer.FormatCount(mergeResult.Added, "CitrixScanSuccessOne", "CitrixScanSuccess", mergeResult.Added, updatedText);
+            var unchangedText = _localizer.FormatCount(mergeResult.Unchanged, "CitrixScanUnchangedOne", "CitrixScanUnchanged", mergeResult.Unchanged);
+            var statusMsg = _localizer.FormatCount(mergeResult.Added, "CitrixScanSuccessOne", "CitrixScanSuccess", mergeResult.Added, updatedText, unchangedText);
             if (scanResult.Warnings.Count > 0)
             {
                 statusMsg += "\n\n" + string.Join("\n", scanResult.Warnings.Take(5));

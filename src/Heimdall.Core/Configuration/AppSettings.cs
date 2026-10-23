@@ -566,6 +566,11 @@ public sealed class AppSettings
     public string? NirSoftPath { get; set; }
     public string? NanaRunPath { get; set; }
 
+    // Citrix Workspace overrides (SelfService executable path, cache directory, store prefix)
+    public string? CitrixSelfServicePath { get; set; }
+    public string? CitrixCacheDirectory { get; set; }
+    public string? CitrixCacheStorePrefix { get; set; }
+
     // X11 forwarding
     public string? X11ServerPath { get; set; }
     public bool X11AutoStart { get; set; } = true;

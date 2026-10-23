@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Xml.Linq;
+using Heimdall.Core.Logging;
 
 namespace Heimdall.Core.Configuration;
 
@@ -33,23 +34,39 @@ public static class CitrixCacheScanner
     private const string ServerStateElementName = "ServerState";
     private const string SubscribedServerState = "Subscribed";
     private const string CitrixIdSwitch = "-CitrixID";
+    private static readonly char[] InvalidStorePrefixChars = Path.GetInvalidFileNameChars()
+        .Concat(['/', '\\', '*', '?'])
+        .Distinct()
+        .ToArray();
 
     /// <summary>
-    /// Scans all Citrix SelfService cache XML files and returns discovered resources.
+    /// Scans all Citrix SelfService cache XML files in the default directory and returns discovered resources.
     /// </summary>
     /// <returns>List of discovered Citrix resources with launch metadata.</returns>
-    public static CitrixScanResult Scan()
-    {
-        string cacheDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Citrix", "SelfService");
+    public static CitrixScanResult Scan() => Scan(null, null);
 
-        return ScanDirectory(cacheDir);
+    /// <summary>
+    /// Scans Citrix SelfService cache XML files in the specified directory (or default if null/empty)
+    /// filtered by an optional store file-name prefix, and returns discovered resources.
+    /// </summary>
+    /// <param name="cacheDirectory">Optional directory override; defaults to <c>%LocalAppData%\Citrix\SelfService</c>.</param>
+    /// <param name="storePrefix">Optional store prefix filter (only <c>&lt;prefix&gt;*_Cache.xml</c> files are scanned).</param>
+    /// <returns>List of discovered Citrix resources with launch metadata.</returns>
+    public static CitrixScanResult Scan(string? cacheDirectory, string? storePrefix = null)
+    {
+        string resolvedCacheDir = string.IsNullOrWhiteSpace(cacheDirectory)
+            ? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Citrix", "SelfService")
+            : Environment.ExpandEnvironmentVariables(cacheDirectory.Trim());
+
+        return ScanDirectory(resolvedCacheDir, storePrefix);
     }
 
-    internal static CitrixScanResult ScanDirectory(string cacheDir)
+    internal static CitrixScanResult ScanDirectory(string cacheDir, string? storePrefix = null)
     {
         CitrixScanResult result = new CitrixScanResult();
+        string? normalizedPrefix = NormalizeStorePrefix(storePrefix);
 
         if (!Directory.Exists(cacheDir))
         {
@@ -58,6 +75,13 @@ public static class CitrixCacheScanner
         }
 
         string[] cacheFiles = Directory.GetFiles(cacheDir, "*_Cache.xml");
+        if (normalizedPrefix is not null)
+        {
+            cacheFiles = cacheFiles
+                .Where(f => Path.GetFileName(f).StartsWith(normalizedPrefix, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
+
         if (cacheFiles.Length == 0)
         {
             result.Warnings.Add("No Citrix cache files found. Open Citrix Workspace and connect to a store first.");
@@ -77,6 +101,27 @@ public static class CitrixCacheScanner
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Validates and trims an optional Citrix cache store file-name prefix, returning <see langword="null"/>
+    /// (and logging a warning) when it contains path separators, wildcards, or invalid file-name characters.
+    /// </summary>
+    public static string? NormalizeStorePrefix(string? storePrefix)
+    {
+        if (string.IsNullOrWhiteSpace(storePrefix))
+        {
+            return null;
+        }
+
+        string trimmed = storePrefix.Trim();
+        if (trimmed.IndexOfAny(InvalidStorePrefixChars) >= 0)
+        {
+            FileLogger.Warn("Ignoring invalid CitrixCacheStorePrefix containing path separators, wildcards, or invalid file-name characters.");
+            return null;
+        }
+
+        return trimmed;
     }
 
     /// <summary>
@@ -218,7 +263,7 @@ public static class CitrixCacheScanner
                     var uri = new Uri(icaUrl);
                     storeUrl = $"{uri.Scheme}://{uri.Host}";
                 }
-                catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[CitrixCacheScanner] malformed URL: {ex.Message}"); }
+                catch (Exception ex) { FileLogger.Warn($"[CitrixCacheScanner] malformed URL: {ex.Message}"); }
             }
 
             result.Resources.Add(new CitrixResource

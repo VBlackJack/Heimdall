@@ -331,6 +331,84 @@ public sealed class CitrixCacheScannerScanDirectoryTests : IDisposable
         Assert.NotEqual(result.Resources[0].CitrixId, result.Resources[1].CitrixId);
     }
 
+    [Theory]
+    [InlineData("store-01-")]
+    [InlineData("STORE-01-")]
+    [InlineData("  store-01-  ")]
+    public void Scan_WithStorePrefix_ScansOnlyMatchingStoreCaseInsensitively(string storePrefix)
+    {
+        WriteCacheFile(
+            "store-01-9c74e619_Cache.xml",
+            """
+            <root>
+              <resource>
+                <FriendlyName>Store One App</FriendlyName>
+                <ServerState>Subscribed</ServerState>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID store-01@@App1 -ica https://store.example.test/Citrix/Store/resources/v2/id1/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+            </root>
+            """);
+        WriteCacheFile(
+            "other-store_Cache.xml",
+            """
+            <root>
+              <resource>
+                <FriendlyName>Other Store App</FriendlyName>
+                <ServerState>Subscribed</ServerState>
+                <LaunchCommandLine>-launch -s other-store -CitrixID other-store@@App2 -ica https://other.example.test/Citrix/Store/resources/v2/id2/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+            </root>
+            """);
+
+        CitrixScanResult result = CitrixCacheScanner.Scan(_tempDir, storePrefix);
+
+        Assert.Empty(result.Warnings);
+        CitrixResource resource = Assert.Single(result.Resources);
+        Assert.Equal("Store One App", resource.FriendlyName);
+        Assert.Equal("store-01@@App1", resource.CitrixId);
+        Assert.Equal("store-01-9c74e619_Cache.xml", resource.SourceFile);
+    }
+
+    [Theory]
+    [InlineData("../store-")]
+    [InlineData(@"..\store-")]
+    [InlineData("store*")]
+    [InlineData("store?")]
+    [InlineData("store:01")]
+    [InlineData("store<01>")]
+    public void Scan_WithInvalidStorePrefix_TreatsPrefixAsUnsetAndScansAllStores(string invalidPrefix)
+    {
+        WriteCacheFile(
+            "store-01_Cache.xml",
+            """
+            <root>
+              <resource>
+                <FriendlyName>Store One App</FriendlyName>
+                <ServerState>Subscribed</ServerState>
+                <LaunchCommandLine>-launch -s store-01 -CitrixID store-01@@App1 -ica https://store.example.test/Citrix/Store/resources/v2/id1/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+            </root>
+            """);
+        WriteCacheFile(
+            "other-02_Cache.xml",
+            """
+            <root>
+              <resource>
+                <FriendlyName>Store Two App</FriendlyName>
+                <ServerState>Subscribed</ServerState>
+                <LaunchCommandLine>-launch -s other-02 -CitrixID other-02@@App2 -ica https://store.example.test/Citrix/Store/resources/v2/id2/launch/ica -cmdline</LaunchCommandLine>
+              </resource>
+            </root>
+            """);
+
+        Assert.Null(CitrixCacheScanner.NormalizeStorePrefix(invalidPrefix));
+
+        CitrixScanResult result = CitrixCacheScanner.Scan(_tempDir, invalidPrefix);
+
+        Assert.Empty(result.Warnings);
+        Assert.Equal(2, result.Resources.Count);
+    }
+
     private void WriteCacheFile(string fileName, string content)
     {
         string filePath = Path.Combine(_tempDir, fileName);
