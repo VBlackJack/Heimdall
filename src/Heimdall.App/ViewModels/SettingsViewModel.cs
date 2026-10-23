@@ -3355,20 +3355,21 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 return;
             }
 
-            int newCount = await _configManager.MutateServersAsync(existing =>
+            CitrixImportMergeResult mergeResult = await _configManager.MutateServersAsync(existing =>
             {
-                existing.AddRange(imported);
-                return imported.Count;
+                return CitrixImportMerger.Merge(existing, imported);
+
             });
 
-            var statusMsg = _localizer.FormatCount(newCount, "CitrixScanSuccessOne", "CitrixScanSuccess", newCount);
+            var updatedText = _localizer.FormatCount(mergeResult.Updated, "CitrixScanUpdatedOne", "CitrixScanUpdated", mergeResult.Updated);
+            var statusMsg = _localizer.FormatCount(mergeResult.Added, "CitrixScanSuccessOne", "CitrixScanSuccess", mergeResult.Added, updatedText);
             if (scanResult.Warnings.Count > 0)
             {
                 statusMsg += "\n\n" + string.Join("\n", scanResult.Warnings.Take(5));
             }
 
             _dialogService.ShowInfo(_localizer["CitrixScanTitle"], statusMsg);
-            FileLogger.Info($"Imported {newCount} Citrix app(s) from local cache");
+            FileLogger.Info($"Imported Citrix apps from local cache: {mergeResult.Added} added, {mergeResult.Updated} updated, {mergeResult.Unchanged} unchanged");
             ServerInventoryChanged?.Invoke();
         }
         catch (VaultLockedException)
