@@ -34,19 +34,21 @@ public sealed class CitrixCacheScannerTests
     public void ToServerProfiles_SingleResource_MapsConstantAndPassthroughFields()
     {
         CitrixResource resource = BuildResource(
+            citrixId: "store-01@@Excel2024",
             friendlyName: "Published Excel",
             launchCommandLine: @"SelfService.exe -qlaunch ""Published Excel""",
-            storeFrontUrl: "https://store.example.com");
+            storeFrontUrl: "https://store.example.test");
         CitrixResource[] resources = [resource];
 
         List<ServerProfileDto> profiles = CitrixCacheScanner.ToServerProfiles(resources);
 
         ServerProfileDto profile = Assert.Single(profiles);
+        Assert.Equal("store-01@@Excel2024", profile.CitrixId);
         Assert.Equal("Published Excel", profile.DisplayName);
         Assert.Equal("Published Excel", profile.CitrixAppName);
         Assert.Equal("Citrix", profile.ConnectionType);
         Assert.Equal(@"SelfService.exe -qlaunch ""Published Excel""", profile.CitrixLaunchCommandLine);
-        Assert.Equal("https://store.example.com", profile.CitrixStoreFrontUrl);
+        Assert.Equal("https://store.example.test", profile.CitrixStoreFrontUrl);
         Assert.True(profile.CitrixUseSso);
         Assert.True(profile.UseDirectConnection);
     }
@@ -55,7 +57,7 @@ public sealed class CitrixCacheScannerTests
     [InlineData(null, "Citrix Local")]
     [InlineData("", "Citrix Local")]
     [InlineData("   ", "Citrix Local")]
-    [InlineData("https://sf.example.com", "https://sf.example.com")]
+    [InlineData("https://sf.example.test", "https://sf.example.test")]
     public void ToServerProfiles_StoreFrontUrl_MapsRemoteServerFallback(
         string? storeFrontUrl,
         string expectedRemoteServer)
@@ -140,14 +142,79 @@ public sealed class CitrixCacheScannerTests
         Assert.Equal("Third App", profiles[2].DisplayName);
     }
 
+    [Theory]
+    [InlineData(
+        "-launch -s store-01 -CitrixID store-01@@PuTTy -ica https://store.example.test/Citrix/Store/resources/v2/abc/launch/ica -cmdline",
+        "store-01@@PuTTy")]
+    [InlineData(
+        "-launch -s store-01 -CitrixID \"store-01@@PuTTy Admin\" -ica https://store.example.test/Citrix/Store/resources/v2/def/launch/ica -cmdline",
+        "store-01@@PuTTy Admin")]
+    [InlineData(
+        "-launch -s store-01 -CitrixID \"store-01@@PuTTy 🛡️\" -ica https://store.example.test/Citrix/Store/resources/v2/ghi/launch/ica -cmdline",
+        "store-01@@PuTTy 🛡️")]
+    [InlineData(
+        "-launch -s store-01 -CitrixID store-01@@PuTTy_🛡️ -ica https://store.example.test/Citrix/Store/resources/v2/jkl/launch/ica -cmdline",
+        "store-01@@PuTTy_🛡️")]
+    public void ExtractCitrixId_ValidFlag_ReturnsExpectedId(string launchCommandLine, string expectedCitrixId)
+    {
+        string? extracted = CitrixCacheScanner.ExtractCitrixId(launchCommandLine);
+
+        Assert.Equal(expectedCitrixId, extracted);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(@"SelfService.exe -qlaunch ""Published App""")]
+    [InlineData("-launch -s store-01 -CitrixIdentity store-01@@WrongFlag -cmdline")]
+    [InlineData("-launch -s store-01 -CitrixID")]
+    [InlineData("-launch -s store-01 -CitrixID   ")]
+    [InlineData("-launch -s store-01 -CitrixID \"\" -cmdline")]
+    [InlineData("-launch -s store-01 -CitrixID \"   \" -cmdline")]
+    [InlineData("-launch -s store-01 -CitrixID \"unterminated -cmdline")]
+    [InlineData("-launch -s store-01 -CitrixID -ica https://store.example.test/Citrix/Store/resources/v2/abc/launch/ica -cmdline")]
+    public void ExtractCitrixId_AbsentOrEmptyValue_ReturnsNull(string launchCommandLine)
+    {
+        string? extracted = CitrixCacheScanner.ExtractCitrixId(launchCommandLine);
+
+        Assert.Null(extracted);
+    }
+
+    [Fact]
+    public void ToServerProfiles_TwoPuttyVariants_PreservesDistinctCitrixIds()
+    {
+        CitrixResource[] resources =
+        [
+            BuildResource(
+                citrixId: "store-01@@PuTTy.Standard",
+                friendlyName: "PuTTy",
+                launchCommandLine: "-launch -s store-01 -CitrixID store-01@@PuTTy.Standard -ica https://store.example.test/Citrix/Store/resources/v2/a/launch/ica -cmdline"),
+            BuildResource(
+                citrixId: "store-01@@PuTTy.Elevated",
+                friendlyName: "PuTTy 🛡️",
+                launchCommandLine: "-launch -s store-01 -CitrixID \"store-01@@PuTTy.Elevated\" -ica https://store.example.test/Citrix/Store/resources/v2/b/launch/ica -cmdline")
+        ];
+
+        List<ServerProfileDto> profiles = CitrixCacheScanner.ToServerProfiles(resources);
+
+        Assert.Equal(2, profiles.Count);
+        Assert.Equal("PuTTy", profiles[0].DisplayName);
+        Assert.Equal("PuTTy 🛡️", profiles[1].DisplayName);
+        Assert.Equal("store-01@@PuTTy.Standard", profiles[0].CitrixId);
+        Assert.Equal("store-01@@PuTTy.Elevated", profiles[1].CitrixId);
+        Assert.NotEqual(profiles[0].CitrixId, profiles[1].CitrixId);
+    }
+
     private static CitrixResource BuildResource(
+        string? citrixId = null,
         string friendlyName = "Published App",
         string? category = "Applications",
         string launchCommandLine = @"SelfService.exe -qlaunch ""Published App""",
-        string? storeFrontUrl = "https://store.example.com")
+        string? storeFrontUrl = "https://store.example.test")
     {
         return new CitrixResource
         {
+            CitrixId = citrixId,
             FriendlyName = friendlyName,
             Category = category,
             LaunchCommandLine = launchCommandLine,

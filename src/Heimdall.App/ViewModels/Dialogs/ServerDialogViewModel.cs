@@ -2535,6 +2535,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
         dto.SortOrder = seed.SortOrder;
         dto.TunnelsPanelExpanded = seed.TunnelsPanelExpanded;
+        dto.CitrixId = seed.CitrixId;
         dto.CitrixLaunchCommandLine = seed.CitrixLaunchCommandLine;
         dto.ExtensionData = seed.ExtensionData;
     }
