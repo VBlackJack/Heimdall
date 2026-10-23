@@ -12,6 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-23: subscribed Citrix apps, idempotent re-import, and Workspace settings (v2026.102301)
+
+### Citrix Workspace (#680, #681, #682)
+
+- **Subscribed applications only** (#680). `CitrixCacheScanner.ParseCacheFile` now reads the
+  `<ServerState>` element of each `<resource>` in Citrix Cloud / Workspace SelfService cache XML
+  files and skips resources whose state is present and not `Subscribed` (case-insensitive), while
+  keeping legacy on-premises resources that omit `<ServerState>`. `ExtractCitrixId` parses the
+  `-CitrixID` token (quoted or unquoted) from `<LaunchCommandLine>` into `CitrixResource.CitrixId`
+  and `ServerProfileDto.CitrixId`, preserved across dialog edits and profile sanitizers.
+- **Idempotent cache re-import** (#681). `CitrixImportMerger.Merge` matches incoming cache
+  profiles against existing Citrix profiles by `CitrixId` (`StringComparison.Ordinal`) instead of
+  appending duplicates on every scan. Matched profiles refresh `CitrixLaunchCommandLine`,
+  `CitrixStoreFrontUrl`, `CitrixAppName`, and `RemoteServer` while preserving `Id`, `DisplayName`,
+  `Group`, notes, favorites, sort order, tags, and `ExtensionData`. Duplicate `CitrixId` entries
+  within a single scan keep the first occurrence and log a warning count without exposing IDs;
+  unmatched profiles are never deleted.
+- **Workspace path, cache folder, and store prefix settings** (#682). Added optional
+  `CitrixSelfServicePath`, `CitrixCacheDirectory`, and `CitrixCacheStorePrefix` settings under
+  `Settings > Advanced > Tools & integrations`. `CitrixCacheScanner.Scan(cacheDirectory, storePrefix)`
+  filters `*_Cache.xml` files by validated store prefix (`OrdinalIgnoreCase`), rejecting path
+  separators, wildcards, and invalid file-name characters. `CitrixHandler` uses
+  `CitrixSelfServicePath` only when it points to an existing `SelfService.exe` file
+  (`OrdinalIgnoreCase`), falling back to the default probe list with a warning otherwise.
+  `SettingsViewModel.ImportCitrixAppsAsync` now runs the cache scan off the UI thread via
+  `Task.Run` and reports added, updated, and already up-to-date counts in the summary dialog.
+- Tests: `CitrixCacheScannerTests`, `CitrixCacheScannerScanDirectoryTests`,
+  `CitrixImportMergerTests`, `CitrixHandlerTests`, and `SettingsViewModelTests` (17,966 passed).
+
 ## 2026-10-22: a whole outline on the selected tab, no quick add button (v2026.102201)
 
 ### Session tabs (#677, #678)
