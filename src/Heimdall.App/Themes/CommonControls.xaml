@@ -353,8 +353,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
-                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}"/>
+                            <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentHoverFillBrush}"/>
+                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentHoverFillBrush}"/>
                         </Trigger>
                         <!-- Pressed keeps the accent fill, the one shade the label is readable on in
                              every theme and accent; the pressed shade outlines it instead. As a

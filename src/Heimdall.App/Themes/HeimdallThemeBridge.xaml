@@ -50,6 +50,10 @@
     <SolidColorBrush x:Key="AccentTextBrush" Color="{DynamicResource AccentTextColor}" />
     <SolidColorBrush x:Key="BadgeTextBrush" Color="{DynamicResource BackgroundColor}" />
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="{DynamicResource BackgroundColor}" />
+    <!-- The primary button's hover fill. AccentHoverFillColor is not in any theme: HeimdallThemeService
+         picks it on every theme and accent change, the hover shade where TextOnAccentBrush reads on it
+         at 4.5 to 1, the pressed shade where it does not (Theming/ThemeTextColours.cs). -->
+    <SolidColorBrush x:Key="AccentHoverFillBrush" Color="{DynamicResource AccentHoverFillColor}" />
     <SolidColorBrush x:Key="FocusIndicatorBrush" Color="{DynamicResource CyanColor}" />
     <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="{DynamicResource TextSecondaryColor}" Opacity="0.70" />
     <SolidColorBrush x:Key="ScrollBarTrackBrush" Color="{DynamicResource BackgroundColor}" />
