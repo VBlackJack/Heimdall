@@ -294,7 +294,7 @@ public sealed class ThemeSurfaceTokenContrastTests
     /// rebuilt from the colour key and opacity the bridge gives it, after the derived text
     /// colours are written beside the theme's own, as the theme service writes them.
     /// </summary>
-    private static ResourceDictionary Palette(string theme)
+    internal static ResourceDictionary Palette(string theme)
     {
         ResourceDictionary colours = ThemeColours(theme);
         ThemeTextColours.Apply(colours, key => colours[key]);
@@ -311,7 +311,7 @@ public sealed class ThemeSurfaceTokenContrastTests
     }
 
     /// <summary>One theme's own colours, as ThemeForge ships them.</summary>
-    private static ResourceDictionary ThemeColours(string theme) =>
+    internal static ResourceDictionary ThemeColours(string theme) =>
         (ResourceDictionary)Application.LoadComponent(
             new Uri(string.Format(CultureInfo.InvariantCulture, ThemeUriFormat, theme), UriKind.Relative));
 
@@ -335,17 +335,17 @@ public sealed class ThemeSurfaceTokenContrastTests
         }
     }
 
-    private static Color ColorOf(ResourceDictionary palette, string key) => Assert.IsType<Color>(palette[key]);
+    internal static Color ColorOf(ResourceDictionary palette, string key) => Assert.IsType<Color>(palette[key]);
 
     /// <summary>A translucent colour as drawn over an opaque one.</summary>
-    private static Color Over(Color top, Color under)
+    internal static Color Over(Color top, Color under)
     {
         double a = top.A / 255.0;
         byte Mix(byte t, byte u) => (byte)Math.Round((t * a) + (u * (1 - a)));
         return Color.FromRgb(Mix(top.R, under.R), Mix(top.G, under.G), Mix(top.B, under.B));
     }
 
-    private static double Contrast(Color a, Color b)
+    internal static double Contrast(Color a, Color b)
     {
         double la = Luminance(a);
         double lb = Luminance(b);

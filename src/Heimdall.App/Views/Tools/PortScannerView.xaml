@@ -280,14 +280,14 @@
                                Margin="{StaticResource MarginInlineXs}"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
-                               Foreground="{DynamicResource BorderBrush}"/>
+                               Foreground="{DynamicResource TextTertiaryBrush}"/>
 
                     <TextBlock x:Name="TxtClosed" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                                Foreground="{DynamicResource ErrorTextBrush}" FontWeight="SemiBold"
                                Margin="{StaticResource MarginInlineXs}"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
-                               Foreground="{DynamicResource BorderBrush}"/>
+                               Foreground="{DynamicResource TextTertiaryBrush}"/>
 
                     <TextBlock x:Name="TxtTotal" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                                Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"

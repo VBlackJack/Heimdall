@@ -220,7 +220,7 @@
                                AutomationProperties.AutomationId="ServiceStatus.TotalCount"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
-                               Foreground="{DynamicResource BorderBrush}"/>
+                               Foreground="{DynamicResource TextTertiaryBrush}"/>
 
                     <TextBlock x:Name="LblRunning" Text="{loc:Translate ToolServicesRunningLabel}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
@@ -229,7 +229,7 @@
                                AutomationProperties.AutomationId="ServiceStatus.RunningCount"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
-                               Foreground="{DynamicResource BorderBrush}"/>
+                               Foreground="{DynamicResource TextTertiaryBrush}"/>
 
                     <TextBlock x:Name="LblStopped" Text="{loc:Translate ToolServicesStoppedLabel}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>

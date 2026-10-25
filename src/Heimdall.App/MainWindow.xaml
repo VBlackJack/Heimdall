@@ -6156,8 +6156,10 @@
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Session.IsBroadcastMode}" Value="True">
                                         <Setter Property="Background" Value="{DynamicResource BroadcastActiveBrush}"/>
+                                        <!-- The red outline and tint say "broadcasting"; the label
+                                             stays primary text, which reads on the tint. -->
                                         <Setter Property="BorderBrush" Value="{DynamicResource ErrorTextBrush}"/>
-                                        <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -6812,7 +6814,7 @@
                                 <Ellipse Width="8" Height="8" Margin="4,0">
                                     <Ellipse.Style>
                                         <Style TargetType="Ellipse">
-                                            <Setter Property="Fill" Value="{DynamicResource TextDisabledBrush}"/>
+                                            <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding}" Value="True">
                                                     <Setter Property="Fill" Value="{DynamicResource AccentBrush}"/>
