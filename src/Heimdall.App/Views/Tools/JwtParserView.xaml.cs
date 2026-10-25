@@ -21,6 +21,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Heimdall.App.Services;
+using Heimdall.App.Theming;
 using Heimdall.App.ViewModels.Tools;
 using Heimdall.Core.Jwt;
 using Heimdall.Core.Localization;
@@ -75,7 +76,7 @@ public partial class JwtParserView : UserControl, IToolView
     private void OnCloseHelpClick(object sender, RoutedEventArgs e) => HelpPanel.Visibility = Visibility.Collapsed;
     private void OnLocaleChanged(string _) { if (HelpPanel.Visibility == Visibility.Visible) { UpdateHelpText(); } }
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e) { if (e.PropertyName is nameof(JwtParserViewModel.ExpirationStatus) or nameof(JwtParserViewModel.IsExpirationVisible)) { ApplyExpirationTheme(); } }
-    private void ApplyExpirationTheme() { if (!_vm.IsExpirationVisible || _vm.ExpirationStatus == JwtExpirationStatus.InvalidClaim) { return; } if (TryFindResource(_vm.ExpirationStatus switch { JwtExpirationStatus.Expired => "ErrorBrush", JwtExpirationStatus.Valid => "SuccessBrush", _ => "TextSecondaryBrush" }) is not SolidColorBrush brush) { return; } ExpirationBorder.Background = CreateOverlayBrush(brush.Color); ExpirationBorder.BorderBrush = brush; TxtExpiration.Foreground = brush; }
+    private void ApplyExpirationTheme() { if (!_vm.IsExpirationVisible || _vm.ExpirationStatus == JwtExpirationStatus.InvalidClaim) { return; } string brushKey = _vm.ExpirationStatus switch { JwtExpirationStatus.Expired => "ErrorBrush", JwtExpirationStatus.Valid => "SuccessBrush", _ => "TextSecondaryBrush" }; if (TryFindResource(brushKey) is not SolidColorBrush brush) { return; } ExpirationBorder.Background = CreateOverlayBrush(brush.Color); ExpirationBorder.BorderBrush = brush; TxtExpiration.Foreground = TryFindResource(SemanticTextBrushes.TextKeyFor(brushKey)) as Brush ?? brush; }
     private void UpdateHelpText() => TxtHelpContent.Text = (_localizer?["ToolHelpJWT"] ?? "ToolHelpJWT").Replace("\\n", "\n", StringComparison.Ordinal);
     private static SolidColorBrush CreateOverlayBrush(System.Windows.Media.Color color) { var brush = new SolidColorBrush(color) { Opacity = 40.0 / 255.0 }; brush.Freeze(); return brush; }
 }

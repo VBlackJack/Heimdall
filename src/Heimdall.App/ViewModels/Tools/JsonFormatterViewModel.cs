@@ -263,15 +263,15 @@ public sealed partial class JsonFormatterViewModel : ObservableObject, IDisposab
                     _lastStatusLine.GetValueOrDefault() + 1,
                     _lastStatusColumn.GetValueOrDefault() + 1,
                     _lastStatusMessage);
-                StatusForegroundBrushKey = "ErrorBrush";
+                StatusForegroundBrushKey = "ErrorTextBrush";
                 break;
             case JsonStatusKind.ParseError:
                 StatusText = string.Format(CultureInfo.CurrentCulture, L("ToolJsonStatusError"), _lastStatusMessage);
-                StatusForegroundBrushKey = "ErrorBrush";
+                StatusForegroundBrushKey = "ErrorTextBrush";
                 break;
             case JsonStatusKind.InputTooLarge:
                 StatusText = L("ToolJsonErrorInputTooLarge");
-                StatusForegroundBrushKey = "ErrorBrush";
+                StatusForegroundBrushKey = "ErrorTextBrush";
                 break;
             default:
                 throw new ArgumentOutOfRangeException();

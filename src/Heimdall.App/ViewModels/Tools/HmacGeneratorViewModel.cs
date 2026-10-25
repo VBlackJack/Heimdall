@@ -257,12 +257,12 @@ public sealed partial class HmacGeneratorViewModel : ObservableObject, IDisposab
         if (outcome.Matched)
         {
             VerifyResultText = L("ToolHmacVerifyMatch");
-            VerifyForegroundBrushKey = "SuccessBrush";
+            VerifyForegroundBrushKey = "SuccessTextBrush";
             return;
         }
 
         VerifyResultText = L("ToolHmacVerifyNoMatch");
-        VerifyForegroundBrushKey = "ErrorBrush";
+        VerifyForegroundBrushKey = "ErrorTextBrush";
     }
 
     private void RefreshLocalizedMessages()

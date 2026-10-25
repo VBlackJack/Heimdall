@@ -269,7 +269,7 @@ public partial class TlsAuditView : UserControl, IToolView
         if (_vm.IsAuditing)
         {
             BtnAudit.Content = L("ToolCertBtnStop");
-            BtnAudit.Foreground = (Brush)FindResource("ErrorBrush");
+            BtnAudit.Foreground = (Brush)FindResource("ErrorTextBrush");
             BtnAudit.Style = (Style)FindResource("SecondaryButtonStyle");
             AutomationProperties.SetName(BtnAudit, L("ToolCertBtnStop"));
             TxtHost.IsReadOnly = true;
@@ -378,9 +378,9 @@ public partial class TlsAuditView : UserControl, IToolView
 
         return rating switch
         {
-            TlsProtocolRating.Critical => "ErrorBrush",
-            TlsProtocolRating.Weak => "WarningBrush",
-            TlsProtocolRating.Strong => "SuccessBrush",
+            TlsProtocolRating.Critical => "ErrorTextBrush",
+            TlsProtocolRating.Weak => "WarningTextBrush",
+            TlsProtocolRating.Strong => "SuccessTextBrush",
             _ => "TextPrimaryBrush"
         };
     }
@@ -394,10 +394,10 @@ public partial class TlsAuditView : UserControl, IToolView
 
     private static string GetFindingBrushKey(TlsFindingSeverity severity) => severity switch
     {
-        TlsFindingSeverity.Pass => "SuccessBrush",
-        TlsFindingSeverity.Info => "AccentBrush",
-        TlsFindingSeverity.Warning => "WarningBrush",
-        _ => "ErrorBrush"
+        TlsFindingSeverity.Pass => "SuccessTextBrush",
+        TlsFindingSeverity.Info => "AccentTextBrush",
+        TlsFindingSeverity.Warning => "WarningTextBrush",
+        _ => "ErrorTextBrush"
     };
 
     private Brush GetGradeBrush(TlsGrade grade) => grade switch

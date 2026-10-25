@@ -138,7 +138,7 @@
                                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsWarning}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>

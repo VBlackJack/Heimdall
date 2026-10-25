@@ -82,11 +82,11 @@
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding AgentChipState}" Value="{x:Static vm:SshAgentChipState.Warn}">
                         <Setter Property="Text" Value="&#x26A0;"/>
-                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding AgentChipState}" Value="{x:Static vm:SshAgentChipState.Ok}">
                         <Setter Property="Text" Value="&#x2713;"/>
-                        <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -120,15 +120,15 @@
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.InProgress}">
                         <Setter Property="Text" Value="&#x23F3;"/>
-                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.Success}">
                         <Setter Property="Text" Value="&#x2713;"/>
-                        <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.Failure}">
                         <Setter Property="Text" Value="&#x2715;"/>
-                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.Cancelled}">
                         <Setter Property="Text" Value="&#x25CB;"/>

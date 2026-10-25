@@ -71,7 +71,7 @@ public sealed class JsonFormatterViewModelTests
         Assert.Equal(string.Empty, vm.OutputText);
         Assert.Contains("line 2", vm.StatusText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("position 3", vm.StatusText, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("ErrorBrush", vm.StatusForegroundBrushKey);
+        Assert.Equal("ErrorTextBrush", vm.StatusForegroundBrushKey);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed class JsonFormatterViewModelTests
         await vm.PrettifyCommand.ExecuteAsync(null);
 
         Assert.Equal("Invalid JSON: bad json", vm.StatusText);
-        Assert.Equal("ErrorBrush", vm.StatusForegroundBrushKey);
+        Assert.Equal("ErrorTextBrush", vm.StatusForegroundBrushKey);
     }
 
     [Fact]

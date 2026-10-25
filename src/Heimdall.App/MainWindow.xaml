@@ -1038,7 +1038,7 @@
                                                     <TextBlock Text="&#xE735;"
                                                                FontFamily="{StaticResource FontFamilyIcons}"
                                                                FontSize="{StaticResource FontSizeSmallCaption}"
-                                                               Foreground="{DynamicResource WarningBrush}"
+                                                               Foreground="{DynamicResource WarningTextBrush}"
                                                                Margin="6,0,0,0"
                                                                VerticalAlignment="Center"
                                                                ToolTip="{loc:Translate SessionTreeFavoriteMark}"
@@ -2363,13 +2363,13 @@
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Text" Value="&#x25CF;"/>
-                                                                <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
                                                                 <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusActive}"/>
                                                                 <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusActive}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsAlive}" Value="False">
                                                                         <Setter Property="Text" Value="&#x2716;"/>
-                                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                                                                         <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusInterrupted}"/>
                                                                         <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusInterrupted}"/>
                                                                     </DataTrigger>
@@ -2495,13 +2495,13 @@
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Text" Value="&#x25CF;"/>
-                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
                                                     <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusActive}"/>
                                                     <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusActive}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsAlive}" Value="False">
                                                             <Setter Property="Text" Value="&#x2716;"/>
-                                                            <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                                                             <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusInterrupted}"/>
                                                             <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusInterrupted}"/>
                                                         </DataTrigger>
@@ -6619,7 +6619,7 @@
 
                     <TextBlock Text="{Binding CommandPalette.SnippetValidationError}"
                                FontSize="{StaticResource FontSizeCaption}"
-                               Foreground="{DynamicResource WarningBrush}"
+                               Foreground="{DynamicResource WarningTextBrush}"
                                TextWrapping="Wrap"
                                Margin="14,6,14,0"
                                Visibility="{Binding CommandPalette.SnippetValidationError, Converter={StaticResource NullToVisibilityConverter}}"/>

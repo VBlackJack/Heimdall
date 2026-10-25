@@ -363,7 +363,7 @@
                                         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding SudoMode}" Value="True">
-                                                <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -599,27 +599,27 @@
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding Kind}" Value="Directory">
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE8B7;"/>
-                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoTextBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="SymbolicLink">
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE71B;"/>
-                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoTextBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="Fifo">
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE946;"/>
-                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoTextBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="Socket">
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE946;"/>
-                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoTextBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="Unknown">
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE7BA;"/>
-                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="Device">
                                         <Setter TargetName="FileIcon" Property="Text" Value="&#xE946;"/>
-                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                        <Setter TargetName="FileIcon" Property="Foreground" Value="{DynamicResource InfoTextBrush}"/>
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
@@ -760,7 +760,7 @@
                            HorizontalAlignment="Center"
                            FontSize="{StaticResource FontSizeBodyLarge}"
                            FontWeight="SemiBold"
-                           Foreground="{DynamicResource ErrorBrush}"
+                           Foreground="{DynamicResource ErrorTextBrush}"
                            AutomationProperties.LiveSetting="Assertive"
                            behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                 <TextBlock Text="{loc:Translate SftpDisconnectedOverlayMessage}"
@@ -898,19 +898,19 @@
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding Status}" Value="Running">
                                         <Setter TargetName="JobGlyph" Property="Text" Value="&#xE895;"/>
-                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Status}" Value="Failed">
                                         <Setter TargetName="JobGlyph" Property="Text" Value="&#xE783;"/>
-                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
-                                        <Setter TargetName="JobDetail" Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
+                                        <Setter TargetName="JobDetail" Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Status}" Value="Cancelled">
                                         <Setter TargetName="JobGlyph" Property="Text" Value="&#xE711;"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Status}" Value="Completed">
                                         <Setter TargetName="JobGlyph" Property="Text" Value="&#xE73E;"/>
-                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                        <Setter TargetName="JobGlyph" Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
@@ -969,7 +969,7 @@
                            Text="&#xE783;"
                            FontFamily="{StaticResource FontFamilyIcons}"
                            FontSize="{StaticResource FontSizeCaption}"
-                           Foreground="{DynamicResource ErrorBrush}"
+                           Foreground="{DynamicResource ErrorTextBrush}"
                            VerticalAlignment="Center"
                            Margin="0,0,4,0"
                            Visibility="{Binding IsErrorStatus, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -985,7 +985,7 @@
                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsErrorStatus}" Value="True">
-                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                                     <Setter Property="AutomationProperties.LiveSetting" Value="Assertive"/>
                                 </DataTrigger>
                             </Style.Triggers>

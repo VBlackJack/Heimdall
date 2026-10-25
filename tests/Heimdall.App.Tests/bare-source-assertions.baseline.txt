@@ -67,7 +67,7 @@ tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpSymlinkRe
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpSymlinkRenameRefusal_UsesRawBrowserFactInMenuAndViewModelGuard|assert-presence|"RenameFollowsSymlinkTarget && file.Kind == RemoteEntryKind.SymbolicLink"
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpSymlinkRenameRefusal_UsesRawBrowserFactInMenuAndViewModelGuard|assert-presence|"SftpStatusRenameUnsupportedEntry"
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpEntryKindSurface_DefinesSpecialKindIconsAndLocalizedTooltipType|assert-presence|"&#xE7BA;"
-tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpEntryKindSurface_DefinesSpecialKindIconsAndLocalizedTooltipType|assert-presence|"WarningBrush"
+tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpEntryKindSurface_DefinesSpecialKindIconsAndLocalizedTooltipType|assert-presence|"WarningTextBrush"
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpEntryKindSurface_DefinesSpecialKindIconsAndLocalizedTooltipType|assert-presence|"<DataTrigger Binding=\"{Binding Kind}\" Value=\"SymbolicLink\">"
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpEntryKindSurface_DefinesSpecialKindIconsAndLocalizedTooltipType|assert-presence|"<DataTrigger Binding=\"{Binding Kind}\" Value=\"Fifo\">"
 tests/Heimdall.App.Tests/EmbeddedTerminalCapabilitySurfaceTests.cs|SftpEntryKindSurface_DefinesSpecialKindIconsAndLocalizedTooltipType|assert-presence|"<DataTrigger Binding=\"{Binding Kind}\" Value=\"Socket\">"

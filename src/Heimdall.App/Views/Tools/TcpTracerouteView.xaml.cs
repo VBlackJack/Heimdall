@@ -172,7 +172,7 @@ public partial class TcpTracerouteView : UserControl, IToolView
         TxtMaxHops.Text = inputs!.MaxHops.ToString(CultureInfo.InvariantCulture);
         _setBusy?.Invoke(true);
         BtnTrace.Content = L("ToolTraceBtnStop");
-        BtnTrace.Foreground = (Brush)FindResource("ErrorBrush");
+        BtnTrace.Foreground = (Brush)FindResource("ErrorTextBrush");
         BtnTrace.Style = (Style)FindResource("SecondaryButtonStyle");
         System.Windows.Automation.AutomationProperties.SetName(BtnTrace, L("ToolTraceBtnStop"));
         TxtHost.IsReadOnly = true;

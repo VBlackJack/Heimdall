@@ -164,7 +164,7 @@ public partial class ArpMonitorView : UserControl, IToolView
     {
         var toggleKey = _vm.IsRunning ? "ToolArpBtnStop" : "ToolArpBtnStart";
         BtnToggle.Content = L(toggleKey);
-        BtnToggle.Foreground = (Brush)FindResource(_vm.IsRunning ? "ErrorBrush" : "TextPrimaryBrush");
+        BtnToggle.Foreground = (Brush)FindResource(_vm.IsRunning ? "ErrorTextBrush" : "TextPrimaryBrush");
         BtnToggle.Style = (Style)FindResource(_vm.IsRunning ? "SecondaryButtonStyle" : "PrimaryButtonStyle");
         AutomationProperties.SetName(BtnToggle, L(toggleKey));
 

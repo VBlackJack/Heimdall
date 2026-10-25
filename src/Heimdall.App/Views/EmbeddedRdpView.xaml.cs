@@ -27,6 +27,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Heimdall.App.Services;
+using Heimdall.App.Theming;
 using Heimdall.App.ViewModels;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.App.Views.EmbeddedRdp;
@@ -3133,7 +3134,7 @@ public partial class EmbeddedRdpView
         icon.Text = glyph;
         icon.SetResourceReference(
             TextBlock.ForegroundProperty,
-            isActive ? "AccentBrush" : "TextDisabledBrush");
+            isActive ? "AccentTextBrush" : "TextDisabledBrush");
         icon.TextDecorations = isActive ? null : TextDecorations.Strikethrough;
         icon.Visibility = RdpRedirectionVisibilityPolicy.IsIndicatorVisible(
             isActive,
@@ -3403,7 +3404,7 @@ public partial class EmbeddedRdpView
             ? Visibility.Visible
             : Visibility.Collapsed;
         StatusTextBlock.Foreground = GetBrush(
-            status is RdpSessionStatus.Error ? "ErrorBrush" : "TextPrimaryBrush");
+            status is RdpSessionStatus.Error ? "ErrorTextBrush" : "TextPrimaryBrush");
         UpdateReconnectButtonVisibility();
         UpdateHealthDot();
     }
@@ -4262,7 +4263,7 @@ public partial class EmbeddedRdpView
             state.Height);
 
         var hasManualOverride = _manualResolutionWidth > 0 && _manualResolutionHeight > 0;
-        var brushKey = hasManualOverride ? "AccentBrush" : "TextPrimaryBrush";
+        var brushKey = hasManualOverride ? "AccentTextBrush" : "TextPrimaryBrush";
         if (TryFindResource(brushKey) is System.Windows.Media.Brush brush)
         {
             ResolutionButton.Foreground = brush;
@@ -4772,7 +4773,7 @@ public partial class EmbeddedRdpView
     {
         var (brushKey, glyph) = ResolveSeverityVisual(severity);
         OverlaySeverityStrip.SetResourceReference(Border.BackgroundProperty, brushKey);
-        OverlaySeverityIcon.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+        OverlaySeverityIcon.SetResourceReference(TextBlock.ForegroundProperty, SemanticTextBrushes.TextKeyFor(brushKey));
         OverlaySeverityIcon.Text = glyph;
     }
 

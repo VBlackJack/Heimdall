@@ -160,7 +160,7 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
             _lastFileSizeBytes = 0;
             IsFileMode = false;
             ClearComputedHashes();
-            FileStatusBrushKey = "ErrorBrush";
+            FileStatusBrushKey = "ErrorTextBrush";
             FileStatusText = string.Format(L("ToolHashGenErrorFileTooLarge"), FileSize.Format(ex.LimitBytes));
             IsResultsVisible = false;
             IsEmptyStateVisible = true;
@@ -172,7 +172,7 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
             _lastFileSizeBytes = 0;
             IsFileMode = false;
             ClearComputedHashes();
-            FileStatusBrushKey = "ErrorBrush";
+            FileStatusBrushKey = "ErrorTextBrush";
             FileStatusText = L("ToolHashGenErrorFileNotFound");
             IsResultsVisible = false;
             IsEmptyStateVisible = true;
@@ -183,7 +183,7 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
             _lastFileStatusKind = FileStatusKind.AccessDenied;
             _lastFileSizeBytes = 0;
             ClearComputedHashes();
-            FileStatusBrushKey = "ErrorBrush";
+            FileStatusBrushKey = "ErrorTextBrush";
             FileStatusText = L("ToolHashGenErrorFileAccessDenied");
             IsResultsVisible = false;
             IsEmptyStateVisible = true;
@@ -205,7 +205,7 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
             _lastFileStatusKind = FileStatusKind.GenericError;
             _lastFileSizeBytes = 0;
             ClearComputedHashes();
-            FileStatusBrushKey = "ErrorBrush";
+            FileStatusBrushKey = "ErrorTextBrush";
             FileStatusText = L("ToolHashGenErrorGeneric");
             IsResultsVisible = false;
             IsEmptyStateVisible = true;
@@ -437,19 +437,19 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
                 break;
             case FileStatusKind.TooLarge:
                 FileStatusText = string.Format(L("ToolHashGenErrorFileTooLarge"), FileSize.Format(HashGeneratorService.MaxFileSizeBytes));
-                FileStatusBrushKey = "ErrorBrush";
+                FileStatusBrushKey = "ErrorTextBrush";
                 break;
             case FileStatusKind.NotFound:
                 FileStatusText = L("ToolHashGenErrorFileNotFound");
-                FileStatusBrushKey = "ErrorBrush";
+                FileStatusBrushKey = "ErrorTextBrush";
                 break;
             case FileStatusKind.AccessDenied:
                 FileStatusText = L("ToolHashGenErrorFileAccessDenied");
-                FileStatusBrushKey = "ErrorBrush";
+                FileStatusBrushKey = "ErrorTextBrush";
                 break;
             case FileStatusKind.GenericError:
                 FileStatusText = L("ToolHashGenErrorGeneric");
-                FileStatusBrushKey = "ErrorBrush";
+                FileStatusBrushKey = "ErrorTextBrush";
                 break;
             default:
                 break;
@@ -497,7 +497,7 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
         if (result.Matched && result.MatchedKind is not null)
         {
             VerifyResultText = string.Format(L("ToolHashGenVerifyMatchFormat"), HashAlgorithmCatalog.DisplayName(result.MatchedKind.Value));
-            VerifyForegroundBrushKey = "SuccessBrush";
+            VerifyForegroundBrushKey = "SuccessTextBrush";
             foreach (var row in Results)
             {
                 row.IsMatched = row.Kind == result.MatchedKind.Value;
@@ -507,7 +507,7 @@ public sealed partial class HashGeneratorViewModel : ObservableObject, IDisposab
         }
 
         VerifyResultText = L("ToolHashGenVerifyNoMatch");
-        VerifyForegroundBrushKey = "ErrorBrush";
+        VerifyForegroundBrushKey = "ErrorTextBrush";
     }
 
     private bool HasAnyHashes() => Results.Any(row => !string.IsNullOrEmpty(row.HashValue));
@@ -596,7 +596,7 @@ public sealed partial class HashResultViewModel : ObservableObject
     public string ForegroundBrushKey => !IsSupported
         ? "TextDisabledBrush"
         : IsMatched
-            ? "SuccessBrush"
+            ? "SuccessTextBrush"
             : "TextPrimaryBrush";
 
     public IRelayCommand CopyCommand { get; }

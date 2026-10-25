@@ -17,6 +17,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Heimdall.App.Theming;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
@@ -589,7 +590,7 @@ public partial class PasswordAuditView : UserControl, IToolView
         StrengthBar.SetResourceReference(Border.BackgroundProperty, barBrushKey);
 
         StrengthScoreLabel.Text = $"{score}/100 - {L(analysis.ScoreLabelKey)}";
-        StrengthScoreLabel.SetResourceReference(TextBlock.ForegroundProperty, barBrushKey);
+        StrengthScoreLabel.SetResourceReference(TextBlock.ForegroundProperty, SemanticTextBrushes.TextKeyFor(barBrushKey));
     }
 
     private void UpdateCriteriaDisplay(PasswordAnalysis analysis)
@@ -611,7 +612,7 @@ public partial class PasswordAuditView : UserControl, IToolView
             iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontFamilyIcons");
             iconBlock.SetResourceReference(
                 TextBlock.ForegroundProperty,
-                criterion.Passed ? "SuccessBrush" : "ErrorBrush");
+                criterion.Passed ? "SuccessTextBrush" : "ErrorTextBrush");
             row.Children.Add(iconBlock);
 
             // Detail text (right-aligned)

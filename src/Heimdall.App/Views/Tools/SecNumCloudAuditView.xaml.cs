@@ -422,7 +422,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         {
             BtnStartStop.Content = L("ToolAuditBtnStop");
             BtnStartStop.Style = (Style)FindResource("SecondaryButtonStyle");
-            BtnStartStop.Foreground = (Brush)FindResource("ErrorBrush");
+            BtnStartStop.Foreground = (Brush)FindResource("ErrorTextBrush");
             System.Windows.Automation.AutomationProperties.SetName(BtnStartStop, L("ToolAuditBtnStop"));
 
             TxtScope.IsReadOnly = true;
@@ -483,11 +483,11 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         TxtCompliancePercent.Foreground = GetComplianceBrush(compliance);
 
         TxtPassCount.Text = $"{L("ToolAuditPass")}: {passChecks}";
-        TxtPassCount.Foreground = (Brush)FindResource("SuccessBrush");
+        TxtPassCount.Foreground = (Brush)FindResource("SuccessTextBrush");
         TxtWarnCount.Text = $"{L("ToolAuditWarn")}: {warnChecks}";
-        TxtWarnCount.Foreground = (Brush)FindResource("WarningBrush");
+        TxtWarnCount.Foreground = (Brush)FindResource("WarningTextBrush");
         TxtFailCount.Text = $"{L("ToolAuditFail")}: {failChecks}";
-        TxtFailCount.Foreground = (Brush)FindResource("ErrorBrush");
+        TxtFailCount.Foreground = (Brush)FindResource("ErrorTextBrush");
 
         // The percentage is the live region, and it speaks for the whole badge: four regions
         // updated together would queue four announcements for one audit.
@@ -520,7 +520,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
             Margin = new Thickness(8, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        passLabel.SetResourceReference(TextBlock.ForegroundProperty, "SuccessBrush");
+        passLabel.SetResourceReference(TextBlock.ForegroundProperty, "SuccessTextBrush");
         System.Windows.Automation.AutomationProperties.SetName(passLabel, $"{L("ToolAuditPass")}: {chapter.PassCount}");
         countsPanel.Children.Add(passLabel);
 
@@ -532,7 +532,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
             Margin = new Thickness(4, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        warnLabel.SetResourceReference(TextBlock.ForegroundProperty, "WarningBrush");
+        warnLabel.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
         System.Windows.Automation.AutomationProperties.SetName(warnLabel, $"{L("ToolAuditWarn")}: {chapter.WarnCount}");
         countsPanel.Children.Add(warnLabel);
 
@@ -544,7 +544,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
             Margin = new Thickness(4, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        failLabel.SetResourceReference(TextBlock.ForegroundProperty, "ErrorBrush");
+        failLabel.SetResourceReference(TextBlock.ForegroundProperty, "ErrorTextBrush");
         System.Windows.Automation.AutomationProperties.SetName(failLabel, $"{L("ToolAuditFail")}: {chapter.FailCount}");
         countsPanel.Children.Add(failLabel);
 
@@ -843,9 +843,9 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
     private Brush GetComplianceBrush(int percent) => percent switch
     {
-        >= 80 => (Brush)FindResource("SuccessBrush"),
-        >= 50 => (Brush)FindResource("WarningBrush"),
-        _ => (Brush)FindResource("ErrorBrush"),
+        >= 80 => (Brush)FindResource("SuccessTextBrush"),
+        >= 50 => (Brush)FindResource("WarningTextBrush"),
+        _ => (Brush)FindResource("ErrorTextBrush"),
     };
 
     private static string FormatDuration(TimeSpan ts) => ts.TotalMinutes >= 1

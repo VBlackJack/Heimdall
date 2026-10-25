@@ -163,7 +163,7 @@
                                                        TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Margin="4,2,8,0"
                                                        Text="{Binding ComparisonNote}"
-                                                       Foreground="{DynamicResource InfoBrush}"
+                                                       Foreground="{DynamicResource InfoTextBrush}"
                                                        FontSize="{StaticResource FontSizeCaption}"/>
                                         </StackPanel>
                                         <TextBlock Margin="4,4,8,0"

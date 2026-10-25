@@ -664,7 +664,7 @@ public partial class NotesToolView : UserControl, IToolView
         {
             Header = L("ToolNotesBtnDelete")
         };
-        if (Application.Current.TryFindResource("ErrorBrush") is System.Windows.Media.Brush deleteBrush)
+        if (Application.Current.TryFindResource("ErrorTextBrush") is System.Windows.Media.Brush deleteBrush)
         {
             delete.Foreground = deleteBrush;
         }
@@ -836,7 +836,7 @@ public partial class NotesToolView : UserControl, IToolView
             {
                 Header = L("ToolNotesBtnDelete")
             };
-            if (Application.Current.TryFindResource("ErrorBrush") is System.Windows.Media.Brush treeDeleteBrush)
+            if (Application.Current.TryFindResource("ErrorTextBrush") is System.Windows.Media.Brush treeDeleteBrush)
             {
                 delete.Foreground = treeDeleteBrush;
             }

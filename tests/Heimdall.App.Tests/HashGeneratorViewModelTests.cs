@@ -132,12 +132,12 @@ public sealed class HashGeneratorViewModelTests
         vm.VerifyInput = "900150983cd24fb0d6963f7d28e17f72";
 
         Assert.Contains("MD5", vm.VerifyResultText, StringComparison.Ordinal);
-        Assert.Equal("SuccessBrush", vm.VerifyForegroundBrushKey);
+        Assert.Equal("SuccessTextBrush", vm.VerifyForegroundBrushKey);
         Assert.True(vm.Results.First(r => r.Kind == HashAlgorithmKind.Md5).IsMatched);
     }
 
     [Fact]
-    public async Task VerifyInput_NoMatch_UsesErrorBrush()
+    public async Task VerifyInput_NoMatch_UsesErrorTextBrush()
     {
         var vm = new HashGeneratorViewModel(new FakeHashGeneratorService());
         vm.Initialize(await CreateLocalizerAsync("en"));
@@ -146,7 +146,7 @@ public sealed class HashGeneratorViewModelTests
 
         vm.VerifyInput = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-        Assert.Equal("ErrorBrush", vm.VerifyForegroundBrushKey);
+        Assert.Equal("ErrorTextBrush", vm.VerifyForegroundBrushKey);
         Assert.Contains("No match", vm.VerifyResultText, StringComparison.Ordinal);
     }
 
@@ -178,7 +178,7 @@ public sealed class HashGeneratorViewModelTests
 
         Assert.False(vm.IsFileMode);
         Assert.Contains(FileSize.Format(HashGeneratorService.MaxFileSizeBytes), vm.FileStatusText, StringComparison.Ordinal);
-        Assert.Equal("ErrorBrush", vm.FileStatusBrushKey);
+        Assert.Equal("ErrorTextBrush", vm.FileStatusBrushKey);
     }
 
     [Fact]

@@ -241,7 +241,7 @@ public partial class SmbEnumeratorView : UserControl, IToolView
         if (_vm.IsBusy)
         {
             BtnEnumerate.Content = L("BtnCancel");
-            BtnEnumerate.Foreground = (Brush)FindResource("ErrorBrush");
+            BtnEnumerate.Foreground = (Brush)FindResource("ErrorTextBrush");
             BtnEnumerate.Style = (Style)FindResource("SecondaryButtonStyle");
             AutomationProperties.SetName(BtnEnumerate, L("BtnCancel"));
             return;

@@ -171,10 +171,10 @@
                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding StatusKind}" Value="{x:Static network:WakeOnLanStatusKind.Sent}">
-                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding StatusKind}" Value="{x:Static network:WakeOnLanStatusKind.Error}">
-                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

@@ -190,10 +190,10 @@ public partial class MessageDialog : Window
         // Icon glyph + color from Segoe MDL2 Assets
         var (icon, brushKey) = severity switch
         {
-            "error" => ("\uEA39", "ErrorBrush"),       // ErrorBadge
-            "warning" or "danger" => ("\uE7BA", "WarningBrush"), // Warning
-            "success" => ("\uE73E", "SuccessBrush"),    // CheckMark
-            _ => ("\uE946", "InfoBrush")                // Info
+            "error" => ("\uEA39", "ErrorTextBrush"),       // ErrorBadge
+            "warning" or "danger" => ("\uE7BA", "WarningTextBrush"), // Warning
+            "success" => ("\uE73E", "SuccessTextBrush"),    // CheckMark
+            _ => ("\uE946", "InfoTextBrush")                // Info
         };
 
         dialog.IconText.Text = icon;

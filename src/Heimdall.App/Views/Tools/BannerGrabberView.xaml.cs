@@ -460,7 +460,7 @@ public partial class BannerGrabberView : UserControl, IToolView
         if (_vm.IsGrabbing)
         {
             BtnGrab.Content = L("ToolBannerBtnStop");
-            BtnGrab.Foreground = (System.Windows.Media.Brush)FindResource("ErrorBrush");
+            BtnGrab.Foreground = (System.Windows.Media.Brush)FindResource("ErrorTextBrush");
             BtnGrab.Style = (Style)FindResource("SecondaryButtonStyle");
             System.Windows.Automation.AutomationProperties.SetName(BtnGrab, L("ToolBannerBtnStop"));
         }
