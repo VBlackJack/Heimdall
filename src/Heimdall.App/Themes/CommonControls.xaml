@@ -356,8 +356,11 @@
                             <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
                             <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}"/>
                         </Trigger>
+                        <!-- Pressed keeps the accent fill, the one shade the label is readable on in
+                             every theme and accent; the pressed shade outlines it instead. As a
+                             fill it held the label at 3.29 to 4.4 to 1 on the dark themes. -->
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentPressedBrush}"/>
+                            <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
                             <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentPressedBrush}"/>
                         </Trigger>
                         <Trigger Property="IsFocused" Value="True">

@@ -164,7 +164,7 @@
                     <TextBlock x:Name="TxtProviderBadge" Text=""
                                FontSize="{StaticResource FontSizeSmallCaption}" FontWeight="SemiBold"
                                Padding="6,2" Margin="{StaticResource MarginInlineSm}"
-                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               Foreground="{DynamicResource BadgeTextBrush}"
                                Background="{DynamicResource ToolExternalBrush}"/>
                     <TextBlock x:Name="TxtStatus" Text=""
                                FontSize="{StaticResource FontSizeSmallCaption}"

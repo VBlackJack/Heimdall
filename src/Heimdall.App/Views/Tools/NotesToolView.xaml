@@ -42,7 +42,6 @@
         <Style x:Key="NotesMetaLineTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
             <Setter Property="FontSize" Value="{StaticResource FontSizeBadge}"/>
-            <Setter Property="Opacity" Value="0.92"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -134,7 +133,6 @@
                                VerticalAlignment="Center"
                                Visibility="{Binding IsDirty, Converter={StaticResource BoolToVisibilityConverter}}"
                                Margin="8,0,0,0"
-                               Opacity="0.85"
                                AutomationProperties.AutomationId="NotesTool.UnsavedIndicator"/>
                 </StackPanel>
             </DockPanel>
@@ -249,8 +247,7 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="{StaticResource FontSizeCaption}"
-                                       Visibility="Collapsed"
-                                       Opacity="0.7"/>
+                                       Visibility="Collapsed"/>
                             <TextBlock Text="&#xE8D4;"
                                        FontFamily="{StaticResource FontFamilyIcons}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
@@ -354,7 +351,6 @@
                                             <TextBlock Text="{Binding Icon}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        FontSize="{StaticResource FontSizeSmallCaption}"
-                                                       Opacity="0.88"
                                                        Margin="0,0,4,0"
                                                        VerticalAlignment="Center"/>
                                             <TextBlock x:Name="FolderTitleText"
@@ -476,8 +472,7 @@
                                Margin="2,8,0,0"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Text="{Binding ListFooterText}"
-                               FontSize="{StaticResource FontSizeCaption}"
-                               Opacity="0.62"/>
+                               FontSize="{StaticResource FontSizeCaption}"/>
                 </Grid>
             </Border>
 
@@ -580,8 +575,7 @@
                                        Margin="0,3,0,0"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="{StaticResource FontSizeCaption}"
-                                       FontFamily="{StaticResource FontFamilyMonospace}"
-                                       Opacity="0.78"/>
+                                       FontFamily="{StaticResource FontFamilyMonospace}"/>
                         </StackPanel>
                     </Grid>
 
@@ -635,11 +629,9 @@
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-                                <Setter Property="Opacity" Value="0.72"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding StatusIsError}" Value="True">
-                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
-                                        <Setter Property="Opacity" Value="1"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

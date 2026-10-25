@@ -118,11 +118,27 @@
                 <Button x:Name="BtnDismissAlert" DockPanel.Dock="Right"
                         Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeCaption}"
                         Command="{Binding DismissAlertCommand}"
-                        Style="{DynamicResource SecondaryButtonStyle}"
                         Padding="{StaticResource PaddingButtonHelp}" Margin="{StaticResource MarginInlineControl}"
                         Background="Transparent" BorderThickness="0"
                         VerticalAlignment="Center"
-                        TabIndex="3"/>
+                        TabIndex="3">
+                    <!-- On the warning fill the glyph takes the banner text's colour; hovered or
+                         pressed, the button paints its own surface and the glyph goes back to the
+                         primary text colour that surface is made for. -->
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                            <Setter Property="Foreground" Value="{DynamicResource BackgroundBrush}"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
                 <StackPanel>
                     <TextBlock x:Name="TxtAlertTitle" Text="{Binding AlertTitle}"
                                FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
@@ -242,7 +258,7 @@
                                Text="{Binding TotalText}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
-                               Foreground="{DynamicResource BorderBrush}"/>
+                               Foreground="{DynamicResource TextTertiaryBrush}"/>
                     <TextBlock x:Name="TxtLastRefresh" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
                                Text="{Binding LastRefreshText}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>

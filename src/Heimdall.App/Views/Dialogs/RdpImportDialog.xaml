@@ -234,13 +234,17 @@
                                                            Foreground="{DynamicResource TextOnAccentBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
+                                            <!-- Outlined rather than filled: the quieter of the chips, and
+                                                 a disabled-grey fill left its label at 3.6 to 1. The
+                                                 padding gives back the outline's pixel so the chips align. -->
                                             <Border Margin="0,0,6,4"
-                                                    Padding="6,2"
+                                                    Padding="5,1"
                                                     CornerRadius="10"
-                                                    Background="{DynamicResource TextDisabledBrush}"
+                                                    BorderBrush="{DynamicResource BorderStrongBrush}"
+                                                    BorderThickness="1"
                                                     Visibility="{Binding HasSkippedMappings, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding SkippedMappingsText}"
-                                                           Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                         </WrapPanel>
