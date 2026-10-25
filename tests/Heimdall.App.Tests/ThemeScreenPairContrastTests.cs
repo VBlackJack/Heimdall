@@ -135,6 +135,26 @@ public sealed class ThemeScreenPairContrastTests
     }
 
     /// <summary>
+    /// A hovered primary button keeps its label readable. On ThemeForge's hover shade the label was
+    /// 4.35 to 1 on Parchment and 4.30 on Folio; the style paints the derived hover fill instead.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void AHoveredPrimaryButtonLabelIsReadable(string theme)
+    {
+        XElement style = KeyedStyle("Themes/CommonControls.xaml", "PrimaryButtonStyle");
+        string label = SetterKey(style, "Foreground");
+        string hoverFill = TriggerSetterKey(style, "IsMouseOver", "Background", "ButtonBorder");
+        ResourceDictionary palette = ThemeSurfaceTokenContrastTests.Palette(theme);
+        Color text = ThemeSurfaceTokenContrastTests.ColorOf(palette, label);
+        Color fill = ThemeSurfaceTokenContrastTests.ColorOf(palette, hoverFill);
+
+        Assert.True(
+            ThemeSurfaceTokenContrastTests.Contrast(text, fill) >= MinimumTextContrast,
+            Report(theme, $"{label} on hovered {hoverFill}", text, fill));
+    }
+
+    /// <summary>
     /// The onboarding step dots: an inactive dot is an indicator, not a disabled control, and must
     /// stand at 3 to 1 on the onboarding card. In the disabled colour it was 2.4 on Parchment.
     /// </summary>

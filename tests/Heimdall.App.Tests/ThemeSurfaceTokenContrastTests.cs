@@ -98,15 +98,29 @@ public sealed class ThemeSurfaceTokenContrastTests
     }
 
     /// <summary>
-    /// Semantic and accent text reads at 4.5 to 1 on the window background and on a card. The
-    /// bridge used to paint ErrorTextBrush with the theme's ErrorColor itself: #FF5555 on the
-    /// Drakul card #44475A is 2.91 to 1, and the accent #BD93F9 there is 3.79 to 1.
+    /// Semantic and accent text reads at 4.5 to 1 on the window background, on a card, on a
+    /// hovered row and on a selected row. The bridge used to paint ErrorTextBrush with the theme's
+    /// ErrorColor itself: #FF5555 on the Drakul card #44475A is 2.91 to 1, and the accent #BD93F9
+    /// there is 3.79 to 1. Derived for the window and the card only, the error text was 4.06 to 1
+    /// on a hovered row on Magellan and 3.63 on Cinder.
     /// </summary>
+    /// <remarks>
+    /// The two row grounds are the bridge's own brushes, HighlightBrush and TreeRowSelectedBrush,
+    /// drawn over the window as the session tree draws them, read from the bridge's XAML.
+    /// </remarks>
     [Theory]
     [MemberData(nameof(Themes))]
-    public void SemanticAndAccentTextIsReadableOnTheBackgroundAndOnACard(string theme)
+    public void SemanticAndAccentTextIsReadableOnTheBackgroundOnACardAndOnRows(string theme)
     {
         ResourceDictionary palette = Palette(theme);
+        Color background = ColorOf(palette, "BackgroundBrush");
+        (string Name, Color Ground)[] grounds =
+        [
+            ("BackgroundBrush", background),
+            ("CardBrush", ColorOf(palette, "CardBrush")),
+            ("HighlightBrush over BackgroundBrush", Over(ColorOf(palette, "HighlightBrush"), background)),
+            ("TreeRowSelectedBrush over BackgroundBrush", Over(ColorOf(palette, "TreeRowSelectedBrush"), background)),
+        ];
         List<string> unreadable = [];
 
         foreach (string text in SemanticTextBrushes)
@@ -118,17 +132,98 @@ public sealed class ThemeSurfaceTokenContrastTests
             }
 
             Color foreground = ColorOf(palette, text);
-            foreach (string ground in new[] { "BackgroundBrush", "CardBrush" })
+            foreach ((string name, Color under) in grounds)
             {
-                Color under = ColorOf(palette, ground);
                 if (Contrast(Over(foreground, under), under) < MinimumTextContrast)
                 {
-                    unreadable.Add(Report(theme, text + " on " + ground, foreground, under));
+                    unreadable.Add(Report(theme, text + " on " + name, foreground, under));
                 }
             }
         }
 
         Assert.True(unreadable.Count == 0, string.Join(Environment.NewLine, unreadable));
+    }
+
+    /// <summary>
+    /// The selected-row ground the derivation measures is the one the bridge paints: the accent at
+    /// the opacity of <c>TreeRowSelectedBrush</c>. Changing one without the other would derive text
+    /// colours for a row the tree no longer draws.
+    /// </summary>
+    [Fact]
+    public void TheDerivationsSelectedRowIsTheBridgesSelectedRowBrush()
+    {
+        (string _, string colourKey, double opacity) = Assert.Single(BridgeBrushes(), brush => brush.Key == "TreeRowSelectedBrush");
+
+        Assert.Equal(ThemeTextColours.AccentKey, colourKey);
+        Assert.Equal(ThemeTextColours.SelectedRowOpacity, opacity);
+    }
+
+    /// <summary>
+    /// A primary button's label reads on its hover fill. ThemeForge lightens the accent for hover
+    /// on every theme; on Parchment and Folio that left the label at 4.35 and 4.30 to 1, and under
+    /// 4 with the green and cyan accents, where no label colour reaches 4.5. The fill is the hover
+    /// shade where the label reads on it and the pressed shade where it does not.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void APrimaryButtonLabelIsReadableOnItsHoverFill(string theme)
+    {
+        ResourceDictionary palette = Palette(theme);
+        Color label = ColorOf(palette, "TextOnAccentBrush");
+        Color fill = ColorOf(palette, "AccentHoverFillBrush");
+
+        Assert.True(Contrast(label, fill) >= MinimumTextContrast, Report(theme, "label on the hover fill", label, fill));
+    }
+
+    /// <summary>
+    /// The hover fill keeps ThemeForge's hover shade wherever the label reads on it (every dark
+    /// theme), and moves to the pressed shade only where it does not, the light themes.
+    /// </summary>
+    [Fact]
+    public void TheHoverFillKeepsTheHoverShadeWhereverTheLabelReadsOnIt()
+    {
+        List<string> kept = [];
+        List<string> moved = [];
+        foreach (string theme in ThemeNames.All)
+        {
+            ResourceDictionary colours = ThemeColours(theme);
+            Color fill = Assert.IsType<Color>(ColorOf(Palette(theme), "AccentHoverFillBrush"));
+            Color hover = (Color)colours["AccentHoverColor"];
+            bool labelReadsOnHover = Contrast((Color)colours[ThemeTextColours.BackgroundKey], hover) >= MinimumTextContrast;
+
+            Assert.True(labelReadsOnHover == (fill == hover), $"{theme}: hover {hover}, fill {fill}");
+            (fill == hover ? kept : moved).Add(theme);
+        }
+
+        Assert.Contains(ThemeNames.Magellan, kept);
+        Assert.Equal([ThemeNames.Parchment, ThemeNames.Folio], moved.OrderByDescending(name => name, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// The choice reads the shades the application resolves, an accent tint's own: the first one
+    /// the label reads on, in the order hover, pressed, rest, and the most readable when none does.
+    /// </summary>
+    [Fact]
+    public void TheHoverFillTakesTheFirstShadeTheLabelReadsOn()
+    {
+        Color white = Color.FromRgb(0xFF, 0xFF, 0xFF);
+        Color pale = Color.FromRgb(0xC0, 0xC0, 0xC0);
+        Color mid = Color.FromRgb(0x80, 0x80, 0x80);
+        Color dark = Color.FromRgb(0x30, 0x30, 0x30);
+
+        Assert.Equal(dark, ThemeTextColours.AccentHoverFill(white, Shades(dark, pale, pale)));
+        Assert.Equal(dark, ThemeTextColours.AccentHoverFill(white, Shades(pale, dark, pale)));
+        Assert.Equal(dark, ThemeTextColours.AccentHoverFill(white, Shades(pale, pale, dark)));
+        Assert.Equal(mid, ThemeTextColours.AccentHoverFill(white, Shades(pale, mid, pale)));
+        Assert.Null(ThemeTextColours.AccentHoverFill(white, _ => null));
+
+        static Func<string, object?> Shades(Color hover, Color pressed, Color rest) => key => key switch
+        {
+            "AccentHoverBrush" => new System.Windows.Media.SolidColorBrush(hover),
+            "AccentPressedBrush" => new System.Windows.Media.SolidColorBrush(pressed),
+            "AccentBrush" => new System.Windows.Media.SolidColorBrush(rest),
+            _ => null,
+        };
     }
 
     /// <summary>Text drawn on an accent fill, a primary button's label, stays readable.</summary>
@@ -190,14 +285,17 @@ public sealed class ThemeSurfaceTokenContrastTests
         ResourceDictionary colours = ThemeColours(theme);
         Color background = Assert.IsType<Color>(colours[ThemeTextColours.BackgroundKey]);
         Color card = Assert.IsType<Color>(colours[ThemeTextColours.CardKey]);
+        Color[] rows = ThemeTextColours.RowGrounds(background, card, key => colours[key]);
+        Assert.Equal(4, rows.Length);
         ResourceDictionary derived = new();
         ThemeTextColours.Apply(derived, key => colours[key]);
 
-        foreach ((string sourceKey, string textKey, double target) in ThemeTextColours.Pairs)
+        foreach ((string sourceKey, string textKey, double target, bool inRows) in ThemeTextColours.Pairs)
         {
             Color source = Assert.IsType<Color>(colours[sourceKey]);
             Color text = Assert.IsType<Color>(derived[textKey]);
-            bool passes = Contrast(source, background) >= target && Contrast(source, card) >= target;
+            Color[] grounds = inRows ? rows : [background, card];
+            bool passes = grounds.All(ground => Contrast(source, ground) >= target);
 
             if (passes)
             {
@@ -226,7 +324,7 @@ public sealed class ThemeSurfaceTokenContrastTests
             ResourceDictionary colours = ThemeColours(theme);
             ResourceDictionary derived = new();
             ThemeTextColours.Apply(derived, key => colours[key]);
-            foreach ((string sourceKey, string textKey, _) in ThemeTextColours.Pairs)
+            foreach ((string sourceKey, string textKey, _, _) in ThemeTextColours.Pairs)
             {
                 if ((Color)colours[sourceKey] == (Color)derived[textKey])
                 {
@@ -264,11 +362,12 @@ public sealed class ThemeSurfaceTokenContrastTests
         Color parchmentError = Assert.IsType<Color>(application["ErrorTextColor"]);
 
         Assert.NotEqual(drakulError, parchmentError);
+        Color parchmentBackground = (Color)parchment[ThemeTextColours.BackgroundKey];
         Assert.Equal(
             ThemeTextColours.Derive(
                 (Color)parchment["ErrorColor"],
-                (Color)parchment[ThemeTextColours.BackgroundKey],
-                (Color)parchment[ThemeTextColours.CardKey]),
+                ThemeTextColours.RowGrounds(parchmentBackground, (Color)parchment[ThemeTextColours.CardKey], key => parchment[key]),
+                lighten: false),
             parchmentError);
     }
 
