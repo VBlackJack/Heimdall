@@ -223,7 +223,7 @@ public partial class HttpHeaderAnalyzerView : UserControl, IToolView
         if (_vm.IsBusy)
         {
             BtnCheck.Content = L("BtnCancel");
-            BtnCheck.Foreground = (Brush)FindResource("ErrorBrush");
+            BtnCheck.Foreground = (Brush)FindResource("ErrorTextBrush");
             BtnCheck.Style = (Style)FindResource("SecondaryButtonStyle");
             AutomationProperties.SetName(BtnCheck, L("BtnCancel"));
             return;

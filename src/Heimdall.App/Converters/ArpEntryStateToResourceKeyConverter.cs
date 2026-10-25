@@ -36,9 +36,9 @@ public sealed class ArpEntryStateToResourceKeyConverter : IValueConverter
 
         return state switch
         {
-            ArpEntryState.New => "SuccessBrush",
-            ArpEntryState.Changed => "WarningBrush",
-            ArpEntryState.Gone => "ErrorBrush",
+            ArpEntryState.New => "SuccessTextBrush",
+            ArpEntryState.Changed => "WarningTextBrush",
+            ArpEntryState.Gone => "ErrorTextBrush",
             _ => "TextSecondaryBrush",
         };
     }

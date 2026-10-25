@@ -68,7 +68,7 @@
                        TextWrapping="Wrap"
                        Visibility="{Binding IsNothingMasked, Converter={StaticResource BoolToVisibilityConverter}}"/>
             <TextBlock Text="{Binding RefusedText, NotifyOnTargetUpdated=True}"
-                       Foreground="{DynamicResource ErrorBrush}"
+                       Foreground="{DynamicResource ErrorTextBrush}"
                        FontWeight="SemiBold"
                        TextWrapping="Wrap"
                        AutomationProperties.AutomationId="MaskedCopyRefused"

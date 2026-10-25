@@ -71,7 +71,7 @@
                 <TextBlock x:Name="EditorNoticeText" Text="{Binding NoticeText}"
                            Margin="16,0,0,0" TextWrapping="Wrap"
                            FontSize="{StaticResource FontSizeCaption}"
-                           Foreground="{DynamicResource WarningBrush}"
+                           Foreground="{DynamicResource WarningTextBrush}"
                            AutomationProperties.Name="{Binding NoticeText}"
                            Visibility="{Binding HasNotice, Converter={StaticResource BoolToVisibilityConverter}}"/>
             </DockPanel>

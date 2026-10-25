@@ -237,7 +237,7 @@
                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding StatusForegroundBrushKey}" Value="ErrorBrush">
-                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

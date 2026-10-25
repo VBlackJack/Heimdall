@@ -688,7 +688,7 @@
                                        FontFamily="{StaticResource FontFamilyIcons}"
                                        FontSize="{StaticResource IconSizeLarge}"
                                        Text="&#xE783;"
-                                       Foreground="{DynamicResource WarningBrush}"
+                                       Foreground="{DynamicResource WarningTextBrush}"
                                        Focusable="False"
                                        IsHitTestVisible="False"
                                        AutomationProperties.Name=" "/>

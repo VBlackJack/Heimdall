@@ -25,10 +25,10 @@ public sealed class ArpEntryStateToResourceKeyConverterTests
     private readonly ArpEntryStateToResourceKeyConverter _converter = new();
 
     [Theory]
-    [InlineData(ArpEntryState.New, "SuccessBrush")]
+    [InlineData(ArpEntryState.New, "SuccessTextBrush")]
     [InlineData(ArpEntryState.Stable, "TextSecondaryBrush")]
-    [InlineData(ArpEntryState.Changed, "WarningBrush")]
-    [InlineData(ArpEntryState.Gone, "ErrorBrush")]
+    [InlineData(ArpEntryState.Changed, "WarningTextBrush")]
+    [InlineData(ArpEntryState.Gone, "ErrorTextBrush")]
     public void Convert_MapsState_ToExpectedResourceKey(ArpEntryState state, string expectedResourceKey)
     {
         var result = _converter.Convert(state, typeof(string), null, CultureInfo.InvariantCulture);

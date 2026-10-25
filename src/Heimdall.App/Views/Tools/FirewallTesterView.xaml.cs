@@ -463,7 +463,7 @@ public partial class FirewallTesterView : UserControl, IToolView
         if (_vm.IsTesting)
         {
             BtnTest.Content = L("ToolFwBtnStop");
-            BtnTest.Foreground = (Brush)FindResource("ErrorBrush");
+            BtnTest.Foreground = (Brush)FindResource("ErrorTextBrush");
             BtnTest.Style = (Style)FindResource("SecondaryButtonStyle");
             System.Windows.Automation.AutomationProperties.SetName(BtnTest, L("ToolFwBtnStop"));
             ProgressPanel.Visibility = Visibility.Visible;

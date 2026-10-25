@@ -307,10 +307,10 @@
                                        FontWeight="SemiBold">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsVerifyResultValid}" Value="True">
-                                                <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

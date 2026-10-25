@@ -3079,7 +3079,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         StatusTextBlock.SetResourceReference(
             TextBlock.ForegroundProperty,
             forceErrorBrush || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase)
-                ? "ErrorBrush"
+                ? "ErrorTextBrush"
                 : "TextPrimaryBrush");
     }
 

@@ -249,7 +249,7 @@ public sealed class ToolsTabPopulationService
             var favIds = vm.FavoriteToolIds;
             if (favIds.Count > 0)
             {
-                AddToolsTabSectionHeader(target, vm.Localize("ToolsFavoritesHeader"), "WarningBrush");
+                AddToolsTabSectionHeader(target, vm.Localize("ToolsFavoritesHeader"), "WarningTextBrush");
                 var favPanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
                 foreach (var favId in favIds)
                 {
@@ -264,7 +264,7 @@ public sealed class ToolsTabPopulationService
             }
             else
             {
-                AddToolsTabSectionHeader(target, vm.Localize("ToolsFavoritesHeader"), "WarningBrush");
+                AddToolsTabSectionHeader(target, vm.Localize("ToolsFavoritesHeader"), "WarningTextBrush");
                 var emptyFav = new TextBlock
                 {
                     Text = vm.Localize("ToolsEmptyFavorites"),
@@ -564,7 +564,7 @@ public sealed class ToolsTabPopulationService
         };
         pinBtn.SetResourceReference(Control.FontFamilyProperty, "FontFamilyIcons");
         pinBtn.SetResourceReference(Control.ForegroundProperty,
-            isFav ? "WarningBrush" : "TextSecondaryBrush");
+            isFav ? "WarningTextBrush" : "TextSecondaryBrush");
         AutomationProperties.SetName(pinBtn,
             isFav ? vm.Localize("A11yUnpinTool") : vm.Localize("A11yPinTool"));
         pinBtn.Click += (_, e) =>

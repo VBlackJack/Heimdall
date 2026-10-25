@@ -189,7 +189,7 @@ public partial class PingToolView : UserControl, IToolView
 
         _setBusy?.Invoke(true);
         BtnToggle.Content = L("ToolPingBtnStop");
-        BtnToggle.Foreground = (Brush)FindResource("ErrorBrush");
+        BtnToggle.Foreground = (Brush)FindResource("ErrorTextBrush");
         BtnToggle.Style = (Style)FindResource("SecondaryButtonStyle");
         System.Windows.Automation.AutomationProperties.SetName(BtnToggle, L("ToolPingBtnStop"));
         TxtHost.IsReadOnly = true;
@@ -406,7 +406,7 @@ public partial class PingToolView : UserControl, IToolView
         var run = new Run(text + Environment.NewLine)
         {
             Foreground = isError
-                ? (Brush)FindResource("ErrorBrush")
+                ? (Brush)FindResource("ErrorTextBrush")
                 : (Brush)FindResource("TextPrimaryBrush"),
         };
 

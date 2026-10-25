@@ -228,10 +228,10 @@ public partial class HttpStatusCodesView : UserControl, IToolView
         var brush = code switch
         {
             < 200 => TryGetBrush("TextSecondaryBrush", Brushes.Gray),
-            < 300 => TryGetBrush("SuccessBrush", Brushes.Green),
+            < 300 => TryGetBrush("SuccessTextBrush", Brushes.Green),
             < 400 => TryGetBrush("AccentTextBrush", Brushes.DodgerBlue),
-            < 500 => TryGetBrush("WarningBrush", Brushes.Orange),
-            _ => TryGetBrush("ErrorBrush", Brushes.Red)
+            < 500 => TryGetBrush("WarningTextBrush", Brushes.Orange),
+            _ => TryGetBrush("ErrorTextBrush", Brushes.Red)
         };
 
         return new HttpStatusEntry(code, name, description, category, brush);

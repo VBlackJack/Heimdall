@@ -98,7 +98,7 @@ public sealed class EmbeddedTerminalCapabilitySurfaceTests
         string unknownTrigger = ExtractDataTriggerBlock(source, "Unknown");
 
         Assert.Contains("&#xE7BA;", unknownTrigger, StringComparison.Ordinal);
-        Assert.Contains("WarningBrush", unknownTrigger, StringComparison.Ordinal);
+        Assert.Contains("WarningTextBrush", unknownTrigger, StringComparison.Ordinal);
 
         // The plain-file appearance must not be what this trigger applies.
         Assert.DoesNotContain("&#xE7C3;", unknownTrigger, StringComparison.Ordinal);

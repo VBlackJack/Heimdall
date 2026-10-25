@@ -170,7 +170,7 @@
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding IsDirectory}" Value="True">
                                         <Setter TargetName="Icon" Property="Text" Value="&#xE8B7;"/>
-                                        <Setter TargetName="Icon" Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                        <Setter TargetName="Icon" Property="Foreground" Value="{DynamicResource InfoTextBrush}"/>
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
@@ -280,7 +280,7 @@
                         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsErrorStatus}" Value="True">
-                                <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                                 <Setter Property="AutomationProperties.LiveSetting" Value="Assertive"/>
                             </DataTrigger>
                         </Style.Triggers>

@@ -506,7 +506,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     /// <summary>Resource key of the brush used for the favorite filter toggle.</summary>
     public string FavoritesFilterBrushKey
-        => FavoritesFilterActive ? "WarningBrush" : "TextSecondaryBrush";
+        => FavoritesFilterActive ? "WarningTextBrush" : "TextSecondaryBrush";
 
     /// <summary>Localized "X of Y results" counter shown under the filter bar.</summary>
     public string ResultCountText

@@ -37,10 +37,10 @@ public sealed class SmbSeverityToBrushConverter : IValueConverter
 
         var resourceKey = severity switch
         {
-            SmbFindingSeverity.Success => "SuccessBrush",
-            SmbFindingSeverity.Warning => "WarningBrush",
-            SmbFindingSeverity.Critical => "ErrorBrush",
-            _ => "InfoBrush",
+            SmbFindingSeverity.Success => "SuccessTextBrush",
+            SmbFindingSeverity.Warning => "WarningTextBrush",
+            SmbFindingSeverity.Critical => "ErrorTextBrush",
+            _ => "InfoTextBrush",
         };
 
         return Application.Current?.TryFindResource(resourceKey) as Brush ?? Brushes.Transparent;

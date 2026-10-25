@@ -311,7 +311,7 @@ public partial class DefaultCredentialView : UserControl, IToolView
         if (_vm.IsScanning)
         {
             BtnScan.Content = L("ToolDefCredBtnStop");
-            BtnScan.Foreground = (Brush)FindResource("ErrorBrush");
+            BtnScan.Foreground = (Brush)FindResource("ErrorTextBrush");
             BtnScan.Style = (Style)FindResource("SecondaryButtonStyle");
             AutomationProperties.SetName(BtnScan, L("ToolDefCredBtnStop"));
             return;
@@ -350,9 +350,9 @@ public partial class DefaultCredentialView : UserControl, IToolView
             StatusText = DefaultCredentialEngine.StatusToLabel(dto.Status, L),
             StatusBrush = dto.Status switch
             {
-                CredTestStatus.Default => (Brush)FindResource("ErrorBrush"),
-                CredTestStatus.Changed => (Brush)FindResource("SuccessBrush"),
-                CredTestStatus.Error => (Brush)FindResource("WarningBrush"),
+                CredTestStatus.Default => (Brush)FindResource("ErrorTextBrush"),
+                CredTestStatus.Changed => (Brush)FindResource("SuccessTextBrush"),
+                CredTestStatus.Error => (Brush)FindResource("WarningTextBrush"),
                 _ => Brushes.Transparent
             },
             Detail = dto.Status == CredTestStatus.Error

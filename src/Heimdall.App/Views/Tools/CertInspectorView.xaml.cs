@@ -379,7 +379,7 @@ public partial class CertInspectorView : UserControl, IToolView
         if (_vm.IsChecking)
         {
             BtnCheck.Content = L("ToolCertBtnStop");
-            BtnCheck.Foreground = (Brush)FindResource("ErrorBrush");
+            BtnCheck.Foreground = (Brush)FindResource("ErrorTextBrush");
             BtnCheck.Style = (Style)FindResource("SecondaryButtonStyle");
             AutomationProperties.SetName(BtnCheck, L("ToolCertBtnStop"));
             SetScanInputsEnabled(false);
@@ -418,7 +418,7 @@ public partial class CertInspectorView : UserControl, IToolView
         TxtHostnameMatch.Text = summary.HostnameMatches
             ? "\u2714 " + L("ToolCertHostnameMatch")
             : "\u2716 " + L("ToolCertHostnameMismatch");
-        TxtHostnameMatch.Foreground = (Brush)FindResource(summary.HostnameMatches ? "SuccessBrush" : "ErrorBrush");
+        TxtHostnameMatch.Foreground = (Brush)FindResource(summary.HostnameMatches ? "SuccessTextBrush" : "ErrorTextBrush");
         TlsHostPanel.Visibility = Visibility.Visible;
 
         ChainList.ItemsSource = summary.Chain;
@@ -485,7 +485,7 @@ public partial class CertInspectorView : UserControl, IToolView
                 HostnameMatchText = summary.HostnameMatches
                     ? "\u2714 " + L("ToolCertHostnameMatch")
                     : "\u2716 " + L("ToolCertHostnameMismatch"),
-                HostnameMatchBrush = (Brush)FindResource(summary.HostnameMatches ? "SuccessBrush" : "ErrorBrush"),
+                HostnameMatchBrush = (Brush)FindResource(summary.HostnameMatches ? "SuccessTextBrush" : "ErrorTextBrush"),
                 ExpirationText = expirationText,
                 ExpirationBrush = GetExpirationBrush(summary.ExpirationStatus),
                 Chain = summary.Chain,

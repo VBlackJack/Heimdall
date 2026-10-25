@@ -1253,7 +1253,7 @@ public sealed class ContextMenuFactory
     /// </summary>
     private static void ApplyDestructiveForeground(MenuItem item)
     {
-        if (Application.Current?.TryFindResource("ErrorBrush") is Brush errorBrush)
+        if (Application.Current?.TryFindResource("ErrorTextBrush") is Brush errorBrush)
         {
             item.Foreground = errorBrush;
         }
