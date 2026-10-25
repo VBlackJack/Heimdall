@@ -15,13 +15,15 @@
  */
 
 using System.Windows;
+using System.Windows.Media;
 using Color = System.Windows.Media.Color;
 
 namespace Heimdall.App.Theming;
 
 /// <summary>
-/// The colours the theme bridge paints semantic and accent text and boundary lines with, derived
-/// from the active theme so that each one stands out on the window background and on a card.
+/// The colours the theme bridge paints semantic and accent text, boundary lines and the primary
+/// button's hover fill with, derived from the active theme so that each one stands out on the
+/// grounds it is drawn on.
 /// </summary>
 /// <remarks>
 /// <para>A ThemeForge palette gives one colour per meaning (error, warning, success, info,
@@ -29,11 +31,19 @@ namespace Heimdall.App.Theming;
 /// on Drakul the error red is 2.91 to 1 on the card, the accent 3.79 to 1.</para>
 /// <para>The derivation keeps the hue and saturation and only moves the lightness, away from the
 /// grounds (lighter on a dark theme, darker on a light one), one small step at a time, and stops
-/// at the first value readable on both grounds. A theme colour that already passes is returned
+/// at the first value readable on every ground. A theme colour that already passes is returned
 /// unchanged, byte for byte.</para>
+/// <para>Text is drawn in list rows as well as on the window and on cards, so a text colour must
+/// also read on a hovered row (the selection colour) and on a selected row (the accent at
+/// <see cref="SelectedRowOpacity"/> over the window). Checked on the window and the card only, the
+/// error text was 4.06 to 1 on a hovered row on Magellan and 3.63 on Cinder.</para>
 /// <para>Each pair carries its own target: text asks 4.5 to 1 (WCAG 1.4.3), a boundary line that
 /// identifies a region asks 3 to 1 (WCAG 1.4.11). On Drakul the border colour is the card colour
 /// itself, 1.00 to 1 on a card.</para>
+/// <para>The primary button's label is the background colour, fixed. ThemeForge lightens the
+/// accent for the hover fill on every theme, and on a light one that leaves no label colour, light
+/// or dark, at 4.5 to 1 (Parchment with the green accent: 3.64 and 4.30). The hover fill is the
+/// theme's hover shade where the label reads on it, the pressed shade where it does not.</para>
 /// </remarks>
 internal static class ThemeTextColours
 {
@@ -48,6 +58,21 @@ internal static class ThemeTextColours
 
     /// <summary>The theme key of the card surface, the bridge's <c>CardBrush</c>.</summary>
     internal const string CardKey = "SurfaceAltColor";
+
+    /// <summary>The theme key of the hovered row, the bridge's <c>HighlightBrush</c>.</summary>
+    internal const string SelectionKey = "SelectionColor";
+
+    /// <summary>The theme key of the accent, which tints a selected row.</summary>
+    internal const string AccentKey = "AccentColor";
+
+    /// <summary>
+    /// The opacity of the accent over the window on a selected row: the bridge's
+    /// <c>TreeRowSelectedBrush</c>, which a test holds to this value.
+    /// </summary>
+    internal const double SelectedRowOpacity = 0.18;
+
+    /// <summary>The resource key the primary button's hover fill is written to.</summary>
+    internal const string AccentHoverFillKey = "AccentHoverFillColor";
 
     /// <summary>How far the lightness moves per step, on the 0 to 1 HSL scale.</summary>
     private const double LightnessStep = 0.01;
@@ -67,17 +92,18 @@ internal static class ThemeTextColours
     private const double ChannelMaximum = 255.0;
 
     /// <summary>
-    /// Each theme colour, the resource key of the colour derived from it, and the contrast the
-    /// derived colour must reach against both grounds.
+    /// Each theme colour, the resource key of the colour derived from it, the contrast the derived
+    /// colour must reach, and whether it is drawn in rows (text) or only around regions (the strong
+    /// border, on the window and on a card).
     /// </summary>
-    internal static IReadOnlyList<(string SourceKey, string TextKey, double Target)> Pairs { get; } =
+    internal static IReadOnlyList<(string SourceKey, string TextKey, double Target, bool InRows)> Pairs { get; } =
     [
-        ("ErrorColor", "ErrorTextColor", MinimumContrast),
-        ("WarningColor", "WarningTextColor", MinimumContrast),
-        ("SuccessColor", "SuccessTextColor", MinimumContrast),
-        ("InfoColor", "InfoTextColor", MinimumContrast),
-        ("AccentColor", "AccentTextColor", MinimumContrast),
-        ("BorderColor", "BorderStrongColor", MinimumBoundaryContrast),
+        ("ErrorColor", "ErrorTextColor", MinimumContrast, true),
+        ("WarningColor", "WarningTextColor", MinimumContrast, true),
+        ("SuccessColor", "SuccessTextColor", MinimumContrast, true),
+        ("InfoColor", "InfoTextColor", MinimumContrast, true),
+        ("AccentColor", "AccentTextColor", MinimumContrast, true),
+        ("BorderColor", "BorderStrongColor", MinimumBoundaryContrast, false),
     ];
 
     /// <summary>
@@ -97,31 +123,100 @@ internal static class ThemeTextColours
             return;
         }
 
-        foreach ((string sourceKey, string textKey, double contrast) in Pairs)
+        bool lighten = ThemeLuminance.IsDark(background);
+        Color[] regions = [background, card];
+        Color[] rows = RowGrounds(background, card, find);
+        foreach ((string sourceKey, string textKey, double contrast, bool inRows) in Pairs)
         {
             if (find(sourceKey) is Color source)
             {
-                target[textKey] = Derive(source, background, card, contrast);
+                target[textKey] = Derive(source, inRows ? rows : regions, lighten, contrast);
             }
+        }
+
+        if (AccentHoverFill(background, find) is Color hoverFill)
+        {
+            target[AccentHoverFillKey] = hoverFill;
         }
     }
 
     /// <summary>
-    /// The colour closest to <paramref name="colour"/>, same hue and saturation, that reaches
-    /// <paramref name="target"/> against both grounds; the colour itself when it already does.
+    /// The grounds text is drawn on: the window, a card, a hovered row and a selected row. A theme
+    /// without a selection or an accent colour gives the grounds it has.
     /// </summary>
-    /// <param name="colour">The theme's own colour for the meaning.</param>
     /// <param name="background">The window background.</param>
     /// <param name="card">The card surface.</param>
-    /// <param name="target">The contrast to reach; <see cref="MinimumContrast"/> for text.</param>
-    internal static Color Derive(Color colour, Color background, Color card, double target = MinimumContrast)
+    /// <param name="find">Looks a resource up in the active theme.</param>
+    internal static Color[] RowGrounds(Color background, Color card, Func<string, object?> find)
     {
-        if (IsReadable(colour, background, card, target))
+        ArgumentNullException.ThrowIfNull(find);
+
+        List<Color> grounds = [background, card];
+        if (find(SelectionKey) is Color selection)
+        {
+            grounds.Add(selection);
+        }
+
+        if (find(AccentKey) is Color accent)
+        {
+            grounds.Add(Over(accent, SelectedRowOpacity, background));
+        }
+
+        return [.. grounds];
+    }
+
+    /// <summary>
+    /// The primary button's hover fill: the first of the hover, pressed and rest accent shades the
+    /// label reads on at <see cref="MinimumContrast"/>, the most readable of them when none does.
+    /// The shades are read as the application resolves them, so an accent tint's own shades are
+    /// the ones measured.
+    /// </summary>
+    /// <param name="label">The label colour, the bridge's <c>TextOnAccentBrush</c>.</param>
+    /// <param name="find">Looks a resource up in the application.</param>
+    internal static Color? AccentHoverFill(Color label, Func<string, object?> find)
+    {
+        ArgumentNullException.ThrowIfNull(find);
+
+        Color?[] shades =
+        [
+            ColourOf(find("AccentHoverBrush")) ?? ColourOf(find("AccentHoverColor")),
+            ColourOf(find("AccentPressedBrush")) ?? ColourOf(find("AccentPressedColor")),
+            ColourOf(find("AccentBrush")) ?? ColourOf(find(AccentKey)),
+        ];
+        Color[] known = [.. shades.Where(shade => shade.HasValue).Select(shade => shade!.Value)];
+        if (known.Length == 0)
+        {
+            return null;
+        }
+
+        foreach (Color shade in known)
+        {
+            if (ContrastRatio(label, shade) >= MinimumContrast)
+            {
+                return shade;
+            }
+        }
+
+        return known.MaxBy(shade => ContrastRatio(label, shade));
+    }
+
+    /// <summary>
+    /// The colour closest to <paramref name="colour"/>, same hue and saturation, that reaches
+    /// <paramref name="target"/> against every ground; the colour itself when it already does.
+    /// </summary>
+    /// <param name="colour">The theme's own colour for the meaning.</param>
+    /// <param name="grounds">The opaque colours it is drawn on.</param>
+    /// <param name="lighten">Whether to move lighter (a dark theme) or darker (a light one).</param>
+    /// <param name="target">The contrast to reach; <see cref="MinimumContrast"/> for text.</param>
+    internal static Color Derive(Color colour, IReadOnlyList<Color> grounds, bool lighten, double target = MinimumContrast)
+    {
+        ArgumentNullException.ThrowIfNull(grounds);
+
+        if (IsReadable(colour, grounds, target))
         {
             return colour;
         }
 
-        bool lighten = ThemeLuminance.IsDark(background);
         (double hue, double saturation, double lightness) = ToHsl(colour);
         Color candidate = colour;
         for (int step = 1; step <= MaximumSteps; step++)
@@ -130,7 +225,7 @@ internal static class ThemeTextColours
                 ? Math.Min(1.0, lightness + (step * LightnessStep))
                 : Math.Max(0.0, lightness - (step * LightnessStep));
             candidate = FromHsl(hue, saturation, moved, colour.A);
-            if (IsReadable(candidate, background, card, target))
+            if (IsReadable(candidate, grounds, target))
             {
                 return candidate;
             }
@@ -149,9 +244,27 @@ internal static class ThemeTextColours
         return (Math.Max(a, b) + LuminanceFlare) / (Math.Min(a, b) + LuminanceFlare);
     }
 
-    private static bool IsReadable(Color colour, Color background, Color card, double target) =>
-        ContrastRatio(colour, background) >= target
-        && ContrastRatio(colour, card) >= target;
+    private static bool IsReadable(Color colour, IReadOnlyList<Color> grounds, double target) =>
+        grounds.All(ground => ContrastRatio(colour, ground) >= target);
+
+    /// <summary>A brush's or a colour resource's colour; null for anything else.</summary>
+    private static Color? ColourOf(object? resource) => resource switch
+    {
+        Color colour => colour,
+        SolidColorBrush brush => brush.Color,
+        _ => null,
+    };
+
+    /// <summary>
+    /// <paramref name="top"/> at <paramref name="opacity"/> as drawn over an opaque colour, the
+    /// opacity taken as the alpha byte it rounds to.
+    /// </summary>
+    private static Color Over(Color top, double opacity, Color under)
+    {
+        double alpha = Math.Round(opacity * ChannelMaximum) / ChannelMaximum;
+        byte Mix(byte t, byte u) => (byte)Math.Round((t * alpha) + (u * (1 - alpha)));
+        return new Color { A = under.A, R = Mix(top.R, under.R), G = Mix(top.G, under.G), B = Mix(top.B, under.B) };
+    }
 
     private static double RelativeLuminance(Color colour) =>
         (RedWeight * Linear(colour.R)) + (GreenWeight * Linear(colour.G)) + (BlueWeight * Linear(colour.B));
