@@ -195,7 +195,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _defaultLocale = "en";
 
     [ObservableProperty]
-    private string _defaultTheme = "Drakul";
+    private string _defaultTheme = AppSettings.FactoryDefaultTheme;
 
     [ObservableProperty]
     private string _accentTint = "Default";
