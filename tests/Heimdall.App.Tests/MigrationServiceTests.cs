@@ -249,6 +249,27 @@ public class MigrationServiceTests : IDisposable
         Assert.True(settings.EnableLogging);
     }
 
+    /// <summary>
+    /// An imported settings file that names a theme keeps it, the former default included; only a
+    /// file that names none gets the factory theme.
+    /// </summary>
+    [Theory]
+    [InlineData("""{ "DefaultLocale": "fr" }""", "Magellan")]
+    [InlineData("""{ "DefaultLocale": "fr", "DefaultTheme": "Drakul" }""", "Drakul")]
+    public async Task ImportFromLegacyAsync_GivesTheFactoryThemeOnlyToAFileWithoutOne(
+        string legacySettings,
+        string expectedTheme)
+    {
+        WriteLegacyFile(Path.Combine("config", "settings.json"), legacySettings);
+        WriteLegacyFile(Path.Combine("config", "servers.json"), "[]");
+
+        var result = await _service.ImportFromLegacyAsync(_legacyPath);
+
+        Assert.True(result.SettingsImported);
+        var settings = await _configManager.LoadSettingsAsync();
+        Assert.Equal(expectedTheme, settings.DefaultTheme);
+    }
+
     [Fact]
     public async Task ImportFromLegacyAsync_Imports_Server_Inventory()
     {

@@ -12,6 +12,19 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased
+
+### Theme
+
+- **Magellan is the default theme** (owner decision 2026-10-25). `HeimdallThemeService.DefaultTheme`,
+  the new `AppSettings.FactoryDefaultTheme` (which `AppSettings.DefaultTheme` and the Settings panel
+  start from) and `config/settings.default.json` now name `Magellan` instead of `Drakul`. It applies
+  only when no theme is set: a fresh install, a settings file or an imported legacy file without
+  `DefaultTheme`, or an unknown name that falls back. A recorded choice, `Drakul` included, is kept
+  and not migrated. The theme's per-setting marker and reset compare with `Magellan`; the full
+  "Reset to defaults" still keeps the current theme, as before. Pinned by
+  `TheDefaultThemeIsMagellanEverywhereADefaultIsStated` and `TheThemeMarkerComparesAgainstMagellan`.
+
 ## 2026-10-23: subscribed Citrix apps, idempotent re-import, and Workspace settings (v2026.102301)
 
 ### Citrix Workspace (#680, #681, #682)
