@@ -32,6 +32,13 @@ public sealed class AppSettings
 {
     public const int CurrentSchemaVersion = 1;
 
+    /// <summary>
+    /// Theme applied when no theme is set: a fresh install, a settings file without
+    /// <see cref="DefaultTheme"/>, or a name the theme engine does not know. An explicit choice
+    /// is never rewritten to it.
+    /// </summary>
+    public const string FactoryDefaultTheme = "Magellan";
+
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
     [JsonExtensionData]
@@ -46,7 +53,7 @@ public sealed class AppSettings
     public bool FullScreen { get; set; } = true;
     public bool AdminMode { get; set; } = true;
     public string DefaultLocale { get; set; } = "en";
-    public string DefaultTheme { get; set; } = "Drakul";
+    public string DefaultTheme { get; set; } = FactoryDefaultTheme;
     public string AccentTint { get; set; } = "Default";
 
     // Tools (legacy Plink paths, kept for import compatibility)

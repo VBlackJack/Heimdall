@@ -5,7 +5,7 @@
     "fullScreen": true,
     "adminMode": true,
     "defaultLocale": "en",
-    "defaultTheme": "Drakul",
+    "defaultTheme": "Magellan",
     "accentTint": "Default",
     "plinkPath": "C:\\Program Files\\PuTTY\\plink.exe",
     "puttyPath": null,

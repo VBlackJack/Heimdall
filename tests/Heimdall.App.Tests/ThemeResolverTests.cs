@@ -108,13 +108,42 @@ public sealed class ThemeResolverTests
     [InlineData("Blade")]
     [InlineData("Buffy")]
     [InlineData("NotATheme")]
-    public void ResolveThemeId_WithInvalidOrLegacyName_DefaultsToDrakulAndPersists(
+    public void ResolveThemeId_WithInvalidOrLegacyName_DefaultsToMagellanAndPersists(
         string? persisted)
     {
         ThemeResolution result = HeimdallThemeService.ResolveThemeId(persisted);
 
-        Assert.Equal(ThemeNames.Drakul, result.ThemeId);
+        Assert.Equal(ThemeNames.Magellan, result.ThemeId);
         Assert.True(result.ShouldPersist);
+    }
+
+    /// <summary>
+    /// Magellan is the default theme, and the four places that state a default agree on it: the
+    /// engine's fallback, the settings type, the bundled factory file the markers and the reset
+    /// read, and the panel before anything is loaded.
+    /// </summary>
+    [Fact]
+    public void TheDefaultThemeIsMagellanEverywhereADefaultIsStated()
+    {
+        string factoryFile = File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "config", "settings.default.json"));
+
+        Assert.Equal(ThemeNames.Magellan, HeimdallThemeService.DefaultTheme);
+        Assert.Equal(ThemeNames.Magellan, Heimdall.Core.Configuration.AppSettings.FactoryDefaultTheme);
+        Assert.Equal(ThemeNames.Magellan, new Heimdall.Core.Configuration.AppSettings().DefaultTheme);
+        Assert.Equal(
+            ThemeNames.Magellan,
+            Heimdall.App.ViewModels.SettingsViewModel.ParseFactoryDefaults(factoryFile).DefaultTheme);
+    }
+
+    /// <summary>The former default stays a valid explicit choice and is not rewritten.</summary>
+    [Fact]
+    public void ResolveThemeId_WithTheFormerDefault_KeepsItWithoutPersisting()
+    {
+        ThemeResolution result = HeimdallThemeService.ResolveThemeId(ThemeNames.Drakul);
+
+        Assert.Equal(ThemeNames.Drakul, result.ThemeId);
+        Assert.False(result.ShouldPersist);
     }
 
     [Theory]

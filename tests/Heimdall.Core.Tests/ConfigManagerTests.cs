@@ -324,9 +324,28 @@ public class ConfigManagerTests : IDisposable
 
         Assert.NotNull(settings);
         Assert.Equal("en", settings.DefaultLocale);
-        Assert.Equal("Drakul", settings.DefaultTheme);
+        Assert.Equal("Magellan", settings.DefaultTheme);
         Assert.Equal(1920, settings.DefaultResolutionWidth);
         Assert.Equal(1080, settings.DefaultResolutionHeight);
+    }
+
+    /// <summary>
+    /// A settings file that never recorded a theme gets the factory theme, and one that recorded
+    /// the former default keeps it: the new default reaches only users who never chose.
+    /// </summary>
+    [Theory]
+    [InlineData("""{ "defaultLocale": "fr" }""", "Magellan")]
+    [InlineData("""{ "defaultLocale": "fr", "defaultTheme": "Drakul" }""", "Drakul")]
+    public async Task LoadSettingsAsync_GivesTheFactoryThemeOnlyWhenNoThemeIsRecorded(
+        string json,
+        string expectedTheme)
+    {
+        Directory.CreateDirectory(Path.Combine(_tempDir, "config"));
+        await File.WriteAllTextAsync(_manager.SettingsPath, json, new UTF8Encoding(false));
+
+        var settings = await _manager.LoadSettingsAsync();
+
+        Assert.Equal(expectedTheme, settings.DefaultTheme);
     }
 
     [Fact]

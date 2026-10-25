@@ -82,6 +82,27 @@ public sealed partial class SettingsViewModelTests
     }
 
     /// <summary>
+    /// The theme marker compares against Magellan: the former default Drakul is marked as a
+    /// change, and the per-setting reset brings Magellan back.
+    /// </summary>
+    [Fact]
+    public void TheThemeMarkerComparesAgainstMagellan()
+    {
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager());
+        viewModel.LoadFromSettings(SettingsViewModel.ParseFactoryDefaults(ReadFactoryDefaultsFile()));
+        SettingDefaultState theme = viewModel.Defaults[nameof(SettingsViewModel.DefaultTheme)];
+        Assert.Equal("Magellan", viewModel.DefaultTheme);
+        Assert.False(theme.IsModified);
+
+        viewModel.DefaultTheme = "Drakul";
+        Assert.True(theme.IsModified);
+
+        theme.ResetCommand.Execute(null);
+        Assert.Equal("Magellan", viewModel.DefaultTheme);
+        Assert.False(theme.IsModified);
+    }
+
+    /// <summary>
     /// A number typed into its box is marked once the box commits it, through the number the box
     /// edits rather than the text.
     /// </summary>

@@ -36,7 +36,7 @@ internal readonly record struct AccentTintResolution(string AccentTintId, bool S
 /// </summary>
 public sealed class HeimdallThemeService
 {
-    private const string DefaultTheme = ThemeForgeNames.Drakul;
+    internal const string DefaultTheme = ThemeForgeNames.Magellan;
     private const string DefaultAccentTint = nameof(ThemeForgeAccentTint.Default);
     private const string BridgeDictionaryPath = "Themes/HeimdallThemeBridge.xaml";
     private const string BridgeDictionaryPackPath =
