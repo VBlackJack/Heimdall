@@ -12,6 +12,45 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-27: a Command Library that fits a laptop screen, with a resizable panel (v2026.102701)
+
+From a UX/UI audit of the Command Library on 2026-10-26 (1 P1, 4 P2, 7 P3; the P1 and P2 are in
+this release, the P3 remain open). Each defect was measured on the running build before the fix.
+
+### Layout of the bottom of the tool (#701)
+
+- **The list and the command bar stay on screen in a short window.** The generator, history and
+  runbook panels sat in auto rows under the list; a `Grid` measures an auto row against infinity,
+  so the generator took its full 450 px cap whatever was left. At 1024x768 the list got 0 px and
+  Copy / Insert / Send were clipped below the tool. The body is now a `DockPanel` (a docked panel
+  is measured against the height really left) and each panel's `MaxHeight` comes from the new
+  `RemainingHeightConverter`: `min(cap, body - 128 px)`, the 128 px being the list's two-row reserve.
+  Pinned by `CommandLibraryBottomPanelLayoutTests` (rendered at 520 px: red with `Copy ends at 579 px
+  in a view 520 px high`) and `RemainingHeightConverterTests`.
+- **History rows span the panel.** The collapsed empty-state text was the history `DockPanel`'s last
+  child and took the fill, leaving the list docked left at the width of its content (160 px of 900).
+
+### Generator after the history or the runbooks (#702)
+
+- **Closing the history or the runbooks shows the selected action's generator again.** Opening them
+  hid it without clearing the selection, and clicking the still-highlighted row changed nothing.
+- **Replaying a history row of the action already selected works.** `SelectedEntry = target` was a
+  no-op, so the generator stayed hidden and the replay returned with the history still open. The
+  eight existing replay tests all started with no selection. Pinned by four new tests in
+  `CommandLibraryHistoryReplayTests`, three of them red before the fix.
+
+### Resizable bottom panel (#703)
+
+- **A grip on the top edge of the open panel** sets its height by mouse drag, or by Up / Down
+  (16 px) once focused; a double-click restores the automatic height. One height for the three
+  panels, saved as `CmdLibBottomPanelHeight` in `settings.json` (0 = automatic) and read back from
+  `ConfigManager.CurrentSettings`. A chosen height lifts the panel's cap but never the list's
+  reserve. The grip overlays the bottom edge of the list so the list keeps its whole reserve.
+- Two defects of the first version were caught only on the running app, while every event-driven
+  test was green: the grip was drawn in the tool header, and the saved height was never restored
+  because `AppSettings` is not registered in DI. `TheGripSitsOnTopOfTheOpenPanel` now pins the
+  position.
+
 ## 2026-10-26: clearer Settings sections, and the last contrast gaps closed (v2026.102602)
 
 ### Settings (#694)
