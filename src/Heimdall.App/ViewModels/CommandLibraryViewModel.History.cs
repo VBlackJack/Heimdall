@@ -229,7 +229,17 @@ public sealed partial class CommandLibraryViewModel
             return;
         }
 
-        SelectedEntry = target;
+        // Replaying the action already selected changes no selection, so the setter shows
+        // nothing and the generator the open history had hidden stays hidden.
+        if (ReferenceEquals(SelectedEntry, target))
+        {
+            ShowGeneratorForSelection();
+        }
+        else
+        {
+            SelectedEntry = target;
+        }
+
         if (!IsGeneratorVisible) return;
 
         if (HasMultipleTemplates)

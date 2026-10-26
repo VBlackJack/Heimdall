@@ -193,6 +193,87 @@ public sealed class CommandLibraryHistoryReplayTests
         Assert.Equal(expectsWindows, viewModel.UseWindowsTemplate);
     }
 
+    /// <summary>
+    /// The common replay: send, open the history, replay the row just written. The action is
+    /// still the selected one, so setting the selection again changes nothing, and opening the
+    /// history had hidden the generator. Replay used to return at that point, leaving the
+    /// history open and the generator hidden, with nothing said.
+    /// </summary>
+    [Fact]
+    public async Task ReplayingTheSelectedActionShowsTheGeneratorAgain()
+    {
+        var viewModel = await CreateViewModelAsync(
+            CommandLibraryTestHelpers.CreateLinuxAction(
+                "tail", "Tail a log", "tail -f {path}",
+                CommandLibraryTestHelpers.RequiredParameter("path", "Path")));
+        using var _ = viewModel;
+        viewModel.SelectedEntry = SingleEntry(viewModel);
+        await viewModel.ToggleHistoryAsync();
+        Assert.False(viewModel.IsGeneratorVisible);
+
+        viewModel.ReplayHistoryEntry(Row("tail", Platform.Linux, ("path", "/var/log/syslog")));
+
+        Assert.True(viewModel.IsGeneratorVisible);
+        Assert.False(viewModel.IsHistoryVisible);
+        Assert.Equal("/var/log/syslog", Parameter(viewModel, "path").Value);
+    }
+
+    /// <summary>
+    /// Closing the history hands the bottom of the tool back to the generator of the action
+    /// still selected. Without that the row stays highlighted over nothing, and clicking it
+    /// does not help because the selection does not change.
+    /// </summary>
+    [Fact]
+    public async Task ClosingTheHistoryShowsTheSelectedActionAgain()
+    {
+        var viewModel = await CreateViewModelAsync(
+            CommandLibraryTestHelpers.CreateLinuxAction("tail", "Tail a log", "tail -f /tmp/a"));
+        using var _ = viewModel;
+        viewModel.SelectedEntry = SingleEntry(viewModel);
+
+        await viewModel.ToggleHistoryAsync();
+        await viewModel.ToggleHistoryAsync();
+
+        Assert.False(viewModel.IsHistoryVisible);
+        Assert.True(viewModel.IsGeneratorVisible);
+    }
+
+    /// <summary>
+    /// Positive control for the test above: with nothing selected there is no generator to
+    /// give back, and closing the history must not open an empty one.
+    /// </summary>
+    [Fact]
+    public async Task ClosingTheHistoryWithNothingSelectedOpensNoGenerator()
+    {
+        var viewModel = await CreateViewModelAsync(
+            CommandLibraryTestHelpers.CreateLinuxAction("tail", "Tail a log", "tail -f /tmp/a"));
+        using var _ = viewModel;
+
+        await viewModel.ToggleHistoryAsync();
+        await viewModel.ToggleHistoryAsync();
+
+        Assert.False(viewModel.IsGeneratorVisible);
+    }
+
+    [Fact]
+    public async Task ClosingTheRunbooksShowsTheSelectedActionAgain()
+    {
+        var viewModel = await CreateViewModelAsync(
+            CommandLibraryTestHelpers.CreateLinuxAction("tail", "Tail a log", "tail -f /tmp/a"));
+        using var _ = viewModel;
+        viewModel.SelectedEntry = SingleEntry(viewModel);
+
+        await viewModel.ToggleRunbooksAsync();
+        Assert.False(viewModel.IsGeneratorVisible);
+        await viewModel.ToggleRunbooksAsync();
+
+        Assert.False(viewModel.IsRunbooksVisible);
+        Assert.True(viewModel.IsGeneratorVisible);
+    }
+
+    private static CommandLibraryActionEntry SingleEntry(CommandLibraryViewModel viewModel)
+        => Assert.Single(viewModel.ActionsView!.Cast<CommandLibraryActionEntry>());
+
     private static ActionModel DualPlatformAction()
     {
         var parameter = CommandLibraryTestHelpers.RequiredParameter("path", "Path");
