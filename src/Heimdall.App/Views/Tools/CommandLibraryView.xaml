@@ -2,7 +2,9 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+             xmlns:converters="clr-namespace:Heimdall.App.Converters"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:vm="clr-namespace:Heimdall.App.ViewModels"
              d:DataContext="{d:DesignInstance Type=vm:CommandLibraryViewModel}"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -21,6 +23,18 @@
         <KeyBinding Key="Return" Modifiers="Shift" Command="{Binding InsertCommand}"/>
         <KeyBinding Key="D" Modifiers="Control" Command="{Binding DuplicateSelectedCommand}"/>
     </UserControl.InputBindings>
+    <!-- The action list and the three bottom panels (generator, history, runbooks) share the
+         body. A panel sits in an auto row, which is served before the list's star row, so a cap
+         alone let the generator take everything in a short window: at 1024x768 the list was gone
+         and the Copy / Send bar was clipped below the tool. Each panel's height is therefore
+         what the body has left once the list has kept two rows, and never more than its cap. -->
+    <UserControl.Resources>
+        <converters:RemainingHeightConverter x:Key="RemainingHeightConverter"/>
+        <sys:Double x:Key="CmdLibActionListMinHeight">128</sys:Double>
+        <sys:Double x:Key="CmdLibGeneratorMaxHeight">450</sys:Double>
+        <sys:Double x:Key="CmdLibHistoryMaxHeight">300</sys:Double>
+        <sys:Double x:Key="CmdLibRunbooksMaxHeight">420</sys:Double>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -28,9 +42,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- ═══════════ ROW 0 - HEADER ═══════════ -->
@@ -259,157 +270,26 @@
                      Style="{StaticResource ToolLoadingBarStyle}"
                      Visibility="{Binding IsOperationRunning, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-        <!-- ═══════════ ROW 4 - ACTION LIST ═══════════ -->
-        <ListView Grid.Row="4"
-                  Background="Transparent" BorderThickness="0"
-                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                  ItemsSource="{Binding ActionsView}"
-                  SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
-                  AutomationProperties.Name="{loc:Translate ToolCmdLibTitle}"
-                  TabIndex="5">
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <!-- The row's text lives in TextBlocks inside a DockPanel, none of which
-                         contributes to the container's automation name, so without this the
-                         row announces the bound entry's class name. -->
-                    <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                    <Setter Property="Padding" Value="{StaticResource ToolFooterPadding}"/>
-                    <Setter Property="Cursor" Value="Hand"/>
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="ListViewItem">
-                                <Border x:Name="Bd"
-                                        Padding="{TemplateBinding Padding}"
-                                        Background="{TemplateBinding Background}"
-                                        BorderBrush="{DynamicResource BorderBrush}"
-                                        BorderThickness="0,0,0,1">
-                                    <ContentPresenter/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background"
-                                                Value="{DynamicResource SurfaceBrush}"/>
-                                    </Trigger>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="Bd" Property="Background"
-                                                Value="{DynamicResource CardBrush}"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </ListView.ItemContainerStyle>
-
-            <ListView.GroupStyle>
-                <GroupStyle>
-                    <GroupStyle.HeaderTemplate>
-                        <DataTemplate>
-                            <Border Padding="12,8,12,4"
-                                    Background="{DynamicResource BackgroundBrush}">
-                                <TextBlock Text="{Binding Name}"
-                                           FontSize="{StaticResource FontSizeBodyLarge}"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource AccentTextBrush}"/>
-                            </Border>
-                        </DataTemplate>
-                    </GroupStyle.HeaderTemplate>
-                </GroupStyle>
-            </ListView.GroupStyle>
-
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <DockPanel>
-                        <!-- Favorite toggle -->
-                        <!-- 24x24 kept intentionally: dense list-row context, favorite toggling rides a larger row hit area. -->
-                        <Button DockPanel.Dock="Right"
-                                Content="{Binding FavoriteIcon}"
-                                Command="{Binding DataContext.ToggleFavoriteByIdCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding Source.Id}"
-                                ToolTip="{Binding FavoriteTooltip}"
-                                AutomationProperties.Name="{Binding FavoriteTooltip}"
-                                Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" Width="24" Height="24"
-                                VerticalAlignment="Center" Margin="{StaticResource MarginInlineStart}"
-                                Foreground="{DynamicResource WarningTextBrush}"/>
-                        <!-- Risk badge -->
-                        <Border DockPanel.Dock="Left"
-                                CornerRadius="{StaticResource CornerRadiusSm}" Padding="4,1"
-                                VerticalAlignment="Center" Margin="{StaticResource MarginLabelInline}"
-                                ToolTip="{Binding RiskLabel}">
-                            <Border.Background>
-                                <MultiBinding Converter="{StaticResource ResourceKeyToBrushConverter}">
-                                    <Binding Path="RiskBrushKey"/>
-                                    <Binding Path="DataContext.ThemeRevision" RelativeSource="{RelativeSource AncestorType=Window}"/>
-                                </MultiBinding>
-                            </Border.Background>
-                            <TextBlock Text="{Binding RiskBadge}"
-                                       FontSize="{StaticResource FontSizeSmallCaption}"
-                                       FontWeight="Bold" Foreground="{DynamicResource BadgeTextBrush}"/>
-                        </Border>
-                        <!-- Platform badge -->
-                        <TextBlock DockPanel.Dock="Right"
-                                   Text="{Binding PlatformLabel}"
-                                   FontSize="{StaticResource FontSizeSmallCaption}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"
-                                   Margin="{StaticResource MarginInlineControl}"/>
-                        <!-- Title + description -->
-                        <StackPanel>
-                            <TextBlock Text="{Binding Title}"
-                                       FontSize="{StaticResource FontSizeBody}"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding Description}"
-                                       FontSize="{StaticResource FontSizeCaption}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       TextTrimming="CharacterEllipsis"/>
-                            <!-- The command itself, for the template a click would open on under
-                                 the current platform filter. Not part of the row's spoken name,
-                                 which stays title then badges. -->
-                            <TextBlock Text="{Binding CommandPreview}"
-                                       FontFamily="{StaticResource FontFamilyMonospace}"
-                                       FontSize="{StaticResource FontSizeCaption}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       TextWrapping="NoWrap"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
-                    </DockPanel>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
-
-        <!-- No results -->
-        <TextBlock Grid.Row="4"
-                   Text="{loc:Translate ToolCmdLibNoResults}"
-                   Visibility="{Binding IsNoResultsVisible, Converter={StaticResource BoolToVisibilityConverter}}"
-                   Style="{StaticResource ToolEmptyStateTextStyle}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-
-        <!-- Empty state -->
-        <Border Grid.Row="4"
-                Style="{StaticResource ToolEmptyStateStyle}"
-                Visibility="{Binding IsEmptyStateVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Text="&#xE8F1;" FontFamily="{StaticResource FontFamilyIcons}"
-                           Style="{StaticResource ToolEmptyStateIconStyle}"
-                           Focusable="False"/>
-                <TextBlock Text="{Binding EmptyStateMessage}"
-                           Style="{StaticResource ToolEmptyStateTextStyle}"/>
-            </StackPanel>
-        </Border>
-
-        <!-- ═══════════ ROW 5 - GENERATOR PANEL ═══════════ -->
-        <Border Grid.Row="5"
+        <!-- ═══════════ ROW 4 - BODY: BOTTOM PANELS + ACTION LIST ═══════════ -->
+        <!-- A DockPanel, not a Grid: it measures a docked panel against the height that is
+             really left, where a Grid measures an auto row against infinity. In a Grid the
+             generator asked for its full cap, the body overflowed its row, and its own
+             ActualHeight then fed the cap back, so nothing ever gave way. The list is the
+             last child and takes what the open panel leaves. -->
+        <DockPanel x:Name="BodyPanel" Grid.Row="4">
+        <!-- ═══════════ GENERATOR PANEL ═══════════ -->
+        <Border DockPanel.Dock="Bottom"
                 Visibility="{Binding IsGeneratorVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="0,1,0,0"
-                MaxHeight="450">
+                BorderThickness="0,1,0,0">
+            <Border.MaxHeight>
+                <MultiBinding Converter="{StaticResource RemainingHeightConverter}">
+                    <Binding Path="ActualHeight" ElementName="BodyPanel"/>
+                    <Binding Source="{StaticResource CmdLibActionListMinHeight}"/>
+                    <Binding Source="{StaticResource CmdLibGeneratorMaxHeight}"/>
+                </MultiBinding>
+            </Border.MaxHeight>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
@@ -787,13 +667,19 @@
             </Grid>
         </Border>
 
-        <!-- ═══════════ ROW 6 - HISTORY PANEL ═══════════ -->
-        <Border Grid.Row="6"
+        <!-- ═══════════ HISTORY PANEL ═══════════ -->
+        <Border DockPanel.Dock="Bottom"
                 Visibility="{Binding IsHistoryVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="0,1,0,0"
-                MaxHeight="300">
+                BorderThickness="0,1,0,0">
+            <Border.MaxHeight>
+                <MultiBinding Converter="{StaticResource RemainingHeightConverter}">
+                    <Binding Path="ActualHeight" ElementName="BodyPanel"/>
+                    <Binding Source="{StaticResource CmdLibActionListMinHeight}"/>
+                    <Binding Source="{StaticResource CmdLibHistoryMaxHeight}"/>
+                </MultiBinding>
+            </Border.MaxHeight>
             <DockPanel>
                 <DockPanel DockPanel.Dock="Top" Margin="12,8,12,4">
                     <Button DockPanel.Dock="Right"
@@ -825,6 +711,16 @@
                                VerticalAlignment="Center"
                                Margin="{StaticResource MarginInlineControl}"/>
                 </DockPanel>
+                <!-- Docked before the list so the list stays the panel's last child and fills
+                     it. As the last child this text took the fill even while collapsed, and the
+                     list was docked left at the width of its content: timestamp, Copy and Replay
+                     ended around the middle of the panel. -->
+                <TextBlock DockPanel.Dock="Bottom"
+                           Text="{loc:Translate ToolCmdLibHistoryEmpty}"
+                           Visibility="{Binding IsHistoryEmpty, Converter={StaticResource BoolToVisibilityConverter}}"
+                           Style="{StaticResource ToolEmptyStateTextStyle}"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,8"/>
                 <ListView ItemsSource="{Binding HistoryEntries}"
                           Background="Transparent" BorderThickness="0"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -955,22 +851,23 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
-                <TextBlock Text="{loc:Translate ToolCmdLibHistoryEmpty}"
-                           Visibility="{Binding IsHistoryEmpty, Converter={StaticResource BoolToVisibilityConverter}}"
-                           Style="{StaticResource ToolEmptyStateTextStyle}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Margin="0,8,0,8"/>
             </DockPanel>
         </Border>
 
-        <!-- ═══════════ ROW 7 - RUNBOOKS PANEL ═══════════ -->
-        <Border Grid.Row="7"
+        <!-- ═══════════ RUNBOOKS PANEL ═══════════ -->
+        <Border DockPanel.Dock="Bottom"
                 x:Name="RunbooksPanel"
                 Visibility="{Binding IsRunbooksVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="0,1,0,0"
-                MaxHeight="420">
+                BorderThickness="0,1,0,0">
+            <Border.MaxHeight>
+                <MultiBinding Converter="{StaticResource RemainingHeightConverter}">
+                    <Binding Path="ActualHeight" ElementName="BodyPanel"/>
+                    <Binding Source="{StaticResource CmdLibActionListMinHeight}"/>
+                    <Binding Source="{StaticResource CmdLibRunbooksMaxHeight}"/>
+                </MultiBinding>
+            </Border.MaxHeight>
             <Grid>
                 <!-- The list of runbooks -->
                 <DockPanel x:Name="RunbookListPanel"
@@ -1246,5 +1143,152 @@
                 </DockPanel>
             </Grid>
         </Border>
+
+        <!-- ═══════════ ACTION LIST ═══════════ -->
+        <Grid>
+            <ListView
+                      Background="Transparent" BorderThickness="0"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      ItemsSource="{Binding ActionsView}"
+                      SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
+                      AutomationProperties.Name="{loc:Translate ToolCmdLibTitle}"
+                      TabIndex="5">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <!-- The row's text lives in TextBlocks inside a DockPanel, none of which
+                             contributes to the container's automation name, so without this the
+                             row announces the bound entry's class name. -->
+                        <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="{StaticResource ToolFooterPadding}"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <Border x:Name="Bd"
+                                            Padding="{TemplateBinding Padding}"
+                                            Background="{TemplateBinding Background}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="0,0,0,1">
+                                        <ContentPresenter/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background"
+                                                    Value="{DynamicResource SurfaceBrush}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd" Property="Background"
+                                                    Value="{DynamicResource CardBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListView.ItemContainerStyle>
+
+                <ListView.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.HeaderTemplate>
+                            <DataTemplate>
+                                <Border Padding="12,8,12,4"
+                                        Background="{DynamicResource BackgroundBrush}">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="{StaticResource FontSizeBodyLarge}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AccentTextBrush}"/>
+                                </Border>
+                            </DataTemplate>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </ListView.GroupStyle>
+
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <DockPanel>
+                            <!-- Favorite toggle -->
+                            <!-- 24x24 kept intentionally: dense list-row context, favorite toggling rides a larger row hit area. -->
+                            <Button DockPanel.Dock="Right"
+                                    Content="{Binding FavoriteIcon}"
+                                    Command="{Binding DataContext.ToggleFavoriteByIdCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding Source.Id}"
+                                    ToolTip="{Binding FavoriteTooltip}"
+                                    AutomationProperties.Name="{Binding FavoriteTooltip}"
+                                    Style="{DynamicResource GhostButtonStyle}"
+                                    FontSize="{StaticResource FontSizeBodyLarge}" Width="24" Height="24"
+                                    VerticalAlignment="Center" Margin="{StaticResource MarginInlineStart}"
+                                    Foreground="{DynamicResource WarningTextBrush}"/>
+                            <!-- Risk badge -->
+                            <Border DockPanel.Dock="Left"
+                                    CornerRadius="{StaticResource CornerRadiusSm}" Padding="4,1"
+                                    VerticalAlignment="Center" Margin="{StaticResource MarginLabelInline}"
+                                    ToolTip="{Binding RiskLabel}">
+                                <Border.Background>
+                                    <MultiBinding Converter="{StaticResource ResourceKeyToBrushConverter}">
+                                        <Binding Path="RiskBrushKey"/>
+                                        <Binding Path="DataContext.ThemeRevision" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                    </MultiBinding>
+                                </Border.Background>
+                                <TextBlock Text="{Binding RiskBadge}"
+                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                           FontWeight="Bold" Foreground="{DynamicResource BadgeTextBrush}"/>
+                            </Border>
+                            <!-- Platform badge -->
+                            <TextBlock DockPanel.Dock="Right"
+                                       Text="{Binding PlatformLabel}"
+                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="{StaticResource MarginInlineControl}"/>
+                            <!-- Title + description -->
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}"
+                                           FontSize="{StaticResource FontSizeBody}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Description}"
+                                           FontSize="{StaticResource FontSizeCaption}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <!-- The command itself, for the template a click would open on under
+                                     the current platform filter. Not part of the row's spoken name,
+                                     which stays title then badges. -->
+                                <TextBlock Text="{Binding CommandPreview}"
+                                           FontFamily="{StaticResource FontFamilyMonospace}"
+                                           FontSize="{StaticResource FontSizeCaption}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- No results -->
+            <TextBlock
+                       Text="{loc:Translate ToolCmdLibNoResults}"
+                       Visibility="{Binding IsNoResultsVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                       Style="{StaticResource ToolEmptyStateTextStyle}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+            <!-- Empty state -->
+            <Border
+                    Style="{StaticResource ToolEmptyStateStyle}"
+                    Visibility="{Binding IsEmptyStateVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE8F1;" FontFamily="{StaticResource FontFamilyIcons}"
+                               Style="{StaticResource ToolEmptyStateIconStyle}"
+                               Focusable="False"/>
+                    <TextBlock Text="{Binding EmptyStateMessage}"
+                               Style="{StaticResource ToolEmptyStateTextStyle}"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+        </DockPanel>
     </Grid>
 </UserControl>
