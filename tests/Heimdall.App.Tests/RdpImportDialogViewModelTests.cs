@@ -145,6 +145,47 @@ public sealed class RdpImportDialogViewModelTests
         Assert.Empty(offenders);
     }
 
+    /// <summary>
+    /// The status chips never get cut at the column edge: they stack one per line in a panel that
+    /// hands each chip the column's width, sit at their own width, and wrap their text. In a
+    /// WrapPanel a chip wider than the column was cut ("Gateway g", "1 unknowr").
+    /// </summary>
+    [Fact]
+    public void StatusChips_StackAndWrapInsideTheColumn()
+    {
+        var document = XDocument.Load(RdpImportDialogPath());
+        XElement cell = Assert.Single(
+            document.Descendants(),
+            element => element.Attribute("Grid.Column")?.Value == "4"
+                && element.Elements().Any(child => child.Name.LocalName == "Border"));
+
+        Assert.Equal("StackPanel", cell.Name.LocalName);
+        Assert.Null(cell.Attribute("Orientation"));
+        List<XElement> chips = cell.Elements().Where(child => child.Name.LocalName == "Border").ToList();
+        Assert.True(chips.Count >= 6, $"only {chips.Count} status chips found");
+        foreach (XElement chip in chips)
+        {
+            Assert.Equal("Left", chip.Attribute("HorizontalAlignment")?.Value);
+            XElement label = Assert.Single(chip.Elements(), child => child.Name.LocalName == "TextBlock");
+            Assert.Equal("Wrap", label.Attribute("TextWrapping")?.Value);
+        }
+    }
+
+    /// <summary>The header and the rows lay their columns out alike, so the headings sit over their cells.</summary>
+    [Fact]
+    public void HeaderAndRows_ShareTheirColumnWidths()
+    {
+        var document = XDocument.Load(RdpImportDialogPath());
+        List<string> layouts = document.Descendants()
+            .Where(element => element.Name.LocalName == "Grid.ColumnDefinitions")
+            .Select(columns => string.Join(",", columns.Elements().Select(column => column.Attribute("Width")?.Value)))
+            .Where(layout => layout.Split(',').Length == 6)
+            .ToList();
+
+        Assert.Equal(2, layouts.Count);
+        Assert.Equal(layouts[0], layouts[1]);
+    }
+
     [Fact]
     public async Task RowAccessibleSummary_NamesTheGatewayTheImportWouldCommit()
     {
